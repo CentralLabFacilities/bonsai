@@ -1,0 +1,329 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Changes &mdash; Bonsai2 Docs 0.1 documentation</title>
+  
+
+  
+  
+    <link rel="shortcut icon" href="_static/favicon.ico"/>
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="genindex.html"/>
+        <link rel="search" title="Search" href="search.html"/>
+    <link rel="top" title="Bonsai2 Docs 0.1 documentation" href="index.html"/>
+        <link rel="next" title="Quickstart" href="quickstart.html"/>
+        <link rel="prev" title="BonSAI2 Docu" href="index.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> Bonsai2 Docs
+          
+
+          
+            
+            <img src="_static/bonsai2-l1s.png" class="logo" />
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <p class="caption"><span class="caption-text">Table of Contents</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Changes from bonsai1</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#modules">Modules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#scxml">SCXML</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#sourcing">Sourcing</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#core">Core</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#skills">Skills</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#sensors">Sensors</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">QuickStart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="bonsai.html">Bonsai2</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="index.html">Bonsai2 Docs</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+ 
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="index.html">Docs</a> &raquo;</li>
+      
+    <li>Changes</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="changes">
+<h1>Changes<a class="headerlink" href="#changes" title="Permalink to this headline">¶</a></h1>
+<p>Bonsai 1 to 2 Changes</p>
+<div class="section" id="modules">
+<h2>Modules<a class="headerlink" href="#modules" title="Permalink to this headline">¶</a></h2>
+<p>Bonsai uses a new module layout</p>
+<ul class="simple">
+<li><dl class="first docutils">
+<dt>Bonsai2 Core</dt>
+<dd><ul class="first last">
+<li>Core Implementation: object configuration, skill configuration, runner</li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="first docutils">
+<dt>Bonsai2 Interfaces</dt>
+<dd><ul class="first last">
+<li>Object Interfaces: Actuators,Sensors Old core</li>
+<li>Data Definitions: Old BTL-Core</li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="first docutils">
+<dt>Bonsai2 Skills</dt>
+<dd><ul class="first last">
+<li>Core Skills: Old bonsaiBehavior skills</li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="first docutils">
+<dt>Bonsai2 SCXML</dt>
+<dd><ul class="first last">
+<li>SCXML statemachine Implementation : old bonsaiBehavior engine</li>
+<li>SCXML guis/server</li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="first docutils">
+<dt>Bonsai2 Adapter</dt>
+<dd><ul class="first last">
+<li>Interface Implementations: Objects and Data</li>
+<li>Old btl-mw and core-mw-actuator/sensor</li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+<p>This results in the Dependency Graph:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Core</span> <span class="o">-&gt;</span> <span class="n">Interfaces</span> <span class="o">-&gt;</span> <span class="n">Skills</span>
+<span class="n">Core</span> <span class="o">-&gt;</span> <span class="n">SCXML</span><span class="o">-</span><span class="n">common</span>
+<span class="n">Interfaces</span> <span class="o">-&gt;</span> <span class="n">Adapter</span><span class="o">-</span><span class="n">mw</span>
+</pre></div>
+</div>
+<p>(SCXML-mw implementations depends on the corresponding adapter)</p>
+<ul class="simple">
+<li>SCXML has a Server+Gui implementation that runs without any middleware (single binary)</li>
+<li>To use different adapter or skill packages you have to add them to the classpath of your scxml-binaries - the easiest way to do this is creating a ‘dist’ project that uses appassembler and depends on the needed packages</li>
+</ul>
+</div>
+<div class="section" id="scxml">
+<h2>SCXML<a class="headerlink" href="#scxml" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="sourcing">
+<h3>Sourcing<a class="headerlink" href="#sourcing" title="Permalink to this headline">¶</a></h3>
+<p>sourcing can now utilize defined mappings instead of relative paths</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;consume&quot;</span> <span class="na">src=</span><span class="s">&quot;${TEST}/memorySlots.xml&quot;</span><span class="nt">/&gt;</span>
+</pre></div>
+</div>
+<p>the mappings can be set with the -m option example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">-</span><span class="n">m</span> <span class="n">TEST</span><span class="o">=/</span><span class="n">tmp</span><span class="o">/</span><span class="n">statemachines</span> <span class="o">-</span><span class="n">m</span> <span class="n">BEHAVIORS</span><span class="o">=/</span><span class="n">tmp</span><span class="o">/</span><span class="n">statemachines</span><span class="o">/</span><span class="n">behaviors</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="core">
+<h2>Core<a class="headerlink" href="#core" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="skills">
+<h3>Skills<a class="headerlink" href="#skills" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li><dl class="first docutils">
+<dt>Skills no longer have variables (getVariables/MapReader)</dt>
+<dd><ul class="first last">
+<li>instead you can request parameter during configuration</li>
+<li>this results in better verification: missing/obsolete parameter, optional parameter with the defaults and parameter types</li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+</div>
+<div class="section" id="sensors">
+<h3>Sensors<a class="headerlink" href="#sensors" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>Wire type is now a required attribute for Sensors</li>
+</ul>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;Sensor</span> <span class="na">key=</span><span class="s">&quot;SpeechSensor&quot;</span>
+    <span class="na">dataTypeClass=</span><span class="s">&quot;de.unibi.citec.clf.btl.data.speechrec.Utterance&quot;</span>
+    <span class="na">factoryClass=</span><span class="s">&quot;de.unibi.citec.clf.bonsai.ros.RosFactory&quot;</span>
+    <span class="na">sensorClass=</span><span class="s">&quot;de.unibi.citec.clf.bonsai.ros.sensors.RosBtlMsgSensor&quot;</span>
+    <span class="na">wireTypeClass=</span><span class="s">&quot;std_msgs.String&quot;</span><span class="nt">&gt;</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="quickstart.html" class="btn btn-neutral float-right" title="Quickstart" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="index.html" class="btn btn-neutral" title="BonSAI2 Docu" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2018, Leroy Rügemer.
+      Last updated on Jun 12, 2018.
+
+    </p>
+  </div> 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'0.1',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

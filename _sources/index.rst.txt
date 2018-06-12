@@ -1,0 +1,16 @@
+.. _bonsai2-index:
+============
+BonSAI2 Docu
+============
+
+.. toctree::
+    :maxdepth: 3
+    :caption: Table of Contents
+
+    Changes from bonsai1 <changes>
+    QuickStart <quickstart>
+    Bonsai2 <bonsai>
+
+.. |logo| image:: /_static/img/bonsai2-l1.png
+    :width: 256
+    :alt: BonSAI2

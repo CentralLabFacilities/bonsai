@@ -1,0 +1,320 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Behavior Abstraction Layer &mdash; Bonsai2 Docs 0.1 documentation</title>
+  
+
+  
+  
+    <link rel="shortcut icon" href="../_static/favicon.ico"/>
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="../genindex.html"/>
+        <link rel="search" title="Search" href="../search.html"/>
+    <link rel="top" title="Bonsai2 Docs 0.1 documentation" href="../index.html"/> 
+
+  
+  <script src="../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> Bonsai2 Docs
+          
+
+          
+            
+            <img src="../_static/bonsai2-l1s.png" class="logo" />
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <p class="caption"><span class="caption-text">Table of Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../changes.html">Changes from bonsai1</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">QuickStart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bonsai.html">Bonsai2</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../index.html">Bonsai2 Docs</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+ 
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../index.html">Docs</a> &raquo;</li>
+      
+    <li>Behavior Abstraction Layer</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="behavior-abstraction-layer">
+<h1>Behavior Abstraction Layer<a class="headerlink" href="#behavior-abstraction-layer" title="Permalink to this headline">¶</a></h1>
+<p>BehaviorAL is used to expose robot behaviors to extern users (e.x Apartment)
+It can be used to trigger statemachines remotely.</p>
+<p>Params:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="nd">@Option</span><span class="o">(</span><span class="n">name</span> <span class="o">=</span> <span class="s">&quot;-l&quot;</span><span class="o">,</span> <span class="n">aliases</span> <span class="o">=</span> <span class="o">{</span><span class="s">&quot;--logging&quot;</span><span class="o">},</span> <span class="n">metaVar</span> <span class="o">=</span> <span class="s">&quot;PATH&quot;</span><span class="o">,</span> <span class="n">usage</span> <span class="o">=</span> <span class="s">&quot;path to a log4j properties file&quot;</span><span class="o">)</span>
+<span class="nd">@Option</span><span class="o">(</span><span class="n">name</span> <span class="o">=</span> <span class="s">&quot;-c&quot;</span><span class="o">,</span> <span class="n">aliases</span> <span class="o">=</span> <span class="o">{</span><span class="s">&quot;--config&quot;</span><span class="o">},</span> <span class="n">metaVar</span> <span class="o">=</span> <span class="s">&quot;PATH&quot;</span><span class="o">,</span> <span class="n">usage</span> <span class="o">=</span> <span class="s">&quot;path to the bahaviorAL config file&quot;</span><span class="o">)</span>
+<span class="nd">@Option</span><span class="o">(</span><span class="n">name</span> <span class="o">=</span> <span class="s">&quot;-s&quot;</span><span class="o">,</span> <span class="n">aliases</span> <span class="o">=</span> <span class="o">{</span><span class="s">&quot;--server_scope&quot;</span><span class="o">},</span> <span class="n">metaVar</span> <span class="o">=</span> <span class="s">&quot;VALUE&quot;</span><span class="o">,</span> <span class="n">usage</span> <span class="o">=</span> <span class="s">&quot;scope for server, default is: &#39;/bonsai&#39;&quot;</span><span class="o">)</span>
+<span class="nd">@Option</span><span class="o">(</span><span class="n">name</span> <span class="o">=</span> <span class="s">&quot;-b&quot;</span><span class="o">,</span> <span class="n">aliases</span> <span class="o">=</span> <span class="o">{</span><span class="s">&quot;--bonsai_server&quot;</span><span class="o">},</span> <span class="n">metaVar</span> <span class="o">=</span> <span class="s">&quot;VALUE&quot;</span><span class="o">,</span> <span class="n">usage</span> <span class="o">=</span> <span class="s">&quot;scope for bonsai (the server that gets the xml files), default is: &#39;/behavioral/server&#39;&quot;</span><span class="o">)</span>
+</pre></div>
+</div>
+<p>Example config file:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="l l-Scalar l-Scalar-Plain">autoload</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">example</span>
+<span class="l l-Scalar l-Scalar-Plain">statemachines</span><span class="p p-Indicator">:</span>
+        <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">name</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">example</span>
+                <span class="l l-Scalar l-Scalar-Plain">task</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">${PATH_TO_CSRA_SCXML}/example.xml</span>
+                <span class="l l-Scalar l-Scalar-Plain">config</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">${PATH_TO_CSRA_CONFIG}/csra/CSRAMekaConfig.xml</span>
+                <span class="l l-Scalar l-Scalar-Plain">actions</span><span class="p p-Indicator">:</span>
+                        <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">name</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">talk</span>
+                                <span class="l l-Scalar l-Scalar-Plain">target</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">ExecuteSpeak</span>
+                                <span class="l l-Scalar l-Scalar-Plain">params</span><span class="p p-Indicator">:</span>
+                                        <span class="l l-Scalar l-Scalar-Plain">text</span><span class="p p-Indicator">:</span> <span class="s">&quot;hello&quot;</span>
+                        <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">name</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">gotoannotation</span>
+                                <span class="l l-Scalar l-Scalar-Plain">target</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">ExecuteNavToAnnotation</span>
+                                <span class="l l-Scalar l-Scalar-Plain">params</span><span class="p p-Indicator">:</span>
+                                        <span class="l l-Scalar l-Scalar-Plain">location</span><span class="p p-Indicator">:</span> <span class="s">&quot;start&quot;</span>
+                        <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">name</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">stop</span>
+                                <span class="l l-Scalar l-Scalar-Plain">target</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">ExecuteStop</span>
+                        <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">name</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">test</span>
+                                <span class="l l-Scalar l-Scalar-Plain">target</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">MemoryTest</span>
+        <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">name</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">test</span>
+                <span class="l l-Scalar l-Scalar-Plain">task</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">${PATH_TO_CSRA_SCXML}/test2.xml</span>
+                <span class="l l-Scalar l-Scalar-Plain">config</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">${PATH_TO_CSRA_CONFIG}/csra/CSRATest.xml</span>
+                <span class="l l-Scalar l-Scalar-Plain">actions</span><span class="p p-Indicator">:</span>
+                        <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">name</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">start</span>
+                                <span class="l l-Scalar l-Scalar-Plain">target</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">init</span>
+                                <span class="l l-Scalar l-Scalar-Plain">params</span><span class="p p-Indicator">:</span>
+                                        <span class="l l-Scalar l-Scalar-Plain">object</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">blaanything</span>
+</pre></div>
+</div>
+<p>This configuration will automatically load the <code class="docutils literal notranslate"><span class="pre">example</span></code> statemachine. As the loading takes some time to verify config etc. you can configure the multiple initial states that can be triggered (<code class="docutils literal notranslate"><span class="pre">actions</span></code>). Each behavior should end with a final state to indicate when the <code class="docutils literal notranslate"><span class="pre">action</span></code> is finished. A final <code class="docutils literal notranslate"><span class="pre">End</span></code> state indicates that the <code class="docutils literal notranslate"><span class="pre">action</span></code> finished without errors.</p>
+<ul class="simple">
+<li><code class="docutils literal notranslate"><span class="pre">target</span></code> sets the scxml initial state</li>
+<li><code class="docutils literal notranslate"><span class="pre">name</span></code> is used to call the action</li>
+<li><code class="docutils literal notranslate"><span class="pre">params</span></code>  can be used to overwrite statemachine variables:</li>
+</ul>
+<p>Example dialog.Talk skill (from ExecuteSpeak):</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;data</span> <span class="na">id=</span><span class="s">&quot;#_MESSAGE&quot;</span> <span class="na">expr=</span><span class="s">&quot;&#39;@text&#39;&quot;</span> <span class="nt">/&gt;</span>
+</pre></div>
+</div>
+<div class="section" id="rsb-interface">
+<h2>RSB Interface<a class="headerlink" href="#rsb-interface" title="Permalink to this headline">¶</a></h2>
+<p>RPCserver runs on (default) /behavioral/server</p>
+<ul class="simple">
+<li><dl class="first docutils">
+<dt><code class="docutils literal notranslate"><span class="pre">String</span> <span class="pre">listScenarios()</span></code></dt>
+<dd><ul class="first last">
+<li>returns a “;” seperated string containing all scenarios</li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="first docutils">
+<dt><code class="docutils literal notranslate"><span class="pre">boolean</span> <span class="pre">changeScenario(String)</span></code></dt>
+<dd><ul class="first last">
+<li>changes the currently loaded scenario</li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="first docutils">
+<dt><code class="docutils literal notranslate"><span class="pre">String</span> <span class="pre">listActions()</span></code></dt>
+<dd><ul class="first last">
+<li>returns a “;” seperated string containing all actions of the currently loaded scenario</li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="first docutils">
+<dt><code class="docutils literal notranslate"><span class="pre">dict</span> <span class="pre">getActionParams(String)</span></code></dt>
+<dd><ul class="first last">
+<li><dl class="first docutils">
+<dt>returns a dict that can contains all params used by the action</dt>
+<dd><ul class="first last">
+<li>the dict can be used to call <code class="docutils literal notranslate"><span class="pre">startAction()</span></code></li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="first docutils">
+<dt><code class="docutils literal notranslate"><span class="pre">boolean</span> <span class="pre">startAction(X)</span></code></dt>
+<dd><ul class="first last">
+<li>starts the statemachine a predifined action</li>
+<li><dl class="first docutils">
+<dt>x=String start action x</dt>
+<dd><ul class="first last">
+<li>can be used to set statemachine parameter with String like <code class="docutils literal notranslate"><span class="pre">name=speakTobi,text=&quot;hello&quot;,variable=x</span></code></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li>x=Dict start action by dict</li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="first docutils">
+<dt><code class="docutils literal notranslate"><span class="pre">boolean</span> <span class="pre">isDone()</span></code></dt>
+<dd><ul class="first last">
+<li>blocking callback until statemachine stops running</li>
+<li>returns true if last state was <code class="docutils literal notranslate"><span class="pre">End</span></code></li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2018, Leroy Rügemer.
+      Last updated on Jun 12, 2018.
+
+    </p>
+  </div> 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../',
+            VERSION:'0.1',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../_static/jquery.js"></script>
+      <script type="text/javascript" src="../_static/underscore.js"></script>
+      <script type="text/javascript" src="../_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>
