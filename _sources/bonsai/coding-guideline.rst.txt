@@ -2,7 +2,7 @@
 Coding Guidelines
 =================
 
-All Skills and behaviours in bonsai2-skills shall be properly documented.
+All Skills and behaviours in bonsai-skills shall be properly documented.
 
 Skills
 ------

@@ -47,21 +47,27 @@ Bonsai
     mkdir bonsai
     cd bonsai
 
-2. Checkout bonsai and additional statemachines::
+2. Checkout bonsai::
 
-    git clone http://projects.cit-ec.uni-bielefeld.de/git/bonsai-2.git
+    git clone https://github.com/LeroyR/bonsai-test-repo.git
+    git clone clf bonsai extensions
+
+3. and additional statemachines::
+
     git clone http://projects.cit-ec.uni-bielefeld.de/git/pepper.bonsai.git
     git clone http://projects.cit-ec.uni-bielefeld.de/git/robocupathome.robocup-dist.git
 
+.. note: Robocup@Bielefeld only repositories
+
 3. Copy example-dist and patch the path::
 
-    cp -r bonsai2/example-dist my-bonsai-dist
-    cp my-bonsai-dist/src/main/resources/localMapping.default.properties my-bonsai-dist/src/main/resources/localMapping.properties
-    sed -i 's@<PATH_TO>@'"$PWD"'@g' my-bonsai-dist/src/main/resources/localMapping.properties
+    cp -r bonsai/bonsai_tutorials my_dist
+    cp my_dist/src/main/resources/localMapping.default.properties my_dist/src/main/resources/localMapping.properties
+    sed -i 's@<PATH_TO>@'"$PWD"'@g' my_dist/src/main/resources/localMapping.properties
 
 4. Assemble run script::
 
-    cd my-bonsai-dist
+    cd my_dist
     mvn -B install appassembler:assemble
 
 5. Start a roscore in another terminal
@@ -92,5 +98,5 @@ Pepper IDEA
     cp -R idea-default idea
     idea idea
 
-5. Idea should now start with every bonsai2 module loaded. Delete the modules you are not working on (FILE->Project Structure / Modules)
+5. Idea should now start with every bonsai module loaded. Delete the modules you are not working on (FILE->Project Structure / Modules)
 

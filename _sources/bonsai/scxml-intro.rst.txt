@@ -204,7 +204,7 @@ Connect Skill to State
 -----
 
 - Skills are Java Classes that implement ``AbstraktSkill``. 
-- You will find basic skills in Bonsai2 [Core Skill].
+- You will find basic skills in Bonsai [Core Skill].
 - If the ``id`` of a state matches the path to a skill the skill gets executed on entry of the state.
 - If you have a skill in [Core Skill] under skills/nav called Drive the matching state id would be ``nav.Drive``.
 

@@ -2,28 +2,28 @@
 Changes
 =======
 
-Bonsai 1 to 2 Changes
+Bonsai v1 to v2 Changes
 
 Modules
 -------
 
 Bonsai uses a new module layout
 
-- Bonsai2 Core
+- Bonsai Core
     - Core Implementation: object configuration, skill configuration, runner
 
-- Bonsai2 Interfaces
+- Bonsai Interfaces
     - Object Interfaces: Actuators,Sensors Old core
     - Data Definitions: Old BTL-Core
 
-- Bonsai2 Skills
+- Bonsai Skills
     - Core Skills: Old bonsaiBehavior skills
 
-- Bonsai2 SCXML
+- Bonsai SCXML
     - SCXML statemachine Implementation : old bonsaiBehavior engine
     - SCXML guis/server
 
-- Bonsai2 Adapter
+- Bonsai Adapter
     - Interface Implementations: Objects and Data
     - Old btl-mw and core-mw-actuator/sensor
 

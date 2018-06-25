@@ -1,6 +1,6 @@
 .. _bonsai2-index:
 ============
-BonSAI2 Docu
+BonSAI Docu
 ============
 
 .. toctree::
@@ -9,8 +9,8 @@ BonSAI2 Docu
 
     Changes from bonsai1 <changes>
     QuickStart <quickstart>
-    Bonsai2 <bonsai>
+    Bonsai <bonsai>
 
-.. |logo| image:: /_static/img/bonsai2-l1.png
+.. |logo| image:: /_static/img/bonsai-l1.png
     :width: 256
-    :alt: BonSAI2
+    :alt: BonSAI
