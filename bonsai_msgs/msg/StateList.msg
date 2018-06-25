@@ -1,0 +1,2 @@
+string[] states
+Transition[] transitions

@@ -1,0 +1,169 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- The Basics -->
+    <groupId>de.unibi.citec.clf</groupId>
+    <version>0.5.0</version>
+    <artifactId>bonsai_adapter_ros</artifactId>
+    <packaging>jar</packaging>
+
+    <!-- More Project Information -->
+    <name>BonSAI [Adapter ROS]</name>
+    <description>
+        BonSAI is a robot abstraction layer written in Java. 
+        It aims to provide a simple interface to various functions of a 
+        robotic system and can define behaviors and actions according to 
+        these functions. This leads to e.g. reusable behaviors (follow a person) 
+        that can be facilitated for more complex tasks or scenarios of a robot.
+    </description>
+
+    <properties>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+        <dir>target</dir>
+    </properties>
+
+    <dependencies>
+
+        <dependency>
+            <groupId>de.unibi.citec.clf</groupId>
+            <artifactId>bonsai_interfaces</artifactId>
+            <version>0.5.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.ros.rosjava_bootstrap</groupId>
+            <artifactId>message_generation</artifactId>
+            <version>[0.3.3,0.4.0)</version>
+            <type>jar</type>
+        </dependency>
+
+
+        <dependency>
+            <groupId>org.ros.rosjava_core</groupId>
+            <artifactId>rosjava</artifactId>
+            <version>[0.3.1,0.4.0)</version>
+            <type>jar</type>
+        </dependency>
+        <dependency>
+            <groupId>org.ros.rosjava_core</groupId>
+            <artifactId>rosjava_geometry</artifactId>
+            <version>[0.3.1,0.4.0)</version>
+            <type>jar</type>
+        </dependency>
+        <dependency>
+            <groupId>com.github.rosjava</groupId>
+            <artifactId>rosjava_actionlib</artifactId>
+            <version>[0.4.3,0.5.0)</version>
+        </dependency>
+
+        <!-- Messages -->
+        <dependency>
+            <groupId>org.ros.rosjava_messages</groupId>
+            <artifactId>std_msgs</artifactId>
+            <version>[0.5.10,0.6.0)</version>
+        </dependency>
+        <dependency>
+            <groupId>org.ros.rosjava_messages</groupId>
+            <artifactId>tf2_msgs</artifactId>
+            <version>[0.5.16,0.6)</version>
+        </dependency>
+        <dependency>
+            <groupId>org.ros.rosjava_messages</groupId>
+            <artifactId>sensor_msgs</artifactId>
+            <version>[1.11.0,1.13.0)</version>
+        </dependency>
+        <dependency>
+            <groupId>org.ros.rosjava_messages</groupId>
+            <artifactId>shape_msgs</artifactId>
+            <version>[1.11.0,1.13.0)</version>
+        </dependency>
+        <dependency>
+            <groupId>org.ros.rosjava_messages</groupId>
+            <artifactId>geometry_msgs</artifactId>
+            <version>[1.11.0,1.13.0)</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.ros.rosjava_messages</groupId>
+            <artifactId>actionlib_msgs</artifactId>
+            <version>[1.11.0,1.13.0)</version>
+        </dependency>
+        <dependency>
+            <groupId>org.ros.rosjava_messages</groupId>
+            <artifactId>std_srvs</artifactId>
+            <version>[1.11.0,1.13.0)</version>
+        </dependency> 
+        <dependency>
+            <groupId>org.ros.rosjava_messages</groupId>
+            <artifactId>move_base_msgs</artifactId>
+            <version>[1.12.0,1.15.0)</version> <!-- 1.14 is custom clf version -->
+        </dependency>
+        <dependency>
+            <groupId>org.ros.rosjava_messages</groupId>
+            <artifactId>moveit_msgs</artifactId>
+            <version>[0.7.0,0.10.0]</version>
+        </dependency>
+        <dependency>
+            <groupId>org.ros.rosjava_messages</groupId>
+            <artifactId>grasping_msgs</artifactId>
+            <version>0.3.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.ros.rosjava_messages</groupId>
+            <artifactId>octomap_msgs</artifactId>
+            <version>0.3.3</version>
+        </dependency> 
+        <dependency>
+            <groupId>org.ros.rosjava_messages</groupId>
+            <artifactId>nav_msgs</artifactId>
+            <version>1.12.5</version>
+        </dependency> 
+
+    </dependencies>
+    
+    <repositories>
+        <repository>
+            <id>springsource_release</id>
+            <url>http://repository.springsource.com/maven/bundles/release</url>
+        </repository>
+        <repository>
+            <id>springsource_external</id>
+            <url>http://repository.springsource.com/maven/bundles/external</url>
+        </repository>
+    </repositories>
+
+    <build>
+        <directory>${dir}</directory>
+        <testResources>
+            <testResource>
+                <directory>${project.basedir}/src/test/resources</directory>
+            </testResource>
+            <testResource>
+                <directory>${project.basedir}/src/main/resources</directory>
+            </testResource>
+        </testResources>
+
+        <plugins>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.7.9</version>
+                <configuration>
+                    <destFile>${sonar.jacoco.reportPath}</destFile>
+                    <append>true</append>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+
+    </build>
+
+</project>

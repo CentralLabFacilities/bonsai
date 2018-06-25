@@ -1,0 +1,406 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="74.018486mm"
+   height="60.219749mm"
+   viewBox="0 0 262.27023 213.37706"
+   id="svg2"
+   version="1.1"
+   inkscape:version="0.91 r13725"
+   inkscape:export-filename="/home/dom/gits/robocupathome.documentation/source/_static/img/pipeline"
+   inkscape:export-xdpi="90"
+   inkscape:export-ydpi="90"
+   sodipodi:docname="pipeline.svg">
+  <defs
+     id="defs4" />
+  <sodipodi:namedview
+     id="base"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageopacity="0.0"
+     inkscape:pageshadow="2"
+     inkscape:zoom="2.8"
+     inkscape:cx="203.99406"
+     inkscape:cy="81.513169"
+     inkscape:document-units="px"
+     inkscape:current-layer="g3369"
+     showgrid="false"
+     inkscape:window-width="2560"
+     inkscape:window-height="1330"
+     inkscape:window-x="0"
+     inkscape:window-y="54"
+     inkscape:window-maximized="1"
+     fit-margin-top="0"
+     fit-margin-left="0"
+     fit-margin-right="0"
+     fit-margin-bottom="0" />
+  <metadata
+     id="metadata7">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title></dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     transform="translate(-1097.4363,-799.00503)">
+    <g
+       transform="matrix(1.25,0,0,-1.25,911.54766,1628.8542)"
+       inkscape:label="image_processing_pipeline"
+       id="g3363">
+      <g
+         transform="translate(253.619,631)"
+         id="g3365">
+        <g
+           id="g3367">
+          <g
+             id="g3369">
+            <g
+               id="g3371"
+               inkscape:export-xdpi="140"
+               inkscape:export-ydpi="140">
+              <g
+                 id="g3373">
+                <path
+                   inkscape:connector-curvature="0"
+                   id="path3375"
+                   style="fill:#ffffff;fill-opacity:1;fill-rule:nonzero;stroke:#0000ff;stroke-width:0.59776002;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-dasharray:none;stroke-opacity:1"
+                   d="m -104.6092,-9.96277 209.21843,0 0,19.92555 -209.21843,0 0,-19.92555 z" />
+              </g>
+              <g
+                 transform="translate(-61.194,-2.49)"
+                 id="g3377">
+                <g
+                   id="g3379">
+                  <g
+                     transform="translate(-192.425,-628.51)"
+                     id="g3381">
+                    <text
+                       id="text3383"
+                       style="font-variant:normal;font-weight:normal;font-size:9.96259975px;font-family:CMR10;-inkscape-font-specification:CMR10;writing-mode:lr-tb;fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:none"
+                       transform="matrix(1,0,0,-1,192.425,628.51)">
+                      <tspan
+                         id="tspan3385"
+                         sodipodi:role="line"
+                         y="0"
+                         x="0 6.368094 11.349394 16.328701 24.073627 31.128143 38.955757 49.329815 54.311115 59.846336 68.699104 74.234322 78.661697 84.196922 88.071373 96.924141 99.69175 107.99359 112.97488 117.95618">TakeRGBanddepthimage</tspan>
+                    </text>
+                    <g
+                       transform="translate(192.425,628.51)"
+                       id="g3387" />
+                  </g>
+                </g>
+                <g
+                   transform="translate(61.194,2.49)"
+                   id="g3389" />
+              </g>
+            </g>
+            <g
+               id="g3391"
+               inkscape:export-xdpi="140"
+               inkscape:export-ydpi="140">
+              <path
+                 inkscape:connector-curvature="0"
+                 id="path3393"
+                 style="fill:none;stroke:#000000;stroke-width:0.59776002;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-dasharray:none;stroke-opacity:1"
+                 d="M 0,23.1302 0,12.47339" />
+              <g
+                 transform="matrix(0,-1,1,0,0,12.47339)"
+                 id="g3395">
+                <g
+                   id="g3397">
+                  <path
+                     inkscape:connector-curvature="0"
+                     id="path3399"
+                     style="fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:#000000;stroke-width:0.59776002;stroke-linecap:butt;stroke-linejoin:round;stroke-miterlimit:10;stroke-dasharray:none;stroke-opacity:1"
+                     d="m 0.91655,0 c -1.14568,0.22913 -2.29138,0.68741 -3.66621,1.4894 1.37483,-1.03113 1.37483,-1.94767 0,-2.9788 1.37483,0.80199 2.52053,1.26027 3.66621,1.4894 z" />
+                </g>
+              </g>
+              <g
+                 id="g3401">
+                <g
+                   transform="translate(-10.281,26.75)"
+                   id="g3403">
+                  <g
+                     id="g3405">
+                    <g
+                       transform="translate(-243.338,-657.75)"
+                       id="g3407">
+                      <text
+                         id="text3409"
+                         style="font-variant:normal;font-weight:normal;font-size:9.96259975px;font-family:CMR10;-inkscape-font-specification:CMR10;writing-mode:lr-tb;fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:none"
+                         transform="matrix(1,0,0,-1,243.338,657.75)">
+                        <tspan
+                           id="tspan3411"
+                           sodipodi:role="line"
+                           y="0"
+                           x="0 3.9292495 7.8037047 12.785005 16.687355">start</tspan>
+                      </text>
+                      <g
+                         transform="translate(243.338,657.75)"
+                         id="g3413" />
+                    </g>
+                  </g>
+                  <g
+                     transform="translate(10.281,-26.75)"
+                     id="g3415" />
+                </g>
+              </g>
+            </g>
+            <g
+               id="g3417"
+               inkscape:export-xdpi="140"
+               inkscape:export-ydpi="140">
+              <g
+                 id="g3419">
+                <path
+                   inkscape:connector-curvature="0"
+                   id="path3421"
+                   style="fill:#ffffff;fill-opacity:1;fill-rule:nonzero;stroke:#0000ff;stroke-width:0.59776002;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-dasharray:none;stroke-opacity:1"
+                   d="m -104.6092,-52.483 209.21843,0 0,19.92555 -209.21843,0 0,-19.92555 z" />
+              </g>
+              <g
+                 transform="translate(-53.023,-45.01)"
+                 id="g3423">
+                <g
+                   id="g3425">
+                  <g
+                     transform="translate(-200.596,-585.99)"
+                     id="g3427">
+                    <text
+                       id="text3429"
+                       style="font-variant:normal;font-weight:normal;font-size:9.96259975px;font-family:CMR10;-inkscape-font-specification:CMR10;writing-mode:lr-tb;fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:none"
+                       transform="matrix(1,0,0,-1,200.596,585.99)">
+                      <tspan
+                         id="tspan3431"
+                         sodipodi:role="line"
+                         y="0"
+                         x="0 7.6104302 12.037809 15.912265 20.339643 24.767023 31.959024 37.494244 40.261856 45.243156 50.778378 58.533264 64.068481 67.997734 70.765343 76.300568 84.599411 91.379959 98.574944">DetectplaneusingPCA</tspan>
+                    </text>
+                    <g
+                       transform="translate(200.596,585.99)"
+                       id="g3433" />
+                  </g>
+                </g>
+                <g
+                   transform="translate(53.023,45.01)"
+                   id="g3435" />
+              </g>
+            </g>
+            <g
+               id="g3437"
+               inkscape:export-xdpi="140"
+               inkscape:export-ydpi="140">
+              <g
+                 id="g3439">
+                <path
+                   inkscape:connector-curvature="0"
+                   id="path3441"
+                   style="fill:#ffffff;fill-opacity:1;fill-rule:nonzero;stroke:#0000ff;stroke-width:0.59776002;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-dasharray:none;stroke-opacity:1"
+                   d="m -104.6092,-95.00322 209.21843,0 0,19.92555 -209.21843,0 0,-19.92555 z" />
+              </g>
+              <g
+                 transform="translate(-60.869,-87.53)"
+                 id="g3443">
+                <g
+                   id="g3445">
+                  <g
+                     transform="translate(-192.75,-543.47)"
+                     id="g3447">
+                    <text
+                       id="text3449"
+                       style="font-variant:normal;font-weight:normal;font-size:9.96259975px;font-family:CMR10;-inkscape-font-specification:CMR10;writing-mode:lr-tb;fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:none"
+                       transform="matrix(1,0,0,-1,192.75,543.47)">
+                      <tspan
+                         id="tspan3451"
+                         sodipodi:role="line"
+                         y="0"
+                         x="0 5.5352206 9.9625998 14.9439 23.245735 27.673115 32.929382 40.131344 45.112644 51.195808 54.240379 58.667759 63.095139 66.969597 74.226349 79.75161 83.690819 86.458435 91.983688 100.2925 107.07304 114.26804">SegmentobjectsusingPCA</tspan>
+                    </text>
+                    <g
+                       transform="translate(192.75,543.47)"
+                       id="g3453" />
+                  </g>
+                </g>
+                <g
+                   transform="translate(60.869,87.53)"
+                   id="g3455" />
+              </g>
+            </g>
+            <g
+               id="g3457"
+               inkscape:export-xdpi="140"
+               inkscape:export-ydpi="140">
+              <g
+                 id="g3459">
+                <path
+                   inkscape:connector-curvature="0"
+                   id="path3461"
+                   style="fill:#ffffff;fill-opacity:1;fill-rule:nonzero;stroke:#0000ff;stroke-width:0.59776002;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-dasharray:none;stroke-opacity:1"
+                   d="m -104.6092,-137.52344 209.21843,0 0,19.92555 -209.21843,0 0,-19.92555 z" />
+              </g>
+              <g
+                 transform="translate(-98.983,-130.049)"
+                 id="g3463">
+                <g
+                   id="g3465">
+                  <g
+                     transform="translate(-154.636,-500.951)"
+                     id="g3467">
+                    <text
+                       id="text3469"
+                       style="font-variant:normal;font-weight:normal;font-size:9.96259975px;font-family:CMR10;-inkscape-font-specification:CMR10;writing-mode:lr-tb;fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:none"
+                       transform="matrix(1,0,0,-1,154.636,500.951)">
+                      <tspan
+                         id="tspan3471"
+                         sodipodi:role="line"
+                         y="0"
+                         x="0 7.1949897 11.097341 16.07864 24.931406 30.745581 35.726879 41.2621 46.797321 52.332542 55.100151 60.635372 68.934219 74.74839 79.450737 88.026543 90.794151 99.656883 106.7114 114.52905 124.90311 129.88441 135.41963 144.28236 149.81758 154.24496 159.78018 163.65463 172.5074 175.27501 183.57684 188.55815 193.53944">CropboundingboxinRGBanddepthimage</tspan>
+                    </text>
+                    <g
+                       transform="translate(154.636,500.951)"
+                       id="g3473" />
+                  </g>
+                </g>
+                <g
+                   transform="translate(98.983,130.049)"
+                   id="g3475" />
+              </g>
+            </g>
+            <g
+               id="g3477"
+               inkscape:export-xdpi="140"
+               inkscape:export-ydpi="140">
+              <path
+                 inkscape:connector-curvature="0"
+                 id="path3479"
+                 style="fill:none;stroke:#000000;stroke-width:0.59776002;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-dasharray:none;stroke-opacity:1"
+                 d="M 0,-10.26166 0,-30.04683" />
+              <g
+                 transform="matrix(0,-1,1,0,0,-30.04683)"
+                 id="g3481">
+                <g
+                   id="g3483">
+                  <path
+                     inkscape:connector-curvature="0"
+                     id="path3485"
+                     style="fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:#000000;stroke-width:0.59776002;stroke-linecap:butt;stroke-linejoin:round;stroke-miterlimit:10;stroke-dasharray:none;stroke-opacity:1"
+                     d="m 0.91655,0 c -1.14568,0.22913 -2.29138,0.68741 -3.66621,1.4894 1.37483,-1.03113 1.37483,-1.94767 0,-2.9788 1.37483,0.80199 2.52053,1.26027 3.66621,1.4894 z" />
+                </g>
+              </g>
+              <g
+                 id="g3487">
+                <g
+                   transform="translate(3.619,-21.259)"
+                   id="g3489">
+                  <g
+                     id="g3491" />
+                  <g
+                     transform="translate(-3.619,21.259)"
+                     id="g3493" />
+                </g>
+              </g>
+            </g>
+            <g
+               id="g3495"
+               inkscape:export-xdpi="140"
+               inkscape:export-ydpi="140">
+              <path
+                 inkscape:connector-curvature="0"
+                 id="path3497"
+                 style="fill:none;stroke:#000000;stroke-width:0.59776002;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-dasharray:none;stroke-opacity:1"
+                 d="M 0,-52.78189 0,-72.56705" />
+              <g
+                 transform="matrix(0,-1,1,0,0,-72.56705)"
+                 id="g3499">
+                <g
+                   id="g3501">
+                  <path
+                     inkscape:connector-curvature="0"
+                     id="path3503"
+                     style="fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:#000000;stroke-width:0.59776002;stroke-linecap:butt;stroke-linejoin:round;stroke-miterlimit:10;stroke-dasharray:none;stroke-opacity:1"
+                     d="m 0.91655,0 c -1.14568,0.22913 -2.29138,0.68741 -3.66621,1.4894 1.37483,-1.03113 1.37483,-1.94767 0,-2.9788 1.37483,0.80199 2.52053,1.26027 3.66621,1.4894 z" />
+                </g>
+              </g>
+              <g
+                 id="g3505">
+                <g
+                   transform="translate(3.619,-63.779)"
+                   id="g3507">
+                  <g
+                     id="g3509" />
+                  <g
+                     transform="translate(-3.619,63.779)"
+                     id="g3511" />
+                </g>
+              </g>
+            </g>
+            <g
+               id="g3513"
+               inkscape:export-xdpi="140"
+               inkscape:export-ydpi="140">
+              <path
+                 inkscape:connector-curvature="0"
+                 id="path3515"
+                 style="fill:none;stroke:#000000;stroke-width:0.59776002;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-dasharray:none;stroke-opacity:1"
+                 d="m 0,-95.30211 0,-19.78516" />
+              <g
+                 transform="matrix(0,-1,1,0,0,-115.08727)"
+                 id="g3517">
+                <g
+                   id="g3519">
+                  <path
+                     inkscape:connector-curvature="0"
+                     id="path3521"
+                     style="fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:#000000;stroke-width:0.59776002;stroke-linecap:butt;stroke-linejoin:round;stroke-miterlimit:10;stroke-dasharray:none;stroke-opacity:1"
+                     d="m 0.91655,0 c -1.14568,0.22913 -2.29138,0.68741 -3.66621,1.4894 1.37483,-1.03113 1.37483,-1.94767 0,-2.9788 1.37483,0.80199 2.52053,1.26027 3.66621,1.4894 z" />
+                </g>
+              </g>
+              <g
+                 id="g3523">
+                <g
+                   transform="translate(3.619,-106.299)"
+                   id="g3525">
+                  <g
+                     id="g3527" />
+                  <g
+                     transform="translate(-3.619,106.299)"
+                     id="g3529" />
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+        <g
+           transform="translate(-253.619,-631)"
+           id="g3531">
+          <text
+             id="text3533"
+             style="font-variant:normal;font-weight:normal;font-size:9.96259975px;font-family:CMR10;-inkscape-font-specification:CMR10;writing-mode:lr-tb;fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:none"
+             transform="matrix(1,0,0,-1,303.133,89.365)">
+            <tspan
+               id="tspan3535"
+               y="0"
+               x="0">1</tspan>
+          </text>
+        </g>
+      </g>
+    </g>
+  </g>
+</svg>

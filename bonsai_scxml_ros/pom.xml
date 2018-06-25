@@ -1,0 +1,90 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- The Basics -->
+    <groupId>de.unibi.citec.clf</groupId>
+    <version>0.5.0</version>
+    <artifactId>bonsai_scxml_ros</artifactId>
+    <packaging>jar</packaging>
+
+    <!-- More Project Information -->
+    <name>BonSAI [SCXML ROS]</name>
+    <description>
+        BonSAI is a robot abstraction layer written in Java.
+        It aims to provide a simple interface to various functions of a
+        robotic system and can define behaviors and actions according to
+        these functions. This leads to e.g. reusable behaviors (follow a person)
+        that can be facilitated for more complex tasks or scenarios of a robot.
+    </description>
+
+    <properties>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+        <dir>target</dir>
+    </properties>
+
+    <dependencies>
+
+        <dependency>
+            <groupId>de.unibi.citec.clf</groupId>
+            <artifactId>bonsai_adapter_ros</artifactId>
+            <version>0.5.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>de.unibi.citec.clf</groupId>
+            <artifactId>bonsai_scxml_engine</artifactId>
+            <version>0.5.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.ros.rosjava_messages</groupId>
+            <artifactId>bonsai_msgs</artifactId>
+            <version>0.4.1</version>
+        </dependency>
+
+    </dependencies>
+
+    <build>
+        <directory>${dir}</directory>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>appassembler-maven-plugin</artifactId>
+                <version>2.0.0</version>
+                <configuration>
+                    <repositoryName>lib/java</repositoryName>
+                    <copyConfigurationDirectory>true</copyConfigurationDirectory>
+                    <programs>
+                        <program>
+                            <mainClass>de.unibi.citec.clf.bonsai.engine.fxgui.FXGUIStarterROS</mainClass>
+                            <id>statemachine-gui-ros</id>
+                            <platforms>
+                                <platform>unix</platform>
+                            </platforms>
+                        </program>
+                    </programs>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.7.9</version>
+                <configuration>
+                    <destFile>${sonar.jacoco.reportPath}</destFile>
+                    <append>true</append>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

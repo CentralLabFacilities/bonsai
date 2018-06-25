@@ -1,0 +1,690 @@
+package de.unibi.citec.clf.bonsai.ros;
+
+import de.unibi.citec.clf.bonsai.core.CoreObjectFactory;
+import de.unibi.citec.clf.bonsai.core.configuration.FactoryConfigurationResults;
+import de.unibi.citec.clf.bonsai.core.configuration.ObjectConfigurator;
+import de.unibi.citec.clf.bonsai.core.exception.ConfigurationException;
+import de.unibi.citec.clf.bonsai.core.exception.CoreObjectCreationException;
+import de.unibi.citec.clf.bonsai.core.exception.InitializationException;
+import de.unibi.citec.clf.bonsai.core.object.*;
+import de.unibi.citec.clf.bonsai.util.reflection.ReflectionServiceDiscovery;
+import de.unibi.citec.clf.bonsai.util.reflection.ServiceDiscovery;
+import de.unibi.citec.clf.btl.ros.MsgTypeFactory;
+import org.apache.log4j.Logger;
+import org.ros.address.InetAddressFactory;
+import org.ros.namespace.GraphName;
+import org.ros.node.DefaultNodeMainExecutor;
+import org.ros.node.NodeConfiguration;
+import org.ros.node.NodeMainExecutor;
+
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.*;
+import java.util.concurrent.*;
+
+/**
+ * @author jkummert
+ * @author lruegeme
+ */
+public class RosFactory implements CoreObjectFactory {
+
+    private Logger logger = Logger.getLogger(getClass());
+
+    static final String SERVICE_PKG_SENSOR = "de.unibi.citec.clf.bonsai.ros.sensors";
+    static final String SERVICE_PKG_ACTUATOR = "de.unibi.citec.clf.bonsai.ros.actuators";
+    protected ServiceDiscovery serviceDiscoverySensor = new ReflectionServiceDiscovery(SERVICE_PKG_SENSOR);
+    protected ServiceDiscovery serviceDiscoveryActuator = new ReflectionServiceDiscovery(SERVICE_PKG_ACTUATOR);
+
+    protected Set<Class<? extends RosNode>> knownActuators = new HashSet<>();
+    protected Set<Class<? extends RosSensor>> knownSensors = new HashSet<>();
+
+    private NodeMainExecutor nodeMainExecutor;
+    private URI rosMasterUri;
+
+    protected Map<String, Boolean> isActuatorInitialized = new ConcurrentHashMap<>();
+    protected Map<String, Actuator> initializedActuatorsByKey = new ConcurrentHashMap<>();
+
+    protected Map<String, Boolean> isSensorInitialized = new ConcurrentHashMap<>();
+    protected Map<String, Sensor> initializedSensorsByKey = new ConcurrentHashMap<>();
+
+    protected Map<String, ConfiguredObject> configuredObjectsByKey = new ConcurrentHashMap<>();
+    private TFTransformer coordinateTransformer;
+
+    private class ConfiguredObject {
+
+        public Class clazz;
+        public ObjectConfigurator conf;
+    }
+
+    private class ConfiguredActuator extends ConfiguredObject {
+
+        public Class implemented = null;
+    }
+
+    private class ConfiguredSensor extends ConfiguredObject {
+
+        public Class wire;
+        public Class data;
+        public Class list;
+    }
+
+    /**
+     * Constructor.
+     */
+    public RosFactory() {
+        String master = System.getenv("ROS_MASTER_URI");
+        if (master == null || master.isEmpty()) {
+            logger.warn("ROS_MASTER_URI not set");
+            master = "http://localhost:11311/";
+        }
+        try {
+            rosMasterUri = new URI(master);
+        } catch (URISyntaxException e) {
+            logger.fatal(e);
+            throw new RuntimeException(e);
+        }
+        logger.info("using ros master: " + rosMasterUri);
+        nodeMainExecutor = DefaultNodeMainExecutor.newDefault();
+        //spawn message factory node
+        MsgTypeFactory.getInstance();
+    }
+
+    /**
+     * @param node node to execute
+     * @param wait wait for isInitialised
+     */
+    public void spawnRosNode(RosNode node, boolean wait) throws TimeoutException, ExecutionException, InterruptedException {
+
+
+        String local = System.getenv("ROS_IP");
+        if (local == null || local.isEmpty()) {
+            logger.warn("ROS_IP not set");
+            //local;= InetAddressFactory.newNonLoopback().getHostAddress();
+            //local = "127.0.0.1";
+
+            local = System.getenv("basepc");
+            if (local == null || local.isEmpty()) {
+                logger.warn("basepc not set, using 127.0.0.1");
+                local = InetAddressFactory.newNonLoopback().getHostName();
+            }
+        }
+
+        logger.debug("running node on: " + local + " , master: " + rosMasterUri);
+        NodeConfiguration c = NodeConfiguration.newPublic(local, rosMasterUri);
+        c.setNodeName(node.getDefaultNodeName());
+        nodeMainExecutor.execute(node, c);
+        //wait for node to be initialized
+        if (wait && !node.isInitialised().get(2000, TimeUnit.MILLISECONDS)) {
+            throw new ExecutionException(new TimeoutException("could not start node in 2s"));
+        }
+        logger.debug(node.getDefaultNodeName() + ", should be started");
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean canCreateActuator(String key, Class<? extends Actuator> actuatorClass) {
+        return configuredObjectsByKey.containsKey(key);
+        //ConfiguredObject obj = configuredObjectsByKey.get(key);
+        //return actuatorClass.isAssignableFrom(obj.clazz);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean canCreateSensor(String key, Class<?> dataType) {
+
+        return configuredObjectsByKey.containsKey(key);
+        //ConfiguredObject obj = configuredObjectsByKey.get(key);
+        //return actuatorClass.isAssignableFrom(obj.clazz);
+
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean canCreateSensor(String key, Class<? extends List<?>> listType, Class<?> dataType) {
+        return false;
+
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @return
+     */
+    @Override
+    public FactoryConfigurationResults configureActuators(Set<ActuatorToConfigure> actuators)
+            throws IllegalArgumentException, CoreObjectCreationException {
+
+        logger.info("Configuring actuators: " + actuators);
+        FactoryConfigurationResults results = new FactoryConfigurationResults();
+
+        actuatorLoop:
+        for (ActuatorToConfigure actuator : actuators) {
+            logger.debug("Processing actuator to configure: " + actuator);
+
+            // find the actuator configuration that can handle this requested
+            for (Class<? extends RosNode> actuatorClass : knownActuators) {
+
+                logger.debug("Checking if class " + actuatorClass + " satifies actuator " + actuator);
+
+                boolean isSuitable = actuatorClass.equals(actuator.getActuatorClass())
+                        && actuator.getInterfaceClass().isAssignableFrom(actuatorClass);
+
+                if (!isSuitable) {
+                    logger.debug("Actuator class " + actuatorClass + " does not satify actuator " + actuator);
+                    logger.trace("actuator class: " + actuatorClass);
+                    logger.trace("actuator needs: " + actuator.getActuatorClass());
+                    logger.trace("actuator class == " + (actuatorClass.equals(actuator.getActuatorClass())));
+                    logger.trace("actuator impl " + actuator.getInterfaceClass().isAssignableFrom(actuatorClass));
+                    continue;
+                }
+                logger.debug("Actuator class " + actuatorClass + " satisfies actuator " + actuator);
+
+                ConfiguredActuator configured = new ConfiguredActuator();
+                configured.clazz = actuatorClass;
+                configured.conf = ObjectConfigurator.createConfigPhase();
+                configured.implemented = actuator.getInterfaceClass();
+
+                try {
+                    // if this object is suitable, create an instance and configure it
+                    Constructor<?> cons = actuatorClass.getConstructor(GraphName.class);
+                    ManagedCoreObject object = (ManagedCoreObject) cons.newInstance(GraphName.of(RosNode.NODE_PREFIX + actuator.getKey()));
+                    object.configure(configured.conf);
+                    configured.conf.activateObjectPhase(actuator.getActuatorOptions());
+
+                    configuredObjectsByKey.put(actuator.getKey(), configured);
+                    isActuatorInitialized.put(actuator.getKey(), false);
+
+                    // stop searching for this actuator
+                    continue actuatorLoop;
+
+                } catch (ConfigurationException e) {
+                    logger.debug("error configuring Object:" + actuator.getKey() + " number errors:" + configured.conf.getExceptions().size());
+                    results.exceptions.add(e);
+                    for (ConfigurationException ex : configured.conf.getExceptions()) {
+                        results.exceptions.add(ex);
+                        logger.trace(ex.getMessage());
+                    }
+
+                    for (Map.Entry<String, Class> entry : configured.conf.getUnusedOptionalParams().entrySet()) {
+                        logger.trace("unused opt param: " + entry.getKey());
+                    }
+                    continue actuatorLoop;
+                } catch (IllegalAccessException | InstantiationException | NoSuchMethodException | SecurityException | InvocationTargetException ex) {
+                    throw new CoreObjectCreationException(ex);
+                }
+
+            }
+
+            logger.error("Error while configuring " + actuator.getKey()
+                    + "! Implementation for Actuator "
+                    + actuator.getActuatorClass() + " is unknown. ");
+
+        }
+
+        return results;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public FactoryConfigurationResults configureWorkingMemories(Set<WorkingMemoryToConfigure> memories)
+            throws IllegalArgumentException, CoreObjectCreationException {
+        logger.info("Configuring memories: " + memories);
+        FactoryConfigurationResults results = new FactoryConfigurationResults();
+        throw new CoreObjectCreationException("no ros memory");
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    @Override
+    public FactoryConfigurationResults configureSensors(Set<SensorToConfigure> sensors)
+            throws IllegalArgumentException, CoreObjectCreationException {
+
+        logger.info("Configuring sensors: " + sensors);
+        FactoryConfigurationResults results = new FactoryConfigurationResults();
+
+        List<Exception> exceptions = new LinkedList<>();
+
+        sensorLoop:
+        for (SensorToConfigure sensor : sensors) {
+            logger.debug("Processing sensor to configure: " + sensor);
+
+            if (sensor.isListSensor()) {
+                //todo
+                results.exceptions.add(new CoreObjectCreationException("no ros list sensors"));
+                continue;
+            }
+
+            // find the sensor configuration that can handle this requested
+            for (Class<? extends RosSensor> sensorClass : knownSensors) {
+
+                logger.debug("Checking if class " + sensorClass + " satifies sensor " + sensor);
+
+                boolean isSuitable = sensorClass.equals(sensor.getSensorClass())
+                        && org.ros.internal.message.Message.class.isAssignableFrom(sensor.getWireClass());
+
+                if (!isSuitable) {
+                    logger.debug("Sensor class " + sensorClass + " does not satify sensor " + sensor);
+                    logger.trace("Sensor class: " + sensorClass);
+                    logger.trace("Sensor needs: " + sensor.getSensorClass());
+                    logger.trace("Sensor class == " + sensorClass.equals(sensor.getSensorClass()));
+                    logger.trace("Sensor wire " + org.ros.internal.message.Message.class.isAssignableFrom(sensor.getWireClass()));
+                    continue;
+                }
+                logger.debug("Sensor class " + sensorClass + " satisfies sensor " + sensor);
+
+                ConfiguredSensor configured = new ConfiguredSensor();
+                configured.clazz = sensorClass;
+                configured.conf = ObjectConfigurator.createConfigPhase();
+                configured.wire = sensor.getWireClass();
+                configured.data = sensor.getDataTypeClass();
+                configured.list = sensor.getListTypeClass();
+
+                try {
+                    // if this object is suitable, create an instance and configure it
+                    Constructor<?>[] declaredConstructors = sensorClass.getDeclaredConstructors();
+                    if (declaredConstructors.length != 1) {
+                        throw new NoSuchMethodException("sensor wrong constructors?");
+                    }
+                    ManagedCoreObject object = (ManagedCoreObject) declaredConstructors[0].newInstance(
+                            configured.data, configured.wire, GraphName.of(RosNode.NODE_PREFIX + sensor.getKey()));
+                    object.configure(configured.conf);
+                    configured.conf.activateObjectPhase(sensor.getSensorOptions());
+
+                    configuredObjectsByKey.put(sensor.getKey(), configured);
+                    isSensorInitialized.put(sensor.getKey(), false);
+
+                    // stop searching for this actuator
+                    continue sensorLoop;
+
+                } catch (ConfigurationException e) {
+                    logger.debug("error configuring Object:" + sensor.getKey() + " number errors:" + configured.conf.getExceptions().size());
+                    results.exceptions.add(e);
+                    for (ConfigurationException ex : configured.conf.getExceptions()) {
+                        results.exceptions.add(ex);
+                        logger.trace(ex.getMessage());
+                    }
+
+                    for (Map.Entry<String, Class> entry : configured.conf.getUnusedOptionalParams().entrySet()) {
+                        logger.trace("unused opt param: " + entry.getKey());
+                    }
+                    continue sensorLoop;
+                } catch (IllegalAccessException | InstantiationException | NoSuchMethodException | SecurityException | InvocationTargetException ex) {
+                    logger.error(ex);
+                    continue sensorLoop;
+                }
+
+            }
+
+            logger.error("Error while configuring " + sensor.getKey()
+                    + "! Implementation for Sensor "
+                    + sensor.getSensorClass() + " is unknown. ");
+
+        }
+        return results;
+    }
+
+    @Override
+    public FactoryConfigurationResults configureCoordinateTransformer(CoordinateTransformerToConfigure transformer) throws IllegalArgumentException, CoreObjectCreationException {
+
+        logger.fatal("Configuring transformer: " + transformer);
+        FactoryConfigurationResults results = new FactoryConfigurationResults();
+
+        if (transformer.getTransformerClass().equals(TFTransformer.class)) {
+            coordinateTransformer = new TFTransformer(GraphName.of(RosNode.NODE_PREFIX + "Transformer"));
+            coordinateTransformer.getNode().setKey("Transformer");
+        } else {
+            throw new IllegalArgumentException("can only create " + TFTransformer.class +
+                    " but requested is: " + transformer.getTransformerClass());
+        }
+
+        return results;
+    }
+
+    public <T extends Actuator> T createActuator(String key, Class<T> actuatorClass, boolean wait)
+            throws IllegalArgumentException, CoreObjectCreationException {
+        logger.trace("create actuator: " + actuatorClass);
+        //check if actuator was already initialized
+        if (isActuatorInitialized.get(key)) {
+            return (T) initializedActuatorsByKey.get(key);
+        }
+
+        // first check that the requested actuator can be created
+        if (!canCreateActuator(key, actuatorClass)) {
+            throw new IllegalArgumentException("No actuator with key '" + key
+                    + "' and interface class '" + actuatorClass
+                    + "' can be created by this factory.");
+        }
+
+        ConfiguredObject obj = configuredObjectsByKey.get(key);
+        Actuator actuator;
+
+        try {
+            Constructor<?> cons = obj.clazz.getConstructor(GraphName.class);
+            actuator = (Actuator) cons.newInstance(GraphName.of(RosNode.NODE_PREFIX + key));
+            ((RosNode) actuator).setKey(key);
+            actuator.configure(obj.conf);
+        } catch (NoSuchMethodException | SecurityException | InstantiationException | IllegalAccessException | InvocationTargetException ex) {
+            logger.error("failed to create instance");
+            throw new CoreObjectCreationException(ex);
+        } catch (ConfigurationException e) {
+            throw new CoreObjectCreationException(e);
+        }
+
+        if (actuator instanceof RosNode) {
+            try {
+                spawnRosNode((RosNode) actuator, wait);
+                if (wait) {
+                    TimeUnit.SECONDS.sleep(2);
+                }
+            } catch (InterruptedException | ExecutionException | TimeoutException ex) {
+                logger.error(ex);
+                throw new CoreObjectCreationException("cant execute node for: " + actuator.getClass());
+            }
+        } else {
+            logger.fatal("critical fail");
+            throw new CoreObjectCreationException("cant execute node for: " + actuator.getClass());
+        }
+
+        if (wait) {
+            isActuatorInitialized.put(key, true);
+            initializedActuatorsByKey.put(key, actuator);
+        }
+
+        try {
+            return (T) actuator;
+        } catch (ClassCastException e) {
+            assert false : "canCreateActuator seems to be wrong...";
+
+            throw new IllegalArgumentException("No actuator with key '" + key
+                    + "' and interface class '" + actuatorClass
+                    + "' can be created by this factory.");
+        }
+
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @SuppressWarnings("unchecked")
+    @Override
+    public <T extends Actuator> T createActuator(String key, Class<T> actuatorClass)
+            throws IllegalArgumentException, CoreObjectCreationException {
+        return this.createActuator(key, actuatorClass, true);
+    }
+
+    public <T> Sensor<T> createSensor(String key, Class<T> dataType, boolean wait)
+            throws IllegalArgumentException, CoreObjectCreationException {
+
+        logger.trace("create sensor for: " + dataType);
+        //check if actuator was already initialized
+        if (isSensorInitialized.get(key)) {
+            return (Sensor<T>) initializedSensorsByKey.get(key);
+        }
+
+        // first check that the requested actuator can be created
+        if (!canCreateSensor(key, dataType)) {
+            throw new IllegalArgumentException("No Sensor with key '" + key
+                    + "' and data class '" + dataType
+                    + "' can be created by this factory.");
+        }
+
+        ConfiguredSensor obj;
+        Sensor sensor;
+
+        try {
+            obj = (ConfiguredSensor) configuredObjectsByKey.get(key);
+            Constructor<?>[] declaredConstructors = obj.clazz.getDeclaredConstructors();
+            if (declaredConstructors.length != 1) {
+                throw new NoSuchMethodException("sensor wrong constructors?");
+            }
+            sensor = (Sensor) declaredConstructors[0].newInstance(obj.data, obj.wire, GraphName.of(RosNode.NODE_PREFIX + key));
+            ((RosNode) sensor).setKey(key);
+            sensor.configure(obj.conf);
+        } catch (NoSuchMethodException | SecurityException | InstantiationException | IllegalAccessException | InvocationTargetException ex) {
+            logger.error("failed to create instance");
+            throw new CoreObjectCreationException(ex);
+        } catch (ConfigurationException ex) {
+            throw new CoreObjectCreationException(ex);
+        } catch (ClassCastException ex) {
+            assert false : "canCreateActuator seems to be wrong...";
+            throw new CoreObjectCreationException(ex);
+        }
+
+        if (sensor instanceof RosNode) {
+            try {
+                spawnRosNode((RosNode) sensor, wait);
+                if (wait) {
+                    TimeUnit.SECONDS.sleep(2);
+                }
+            } catch (InterruptedException | ExecutionException | TimeoutException ex) {
+                logger.error(ex);
+                throw new CoreObjectCreationException("cant execute node for: " + sensor.getClass());
+            }
+        } else {
+            logger.fatal("critical fail");
+            throw new CoreObjectCreationException("cant execute node for: " + sensor.getClass());
+        }
+
+        if (wait) {
+            isSensorInitialized.put(key, true);
+            initializedSensorsByKey.put(key, sensor);
+        }
+
+
+        try {
+            return (Sensor<T>) sensor;
+        } catch (ClassCastException e) {
+            assert false : "canCreateActuator seems to be wrong...";
+
+            throw new IllegalArgumentException("No Sensor with key '" + key
+                    + "' and data class '" + dataType
+                    + "' can be created by this factory.");
+        }
+
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @SuppressWarnings("unchecked")
+    @Override
+    public <T> Sensor<T> createSensor(String key, Class<T> dataType)
+            throws IllegalArgumentException, CoreObjectCreationException {
+        return this.createSensor(key, dataType, true);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @SuppressWarnings("unchecked")
+    @Override
+    public <S extends List<T>, T> Sensor<S> createSensor(String key,
+                                                         Class<S> listType, Class<T> dataType)
+            throws IllegalArgumentException, CoreObjectCreationException {
+
+        throw new CoreObjectCreationException("ros has no list sensor atm");
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    public void initialize(Map<String, String> options)
+            throws IllegalArgumentException, InitializationException {
+
+        knownActuators = serviceDiscoveryActuator.discoverServicesByInterface(RosNode.class);
+        knownSensors = serviceDiscoverySensor.discoverServicesByInterface(RosSensor.class);
+//        try {
+//            createAllNodes = MapReader.readConfigBool("createAllNodes", createAllNodes, options);
+//
+//        } catch (MapReader.KeyNotFound ex) {
+//            java.util.logging.Logger.getLogger(RosFactory.class.getName()).log(Level.SEVERE, null, ex);
+//        }
+
+        logger.debug("Ros factory initialize");
+        logger.trace("found " + knownActuators.size() + " actuators:");
+        for (Class c : knownActuators) {
+            logger.debug("found " + c);
+        }
+//        knownWorkingMemories = serviceDiscovery
+//                .discoverServicesByInterface(ConfiguredRsbWorkingMemory.class);
+//        knownTransformers = serviceDiscovery
+//                .discoverServicesByInterface(ConfiguredRsbCoordinateTransformer.class);
+//
+//        // search for subclasses of ConfiguredRsbSensorListable
+//        for (Class<? extends ConfiguredRsbSensor> clazz : knownSensors) {
+//            if (ConfiguredRsbSensorListable.class.isAssignableFrom(clazz)) {
+//                knownListSensors
+//                        .add((Class<? extends ConfiguredRsbSensorListable>) clazz);
+//            }
+//
+//        }
+
+        this.cleanUp();
+
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public <T extends WorkingMemory> T createWorkingMemory(String key) throws IllegalArgumentException,
+            CoreObjectCreationException {
+        throw new CoreObjectCreationException("no ros memories");
+    }
+
+    @Override
+    public boolean canCreateWorkingMemory(String key) {
+        return false;
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public <T extends TransformLookup> T createCoordinateTransformer() throws IllegalArgumentException,
+            CoreObjectCreationException {
+
+        if (coordinateTransformer == null)
+            throw new CoreObjectCreationException("no ros transformer configured");
+
+        if (!coordinateTransformer.getNode().initialized) {
+            try {
+                spawnRosNode(coordinateTransformer.getNode(), true);
+            } catch (TimeoutException | ExecutionException | InterruptedException e) {
+                throw new CoreObjectCreationException(e);
+            }
+        }
+
+        return (T) coordinateTransformer;
+
+    }
+
+    @Override
+    public boolean canCreateCoordinateTransformer() {
+        return true;
+    }
+
+    @Override
+    public void cleanUp() {
+        logger.warn("cleanup, may take some time...");
+        initializedActuatorsByKey.values().stream().filter((a) -> (a instanceof RosNode)).forEachOrdered((a) -> {
+            ((RosNode) a).destroyNode();
+        });
+
+        initializedSensorsByKey.values().stream().filter((s) -> (s instanceof RosNode)).forEachOrdered((s) -> {
+            ((RosNode) s).destroyNode();
+        });
+
+        if (coordinateTransformer != null) {
+            coordinateTransformer.getNode().destroyNode();
+        }
+
+        if (nodeMainExecutor != null) {
+            nodeMainExecutor.shutdown();
+        }
+    }
+
+    @Override
+    public FactoryConfigurationResults createAndCacheAllConfiguredObjects() throws CoreObjectCreationException {
+
+        FactoryConfigurationResults res = new FactoryConfigurationResults();
+        Queue<RosNode> nodesQuene = new ConcurrentLinkedQueue<>();
+
+        if (coordinateTransformer != null) {
+            try {
+                spawnRosNode(coordinateTransformer.getNode(), false);
+            } catch (TimeoutException | ExecutionException | InterruptedException e) {
+                logger.error(e);
+            }
+            nodesQuene.add(coordinateTransformer.getNode());
+        }
+
+        configuredObjectsByKey.entrySet().parallelStream().forEach((entry) -> {
+            String key = entry.getKey();
+            ConfiguredObject obj = entry.getValue();
+
+            RosNode node;
+
+            try {
+                if (obj instanceof ConfiguredActuator) {
+                    ConfiguredActuator act = (ConfiguredActuator) obj;
+                    node = (RosNode) createActuator(key, act.clazz, false);
+                } else if (obj instanceof ConfiguredSensor) {
+                    ConfiguredSensor sen = (ConfiguredSensor) obj;
+                    node = (RosNode) createSensor(key, sen.clazz, false);
+                } else {
+                    throw new CoreObjectCreationException("?");
+                }
+
+                nodesQuene.add(node);
+
+            } catch (ClassCastException | IllegalArgumentException | CoreObjectCreationException ex) {
+                logger.fatal("object " + key + " with class " + obj.clazz + " cached creation error");
+            }
+        });
+
+        nodesQuene.parallelStream().forEach((node) -> {
+            String key = node.getKey();
+            try {
+                if (!node.isInitialised().get(3000, TimeUnit.MILLISECONDS)) {
+                    logger.warn("node is not started " + key);
+                    res.exceptions.add(new CoreObjectCreationException("node is not started " + key));
+                } else {
+                    if (node instanceof Sensor) {
+                        isSensorInitialized.put(key, true);
+                        initializedSensorsByKey.put(key, (Sensor) node);
+                    } else if (node instanceof Actuator) {
+                        isActuatorInitialized.put(key, true);
+                        initializedActuatorsByKey.put(key, (Actuator) node);
+                    }
+                }
+            } catch (InterruptedException | ExecutionException ex) {
+                logger.warn(ex);
+                res.exceptions.add(ex);
+            } catch (TimeoutException ex) {
+                res.exceptions.add(new CoreObjectCreationException("node is not started: " + node.getKey() + " check stderr for output"));
+            }
+        });
+
+        logger.debug("Sleep additional 2sec");
+        try {
+            TimeUnit.SECONDS.sleep(2);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        }
+
+        logger.debug("all nodes should be started now");
+        return res;
+    }
+
+}

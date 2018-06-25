@@ -1,0 +1,5 @@
+# Disable transitions from events fired by skills
+
+bool enableEvents
+---
+string res

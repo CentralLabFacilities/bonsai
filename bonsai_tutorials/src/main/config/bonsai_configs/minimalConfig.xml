@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<BonsaiConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                     xsi:noNamespaceSchemaLocation="BonsaiConfiguration.xsd">
+    
+    <FactoryOptions factoryClass="de.unibi.citec.clf.bonsai.ros.RosFactory" />
+    <FactoryOptions factoryClass="de.unibi.citec.clf.bonsai.memory.MemoryFactory" />
+
+    <CoordinateTransformer factoryClass="de.unibi.citec.clf.bonsai.ros.RosFactory"
+                           coordinateTransformerClass="de.unibi.citec.clf.bonsai.ros.TFTransformer"
+    />
+    
+    <WorkingMemory key="WorkingMemory"
+                   factoryClass="de.unibi.citec.clf.bonsai.memory.MemoryFactory"
+                   workingMemoryClass="de.unibi.citec.clf.bonsai.memory.DefaultMemory">
+    </WorkingMemory>
+      
+</BonsaiConfiguration>

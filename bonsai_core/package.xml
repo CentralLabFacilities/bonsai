@@ -1,0 +1,15 @@
+<package format="2">
+  <name>bonsai_core</name>
+  <version>0.5.0</version>
+  <description>
+  This package provides foo capability.
+  </description>
+  <maintainer email="lruegeme@techfak.uni-bielefeld.de">Leroy Rügemer</maintainer>
+  <license>TODO</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <build_depend>rosjava_build_tools</build_depend>
+  <build_depend>java</build_depend>
+
+</package>

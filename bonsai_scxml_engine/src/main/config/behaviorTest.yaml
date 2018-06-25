@@ -1,0 +1,31 @@
+autoload: demo
+statemachines:
+  - name: demo
+    task: /vol/meka/nightly/opt/robocup-statemachine/etc/state_machines/demos/demoBehavior.xml
+    config: /vol/meka/nightly/opt/robocup-statemachine/etc/bonsai_configs/demos/demoDynamicConfig.xml
+    actions:
+      - name: grasp
+        target: ExecuteGrasp
+        params:
+          objects: anything 
+      - name: speakMeka
+        target: ExecuteSpeak
+        params:
+          text: "hello, i am M E K A"
+      - name: speakTobi
+        target: ExecuteSpeak
+        params:
+          text: "hello, i am not Tobi"
+      - name: wave
+        target: ExecuteWait
+        params:
+          location: table_one
+      - name: drive
+        target: ExecuteNav
+        params:
+          location: table_one
+      - name: stop
+        target: ExecuteStop
+      - name: follow
+        target: ExecuteFollow
+    
