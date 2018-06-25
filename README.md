@@ -1,9 +1,8 @@
 # Bonsai
 
-<https://leroyr.github.io/bonsai-test-repo/>
-
-
 ## User Manual
+
+<https://centrallabfacilities.github.io/bonsai/>
 
 Documentation can be found in the docs folder.
 You need [sphinx](http://www.sphinx-doc.org) to build the documentation
