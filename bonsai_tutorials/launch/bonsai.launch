@@ -1,0 +1,3 @@
+<launch>
+	<node name="bonsai" type="bonsai" pkg="bonsai_tutorials" args="-m SCXML=$(find bonsai_scxml_engine)/etc/behaviors -m TUTORIALS=$(find bonsai_tutorials)/etc/state_machines"  />
+</launch>
