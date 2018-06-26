@@ -6,9 +6,10 @@ find_package(catkin REQUIRED rosjava_build_tools bonsai_core)
 catkin_package()
 
 set(ASSEMBLE_DIR ${CATKIN_DEVEL_PREFIX}/${CATKIN_PACKAGE_SHARE_DESTINATION})
+set(REPOSITORY_DIR ${CATKIN_DEVEL_PREFIX}/${CATKIN_GLOBAL_MAVEN_DESTINATION})
 
 add_custom_target(maven ALL 
-				  COMMAND mvn -Ddir=${CMAKE_BINARY_DIR} -DoutputDirectory=${CATKIN_PACKAGE_BIN_DESTINATION} -DassembleDirectory=${ASSEMBLE_DIR} -DaltDeploymentRepository=ros::default::file://${CATKIN_DEVEL_PREFIX}/${CATKIN_GLOBAL_MAVEN_DESTINATION} -B deploy appassembler:assemble
+				  COMMAND mvn -Ddir=${CMAKE_BINARY_DIR} -DoutputDirectory=${CATKIN_PACKAGE_BIN_DESTINATION} -DassembleDirectory=${ASSEMBLE_DIR} -DaltDeploymentRepository=ros::default::file://${REPOSITORY_DIR} -B deploy appassembler:assemble
 				  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 				  )
 #########
@@ -16,6 +17,11 @@ add_custom_target(maven ALL
 #########
 install(DIRECTORY launch
     DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+)
+
+#install repository
+install(DIRECTORY ${REPOSITORY_DIR}
+	DESTINATION ${CMAKE_INSTALL_PREFIX}/${CATKIN_GLOBAL_MAVEN_DESTINATION}
 )
 
 #install appassembler

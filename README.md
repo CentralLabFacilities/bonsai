@@ -1,13 +1,20 @@
 # Bonsai
 
+Bielefeld Sensor Actuator Interface
+
 ## User Manual
 
-<https://centrallabfacilities.github.io/bonsai/>
+[Hosted version](https://centrallabfacilities.github.io/bonsai/)
 
-Documentation can be found in the docs folder.
+The source can be found in the docs folder.
 You need [sphinx](http://www.sphinx-doc.org) to build the documentation
 
-#### Generate gh-pages
+
+# Maintainer
+
+## Update github.io Documentation
+
+:warning: This will create **and push** a new commit to the gh-pages branch.
 
 from master branch root:
 

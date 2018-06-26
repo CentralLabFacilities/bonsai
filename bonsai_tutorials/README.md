@@ -1,11 +1,14 @@
 # Bonsai Tutorial
 
-This project shows how to run a bonsai distribution
+This project shows a simple bonsai distribution
+
+## Prereq
 
 ## Rosjava msgs
 
 You can fetch the required rosjava msgs by adding these repositories to your .m2/settings.xml
 
+```xml
   <repository>
     <id>citec</id>
     <name>citec</name>
@@ -30,11 +33,14 @@ You can fetch the required rosjava msgs by adding these repositories to your .m2
         <updatePolicy>always</updatePolicy>
       </snapshots>
   </repository>
+```
 
 ## Run from within IDE
 
-Bonsai needs the path to the scxml files. For this you have to create a Mappings file.
+Bonsai needs the path to resolve scxml files . For this you have to create a Mappings file.
 
-> cp bonsai_tutorials/src/main/resources/localMapping.default.properties bonsai_tutorials/src/main/resources/localMapping.properties
-> sed -i 's@<PATH_TO>@'"$PWD"'@g' bonsai_tutorials/src/main/resources/localMapping.properties
+```
+cp bonsai_tutorials/src/main/resources/localMapping.default.properties bonsai_tutorials/src/main/resources/localMapping.properties
 
+sed -i 's@<PATH_TO>@'"$PWD"'@g' bonsai_tutorials/src/main/resources/localMapping.properties
+```
