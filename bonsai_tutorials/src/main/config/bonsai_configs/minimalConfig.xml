@@ -14,5 +14,7 @@
                    factoryClass="de.unibi.citec.clf.bonsai.memory.MemoryFactory"
                    workingMemoryClass="de.unibi.citec.clf.bonsai.memory.DefaultMemory">
     </WorkingMemory>
+    
+    <Actuator key="RepeatPrinter" factoryClass="de.unibi.citec.clf.bonsai.ros.RosFactory" actuatorClass="" actuatorInterface=""
       
 </BonsaiConfiguration>

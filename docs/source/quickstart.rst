@@ -95,30 +95,54 @@ Quickstart
 Building all projects
 =====================
 
-1. create and initialize a catkin workspace::
-
-    mkdir ws_bonsai
-    cd ws_bonsai
-    source /opt/ros/kinetic.bash
-    catkin init
+Prerequisites
+-------------
 
 .. note::
 
-    You may want to source a different workspace
-
-    Robocup at Bielefeld::
+    Robocup at Bielefeld sourcing your distribution satisfies all prerequisites::
 
         source /vol/robocup/<DIST>/setup.bash
 
-2. link bonsai projects::
+1. install ros-kinetic-desktop
 
+2. create and initialize a catkin workspace::
+
+    mkdir ws_bonsai
+    cd ws_bonsai
+    source /opt/ros/kinetic/setup.bash
     mkdir src
-    cd src
-    ln -s <PATH to bonsai.git>
-    ln -s <link to addons, pepper-dist etc>
-    cd ..
+    catkin init
 
-3. build workspace::
+3. additional package requirements
+
+    git clone https://github.com/CentralLabFacilities/rosjava_bootstrap.git src/rosjava_bootstrap
+    git clone https://github.com/CentralLabFacilities/rosjava_build_tools.git src/rosjava_build_tools
+
+    git clone https://github.com/CentralLabFacilities/rosjava_core.git src/rosjava_core
+    git clone https://github.com/CentralLabFacilities/genjava.git src/genjava
+
+    git clone https://github.com/CentralLabFacilities/rosjava_actionlib.git src/rosjava_actionlib
+
+
+4. build the packages::
+
+    catkin build
+
+5. generate messages::
+
+    source devel/setup.bash
+    rosrun genjava genjava_message_artifacts
+
+
+Building
+--------
+
+1. clone bonsai projects::
+
+    git clone https://github.com/CentralLabFacilities/bonsai.git src/bonsai
+
+2. build workspace::
 
     catkin build
 
