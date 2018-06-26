@@ -97,7 +97,11 @@
 <li class="toctree-l3"><a class="reference internal" href="#id2">Quickstart</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#building-all-projects">Building all projects</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#building-all-projects">Building all projects</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#prerequisites">Prerequisites</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#building">Building</a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="#robocup-at-bielefeld">Robocup at Bielefeld</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#pepper">Pepper</a></li>
 </ul>
@@ -247,31 +251,54 @@
 </div>
 <div class="section" id="building-all-projects">
 <h2>Building all projects<a class="headerlink" href="#building-all-projects" title="Permalink to this headline">¶</a></h2>
-<ol class="arabic">
-<li><p class="first">create and initialize a catkin workspace:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">mkdir</span> <span class="n">ws_bonsai</span>
-<span class="n">cd</span> <span class="n">ws_bonsai</span>
-<span class="n">source</span> <span class="o">/</span><span class="n">opt</span><span class="o">/</span><span class="n">ros</span><span class="o">/</span><span class="n">kinetic</span><span class="o">.</span><span class="n">bash</span>
-<span class="n">catkin</span> <span class="n">init</span>
-</pre></div>
-</div>
-</li>
-</ol>
+<div class="section" id="prerequisites">
+<h3>Prerequisites<a class="headerlink" href="#prerequisites" title="Permalink to this headline">¶</a></h3>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
-<p>You may want to source a different workspace</p>
-<p>Robocup at Bielefeld:</p>
+<p>Robocup at Bielefeld sourcing your distribution satisfies all prerequisites:</p>
 <div class="last highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">source</span> <span class="o">/</span><span class="n">vol</span><span class="o">/</span><span class="n">robocup</span><span class="o">/&lt;</span><span class="n">DIST</span><span class="o">&gt;/</span><span class="n">setup</span><span class="o">.</span><span class="n">bash</span>
 </pre></div>
 </div>
 </div>
-<ol class="arabic" start="2">
-<li><p class="first">link bonsai projects:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">mkdir</span> <span class="n">src</span>
-<span class="n">cd</span> <span class="n">src</span>
-<span class="n">ln</span> <span class="o">-</span><span class="n">s</span> <span class="o">&lt;</span><span class="n">PATH</span> <span class="n">to</span> <span class="n">bonsai</span><span class="o">.</span><span class="n">git</span><span class="o">&gt;</span>
-<span class="n">ln</span> <span class="o">-</span><span class="n">s</span> <span class="o">&lt;</span><span class="n">link</span> <span class="n">to</span> <span class="n">addons</span><span class="p">,</span> <span class="n">pepper</span><span class="o">-</span><span class="n">dist</span> <span class="n">etc</span><span class="o">&gt;</span>
-<span class="n">cd</span> <span class="o">..</span>
+<ol class="arabic">
+<li><p class="first">install ros-kinetic-desktop</p>
+</li>
+<li><p class="first">create and initialize a catkin workspace:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">mkdir</span> <span class="n">ws_bonsai</span>
+<span class="n">cd</span> <span class="n">ws_bonsai</span>
+<span class="n">source</span> <span class="o">/</span><span class="n">opt</span><span class="o">/</span><span class="n">ros</span><span class="o">/</span><span class="n">kinetic</span><span class="o">/</span><span class="n">setup</span><span class="o">.</span><span class="n">bash</span>
+<span class="n">mkdir</span> <span class="n">src</span>
+<span class="n">catkin</span> <span class="n">init</span>
+</pre></div>
+</div>
+</li>
+<li><p class="first">additional package requirements</p>
+<blockquote>
+<div><p>git clone <a class="reference external" href="https://github.com/CentralLabFacilities/rosjava_bootstrap.git">https://github.com/CentralLabFacilities/rosjava_bootstrap.git</a> src/rosjava_bootstrap
+git clone <a class="reference external" href="https://github.com/CentralLabFacilities/rosjava_build_tools.git">https://github.com/CentralLabFacilities/rosjava_build_tools.git</a> src/rosjava_build_tools</p>
+<p>git clone <a class="reference external" href="https://github.com/CentralLabFacilities/rosjava_core.git">https://github.com/CentralLabFacilities/rosjava_core.git</a> src/rosjava_core
+git clone <a class="reference external" href="https://github.com/CentralLabFacilities/genjava.git">https://github.com/CentralLabFacilities/genjava.git</a> src/genjava</p>
+<p>git clone <a class="reference external" href="https://github.com/CentralLabFacilities/rosjava_actionlib.git">https://github.com/CentralLabFacilities/rosjava_actionlib.git</a> src/rosjava_actionlib</p>
+</div></blockquote>
+</li>
+<li><p class="first">build the packages:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">catkin</span> <span class="n">build</span>
+</pre></div>
+</div>
+</li>
+<li><p class="first">generate messages:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">source</span> <span class="n">devel</span><span class="o">/</span><span class="n">setup</span><span class="o">.</span><span class="n">bash</span>
+<span class="n">rosrun</span> <span class="n">genjava</span> <span class="n">genjava_message_artifacts</span>
+</pre></div>
+</div>
+</li>
+</ol>
+</div>
+<div class="section" id="building">
+<h3>Building<a class="headerlink" href="#building" title="Permalink to this headline">¶</a></h3>
+<ol class="arabic">
+<li><p class="first">clone bonsai projects:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">git</span> <span class="n">clone</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">CentralLabFacilities</span><span class="o">/</span><span class="n">bonsai</span><span class="o">.</span><span class="n">git</span> <span class="n">src</span><span class="o">/</span><span class="n">bonsai</span>
 </pre></div>
 </div>
 </li>
@@ -280,6 +307,8 @@
 </pre></div>
 </div>
 </li>
+</ol>
+<ol class="arabic" start="4">
 <li><p class="first">run bonsai tutorials dist:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">source</span> <span class="n">devel</span><span class="o">/</span><span class="n">setup</span><span class="o">.</span><span class="n">bash</span>
 <span class="n">roslaunch</span> <span class="n">bonsai_tutorials</span> <span class="n">bonsai</span><span class="o">.</span><span class="n">launch</span>
@@ -287,6 +316,7 @@
 </div>
 </li>
 </ol>
+</div>
 </div>
 <div class="section" id="robocup-at-bielefeld">
 <h2>Robocup at Bielefeld<a class="headerlink" href="#robocup-at-bielefeld" title="Permalink to this headline">¶</a></h2>
