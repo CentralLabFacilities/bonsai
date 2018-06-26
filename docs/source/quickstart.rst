@@ -53,8 +53,8 @@ Repositories:
     </profiles>
     ...
 
-Quickstart
-----------
+Running Tutorials
+-----------------
 
 0. add repositories to settings.xml, see :ref:`maven`.
 
@@ -92,6 +92,8 @@ Quickstart
 
     target/appassembler/bin/bonsai -c src/main/config/bonsai_configs/minimalConfig.xml -t src/main/config/state_machines/minimal.xml
 
+You can also start LaunchLocal.java from within your IDE
+
 Building all projects
 =====================
 
@@ -114,7 +116,7 @@ Prerequisites
     mkdir src
     catkin init
 
-3. additional package requirements
+3. additional package requirements::
 
     git clone https://github.com/CentralLabFacilities/rosjava_bootstrap.git src/rosjava_bootstrap
     git clone https://github.com/CentralLabFacilities/rosjava_build_tools.git src/rosjava_build_tools

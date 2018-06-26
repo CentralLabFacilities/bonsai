@@ -9,7 +9,7 @@ set(ASSEMBLE_DIR ${CATKIN_DEVEL_PREFIX}/${CATKIN_PACKAGE_SHARE_DESTINATION})
 set(REPOSITORY_DIR ${CATKIN_DEVEL_PREFIX}/${CATKIN_GLOBAL_MAVEN_DESTINATION})
 
 add_custom_target(maven ALL 
-				  COMMAND mvn -Ddir=${CMAKE_BINARY_DIR} -DoutputDirectory=${CATKIN_PACKAGE_BIN_DESTINATION} -DassembleDirectory=${ASSEMBLE_DIR} -DaltDeploymentRepository=ros::default::file://${REPOSITORY_DIR} -B deploy appassembler:assemble
+				  COMMAND mvn -Ddir=${CMAKE_BINARY_DIR} -DoutputDirectory=${CATKIN_PACKAGE_BIN_DESTINATION} -DassembleDirectory=${ASSEMBLE_DIR} -DaltDeploymentRepository=ros::default::file://${REPOSITORY_DIR} -B deploy install appassembler:assemble
 				  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 				  )
 #########
@@ -20,7 +20,7 @@ install(DIRECTORY launch
 )
 
 #install repository
-install(DIRECTORY ${REPOSITORY_DIR}
+install(DIRECTORY ${REPOSITORY_DIR}/
 	DESTINATION ${CMAKE_INSTALL_PREFIX}/${CATKIN_GLOBAL_MAVEN_DESTINATION}
 )
 

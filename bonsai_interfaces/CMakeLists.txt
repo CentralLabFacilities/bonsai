@@ -19,6 +19,6 @@ add_custom_target(maven ALL
 #########
 
 #install repository
-install(DIRECTORY ${REPOSITORY_DIR}
+install(DIRECTORY ${REPOSITORY_DIR}/
 	DESTINATION ${CMAKE_INSTALL_PREFIX}/${CATKIN_GLOBAL_MAVEN_DESTINATION}
 )
