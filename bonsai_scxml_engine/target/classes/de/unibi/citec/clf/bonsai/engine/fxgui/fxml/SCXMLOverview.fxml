@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.RowConstraints?>
+<?import javafx.scene.layout.VBox?>
+
+<AnchorPane maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="-Infinity" minWidth="-Infinity" prefHeight="400.0" prefWidth="600.0" xmlns="http://javafx.com/javafx/8.0.141" xmlns:fx="http://javafx.com/fxml/1" fx:controller="de.unibi.citec.clf.bonsai.engine.fxgui.controller.SCXMLOverviewController">
+    <children>
+        <VBox layoutX="323.0" layoutY="111.0" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="-Infinity" minWidth="-Infinity" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+            <children>
+                <GridPane minHeight="-Infinity" prefHeight="60.0">
+                    <columnConstraints>
+                        <ColumnConstraints hgrow="SOMETIMES" maxWidth="100.0" prefWidth="100.0" />
+                        <ColumnConstraints hgrow="SOMETIMES" maxWidth="1.7976931348623157E308" prefWidth="368.0" />
+                        <ColumnConstraints hgrow="SOMETIMES" maxWidth="140.0" minWidth="-Infinity" prefWidth="100.0" />
+                    </columnConstraints>
+                    <rowConstraints>
+                        <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
+                        <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
+                    </rowConstraints>
+                    <children>
+                        <Label maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="-Infinity" minWidth="-Infinity" prefHeight="30.0" prefWidth="52.0" text="Configuration" />
+                        <TextField fx:id="textConfig" maxHeight="-Infinity" maxWidth="1.7976931348623157E308" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" />
+                        <Button maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#browseConfig" text="Browse..." GridPane.columnIndex="2" />
+                        <Label maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" text="SCXML" GridPane.rowIndex="1" />
+                        <TextField fx:id="textScxml" maxWidth="1.7976931348623157E308" GridPane.columnIndex="1" GridPane.rowIndex="1" />
+                        <Button maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#browseScxml" text="Browse..." GridPane.columnIndex="2" GridPane.rowIndex="1" />
+                    </children>
+                </GridPane>
+                <HBox minHeight="-Infinity" prefHeight="30.0" prefWidth="200.0">
+                    <children>
+                        <Button maxHeight="1.7976931348623157E308" mnemonicParsing="false" onAction="#buttonLoad" prefWidth="5000.0" text="Load" />
+                    </children>
+                </HBox>
+                <HBox fillHeight="false" maxHeight="-Infinity" minHeight="-Infinity" prefHeight="24.0" prefWidth="200.0">
+                    <children>
+                        <Label maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minWidth="-Infinity" prefHeight="5000.0" text="Status:" />
+                        <Label fx:id="labelStatus" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minWidth="-Infinity" prefHeight="5000.0" text="Stopped/Disconnected/Running/Waiting" />
+                        <Separator prefWidth="5000.0" visible="false" />
+                        <Separator prefWidth="20.0" />
+                    </children>
+                </HBox>
+                <VBox maxHeight="1.7976931348623157E308" prefWidth="200.0">
+                    <children>
+                        <ListView fx:id="stateListView" maxHeight="1.7976931348623157E308" />
+                    </children>
+                </VBox>
+            <HBox maxHeight="-Infinity" minHeight="-Infinity" prefHeight="30.0" prefWidth="200.0">
+               <children>
+                  <Label maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minWidth="-Infinity" prefHeight="30.0" prefWidth="44.0" text="Filter:" />
+                  <Separator prefWidth="200.0" visible="false" />
+                  <TextField fx:id="filterField" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="-Infinity" minWidth="-Infinity" prefHeight="30.0" prefWidth="459.0" />
+                  <Separator prefWidth="200.0" visible="false" />
+                  <Button maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minWidth="-Infinity" mnemonicParsing="false" onAction="#deselectState" text="Deselect" />
+               </children>
+            </HBox>
+                <HBox prefHeight="30.0" prefWidth="200.0">
+                    <children>
+                        <Button maxHeight="1.7976931348623157E308" mnemonicParsing="false" onAction="#buttonStart" prefWidth="5000.0" text="Start" />
+                    </children>
+                </HBox>
+            </children>
+        </VBox>
+    </children>
+</AnchorPane>

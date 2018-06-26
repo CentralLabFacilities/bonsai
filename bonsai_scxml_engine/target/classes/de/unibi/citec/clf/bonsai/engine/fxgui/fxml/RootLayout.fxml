@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+
+<?import javafx.scene.control.TabPane?>
+<TabPane maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="450.0"
+         prefWidth="600.0" tabClosingPolicy="UNAVAILABLE" xmlns="http://javafx.com/javafx/8.0.40"
+         xmlns:fx="http://javafx.com/fxml/1">
+    <!--<stylesheets>
+            <URL value="@/de/unibi/citec/clf/bonsai/engine/fxgui/css/default.css" />
+        </stylesheets>-->
+</TabPane>

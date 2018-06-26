@@ -1,0 +1,5 @@
+.root {
+    -fx-base: #e88181;
+    -fx-background: derive(#ececec, 26.4%);
+    -fx-focus-color: #b67878;
+}

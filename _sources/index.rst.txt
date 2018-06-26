@@ -4,11 +4,13 @@ BonSAI Docu
 ============
 
 .. toctree::
-    :maxdepth: 3
+    :maxdepth: 2
     :caption: Table of Contents
 
-    Changes from bonsai1 <changes>
     QuickStart <quickstart>
+
+    Changes <changes>
+
     Bonsai <bonsai>
 
 .. |logo| image:: /_static/img/bonsai-l1.png

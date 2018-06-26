@@ -36,8 +36,8 @@
               href="genindex.html"/>
         <link rel="search" title="Search" href="search.html"/>
     <link rel="top" title="Bonsai Docs 2.0 documentation" href="index.html"/>
-        <link rel="next" title="Bonsai 2 - Bielefeld Sensor Actuator Interface" href="bonsai.html"/>
-        <link rel="prev" title="Changes" href="changes.html"/> 
+        <link rel="next" title="Changes" href="changes.html"/>
+        <link rel="prev" title="BonSAI Docu" href="index.html"/> 
 
   
   <script src="_static/js/modernizr.min.js"></script>
@@ -91,16 +91,20 @@
             
                 <p class="caption"><span class="caption-text">Table of Contents</span></p>
 <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="changes.html">Changes from bonsai1</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">QuickStart</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#general">General</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#maven">Maven</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#bonsai">Bonsai</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id2">Quickstart</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#pepper-idea">Pepper IDEA</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#building-all-projects">Building all projects</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#robocup-at-bielefeld">Robocup at Bielefeld</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#pepper">Pepper</a></li>
 </ul>
 </li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="changes.html">Changes</a></li>
 <li class="toctree-l1"><a class="reference internal" href="bonsai.html">Bonsai</a></li>
 </ul>
 
@@ -149,60 +153,76 @@
 <div class="section" id="general">
 <h2>General<a class="headerlink" href="#general" title="Permalink to this headline">¶</a></h2>
 <div class="section" id="maven">
-<h3>Maven<a class="headerlink" href="#maven" title="Permalink to this headline">¶</a></h3>
+<span id="id1"></span><h3>Maven<a class="headerlink" href="#maven" title="Permalink to this headline">¶</a></h3>
 <p>To fetch the dependencies of bonsai add the following repositories to your <code class="docutils literal notranslate"><span class="pre">.m2/settings.xml</span></code></p>
 <p>Repositories:</p>
-<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;repository&gt;</span>
-    <span class="nt">&lt;id&gt;</span>citec<span class="nt">&lt;/id&gt;</span>
-    <span class="nt">&lt;name&gt;</span>citec<span class="nt">&lt;/name&gt;</span>
-    <span class="nt">&lt;url&gt;</span>https://mvn.cit-ec.de/nexus/content/repositories/releases<span class="nt">&lt;/url&gt;</span>
-    <span class="nt">&lt;layout&gt;</span>default<span class="nt">&lt;/layout&gt;</span>
-    <span class="nt">&lt;releases&gt;</span>
-        <span class="nt">&lt;updatePolicy&gt;</span>always<span class="nt">&lt;/updatePolicy&gt;</span>
-        <span class="nt">&lt;enabled&gt;</span>true<span class="nt">&lt;/enabled&gt;</span>
-    <span class="nt">&lt;/releases&gt;</span>
-<span class="nt">&lt;/repository&gt;</span>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span>...
+<span class="nt">&lt;profiles&gt;</span>
+    <span class="nt">&lt;profile&gt;</span>
+        ...
+        <span class="nt">&lt;repositories&gt;</span>
 
-<span class="nt">&lt;repository&gt;</span>
-    <span class="nt">&lt;id&gt;</span>citec<span class="nt">&lt;/id&gt;</span>
-    <span class="nt">&lt;name&gt;</span>citec<span class="nt">&lt;/name&gt;</span>
-    <span class="nt">&lt;url&gt;</span>https://mvn.cit-ec.de/nexus/content/repositories/snapshots<span class="nt">&lt;/url&gt;</span>
-    <span class="nt">&lt;layout&gt;</span>default<span class="nt">&lt;/layout&gt;</span>
-    <span class="nt">&lt;releases&gt;</span>
-        <span class="nt">&lt;enabled&gt;</span>false<span class="nt">&lt;/enabled&gt;</span>
-    <span class="nt">&lt;/releases&gt;</span>
-     <span class="nt">&lt;snapshots&gt;</span>
-        <span class="nt">&lt;enabled&gt;</span>true<span class="nt">&lt;/enabled&gt;</span>
-        <span class="nt">&lt;updatePolicy&gt;</span>always<span class="nt">&lt;/updatePolicy&gt;</span>
-      <span class="nt">&lt;/snapshots&gt;</span>
-<span class="nt">&lt;/repository&gt;</span>
+            <span class="nt">&lt;repository&gt;</span>
+                <span class="nt">&lt;id&gt;</span>citec<span class="nt">&lt;/id&gt;</span>
+                <span class="nt">&lt;name&gt;</span>citec<span class="nt">&lt;/name&gt;</span>
+                <span class="nt">&lt;url&gt;</span>https://mvn.cit-ec.de/nexus/content/repositories/releases<span class="nt">&lt;/url&gt;</span>
+                <span class="nt">&lt;layout&gt;</span>default<span class="nt">&lt;/layout&gt;</span>
+                <span class="nt">&lt;releases&gt;</span>
+                    <span class="nt">&lt;updatePolicy&gt;</span>always<span class="nt">&lt;/updatePolicy&gt;</span>
+                    <span class="nt">&lt;enabled&gt;</span>true<span class="nt">&lt;/enabled&gt;</span>
+                <span class="nt">&lt;/releases&gt;</span>
+            <span class="nt">&lt;/repository&gt;</span>
+
+            <span class="nt">&lt;repository&gt;</span>
+                <span class="nt">&lt;id&gt;</span>citec-snapshots<span class="nt">&lt;/id&gt;</span>
+                <span class="nt">&lt;name&gt;</span>citec-snapshots<span class="nt">&lt;/name&gt;</span>
+                <span class="nt">&lt;url&gt;</span>https://mvn.cit-ec.de/nexus/content/repositories/snapshots<span class="nt">&lt;/url&gt;</span>
+                <span class="nt">&lt;layout&gt;</span>default<span class="nt">&lt;/layout&gt;</span>
+                <span class="nt">&lt;releases&gt;</span>
+                    <span class="nt">&lt;enabled&gt;</span>false<span class="nt">&lt;/enabled&gt;</span>
+                <span class="nt">&lt;/releases&gt;</span>
+                <span class="nt">&lt;snapshots&gt;</span>
+                    <span class="nt">&lt;enabled&gt;</span>true<span class="nt">&lt;/enabled&gt;</span>
+                    <span class="nt">&lt;updatePolicy&gt;</span>always<span class="nt">&lt;/updatePolicy&gt;</span>
+                <span class="nt">&lt;/snapshots&gt;</span>
+            <span class="nt">&lt;/repository&gt;</span>
+
+        <span class="nt">&lt;/repositories&gt;</span>
+        ...
+    <span class="nt">&lt;/profile&gt;</span>
+<span class="nt">&lt;/profiles&gt;</span>
+...
 </pre></div>
 </div>
 </div>
-<div class="section" id="bonsai">
-<h3>Bonsai<a class="headerlink" href="#bonsai" title="Permalink to this headline">¶</a></h3>
-<ol class="arabic">
-<li><p class="first">Create a directory for bonsai stuff and change into the dir:</p>
+<div class="section" id="id2">
+<h3>Quickstart<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h3>
+<ol class="arabic" start="0">
+<li><p class="first">add repositories to settings.xml, see <a class="reference internal" href="#maven"><span class="std std-ref">Maven</span></a>.</p>
+</li>
+<li><p class="first">Create a directory for bonsai and change into the dir:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">mkdir</span> <span class="n">bonsai</span>
 <span class="n">cd</span> <span class="n">bonsai</span>
 </pre></div>
 </div>
 </li>
-<li><p class="first">Checkout bonsai:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">git</span> <span class="n">clone</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">LeroyR</span><span class="o">/</span><span class="n">bonsai</span><span class="o">-</span><span class="n">test</span><span class="o">-</span><span class="n">repo</span><span class="o">.</span><span class="n">git</span>
-<span class="n">git</span> <span class="n">clone</span> <span class="n">clf</span> <span class="n">bonsai</span> <span class="n">extensions</span>
-</pre></div>
-</div>
-</li>
-<li><p class="first">and additional statemachines:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">git</span> <span class="n">clone</span> <span class="n">http</span><span class="p">:</span><span class="o">//</span><span class="n">projects</span><span class="o">.</span><span class="n">cit</span><span class="o">-</span><span class="n">ec</span><span class="o">.</span><span class="n">uni</span><span class="o">-</span><span class="n">bielefeld</span><span class="o">.</span><span class="n">de</span><span class="o">/</span><span class="n">git</span><span class="o">/</span><span class="n">pepper</span><span class="o">.</span><span class="n">bonsai</span><span class="o">.</span><span class="n">git</span>
-<span class="n">git</span> <span class="n">clone</span> <span class="n">http</span><span class="p">:</span><span class="o">//</span><span class="n">projects</span><span class="o">.</span><span class="n">cit</span><span class="o">-</span><span class="n">ec</span><span class="o">.</span><span class="n">uni</span><span class="o">-</span><span class="n">bielefeld</span><span class="o">.</span><span class="n">de</span><span class="o">/</span><span class="n">git</span><span class="o">/</span><span class="n">robocupathome</span><span class="o">.</span><span class="n">robocup</span><span class="o">-</span><span class="n">dist</span><span class="o">.</span><span class="n">git</span>
+<li><p class="first">Checkout bonsai and addons:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">git</span> <span class="n">clone</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">CentralLabFacilities</span><span class="o">/</span><span class="n">bonsai</span><span class="o">.</span><span class="n">git</span>
 </pre></div>
 </div>
 </li>
 </ol>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p>Robocup at Bielefeld only repositories:</p>
+<div class="last highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">git</span> <span class="n">clone</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">CentralLabFacilities</span><span class="o">/</span><span class="n">bonsai_addons</span><span class="o">.</span><span class="n">git</span>
+<span class="n">git</span> <span class="n">clone</span> <span class="n">http</span><span class="p">:</span><span class="o">//</span><span class="n">projects</span><span class="o">.</span><span class="n">cit</span><span class="o">-</span><span class="n">ec</span><span class="o">.</span><span class="n">uni</span><span class="o">-</span><span class="n">bielefeld</span><span class="o">.</span><span class="n">de</span><span class="o">/</span><span class="n">git</span><span class="o">/</span><span class="n">pepper</span><span class="o">.</span><span class="n">bonsai</span><span class="o">.</span><span class="n">git</span>
+<span class="n">git</span> <span class="n">clone</span> <span class="n">http</span><span class="p">:</span><span class="o">//</span><span class="n">projects</span><span class="o">.</span><span class="n">cit</span><span class="o">-</span><span class="n">ec</span><span class="o">.</span><span class="n">uni</span><span class="o">-</span><span class="n">bielefeld</span><span class="o">.</span><span class="n">de</span><span class="o">/</span><span class="n">git</span><span class="o">/</span><span class="n">robocupathome</span><span class="o">.</span><span class="n">robocup</span><span class="o">-</span><span class="n">dist</span><span class="o">.</span><span class="n">git</span>
+</pre></div>
+</div>
+</div>
 <ol class="arabic" start="3">
-<li><p class="first">Copy example-dist and patch the path:</p>
+<li><p class="first">Copy tutorials and patch the path:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">cp</span> <span class="o">-</span><span class="n">r</span> <span class="n">bonsai</span><span class="o">/</span><span class="n">bonsai_tutorials</span> <span class="n">my_dist</span>
 <span class="n">cp</span> <span class="n">my_dist</span><span class="o">/</span><span class="n">src</span><span class="o">/</span><span class="n">main</span><span class="o">/</span><span class="n">resources</span><span class="o">/</span><span class="n">localMapping</span><span class="o">.</span><span class="n">default</span><span class="o">.</span><span class="n">properties</span> <span class="n">my_dist</span><span class="o">/</span><span class="n">src</span><span class="o">/</span><span class="n">main</span><span class="o">/</span><span class="n">resources</span><span class="o">/</span><span class="n">localMapping</span><span class="o">.</span><span class="n">properties</span>
 <span class="n">sed</span> <span class="o">-</span><span class="n">i</span> <span class="s1">&#39;s@&lt;PATH_TO&gt;@&#39;</span><span class="s2">&quot;$PWD&quot;</span><span class="s1">&#39;@g&#39;</span> <span class="n">my_dist</span><span class="o">/</span><span class="n">src</span><span class="o">/</span><span class="n">main</span><span class="o">/</span><span class="n">resources</span><span class="o">/</span><span class="n">localMapping</span><span class="o">.</span><span class="n">properties</span>
@@ -218,28 +238,70 @@
 <li><p class="first">Start a roscore in another terminal</p>
 </li>
 <li><p class="first">Run example statemachine:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">target</span><span class="o">/</span><span class="n">appassembler</span><span class="o">/</span><span class="nb">bin</span><span class="o">/</span><span class="n">bonsai</span>  <span class="o">-</span><span class="n">c</span> <span class="n">src</span><span class="o">/</span><span class="n">main</span><span class="o">/</span><span class="n">config</span><span class="o">/</span><span class="n">bonsai_configs</span><span class="o">/</span><span class="n">minimalConfig</span><span class="o">.</span><span class="n">xml</span> <span class="o">-</span><span class="n">t</span> <span class="n">src</span><span class="o">/</span><span class="n">main</span><span class="o">/</span><span class="n">config</span><span class="o">/</span><span class="n">state_machines</span><span class="o">/</span><span class="n">minimal</span><span class="o">.</span><span class="n">xml</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">target</span><span class="o">/</span><span class="n">appassembler</span><span class="o">/</span><span class="nb">bin</span><span class="o">/</span><span class="n">bonsai</span> <span class="o">-</span><span class="n">c</span> <span class="n">src</span><span class="o">/</span><span class="n">main</span><span class="o">/</span><span class="n">config</span><span class="o">/</span><span class="n">bonsai_configs</span><span class="o">/</span><span class="n">minimalConfig</span><span class="o">.</span><span class="n">xml</span> <span class="o">-</span><span class="n">t</span> <span class="n">src</span><span class="o">/</span><span class="n">main</span><span class="o">/</span><span class="n">config</span><span class="o">/</span><span class="n">state_machines</span><span class="o">/</span><span class="n">minimal</span><span class="o">.</span><span class="n">xml</span>
 </pre></div>
 </div>
 </li>
 </ol>
 </div>
 </div>
-<div class="section" id="pepper-idea">
-<h2>Pepper IDEA<a class="headerlink" href="#pepper-idea" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="building-all-projects">
+<h2>Building all projects<a class="headerlink" href="#building-all-projects" title="Permalink to this headline">¶</a></h2>
 <ol class="arabic">
+<li><p class="first">create and initialize a catkin workspace:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">mkdir</span> <span class="n">ws_bonsai</span>
+<span class="n">cd</span> <span class="n">ws_bonsai</span>
+<span class="n">source</span> <span class="o">/</span><span class="n">opt</span><span class="o">/</span><span class="n">ros</span><span class="o">/</span><span class="n">kinetic</span><span class="o">.</span><span class="n">bash</span>
+<span class="n">catkin</span> <span class="n">init</span>
+</pre></div>
+</div>
+</li>
+</ol>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p>You may want to source a different workspace</p>
+<p>Robocup at Bielefeld:</p>
+<div class="last highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">source</span> <span class="o">/</span><span class="n">vol</span><span class="o">/</span><span class="n">robocup</span><span class="o">/&lt;</span><span class="n">DIST</span><span class="o">&gt;/</span><span class="n">setup</span><span class="o">.</span><span class="n">bash</span>
+</pre></div>
+</div>
+</div>
+<ol class="arabic" start="2">
+<li><p class="first">link bonsai projects:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">mkdir</span> <span class="n">src</span>
+<span class="n">cd</span> <span class="n">src</span>
+<span class="n">ln</span> <span class="o">-</span><span class="n">s</span> <span class="o">&lt;</span><span class="n">PATH</span> <span class="n">to</span> <span class="n">bonsai</span><span class="o">.</span><span class="n">git</span><span class="o">&gt;</span>
+<span class="n">ln</span> <span class="o">-</span><span class="n">s</span> <span class="o">&lt;</span><span class="n">link</span> <span class="n">to</span> <span class="n">addons</span><span class="p">,</span> <span class="n">pepper</span><span class="o">-</span><span class="n">dist</span> <span class="n">etc</span><span class="o">&gt;</span>
+<span class="n">cd</span> <span class="o">..</span>
+</pre></div>
+</div>
+</li>
+<li><p class="first">build workspace:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">catkin</span> <span class="n">build</span>
+</pre></div>
+</div>
+</li>
+<li><p class="first">run bonsai tutorials dist:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">source</span> <span class="n">devel</span><span class="o">/</span><span class="n">setup</span><span class="o">.</span><span class="n">bash</span>
+<span class="n">roslaunch</span> <span class="n">bonsai_tutorials</span> <span class="n">bonsai</span><span class="o">.</span><span class="n">launch</span>
+</pre></div>
+</div>
+</li>
+</ol>
+</div>
+<div class="section" id="robocup-at-bielefeld">
+<h2>Robocup at Bielefeld<a class="headerlink" href="#robocup-at-bielefeld" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="pepper">
+<h3>Pepper<a class="headerlink" href="#pepper" title="Permalink to this headline">¶</a></h3>
+<ol class="arabic" start="0">
 <li><p class="first">Setup Jenkins</p>
 </li>
 <li><p class="first">Install IntelliJ IDEA</p>
 </li>
-<li><p class="first">create a directory for bonsai stuff and change into the dir:</p>
+<li><p class="first">Run the following commands:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">mkdir</span> <span class="n">bonsai</span>
 <span class="n">cd</span> <span class="n">bonsai</span>
-</pre></div>
-</div>
-</li>
-<li><p class="first">Run the following commands:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">git</span> <span class="n">clone</span> <span class="n">http</span><span class="p">:</span><span class="o">//</span><span class="n">projects</span><span class="o">.</span><span class="n">cit</span><span class="o">-</span><span class="n">ec</span><span class="o">.</span><span class="n">uni</span><span class="o">-</span><span class="n">bielefeld</span><span class="o">.</span><span class="n">de</span><span class="o">/</span><span class="n">git</span><span class="o">/</span><span class="n">bonsai</span><span class="o">-</span><span class="mf">2.</span><span class="n">git</span>
+<span class="n">git</span> <span class="n">clone</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">CentralLabFacilities</span><span class="o">/</span><span class="n">bonsai</span><span class="o">.</span><span class="n">git</span>
+<span class="n">git</span> <span class="n">clone</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">CentralLabFacilities</span><span class="o">/</span><span class="n">bonsai_addons</span><span class="o">.</span><span class="n">git</span>
 <span class="n">git</span> <span class="n">clone</span> <span class="n">http</span><span class="p">:</span><span class="o">//</span><span class="n">projects</span><span class="o">.</span><span class="n">cit</span><span class="o">-</span><span class="n">ec</span><span class="o">.</span><span class="n">uni</span><span class="o">-</span><span class="n">bielefeld</span><span class="o">.</span><span class="n">de</span><span class="o">/</span><span class="n">git</span><span class="o">/</span><span class="n">pepper</span><span class="o">.</span><span class="n">bonsai</span><span class="o">.</span><span class="n">git</span>
 <span class="n">git</span> <span class="n">clone</span> <span class="n">http</span><span class="p">:</span><span class="o">//</span><span class="n">projects</span><span class="o">.</span><span class="n">cit</span><span class="o">-</span><span class="n">ec</span><span class="o">.</span><span class="n">uni</span><span class="o">-</span><span class="n">bielefeld</span><span class="o">.</span><span class="n">de</span><span class="o">/</span><span class="n">git</span><span class="o">/</span><span class="n">robocupathome</span><span class="o">.</span><span class="n">robocup</span><span class="o">-</span><span class="n">dist</span><span class="o">.</span><span class="n">git</span>
 <span class="n">cp</span> <span class="n">pepper</span><span class="o">.</span><span class="n">bonsai</span><span class="o">/</span><span class="n">pepper</span><span class="o">-</span><span class="nb">bin</span><span class="o">/</span><span class="n">src</span><span class="o">/</span><span class="n">main</span><span class="o">/</span><span class="n">resources</span><span class="o">/</span><span class="n">localMapping</span><span class="o">.</span><span class="n">default</span><span class="o">.</span><span class="n">properties</span> <span class="n">pepper</span><span class="o">.</span><span class="n">bonsai</span><span class="o">/</span><span class="n">pepper</span><span class="o">-</span><span class="nb">bin</span><span class="o">/</span><span class="n">src</span><span class="o">/</span><span class="n">main</span><span class="o">/</span><span class="n">resources</span><span class="o">/</span><span class="n">localMapping</span><span class="o">.</span><span class="n">properties</span>
@@ -255,6 +317,7 @@
 </ol>
 </div>
 </div>
+</div>
 
 
            </div>
@@ -263,10 +326,10 @@
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="bonsai.html" class="btn btn-neutral float-right" title="Bonsai 2 - Bielefeld Sensor Actuator Interface" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="changes.html" class="btn btn-neutral float-right" title="Changes" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="changes.html" class="btn btn-neutral" title="Changes" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="index.html" class="btn btn-neutral" title="BonSAI Docu" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   
@@ -276,7 +339,7 @@
   <div role="contentinfo">
     <p>
         &copy; Copyright 2018, Leroy Rügemer.
-      Last updated on Jun 25, 2018.
+      Last updated on Jun 26, 2018.
 
     </p>
   </div> 

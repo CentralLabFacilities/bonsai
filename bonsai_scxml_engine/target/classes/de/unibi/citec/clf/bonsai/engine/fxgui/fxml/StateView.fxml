@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<AnchorPane maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="400.0"
+            prefWidth="600.0" xmlns="http://javafx.com/javafx/8.0.40" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="de.unibi.citec.clf.bonsai.engine.fxgui.controller.CurrentStateViewController">
+    <children>
+        <VBox layoutX="224.0" layoutY="90.0" prefHeight="400.0" prefWidth="600.0" AnchorPane.bottomAnchor="0.0"
+              AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+            <children>
+                <HBox maxWidth="1.7976931348623157E308" prefHeight="100.0">
+                    <children>
+                        <Label minWidth="-Infinity" text="CurrentStates:"/>
+                        <Separator maxWidth="1.7976931348623157E308" prefWidth="20000.0"/>
+                        <ToggleButton fx:id="toggleStopEvents" maxWidth="1.7976931348623157E308" minWidth="-Infinity"
+                                      mnemonicParsing="false" onAction="#buttonStopEvents" text="No Events"/>
+                    </children>
+                </HBox>
+                <ListView fx:id="stateListView" maxHeight="-Infinity" minHeight="-Infinity" prefHeight="100.0"
+                          prefWidth="200.0"/>
+                <Separator prefWidth="200.0"/>
+                <Label text="Event:"/>
+                <ListView fx:id="eventListView" maxHeight="1.7976931348623157E308" prefWidth="200.0"/>
+                <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#buttonSend" text="Send"/>
+                <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#buttonStop" text="Stop"/>
+            </children>
+        </VBox>
+    </children>
+</AnchorPane>
