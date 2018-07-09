@@ -110,6 +110,8 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     private boolean showDefaultSlotWarnings = true;
     private boolean generateDefaultSlots = false;
     private boolean enableSkillWarnings = false;
+    private boolean configureSkills = true;
+    private boolean hashSkillconfigurations = false;
     public static boolean useFullIdForStateInformer = true;
 
     //private static SkillStateMachineConfig ssmConfig;
@@ -293,57 +295,80 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
             cx = ex;
         }
 
-        // Check if skills use existing sensors/actuators
-        configurator = new StateMachineConfigurator(statePrefix);
-        StateMachineConfiguratorResults smResults = configurator
-                .configureSkills(scxml, generateDefaultSlots);
-
-        Map<StateID, Set<ExitToken>> registeredTokens
-                = configurator.getRegisteredExitTokens();
-
-        // Check if classes and transitions exist
-        validator = new SCXMLValidator(this, statePrefix);
-        ValidationResult scxmlValid = validator.validate(scxml, registeredTokens);
-
-        Map<String, Class<?>> rs = configurator.getRequestedSensors();
-        @SuppressWarnings("rawtypes")
-        Map<String, ListClass> rls = configurator.getRequestedListSensors();
-        Map<String, Class<? extends Actuator>> ra = configurator
-                .getRequestedActuators();
-        Set<String> rwm = configurator.getRequestedWorkingMemories();
-
-        rs.putAll(additionalPermanentSensors);
-
+        LoadingResults results = new LoadingResults();
         ConfigurationParser parser = new XmlConfigurationParser();
         ConfigurationResults confResults = null;
-        try {
-            BonsaiManager bm = BonsaiManager.getInstance();
-            confResults = bm.configure(pathToConfig, parser, rs.keySet(),
-                    rls.keySet(), ra.keySet(), rwm);
+        configurator = new StateMachineConfigurator(statePrefix);
 
-            confResults.merge(bm.canCreateSensors(rs));
-            confResults.merge(bm.canCreateListSensors(rls));
-            confResults.merge(bm.canCreateActuators(ra));
-            confResults.merge(bm.canCreateWorkingMemories(rwm));
-            if (cx != null) {
-                confResults.add(new ConfigurationException(cx));
+
+        // Check if skills use existing sensors/actuators
+        if(configureSkills) {
+            StateMachineConfiguratorResults smResults = configurator
+                    .configureSkills(scxml, generateDefaultSlots);
+
+            Map<StateID, Set<ExitToken>> registeredTokens
+                    = configurator.getRegisteredExitTokens();
+
+            // Check if classes and transitions exist
+            validator = new SCXMLValidator(this, statePrefix);
+            ValidationResult scxmlValid = validator.validate(scxml, registeredTokens);
+
+            Map<String, Class<?>> rs = configurator.getRequestedSensors();
+            @SuppressWarnings("rawtypes")
+            Map<String, ListClass> rls = configurator.getRequestedListSensors();
+            Map<String, Class<? extends Actuator>> ra = configurator
+                    .getRequestedActuators();
+            Set<String> rwm = configurator.getRequestedWorkingMemories();
+
+            rs.putAll(additionalPermanentSensors);
+
+
+            try {
+                BonsaiManager bm = BonsaiManager.getInstance();
+                confResults = bm.configure(pathToConfig, parser, rs.keySet(),
+                        rls.keySet(), ra.keySet(), rwm);
+
+                confResults.merge(bm.canCreateSensors(rs));
+                confResults.merge(bm.canCreateListSensors(rls));
+                confResults.merge(bm.canCreateActuators(ra));
+                confResults.merge(bm.canCreateWorkingMemories(rwm));
+                if (cx != null) {
+                    confResults.add(new ConfigurationException(cx));
+                }
+
+            } catch (Throwable t) {
+                isInitialized = false;
+
+                logger.error(t.getMessage(), t);
+                throw new LoadingException("configure failed: " + t.getMessage());
             }
 
-        } catch (Throwable t) {
-            LoadingResults results = new LoadingResults();
-            isInitialized = false;
+            isInitialized = true;
 
-            logger.error(t.getMessage(), t);
-            throw new LoadingException("configure failed: " + t.getMessage());
+            results.statePrefix = statePrefix;
+            results.configurationResults = confResults;
+            results.stateMachineResults = smResults;
+            results.validationResult = scxmlValid;
+            results.showDefaultSlotWarnings = showDefaultSlotWarnings;
+        } else {
+
+            results.stateMachineResults = configurator.configureSlotsOnly(scxml);
+            try {
+                BonsaiManager bm = BonsaiManager.getInstance();
+                confResults = bm.configure(pathToConfig,parser);
+            } catch (Throwable t) {
+                isInitialized = false;
+
+                logger.error(t.getMessage(), t);
+                throw new LoadingException("configure failed: " + t.getMessage());
+            }
+
+            isInitialized = true;
+
+            results.statePrefix = statePrefix;
+            results.configurationResults = confResults;
+            results.showDefaultSlotWarnings = showDefaultSlotWarnings;
         }
-
-        isInitialized = true;
-        LoadingResults results = new LoadingResults();
-        results.statePrefix = statePrefix;
-        results.configurationResults = confResults;
-        results.stateMachineResults = smResults;
-        results.validationResult = scxmlValid;
-        results.showDefaultSlotWarnings = showDefaultSlotWarnings;
 
         logger.debug("\n#########RESULTS:#########\n" + results.toString());
         if (enableSkillWarnings) {
@@ -401,6 +426,12 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
 
         generateDefaultSlots = MapReader.readConfigBool("#_GENERATE_DEFAULT_SLOTS", generateDefaultSlots, data);
         logger.debug("Set generation of default slots to: " + generateDefaultSlots);
+
+        configureSkills = MapReader.readConfigBool("#_CONFIGURE_AND_VALIDATE", configureSkills, data);
+        logger.debug("Enable full configuration and validation: " + configureSkills);
+
+        hashSkillconfigurations = MapReader.readConfigBool("#_ENABLE_CONFIG_CACHE", generateDefaultSlots, data);
+        logger.debug("Enable configuration cache: " + hashSkillconfigurations);
     }
 
     /**
@@ -435,10 +466,11 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
                 continue;
             }
             String expr = data.getExpr();
-            if (expr == null) {
-                logger.error("expr from Data is null! data:" + data.getId());
+            if (expr == null ) {
+                if(!data.getId().equalsIgnoreCase("#_SLOTS")) logger.error("expr from Data is null! data:" + data.getId());
                 continue;
             }
+
             String name = expr.replaceAll("'", "");
             //logger.fatal(name);
             if (name.startsWith(a)) {

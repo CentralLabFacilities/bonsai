@@ -113,12 +113,12 @@ public class LookToPersonOnce extends AbstractSkill {
             robotPos = positionSensor.readLast(1);
         } catch (IOException | InterruptedException ex) {
             logger.warn("Could not read from position sensor.", ex);
-            return ExitToken.loop(25);
+            return ExitToken.loop(50);
         }
 
         if (currentPersons == null) {
             logger.debug("Person list null");
-            return ExitToken.loop(25);
+            return ExitToken.loop(50);
         }
 
         for (int i = 0; i < currentPersons.size(); ++i) {

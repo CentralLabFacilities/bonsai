@@ -75,7 +75,7 @@ public class Talk extends AbstractSkill {
     @Override
     public ExitToken execute() {
         if (!sayingComplete.isDone() && blocking){
-            return ExitToken.loop();
+            return ExitToken.loop(50);
         }
         return tokenSuccess;
     }

@@ -24,6 +24,7 @@ import de.unibi.citec.clf.btl.units.LengthUnit;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
@@ -345,11 +346,11 @@ public class SearchForMultiplePersons extends AbstractSkill {
         }
         if (possiblePersons == null) {
             logger.warn("Seen persons is null");
-            return ExitToken.loop();
+            return ExitToken.loop(100);
         }
 
         if (possiblePersons.isEmpty()) {
-            return ExitToken.loop();
+            return ExitToken.loop(100);
         }
 
         for (PersonData currentPerson : possiblePersons) {
@@ -404,9 +405,9 @@ public class SearchForMultiplePersons extends AbstractSkill {
                 logger.error("Got an NumberFormatException: " + ex.getMessage());
             }
 
-            logger.debug("Checking gesture; Got: "+attribute.getGesture());
-            if (!gesture.isEmpty() && !gesture.contains(attribute.getGesture())) {
-                logger.debug("Person with wrong gesture " + attribute.getGesture() + " ignored");
+            logger.debug("Checking gestures; Got: "+attribute.getGestures());
+            if (!gesture.isEmpty() && !Collections.disjoint(gesture, attribute.getGestures())) {
+                logger.debug("Person with wrong gestures " + attribute.getGestures() + " ignored");
                 continue;
             }
             logger.debug("Gesture check passed");

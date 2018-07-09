@@ -185,7 +185,7 @@ public class StoreWavingHandPosition extends AbstractSkill {
             PersonAttribute attribute = null;
             try {
                 attribute = attributeActuator.getPersonAttributes(personList.get(i).getUuid());
-                logger.info("got attributes of uuid: " + personList.get(i).getUuid() + "gesture was: " + attribute.getGesture());
+                logger.info("got attributes of uuid: " + personList.get(i).getUuid() + "gestures were: " + attribute.getGestures());
             } catch (InterruptedException | ExecutionException ex) {
                 logger.warn("could not get person attribute: " + ex);
                 return ExitToken.loop();
@@ -194,9 +194,9 @@ public class StoreWavingHandPosition extends AbstractSkill {
                 logger.warn("person attribute is null");
                 return ExitToken.loop();
             }
-            if (attribute.getGesture().equals(PersonAttribute.Gesture.WAVING) ||
-                    attribute.getGesture().equals(PersonAttribute.Gesture.RAISING_LEFT_ARM) ||
-                    attribute.getGesture().equals(PersonAttribute.Gesture.RAISING_RIGHT_ARM)) {
+            if (attribute.getGestures().contains(PersonAttribute.Gesture.WAVING) ||
+                    attribute.getGestures().contains(PersonAttribute.Gesture.RAISING_LEFT_ARM) ||
+                    attribute.getGestures().contains(PersonAttribute.Gesture.RAISING_RIGHT_ARM)) {
                 globalWavingPos = personList.get(i).getPosition();
                 frameId = personList.get(i).getFrameId();
             }

@@ -62,7 +62,7 @@ public class GetPersonPosition extends AbstractSkill{
         try {
             personData = personDataSlot.recall();
 
-            if (positionData == null) {
+            if (personData == null) {
                 logger.error("your PersonDataSlot was empty");
                 return false;
             }

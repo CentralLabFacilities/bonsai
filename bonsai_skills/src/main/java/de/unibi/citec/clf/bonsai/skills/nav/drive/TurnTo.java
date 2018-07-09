@@ -135,7 +135,7 @@ public class TurnTo extends AbstractSkill {
                 }
                 return tokenSuccessPsTimeout;
             }
-            return ExitToken.loop();
+            return ExitToken.loop(50);
         }
         logger.debug("Driving done!");
         try {

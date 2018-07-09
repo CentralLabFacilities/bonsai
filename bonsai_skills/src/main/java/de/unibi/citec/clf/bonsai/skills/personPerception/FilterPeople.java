@@ -13,6 +13,7 @@ import de.unibi.citec.clf.btl.data.person.PersonAttribute;
 import de.unibi.citec.clf.btl.data.person.PersonData;
 import de.unibi.citec.clf.btl.data.person.PersonDataList;
 
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -21,7 +22,7 @@ import java.util.concurrent.ExecutionException;
  * This Skill is used to filter a List of Persons by one or more specific attributes.
  * These Attributes can be any of the Attributes found in PersonAttribute, i.e. gesture, posture, gender, shirtcolor
  * and age. They are read via Slots (see below). Multiple values can be given, if the e.g. gestures are seperatet by
- * colons (":")
+ * semicolons (";")
  * <pre>
  *
  * Options:
@@ -71,8 +72,6 @@ public class FilterPeople extends AbstractSkill {
     private MemorySlotReader<String> shirtcolorSlot;
     private MemorySlotReader<String> ageSlot;
 
-    private GetPersonAttributesActuator attributeActuator;
-
     private PersonDataList personDataList;
     private List<PersonAttribute.Gesture> gesture = new LinkedList<>();
     private List<PersonAttribute.Posture> posture = new LinkedList<>();
@@ -86,8 +85,6 @@ public class FilterPeople extends AbstractSkill {
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
         tokenSuccessNoPeople = configurator.requestExitToken(ExitStatus.SUCCESS().ps("noPeople"));
         tokenError = configurator.requestExitToken(ExitStatus.ERROR());
-
-        attributeActuator = configurator.getActuator("GetPersonAttributesActuator", GetPersonAttributesActuator.class);
 
         personDataReadSlot = configurator.getReadSlot("PersonDataListReadSlot", PersonDataList.class);
         personDataWriteSlot = configurator.getWriteSlot("PersonDataListWriteSlot", PersonDataList.class);
@@ -123,9 +120,25 @@ public class FilterPeople extends AbstractSkill {
             if (gestureString == null || gestureString.isEmpty()) {
                 logger.info("your GestureSlot was empty, will not filter by gesture");
             } else {
-                logger.info("will filter by gestures: " + gestureString);
-                for (String gest : gestureString.split(":")) {
-                    gesture.add(PersonAttribute.Gesture.fromString(gest));
+                String[] gestureArray = gestureString.split(";");
+                logger.debug("Gesture slot was not null. Filtering by gestures from slot");
+                for (String ges : gestureArray) {
+
+                    if (ges.length() == 1 && Character.isDigit(ges.charAt(0))) {
+                        if (PersonAttribute.Gesture.fromInteger(Integer.parseInt(ges)) == null) {
+                            logger.warn("Gesture \"" + ges + "\" not defined.");
+                            continue;
+                        }
+                        logger.info("Searching for gesture: "+PersonAttribute.Gesture.fromInteger(Integer.parseInt(ges)));
+                        gesture.add(PersonAttribute.Gesture.fromInteger(Integer.parseInt(ges)));
+                    } else {
+                        if (PersonAttribute.Gesture.fromString(ges) == null) {
+                            logger.warn("Gesture \"" + ges + "\" not defined.");
+                            continue;
+                        }
+                        logger.info("Searching for gesture: "+PersonAttribute.Gesture.fromString(ges));
+                        gesture.add(PersonAttribute.Gesture.fromString(ges));
+                    }
                 }
             }
 
@@ -141,9 +154,25 @@ public class FilterPeople extends AbstractSkill {
             if (postureString == null || postureString.isEmpty()) {
                 logger.info("your PostureSlot was empty, will not filter by posture");
             } else {
-                logger.info("will filter by postures: " + postureString);
-                for (String post : postureString.split(":")) {
-                    posture.add(PersonAttribute.Posture.fromString(post));
+                logger.debug("Posture slot was not null. Filtering by postures from slot");
+                String[] postureArray = postureString.split(";");
+                for (String pos : postureArray) {
+
+                    if (pos.length() == 1 && Character.isDigit(pos.charAt(0))) {
+                        if (PersonAttribute.Posture.fromInteger(Integer.parseInt(pos)) == null) {
+                            logger.warn("Posture " + pos + " not defined.");
+                            continue;
+                        }
+                        logger.info("Searching for posture: "+PersonAttribute.Posture.fromInteger(Integer.parseInt(pos)));
+                        posture.add(PersonAttribute.Posture.fromInteger(Integer.parseInt(pos)));
+                    } else {
+                        if (PersonAttribute.Posture.fromString(pos) == null) {
+                            logger.warn("Posture " + pos + " not defined.");
+                            continue;
+                        }
+                        logger.info("Searching for posture: "+PersonAttribute.Posture.fromString(pos));
+                        posture.add(PersonAttribute.Posture.fromString(pos));
+                    }
                 }
             }
 
@@ -160,7 +189,7 @@ public class FilterPeople extends AbstractSkill {
                 logger.info("your GenderSlot was empty, will not filter by gender");
             } else {
                 logger.info("will filter by genders: " + genderString);
-                for (String gend : genderString.split(":")) {
+                for (String gend : genderString.split(";")) {
                     gender.add(PersonAttribute.Gender.fromString(gend));
                 }
             }
@@ -178,7 +207,7 @@ public class FilterPeople extends AbstractSkill {
                 logger.info("your ShirtcolorSlot was empty, will not filter by shircolor");
             } else {
                 logger.info("will filter by shirtcolors: " + shirtcolorString);
-                for (String shirtc : shirtcolorString.split(":")) {
+                for (String shirtc : shirtcolorString.split(";")) {
                     shirtcolor.add(PersonAttribute.Shirtcolor.fromString(shirtc));
                 }
             }
@@ -193,9 +222,9 @@ public class FilterPeople extends AbstractSkill {
             ageString = ageSlot.recall();
 
             if (ageString == null || ageString.isEmpty()) {
-                logger.info("your AgeSlot was empty, will not filter by age");
-                ageFrom = Integer.MIN_VALUE;
-                ageTo = Integer.MAX_VALUE;
+                logger.info("your AgeSlot was empty, defaulting to 0-200");
+                ageFrom = 0;
+                ageTo = 200;
             } else if (ageString.contains("-")) {
                 ageFrom = Integer.parseInt(ageString.split("-")[0]);
                 ageTo = Integer.parseInt(ageString.split("-")[1]);
@@ -215,43 +244,44 @@ public class FilterPeople extends AbstractSkill {
     public ExitToken execute() {
         PersonDataList filteredPersons = new PersonDataList();
         for (PersonData person : personDataList) {
-            PersonAttribute att = null;
-            try {
-                att = attributeActuator.getPersonAttributes(person.getUuid());
-            } catch (InterruptedException e) {
-                logger.fatal("get person att call was interupted ", e);
-            } catch (ExecutionException e) {
-                logger.fatal("get person att exec execption: ", e);
-            }
+            //FETCHING PERSON ATTZIBUTE
+            PersonAttribute att = person.getPersonAttribute();
+
             if(att != null){
                 person.setPersonAttribute(att);
                 try {
-                    ageFrom = att.getAgeFrom();
-                    ageTo = att.getAgeTo();
+                    att.getAgeFrom();
+                    att.getAgeTo();
                 } catch (NumberFormatException e) {
                     att.setAge("0-200");
                     logger.debug("got no age info, using 0-200 instead to not miss anybody", e);
                 }
                 logger.debug("attributes of current person");
-                logger.debug("got gesture " + att.getGesture());
+                logger.debug("got name " + person.getName());
+                logger.debug("got gestures " + att.getGestures());
                 logger.debug("got posture " + att.getPosture());
                 logger.debug("got gender " + att.getGender());
                 logger.debug("got shirt " + att.getShirtcolor());
                 logger.debug("got age " + att.getAgeFrom() + " " + att.getAgeTo());
-                if (!gesture.isEmpty() && !gesture.contains(att.getGesture())) {
+                if (!gesture.isEmpty() && Collections.disjoint(gesture, att.getGestures())) {
+                    logger.debug("Gesture check failed!");
                     continue;
                 }
                 if (!posture.isEmpty() && !posture.contains(att.getPosture())) {
+                    logger.debug("Posture check failed!");
                     continue;
                 }
                 if (!gender.isEmpty() && !gender.contains(att.getGender())) {
+                    logger.debug("Gender check failed!");
                     continue;
                 }
                 if (!shirtcolor.isEmpty() && !shirtcolor.contains(att.getShirtcolor())) {
+                    logger.debug("Shirt color check failed!");
                     continue;
                 }
                 try {
                     if (att.getAgeFrom() > ageTo || att.getAgeTo() < ageFrom) {
+                        logger.debug("Age check failed!");
                         continue;
                     }
                 } catch (NumberFormatException ex) {

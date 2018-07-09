@@ -137,7 +137,7 @@ public class FollowPersonTurnOnly extends AbstractSkill {
             logger.error("Could not momorize followed person", e);
         }
 
-        return ExitToken.loop();
+        return ExitToken.loop(50);
     }
 
     @Override

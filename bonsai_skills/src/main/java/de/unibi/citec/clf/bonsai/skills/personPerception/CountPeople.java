@@ -65,17 +65,16 @@ public class CountPeople extends AbstractSkill {
             personDataList = personDataListSlot.recall();
 
             if (personDataList == null) {
-                logger.error("your PersonDataListSlot was empty");
-                return false;
+                logger.error("your PersonDataListSlot was empty, creating empty person data list");
+                personDataList = new PersonDataList();
+                return true;
             }
 
         } catch (CommunicationException ex) {
             logger.fatal("Unable to read from memory: ", ex);
             return false;
         }
-
         return true;
-
     }
 
     @Override

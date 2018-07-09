@@ -109,7 +109,7 @@ public class LookToPersonHead extends AbstractSkill {
         }
 
         if (initialTimeout > 0) {
-            logger.debug("using timeout of " + timeout + " ms");
+            logger.debug("using timeout of " + initialTimeout + " ms");
             timeout = initialTimeout + System.currentTimeMillis();
         }
 

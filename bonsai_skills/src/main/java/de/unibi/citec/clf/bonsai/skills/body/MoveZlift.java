@@ -94,7 +94,7 @@ public class MoveZlift extends AbstractSkill {
             if (timeout > 0 && timeout < System.currentTimeMillis()) {
                 return tokenError;
             }
-            return ExitToken.loop();
+            return ExitToken.loop(50);
         }
         return tokenSuccess;
     }

@@ -179,10 +179,6 @@ public class SCXMLOverviewController implements IStateListener {
     @FXML
     protected void buttonStart() {
 
-
-
-        if(true) return;
-
         logger.fatal("start");
         if (remote == null) {
             logger.fatal("remote not set");
@@ -249,16 +245,21 @@ public class SCXMLOverviewController implements IStateListener {
         FXGUI.setEnabled(false);
         filterField.textProperty().setValue("");
 
-        String ret = remote.load(textConfig.getText(), textScxml.getText(), includeMapping);
+        try {
+            String ret = remote.load(textConfig.getText(), textScxml.getText(), includeMapping);
+
         if (!ret.isEmpty()) {
             showResultAlert(ret);
         } else {
             logger.info("loading finished without error");
         }
+        } catch (Exception e) {
+            logger.fatal(e);
+        }
 
         FXGUI.setEnabled(true);
 
-        logger.info("getting states...");
+        //logger.info("getting states...");
 
         //setStateList();
 

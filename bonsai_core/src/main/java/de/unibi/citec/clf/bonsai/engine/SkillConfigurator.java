@@ -185,9 +185,11 @@ public class SkillConfigurator implements ISkillConfigurator {
 
         boolean missingSlotDef = false;
 
+
         for (String req : slotRequests.keySet()) {
             if (!this.slotXPathMapping.containsKey(req)) {
                 if (createDefaultMapping) {
+                    logger.warn("missing slot mapping, create default");
                     this.slotXPathMapping.put(req, "/defaults/" + req);
                 } else {
                     missingSlotDef = true;

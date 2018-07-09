@@ -123,27 +123,23 @@ public class SelectPersonFromList extends AbstractSkill {
         tokenErrorIndexOutOfBounds = configurator.requestExitToken(ExitStatus.ERROR().withProcessingStatus("IndexOutOfBounds"));
         tokenError = configurator.requestExitToken(ExitStatus.ERROR());
 
-        if (checkInArena) {
-            tokenErrorNotInArena = configurator.requestExitToken(ExitStatus.ERROR().withProcessingStatus("NotInArena"));
-        }
 
-        if (setNavGoal) {
-            navGoalDataSlot = configurator.getWriteSlot("NavigationGoalDataSlot", NavigationGoalData.class);
-        }
+        tokenErrorNotInArena = configurator.requestExitToken(ExitStatus.ERROR().withProcessingStatus("NotInArena"));
+
+        navGoalDataSlot = configurator.getWriteSlot("NavigationGoalDataSlot", NavigationGoalData.class);
 
         personDataListSlot = configurator.getReadSlot("PersonDataListSlot", PersonDataList.class);
         personDataListUpdatedSlot = configurator.getWriteSlot("PersonDataListSlot", PersonDataList.class);
         personDataSlot = configurator.getWriteSlot("PersonDataSlot", PersonData.class);
 
-        if (setTurn) {
-            turnGoalSlot = configurator.getWriteSlot("turn", NavigationGoalData.class);
-        }
+        turnGoalSlot = configurator.getWriteSlot("turn", NavigationGoalData.class);
 
         positionSensor = configurator.getSensor("PositionSensor", PositionData.class);
 
         kBaseActuator = configurator.getActuator("KBaseActuator", KBaseActuator.class);
 
-    }
+        }
+
 
     @Override
     public boolean init() {
@@ -165,6 +161,10 @@ public class SelectPersonFromList extends AbstractSkill {
     @Override
     public ExitToken execute() {
 
+        if (personDataList == null) {
+            return tokenErrorNoPersonInList;
+        }
+
         int availablePersons = personDataList.elements.size();
 
         if (availablePersons == 0) {
@@ -183,12 +183,15 @@ public class SelectPersonFromList extends AbstractSkill {
         if (index == -1) {
             for(PersonData p : personDataList) {
                 activePerson = p;
+                logger.debug("Processing person with UUID: "+p.getUuid());
                 double distance = robotPosition.getDistance(activePerson.getPosition(), LengthUnit.MILLIMETER);
 
                 if (checkInArena) {
                     Arena arena = kBaseActuator.getArena();
-                    if (arena.getCurrentRoom(activePerson.getPosition()).equals("outside the arena")) {
+                    logger.debug("Checking if person is inside arena; Got room: "+arena.getCurrentRoom(activePerson.getPosition()));
+                    if (arena.getCurrentRoom(activePerson.getPosition()).equals("outside")) {
                         logger.debug("Person not in arena");
+                        activePerson = null;
                         continue;
                     }
                 }
@@ -212,7 +215,7 @@ public class SelectPersonFromList extends AbstractSkill {
 
             if (checkInArena) {
                 Arena arena = kBaseActuator.getArena();
-                if (arena.getCurrentRoom(activePerson.getPosition()).equals("outside the arena")) {
+                if (arena.getCurrentRoom(activePerson.getPosition()).equals("outside")) {
                     logger.debug("Person not in arena");
                     return tokenErrorNotInArena;
                 }
@@ -222,7 +225,9 @@ public class SelectPersonFromList extends AbstractSkill {
         if (setNavGoal || setTurn) {
             double distance = robotPosition.getDistance(activePerson.getPosition(), LengthUnit.MILLIMETER);
 
+            logger.debug("Distance to person: "+distance);
             distance = distance - stopDistance;
+            logger.debug("Distance to person with stop-distance: "+distance);
             PolarCoordinate polar = new PolarCoordinate(MathTools.globalToLocal(activePerson.getPosition(), robotPosition));
             navData = CoordinateSystemConverter.polar2NavigationGoalData(robotPosition, polar.getAngle(AngleUnit.RADIAN), distance, AngleUnit.RADIAN, LengthUnit.MILLIMETER);
 
@@ -235,7 +240,9 @@ public class SelectPersonFromList extends AbstractSkill {
         }
 
         if (popFromList) {
+            logger.debug("Deleting active person from list. List has currently size "+personDataList.size());
             personDataList.elements.remove(activePerson);
+            logger.debug("Person List has now "+personDataList.size()+" elements!");
         }
 
         return tokenSuccessSetActive;

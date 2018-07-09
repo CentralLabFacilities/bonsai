@@ -223,7 +223,7 @@ public class FindNewNavigationGoalForExploration extends AbstractSkill{
             return tokenSuccessPercentageToCheckReached;
         }
         if(!momentaryPlan.isDone()){
-            return ExitToken.loop();
+            return ExitToken.loop(50);
         }
         try {
             if(momentaryPlan.get() != null && momentaryBestPoint != null){
@@ -237,10 +237,10 @@ public class FindNewNavigationGoalForExploration extends AbstractSkill{
             PositionData pd = genPoint();
             if(!reducedPolygon.contains(pd)){
                 momentaryBestPoint = null;
-                return ExitToken.loop();
+                return ExitToken.loop(50);
             }
             pointReachable(pd);
-            return ExitToken.loop();
+            return ExitToken.loop(50);
         }
 
         for(PositionData pos : generatedPoints){

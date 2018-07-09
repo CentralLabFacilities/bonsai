@@ -23,6 +23,7 @@ public class Utterance extends Type implements Iterable<UtterancePart> {
 
 	private LinkedHashMap<Integer, UtterancePart> utterancePartMap = new LinkedHashMap<>();
 	private boolean stable;
+	private boolean valid;
 	private Timestamp begin;
 	private Timestamp end;
 	private GrammarTree grammarTree;
@@ -57,6 +58,10 @@ public class Utterance extends Type implements Iterable<UtterancePart> {
 	public void setEnd(long timestamp, TimeUnit unit) {
 		this.end = new Timestamp(timestamp, unit);
 	}
+
+	public boolean isValid() { return valid; }
+
+	public void setValid(boolean valid) { this.valid = valid; }
 
 	@Deprecated
 	public void addUtterancePart(UtterancePart uttp) {
@@ -125,6 +130,7 @@ public class Utterance extends Type implements Iterable<UtterancePart> {
 	@Override
 	public int hashCode() {
 
-		return Objects.hash(super.hashCode(), utterancePartMap, stable, begin, end, grammarTree);
+		return Objects.hash(super.hashCode(), utterancePartMap, valid, stable, begin, end, grammarTree);
 	}
+
 }

@@ -22,6 +22,8 @@ import java.util.concurrent.Future;
  * Options:
  *  #_BLOCKING:     [boolean] Optional (default: true)
  *                      -> If true skill ends after gaze was completed
+ *  #_VERTICAL:     [String] Optional (Default: 0)
+ *                      -> Vertical direction to look to in rad
  *
  *
  * Slots:
@@ -46,8 +48,10 @@ import java.util.concurrent.Future;
 public class LookToPosition extends AbstractSkill {
 
     private static final String KEY_BLOCKING = "#_BLOCKING";
+    private static final String KEY_VERTICAL = "#_VERTICAL";
 
     private boolean blocking = true;
+    private double vertical = 0.0;
 
     private ExitToken tokenSuccess;
 
@@ -66,6 +70,7 @@ public class LookToPosition extends AbstractSkill {
     public void configure(ISkillConfigurator configurator) {
 
         blocking = configurator.requestOptionalBool(KEY_BLOCKING, blocking);
+        vertical = configurator.requestOptionalDouble(KEY_VERTICAL, vertical);
 
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
 
@@ -96,7 +101,6 @@ public class LookToPosition extends AbstractSkill {
         PositionData posDataLocal = CoordinateSystemConverter.globalToLocal(posToLook, robotPos);
 
         double horizontal = Math.atan2(posDataLocal.getY(LengthUnit.METER), posDataLocal.getX(LengthUnit.METER));
-        double vertical = 0.0;
 
         gazeDone = gazeActuator.setGazeTargetAsync((float) vertical, (float) horizontal);
 
@@ -106,7 +110,7 @@ public class LookToPosition extends AbstractSkill {
     @Override
     public ExitToken execute() {
         if (!gazeDone.isDone() && blocking) {
-            return ExitToken.loop();
+            return ExitToken.loop(50);
         }
 
         return tokenSuccess;

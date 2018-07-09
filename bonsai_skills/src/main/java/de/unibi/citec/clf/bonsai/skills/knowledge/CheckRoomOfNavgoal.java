@@ -1,39 +1,65 @@
 package de.unibi.citec.clf.bonsai.skills.knowledge;
 
+import de.unibi.citec.clf.bonsai.actuators.KBaseActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
+import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
+import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.btl.data.common.Timestamp;
+import de.unibi.citec.clf.btl.data.geometry.Point2D;
 import de.unibi.citec.clf.btl.data.knowledgebase.Arena;
 import de.unibi.citec.clf.btl.data.knowledgebase.KBase;
+import de.unibi.citec.clf.btl.data.knowledgebase.Room;
 import de.unibi.citec.clf.btl.data.navigation.NavigationGoalData;
 import de.unibi.citec.clf.btl.data.navigation.PositionData;
 import de.unibi.citec.clf.btl.units.AngleUnit;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 
 /**
+ * This Skill is used for retrieving the room the robot is currently in.
+ * <pre>
  *
- * @author sarah
+ * Options:
+ *
+ * Slots:
+ *  RoomNameSlot: [String] [Write]
+ *      -> Memory slot the name of the room will be writen to
+ *  NavigationGoalDataSlot: [NavigationGoalData] [Read]
+ *      -> Memory slot the NavGoal will be retrieved from
+ *
+ * ExitTokens:
+ *  success.insideArena:    Navgoal is inside the Arena, check RoomNameSlot for specifics.
+ *  success.outsideArena:    Navgoal is outside the Arena, check RoomNameSlot for specifics.
+ *  error:      Name of the Room could not be retrieved
+ *
+ * Sensors:
+ *
+ * Actuators:
+ *  KBaseActuator: [KBaseActuator]
+ *      -> Called to check the Room
+ *
+ *
+ * </pre>
+ *
+ * @author saschroeder
+ * @author rfeldhans
  */
-@Deprecated
 public class CheckRoomOfNavgoal extends AbstractSkill {
 
-    // used tokens
     private ExitToken tokenSuccessInsideArena;
     private ExitToken tokenSuccessOutsideArena;
     private ExitToken tokenError;
 
-    private MemorySlot<String> roomSlot;
-    private MemorySlot<KBase> kbaseSlot;
-    private MemorySlot<NavigationGoalData> navigationGoalDataSlot;
+    private MemorySlotWriter<String> roomSlot;
+    private MemorySlotReader<NavigationGoalData> navigationGoalDataSlot;
 
-    private Sensor<PositionData> posSensor;
+    private KBaseActuator kBaseActuator;
 
-    private KBase kbase;
     private String roomName;
     private NavigationGoalData navGoal;
 
@@ -44,14 +70,12 @@ public class CheckRoomOfNavgoal extends AbstractSkill {
         tokenSuccessOutsideArena = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus("outsideArena"));
         tokenError = configurator.requestExitToken(ExitStatus.ERROR());
 
-        roomSlot = configurator.getSlot(
+        roomSlot = configurator.getWriteSlot(
                 "RoomSlot", String.class);
-        kbaseSlot = configurator.getSlot(
-                "KBaseSlot", KBase.class);
-        navigationGoalDataSlot = configurator.getSlot(
+        navigationGoalDataSlot = configurator.getReadSlot(
                 "NavigationGoalDataSlot", NavigationGoalData.class);
 
-        posSensor = configurator.getSensor("PositionSensor", PositionData.class);
+        kBaseActuator = configurator.getActuator("KBaseActuator", KBaseActuator.class);
 
     }
 
@@ -69,26 +93,23 @@ public class CheckRoomOfNavgoal extends AbstractSkill {
             logger.fatal("exception", ex);
             return false;
         }
-        try {
-            kbase = kbaseSlot.recall();
-        } catch (CommunicationException ex) {
-            logger.error("Could not recall KBaseSlot: " + ex.getMessage());
-        }
-
         return true;
-
     }
 
     @Override
     public ExitToken execute() {
 
-        PositionData pos = new PositionData(navGoal.getX(LengthUnit.METER), navGoal.getY(LengthUnit.METER), navGoal.getYaw(AngleUnit.RADIAN), new Timestamp(), LengthUnit.METER, AngleUnit.RADIAN);
+        Point2D pos = new Point2D(navGoal.getX(LengthUnit.METER), navGoal.getY(LengthUnit.METER), LengthUnit.METER);
+        logger.debug("Navgoal Position: " + pos);
 
-        logger.debug("Person Position: " + pos);
-
-        Arena arena = kbase.getArena();
-
-        roomName = arena.getCurrentRoom(pos);
+        Room room;
+        try {
+            room = kBaseActuator.getRoomForPoint(pos);
+        } catch (KBaseActuator.BDONotFoundException | KBaseActuator.NoAreaFoundException e) {
+            logger.error(e.getMessage());
+            return tokenError;
+        }
+        roomName = room.getName();
 
         logger.debug("Name of room: " + roomName);
 

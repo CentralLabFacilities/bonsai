@@ -11,9 +11,9 @@ import java.util.Objects;
 
 public class NavigationGoalData extends PositionData {
 
-	private double coordinateTolerance = 0.05;
-	private double yawTolerance = 0.1;
-	public static final LengthUnit iLU = LengthUnit.METER;
+	private double coordinateTolerance = 7.0;
+	private double yawTolerance = 0.15;
+	public static final LengthUnit iLU = LengthUnit.CENTIMETER;
 	public static final AngleUnit iAU = AngleUnit.RADIAN;
 
 	/**

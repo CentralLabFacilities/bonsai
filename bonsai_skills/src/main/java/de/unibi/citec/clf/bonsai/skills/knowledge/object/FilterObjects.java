@@ -124,7 +124,7 @@ public class FilterObjects extends AbstractSkill {
                 logger.info("your NameSlot was empty, will not filter by name");
             } else {
                 logger.info("will filter by names: " + nameString);
-                for (String name : nameString.split(":")) {
+                for (String name : nameString.split(";")) {
                     names.add(name);
                 }
             }
@@ -140,7 +140,7 @@ public class FilterObjects extends AbstractSkill {
                 logger.info("your LocationSlot was empty, will not filter by location");
             } else {
                 logger.info("will filter by locations: " + locationString);
-                for (String loc : locationString.split(":")) {
+                for (String loc : locationString.split(";")) {
                     locations.add(loc);
                 }
             }
@@ -152,11 +152,11 @@ public class FilterObjects extends AbstractSkill {
         try {
             categoryString = categorySlot.recall();
 
-            if (categoryString == null || categoryString.isEmpty()) {
-                logger.info("your CategorySlot was empty, will not filter by category");
+            if (categoryString == null || categoryString.isEmpty() || categoryString.toLowerCase().equals("object")  || categoryString.toLowerCase().equals("objects")) {
+                logger.info("your CategorySlot was empty or did hold the litaral string object or objects, will not filter by category");
             } else {
                 logger.info("will filter by categories: " + categoryString);
-                for (String cat : categoryString.split(":")) {
+                for (String cat : categoryString.split(";")) {
                     categorys.add(cat);
                 }
             }
@@ -172,7 +172,7 @@ public class FilterObjects extends AbstractSkill {
                 logger.info("your ShapeSlot was empty, will not filter by shape");
             } else {
                 logger.info("will filter by shapes: " + shapeString);
-                for (String shape : shapeString.split(":")) {
+                for (String shape : shapeString.split(";")) {
                     shapes.add(shape);
                 }
             }
@@ -188,7 +188,7 @@ public class FilterObjects extends AbstractSkill {
                 logger.info("your ColorSlot was empty, will not filter by color");
             } else {
                 logger.info("will filter by colors: " + colorString);
-                for (String color : colorString.split(":")) {
+                for (String color : colorString.split(";")) {
                     colors.add(color);
                 }
             }

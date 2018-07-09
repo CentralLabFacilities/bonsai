@@ -18,6 +18,8 @@ public interface GazeActuator extends Actuator {
     @Deprecated
     void setGazeTarget(float pitch, float yaw);
 
+    void setGazeTarget(float pitch, float yaw, float speed);
+
     Future<Boolean> setGazeTargetPitchAsync(float pitch, float duration);
 
     Future<Boolean> setGazeTargetYawAsync(float yaw, float duration);

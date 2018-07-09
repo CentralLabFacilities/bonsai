@@ -43,7 +43,7 @@ public class FitObjectPrimitives extends AbstractSkill {
     @Override
     public ExitToken execute() {
         while (!res.isDone()) {
-            return ExitToken.loop();
+            return ExitToken.loop(50);
         }
         try {
             if (res.get().booleanValue()) {

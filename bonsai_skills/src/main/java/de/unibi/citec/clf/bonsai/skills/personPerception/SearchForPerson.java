@@ -20,6 +20,7 @@ import de.unibi.citec.clf.btl.units.LengthUnit;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
@@ -246,11 +247,11 @@ public class SearchForPerson extends AbstractSkill {
         }
         if (possiblePersons == null) {
             logger.warn("Seen persons is null");
-            return ExitToken.loop();
+            return ExitToken.loop(100);
         }
 
         if (possiblePersons.isEmpty()) {
-            return ExitToken.loop();
+            return ExitToken.loop(100);
         }
 
         logger.debug("number of detected persons " + possiblePersons.size());
@@ -284,8 +285,8 @@ public class SearchForPerson extends AbstractSkill {
                     attribute = attributeActuator.getPersonAttributes(currentPerson.getUuid());
                     currentPerson.setPersonAttribute(attribute);
                     logger.debug("got person attributes");
-                    if (!gesture.isEmpty() && !gesture.contains(attribute.getGesture())) {
-                        logger.debug("Person with wrong gesture " + attribute.getGesture() + " ignored");
+                    if (!gesture.isEmpty() && !Collections.disjoint(gesture, attribute.getGestures())) {
+                        logger.debug("Person with wrong gestures " + attribute.getGestures() + " ignored");
                         continue;
                     }
                     if (!posture.isEmpty() && !posture.contains(attribute.getPosture())) {
@@ -335,7 +336,7 @@ public class SearchForPerson extends AbstractSkill {
         if (globalGoal != null && foundPerson != null) {
             return tokenSuccessPersonfound;
         }
-        return ExitToken.loop();
+        return ExitToken.loop(100);
     }
 
     @Override

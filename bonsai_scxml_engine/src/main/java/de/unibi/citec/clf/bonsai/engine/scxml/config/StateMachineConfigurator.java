@@ -98,22 +98,28 @@ public class StateMachineConfigurator {
                     String slotXpath = attr.getNamedItem("xpath").getNodeValue();
 
                     boolean foundTraget = false;
-                    for (String target : targets.keySet()) {
-                        String fullIdRegEx = state.replace(".", "\\.");
-                        fullIdRegEx = fullIdRegEx.replace("*", ".*");
-                        if (target.matches(fullIdRegEx)) {
-                            foundTraget = true;
-                            break;
+                    if(state.contains("*")) {
+                        String idRegex = state.replace(".", "\\.");
+                        idRegex = idRegex.replace("*", ".*");
+                        for (String target : targets.keySet()) {
+                            if (target.matches(idRegex)) {
+                                foundTraget = true;
+                                break;
+                            }
                         }
+                    } else {
+                        foundTraget = targets.containsKey(state);
                     }
 
+
                     if (!foundTraget) {
-                        results.add(new SkillConfigFaults(StateID.getUnknownState(), "Slot definition '"
-                                + slotKey + "' for unknown state '" + state + "'."));
+                        String msg = "Slot definition '" + slotKey + "' for unknown state '" + state + "'.";
+                        logger.error(msg);
+                        results.add(new SkillConfigFaults(StateID.getUnknownState(), msg));
                         continue;
                     }
 
-                    logger.debug("Set XPath '" + slotXpath + "' for slot '" + slotKey + "' in state '" + state + "'.");
+                    logger.trace("Set XPath '" + slotXpath + "' for slot '" + slotKey + "' in state '" + state + "'.");
                     if (!stateSlotXPathMapping.containsKey(fullstate)) {
                         stateSlotXPathMapping.put(fullstate, new HashMap<>());
                     }
@@ -131,6 +137,58 @@ public class StateMachineConfigurator {
             }
         }
         logger.debug("################################");
+        return results;
+    }
+
+    public synchronized StateMachineConfiguratorResults configureSlotsOnly(SCXML scxml) {
+        StateMachineConfiguratorResults results = new StateMachineConfiguratorResults();
+
+        List<Data> dataList = (scxml.getDatamodel() != null) ? scxml.getDatamodel().getData() : new LinkedList<>();
+        for (Data d : dataList) {
+            // Look for slots
+            if (d.getId().equals("#_SLOTS")) {
+
+                NodeList children = d.getNode().getChildNodes();
+                NodeList slotNodes = children.item(0).getChildNodes();
+
+                for (int i = 0; i < slotNodes.getLength(); ++i) {
+                    NamedNodeMap attr = slotNodes.item(i).getAttributes();
+                    String slotKey = attr.getNamedItem("key").getNodeValue();
+                    String state = attr.getNamedItem("state").getNodeValue();
+                    String fullstate = prefix;
+                    if (prefix.endsWith(".")) {
+                        fullstate += state;
+                    } else {
+                        fullstate += "." + state;
+                    }
+                    String slotXpath = attr.getNamedItem("xpath").getNodeValue();
+
+                    logger.trace("Set XPath '" + slotXpath + "' for slot '" + slotKey + "' in state '" + state + "'.");
+                    if (!stateSlotXPathMapping.containsKey(fullstate)) {
+                        stateSlotXPathMapping.put(fullstate, new HashMap<>());
+                    }
+                    stateSlotXPathMapping.get(fullstate).put(slotKey, slotXpath);
+                }
+            }
+        }
+        for(String state : stateSlotXPathMapping.keySet()) {
+            try {
+                stateIDXPathMapping.put(new StateID(state), stateSlotXPathMapping.get(state));
+            } catch (StateIDException e) {
+                logger.fatal(e);
+            }
+        }
+
+
+        // print slot-XPath mapping
+        logger.debug("### STATE-SLOT-XPATH MAPPING ###");
+        for (String stateID : stateSlotXPathMapping.keySet()) {
+            logger.debug("Mapping for state: " + stateID);
+            for (String slot : stateSlotXPathMapping.get(stateID).keySet()) {
+                logger.debug(" - " + slot + " : " + stateSlotXPathMapping.get(stateID).get(slot));
+            }
+        }
+
         return results;
     }
 
@@ -181,7 +239,7 @@ public class StateMachineConfigurator {
 
             Data d = (Data) a;
 
-            if (d.getId().equalsIgnoreCase("#_slots")) {
+            if (d.getId().equalsIgnoreCase("#_SLOTS")) {
                 continue;
             }
 
@@ -209,16 +267,12 @@ public class StateMachineConfigurator {
         Map<String, String> result = new HashMap<>();
         for (String key : slotKey) {
             String matching = null;
-            // Search without regex
-            for (String candidate : stateSlotXPathMapping.keySet()) {
-                if (!candidate.contains("*")) {
-                    if ((state.getFullID().equals(candidate))
-                            && (stateSlotXPathMapping.get(candidate).containsKey(key))) {
-                        matching = candidate;
-                        break;
-                    }
-                }
+            String fid = state.getFullID();
+            // fetch match
+            if(stateSlotXPathMapping.containsKey(fid) && stateSlotXPathMapping.get(fid).containsKey(key)) {
+                matching = fid;
             }
+
             if (matching != null) {
                 result.put(key, stateSlotXPathMapping.get(matching).get(key));
                 continue;
@@ -343,6 +397,11 @@ public class StateMachineConfigurator {
         // receive configuration
         try {
             aSkill.configure(conf);
+
+            results.merge(fetchRequestedActuators(conf.getActuatorRequests(), id));
+            results.merge(fetchRequestedSensors(conf.getSensorRequests(), id));
+            results.merge(fetchRequestedSlots(conf.getSlotRequests(), id, generateDefaultSlots));
+
             conf.activateObjectPhase(datamodelVars, null);
             for (String a : conf.getUnusedParams()) {
                 results.add(new SkillConfigFaults(id, id + " - unused param: " + a));
@@ -361,9 +420,7 @@ public class StateMachineConfigurator {
         }
 
 
-        results.merge(fetchRequestedActuators(conf.getActuatorRequests(), id));
-        results.merge(fetchRequestedSensors(conf.getSensorRequests(), id));
-        results.merge(fetchRequestedSlots(conf.getSlotRequests(), id, generateDefaultSlots));
+
 
         registeredExitTokens.put(id, conf.getRegisteredExitTokens());
 

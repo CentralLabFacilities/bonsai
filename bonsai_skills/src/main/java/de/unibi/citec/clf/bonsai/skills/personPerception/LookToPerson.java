@@ -3,6 +3,7 @@ package de.unibi.citec.clf.bonsai.skills.personPerception;
 import de.unibi.citec.clf.bonsai.actuators.GazeActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
+import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
@@ -26,6 +27,8 @@ import java.io.IOException;
  *      -> Maximum horizontal angle in rad for the head movement.
  *  #_MIN_ANGLE:        [double]
  *      -> Minimum horizontal angle in rad for the head movement.
+ *  #_MIN_TURNING_ANGLE:        [double]
+ *      -> Minimum horizontal angle in rad for the head movements turning.
  *  #_TIMEOUT           [long] Optional (default: 7000)
  *      -> Amount of time robot searches for a person before notFound is sent in ms
  *
@@ -53,7 +56,14 @@ import java.io.IOException;
  */
 public class LookToPerson extends AbstractSkill {
 
+    private String KEY_MAX_ANGLE = "#_MAX_ANGLE";
+    private String KEY_MIN_ANGLE = "#_MIN_ANGLE";
+    private String KEY_MIN_TURNING_ANGLE = "#_MIN_TURNING_ANGLE";
+    private String KEY_TIMEOUT = "#_TIMEOUT";
+
     private ExitToken tokenErrorNotFound;
+    //set loop time to 14hz
+    private ExitToken tokenLoopDiLoop = ExitToken.loop(71);
 
     private MemorySlotReader<PersonData> targetPersonSlot;
 
@@ -62,17 +72,19 @@ public class LookToPerson extends AbstractSkill {
     private Sensor<PersonDataList> personSensor;
     private Sensor<PositionData> positionSensor;
 
-    private String KEY_MAX_ANGLE = "#_MAX_ANGLE";
-    private String KEY_MIN_ANGLE = "#_MIN_ANGLE";
-    private String KEY_TIMEOUT = "#_TIMEOUT";
-
     private List<PersonData> currentPersons;
     private String targetID;
     private PositionData robotPos;
     private double maxAngle = 0.78;
     private double minAngle = -0.78;
+    private double minTurningAngle = 0.04;
+    //robert sagt 0.0 4 ist besser als 0.08;
+    private double lastAngle = 0.0;
+
     private long timeout;
     private long initialTimeout = 3000;
+    private float turnAngleMultiplier = 0.75f;
+    private float gazeSpeed = 0.6f; //was 0.125 per default in actuator
 
     @Override
     public void configure(ISkillConfigurator configurator) {
@@ -81,6 +93,7 @@ public class LookToPerson extends AbstractSkill {
 
         maxAngle = configurator.requestOptionalDouble(KEY_MAX_ANGLE, maxAngle);
         minAngle = configurator.requestOptionalDouble(KEY_MIN_ANGLE, minAngle);
+        minTurningAngle = configurator.requestOptionalDouble(KEY_MIN_TURNING_ANGLE, minTurningAngle);
         initialTimeout = configurator.requestOptionalInt(KEY_TIMEOUT, (int)initialTimeout);
 
         targetPersonSlot = configurator.getReadSlot("TargetPersonSlot", PersonData.class);
@@ -101,8 +114,13 @@ public class LookToPerson extends AbstractSkill {
             return false;
         }
 
+        if (targetID == null){
+            logger.warn("target id was null!");
+        }
+
+
         if (initialTimeout > 0) {
-            logger.debug("using timeout of " + timeout + " ms");
+            logger.debug("using timeout of " + initialTimeout + " ms");
             timeout = initialTimeout + System.currentTimeMillis();
         }
 
@@ -128,12 +146,12 @@ public class LookToPerson extends AbstractSkill {
             robotPos = positionSensor.readLast(1);
         } catch (IOException | InterruptedException ex) {
             logger.warn("Could not read from position sensor.", ex);
-            return ExitToken.loop(50);
+            return tokenLoopDiLoop;
         }
 
         if (currentPersons == null) {
             logger.debug("Person list null");
-            return ExitToken.loop(50);
+            return tokenLoopDiLoop;
         }
 
         if (currentPersons.size() == 0) {
@@ -147,22 +165,28 @@ public class LookToPerson extends AbstractSkill {
                 PositionData posDataLocal = CoordinateSystemConverter.globalToLocal(posData, robotPos);
 
                 double horizontal = Math.atan2(posDataLocal.getY(LengthUnit.METER), posDataLocal.getX(LengthUnit.METER));
-                double vertical = 0.174533;
+                float vertical = 0.2617993877991f;
 
                 if (horizontal > maxAngle) {
                     horizontal = maxAngle;
                 } else if (horizontal < minAngle) {
                     horizontal = minAngle;
                 }
-
-                gazeActuator.setGazeTarget((float) vertical, (float) horizontal);
+                if(Math.abs(horizontal-lastAngle) < minTurningAngle){
+                    logger.info("Person's angle was not big enough to turn!");
+                    gazeActuator.setGazeTargetPitch(vertical);
+                    timeout = initialTimeout + System.currentTimeMillis();
+                    return tokenLoopDiLoop;
+                }
+                gazeActuator.setGazeTarget(vertical, (float) horizontal * turnAngleMultiplier, gazeSpeed);
+                lastAngle = horizontal;
                 timeout = initialTimeout + System.currentTimeMillis();
-                return ExitToken.loop(50);
+                return tokenLoopDiLoop;
             }
         }
 
         logger.warn("No found person matched the UUID I am looking for");
-        return ExitToken.loop(50);
+        return tokenLoopDiLoop;
 
     }
 
@@ -170,4 +194,5 @@ public class LookToPerson extends AbstractSkill {
     public ExitToken end(ExitToken curToken) {
         return curToken;
     }
+
 }

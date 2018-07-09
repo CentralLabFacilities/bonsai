@@ -92,7 +92,7 @@ public class SetGoalNearerToRobot extends AbstractSkill {
         }
 
         try {
-            robotPos = robotPositionSensor.readLast(5000);
+            robotPos = robotPositionSensor.readLast(1);
         } catch (IOException | InterruptedException ex) {
             logger.error("Could not read from position sensor", ex);
             return false;

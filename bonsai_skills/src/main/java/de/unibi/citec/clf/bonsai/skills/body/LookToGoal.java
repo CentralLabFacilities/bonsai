@@ -109,7 +109,7 @@ public class LookToGoal extends AbstractSkill {
     public ExitToken execute() {
 
         if (!gazeDone.isDone() && blocking) {
-            return ExitToken.loop();
+            return ExitToken.loop(50);
         }
         return tokenSuccess;
     }

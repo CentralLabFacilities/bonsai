@@ -168,7 +168,7 @@ public class NavigateToPerson extends AbstractSkill {
 
         if (robotPosition == null) {
             logger.warn("Got no robot position");
-            return ExitToken.loop();
+            return ExitToken.loop(50);
         }
 
         if (personFollow == null) {
@@ -243,7 +243,7 @@ public class NavigateToPerson extends AbstractSkill {
             personFollow = findClosestToPosition(initialPosition, refindDistance);
             if (personFollow != null) {
                 initialPosition = new PositionData(personFollow.getPosition());
-                return ExitToken.loop();
+                return ExitToken.loop(50);
             }
             return tokenErrorPersonLost;
         } else {

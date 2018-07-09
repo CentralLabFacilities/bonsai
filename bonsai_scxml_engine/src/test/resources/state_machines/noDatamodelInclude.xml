@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="dialog.Talk#KnockKnock">
+
+    <state id="dialog.Talk#KnockKnock">
+        <datamodel>
+            <data id="#_MESSAGE" expr="'Knock knock, please open the door.'"/>
+            <data id="#_NONBLOCKING" expr="'false'"/>
+        </datamodel>
+        <transition event="Talk.success"/>
+        <transition event="Talk.success.timeout"/>
+        <transition event="Talk.fatal">
+            <send event="fatal"/>
+        </transition>
+    </state>
+
+</scxml>

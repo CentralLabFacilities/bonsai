@@ -76,7 +76,9 @@ public class SCXMLDecoder {
      * @return the scxml as SCXML
      * @throws TransformerException something went wrong
      */
-    public static SCXML parseSCXML(InputSource in) throws TransformerException { try {
+    public static SCXML parseSCXML(InputSource in) throws TransformerException {
+        logger.fatal(in.getEncoding());
+        try {
             SCXML parsed = SCXMLParser.parse(in, new LoggingSAXErrorHandler(logger));
             return parsed;
         } catch (IOException | SAXException | ModelException ex) {

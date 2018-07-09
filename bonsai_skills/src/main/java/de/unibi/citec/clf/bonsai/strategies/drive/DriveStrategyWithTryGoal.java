@@ -5,22 +5,18 @@ import de.unibi.citec.clf.bonsai.core.object.Sensor;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException;
 import de.unibi.citec.clf.bonsai.util.CoordinateSystemConverter;
-import de.unibi.citec.clf.btl.data.navigation.CommandResult;
-import de.unibi.citec.clf.btl.data.navigation.NavigationGoalData;
-import de.unibi.citec.clf.btl.data.navigation.PositionData;
+import de.unibi.citec.clf.btl.data.navigation.*;
 import de.unibi.citec.clf.btl.units.AngleUnit;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
 
 import org.apache.log4j.Logger;
 
 /**
- * This drive strategy tries goals on line of sight from the robot to the target goal (nearest goals to the target
- * first).
+ * This drive strategy tries goals on line of sight from the robot to the target
+ * goal (nearest goals to the target first).
  *
  * @author cklarhor
  *
@@ -30,7 +26,7 @@ public abstract class DriveStrategyWithTryGoal implements DriveStrategy {
     private static final String MAX_DISTANCE_SUCCESS_KEY = "#_MAX_DISTANCE_SUCCESS";
     private static final String YAW_TOLERANCE_KEY = "#_MAX_YAW_TOLERANCE_SUCCESS";
     private static final String REPLAN = "#_REPLAN";
-    private static final double DEFAULT_MAX_DISTANCE_SUCCESS = 0.2;
+    private static final double DEFAULT_MAX_DISTANCE_SUCCESS = 0.1;
     private static final double DEFAULT_YAW_TOLERANCE = 0.1;
     protected final Logger logger = Logger.getLogger(this.getClass());
     private final Sensor<PositionData> robotPositionSensor;
@@ -40,9 +36,14 @@ public abstract class DriveStrategyWithTryGoal implements DriveStrategy {
     protected double yawTolerance;
     protected PositionData robotPos;
     private Future<CommandResult> lastCommandResult;
+    private PositionData lastRobotPos;
 
     protected int takeGoal = 1;
     protected int replan = 3;
+    protected int closerSteps = 1;
+    protected double closerStepSize = 0.1;
+    protected double closerMaxSteps = 3;
+    protected double minDistanceSuccess = 0.1;
 
     @Override
     public boolean init(NavigationGoalData pTargetGoal) {
@@ -114,15 +115,10 @@ public abstract class DriveStrategyWithTryGoal implements DriveStrategy {
                 return StrategyState.NOT_FINISHED;
             }
 
-            if (lastCommandResult != null
-                    && lastCommandResult.get().getResultType() != CommandResult.Result.SUCCESS
-                    && lastCommandResult.get().getResultType() != CommandResult.Result.PATH_BLOCKED) {
-                logger.error("The last command was not successfull (" + lastCommandResult.get() + ")");
-                return StrategyState.ERROR;
-            }
             if (lastCommandResult != null) {
                 logger.debug("lastCommandResult Timestamp: " + lastCommandResult.get().getTimestamp());
             }
+            lastRobotPos = robotPos;
             updateRobotPosition();
             if (robotPos == null) {
                 logger.error("RobotSensor returned null");
@@ -140,13 +136,15 @@ public abstract class DriveStrategyWithTryGoal implements DriveStrategy {
                     return StrategyState.ERROR;
                 }
             } else {
-                if (checkSuccess()) {
+                if (checkMinSuccess()) {
                     correctYaw();
                     return StrategyState.SUCCESS;
                 }
                 driveTo(actualBestGoal);
-                ++takeGoal;
-                logger.debug("Take " + takeGoal + " to last goal");
+                if (robotPos.getDistance(lastRobotPos, LengthUnit.METER) < 0.05) {
+                    ++takeGoal;
+                    logger.debug("Robot did not move. Trying " + takeGoal + " to last plan step");
+                }
                 return StrategyState.NOT_FINISHED;
             }
 
@@ -156,24 +154,21 @@ public abstract class DriveStrategyWithTryGoal implements DriveStrategy {
         }
     }
 
+    private boolean checkMinSuccess() {
+        return (robotPos.getDistance(targetGoal, LengthUnit.METER) < minDistanceSuccess);
+    }
+
     private void correctYaw() throws InterruptedException, ExecutionException {
         updateRobotPosition();
         double yawDiff = targetGoal.getYaw(AngleUnit.RADIAN) - robotPos.getYaw(AngleUnit.RADIAN);
         logger.debug("Target Goal Yaw: " + targetGoal.getYaw(AngleUnit.RADIAN) + "   robotPos Yaw: " + robotPos.getYaw(AngleUnit.RADIAN));
-        if (Math.abs(yawDiff) < yawTolerance) {
-            logger.debug("no yaw correction needed");
-            return;
-        }
-        NavigationGoalData navGoal = CoordinateSystemConverter.polar2NavigationGoalData(robotPos, yawDiff, 0, AngleUnit.RADIAN, LengthUnit.METER);
-        navGoal.setFrameId(targetGoal.getFrameId());
-        Future<CommandResult> result = nav.navigateToCoordinate(navGoal);
+
+        TurnData t = new TurnData();
+        t.setAngle(yawDiff, AngleUnit.RADIAN);
+        Future<CommandResult> result = nav.moveRelative(new DriveData(), t);
         while (!result.isDone()) {
             Thread.sleep(50);
         }
-        CommandResult cr = result.get();
-        logger.debug("yaw corrected: " + cr.getResultType().name() + "-> " + cr + "turned (Wanted): " + yawDiff);
-        updateRobotPosition();
-        logger.debug("yaw is now " + robotPos.getYaw(AngleUnit.RADIAN));
     }
 
     @Override

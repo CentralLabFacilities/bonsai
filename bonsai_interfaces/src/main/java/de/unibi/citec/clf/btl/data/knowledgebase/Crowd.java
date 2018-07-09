@@ -68,7 +68,7 @@ public class Crowd extends Type {
     public List<PersonData> getPersonsWithSpecificGesture(PersonAttribute.Gesture gesture, List<PersonData> toFilter) {
         List<PersonData> list = new List<>(PersonData.class);
         for (PersonData pers : toFilter) {
-            if (gesture == pers.getPersonAttribute().getGesture()) {
+            if (pers.getPersonAttribute().getGestures().contains(gesture)) {
                 list.add(pers);
             }
         }

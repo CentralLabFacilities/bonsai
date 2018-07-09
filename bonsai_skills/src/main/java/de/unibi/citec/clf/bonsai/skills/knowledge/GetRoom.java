@@ -87,8 +87,7 @@ public class GetRoom extends AbstractSkill {
         try {
             roomName = kBaseActuator.getRoomForPoint(positionData).getName();
         } catch (KBaseActuator.BDONotFoundException e) {
-            logger.fatal("Should never ever occur.");
-            e.printStackTrace();
+            logger.fatal("Should never ever occur. " + e.getMessage());
             return ExitToken.fatal();
         } catch (KBaseActuator.NoAreaFoundException e) {
             logger.error("Position was in no room. We will just assume it was outside the arena.");

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0"
+       initial="CheckDatamodel#1">
+    <datamodel>
+        <data id="#_STATE_PREFIX" expr="'de.unibi.citec.clf.bonsai.test.skills.'"/>
+        <!-- Utterance to speak -->
+        <data id="val" expr="false"/>
+    </datamodel>
+
+    <state id="CheckDatamodel#1">
+        <datamodel>
+            <!-- Use the SCXML "text" data  -->
+            <data id="SUCCESS" expr="'@val'"/>
+        </datamodel>
+        <transition event="CheckDatamodel.*" target="CheckDatamodel#2">
+            <!-- Change the SCXML data  -->
+            <assign name="val" expr="true"/>
+        </transition>
+    </state>
+
+    <state id="CheckDatamodel#2">
+        <datamodel>
+            <data id="SUCCESS" expr="'@val'"/>
+        </datamodel>
+        <transition event="CheckDatamodel.success" target="End"/>
+        <transition event="CheckDatamodel.fatal" target="Fatal"/>
+    </state>
+
+    <final id="End"/>
+    <final id="Fatal"/>
+</scxml>

@@ -41,7 +41,7 @@ public class FetchSensorData extends AbstractSkill {
 
     @Override
     public ExitToken execute() {
-        if(!sen.hasNext()) return ExitToken.loop();
+        if(!sen.hasNext()) return ExitToken.loop(50);
         try {
             Point3D data = sen.readLast(1000);
             logger.error(data);

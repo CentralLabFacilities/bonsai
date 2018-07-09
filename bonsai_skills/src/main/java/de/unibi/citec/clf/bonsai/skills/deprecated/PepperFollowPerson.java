@@ -127,11 +127,11 @@ public class PepperFollowPerson extends AbstractSkill {
 
         if (robotPosition == null) {
             logger.warn("Got no robot position");
-            return ExitToken.loop();
+            return ExitToken.loop(50);
         }   
         if (currentPerson == null) {
             logger.warn("Got no person position");
-            return ExitToken.loop();
+            return ExitToken.loop(50);
         }
         
         if(System.currentTimeMillis() - lasttalk>15000){

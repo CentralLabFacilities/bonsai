@@ -65,14 +65,14 @@ public class SetRobotGaze extends AbstractSkill {
     public void configure(ISkillConfigurator configurator) throws SkillConfigurationException {
 
         blocking = configurator.requestOptionalBool(KEY_BLOCKING, blocking);
+        horizontal = configurator.requestOptionalDouble(KEY_HORIZONTAL, horizontal);
+        vertical = configurator.requestOptionalDouble(KEY_VERTICAL, vertical);
+        move_duration = configurator.requestOptionalDouble(KEY_MOVE_DURATION, move_duration);
 
         gazeActuator = configurator.getActuator("GazeActuator", GazeActuator.class);
 
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
 
-        horizontal = configurator.requestOptionalDouble(KEY_HORIZONTAL, horizontal);
-        vertical = configurator.requestOptionalDouble(KEY_VERTICAL, vertical);
-        move_duration = configurator.requestOptionalDouble(KEY_MOVE_DURATION, move_duration);
     }
 
     @Override
@@ -87,6 +87,7 @@ public class SetRobotGaze extends AbstractSkill {
         if (horizontal == Double.MAX_VALUE && vertical == Double.MAX_VALUE) {
             gazeStatus = gazeActuator.setGazeTargetAsync((float)0.0,(float)0.0,2);
             logger.warn("Don't leave both horizontal and vertical unset, that makes just no sense at all.");
+            return true;
         }
         
         if (horizontal == Double.MAX_VALUE) {
@@ -116,18 +117,12 @@ public class SetRobotGaze extends AbstractSkill {
 
     @Override
     public ExitToken execute() {
-        
-        try {
-            if ((!gazeStatus.isDone() && !gazeStatus.get()) && blocking) {
-                logger.trace("Gaze done: " + gazeStatus.isDone() + " gaze cancelled: " + gazeStatus.isCancelled() + "gaze get: " + gazeStatus.get());
-                return ExitToken.loop(10);
-            }
-        } catch (InterruptedException ex) {
-            Logger.getLogger(SetRobotGaze.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (ExecutionException ex) {
-            Logger.getLogger(SetRobotGaze.class.getName()).log(Level.SEVERE, null, ex);
+
+        if (blocking && !gazeStatus.isDone()) {
+            logger.trace("Gaze done: " + gazeStatus.isDone() + " gaze cancelled: " + gazeStatus.isCancelled());
+            return ExitToken.loop(50);
         }
-        
+
 
         return tokenSuccess;
     }

@@ -109,7 +109,7 @@ public class WaitForNonterminals extends AbstractSkill {
                 }
             }
 
-            return ExitToken.loop();
+            return ExitToken.loop(50);
         }
 
         List<GrammarNonTerminal> understood = speechManager.getNonTerminalNodes();
@@ -131,7 +131,7 @@ public class WaitForNonterminals extends AbstractSkill {
                 }
             }
         }
-        return ExitToken.loop();
+        return ExitToken.loop(50);
     }
 
     @Override

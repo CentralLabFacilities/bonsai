@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="SlotIO#writeA">
+    <datamodel>
+        <data id="#_STATE_PREFIX" expr="'de.unibi.citec.clf.bonsai.skills.'"/>
+        <data id="#_CONFIGURE_AND_VALIDATE" expr="false"/>
+        <data id="#_SLOTS">
+            <slots>
+                <slot key="ReadSlot" state="CompareSlot#readA" xpath="/test/one"/>
+                <slot key="ReadSlot" state="CompareSlot#readB" xpath="/test/two"/>
+                <slot key="StringSlot" state="SlotIO#writeB" xpath="/test/two"/>
+                <slot key="StringSlot" state="SlotIO#writeA" xpath="/test/one"/>
+            </slots>
+        </data>
+
+    </datamodel>
+
+    <state id="SlotIO#writeA">
+        <datamodel>
+            <data id="#_WRITE" expr="'A'"/>
+        </datamodel>
+        <transition event="SlotIO.success" target="SlotIO#writeB"/>
+        <transition event="SlotIO.error" target="Fatal"/>
+        <transition event="SlotIO.fatal" target="Fatal"/>
+    </state>
+
+    <state id="SlotIO#writeB">
+        <datamodel>
+            <data id="#_WRITE" expr="'B'"/>
+        </datamodel>
+        <transition event="SlotIO.success" target="CompareSlot#readA"/>
+        <transition event="SlotIO.error" target="Fatal"/>
+        <transition event="SlotIO.fatal" target="Fatal"/>
+    </state>
+
+    <state id="CompareSlot#readA">
+        <datamodel>
+            <data id="#_COMPARE_STRING" expr="'A'"/>
+        </datamodel>
+        <transition event="CompareSlot.success.match" target="CompareSlot#readB"/>
+        <transition event="CompareSlot.success.misMatch" target="Fatal"/>
+        <transition event="CompareSlot.error" target="Fatal"/>
+        <transition event="CompareSlot.fatal" target="Fatal"/>
+    </state>
+
+    <state id="CompareSlot#readB">
+        <datamodel>
+            <data id="#_COMPARE_STRING" expr="'B'"/>
+        </datamodel>
+        <transition event="CompareSlot.success.match" target="End"/>
+        <transition event="CompareSlot.success.misMatch" target="Fatal"/>
+        <transition event="CompareSlot.error" target="Fatal"/>
+        <transition event="CompareSlot.fatal" target="Fatal"/>
+    </state>
+
+
+    <state id="Fatal" final="true"/>
+
+    <state id="End" final="true"/>
+</scxml>

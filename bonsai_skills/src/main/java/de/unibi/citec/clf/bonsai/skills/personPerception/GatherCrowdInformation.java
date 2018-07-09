@@ -1,8 +1,8 @@
 package de.unibi.citec.clf.bonsai.skills.personPerception;
 
-import de.unibi.citec.clf.bonsai.actuators.GetCrowdAttributesActuator;
+import de.unibi.citec.clf.bonsai.actuators.DetectPeopleActuator;
+import de.unibi.citec.clf.bonsai.actuators.KBaseActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
-import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
@@ -12,14 +12,16 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException;
 import de.unibi.citec.clf.bonsai.skills.deprecated.personPerception.openpose.SearchForPerson;
 import de.unibi.citec.clf.btl.List;
+import de.unibi.citec.clf.btl.data.knowledgebase.Arena;
 import de.unibi.citec.clf.btl.data.knowledgebase.Crowd;
 import de.unibi.citec.clf.btl.data.navigation.PositionData;
-import de.unibi.citec.clf.btl.data.person.PersonAttribute;
 import de.unibi.citec.clf.btl.data.person.PersonData;
+import de.unibi.citec.clf.btl.data.person.PersonDataList;
+import de.unibi.citec.clf.btl.units.LengthUnit;
 
 import java.io.IOException;
-import java.util.LinkedList;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -31,6 +33,8 @@ import java.util.logging.Logger;
  * Options:
  *  #_THIS_ROOM_ONLY: [boolean] Optional (default: false)
  *                          -> Only People that are in the arena will be used
+ *  #_TIMEOUT: [long] Optional (default: 8000)
+ *                          -> Timeout in ms
  *
  * Slots:
  *  CrowdSlot: [Crowd] [Write]
@@ -39,6 +43,7 @@ import java.util.logging.Logger;
  * ExitTokens:
  *  success.noPeople -> robot has not seen any people
  *  success.peopleFound -> robot has seen any amount of people != 0. Crowd saved to memory
+ *  error.timeout -> actuator did not return before timeout
  *  fatal -> a hard error occurred e.g. Slot communication error
  *
  * Actuators:
@@ -55,32 +60,44 @@ import java.util.logging.Logger;
  */
 public class GatherCrowdInformation extends AbstractSkill {
 
-    private final static String KEY_THIS_ROOM_ONLY = "#_THIS_ROOM_ONLY";
+    private final static String KEY_CHECK_IN_ARENA = "#_CHECK_IN_ARENA";
+    private final static String KEY_TIMEOUT = "#_TIMEOUT";
 
-    boolean thisRoom = false;
+    private boolean checkInArena = false;
+    private long timeout = 60000;
 
     private ExitToken tokenSuccessNoPeople;
     private ExitToken tokenSuccessPeopleFound;
+    private ExitToken tokenErrorTimeout;
+    private ExitToken tokenErrorNotInArena;
 
     private MemorySlotWriter<Crowd> crowdSlot;
 
-    private GetCrowdAttributesActuator getCrowdAttributesActuator;
+    private KBaseActuator kBaseActuator;
+    private DetectPeopleActuator peopleActuator;
     private Sensor<PositionData> positionSensor;
     private PositionData robotPos;
+
+    private Future<PersonDataList> peopleFuture;
 
     private Crowd crowd;
 
     @Override
     public void configure(ISkillConfigurator configurator) throws SkillConfigurationException {
-        thisRoom = configurator.requestOptionalBool(KEY_THIS_ROOM_ONLY, thisRoom);
+        checkInArena = configurator.requestOptionalBool(KEY_CHECK_IN_ARENA, checkInArena);
+        timeout = configurator.requestOptionalInt(KEY_TIMEOUT, (int)timeout);
 
         tokenSuccessNoPeople = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus("noPeople"));
         tokenSuccessPeopleFound = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus("peopleFound"));
+        tokenErrorTimeout = configurator.requestExitToken(ExitStatus.ERROR().withProcessingStatus("timeout"));
+        tokenErrorNotInArena = configurator.requestExitToken(ExitStatus.ERROR().withProcessingStatus("NotInArena"));
 
         crowdSlot = configurator.getWriteSlot("CrowdSlot", Crowd.class);
 
-        getCrowdAttributesActuator = configurator.getActuator("GetCrowdAttributesActuator", GetCrowdAttributesActuator.class);
+        peopleActuator = configurator.getActuator("PeopleActuator", DetectPeopleActuator.class);
         positionSensor = configurator.getSensor("PositionSensor", PositionData.class);
+
+        kBaseActuator = configurator.getActuator("KBaseActuator", KBaseActuator.class);
     }
 
     @Override
@@ -92,58 +109,56 @@ public class GatherCrowdInformation extends AbstractSkill {
             Logger.getLogger(SearchForPerson.class.getName()).log(Level.SEVERE, null, ex);
         }
         logger.debug("Detecting Persons");
-
+        try {
+            peopleFuture = peopleActuator.getPeople(true, true, 10.0f);
+            timeout += System.currentTimeMillis();
+        } catch (InterruptedException | ExecutionException e) {
+            logger.error(e);
+            return false;
+        }
         return true;
     }
 
     @Override
     public ExitToken execute() {
-        java.util.List<PersonAttribute> personAttributes = new LinkedList<>();
 
+        if(!peopleFuture.isDone()){
+            if(timeout<System.currentTimeMillis()){
+                return tokenErrorTimeout;
+            }
+            return ExitToken.loop(50);
+        }
+        List<PersonData> persons;
         try {
-            personAttributes = getCrowdAttributesActuator.getCrowdAttributes();
-        } catch (InterruptedException | ExecutionException ex) {
-            Logger.getLogger(GatherCrowdInformation.class.getName()).log(Level.SEVERE, null, ex);
+            persons = peopleFuture.get();
+        } catch (InterruptedException | ExecutionException e) {
+            logger.error("cant access people actuator");
+            return ExitToken.fatal();
         }
 
-        if (personAttributes.isEmpty()) {
+        if (persons.isEmpty()) {
             return tokenSuccessNoPeople;
         }
 
-        crowd =new Crowd();
-        List<PersonData> persons = new List<>(PersonData.class);
-        logger.debug("Parsing people list");
-        for (PersonAttribute personAttribute : personAttributes) {
-            //TODO get real People from CrowdAttributes
-            logger.debug("Person: " + personAttribute.toString() + "\nDist: ??  + \nage: " + personAttribute.getAge() + "\ngender: " + personAttribute.getGender() + "\ngesture: " + personAttribute.getGesture() + "\nposture: " + personAttribute.getPosture() + "\nshirtcolor: " + personAttribute.getShirtcolor() /*+ personAttribute.getDistanceToRobot() +*/);
-
-            //TODO get Confidence and reject those with a low confidence
-
-            if (personAttribute.getAge().equals("")) {
-                personAttribute.setAge("25-35");
-            }
-            PersonData person = new PersonData();
-            person.setPersonAttribute(personAttribute);
-
-
-            if (thisRoom) {
-                //TODO
-                /*
-                Point2D personPositionLocal = personAttribute.getPosition();
-                Point2D personPositionGlobal = CoordinateSystemConverter.localToGlobal(personPositionLocal, robotPos);
-                person.setLastKnownPosition(personPositionGlobal);
-
-                logger.debug("GlobalCoordinates: " + person.getLastKnownPosition());
-
-                if ((kBaseActuator.getArena().getCurrentRoom(person.getLastKnownPosition()).equals("outside") || kBaseActuator.getArena().getCurrentRoom(person.getLastKnownPosition()).equals("outside the arena"))) {
-                    logger.debug("Not in arena!");
+        crowd = new Crowd();
+        if (checkInArena) {
+            List<PersonData> personsInArena = persons;
+            for(PersonData p : persons) {
+                Arena arena = kBaseActuator.getArena();
+                logger.debug("Checking if person is inside arena; Got room: "+arena.getCurrentRoom(p.getPosition()));
+                if (arena.getCurrentRoom(p.getPosition()).equals("outside")) {
+                    logger.debug("Person not in arena");
+                    personsInArena.remove(p);
                 }
-                */
             }
-
-            persons.add(person);
+            if (personsInArena.isEmpty()) {
+                return tokenErrorNotInArena;
+            } else {
+                crowd.setPersons(personsInArena);
+            }
+        } else {
+            crowd.setPersons(persons);
         }
-        crowd.setPersons(persons);
 
         return tokenSuccessPeopleFound;
     }

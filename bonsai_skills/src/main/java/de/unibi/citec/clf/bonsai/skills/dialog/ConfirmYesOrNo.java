@@ -159,7 +159,7 @@ public class ConfirmYesOrNo extends AbstractSkill {
     private ExitToken simpleYesNo() {
 
         if (!speechManager.hasNewUnderstanding()) {
-            return ExitToken.loop();
+            return ExitToken.loop(50);
         }
 
         if (!speechManager.getUnderstoodWords(nonTerminalYes).isEmpty()) {
@@ -168,7 +168,7 @@ public class ConfirmYesOrNo extends AbstractSkill {
             return tokenSuccessPsNo;
         }
 
-        return ExitToken.loop();
+        return ExitToken.loop(50);
 
     }
 
@@ -176,7 +176,7 @@ public class ConfirmYesOrNo extends AbstractSkill {
 
         if (sayingComplete != null) {
             if (!sayingComplete.isDone()) {
-                return ExitToken.loop();
+                return ExitToken.loop(50);
             }
         }
 
@@ -189,13 +189,13 @@ public class ConfirmYesOrNo extends AbstractSkill {
                     logger.error("IO Exception in speechActuator");
                 }
                 nextRepeat = System.currentTimeMillis() + timeUntilRepeat;
-                return ExitToken.loop();
+                return ExitToken.loop(50);
             }
         }
 
         // Loop if no new Understandings
         if (!speechManager.hasNewUnderstanding()) {
-            return ExitToken.loop();
+            return ExitToken.loop(50);
         }
 
         if (!speechManager.getUnderstoodWords(nonTerminalYes).isEmpty()) {
@@ -209,7 +209,7 @@ public class ConfirmYesOrNo extends AbstractSkill {
         } catch (IOException ex) {
             logger.error("IO Exception in speechActuator");
         }
-        return ExitToken.loop();
+        return ExitToken.loop(50);
 
     }
 }

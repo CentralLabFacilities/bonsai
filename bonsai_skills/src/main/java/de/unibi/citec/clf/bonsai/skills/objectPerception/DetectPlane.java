@@ -147,7 +147,7 @@ public class DetectPlane extends AbstractSkill {
                 logger.fatal("Clafu takes longer than 10sec.");
                 return ExitToken.fatal();
             }*/
-            return ExitToken.loop();
+            return ExitToken.loop(50);
         }
 
         try {

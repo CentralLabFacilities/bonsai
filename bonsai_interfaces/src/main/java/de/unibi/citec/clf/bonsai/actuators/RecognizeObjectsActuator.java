@@ -16,7 +16,7 @@ import java.util.concurrent.ExecutionException;
  */
 public interface RecognizeObjectsActuator extends Actuator{
     
-    List<ObjectShapeData> recognize(boolean doSegmentation) throws InterruptedException, ExecutionException;
+    List<ObjectShapeData> recognize() throws InterruptedException, ExecutionException;
         
     PlanePatchList getLastDetectedPlanes();
 }

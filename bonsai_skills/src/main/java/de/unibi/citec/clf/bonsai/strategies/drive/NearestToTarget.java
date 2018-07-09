@@ -4,9 +4,12 @@ import de.unibi.citec.clf.bonsai.actuators.NavigationActuator;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException;
+import de.unibi.citec.clf.bonsai.util.CoordinateSystemConverter;
+import de.unibi.citec.clf.btl.data.geometry.PolarCoordinate;
 import de.unibi.citec.clf.btl.data.navigation.GlobalPlan;
 import de.unibi.citec.clf.btl.data.navigation.NavigationGoalData;
 import de.unibi.citec.clf.btl.data.navigation.PositionData;
+import de.unibi.citec.clf.btl.tools.MathTools;
 import de.unibi.citec.clf.btl.units.AngleUnit;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 import java.io.IOException;
@@ -19,6 +22,8 @@ import java.util.concurrent.Future;
  * @author nneumann
  */
 public class NearestToTarget extends DriveStrategyWithTryGoal {
+
+    GlobalPlan oldPlan = null;
 
     public NearestToTarget(NavigationActuator nav,
             Sensor<PositionData> robotPositionSensor, ISkillConfigurator conf) throws SkillConfigurationException {
@@ -33,7 +38,7 @@ public class NearestToTarget extends DriveStrategyWithTryGoal {
         Future<GlobalPlan> globalPlanRes;
         try {
             globalPlanRes = nav.getPlan(targetGoal, robotPos);
-            while(!globalPlanRes.isDone() && !globalPlanRes.isCancelled()) {
+            while (!globalPlanRes.isDone() && !globalPlanRes.isCancelled()) {
                 Thread.sleep(10); // better exittoken.loop() but how?
             }
             planToTarget = globalPlanRes.get();
@@ -43,21 +48,44 @@ public class NearestToTarget extends DriveStrategyWithTryGoal {
         } catch (InterruptedException | ExecutionException e) {
             logger.error("Could not recieve global plan ", e);
         }
-        if(planToTarget == null) {
-            logger.error("Could not make plan.");
-            return null;
+        if (planToTarget == null || planToTarget.isEmpty()) {
+            if (oldPlan == null || oldPlan.isEmpty()) {
+                if (closerSteps < closerMaxSteps) {
+                    logger.warn("Could not make plan. Setting Target nearer to robot");
+
+                    PolarCoordinate targetPolar = new PolarCoordinate(MathTools.globalToLocal(
+                            targetGoal, robotPos));
+
+                    double distance = targetPolar.getDistance(LengthUnit.METER);
+                    logger.debug("Old goal distance: " + distance);
+                    
+                    if (distance - (closerSteps * closerStepSize) < 0) {
+                        distance = 0;
+                    } else {
+                        distance = distance - (closerSteps * closerStepSize);
+                    }
+                    logger.debug("New goal distance: " + distance);
+                    
+                    ++closerSteps;
+
+                    return CoordinateSystemConverter.polar2NavigationGoalData(
+                            robotPos, targetPolar.getAngle(AngleUnit.RADIAN), distance, AngleUnit.RADIAN, LengthUnit.METER);
+                } else {
+                    logger.debug("Setting goal nearer to robot exausted. Giving up.");
+                    return null;
+                }
+            } else {
+                planToTarget = oldPlan;
+            }
         }
-        logger.debug("This is the plan: ");
-        for (int i = 0; i < planToTarget.size(); ++i) {
-            logger.debug(i + ": " + planToTarget.get(i));
-        }
+        oldPlan = planToTarget;
         logger.debug("Try Goal took: " + (System.nanoTime() - startTime));
         if ((!planToTarget.isEmpty()) && (takeGoal < replan)) {
             logger.info("Target goal reachable");
             planToTarget.get(Math.max(planToTarget.size() - takeGoal, 0)).setYaw(targetGoal.getYaw(AngleUnit.RADIAN), AngleUnit.RADIAN);
             return planToTarget.get(Math.max(planToTarget.size() - takeGoal, 0));
         }
-        logger.debug("Target Goal not reachable.");
+        logger.error("Already took " + replan + " replan steps. Giving up.");
         return null;
     }
 

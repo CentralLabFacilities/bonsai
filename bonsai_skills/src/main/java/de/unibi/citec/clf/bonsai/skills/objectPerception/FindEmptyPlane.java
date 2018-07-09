@@ -85,7 +85,7 @@ public class FindEmptyPlane extends AbstractSkill {
         }
 
         if (!futureB.isDone()) {
-            return ExitToken.loop();
+            return ExitToken.loop(50);
         }
 
         logger.debug("calfu is done");

@@ -54,6 +54,7 @@ public class SimpleSpeechHelper implements SensorListener<Utterance> {
     protected LinkedList<Utterance> utteranceBuffer = new LinkedList<>();
     private final Object utteranceBufferLock = new Object();
     private boolean hasNewUnderstandings = false;
+    private boolean hasNewSound = false;
 
     /**
      * Construct a new {@link SimpleSpeechHelper} instance.
@@ -98,6 +99,7 @@ public class SimpleSpeechHelper implements SensorListener<Utterance> {
                 list.addAll(l);
             }
             hasNewUnderstandings = false;
+            hasNewSound = false;
         }
         return list;
     }
@@ -162,7 +164,7 @@ public class SimpleSpeechHelper implements SensorListener<Utterance> {
      * Find and return the sub-tree where the given grammar non-terminal name is
      * the name of the sub-trees root node.
      *
-     * @param nt Name of the grammar non-terminal that is equal to the new root.
+     * @param grammarNonTerminal Name of the grammar non-terminal that is equal to the new root.
      * @return A sub-tree with a root node name equal to the given name.
      */
     public GrammarNonTerminal getSubTree(final String grammarNonTerminal) {
@@ -218,7 +220,7 @@ public class SimpleSpeechHelper implements SensorListener<Utterance> {
      * Find and return the sub-tree where the given grammar non-terminal name is
      * the name of the sub-trees root node.
      *
-     * @param nt Name of the grammar non-terminal that is equal to the new root.
+     * @param grammarNonTerminal Name of the grammar non-terminal that is equal to the new root.
      * @return A sub-tree with a root node name equal to the given name.
      */
     public List<GrammarNonTerminal> getSubTrees(final String grammarNonTerminal) {
@@ -509,8 +511,25 @@ public class SimpleSpeechHelper implements SensorListener<Utterance> {
 
     public Utterance getLastUtterance(){
         synchronized (utteranceBufferLock) {
-            return utteranceBuffer.getLast();
+            for(int i=utteranceBuffer.size();i>0;i--){
+                if(utteranceBuffer.get(i).isValid()){
+                    return utteranceBuffer.get(i);
+                }
+            }
         }
+        return null;
+    }
+
+    public List<Utterance> getAllUtterances(){
+        synchronized (utteranceBufferLock) {
+            //utteranceBuffer.clear();
+            hasNewUnderstandings = false;
+            return utteranceBuffer;
+        }
+    }
+
+    public void clearBuffer() {
+        utteranceBuffer.clear();
     }
     
     public List<GrammarTree> getAllTrees() {
@@ -527,9 +546,13 @@ public class SimpleSpeechHelper implements SensorListener<Utterance> {
     public void newDataAvailable(Utterance utter) {
         synchronized (utteranceBufferLock) {
             logger.debug("got new data: " + utter.getSimpleString());
-            logger.debug(utter.getGrammarTree().toString());
+            logger.debug("is valid: " + utter.isValid());
+            if (utter.isValid()) {
+                logger.debug(utter.getGrammarTree().toString());
+                hasNewUnderstandings = true;
+            }
             utteranceBuffer.add(utter);
-            hasNewUnderstandings = true;
+            hasNewSound = true;
         }
     }
 
@@ -539,12 +562,17 @@ public class SimpleSpeechHelper implements SensorListener<Utterance> {
             speechSensor.clear();
             utteranceBuffer.clear();
             hasNewUnderstandings = false;
+            hasNewSound = false;
         }
 
     }
 
     public boolean hasNewUnderstanding() {
         return hasNewUnderstandings;
+    }
+
+    public boolean hasNewSound() {
+        return hasNewSound;
     }
 
     public void removeHelper() {

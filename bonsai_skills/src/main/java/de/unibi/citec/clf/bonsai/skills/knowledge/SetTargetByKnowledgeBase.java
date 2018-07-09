@@ -77,6 +77,7 @@ public class SetTargetByKnowledgeBase extends AbstractSkill {
     public void configure(ISkillConfigurator configurator) throws SkillConfigurationException {
 
         useSpecificViewpoint = configurator.requestOptionalBool(KEY_USE_SPECIFIC_VIEWPOINT, useSpecificViewpoint);
+        logger.debug("############ requested use specific viewpoint " + useSpecificViewpoint);
 
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
         tokenErrorNoSuchLocation = configurator.requestExitToken(ExitStatus.ERROR().ps("NoSuchLocation"));
@@ -88,8 +89,10 @@ public class SetTargetByKnowledgeBase extends AbstractSkill {
         viewpointName = configurator.requestOptionalValue(KEY_VIEWPOINT, viewpointName);
 
         if (useSlot) {
+            logger.debug("############ configurating location slot");
             locationNameSlot = configurator.getReadSlot("LocationNameSlot", String.class);
             if (useSpecificViewpoint) {
+                logger.debug("############ configurating viewpoint slot");
                 viewpointNameSlot = configurator.getReadSlot("ViewpointNameSlot", String.class);
             }
         }
@@ -102,12 +105,15 @@ public class SetTargetByKnowledgeBase extends AbstractSkill {
     public boolean init() {
         try {
             if (useSlot) {
+                logger.debug("################################ using slots to retrieve location name");
                 locationName = locationNameSlot.recall();
             }
 
             if (locationName == null) {
                 logger.error("your LocationNameSlot was empty");
                 return false;
+            } else {
+                logger.debug("## recalled location slot " + locationName);
             }
 
         } catch (CommunicationException ex) {
@@ -115,14 +121,18 @@ public class SetTargetByKnowledgeBase extends AbstractSkill {
             return false;
         }
         if (useSpecificViewpoint) {
+            logger.debug("################################ using specific viewpoint");
             try {
                 if (useSlot) {
+                    logger.debug("################################ using slots to retrieve viewpoint name");
                     viewpointName = viewpointNameSlot.recall();
                 }
 
                 if (viewpointName == null) {
                     logger.error("your ViewpointNameSlot was empty");
                     return false;
+                } else {
+                    logger.debug("## recalled viewpoint slot " + locationName);
                 }
 
             } catch (CommunicationException ex) {

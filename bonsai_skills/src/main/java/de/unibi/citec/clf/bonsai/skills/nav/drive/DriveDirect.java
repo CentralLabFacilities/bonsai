@@ -172,7 +172,7 @@ public class DriveDirect extends AbstractSkill {
             return ExitToken.fatal();
         }
         if (!navResult.isDone()) {
-            return ExitToken.loop();
+            return ExitToken.loop(50);
         }
         logger.debug("Driving done!");
         try {

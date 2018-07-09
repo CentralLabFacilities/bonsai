@@ -76,8 +76,15 @@ public class PersonData extends BDO {
         strb.append("uuid: " + uuid + "; ");
         strb.append("timestamp: " + getTimestamp() + "; ");
         strb.append("name: \"" + name + "\"; ");
-        if (attributes.getGesture() != null) {
-            strb.append("gesture: \"" + attributes.getGesture().getGestureName()+"\"; ");
+        if (attributes.getGestures() != null) {
+            strb.append("gestures: [\"");
+            String prefix = "";
+            for(PersonAttribute.Gesture g: attributes.getGestures()){
+                strb.append(prefix);
+                prefix = ", ";
+                strb.append(g.getGestureName());
+            }
+            strb.append("]\"; ");
         }
         if (attributes.getPosture() != null) {
             strb.append("posture: \"" + attributes.getPosture().getPostureName()+"\"; ");

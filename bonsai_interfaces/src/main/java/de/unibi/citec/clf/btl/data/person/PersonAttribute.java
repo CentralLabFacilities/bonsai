@@ -3,6 +3,8 @@ package de.unibi.citec.clf.btl.data.person;
 import de.unibi.citec.clf.btl.Type;
 import org.apache.log4j.Logger;
 
+import java.util.List;
+
 /**
  * The Body class stores information about Body hypothesis coming from openpose.
  *
@@ -11,7 +13,7 @@ import org.apache.log4j.Logger;
  */
 public class PersonAttribute extends Type {
 
-    private Gesture gesture;
+    private List<Gesture> gestures;
     private Posture posture;
     private Gender gender;
     private Shirtcolor shirtcolor;
@@ -241,11 +243,28 @@ public class PersonAttribute extends Type {
 
     protected Logger logger = Logger.getLogger(this.getClass());
 
-    public Gesture getGesture() {
-        return gesture;
+    public Gesture getMostCharacteristicGesture(){
+        if(gestures.size()>0) {
+            if (gestures.contains(Gesture.WAVING)) {
+                return Gesture.WAVING;
+            } else if (gestures.contains(Gesture.RAISING_LEFT_ARM)) {
+                return Gesture.RAISING_LEFT_ARM;
+            } else if (gestures.contains(Gesture.RAISING_RIGHT_ARM)) {
+                return Gesture.RAISING_RIGHT_ARM;
+            } else if (gestures.contains(Gesture.POINTING_LEFT)) {
+                return Gesture.POINTING_LEFT;
+            } else if (gestures.contains(Gesture.POINTING_RIGHT)) {
+                return Gesture.POINTING_RIGHT;
+            }
+        }
+        return Gesture.NEUTRAL;
     }
-    public void setGesture(Gesture gesture) {
-        this.gesture = gesture;
+
+    public List<Gesture> getGestures() {
+        return gestures;
+    }
+    public void setGestures(List<Gesture> gestures) {
+        this.gestures = gestures;
     }
 
     public Posture getPosture() {
@@ -278,7 +297,7 @@ public class PersonAttribute extends Type {
 
     public int getAgeFrom() {
         if(age.equals("")){
-            throw new NumberFormatException();
+            return 0;
         }else if(age.contains("-")){
             return Integer.parseInt(age.split("-")[0]);
         }else{
@@ -287,7 +306,7 @@ public class PersonAttribute extends Type {
     }
     public int getAgeTo() {
         if(age.equals("")){
-            throw new NumberFormatException();
+            return 100;
         }else if(age.contains("-")){
             return Integer.parseInt(age.split("-")[1]);
         }else{

@@ -17,7 +17,6 @@ import java.util.concurrent.ExecutionException;
  * Robot recognizes objects and prepares to write them into report file
  * <pre>
  *
- * Options:
  *
  * Slots:
  *  ObjectShapeListSlot: [ObjectShapeList] [Write]
@@ -51,6 +50,7 @@ public class RecognizeObjects extends AbstractSkill {
 
     private List<ObjectShapeData> objectList;
 
+
     @Override
     public void configure(ISkillConfigurator configurator) {
 
@@ -72,16 +72,18 @@ public class RecognizeObjects extends AbstractSkill {
     public ExitToken execute() {
 
         try {
-            objectList = recognizeObjectsActuator.recognize(false);
+            objectList = recognizeObjectsActuator.recognize();
         } catch (InterruptedException | ExecutionException ex) {
             logger.error("Could not recognize objects: " + ex);
             return tokenError;
         }
 
+        if(objectList == null){
+            return tokenSuccessNoObjects;
+        }
         if (objectList.isEmpty()) {
             return tokenSuccessNoObjects;
         }
-
         return tokenSuccess;
     }
 

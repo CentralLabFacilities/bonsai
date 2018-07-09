@@ -113,7 +113,7 @@ public class NavigateTo extends AbstractSkill {
             case ERROR:
                 return tokenError;
             case NOT_FINISHED:
-                return ExitToken.loop();
+                return ExitToken.loop(50);
             case PATH_BLOCKED:
                 return tokenError;
             default:

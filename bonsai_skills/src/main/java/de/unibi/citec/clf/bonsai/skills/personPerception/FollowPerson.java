@@ -22,11 +22,12 @@ import de.unibi.citec.clf.btl.data.person.PersonDataList;
 import de.unibi.citec.clf.btl.tools.MathTools;
 import de.unibi.citec.clf.btl.units.AngleUnit;
 import de.unibi.citec.clf.btl.units.LengthUnit;
+
 import java.io.IOException;
 
 /**
  * Follow a given person.
- *
+ * <p>
  * <pre>
  *
  * Options:
@@ -67,8 +68,8 @@ import java.io.IOException;
  *  NavigationActuator: [NavigationActuator]
  *      -> Called to execute drive
  *  SpeechActuator:     [SpeechActuator]
- *      -> Used to ask the person to slow down     
- * 
+ *      -> Used to ask the person to slow down
+ *
  * </pre>
  *
  * @author lruegeme
@@ -91,8 +92,11 @@ public class FollowPerson extends AbstractSkill {
     private long talkdistance = 1900;
     private String slowDownMessage = "Please move slower!";
     private String strategy = "NearestToTarget";
+
     private ExitToken tokenErrorPersonLost;
     private ExitToken tokenErrorNoGoalTimeout;
+    // sets loop frequency to 14hz
+    private ExitToken tokenLoopDiLoop = ExitToken.loop(70);
 
     private final double NEW_GOAL_DISTANCE_THRESHOLD = 200;
     private final double NEW_GOAL_ANGLE_THRESHOLD = 0.3;
@@ -122,7 +126,7 @@ public class FollowPerson extends AbstractSkill {
     private long lasttalk = 0;
 
     private PositionData robotPosition = null;
-    double currentPersonDistance = 0;
+    private double currentPersonDistance = 0;
     private DriveStrategy driveStrategy;
 
     @Override
@@ -158,7 +162,7 @@ public class FollowPerson extends AbstractSkill {
 
     @Override
     public boolean init() {
-
+        lastPersonFound = System.currentTimeMillis();
         lastGoalSet = System.currentTimeMillis();
         lastGoalCheckSuccess = System.currentTimeMillis();
 
@@ -189,7 +193,7 @@ public class FollowPerson extends AbstractSkill {
 
         if (robotPosition == null) {
             logger.warn("Got no robot position");
-            return ExitToken.loop();
+            return tokenLoopDiLoop;
         }
 
         if (personFollow == null) {
@@ -205,9 +209,11 @@ public class FollowPerson extends AbstractSkill {
         lastPersonFound = System.currentTimeMillis();
         PolarCoordinate polar = new PolarCoordinate(MathTools.globalToLocal(personFollow.getPosition(), robotPosition));
 
-        double distance = calculateDriveDistance(polar);
+        double driveDistance = calculateDriveDistance(polar);
 
         boolean setAngleOnlyGoal = false;
+
+        logger.info("stopdistance: " + stopDistance + "; personDistance: " + currentPersonDistance + "; drivedistance: " + driveDistance);
 
         if (currentPersonDistance < stopDistance) {
             setAngleOnlyGoal = true;
@@ -218,12 +224,12 @@ public class FollowPerson extends AbstractSkill {
         if (setAngleOnlyGoal) {
             goal = CoordinateSystemConverter.polar2NavigationGoalData(robotPosition, polar.getAngle(AU), 0, AU, LU);
         } else {
-            goal = CoordinateSystemConverter.polar2NavigationGoalData(robotPosition, polar.getAngle(AU), distance, AU, LU);
+            goal = CoordinateSystemConverter.polar2NavigationGoalData(robotPosition, polar.getAngle(AU), driveDistance, AU, LU);
         }
 
         if (goal == null) {
             logger.error("goal null, looping");
-            return ExitToken.loop(250);
+            return tokenLoopDiLoop;
         }
 
         goal.setYawTolerance(0.2, AU);
@@ -238,7 +244,7 @@ public class FollowPerson extends AbstractSkill {
             if (newGoalTimeout > 0 && System.currentTimeMillis() > lastGoalSet + newGoalTimeout) {
                 logger.debug("no new goal in lastGoalTimeout");
 
-                if (distance > personLostDist) {
+                if (driveDistance > personLostDist) {
                     logger.debug("No new goal in: " + newGoalTimeout + "ms! and I am too far away!");
                     wrapUpPersonLost(robotPosition, lastPersonPosition);
                     return tokenErrorNoGoalTimeout;
@@ -248,7 +254,7 @@ public class FollowPerson extends AbstractSkill {
                 }
             }
         }
-        return ExitToken.loop(50);
+        return tokenLoopDiLoop;
     }
 
     private boolean checkSetNewGoal(NavigationGoalData goal, boolean withangle) {
@@ -286,7 +292,8 @@ public class FollowPerson extends AbstractSkill {
 
         List<PersonData> persons;
         try {
-            persons = personSensor.readLast(-1);
+            persons = personSensor.readLast(1);
+
         } catch (IOException | InterruptedException ex) {
             logger.error("Could not read from person sensor", ex);
             return null;
@@ -294,6 +301,10 @@ public class FollowPerson extends AbstractSkill {
         if (persons == null) {
             logger.warn("no persons found");
             return null;
+        }
+        
+        if (persons.size() == 0) {
+            logger.warn("########## Person list size is 0 ############");
         }
 
         for (PersonData person : persons) {
@@ -326,7 +337,7 @@ public class FollowPerson extends AbstractSkill {
             wrapUpPersonLost(robotPosition, lastPersonPosition);
             return tokenErrorPersonLost;
         } else {
-            return ExitToken.loop(personLostTimeout);
+            return tokenLoopDiLoop;
         }
     }
 
@@ -354,7 +365,7 @@ public class FollowPerson extends AbstractSkill {
     private double calculateDriveDistance(PolarCoordinate polar) {
         double distance;
         currentPersonDistance = polar.getDistance(LU);
-        distance = polar.getDistance(LU) - stopDistance;
+        distance = currentPersonDistance - stopDistance;
 
         if (distance < 0) {
             distance = 0;
@@ -365,8 +376,13 @@ public class FollowPerson extends AbstractSkill {
 
     @Override
     public ExitToken end(ExitToken curToken) {
+        logger.debug("Lost Person, Stopping nav act.");
+        try {
+            navActuator.manualStop();
+        } catch (IOException e) {
+            logger.error("could not manual stop", e);
+        }
 
-        
         if (lastPersonPosition != null) {
             try {
                 lastPersonPositionSlot.memorize(lastPersonPosition);

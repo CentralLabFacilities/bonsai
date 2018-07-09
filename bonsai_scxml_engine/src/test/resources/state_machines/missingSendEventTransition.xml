@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0"
+       initial="init">
+    <datamodel>
+        <data id="#_STATE_PREFIX" expr="'de.unibi.citec.clf.bonsai.skills.'"/>
+        <data id="#_SLOTS">
+            <slots>
+                <slot key="StringSlot" state="SlotIO" xpath="/null"/>
+            </slots>
+        </data>
+    </datamodel>
+
+    <state id="init" initial="SlotIO">
+
+        <state id="SlotIO">
+            <transition event="SlotIO.success">
+                <send event="BLUB"/>
+            </transition>
+            <transition event="SlotIO.error">
+                <send event="BLUB2"/>
+            </transition>
+            <transition event="SlotIO.fatal"/>
+        </state>
+
+        <transition event="BLUB" target="End"/>
+    </state>
+
+
+    <state id="Fatal" final="true"/>
+
+    <state id="End" final="true"/>
+</scxml>

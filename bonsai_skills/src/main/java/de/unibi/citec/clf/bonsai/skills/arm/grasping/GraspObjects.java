@@ -206,7 +206,7 @@ public class GraspObjects extends AbstractSkill {
         curTarget = targets.get(curIdx);
         logger.info("trying " + curIdx + "of " + targets.size() + " \n\t" + curTarget.getId() + " is " + curTarget.getBestLabel() + "(" + curTarget.getBestRel() + ") at " + curTarget.getCenter());
         returnFuture = armController.graspObject(curTarget, group);
-        return ExitToken.loop();
+        return ExitToken.loop(50);
 
     }
 

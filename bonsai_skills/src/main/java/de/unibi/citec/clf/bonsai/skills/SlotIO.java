@@ -55,7 +55,8 @@ public class SlotIO extends AbstractSkill {
     @Override
     public ExitToken end(ExitToken curToken) {
         if (write.isEmpty()) {
-            return curToken;
+            logger.debug("Write is empty. Slot will be empty");
+            //return curToken;
         }
 
         logger.debug("write <"+write+"> to slot");

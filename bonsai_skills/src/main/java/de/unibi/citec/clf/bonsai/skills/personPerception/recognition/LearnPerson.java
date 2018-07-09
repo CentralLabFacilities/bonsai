@@ -104,7 +104,7 @@ public class LearnPerson extends AbstractSkill {
     @Override
     public ExitToken execute() {
         if (!learnCompleted.isDone()) {
-            return ExitToken.loop();
+            return ExitToken.loop(100);
         }
 
         try {

@@ -10,9 +10,9 @@ import java.util.Set;
 
 public class LoadingResults {
 
-    public ConfigurationResults configurationResults;
-    public StateMachineConfiguratorResults stateMachineResults;
-    public ValidationResult validationResult;
+    public ConfigurationResults configurationResults = new ConfigurationResults();
+    public StateMachineConfiguratorResults stateMachineResults = new StateMachineConfiguratorResults();
+    public ValidationResult validationResult = new ValidationResult();
     public Set<LoadingException> loadingExceptions = new HashSet<>();
     public String statePrefix = "";
     public boolean showDefaultSlotWarnings = true;

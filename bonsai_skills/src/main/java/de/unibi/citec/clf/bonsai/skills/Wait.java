@@ -31,14 +31,14 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 public class Wait extends AbstractSkill {
 
     private static final String DEFAULT_KEY = "#_TIMEOUT";
-    private long timeout;
+    private long timeout = 1000;
 
     private ExitToken tokenSuccess;
 
     @Override
     public void configure(ISkillConfigurator configurator) {
 
-        timeout = configurator.requestInt(DEFAULT_KEY);
+        timeout = configurator.requestOptionalInt(DEFAULT_KEY, (int)timeout);
         
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
     }
@@ -57,7 +57,7 @@ public class Wait extends AbstractSkill {
         if (timeout < System.currentTimeMillis()) {
             return tokenSuccess;
         }
-        return ExitToken.loop(500);
+        return ExitToken.loop(50);
     }
 
     @Override

@@ -135,7 +135,7 @@ public class GetNewFollowId extends AbstractSkill {
     private List<PersonData> getPersons() {
         List<PersonData> persons = null;
         try {
-            persons = personSensor.readLast(-1);
+            persons = personSensor.readLast(500);
         } catch (IOException | InterruptedException ex) {
             logger.error("Exception while retrieving persons from sensor !", ex);
         }

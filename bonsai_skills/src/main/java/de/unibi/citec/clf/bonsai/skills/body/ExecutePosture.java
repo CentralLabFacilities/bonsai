@@ -28,7 +28,7 @@ public class ExecutePosture extends AbstractSkill {
     private boolean blocking = true;
     private String pose;
     private String group = null;
-    private long timeout = 4000;
+    private long timeout = 10000;
 
     private PostureActuator poseActuator;
     private Future<Boolean> ret;
@@ -63,7 +63,7 @@ public class ExecutePosture extends AbstractSkill {
             if (timeout < System.currentTimeMillis()) {
                 return ExitToken.fatal();
             }
-            return ExitToken.loop();
+            return ExitToken.loop(50);
         }
 
         return tokenSuccess;

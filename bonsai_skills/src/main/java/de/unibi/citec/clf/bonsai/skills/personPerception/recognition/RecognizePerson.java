@@ -87,7 +87,7 @@ public class RecognizePerson extends AbstractSkill {
     @Override
     public ExitToken execute() {
         while (!recognizeCompleted.isDone()) {
-            return ExitToken.loop();
+            return ExitToken.loop(100);
         }
 
         try {

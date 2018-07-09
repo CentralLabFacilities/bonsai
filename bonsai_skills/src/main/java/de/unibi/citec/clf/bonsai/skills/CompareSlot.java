@@ -71,6 +71,9 @@ public class CompareSlot extends AbstractSkill {
 
     @Override
     public ExitToken execute() {
+        if (slotContent == null) {
+            return tokenError;
+        }
         if (slotContent.equals(compareString)) {
             return tokenMatch;
         }
@@ -79,11 +82,6 @@ public class CompareSlot extends AbstractSkill {
 
     @Override
     public ExitToken end(ExitToken curToken) {
-        if (curToken.getExitStatus().isSuccess()) {
-            if(slotContent == null){
-                return tokenError;
-            }
-        }
         return curToken;
     }
 }

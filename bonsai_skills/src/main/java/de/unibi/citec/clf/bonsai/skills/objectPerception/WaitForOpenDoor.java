@@ -79,7 +79,7 @@ public class WaitForOpenDoor extends AbstractSkill implements
         }
 
         if (!isOpen) {
-            return ExitToken.loop();
+            return ExitToken.loop(50);
         }
         return tokenSuccess;
     }

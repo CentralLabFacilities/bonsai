@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0"
+       initial="dialog.Talk#KnockKnock">
+
+    <state id="dialog.Talk#KnockKnock">
+        <datamodel>
+            <data id="#_MESSAGE" expr="'Knock knock, please open the door.'"/>
+            <data id="#_NONBLOCKING" expr="'false'"/>
+        </datamodel>
+        <transition event="Talk.success" target="objectPerception.WaitForOpenDoor"/>
+        <transition event="Talk.success.timeout" target="objectPerception.WaitForOpenDoor"/>
+        <transition event="Talk.fatal">
+            <send event="fatal"/>
+        </transition>
+    </state>
+
+    <state id="objectPerception.WaitForOpenDoor">
+        <datamodel>
+            <data id="#_TIMEOUT" expr="100000"/>
+            <data id="#_DIFF" expr="'1.5'"/>
+        </datamodel>
+        <transition event="WaitForOpenDoor.success" target="nav.drive.DriveDirect#enter"/>
+        <transition event="WaitForOpenDoor.success.timeout" target="nav.drive.DriveDirect#enter"/>
+        <transition event="WaitForOpenDoor.fatal">
+            <send event="fatal"/>
+        </transition>
+    </state>
+
+    <!-- drive 1m straight ahead -->
+    <state id="nav.drive.DriveDirect#enter">
+        <datamodel>
+            <data id="#_ENABLE_OBSTACLE" expr="true"/>
+            <data id="#_TIMEOUT" expr="15000"/>
+            <data id="#_DIST" expr="'1.0'"/>
+            <data id="#_SPEED" expr="'0.5'"/>
+        </datamodel>
+        <transition event="DriveDirect.*">
+            <send event="success"/>
+        </transition>
+    </state>
+
+</scxml>

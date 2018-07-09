@@ -83,8 +83,8 @@ public class SaySlot extends AbstractSkill {
         }
 
         if (sayStr == null) {
-            logger.error("String from slot is null");
-            return false;
+            logger.info("String from slot was not set, will use \"\" and ");
+            sayStr = "";
         }
 
         sayStr = sayText.replaceAll(Matcher.quoteReplacement(REPLACE_STRING), sayStr);
@@ -102,7 +102,7 @@ public class SaySlot extends AbstractSkill {
     @Override
     public ExitToken execute() {
         if (!sayingComplete.isDone() && blocking) {
-            return ExitToken.loop();
+            return ExitToken.loop(50);
         }
         return tokenSuccess;
     }

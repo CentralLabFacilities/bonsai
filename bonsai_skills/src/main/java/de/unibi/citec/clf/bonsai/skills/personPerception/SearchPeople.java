@@ -12,6 +12,7 @@ import de.unibi.citec.clf.btl.data.navigation.PositionData;
 import de.unibi.citec.clf.btl.data.person.PersonData;
 import de.unibi.citec.clf.btl.data.person.PersonDataList;
 import de.unibi.citec.clf.btl.units.AngleUnit;
+import de.unibi.citec.clf.btl.units.LengthUnit;
 
 import java.io.IOException;
 import java.util.List;
@@ -30,6 +31,7 @@ import java.util.List;
  *                          -> How far the person can be away from the robot in mm
  *  #_MAX_ANGLE:        [double] Optional (default: Double.MAX_VALUE)
  *                          -> Person must be inside this angle cone in front of the robot in rad
+ *                          will not be taken into account at the moment!
  *  #_TIMEOUT           [long] Optional (default: -1)
  *                          -> Amount of time robot searches for a person in ms
  *
@@ -83,7 +85,7 @@ public class SearchPeople extends AbstractSkill {
         timeout = configurator.requestOptionalInt(KEY_TIMEOUT, (int) timeout);
 
         if (timeout > 0) {
-            tokenSuccessNoPeople = configurator.requestExitToken(ExitStatus.ERROR().withProcessingStatus("noPeople"));
+            tokenSuccessNoPeople = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus("noPeople"));
         }
         tokenSuccessPeople = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus("people"));
         tokenError = configurator.requestExitToken(ExitStatus.ERROR());
@@ -130,19 +132,25 @@ public class SearchPeople extends AbstractSkill {
 
         if (possiblePersons == null) {
             logger.warn("Seen persons is null");
-            return ExitToken.loop();
+            return ExitToken.loop(50);
         }
 
         if (possiblePersons.isEmpty()) {
-            return ExitToken.loop();
+            return ExitToken.loop(50);
         }
 
         for (PersonData currentPerson : possiblePersons) {
             logger.info("possible person: " + currentPerson.getUuid());
             double angle = robotPosition.getRelativeAngle(currentPerson.getPosition(), AngleUnit.RADIAN);
+            double distance = robotPosition.getDistance(currentPerson.getPosition(), LengthUnit.MILLIMETER);
 
             if (!(angle < searchAngle / 2 && angle > searchAngle / -2)) {
                 logger.debug("Person with angle" + angle + " out of search angle");
+                logger.info("lol dont care");
+                //continue;
+            }
+            if(distance > searchRadius){
+                logger.info("Person with distance " + distance + " is out of search distance");
                 continue;
             }
 
@@ -154,7 +162,7 @@ public class SearchPeople extends AbstractSkill {
         if (foundPersons.elements.size() > 0) {
             return tokenSuccessPeople;
         }
-        return ExitToken.loop();
+        return ExitToken.loop(50);
     }
 
     @Override
