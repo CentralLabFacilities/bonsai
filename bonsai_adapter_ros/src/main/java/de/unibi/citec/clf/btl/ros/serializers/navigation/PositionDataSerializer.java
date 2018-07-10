@@ -21,6 +21,9 @@ import javax.vecmath.Vector3d;
  */
 public class PositionDataSerializer extends RosSerializer<PositionData, geometry_msgs.Pose> {
 
+    private static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger(PositionDataSerializer.class);
+
+
     public PositionDataSerializer() {
     }
 
@@ -45,7 +48,12 @@ public class PositionDataSerializer extends RosSerializer<PositionData, geometry
         yaw = pose.getRotation().getYaw(AngleUnit.RADIAN);
 
         PositionData position = new PositionData(x, y, yaw, 0, LengthUnit.METER, AngleUnit.RADIAN, TimeUnit.MILLISECONDS);
-        position.setFrameId(pose.getFrameId());
+        if(pose.getFrameId().isEmpty()) {
+            position.setFrameId("map");
+            logger.warn("incoming positionData has no frame, assuming map");
+        } else {
+            position.setFrameId(pose.getFrameId());
+        }
         return position;
     }
 
