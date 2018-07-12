@@ -245,16 +245,11 @@ public class SCXMLOverviewController implements IStateListener {
         FXGUI.setEnabled(false);
         filterField.textProperty().setValue("");
 
-        try {
-            String ret = remote.load(textConfig.getText(), textScxml.getText(), includeMapping);
-
+        String ret = remote.load(textConfig.getText(), textScxml.getText(), includeMapping);
         if (!ret.isEmpty()) {
             showResultAlert(ret);
         } else {
             logger.info("loading finished without error");
-        }
-        } catch (Exception e) {
-            logger.fatal(e);
         }
 
         FXGUI.setEnabled(true);

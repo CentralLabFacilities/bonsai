@@ -125,13 +125,15 @@ public class ROSController extends RosNode implements SCXMLRemote {
         clientLoad.call(req, res);
 
         try {
-            LoadStatemachineResponse result = res.get(10, TimeUnit.SECONDS);
+            LoadStatemachineResponse result = res.get();
             return result.getResp();
         } catch (InterruptedException | ExecutionException ex) {
             logger.fatal(ex);
-        } catch (TimeoutException ex) {
-            logger.fatal("timeout calling load" + ex.getMessage());
         }
+//        } catch (TimeoutException ex) {
+//            logger.fatal("timeout calling load" + ex.getMessage());
+//            return "timeout";
+//        }
 
         return "unknown error";
     }
@@ -286,7 +288,7 @@ public class ROSController extends RosNode implements SCXMLRemote {
             clientStopEvents = connectedNode.newServiceClient(serverTopic + "/" + ROSServer.T_STOP_EVENTS, DisableAutomaticTransitions._TYPE);
             clientStop = connectedNode.newServiceClient(serverTopic + "/" + ROSServer.T_STOP, Empty._TYPE);
         } catch (ServiceNotFoundException ex) {
-            logger.error(ex);
+            logger.fatal(ex);
         }
         initialized = true;
     }

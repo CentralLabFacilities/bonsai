@@ -100,7 +100,7 @@ public class StatemachineTest {
         final String conf = "TestConfig.xml";
 
         TestListener test = TestListener.newEndFatal();
-        //failing for now
+        //failing for now 
 //        assertTrue(TestTools.testStatemachine(conf, sm, test));
     }
 

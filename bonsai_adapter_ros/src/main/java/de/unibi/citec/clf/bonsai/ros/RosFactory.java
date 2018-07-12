@@ -7,6 +7,7 @@ import de.unibi.citec.clf.bonsai.core.exception.ConfigurationException;
 import de.unibi.citec.clf.bonsai.core.exception.CoreObjectCreationException;
 import de.unibi.citec.clf.bonsai.core.exception.InitializationException;
 import de.unibi.citec.clf.bonsai.core.object.*;
+import de.unibi.citec.clf.bonsai.util.MapReader;
 import de.unibi.citec.clf.bonsai.util.reflection.ReflectionServiceDiscovery;
 import de.unibi.citec.clf.bonsai.util.reflection.ServiceDiscovery;
 import de.unibi.citec.clf.btl.ros.MsgTypeFactory;
@@ -51,6 +52,11 @@ public class RosFactory implements CoreObjectFactory {
 
     protected Map<String, ConfiguredObject> configuredObjectsByKey = new ConcurrentHashMap<>();
     private TFTransformer coordinateTransformer;
+
+
+    //
+    private static final String KEY_INIT_TIMEOUT = "#_INIT_TIMEOUT";
+    private long initTimeout = 3000;
 
     private class ConfiguredObject {
 
@@ -116,7 +122,7 @@ public class RosFactory implements CoreObjectFactory {
         c.setNodeName(node.getDefaultNodeName());
         nodeMainExecutor.execute(node, c);
         //wait for node to be initialized
-        if (wait && !node.isInitialised().get(2000, TimeUnit.MILLISECONDS)) {
+        if (wait && !node.isInitialised().get(initTimeout, TimeUnit.MILLISECONDS)) {
             throw new ExecutionException(new TimeoutException("could not start node in 2s"));
         }
         logger.debug(node.getDefaultNodeName() + ", should be started");
@@ -338,7 +344,7 @@ public class RosFactory implements CoreObjectFactory {
     @Override
     public FactoryConfigurationResults configureCoordinateTransformer(CoordinateTransformerToConfigure transformer) throws IllegalArgumentException, CoreObjectCreationException {
 
-        logger.fatal("Configuring transformer: " + transformer);
+        logger.info("Configuring transformer: " + transformer);
         FactoryConfigurationResults results = new FactoryConfigurationResults();
 
         if (transformer.getTransformerClass().equals(TFTransformer.class)) {
@@ -525,6 +531,13 @@ public class RosFactory implements CoreObjectFactory {
     public void initialize(Map<String, String> options)
             throws IllegalArgumentException, InitializationException {
 
+        try {
+            initTimeout = MapReader.readConfigLong(KEY_INIT_TIMEOUT,initTimeout,options);
+        } catch (MapReader.KeyNotFound keyNotFound) {
+            throw new IllegalArgumentException(keyNotFound);
+        }
+        logger.info("set init timeout to " + initTimeout);
+
         knownActuators = serviceDiscoveryActuator.discoverServicesByInterface(RosNode.class);
         knownSensors = serviceDiscoverySensor.discoverServicesByInterface(RosSensor.class);
 //        try {
@@ -533,6 +546,8 @@ public class RosFactory implements CoreObjectFactory {
 //        } catch (MapReader.KeyNotFound ex) {
 //            java.util.logging.Logger.getLogger(RosFactory.class.getName()).log(Level.SEVERE, null, ex);
 //        }
+
+
 
         logger.debug("Ros factory initialize");
         logger.trace("found " + knownActuators.size() + " actuators:");
@@ -656,7 +671,7 @@ public class RosFactory implements CoreObjectFactory {
         nodesQuene.parallelStream().forEach((node) -> {
             String key = node.getKey();
             try {
-                if (!node.isInitialised().get(3000, TimeUnit.MILLISECONDS)) {
+                if (!node.isInitialised().get(initTimeout, TimeUnit.MILLISECONDS)) {
                     logger.warn("node is not started " + key);
                     res.exceptions.add(new CoreObjectCreationException("node is not started " + key));
                 } else {

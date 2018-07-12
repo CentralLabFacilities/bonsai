@@ -26,7 +26,7 @@ public class SCXMLStarterROS extends SCXMLStarter {
 
     public static final String DEFAULT_TOPIC_TRANSITIONS = "/bonsai/transitions";
     public static final String DEFAULT_TOPIC_STATUS = "/bonsai/status";
-    public static final String DEFAULT_TOPIC_STATES = "/bonsai/status";
+    public static final String DEFAULT_TOPIC_STATES = "/bonsai/states";
     public static final String DEFAULT_SERVER_TOPIC = "/bonsai/server";
 
 

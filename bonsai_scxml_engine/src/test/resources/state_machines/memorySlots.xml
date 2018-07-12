@@ -18,6 +18,7 @@
             <data id="#_WRITE" expr="'A'"/>
         </datamodel>
         <transition event="SlotIO.success" target="SlotIO#writeB"/>
+        <transition event="SlotIO.error" target="End"/>
         <transition event="SlotIO.fatal" target="Fatal"/>
     </state>
 
@@ -26,16 +27,19 @@
             <data id="#_WRITE" expr="'B'"/>
         </datamodel>
         <transition event="SlotIO.success" target="SlotIO#readA"/>
+        <transition event="SlotIO.error" target="End"/>
         <transition event="SlotIO.fatal" target="Fatal"/>
     </state>
 
     <state id="SlotIO#readA">
         <transition event="SlotIO.success" target="SlotIO#readB"/>
+        <transition event="SlotIO.error" target="End"/>
         <transition event="SlotIO.fatal" target="Fatal"/>
     </state>
 
     <state id="SlotIO#readB">
         <transition event="SlotIO.success" target="End"/>
+        <transition event="SlotIO.error" target="End"/>
         <transition event="SlotIO.fatal" target="Fatal"/>
     </state>
 
