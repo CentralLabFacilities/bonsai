@@ -1,4 +1,5 @@
 string config
 string task
+bool isPath
 ---
 string resp
