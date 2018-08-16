@@ -5,16 +5,11 @@ import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
-import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.btl.data.navigation.NavigationGoalData;
-import de.unibi.citec.clf.bonsai.util.MapReader;
 import de.unibi.citec.clf.btl.units.TimeUnit;
 
 import java.util.Date;
-import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * @author kkonen
@@ -82,7 +77,7 @@ public class CheckTime extends AbstractSkill {
             try {
                 start_time_slot.memorize(time_created);
             } catch (CommunicationException ex) {
-                Logger.getLogger(CheckTime.class.getName()).log(Level.SEVERE, null, ex);
+                logger.error(ex.getMessage());
             }
             return tokenSuccessStart;
         }

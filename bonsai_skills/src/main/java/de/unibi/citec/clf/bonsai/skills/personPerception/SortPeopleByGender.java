@@ -70,7 +70,7 @@ public class SortPeopleByGender extends AbstractSkill {
     @Override
     public ExitToken execute() {
         if(gender.toLowerCase().equals("unknown") || gender.equals("")){
-            logger.info("No gender given, not sorting anything: ");
+            logger.debug("No gender given, not sorting anything: ");
             newPersonDataList = personDataList;
             return tokenSuccess;
         }

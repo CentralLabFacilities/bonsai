@@ -159,6 +159,7 @@ public class SelectObjectFromProp extends AbstractSkill {
         if(rcObject == null){
             return tokenError;
         }
+        logger.info("selected object \"" + rcObject.getName() + "\" based on property \"" + property + "\"");
         return tokenSuccess;
     }
 

@@ -87,7 +87,7 @@ public class WaitForNonterminals extends AbstractSkill {
     public boolean init() {
 
         if (timeout > 0) {
-            logger.info("using timeout of " + timeout + " ms");
+            logger.debug("using timeout of " + timeout + " ms");
             timeout += System.currentTimeMillis();
         }
         speechManager = new SimpleSpeechHelper(speechSensor, true);
@@ -127,6 +127,7 @@ public class WaitForNonterminals extends AbstractSkill {
                         logger.error("Can not write terminals " + nonterminal + " to memory.", e);
                         return ExitToken.fatal();
                     }
+                    logger.info("understood \"" + terminals + "\"");
                     return tokenMap.get(nonterminal);
                 }
             }

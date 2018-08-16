@@ -76,9 +76,9 @@ public class StartPeopleTracking extends AbstractSkill {
     private Sensor<PersonDataList> personSensor;
     private MemorySlotWriter<PersonData> personDataSlot;
 
-    private long timeoutRoi = 10000;
-    private long timeoutTracker = 10000;
-    private long timeoutPersonSensor = 10000;
+    private long timeoutRoi = 20000;
+    private long timeoutTracker = 20000;
+    private long timeoutPersonSensor = 20000;
     private PersonData personData = null;
     private Future<java.util.List<Integer>> roiFut;
     private Future<Boolean> trackingFut;
@@ -101,8 +101,8 @@ public class StartPeopleTracking extends AbstractSkill {
         personDataSlot = configurator.getWriteSlot("PersonDataSlot", PersonData.class);
 
         timeoutRoi = configurator.requestOptionalInt(KEY_TIMEOUT_ROI, (int) timeoutRoi);
-        timeoutTracker = configurator.requestOptionalInt(KEY_TIMEOUT_TRACKER, (int) timeoutRoi);
-        timeoutPersonSensor = configurator.requestOptionalInt(KEY_TIMEOUT_PERSONSENSOR, (int) timeoutRoi);
+        timeoutTracker = configurator.requestOptionalInt(KEY_TIMEOUT_TRACKER, (int) timeoutTracker);
+        timeoutPersonSensor = configurator.requestOptionalInt(KEY_TIMEOUT_PERSONSENSOR, (int) timeoutPersonSensor);
     }
 
     @Override
@@ -116,7 +116,7 @@ public class StartPeopleTracking extends AbstractSkill {
             return false;
         }
 
-        logger.info("OPENPOSE SERVICE CALL ROI TRIGGERED");
+        logger.debug("OPENPOSE SERVICE CALL ROI TRIGGERED");
 
         if (timeoutRoi > 0) {
             logger.debug("using timeout of " + timeoutRoi + " ms for ROI generation");
@@ -146,6 +146,12 @@ public class StartPeopleTracking extends AbstractSkill {
                 if(roiFut.get().get(0) == 0 && roiFut.get().get(1) == 0 && roiFut.get().get(2) == 0 && roiFut.get().get(3) == 0){
                     return tokenErrorNoPerson;
                 }
+                // check width is enough
+                if(roiFut.get().get(3) < 80) {
+                    int diff = 80-roiFut.get().get(3);
+                    roiFut.get().set(0, (int) (roiFut.get().get(0) - diff/2));
+                    roiFut.get().set(3, roiFut.get().get(3) + diff);
+                }
             } catch (InterruptedException | ExecutionException e) {
                 logger.error("could not reach detect people actuator for roi generation service call ", e);
                 return tokenError;
@@ -158,7 +164,7 @@ public class StartPeopleTracking extends AbstractSkill {
                 return tokenError;
             }
 
-            logger.info("TRACKER INITALIZE SERVICE CALL TRIGGERED");
+            logger.debug("TRACKER INITALIZE SERVICE CALL TRIGGERED");
 
             if (timeoutTracker > 0) {
                 logger.debug("using timeout of " + timeoutTracker + " ms for Tracker initialization");
@@ -199,7 +205,7 @@ public class StartPeopleTracking extends AbstractSkill {
             return ExitToken.loop(50);
         }
 
-        logger.info("PERSON SENSOR GOT FIRST PERSON PERCEPT");
+        logger.debug("PERSON SENSOR GOT FIRST PERSON PERCEPT");
 
         return tokenSuccess;
     }

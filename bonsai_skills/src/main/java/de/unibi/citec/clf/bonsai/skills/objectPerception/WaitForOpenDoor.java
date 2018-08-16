@@ -61,10 +61,10 @@ public class WaitForOpenDoor extends AbstractSkill implements
         initAvgDist = 0;
 
         if (timeout > 0) {
-            logger.info("using timeout of " + timeout + "ms");
+            logger.debug("using timeout of " + timeout + "ms");
             timeout += System.currentTimeMillis();
         }
-        logger.info("using diff threshold of " + distDiff);
+        logger.debug("using diff threshold of " + distDiff);
 
         return true;
     }

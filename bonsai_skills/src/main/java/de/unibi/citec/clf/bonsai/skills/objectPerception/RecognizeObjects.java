@@ -84,6 +84,7 @@ public class RecognizeObjects extends AbstractSkill {
         if (objectList.isEmpty()) {
             return tokenSuccessNoObjects;
         }
+        logger.info("recognized objects: " + objectList.toString());
         return tokenSuccess;
     }
 

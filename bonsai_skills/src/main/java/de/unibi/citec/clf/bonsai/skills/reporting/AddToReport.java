@@ -83,7 +83,7 @@ public class AddToReport extends AbstractSkill {
             return false;
         }
         if (report == null) {
-            logger.error("String from slot is null, will be set to empty string.");
+            logger.info("String from slot is null, will be set to empty string.");
             report = "";
         }
 
@@ -96,7 +96,7 @@ public class AddToReport extends AbstractSkill {
             return false;
         }
         if (report == null) {
-            logger.error("String from slot is null, will be set to empty string.");
+            logger.info("String from slot is null, will be set to empty string.");
             info = "";
         }
 

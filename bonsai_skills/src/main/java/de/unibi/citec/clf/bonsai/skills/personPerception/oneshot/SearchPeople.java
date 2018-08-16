@@ -144,9 +144,8 @@ public class SearchPeople extends AbstractSkill {
         do_face_id_bool = (do_face_id == 1);
         do_gender_age_bool = (do_gender_age == 1);
         logger.debug("Detecting Persons");
-        logger.info("Do face id = " + do_face_id_bool);
-        logger.info("Do gender and age = " + do_gender_age_bool);
-        logger.info("Resize Out Ratio = " + resize_out_ratio);
+        logger.info("Do face id = " + do_face_id_bool + ". Do gender and age = " + do_gender_age_bool + ". Resize Out Ratio = " + resize_out_ratio);
+
         try {
             possiblePersons = null;
             peopleFuture = peopleActuator.getPeople(do_gender_age_bool, do_face_id_bool, resize_out_ratio);
@@ -187,53 +186,37 @@ public class SearchPeople extends AbstractSkill {
 
         if (possiblePersons == null) {
             logger.warn("Seen persons is null");
-            try {
-                possiblePersons = null;
-                peopleFuture = peopleActuator.getPeople();
-                current_actuator_timeout = actuator_timeout + System.currentTimeMillis();
-            } catch (InterruptedException | ExecutionException e) {
-                logger.error(e);
-                return tokenError;
-            }
-            return ExitToken.loop(50);
+            return tokenError;
         }
 
         if (possiblePersons.isEmpty()) {
-            try {
-                possiblePersons = null;
-                peopleFuture = peopleActuator.getPeople();
-                current_actuator_timeout = actuator_timeout + System.currentTimeMillis();
-            } catch (InterruptedException | ExecutionException e) {
-                logger.error(e);
-                return tokenError;
-            }
+            logger.info("Seen no persons");
             return tokenSuccessNoPeople;
         }
 
         for (PersonData currentPerson : possiblePersons) {
-            logger.info("I saw a person - checking angle now; searchangle= " + searchAngle);
             PositionData localPersonPos = currentPerson.getPosition();
-            logger.info("Local Person position " + localPersonPos.toString());
             PositionData globalPersonPos = CoordinateSystemConverter.localToGlobal(localPersonPos, robotPosition);
-            logger.info("Global Person position " + globalPersonPos.toString());
+            logger.info("I saw a person - checking angle now; searchangle= " + searchAngle + ". Local Person position "
+                    + localPersonPos.toString() + ". Global Person position " + globalPersonPos.toString());
             double angle = robotPosition.getRelativeAngle(globalPersonPos, AngleUnit.RADIAN);
 
             if (!(angle > searchAngle / -2 && angle <= 0) && !(angle < Math.PI * -2 + (searchAngle / 2) && angle >= Math.PI * -2)) {
-                logger.info("NOT IN SEARCH ANGLE - Person angle " + angle);
-                logger.info("success condition was: " + angle + " < " + searchAngle / 2 + " && " + angle + " < " + (Math.PI * -2 + (searchAngle / 2)));
-                logger.info("lol dont care");
+                logger.info("NOT IN SEARCH ANGLE - Person angle " + angle +
+                        ". success condition was: " + angle + " < " + searchAngle / 2 + " && " + angle + " < " + (Math.PI * -2 + (searchAngle / 2))
+                        + "lol dont care"
+                );
                 //continue;
             }
             if (localPersonPos.getDistance(new Point2D(0.0, 0.0, LengthUnit.METER), LengthUnit.MILLIMETER) > searchRadius) {
-                logger.info("search distance is: " + searchRadius);
-                logger.info("person to far away: " + localPersonPos.getDistance(new Point2D(0.0, 0.0, LengthUnit.METER), LengthUnit.MILLIMETER));
+                logger.info("search distance is: " + searchRadius + ". person to far away: "
+                        + localPersonPos.getDistance(new Point2D(0.0, 0.0, LengthUnit.METER), LengthUnit.MILLIMETER));
                 continue;
             }
 
             logger.info("FOUND PERSON IN SEARCH ANGLE - Person angle" + angle);
             currentPerson.setPosition(globalPersonPos);
             foundPersons.add(currentPerson);
-            logger.info("Adding this person to found persons list");
         }
 
         if (foundPersons.elements.size() > 0) {

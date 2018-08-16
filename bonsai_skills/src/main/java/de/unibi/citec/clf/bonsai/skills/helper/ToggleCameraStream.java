@@ -1,18 +1,13 @@
 package de.unibi.citec.clf.bonsai.skills.helper;
 
 import de.unibi.citec.clf.bonsai.actuators.CameraStreamActuator;
-import de.unibi.citec.clf.bonsai.actuators.NavigationActuator;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
-import de.unibi.citec.clf.btl.data.grasp.RobotType;
 
 /**
- *
- *
  * @author lruegeme
- *
  */
 public class ToggleCameraStream extends AbstractSkill {
 
@@ -48,11 +43,12 @@ public class ToggleCameraStream extends AbstractSkill {
     @Override
     public ExitToken execute() {
         boolean success = false;
-        if(type != null){
-            switch(type.toLowerCase()){
+        if (type != null) {
+            logger.info("set \"" + type.toLowerCase() + "\"");
+            switch (type.toLowerCase()) {
                 case "both":
                     success = cameraStreamActuator.enableColorStream(toggle);
-                    if(success) success = cameraStreamActuator.enableDepthStream(toggle);
+                    if (success) success = cameraStreamActuator.enableDepthStream(toggle);
                     break;
                 case "color":
                     success = cameraStreamActuator.enableColorStream(toggle);
@@ -62,7 +58,7 @@ public class ToggleCameraStream extends AbstractSkill {
                     break;
             }
         }
-        if(success) return tokenSuccess;
+        if (success) return tokenSuccess;
         return tokenError;
     }
 

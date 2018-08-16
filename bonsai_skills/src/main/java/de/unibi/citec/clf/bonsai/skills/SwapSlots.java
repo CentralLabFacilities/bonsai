@@ -58,12 +58,16 @@ public class SwapSlots extends AbstractSkill {
             slotContentB = slotB.recall();
 
             if (slotContentA == null) {
-                logger.warn("your ReadSlot was empty. using empty String");
+                logger.debug("your ReadSlot A was empty. using empty String");
                 slotContentA = "";
+            } else {
+                logger.debug("your ReadSlot A was " + slotContentA);
             }
             if (slotContentB == null) {
-                logger.warn("your ReadSlot was empty. using empty String");
+                logger.debug("your ReadSlot was empty. using empty String");
                 slotContentB = "";
+            } else {
+                logger.debug("your ReadSlot B was " + slotContentB);
             }
 
         } catch (CommunicationException ex) {

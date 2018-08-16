@@ -93,7 +93,7 @@ public class FindEmptyPlane extends AbstractSkill {
         try {
             plane = planeSlot.recall();
         } catch (CommunicationException ex) {
-            Logger.getLogger("could not read plane");
+            logger.error("could not read plane");
         }
 
         try {

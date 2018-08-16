@@ -10,18 +10,20 @@ import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
-import de.unibi.citec.clf.bonsai.strategies.drive.DriveStrategy;
 import de.unibi.citec.clf.bonsai.util.CoordinateSystemConverter;
-import de.unibi.citec.clf.bonsai.util.helper.DriveStrategyBuilder;
 import de.unibi.citec.clf.btl.List;
 import de.unibi.citec.clf.btl.data.geometry.PolarCoordinate;
+import de.unibi.citec.clf.btl.data.navigation.DriveData;
 import de.unibi.citec.clf.btl.data.navigation.NavigationGoalData;
 import de.unibi.citec.clf.btl.data.navigation.PositionData;
+import de.unibi.citec.clf.btl.data.navigation.TurnData;
 import de.unibi.citec.clf.btl.data.person.PersonData;
 import de.unibi.citec.clf.btl.data.person.PersonDataList;
 import de.unibi.citec.clf.btl.tools.MathTools;
 import de.unibi.citec.clf.btl.units.AngleUnit;
 import de.unibi.citec.clf.btl.units.LengthUnit;
+import de.unibi.citec.clf.btl.units.RotationalSpeedUnit;
+import de.unibi.citec.clf.btl.units.SpeedUnit;
 
 import java.io.IOException;
 
@@ -85,11 +87,11 @@ public class FollowPerson extends AbstractSkill {
     private static final String KEY_SLOW_DOWN_MESSAGE = "#_SLOW_DOWN_MESSAGE";
     private static final String KEY_STRATEGY = "#_STRATEGY";
 
-    private long personLostTimeout = 200L;
-    private double stopDistance = 500;
-    private double personLostDist = 2000;
+    private long personLostTimeout = 5000; //200L
+    private double stopDistance = 1000; //500
+    private double personLostDist = 4000; //2000
     private long newGoalTimeout = -1L;
-    private long talkdistance = 1900;
+    private long talkdistance = 2500; //1900
     private String slowDownMessage = "Please move slower!";
     private String strategy = "NearestToTarget";
 
@@ -126,8 +128,11 @@ public class FollowPerson extends AbstractSkill {
     private long lasttalk = 0;
 
     private PositionData robotPosition = null;
+    private PositionData lastRobotPosition = null;
     private double currentPersonDistance = 0;
-    private DriveStrategy driveStrategy;
+    private long robotPosTimeout;
+    private double wiggleAngle = 0.175;
+    private boolean alreadyTalked = false;
 
     @Override
     public void configure(ISkillConfigurator configurator) {
@@ -156,8 +161,6 @@ public class FollowPerson extends AbstractSkill {
 
         navActuator = configurator.getActuator("NavigationActuator", NavigationActuator.class);
         speechActuator = configurator.getActuator("SpeechActuator", SpeechActuator.class);
-
-        driveStrategy = DriveStrategyBuilder.createStrategy(strategy, configurator, navActuator, posSensor);
     }
 
     @Override
@@ -165,6 +168,7 @@ public class FollowPerson extends AbstractSkill {
         lastPersonFound = System.currentTimeMillis();
         lastGoalSet = System.currentTimeMillis();
         lastGoalCheckSuccess = System.currentTimeMillis();
+        robotPosTimeout = System.currentTimeMillis();
 
         lastGoalUsed = new NavigationGoalData();
 
@@ -200,8 +204,22 @@ public class FollowPerson extends AbstractSkill {
             return handlePersonMissing();
         }
 
+        if(!alreadyTalked){
+            /*try {
+                speechActuator.sayAsync("I see you.");
+            } catch (IOException e) {
+                logger.error(e.getMessage());
+            }*/
+            alreadyTalked = true;
+        }
+
         if (System.currentTimeMillis() - lasttalk > 15000) {
             talk();
+        }
+
+        if (robotPosTimeout + 5000 < System.currentTimeMillis()) {
+            handleNonMovingRobot();
+            return tokenLoopDiLoop;
         }
 
         lastPersonPosition = new PositionData(personFollow.getPosition());
@@ -285,6 +303,17 @@ public class FollowPerson extends AbstractSkill {
         } catch (IOException | InterruptedException ex) {
             logger.error("Could not read robot position", ex);
         }
+        if (robot != null) {
+            if (lastRobotPosition != null) {
+                if (checkIfRobotMoving()) {
+                    robotPosTimeout = System.currentTimeMillis();
+                    lastRobotPosition = robot;
+                }
+            } else {
+                robotPosTimeout = System.currentTimeMillis();
+                lastRobotPosition = robot;
+            }
+        }
         return robot;
     }
 
@@ -302,7 +331,7 @@ public class FollowPerson extends AbstractSkill {
             logger.warn("no persons found");
             return null;
         }
-        
+
         if (persons.size() == 0) {
             logger.warn("########## Person list size is 0 ############");
         }
@@ -332,7 +361,7 @@ public class FollowPerson extends AbstractSkill {
     private ExitToken handlePersonMissing() {
 
         if (personLostTimeout > 0 && System.currentTimeMillis() > lastPersonFound + personLostTimeout) {
-            logger.info("Person lost! Did not find person " + lastUuid);
+            logger.info("Person lost for " + personLostTimeout + " ms! Did not find person " + lastUuid);
 
             wrapUpPersonLost(robotPosition, lastPersonPosition);
             return tokenErrorPersonLost;
@@ -372,6 +401,30 @@ public class FollowPerson extends AbstractSkill {
         }
 
         return distance;
+    }
+
+    private boolean checkIfRobotMoving() {
+        boolean ret = true;
+        if (robotPosition.getDistance(lastRobotPosition, LengthUnit.METER) < 0.05 &&
+                robotPosition.getYaw(AngleUnit.RADIAN) - lastRobotPosition.getYaw(AngleUnit.RADIAN) < 0.02) {
+            ret = false;
+        }
+        return ret;
+    }
+
+    private void handleNonMovingRobot() {
+        double directionOfLastSeenPerson = getLastPersonDirection();
+        DriveData driveData = new DriveData(0.1, LengthUnit.METER, 0.01, SpeedUnit.METER_PER_SEC);
+        TurnData turnData = new TurnData(directionOfLastSeenPerson * wiggleAngle, AngleUnit.RADIAN, 1, RotationalSpeedUnit.RADIANS_PER_SEC);
+        wiggleAngle *= -1;
+        navActuator.moveRelative(driveData, null);
+        logger.info("Wiggle, wiggle, wiggle!");
+        robotPosTimeout = System.currentTimeMillis();
+    }
+
+    private double getLastPersonDirection(){
+        PositionData posDataLocal = CoordinateSystemConverter.globalToLocal(lastPersonPosition, robotPosition);
+        return Math.signum(posDataLocal.getYaw(AngleUnit.RADIAN));
     }
 
     @Override

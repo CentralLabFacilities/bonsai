@@ -56,7 +56,7 @@ public class Talk extends AbstractSkill {
 
         text = configurator.requestValue(KEY_MESSAGE);
         blocking = configurator.requestOptionalBool(KEY_BLOCKING, blocking);
-
+        logger.debug(text);
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
         speechActuator = configurator.getActuator("SpeechActuator", SpeechActuator.class);
     }

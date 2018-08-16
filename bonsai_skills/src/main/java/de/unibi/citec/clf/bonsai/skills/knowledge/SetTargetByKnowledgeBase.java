@@ -160,6 +160,8 @@ public class SetTargetByKnowledgeBase extends AbstractSkill {
         }
         navigationGoalData = new NavigationGoalData(viewpoint);
 
+        logger.info("set target \"" + navigationGoalData.toString() + "\" by annotation \"" + locationName + "\" and viewpoint \"" + viewpointName + "\"");
+
         return tokenSuccess;
     }
 

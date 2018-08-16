@@ -73,6 +73,7 @@ public class AddObjectsToList extends AbstractSkill {
                 logger.debug("added new objs to list with label " + obj.getBestLabel());
             }
         }
+        logger.info("list is " + objects.toString());
         return tokenSuccess;
     }
 

@@ -112,7 +112,7 @@ public class DriveDirect extends AbstractSkill {
         dir_y = configurator.requestOptionalDouble(KEY_DIR_Y, dir_y);
 
         if (Double.isNaN(dist) && Double.isNaN(angle)) {
-            logger.info("dist and angle missing, using slot");
+            logger.debug("dist and angle missing, using slot");
             navigationGoalDataSlot = configurator.getReadSlot("NavigationGoalDataSlot", NavigationGoalData.class);
         }
 
@@ -146,7 +146,7 @@ public class DriveDirect extends AbstractSkill {
         if (!Double.isNaN(angle) && angle != 0) {
             turnData = new TurnData(angle, AngleUnit.RADIAN, rotationSpeed, RotationalSpeedUnit.RADIANS_PER_SEC);
         }
-        logger.debug("Driving " + dist + "m," + angle + "rad," + driveData + "," + turnData);
+        logger.info("Driving " + dist + "m," + angle + "rad," + driveData + "," + turnData);
         navResult = navActuator.moveRelative(driveData, turnData);
         logger.debug("called navactuator.");
 

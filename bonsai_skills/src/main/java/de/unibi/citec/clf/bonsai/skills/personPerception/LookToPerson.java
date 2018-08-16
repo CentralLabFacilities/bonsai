@@ -84,7 +84,7 @@ public class LookToPerson extends AbstractSkill {
     private long timeout;
     private long initialTimeout = 3000;
     private float turnAngleMultiplier = 0.75f;
-    private float gazeSpeed = 0.6f; //was 0.125 per default in actuator
+    private float gazeSpeed = 0.06f; //was 0.125 per default in actuator
 
     @Override
     public void configure(ISkillConfigurator configurator) {
@@ -173,7 +173,7 @@ public class LookToPerson extends AbstractSkill {
                     horizontal = minAngle;
                 }
                 if(Math.abs(horizontal-lastAngle) < minTurningAngle){
-                    logger.info("Person's angle was not big enough to turn!");
+                    logger.debug("Person's angle was not big enough to turn!");
                     gazeActuator.setGazeTargetPitch(vertical);
                     timeout = initialTimeout + System.currentTimeMillis();
                     return tokenLoopDiLoop;

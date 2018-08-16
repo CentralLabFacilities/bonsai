@@ -82,6 +82,7 @@ public class CountObjects extends AbstractSkill {
     public ExitToken execute() {
         int size = rcObjectList.size();
         counter = "" + size;
+        logger.info("counted \"" + counter + "\"");
         return tokenSuccess;
     }
 

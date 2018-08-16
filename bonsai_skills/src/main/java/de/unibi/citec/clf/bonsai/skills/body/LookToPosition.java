@@ -103,6 +103,7 @@ public class LookToPosition extends AbstractSkill {
         double horizontal = Math.atan2(posDataLocal.getY(LengthUnit.METER), posDataLocal.getX(LengthUnit.METER));
 
         gazeDone = gazeActuator.setGazeTargetAsync((float) vertical, (float) horizontal);
+        logger.info("looking horizontally to: \"" + horizontal + "\"");
 
         return true;
     }

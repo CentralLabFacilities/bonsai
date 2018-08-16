@@ -93,7 +93,7 @@ public class CheckGoalDistance extends AbstractSkill {
         }
 
         double distance = currentRobotPosition.getDistance(navigationGoalData, LengthUnit.METER);
-        logger.debug("Distance to object is " + distance + "m" + "  minDistance:" + minGoalDistance);
+        logger.info("Distance to object is " + distance + "m" + "  minDistance:" + minGoalDistance);
         if (distance < minGoalDistance) {
             return tokenSuccessPositiveResponse;
         } else {

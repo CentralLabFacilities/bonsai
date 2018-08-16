@@ -9,6 +9,10 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException;
+import de.unibi.citec.clf.btl.data.geometry.Point2D;
+import de.unibi.citec.clf.btl.data.geometry.PrecisePolygon;
+import de.unibi.citec.clf.btl.data.knowledgebase.Arena;
+import de.unibi.citec.clf.btl.data.knowledgebase.Location;
 import de.unibi.citec.clf.btl.data.knowledgebase.Room;
 import de.unibi.citec.clf.btl.data.person.PersonAttribute;
 import de.unibi.citec.clf.btl.data.person.PersonData;
@@ -50,6 +54,7 @@ import java.util.List;
 public class FilterPeopleByArea extends AbstractSkill {
 
     private ExitToken tokenSuccess;
+    private ExitToken tokenSuccessEmpty;
     private ExitToken tokenError;
 
     private MemorySlotReader<PersonDataList> personDataReadSlot;
@@ -62,9 +67,12 @@ public class FilterPeopleByArea extends AbstractSkill {
     private PersonDataList newPersonDataList;
     private String area;
 
+    private final double THRESHHOLD = 1.0;
+
     @Override
     public void configure(ISkillConfigurator configurator) throws SkillConfigurationException {
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
+        tokenSuccessEmpty = configurator.requestExitToken(ExitStatus.SUCCESS().ps("empty"));
         tokenError = configurator.requestExitToken(ExitStatus.ERROR());
 
         personDataReadSlot = configurator.getReadSlot("PersonDataListReadSlot", PersonDataList.class);
@@ -100,7 +108,12 @@ public class FilterPeopleByArea extends AbstractSkill {
     }
 
     @Override
-    public ExitToken execute() { return tokenSuccess; }
+    public ExitToken execute() {
+        if(newPersonDataList.size() == 0){
+            return tokenSuccessEmpty;
+        }
+        return tokenSuccess;
+    }
 
     @Override
     public ExitToken end(ExitToken curToken) {
@@ -119,11 +132,11 @@ public class FilterPeopleByArea extends AbstractSkill {
         java.util.List<Room> rooms = kBaseActuator.getArena().getRooms();
         for (Room room:rooms) {
             if (room.getName().toLowerCase().equals(area)) {
-                logger.debug("area is room");
+                logger.debug("area is room " + area);
                 return true;
             }
         }
-        logger.debug("area is room");
+        logger.debug("area is location " + area);
         return false;
     }
 
@@ -148,6 +161,23 @@ public class FilterPeopleByArea extends AbstractSkill {
             }
         } else {
             for (PersonData personData: personDataList){
+                Point2D personloc = personData.getPosition();
+                logger.debug("Person postion: " + personData.getPosition().toString());
+
+                Arena arena = kBaseActuator.getArena();
+
+                Location loc = arena.getSpecificLocation(area.toLowerCase());
+
+                PrecisePolygon poly = loc.getAnnotation().getPolygon();
+
+                double distance = poly.getDistance(personloc);
+
+                if(distance < THRESHHOLD){
+                    newPersonDataList.add(personData);
+                    logger.debug("Person in location area " + area + " - keeping in list");
+                }
+
+                /*
                 logger.debug("Person postion: " + personData.getPosition().toString());
                 inferedLocation = kBaseActuator.getArena().getNearestLocation(personData.getPosition()).getName().toLowerCase();
                 if(inferedLocation.equals(area)){
@@ -156,6 +186,7 @@ public class FilterPeopleByArea extends AbstractSkill {
                 } else {
                     logger.debug("Person NOT in location area " + area + " - NOT keeping in list");
                 }
+                */
             }
         }
     }

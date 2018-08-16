@@ -97,11 +97,11 @@ public class GeneratePersonDescription extends AbstractSkill {
             }
 
             if (ageFrom < 20 && ageTo <= 15) {
-                ageString = " child ";
+                ageString = " adult ";
             } else if (ageFrom < 40 && ageTo <= 40) {
-                ageString = " young ";
+                ageString = " adult ";
             } else {
-                ageString = " elder ";
+                ageString = " adult ";
             }
         }
 

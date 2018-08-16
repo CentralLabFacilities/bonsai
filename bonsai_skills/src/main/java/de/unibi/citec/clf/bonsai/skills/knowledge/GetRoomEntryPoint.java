@@ -111,8 +111,7 @@ public class GetRoomEntryPoint extends AbstractSkill {
         try {
             theDoors = kBaseActuator.getBDOByAttribute(Door.class, "room", roomName);
         } catch (KBaseActuator.BDONotFoundException e) {
-            logger.error("The BDO could not be found!");
-            e.printStackTrace();
+            logger.error("The BDO could not be found! " + e.getMessage());
             return tokenError;
         }
         if (theDoors.size() < 1) {

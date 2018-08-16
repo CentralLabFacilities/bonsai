@@ -89,7 +89,7 @@ public class DetectPlane extends AbstractSkill {
     }
 
     private ExitToken saneTable() {
-        logger.info("started sane table");
+        logger.debug("started sane table");
 
         Pose3D planeBase = null;
         double largestArea = 0;

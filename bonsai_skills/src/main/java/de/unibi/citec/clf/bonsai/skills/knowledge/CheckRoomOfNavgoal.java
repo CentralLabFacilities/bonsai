@@ -111,7 +111,7 @@ public class CheckRoomOfNavgoal extends AbstractSkill {
         }
         roomName = room.getName();
 
-        logger.debug("Name of room: " + roomName);
+        logger.info("Position \"" + pos.toString() + "\" is in room: " + roomName);
 
         if (roomName.equals("outside") || roomName.equals("outside the arena")) {
             return tokenSuccessOutsideArena;

@@ -90,13 +90,13 @@ public class GetLocation extends AbstractSkill {
         try {
             locationName = kBaseActuator.getLocationForPoint(positionData).getName();
         } catch (KBaseActuator.BDONotFoundException e) {
-            logger.fatal("Should never ever occur.");
-            e.printStackTrace();
+            logger.fatal("Should never ever occur. " + e.getMessage());
             return ExitToken.fatal();
         } catch (KBaseActuator.NoAreaFoundException e) {
             logger.debug("Position was in no location.");
             return tokenErrorNoLocation;
         }
+        logger.info("robot is in location \"" + locationName + "\"");
 
         return tokenSuccess;
     }

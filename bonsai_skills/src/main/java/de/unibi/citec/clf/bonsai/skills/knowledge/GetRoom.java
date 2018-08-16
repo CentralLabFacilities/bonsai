@@ -93,6 +93,7 @@ public class GetRoom extends AbstractSkill {
             logger.error("Position was in no room. We will just assume it was outside the arena.");
             roomName = "outside";
         }
+        logger.info("robot is in room \"" + roomName + "\"");
 
         return tokenSuccess;
     }

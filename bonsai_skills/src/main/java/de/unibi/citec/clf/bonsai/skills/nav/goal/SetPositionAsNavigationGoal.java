@@ -106,6 +106,7 @@ public class SetPositionAsNavigationGoal extends AbstractSkill {
         logger.debug("position to navgoal: " + (posData.toString()));
         navData = new NavigationGoalData(posData);
         navData.setFrameId(PositionData.ReferenceFrame.GLOBAL);
+        logger.info("navgoal: " + navData.toString());
         return tokenSuccess;
     }
 

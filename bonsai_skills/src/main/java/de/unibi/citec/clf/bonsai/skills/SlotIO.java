@@ -39,7 +39,7 @@ public class SlotIO extends AbstractSkill {
         try {
             read = slot.recall();
         } catch (CommunicationException ex) {
-            Logger.getLogger(SlotIO.class.getName()).log(Level.SEVERE, null, ex);
+            logger.error(ex.getMessage());
         }
         if(read == null) read = "";
 
@@ -55,8 +55,10 @@ public class SlotIO extends AbstractSkill {
     @Override
     public ExitToken end(ExitToken curToken) {
         if (write.isEmpty()) {
-            logger.debug("Write is empty. Slot will be empty");
-            //return curToken;
+            //logger.debug("Write is empty. Slot will be empty");
+            // EEGPSR HACK
+            logger.debug("Write is empty, keep slot as it is"); //
+            return curToken;
         }
 
         logger.debug("write <"+write+"> to slot");

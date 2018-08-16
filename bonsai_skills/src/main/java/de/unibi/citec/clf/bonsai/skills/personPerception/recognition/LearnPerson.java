@@ -73,7 +73,7 @@ public class LearnPerson extends AbstractSkill {
         learnPersonActuator = configurator.getActuator("LearnPersonActuator", LearnPersonActuator.class);
 
         if (name == null) {
-            logger.info("key " + KEY_NAME + " not given, using slot");
+            logger.debug("key " + KEY_NAME + " not given, using slot");
             nameSlot = configurator.getReadSlot("NameSlot", String.class);
         }
     }
@@ -126,7 +126,7 @@ public class LearnPerson extends AbstractSkill {
             try {
                 targetPersonWriteSlot.memorize(targetPerson);
             } catch (CommunicationException ex) {
-                logger.warn("could not write targetPerson to slot");
+                logger.error("could not write targetPerson to slot");
                 return ExitToken.fatal();
             }
         }

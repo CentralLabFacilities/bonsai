@@ -21,15 +21,15 @@ import java.util.Map;
  *
  * Please note that more options, slots, and exit tokens might be available
  * through the selected drive strategy
- * 
- * Currently supported strategies:
- *  NearestToTarget: Try to get as close to the target as possible
- * 
+ *
+ * Currently supported strategies: NearestToTarget: Try to get as close to the
+ * target as possible
+ *
  * <pre>
  *
  * Options:
  *  #_STRATEGY: [String] Optional (default: NearestToTarget)
- *                  -> Strategy used for drive 
+ *                  -> Strategy used for drive
  *
  * Slots:
  *  NavigationGoalDataSlot: [NavigationGoalData] [Read]
@@ -54,8 +54,10 @@ import java.util.Map;
 public class NavigateTo extends AbstractSkill {
 
     private static final String KEY_STRATEGY = "#_STRATEGY";
+    private final static String KEY_TIMEOUT = "#_TIMEOUT";
 
     private String strategy = "NearestToTarget";
+    private long timeout = -1L;
 
     private ExitToken tokenError;
     private ExitToken tokenSuccess;
@@ -71,6 +73,7 @@ public class NavigateTo extends AbstractSkill {
     public void configure(ISkillConfigurator configurator) throws SkillConfigurationException {
 
         strategy = configurator.requestOptionalValue(KEY_STRATEGY, strategy);
+        timeout = configurator.requestOptionalInt(KEY_TIMEOUT, (int) timeout);
 
         tokenError = configurator.requestExitToken(ExitStatus.ERROR());
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
@@ -84,6 +87,12 @@ public class NavigateTo extends AbstractSkill {
 
     @Override
     public boolean init() {
+        
+        if (timeout > 0) {
+            logger.debug("using nav timeout of " + timeout + " ms");
+            timeout += System.currentTimeMillis();
+        }
+        
         try {
             targetGoal = navigationGoalDataSlot.recall();
 
@@ -102,6 +111,14 @@ public class NavigateTo extends AbstractSkill {
 
     @Override
     public ExitToken execute() {
+        
+        if (timeout > 0) {
+            if (System.currentTimeMillis() > timeout) {
+                logger.info("Navigate to reached timeout");
+                return tokenError;
+            }
+        }
+        
         if (robotPositionSensor == null) {
             logger.error("execute NavigateTo: Robot position sensor is null");
             return tokenError;

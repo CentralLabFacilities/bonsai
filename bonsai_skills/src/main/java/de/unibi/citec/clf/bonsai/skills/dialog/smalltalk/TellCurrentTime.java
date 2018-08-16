@@ -57,7 +57,7 @@ public class TellCurrentTime extends AbstractSkill {
     public boolean init() {
 
         Calendar rightNow = Calendar.getInstance();
-        int hour = rightNow.get(Calendar.HOUR_OF_DAY);
+        int hour = rightNow.get(Calendar.HOUR_OF_DAY)-6;
         int minutes = rightNow.get(Calendar.MINUTE);
 
         int random = (int) (Math.random() * 5);

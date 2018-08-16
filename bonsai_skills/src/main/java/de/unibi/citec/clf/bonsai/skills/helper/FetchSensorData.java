@@ -46,7 +46,7 @@ public class FetchSensorData extends AbstractSkill {
             Point3D data = sen.readLast(1000);
             logger.error(data);
         } catch (IOException | InterruptedException e) {
-            e.printStackTrace();
+            logger.error(e.getMessage());
         }
         return ExitToken.fatal();
     }

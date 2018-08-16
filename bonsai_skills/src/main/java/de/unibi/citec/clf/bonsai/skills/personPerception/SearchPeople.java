@@ -118,7 +118,7 @@ public class SearchPeople extends AbstractSkill {
         if (timeout > 0) {
             if (System.currentTimeMillis() > timeout) {
                 logger.info("Search for person reached timeout");
-                return tokenSuccessNoPeople;
+                return tokenError;
             }
         }
 
@@ -140,17 +140,16 @@ public class SearchPeople extends AbstractSkill {
         }
 
         for (PersonData currentPerson : possiblePersons) {
-            logger.info("possible person: " + currentPerson.getUuid());
+            logger.debug("possible person: " + currentPerson.getUuid());
             double angle = robotPosition.getRelativeAngle(currentPerson.getPosition(), AngleUnit.RADIAN);
             double distance = robotPosition.getDistance(currentPerson.getPosition(), LengthUnit.MILLIMETER);
 
             if (!(angle < searchAngle / 2 && angle > searchAngle / -2)) {
-                logger.debug("Person with angle" + angle + " out of search angle");
-                logger.info("lol dont care");
+                logger.debug("Person with angle" + angle + " out of search angle. " + "lol dont care");
                 //continue;
             }
             if(distance > searchRadius){
-                logger.info("Person with distance " + distance + " is out of search distance");
+                logger.debug("Person with distance " + distance + " is out of search distance");
                 continue;
             }
 

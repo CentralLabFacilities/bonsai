@@ -20,6 +20,8 @@ import de.unibi.citec.clf.btl.data.person.PersonData;
  * Options:
  *  #_SAY_GENDER: [boolean] Optional (default: true)
  *                 -> whether the robot states male and female count
+ *  #_GERMAN: [boolean] Optional (defauls: false)
+ *                 -> whether the robot speaks german or english (default: english)
  *
  * Slots:
  *  CrowdSlot:  [Crowd] [Read]
@@ -35,12 +37,14 @@ import de.unibi.citec.clf.btl.data.person.PersonData;
  *
  * @author jsimmering
  */
-public class DescribeCrowd extends AbstractSkill{
+public class DescribeCrowd extends AbstractSkill {
 
     private final static String KEY_SAY_GENDER = "#_SAY_GENDER";
+    private final static String KEY_GERMAN = "#_GERMAN";
 
     //defaults
     boolean gender = true;
+    boolean german = false;
 
     // used tokens
     private ExitToken tokenSuccess;
@@ -51,7 +55,7 @@ public class DescribeCrowd extends AbstractSkill{
     private MemorySlotReader<Crowd> crowdSlot;
     private MemorySlotWriter<String> descriptionSlot;
 
-    String description;
+    String description = "I was unable to recognize anyone.";
 
     @Override
     public void configure(ISkillConfigurator configurator) throws SkillConfigurationException {
@@ -60,6 +64,7 @@ public class DescribeCrowd extends AbstractSkill{
         tokenErrorNoCrowd = configurator.requestExitToken(ExitStatus.ERROR().withProcessingStatus("noCrowd"));
 
         gender = configurator.requestOptionalBool(KEY_SAY_GENDER, gender);
+        german = configurator.requestOptionalBool(KEY_GERMAN, german);
 
         // Initialize slots
         crowdSlot = configurator.getReadSlot("CrowdSlot", Crowd.class);
@@ -86,13 +91,21 @@ public class DescribeCrowd extends AbstractSkill{
 
         List<PersonData> persons = crowd.getPersons();
         String people = " people";
+        if (german) {
+            people = " Personen";
+        }
         if (persons.size() == 1) {
             people = " person";
         }
         int countMale = crowd.getMaleCount(persons);
         int countFemale = crowd.getFemaleCount(persons);
 
-        description = "I see " + crowd.getPersons().size() + people + " " + countFemale + " female and " + countMale + " male.";
+        if (german) {
+            description = "Ich sehe " + crowd.getPersons().size() + people + " davon sind meiner Meinung nach " + countFemale + " Frauen und " + countMale + " M\u00E4nner.";
+        } else {
+            description = "I see " + crowd.getPersons().size() + people + " " + countFemale + " female and " + countMale + " male.";
+        }
+
         return tokenSuccess;
     }
 

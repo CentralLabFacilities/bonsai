@@ -104,7 +104,7 @@ public class LookToPersonHead extends AbstractSkill {
         try {
             targetID = targetPersonSlot.recall().getUuid();
         } catch (CommunicationException ex) {
-            logger.warn("Could not read target id from slot.", ex);
+            logger.error("Could not read target id from slot.", ex);
             return false;
         }
 
@@ -129,7 +129,7 @@ public class LookToPersonHead extends AbstractSkill {
         try {
             currentPersons = personSensor.readLast(-1);
         } catch (IOException | InterruptedException ex) {
-            logger.warn("Could not read from person sensor.", ex);
+            logger.fatal("Could not read from person sensor.", ex);
             return ExitToken.fatal();
         }
         

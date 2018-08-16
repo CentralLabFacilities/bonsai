@@ -41,8 +41,8 @@ public abstract class DriveStrategyWithTryGoal implements DriveStrategy {
     protected int takeGoal = 1;
     protected int replan = 3;
     protected int closerSteps = 1;
-    protected double closerStepSize = 0.1;
-    protected double closerMaxSteps = 3;
+    protected double closerStepSize = 0.11;
+    protected double closerMaxSteps = 4;
     protected double minDistanceSuccess = 0.1;
 
     @Override

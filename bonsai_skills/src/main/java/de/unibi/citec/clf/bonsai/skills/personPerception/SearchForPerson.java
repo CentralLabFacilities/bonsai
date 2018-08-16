@@ -285,7 +285,7 @@ public class SearchForPerson extends AbstractSkill {
                     attribute = attributeActuator.getPersonAttributes(currentPerson.getUuid());
                     currentPerson.setPersonAttribute(attribute);
                     logger.debug("got person attributes");
-                    if (!gesture.isEmpty() && !Collections.disjoint(gesture, attribute.getGestures())) {
+                    if (!gesture.isEmpty() && Collections.disjoint(gesture, attribute.getGestures())) {
                         logger.debug("Person with wrong gestures " + attribute.getGestures() + " ignored");
                         continue;
                     }

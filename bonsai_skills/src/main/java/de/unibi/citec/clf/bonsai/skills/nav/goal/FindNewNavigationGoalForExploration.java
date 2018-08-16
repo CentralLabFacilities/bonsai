@@ -152,7 +152,7 @@ public class FindNewNavigationGoalForExploration extends AbstractSkill{
     @Override
     public boolean init() {
         if (timeout > 0) {
-            logger.info("Using timeout of " + timeout + " ms");
+            logger.debug("Using timeout of " + timeout + " ms");
             timeout += System.currentTimeMillis();
         }
         try {
@@ -197,7 +197,7 @@ public class FindNewNavigationGoalForExploration extends AbstractSkill{
                 logger.error("cameraAttributes from its sensor was null");
                 return false;
             }
-            logger.info("Read cameraAttributes from Sensor: " + cameraAttributes.toString());
+            logger.debug("Read cameraAttributes from Sensor: " + cameraAttributes.toString());
         } catch (IOException | InterruptedException e) {
             logger.error("Could not read from cameraAttributes sensor");
         }

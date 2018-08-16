@@ -95,6 +95,7 @@ public class GetNewFollowId extends AbstractSkill {
         target = findClosestToPosition(personPos, maxDist);
 
         if (target != null) {
+            logger.info("new target: " + target.toString());
             return tokenSuccess;
         } else {
             return tokenError;

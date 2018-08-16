@@ -59,11 +59,11 @@ public class FilterObjectsByCategory extends AbstractSkill {
         }
 
         if(category == null){
-            logger.error("no category given, nothing to be done, not removing any items from the list");
+            logger.debug("no category given, nothing to be done, not removing any items from the list");
         }
 
         if (objects == null) {
-            logger.error("no objects recognized before, nothing to be done, but to create an empty list for you");
+            logger.debug("no objects recognized before, nothing to be done, but to create an empty list for you");
             objects = new ObjectShapeList();
         }
         return true;

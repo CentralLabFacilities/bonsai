@@ -9,8 +9,6 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * Created by llach on 30.03.17.
@@ -37,7 +35,7 @@ public class Guiding extends AbstractSkill {
     public boolean init() {
 
         try {
-            logger.info("starting guiding ...");
+            logger.debug("starting guiding ...");
             future = guide.startGuiding();
 
         } catch (IOException e) {
@@ -51,7 +49,7 @@ public class Guiding extends AbstractSkill {
     public ExitToken execute() {
 
         while (!future.isDone()) {
-            logger.info("##### guiding running...");
+            logger.debug("##### guiding running...");
             return ExitToken.loop(1000);
         }
 
@@ -73,7 +71,7 @@ public class Guiding extends AbstractSkill {
         try {
             guide.stopGuiding();
         } catch (IOException ex) {
-            Logger.getLogger(Guiding.class.getName()).log(Level.SEVERE, null, ex);
+            logger.error(ex.getMessage());
         }
         return curToken;
     }

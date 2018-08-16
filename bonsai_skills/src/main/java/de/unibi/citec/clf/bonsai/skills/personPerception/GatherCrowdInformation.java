@@ -11,7 +11,9 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException;
 import de.unibi.citec.clf.bonsai.skills.deprecated.personPerception.openpose.SearchForPerson;
+import de.unibi.citec.clf.bonsai.util.CoordinateSystemConverter;
 import de.unibi.citec.clf.btl.List;
+import de.unibi.citec.clf.btl.data.geometry.Point2D;
 import de.unibi.citec.clf.btl.data.knowledgebase.Arena;
 import de.unibi.citec.clf.btl.data.knowledgebase.Crowd;
 import de.unibi.citec.clf.btl.data.navigation.PositionData;
@@ -20,6 +22,7 @@ import de.unibi.citec.clf.btl.data.person.PersonDataList;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 
 import java.io.IOException;
+import java.util.LinkedList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.logging.Level;
@@ -65,6 +68,8 @@ public class GatherCrowdInformation extends AbstractSkill {
 
     private boolean checkInArena = false;
     private long timeout = 60000;
+
+    private final static LengthUnit m = LengthUnit.METER;
 
     private ExitToken tokenSuccessNoPeople;
     private ExitToken tokenSuccessPeopleFound;
@@ -142,13 +147,25 @@ public class GatherCrowdInformation extends AbstractSkill {
 
         crowd = new Crowd();
         if (checkInArena) {
-            List<PersonData> personsInArena = persons;
-            for(PersonData p : persons) {
-                Arena arena = kBaseActuator.getArena();
-                logger.debug("Checking if person is inside arena; Got room: "+arena.getCurrentRoom(p.getPosition()));
-                if (arena.getCurrentRoom(p.getPosition()).equals("outside")) {
-                    logger.debug("Person not in arena");
-                    personsInArena.remove(p);
+            Arena arena = kBaseActuator.getArena();
+            List<PersonData> personsInArena = new PersonDataList();
+            for (PersonData p : persons) {
+
+                PositionData localPersonPos = p.getPosition();
+                PositionData globalPersonPos = CoordinateSystemConverter.localToGlobal(localPersonPos, robotPos);
+                try{
+                    if(Double.isNaN(globalPersonPos.getX(LengthUnit.METER)) || Double.isNaN(globalPersonPos.getY(LengthUnit.METER))){
+                        logger.debug("Person has invalid Pose");
+                        continue;
+                    }
+                }catch (Exception e){
+                    logger.error(e);
+                    continue;
+                }
+                logger.info("Checking if person is inside arena; Got room: " + arena.getCurrentRoom(globalPersonPos)  +  " and position: " + globalPersonPos.toString());
+                if (!arena.getCurrentRoom(globalPersonPos).equals("outside")) {
+                    logger.debug("Person in arena");
+                    personsInArena.add(p);
                 }
             }
             if (personsInArena.isEmpty()) {

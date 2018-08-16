@@ -90,7 +90,7 @@ public class GetNearestLocation extends AbstractSkill {
         
         locationName = arena.getNearestLocation(positionData).getName();
         
-        logger.debug("Name of location: " + locationName);
+        logger.info("Name of location: " + locationName);
         
         return tokenSuccess;
     }

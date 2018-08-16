@@ -57,7 +57,7 @@ public class CopySlot extends AbstractSkill {
             slotContent = readSlot.recall();
 
             if (slotContent == null) {
-                logger.warn("your ReadSlot was empty");
+                logger.debug("your ReadSlot was empty");
             }
 
         } catch (CommunicationException ex) {

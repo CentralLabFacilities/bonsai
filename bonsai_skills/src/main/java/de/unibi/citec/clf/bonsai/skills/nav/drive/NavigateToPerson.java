@@ -163,7 +163,7 @@ public class NavigateToPerson extends AbstractSkill {
                 }
             }
         } catch (InterruptedException | ExecutionException ex) {
-            logger.info("Could not read nav result");
+            logger.error("Could not read nav result");
         }
 
         if (robotPosition == null) {

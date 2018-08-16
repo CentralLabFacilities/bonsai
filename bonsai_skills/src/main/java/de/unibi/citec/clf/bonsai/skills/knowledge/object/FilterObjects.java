@@ -121,7 +121,7 @@ public class FilterObjects extends AbstractSkill {
             nameString = nameSlot.recall();
 
             if (nameString == null || nameString.isEmpty()) {
-                logger.info("your NameSlot was empty, will not filter by name");
+                logger.debug("your NameSlot was empty, will not filter by name");
             } else {
                 logger.info("will filter by names: " + nameString);
                 for (String name : nameString.split(";")) {
@@ -137,7 +137,7 @@ public class FilterObjects extends AbstractSkill {
             locationString = locationSlot.recall();
 
             if (locationString == null || locationString.isEmpty()) {
-                logger.info("your LocationSlot was empty, will not filter by location");
+                logger.debug("your LocationSlot was empty, will not filter by location");
             } else {
                 logger.info("will filter by locations: " + locationString);
                 for (String loc : locationString.split(";")) {
@@ -153,7 +153,7 @@ public class FilterObjects extends AbstractSkill {
             categoryString = categorySlot.recall();
 
             if (categoryString == null || categoryString.isEmpty() || categoryString.toLowerCase().equals("object")  || categoryString.toLowerCase().equals("objects")) {
-                logger.info("your CategorySlot was empty or did hold the litaral string object or objects, will not filter by category");
+                logger.debug("your CategorySlot was empty or did hold the litaral string object or objects, will not filter by category");
             } else {
                 logger.info("will filter by categories: " + categoryString);
                 for (String cat : categoryString.split(";")) {
@@ -169,7 +169,7 @@ public class FilterObjects extends AbstractSkill {
             shapeString = shapeSlot.recall();
 
             if (shapeString == null || shapeString.isEmpty()) {
-                logger.info("your ShapeSlot was empty, will not filter by shape");
+                logger.debug("your ShapeSlot was empty, will not filter by shape");
             } else {
                 logger.info("will filter by shapes: " + shapeString);
                 for (String shape : shapeString.split(";")) {
@@ -185,7 +185,7 @@ public class FilterObjects extends AbstractSkill {
             colorString = colorSlot.recall();
 
             if (colorString == null || colorString.isEmpty()) {
-                logger.info("your ColorSlot was empty, will not filter by color");
+                logger.debug("your ColorSlot was empty, will not filter by color");
             } else {
                 logger.info("will filter by colors: " + colorString);
                 for (String color : colorString.split(";")) {

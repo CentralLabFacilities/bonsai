@@ -117,7 +117,7 @@ public class SegmentObjects extends AbstractSkill {
     public ExitToken execute() {
 
         if (System.currentTimeMillis() > timeout) {
-            logger.error("reached timeout");
+            logger.info("reached timeout");
             return tokenSuccessTimeout;
         }
 
@@ -145,7 +145,7 @@ public class SegmentObjects extends AbstractSkill {
             try {
                 objectShapeListSlot.memorize(objectShapeList);
             } catch (CommunicationException ex) {
-                logger.error("Could not memorize roomName");
+                logger.error("Could not memorize object shape list");
                 return tokenError;
             }
         }
