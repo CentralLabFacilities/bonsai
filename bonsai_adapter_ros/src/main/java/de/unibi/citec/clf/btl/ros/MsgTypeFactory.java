@@ -188,7 +188,7 @@ public class MsgTypeFactory {
      * @param header header which fields are used
      * @return the type
      */
-    public Type setHeader(Type type, std_msgs.Header header) {
+    public static Type setHeader(Type type, std_msgs.Header header) {
         type.setFrameId(header.getFrameId());
         type.setTimestamp(header.getStamp().secs, TimeUnit.SECONDS);
         return type;
