@@ -6,7 +6,6 @@
     <groupId>de.unibi.citec.clf</groupId>
     <version>0.5.1-SNAPSHOT</version>
     <artifactId>bonsai_adapter_ros</artifactId>
-    <packaging>jar</packaging>
 
     <!-- More Project Information -->
     <name>BonSAI [Adapter ROS]</name>

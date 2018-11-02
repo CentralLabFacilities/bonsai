@@ -189,30 +189,51 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
     @Override
     public Future<CommandResult> moveRelative(DriveData drive, TurnData turn) {
         // first drive, then turn
-        int duration = 3;
+        double duration = 0.03;
 
-        double driveSpeed = drive.getSpeed(SpeedUnit.METER_PER_SEC);
-        int driveNum = (int) (drive.getDistance(LengthUnit.METER) / driveSpeed / duration);
-        double velX = driveSpeed * drive.getDirection().getX(LengthUnit.METER) / drive.getDirection().getLength(LengthUnit.METER);
-        double velY = driveSpeed * drive.getDirection().getY(LengthUnit.METER) / drive.getDirection().getLength(LengthUnit.METER);
+        double velX = 0.0;
+        double velY = 0.0;
+        double dist = 0.0;
+        double driveSpeed = 0.01;
 
-        double turnSpeed = turn.getSpeed(RotationalSpeedUnit.RADIANS_PER_SEC);
-        double turnAngle = turn.getAngle(AngleUnit.RADIAN);
-        int turnNum = (int) (turnAngle / turnSpeed / duration);
+        if (drive != null) {
+            driveSpeed = drive.getSpeed(SpeedUnit.METER_PER_SEC);
+            dist = drive.getDistance(LengthUnit.METER);
+            velX = driveSpeed * drive.getDirection().getX(LengthUnit.METER) / drive.getDirection().getLength(LengthUnit.METER);
+            velY = driveSpeed * drive.getDirection().getY(LengthUnit.METER) / drive.getDirection().getLength(LengthUnit.METER);
+        }
+        int driveNum = (int) ((dist / driveSpeed + 0.5) / duration);
+
+        double turnSpeed = 0.0;
+        double turnAngle = 0.0;
+
+        if (turn != null) {
+            turnSpeed = turn.getSpeed(RotationalSpeedUnit.RADIANS_PER_SEC);
+            turnAngle = turn.getAngle(AngleUnit.RADIAN);
+        }
+        int turnNum;
+        if (turnSpeed != 0) {
+            turnNum = (int) ((turnAngle / turnSpeed + 0.5) / duration);
+        } else {
+            turnNum = 0;
+        }
+
 
         Velocity3D vel = new Velocity3D(velX, velY, 0.0, SpeedUnit.METER_PER_SEC);
         AngularVelocity3D angVel = new AngularVelocity3D(0.0, 0.0, turnSpeed, RotationalSpeedUnit.RADIANS_PER_SEC);
-        Twist3D driveTwist = new Twist3D();
+        Twist3D driveTwist = new Twist3D(vel, angVel);
         driveTwist.setLinear(vel);
-        Twist3D turnTwist = new Twist3D();
+        Twist3D turnTwist = new Twist3D(vel, angVel);
         turnTwist.setAngular(angVel);
 
         try {
             final geometry_msgs.Twist driveMsg = MsgTypeFactory.getInstance().createMsg(driveTwist, Twist.class);
             final geometry_msgs.Twist turnMsg = MsgTypeFactory.getInstance().createMsg(turnTwist, Twist.class);
             final boolean done;
+            logger.debug("publish drive: "+driveMsg.getLinear().getX()+", "+driveMsg.getLinear().getY()+", "+driveMsg.getLinear().getZ()+"for "+(duration*driveNum)+" seconds");
+            logger.debug("publish turn: "+driveMsg.getAngular().getX()+", "+driveMsg.getAngular().getY()+", "+driveMsg.getAngular().getZ()+"for "+(duration*turnNum)+" seconds");
 
-            final Thread thread = new Thread() {
+            /*final Thread thread = new Thread() {
                 public void run() {
                     try {
                         for (int i = 0; i < driveNum; i++) {
@@ -220,6 +241,7 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
                             Thread.sleep(duration * 1000);
                         }
                         for (int i = 0; i < turnNum; i++) {
+                            logger.debug("turn "+i);
                             moveRelativePublisher.publish(turnMsg);
                             Thread.sleep(duration * 1000);
                         }
@@ -227,20 +249,20 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
                         return;
                     }
                 }
-            };
+            };*/
             done = true;
 
             return new Future<CommandResult>() {
 
                 @Override
                 public boolean cancel(boolean b) {
-                    thread.interrupt();
+                    //thread.interrupt();
                     return true;
                 }
 
                 @Override
                 public boolean isCancelled() {
-                    return thread.isInterrupted();
+                    return true;
                 }
 
                 @Override
@@ -250,10 +272,21 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
 
                 @Override
                 public CommandResult get() throws InterruptedException, ExecutionException {
+                    int millis = (int) (duration * 1000);
+                    logger.debug("publish every "+millis+"seconds");
+                    for (int i = 0; i < driveNum; i++) {
+                        moveRelativePublisher.publish(driveMsg);
+                        Thread.sleep(millis);
+                    }
+                    long time1 = System.currentTimeMillis();
+                    for (int i = 0; i < turnNum; i++) {
+                        moveRelativePublisher.publish(turnMsg);
+                        Thread.sleep(millis);
+                    }
+                    logger.debug("turn took: " + (System.currentTimeMillis()-time1));
+
                     if (done) {
                         return new CommandResult("moveRelative", CommandResult.Result.SUCCESS, 0);
-                    } else if (thread.isInterrupted()){
-                        return new CommandResult("moveRelative", CommandResult.Result.CANCELLED, 0);
                     } else {
                         return new CommandResult("moveRelative", CommandResult.Result.UNKNOWN_ERROR, 1);
                     }
@@ -261,10 +294,18 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
 
                 @Override
                 public CommandResult get(long l, TimeUnit timeUnit) throws InterruptedException, ExecutionException, TimeoutException {
+                    int millis = (int) (duration * 1000);
+                    logger.debug("publish every "+millis+"seconds");
+                    for (int i = 0; i < driveNum; i++) {
+                        moveRelativePublisher.publish(driveMsg);
+                        Thread.sleep(millis);
+                    }
+                    for (int i = 0; i < turnNum; i++) {
+                        moveRelativePublisher.publish(turnMsg);
+                        Thread.sleep(millis);
+                    }
                     if (done) {
                         return new CommandResult("moveRelative", CommandResult.Result.SUCCESS, 0);
-                    } else if (thread.isInterrupted()){
-                        return new CommandResult("moveRelative", CommandResult.Result.CANCELLED, 0);
                     } else {
                         return new CommandResult("moveRelative", CommandResult.Result.UNKNOWN_ERROR, 1);
                     }
