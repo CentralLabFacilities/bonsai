@@ -31,6 +31,7 @@ import org.ros.namespace.GraphName;
 import org.ros.node.ConnectedNode;
 import org.ros.node.topic.Publisher;
 import org.ros.concurrent.Rate;
+import org.ros.node.topic.PublisherListener;
 import std_msgs.Header;
 
 import javax.vecmath.Quat4d;
@@ -95,8 +96,8 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
 
     String topic;
 
-    String driveDirectTopic;
-    private Publisher<geometry_msgs.Twist> driveDirectPublisher;
+    String moveRelativeTopic;
+    private Publisher<geometry_msgs.Twist> moveRelativePublisher;
 
     private GraphName nodeName;
     private ActionClient<MoveBaseActionGoal, MoveBaseActionFeedback, MoveBaseActionResult> ac;
@@ -113,6 +114,7 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
     @Override
     public void configure(IObjectConfigurator conf) {
         this.topic = conf.requestValue("topic");
+        this.moveRelativeTopic = conf.requestValue("moveRelativeTopic");
     }
 
     @Override
@@ -123,6 +125,7 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
     @Override
     public void onStart(final ConnectedNode connectedNode) {
         ac = new ActionClient(connectedNode, this.topic, MoveBaseActionGoal._TYPE, MoveBaseActionFeedback._TYPE, MoveBaseActionResult._TYPE);
+        moveRelativePublisher = connectedNode.newPublisher(this.moveRelativeTopic, Twist._TYPE);
         lastAcGoalId = null;
 
         if (ac.waitForActionServerToStart(new Duration(2.0))) {
@@ -213,11 +216,11 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
                 public void run() {
                     try {
                         for (int i = 0; i < driveNum; i++) {
-                            driveDirectPublisher.publish(driveMsg);
+                            moveRelativePublisher.publish(driveMsg);
                             Thread.sleep(duration * 1000);
                         }
                         for (int i = 0; i < turnNum; i++) {
-                            driveDirectPublisher.publish(turnMsg);
+                            moveRelativePublisher.publish(turnMsg);
                             Thread.sleep(duration * 1000);
                         }
                     } catch (java.lang.InterruptedException ex) {
