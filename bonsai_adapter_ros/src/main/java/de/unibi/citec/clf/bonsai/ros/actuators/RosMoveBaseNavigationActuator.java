@@ -8,6 +8,9 @@ import de.unibi.citec.clf.bonsai.actuators.NavigationActuator;
 import de.unibi.citec.clf.bonsai.core.configuration.IObjectConfigurator;
 import de.unibi.citec.clf.bonsai.ros.RosNode;
 import de.unibi.citec.clf.btl.data.geometry.Rotation3D;
+import de.unibi.citec.clf.btl.data.geometry.Twist3D;
+import de.unibi.citec.clf.btl.data.geometry.AngularVelocity3D;
+import de.unibi.citec.clf.btl.data.geometry.Velocity3D;
 import de.unibi.citec.clf.btl.data.navigation.*;
 import de.unibi.citec.clf.btl.ros.MsgTypeFactory;
 import de.unibi.citec.clf.btl.ros.RosSerializer;
@@ -17,6 +20,7 @@ import de.unibi.citec.clf.btl.units.RotationalSpeedUnit;
 import de.unibi.citec.clf.btl.units.SpeedUnit;
 import geometry_msgs.Point;
 import geometry_msgs.Pose;
+import geometry_msgs.Twist;
 import geometry_msgs.Quaternion;
 import move_base_msgs.MoveBaseActionFeedback;
 import move_base_msgs.MoveBaseActionGoal;
@@ -25,6 +29,8 @@ import move_base_msgs.MoveBaseGoal;
 import org.ros.message.Duration;
 import org.ros.namespace.GraphName;
 import org.ros.node.ConnectedNode;
+import org.ros.node.topic.Publisher;
+import org.ros.concurrent.Rate;
 import std_msgs.Header;
 
 import javax.vecmath.Quat4d;
@@ -33,6 +39,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+
 
 /**
  * @author llach
@@ -88,6 +95,8 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
 
     String topic;
 
+    String driveDirectTopic;
+    private Publisher<geometry_msgs.Twist> driveDirectPublisher;
 
     private GraphName nodeName;
     private ActionClient<MoveBaseActionGoal, MoveBaseActionFeedback, MoveBaseActionResult> ac;
@@ -176,8 +185,96 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
 
     @Override
     public Future<CommandResult> moveRelative(DriveData drive, TurnData turn) {
-        throw new UnsupportedOperationException();
+        // first drive, then turn
+        int duration = 3;
+
+        double driveSpeed = drive.getSpeed(SpeedUnit.METER_PER_SEC);
+        int driveNum = (int) (drive.getDistance(LengthUnit.METER) / driveSpeed / duration);
+        double velX = driveSpeed * drive.getDirection().getX(LengthUnit.METER) / drive.getDirection().getLength(LengthUnit.METER);
+        double velY = driveSpeed * drive.getDirection().getY(LengthUnit.METER) / drive.getDirection().getLength(LengthUnit.METER);
+
+        double turnSpeed = turn.getSpeed(RotationalSpeedUnit.RADIANS_PER_SEC);
+        double turnAngle = turn.getAngle(AngleUnit.RADIAN);
+        int turnNum = (int) (turnAngle / turnSpeed / duration);
+
+        Velocity3D vel = new Velocity3D(velX, velY, 0.0, SpeedUnit.METER_PER_SEC);
+        AngularVelocity3D angVel = new AngularVelocity3D(0.0, 0.0, turnSpeed, RotationalSpeedUnit.RADIANS_PER_SEC);
+        Twist3D driveTwist = new Twist3D();
+        driveTwist.setLinear(vel);
+        Twist3D turnTwist = new Twist3D();
+        turnTwist.setAngular(angVel);
+
+        try {
+            final geometry_msgs.Twist driveMsg = MsgTypeFactory.getInstance().createMsg(driveTwist, Twist.class);
+            final geometry_msgs.Twist turnMsg = MsgTypeFactory.getInstance().createMsg(turnTwist, Twist.class);
+            final boolean done;
+
+            final Thread thread = new Thread() {
+                public void run() {
+                    try {
+                        for (int i = 0; i < driveNum; i++) {
+                            driveDirectPublisher.publish(driveMsg);
+                            Thread.sleep(duration * 1000);
+                        }
+                        for (int i = 0; i < turnNum; i++) {
+                            driveDirectPublisher.publish(turnMsg);
+                            Thread.sleep(duration * 1000);
+                        }
+                    } catch (java.lang.InterruptedException ex) {
+                        return;
+                    }
+                }
+            };
+            done = true;
+
+            return new Future<CommandResult>() {
+
+                @Override
+                public boolean cancel(boolean b) {
+                    thread.interrupt();
+                    return true;
+                }
+
+                @Override
+                public boolean isCancelled() {
+                    return thread.isInterrupted();
+                }
+
+                @Override
+                public boolean isDone() {
+                    return done;
+                }
+
+                @Override
+                public CommandResult get() throws InterruptedException, ExecutionException {
+                    if (done) {
+                        return new CommandResult("moveRelative", CommandResult.Result.SUCCESS, 0);
+                    } else if (thread.isInterrupted()){
+                        return new CommandResult("moveRelative", CommandResult.Result.CANCELLED, 0);
+                    } else {
+                        return new CommandResult("moveRelative", CommandResult.Result.UNKNOWN_ERROR, 1);
+                    }
+                }
+
+                @Override
+                public CommandResult get(long l, TimeUnit timeUnit) throws InterruptedException, ExecutionException, TimeoutException {
+                    if (done) {
+                        return new CommandResult("moveRelative", CommandResult.Result.SUCCESS, 0);
+                    } else if (thread.isInterrupted()){
+                        return new CommandResult("moveRelative", CommandResult.Result.CANCELLED, 0);
+                    } else {
+                        return new CommandResult("moveRelative", CommandResult.Result.UNKNOWN_ERROR, 1);
+                    }
+                }
+            };
+
+        } catch (RosSerializer.SerializationException e) {
+            logger.warn("could not serialize twist");
+        }
+
+        throw new UnsupportedOperationException("move relative could not be executed");
     }
+
 
     @Override
     public Future<CommandResult> navigateToCoordinate(NavigationGoalData data) {
