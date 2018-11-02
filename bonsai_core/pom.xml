@@ -4,7 +4,7 @@
 
     <!-- The Basics -->
     <groupId>de.unibi.citec.clf</groupId>
-    <version>0.5.0</version>
+    <version>0.5.1-SNAPSHOT</version>
     <artifactId>bonsai_core</artifactId>
     <packaging>jar</packaging>
 
