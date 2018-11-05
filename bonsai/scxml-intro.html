@@ -108,8 +108,8 @@
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#actions">Actions</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#send">Send</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#assign">Assign</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#id1">Send</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#id2">Assign</a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#sourcing">Sourcing</a></li>
@@ -175,26 +175,24 @@
 <p>SCXML (State Chart XML) can be used to describe Statemachines in a XML document.</p>
 <p>We use Apache Commons XML to create our robot behavior.</p>
 <p>The Bonsai Engine reads these files to couple simple skills to rich robot behavior.
-We dont utilize the whole <a class="reference external" href="http://www.w3.org/TR/scxml/">spec</a> so this page should introduces all relevant parts of SCXML</p>
+BonsaiSCXML is not utilizing the whole <a class="reference external" href="http://www.w3.org/TR/scxml/">spec</a>. This page introduces all the relevant parts of SCXML</p>
 <div class="section" id="state">
 <h2>State<a class="headerlink" href="#state" title="Permalink to this headline">¶</a></h2>
-<p>States define the possible “situations” or states the Statemachine can be in.</p>
-<p>If the Statemachine is running the current states are called active.</p>
-<p>Example:</p>
+<p>States define the possible “situations” (or states) the Statemachine can be in.</p>
+<p>If the Statemachine is running all current states are called active.</p>
+<p>Example State:</p>
 <div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;A&quot;</span><span class="nt">/&gt;</span>
 </pre></div>
 </div>
 <ul class="simple">
-<li>A state is a XML element with the tag.</li>
-<li>The Attribute id is required to defines the <code class="docutils literal notranslate"><span class="pre">StateID</span></code>.</li>
-<li>The root element requires an initial attribute to denote the starting State of the Statemachine.</li>
+<li>A state is a XML element with the <code class="docutils literal notranslate"><span class="pre">state</span></code> tag.</li>
+<li>The Attribute <code class="docutils literal notranslate"><span class="pre">id</span></code> is required and defines the <code class="docutils literal notranslate"><span class="pre">StateID</span></code>.</li>
 </ul>
+<p>The root element requires an attribute to denote the starting State of the Statemachine.</p>
 <div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;scxml</span> <span class="na">xmlns=</span><span class="s">&quot;http://www.w3.org/2005/07/scxml&quot;</span> <span class="na">version=</span><span class="s">&quot;1.0&quot;</span> <span class="na">initial=</span><span class="s">&quot;A&quot;</span><span class="nt">&gt;</span>
 </pre></div>
 </div>
-<ul class="simple">
-<li>States can have Substates. The initial Attribute is then required and needs to be a child.</li>
-</ul>
+<p>States can have Substates. The initial Attribute is required and needs to be a child of the parent.</p>
 <div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;A&quot;</span> <span class="na">initial=</span><span class="s">&quot;B&quot;</span><span class="nt">&gt;</span>
     <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;B&quot;</span><span class="nt">/&gt;</span>
     <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;C&quot;</span><span class="nt">/&gt;</span>
@@ -203,7 +201,7 @@ We dont utilize the whole <a class="reference external" href="http://www.w3.org/
 </div>
 <ul class="simple">
 <li>If a child is active all parent states are active as well.</li>
-<li>States can have and elements which may contain actions which are executed on entry or exit of the state.</li>
+<li>States may have <code class="docutils literal notranslate"><span class="pre">onenty</span></code> and  <code class="docutils literal notranslate"><span class="pre">onexit</span></code> elements which may contain actions(<a class="reference external" href="https://www.w3.org/TR/scxml/#executable">executable content</a>) to be executed on entry or exit of the state.</li>
 </ul>
 <div class="section" id="parallel">
 <h3>Parallel<a class="headerlink" href="#parallel" title="Permalink to this headline">¶</a></h3>
@@ -283,12 +281,12 @@ We dont utilize the whole <a class="reference external" href="http://www.w3.org/
 </div>
 <div class="section" id="actions">
 <h2>Actions<a class="headerlink" href="#actions" title="Permalink to this headline">¶</a></h2>
-<p>Actions are executable content inside <code class="docutils literal notranslate"><span class="pre">onentry</span></code> <code class="docutils literal notranslate"><span class="pre">transition</span></code> and <code class="docutils literal notranslate"><span class="pre">onexit</span></code> elements.</p>
+<p>Actions is the nane of executable content inside <code class="docutils literal notranslate"><span class="pre">onentry</span></code> <code class="docutils literal notranslate"><span class="pre">transition</span></code> and <code class="docutils literal notranslate"><span class="pre">onexit</span></code> elements.</p>
 <ul class="simple">
-<li>we use assign and send actions</li>
+<li>we use <a class="reference external" href="https://www.w3.org/TR/scxml/#assign">assign</a> and <a class="reference external" href="https://www.w3.org/TR/scxml/#send">send</a></li>
 </ul>
-<div class="section" id="send">
-<h3>Send<a class="headerlink" href="#send" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id1">
+<h3>Send<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h3>
 <p>Send is used to create events</p>
 <div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;send</span> <span class="na">event=</span><span class="s">&quot;A&quot;</span><span class="nt">/&gt;</span>
 </pre></div>
@@ -297,8 +295,8 @@ We dont utilize the whole <a class="reference external" href="http://www.w3.org/
 <li>used in behavior Statemachines</li>
 </ul>
 </div>
-<div class="section" id="assign">
-<h3>Assign<a class="headerlink" href="#assign" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id2">
+<h3>Assign<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h3>
 <p>Assign is used to update data entrys</p>
 <div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;assign</span> <span class="na">name=</span><span class="s">&quot;number&quot;</span> <span class="na">expr=</span><span class="s">&quot;2&quot;</span><span class="nt">/&gt;</span>
 </pre></div>
@@ -376,7 +374,7 @@ Result:
 </div>
 <div class="section" id="implicit-events">
 <h2>Implicit events<a class="headerlink" href="#implicit-events" title="Permalink to this headline">¶</a></h2>
-<p>Commons SCXML provides some <strong>interesting</strong> extensions, generating some internal events automatically. As they are named &lt;ID&gt;.&lt;event&gt; you may accidentally cause transitions if you use regex as transition events for Skills (e.x. <code class="docutils literal notranslate"><span class="pre">id=&quot;Wait&quot;</span></code>) or Compount States (<a class="reference internal" href="#sourcing">Sourcing</a>)</p>
+<p>Commons SCXML provides some <strong>interesting</strong> extensions, generating some internal events automatically. As they are named &lt;ID&gt;.&lt;event&gt; you may accidentally cause transitions while using regex as transition events for Skills (e.x. <code class="docutils literal notranslate"><span class="pre">id=&quot;Wait&quot;</span></code>) or Compount States (<a class="reference internal" href="#sourcing">Sourcing</a>)</p>
 <div class="section" id="entry-and-exit">
 <h3>.entry and .exit<a class="headerlink" href="#entry-and-exit" title="Permalink to this headline">¶</a></h3>
 <p>The Commons SCXML implementation generates a <code class="docutils literal notranslate"><span class="pre">.entry</span></code> event when any state is entered and a <code class="docutils literal notranslate"><span class="pre">.exit</span></code> when a state is exited.</p>
@@ -455,7 +453,7 @@ Result:
   <div role="contentinfo">
     <p>
         &copy; Copyright 2018, Leroy Rügemer.
-      Last updated on Jun 26, 2018.
+      Last updated on Nov 05, 2018.
 
     </p>
   </div> 

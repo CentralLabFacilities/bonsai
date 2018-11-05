@@ -12,30 +12,31 @@ SCXML (State Chart XML) can be used to describe Statemachines in a XML document.
 We use Apache Commons XML to create our robot behavior.
 
 The Bonsai Engine reads these files to couple simple skills to rich robot behavior.
-We dont utilize the whole `spec`_ so this page should introduces all relevant parts of SCXML
+BonsaiSCXML is not utilizing the whole `spec`_. This page introduces all the relevant parts of SCXML
 
 State
 -----
 
-States define the possible “situations” or states the Statemachine can be in.
+States define the possible “situations” (or states) the Statemachine can be in.
 
-If the Statemachine is running the current states are called active.
+If the Statemachine is running all current states are called active.
 
-Example:
+Example State:
 
 ::
 
     <state id="A"/>
 
-- A state is a XML element with the tag.
-- The Attribute id is required to defines the ``StateID``.
-- The root element requires an initial attribute to denote the starting State of the Statemachine.
+- A state is a XML element with the ``state`` tag.
+- The Attribute ``id`` is required and defines the ``StateID``.
 
+The root element requires an attribute to denote the starting State of the Statemachine.
 ::
 
     <scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="A">
 
-- States can have Substates. The initial Attribute is then required and needs to be a child.
+
+States can have Substates. The initial Attribute is required and needs to be a child of the parent.
 
 ::
 
@@ -45,7 +46,9 @@ Example:
     </state>
 
 -  If a child is active all parent states are active as well.
--  States can have and elements which may contain actions which are executed on entry or exit of the state.
+-  States may have ``onenty`` and  ``onexit`` elements which may contain actions(`executable content`_) to be executed on entry or exit of the state.
+
+.. _`executable content`: https://www.w3.org/TR/scxml/#executable
 
 Parallel
 ~~~~~~~~
@@ -133,9 +136,13 @@ Example:
 Actions
 -------
 
-Actions are executable content inside ``onentry`` ``transition`` and ``onexit`` elements.
+Actions is the nane of executable content inside ``onentry`` ``transition`` and ``onexit`` elements.
 
--  we use assign and send actions
+-  we use assign_ and send_
+
+.. _send: https://www.w3.org/TR/scxml/#send
+.. _assign: https://www.w3.org/TR/scxml/#assign
+
 
 Send
 ~~~~
@@ -232,7 +239,7 @@ Example:
 Implicit events
 ---------------
 
-Commons SCXML provides some **interesting** extensions, generating some internal events automatically. As they are named <ID>.<event> you may accidentally cause transitions if you use regex as transition events for Skills (e.x. ``id="Wait"``) or Compount States (Sourcing_)
+Commons SCXML provides some **interesting** extensions, generating some internal events automatically. As they are named <ID>.<event> you may accidentally cause transitions while using regex as transition events for Skills (e.x. ``id="Wait"``) or Compount States (Sourcing_)
 
 .entry and .exit
 ~~~~~~~~~~~~~~~~
