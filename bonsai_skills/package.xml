@@ -1,6 +1,6 @@
 <package format="2">
   <name>bonsai_skills</name>
-  <version>0.5.1-SNAPSHOT</version>
+  <version>0.5-SNAPSHOT</version>
   <description>
   This package provides foo capability.
   </description>

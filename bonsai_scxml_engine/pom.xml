@@ -4,7 +4,7 @@
 
     <!-- The Basics -->
     <groupId>de.unibi.citec.clf</groupId>
-    <version>0.5.1-SNAPSHOT</version>
+    <version>0.5-SNAPSHOT</version>
     <artifactId>bonsai_scxml_engine</artifactId>
     <packaging>jar</packaging>
 
@@ -29,7 +29,7 @@
         <dependency>
             <groupId>de.unibi.citec.clf</groupId>
             <artifactId>bonsai_interfaces</artifactId>
-            <version>0.5.1-SNAPSHOT</version>
+            <version>0.5-SNAPSHOT</version>
         </dependency>
 
         <dependency>
@@ -81,7 +81,7 @@
         <dependency>
             <groupId>de.unibi.citec.clf</groupId>
             <artifactId>bonsai_skills</artifactId>
-            <version>0.5.1-SNAPSHOT</version>
+            <version>0.5-SNAPSHOT</version>
             <scope>test</scope>
         </dependency>
 

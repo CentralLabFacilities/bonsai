@@ -4,7 +4,7 @@
 
     <!-- The Basics -->
     <groupId>de.unibi.citec.clf</groupId>
-    <version>0.5.1-SNAPSHOT</version>
+    <version>0.5-SNAPSHOT</version>
     <artifactId>bonsai_tutorials</artifactId>
     <packaging>jar</packaging>
 
@@ -30,21 +30,21 @@
         <dependency>
           <groupId>de.unibi.citec.clf</groupId>
           <artifactId>bonsai_scxml_ros</artifactId>
-          <version>0.5.1-SNAPSHOT</version>
+          <version>0.5-SNAPSHOT</version>
         </dependency>
 
         <!-- Skill Modules -->
         <dependency>
             <groupId>de.unibi.citec.clf</groupId>
             <artifactId>bonsai_skills</artifactId>
-          <version>0.5.1-SNAPSHOT</version>
+          <version>0.5-SNAPSHOT</version>
         </dependency>
 
         <!-- Used Adapters -->
         <dependency>
             <groupId>de.unibi.citec.clf</groupId>
             <artifactId>bonsai_adapter_ros</artifactId>
-          <version>0.5.1-SNAPSHOT</version>
+          <version>0.5-SNAPSHOT</version>
         </dependency>
         <!--<dependency>
           <groupId>de.unibi.citec.clf</groupId>

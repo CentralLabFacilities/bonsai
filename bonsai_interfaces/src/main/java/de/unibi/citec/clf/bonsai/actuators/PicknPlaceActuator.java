@@ -1,17 +1,17 @@
 package de.unibi.citec.clf.bonsai.actuators;
 
 
-import java.io.IOException;
-import java.util.List;
-import java.util.concurrent.Future;
-
 import de.unibi.citec.clf.bonsai.core.object.Actuator;
 import de.unibi.citec.clf.btl.data.geometry.Pose3D;
 import de.unibi.citec.clf.btl.data.grasp.GraspReturnType;
 import de.unibi.citec.clf.btl.data.grasp.KatanaGripperData;
 import de.unibi.citec.clf.btl.data.object.ObjectShapeData;
 
-public interface PicknPlaceActuator extends Actuator {
+import java.io.IOException;
+import java.util.List;
+import java.util.concurrent.Future;
+
+public interface PicknPlaceActuator extends GraspActuator {
 
     /**
      * Move a Joint of the arm.
@@ -34,7 +34,6 @@ public interface PicknPlaceActuator extends Actuator {
      * Goto a single Position (fully described by P,N,O,A).
      *
      * @param pose pose of move to
-     *
      * @return <code>true</code> if the position is reachable,
      * <code>false</code> if not
      * @throws IOException
@@ -60,8 +59,8 @@ public interface PicknPlaceActuator extends Actuator {
     /**
      * Set a special Movement.
      *
-     * @return
      * @param name
+     * @return
      * @throws IOException
      */
     Future<Boolean> directMovement(String name) throws IOException;
@@ -137,8 +136,6 @@ public interface PicknPlaceActuator extends Actuator {
      */
     void unblock() throws IOException;
 
-    Future<GraspReturnType> graspObject(String objectName, String group) throws IOException;
-
     Future<GraspReturnType> isObjectGraspable(String objectName, String group) throws IOException;
 
     Future<GraspReturnType> placeObjectOnSurface(String surfaceName) throws IOException;
@@ -148,7 +145,7 @@ public interface PicknPlaceActuator extends Actuator {
     Future<GraspReturnType> placeObjectOn(ObjectShapeData region) throws IOException;
 
     Future<Boolean> isSomethingInGripper() throws IOException;
-    
+
     void fitObjectsToPrimitives() throws IOException;
 
     void filterGrasps(String filter) throws IOException;

@@ -4,6 +4,8 @@ package de.unibi.citec.clf.bonsai.actuators;
 
 
 import de.unibi.citec.clf.bonsai.core.object.Actuator;
+import de.unibi.citec.clf.btl.data.object.ObjectShapeList;
+
 import java.util.concurrent.Future;
 
 /**
@@ -11,6 +13,9 @@ import java.util.concurrent.Future;
  * @author jkummert
  */
 public interface PlanningSceneActuator extends Actuator{
+
+    Future<Boolean> clearScene();
+    Future<Boolean> addObjects(ObjectShapeList objects);
     
     Future<Boolean> manage();
 }

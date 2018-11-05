@@ -5,6 +5,7 @@ package de.unibi.citec.clf.btl.data.grasp;
 
 
 
+import de.unibi.citec.clf.bonsai.actuators.GraspActuator;
 import de.unibi.citec.clf.btl.Type;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 import de.unibi.citec.clf.btl.units.UnitConverter;
@@ -75,6 +76,10 @@ public class GraspReturnType extends Type {
 		this.rating = rating;
 		this.gr = gr;
 		this.setFrameId(frameId);
+	}
+
+	public GraspActuator.MoveitResult toMoveitResult() {
+		return (getGraspResult()==GraspResult.SUCCESS) ? GraspActuator.MoveitResult.SUCCESS : GraspActuator.MoveitResult.FAILURE;
 	}
 
 	public double getX(LengthUnit unit) {

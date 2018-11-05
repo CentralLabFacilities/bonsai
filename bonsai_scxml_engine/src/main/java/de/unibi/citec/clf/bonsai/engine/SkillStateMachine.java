@@ -201,6 +201,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
      */
     private boolean running = false;
     private boolean isInitialized = false;
+    private boolean isLoading = false;
     private StateMachineConfigurator configurator;
     private SCXMLValidator validator;
     private Set<SkillExceptionHandler> exceptionHandlers = new HashSet<>();
@@ -236,6 +237,9 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
                 String status = "unknown";
                 if (isInitialized) {
                     status = "initialized";
+                }
+                if(isLoading) {
+                    status = "loading";
                 }
                 if (running) {
                     status = "running";
@@ -274,6 +278,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
      */
     public LoadingResults initalize(String pathToTask, String pathToConfig)
             throws StateNotFoundException, StateIDException, LoadingException, TransformerException {
+        isLoading = true;
         scxml = SCXMLDecoder.parseSCXML(new File(pathToTask), includeMapping);
         if (scxml == null) {
             LoadingException e = new LoadingException(
@@ -338,7 +343,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
 
             } catch (Throwable t) {
                 isInitialized = false;
-
+                isLoading = false;
                 logger.error(t.getMessage(), t);
                 throw new LoadingException("configure failed: " + t.getMessage());
             }
@@ -358,13 +363,13 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
                 confResults = bm.configure(pathToConfig,parser);
             } catch (Throwable t) {
                 isInitialized = false;
-
+                isLoading = false;
                 logger.error(t.getMessage(), t);
                 throw new LoadingException("configure failed: " + t.getMessage());
             }
 
             isInitialized = true;
-
+            isLoading = false;
             results.statePrefix = statePrefix;
             results.configurationResults = confResults;
             results.showDefaultSlotWarnings = showDefaultSlotWarnings;

@@ -1,5 +1,6 @@
 package de.unibi.citec.clf.bonsai.skills.arm.grasping;
 
+import de.unibi.citec.clf.bonsai.actuators.GraspActuator;
 import de.unibi.citec.clf.bonsai.actuators.PicknPlaceActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
@@ -54,7 +55,7 @@ public class GraspObjects extends AbstractSkill {
     private ObjectShapeList targets = null;
     private ObjectShapeData curTarget;
     private ObjectShapeList recognized = null;
-    private Future<GraspReturnType> returnFuture;
+    private Future<GraspActuator.MoveitResult> returnFuture;
 
     @Override
     public void configure(ISkillConfigurator configurator) {
@@ -155,7 +156,7 @@ public class GraspObjects extends AbstractSkill {
             return ExitToken.loop(LOOP_TIME);
         }
 
-        GraspReturnType GRT;
+        GraspActuator.MoveitResult GRT;
         try {
             GRT = returnFuture.get();
         } catch (InterruptedException | ExecutionException ex) {
@@ -164,15 +165,11 @@ public class GraspObjects extends AbstractSkill {
         }
 
         logger.info("Armserver returned: " + GRT.toString());
-        switch (GRT.getGraspResult()) {
+        switch (GRT) {
             case SUCCESS:
                 return tokenSuccess;
-            case ROBOT_CRASHED:
-                return ExitToken.fatal();
-            case COLLISION_HANDLED:
-            case POSITION_UNREACHABLE:
-            case FAIL:
-            case NO_RESULT:
+            //case ROBOT_CRASHED:
+            //    return ExitToken.fatal();
             default:
                 return getNext();
 
