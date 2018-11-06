@@ -25,6 +25,7 @@ import move_base_msgs.MoveBaseActionFeedback;
 import move_base_msgs.MoveBaseActionGoal;
 import move_base_msgs.MoveBaseActionResult;
 import move_base_msgs.MoveBaseGoal;
+import org.jboss.netty.util.internal.NonReentrantLock;
 import org.ros.message.Duration;
 import org.ros.message.MessageListener;
 import org.ros.namespace.GraphName;
@@ -40,6 +41,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.locks.Lock;
 
 
 /**
@@ -49,7 +51,8 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
 
     private class DriveDirectThread implements Future<CommandResult>, MessageListener<Pose> {
 
-        private Pose lastPose;
+        private Lock poseLock = new NonReentrantLock();
+        private Pose lastPose = null;
         private Thread driver;
         private Runnable task;
         private geometry_msgs.Twist driveMsg;
@@ -58,7 +61,7 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
         private long driveDuration;
         private long turnDuration;
         private long republishdelay = 20; //ms
-        private Pose3D targetPose;
+        private Pose3D targetPose = null;
 
         public DriveDirectThread() throws RosSerializer.SerializationException {
             Twist3D zeroTwist = new Twist3D(new Velocity3D(), new AngularVelocity3D());
@@ -66,16 +69,19 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
 
             task = () -> {
                 try {
+                    logger.info("starting drive");
                     long timeout = System.currentTimeMillis() + driveDuration;
                     while (System.currentTimeMillis() < timeout) {
                         moveRelativePublisher.publish(driveMsg);
                         Thread.sleep(republishdelay);
                     }
+                    //todo check target pose
                     timeout = System.currentTimeMillis() + turnDuration;
                     while (System.currentTimeMillis() < timeout) {
                         moveRelativePublisher.publish(turnMsg);
                         Thread.sleep(republishdelay);
                     }
+                    //todo check target pose
                 } catch (InterruptedException e) {
                     return;
                 } finally {
@@ -96,11 +102,14 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
             }
 
             try {
-                targetPose = MsgTypeFactory.getInstance().createType(lastPose,Pose3D.class);
+                poseLock.lock();
+                if(lastPose != null) targetPose = MsgTypeFactory.getInstance().createType(lastPose,Pose3D.class);
                 unpackDrive(drive);
                 unpackTurn(turn);
             } catch (RosSerializer.SerializationException | RosSerializer.DeserializationException e) {
                 throw new IOException(e);
+            } finally {
+                poseLock.unlock();
             }
 
             //Start moving
@@ -121,11 +130,11 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
 
             //todo 0.5sec for acceleration?
             turnDuration = (long) ((turnAngle / turnSpeed + 0.5) * 1000);
-            logger.error("turning for " + turnDuration);
-            logger.error("to turn " + turnAngle + "  with " + turnSpeed);
 
             AngularVelocity3D angVel = new AngularVelocity3D(0.0, 0.0, turnSpeed, RotationalSpeedUnit.RADIANS_PER_SEC);
             Twist3D turnTwist = new Twist3D(new Velocity3D(), angVel);
+
+            //TODO target pose + last + turn
 
             turnMsg = MsgTypeFactory.getInstance().createMsg(turnTwist, Twist.class);
 
@@ -147,11 +156,13 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
             //todo 0.5sec for acceleration?
             driveDuration = (long) ((dist / driveSpeed + 0.5) * 1000);
 
-            //CoordinateSystemConverter.glo
-            //
-
             Velocity3D vel = new Velocity3D(velX, velY, 0.0, SpeedUnit.METER_PER_SEC);
             Twist3D driveTwist = new Twist3D(vel, new AngularVelocity3D());
+
+            //TODO target pose + last + drive
+            //hint rotate drive
+            //CoordinateSystemConverter.
+            //
 
             driveMsg = MsgTypeFactory.getInstance().createMsg(driveTwist, Twist.class);
 
@@ -194,7 +205,12 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
 
         @Override
         public void onNewMessage(Pose pose) {
-            lastPose = pose;
+            if(poseLock.tryLock()) {
+                lastPose = pose;
+                poseLock.unlock();
+            }
+
+
         }
     }
 
@@ -202,6 +218,7 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
 
     String moveRelativeTopic;
     private Subscriber<Pose> subscriber;
+    private String poseTopic = "/robot_pose";
     private Publisher<geometry_msgs.Twist> moveRelativePublisher;
     private DriveDirectThread driveDirect;
 
@@ -221,6 +238,7 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
     public void configure(IObjectConfigurator conf) {
         this.topic = conf.requestValue("topic");
         this.moveRelativeTopic = conf.requestValue("moveRelativeTopic");
+        this.poseTopic = conf.requestOptionalValue("pose_topic",poseTopic);
     }
 
     @Override
@@ -232,7 +250,7 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
     public void onStart(final ConnectedNode connectedNode) {
         ac = new ActionClient(connectedNode, this.topic, MoveBaseActionGoal._TYPE, MoveBaseActionFeedback._TYPE, MoveBaseActionResult._TYPE);
         moveRelativePublisher = connectedNode.newPublisher(this.moveRelativeTopic, Twist._TYPE);
-        subscriber = connectedNode.newSubscriber(topic, geometry_msgs.Pose._TYPE);
+        subscriber = connectedNode.newSubscriber(poseTopic, geometry_msgs.Pose._TYPE);
         lastAcGoalId = null;
 
         try {
