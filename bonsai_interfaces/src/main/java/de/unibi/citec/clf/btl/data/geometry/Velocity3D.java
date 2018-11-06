@@ -51,6 +51,10 @@ public class Velocity3D  extends Type{
      * Creates instance.
      */
     public Velocity3D() {
+        this.x = 0;
+        this.y = 0;
+        this.z = 0;
+        this.iSU = SpeedUnit.METER_PER_SEC;
     }
 
     public Velocity3D(Velocity3D v) {

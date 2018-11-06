@@ -195,7 +195,11 @@ public class NavigateToPerson extends AbstractSkill {
 
         logger.info("Goal set" + goal.toString());
 
-        navResult = navActuator.navigateToCoordinate(goal);
+        try {
+            navResult = navActuator.navigateToCoordinate(goal);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         return ExitToken.loop(50);
     }
 

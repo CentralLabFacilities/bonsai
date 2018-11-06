@@ -147,7 +147,11 @@ public class DriveDirect extends AbstractSkill {
             turnData = new TurnData(angle, AngleUnit.RADIAN, rotationSpeed, RotationalSpeedUnit.RADIANS_PER_SEC);
         }
         logger.info("Driving " + dist + "m," + angle + "rad," + driveData + "," + turnData);
-        navResult = navActuator.moveRelative(driveData, turnData);
+        try {
+            navResult = navActuator.moveRelative(driveData, turnData);
+        } catch (IOException e) {
+            return false;
+        }
         logger.debug("called navactuator.");
 
         return true;

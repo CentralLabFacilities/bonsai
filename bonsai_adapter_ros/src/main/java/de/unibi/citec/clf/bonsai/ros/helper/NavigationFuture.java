@@ -1,5 +1,6 @@
 package de.unibi.citec.clf.bonsai.ros.helper;
 
+import actionlib_msgs.GoalStatus;
 import com.github.rosjava_actionlib.ActionFuture;
 import de.unibi.citec.clf.btl.data.navigation.CommandResult;
 import move_base_msgs.MoveBaseActionFeedback;
@@ -13,7 +14,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 /**
- * @param <M>
  * @author lruegeme
  */
 public class NavigationFuture implements Future<CommandResult> {
@@ -43,25 +43,27 @@ public class NavigationFuture implements Future<CommandResult> {
 
     @Override
     public CommandResult get() throws InterruptedException, ExecutionException {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        return toCommandResult(action.get());
     }
 
     @Override
     public CommandResult get(long l, TimeUnit tu) throws InterruptedException, ExecutionException, TimeoutException {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        return toCommandResult(action.get(l,tu));
     }
 
     private static CommandResult toCommandResult(MoveBaseActionResult res) {
 
         MoveBaseResult moveBaseResult = res.getResult();
-        //Not much info here 
-
-        CommandResult.Result status = CommandResult.Result.SUCCESS;
-        int errorCode = 0;
-
-        CommandResult command = new CommandResult("move_base nav", status, errorCode);
-
-        return command;
+        //Not much info here
+        GoalStatus result = res.getStatus();
+        //TODO: USE CORRECT ERROR CODES
+        if (result.getStatus() == GoalStatus.SUCCEEDED) {
+            return new CommandResult("SUCCESS", CommandResult.Result.SUCCESS, 0);
+        } else if (result.getStatus() == GoalStatus.ABORTED) {
+            return new CommandResult("CANCELLED", CommandResult.Result.CANCELLED, 1);
+        } else {
+            return new CommandResult("FAILED", CommandResult.Result.UNKNOWN_ERROR, 2);
+        }
     }
 
 }

@@ -152,7 +152,11 @@ public class PepperFollowPerson extends AbstractSkill {
         //drive.setSpeed(0.5, SpeedUnit.METER_PER_SEC);
         //turn.setAngle(angle, rad);
         //turn.setSpeed(0.5, RotationalSpeedUnit.RADIANS_PER_SEC);
-        navActuator.navigateToCoordinate(navGoal);
+        try {
+            navActuator.navigateToCoordinate(navGoal);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         return ExitToken.loop(250);
 
     }

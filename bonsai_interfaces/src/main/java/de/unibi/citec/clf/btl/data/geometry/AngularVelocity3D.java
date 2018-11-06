@@ -11,7 +11,7 @@ import org.apache.log4j.Logger;
  *
  * @author saschroeder
  */
-public class AngularVelocity3D  extends Type{
+public class AngularVelocity3D  extends Type {
 
     private final Logger logger = Logger.getLogger(AngularVelocity3D.class);
 
@@ -51,6 +51,10 @@ public class AngularVelocity3D  extends Type{
      * Creates instance.
      */
     public AngularVelocity3D() {
+        this.x = 0;
+        this.y = 0;
+        this.z = 0;
+        this.iSU = RotationalSpeedUnit.RADIANS_PER_SEC;
     }
 
     public AngularVelocity3D(AngularVelocity3D v) {

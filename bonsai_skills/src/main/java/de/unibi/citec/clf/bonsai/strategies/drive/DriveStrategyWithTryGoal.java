@@ -165,7 +165,12 @@ public abstract class DriveStrategyWithTryGoal implements DriveStrategy {
 
         TurnData t = new TurnData();
         t.setAngle(yawDiff, AngleUnit.RADIAN);
-        Future<CommandResult> result = nav.moveRelative(new DriveData(), t);
+        Future<CommandResult> result = null;
+        try {
+            result = nav.moveRelative(new DriveData(), t);
+        } catch (IOException e) {
+            throw new ExecutionException(e);
+        }
         while (!result.isDone()) {
             Thread.sleep(50);
         }
@@ -186,7 +191,11 @@ public abstract class DriveStrategyWithTryGoal implements DriveStrategy {
             case GLOBAL:
                 logger.debug("strategy: GLOBAL");
                 long startTime = System.nanoTime();
-                lastCommandResult = nav.navigateToCoordinate(goal);
+                try {
+                    lastCommandResult = nav.navigateToCoordinate(goal);
+                } catch (IOException e) {
+                    throw new ExecutionException(e);
+                }
                 logger.debug("Navigate Call took: " + (System.nanoTime() - startTime));
                 break;
             case LOCAL:

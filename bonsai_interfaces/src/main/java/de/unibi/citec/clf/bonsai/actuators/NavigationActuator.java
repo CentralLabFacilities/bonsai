@@ -13,6 +13,8 @@ import de.unibi.citec.clf.btl.units.AngleUnit;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 import de.unibi.citec.clf.btl.units.RotationalSpeedUnit;
 import de.unibi.citec.clf.btl.units.SpeedUnit;
+
+import javax.annotation.Nullable;
 import java.io.IOException;
 import java.util.concurrent.Future;
 
@@ -97,8 +99,8 @@ public interface NavigationActuator extends Actuator {
      */
     NavigationGoalData getCurrentGoal() throws IOException;
     
-    Future<CommandResult> moveRelative(DriveData drive, TurnData turn);
-    Future<CommandResult> navigateToCoordinate(NavigationGoalData data);
+    Future<CommandResult> moveRelative(@Nullable DriveData drive, @Nullable TurnData turn) throws IOException;
+    Future<CommandResult> navigateToCoordinate(NavigationGoalData data) throws IOException;
 
     //What is this
     @Deprecated  Future<CommandResult> navigateRelative(NavigationGoalData data);

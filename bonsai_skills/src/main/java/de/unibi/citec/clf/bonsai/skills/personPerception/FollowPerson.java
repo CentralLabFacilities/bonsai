@@ -256,7 +256,11 @@ public class FollowPerson extends AbstractSkill {
         if (checkSetNewGoal(goal, setAngleOnlyGoal)) {
             logger.info("Goal set" + goal.toString());
 
-            navActuator.navigateToCoordinate(goal);
+            try {
+                navActuator.navigateToCoordinate(goal);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
             lastGoalSet = System.currentTimeMillis();
         } else {
             if (newGoalTimeout > 0 && System.currentTimeMillis() > lastGoalSet + newGoalTimeout) {
@@ -417,7 +421,11 @@ public class FollowPerson extends AbstractSkill {
         DriveData driveData = new DriveData(0.1, LengthUnit.METER, 0.01, SpeedUnit.METER_PER_SEC);
         TurnData turnData = new TurnData(directionOfLastSeenPerson * wiggleAngle, AngleUnit.RADIAN, 1, RotationalSpeedUnit.RADIANS_PER_SEC);
         wiggleAngle *= -1;
-        navActuator.moveRelative(driveData, null);
+        try {
+            navActuator.moveRelative(driveData, null);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         logger.info("Wiggle, wiggle, wiggle!");
         robotPosTimeout = System.currentTimeMillis();
     }

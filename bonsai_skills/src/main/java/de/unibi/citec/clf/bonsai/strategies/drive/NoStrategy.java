@@ -37,7 +37,12 @@ public class NoStrategy implements DriveStrategy {
             logger.debug("Driving using NoStrategy");
             switch (NavigationGoalData.ReferenceFrame.fromString(targetGoal.getFrameId())) {
                 case GLOBAL:
-                    commandResult = nav.navigateToCoordinate(targetGoal);
+                    try {
+                        commandResult = nav.navigateToCoordinate(targetGoal);
+                    } catch (IOException e) {
+                        logger.error(e);
+                        return StrategyState.ERROR;
+                    }
                     break;
                 case LOCAL:
                     commandResult = nav.navigateRelative(targetGoal);

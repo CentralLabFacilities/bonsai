@@ -129,7 +129,11 @@ public class FollowPersonTurnOnly extends AbstractSkill {
             turnData = new TurnData(angle, AngleUnit.RADIAN, turnSpeed, RotationalSpeedUnit.RADIANS_PER_SEC);
         }
         logger.debug("Driving to " + turnData);
-        navActuator.moveRelative(new DriveData(0, LengthUnit.METER, 0, SpeedUnit.METER_PER_SEC), turnData);
+        try {
+            navActuator.moveRelative(new DriveData(0, LengthUnit.METER, 0, SpeedUnit.METER_PER_SEC), turnData);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
         try {
             followPersonSlotWriter.memorize(personFollow);

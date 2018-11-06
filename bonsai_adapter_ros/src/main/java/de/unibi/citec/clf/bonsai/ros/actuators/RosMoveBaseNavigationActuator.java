@@ -1,16 +1,15 @@
 package de.unibi.citec.clf.bonsai.ros.actuators;
 
 import actionlib_msgs.GoalID;
-import actionlib_msgs.GoalStatus;
 import com.github.rosjava_actionlib.ActionClient;
 import com.github.rosjava_actionlib.ActionFuture;
 import de.unibi.citec.clf.bonsai.actuators.NavigationActuator;
 import de.unibi.citec.clf.bonsai.core.configuration.IObjectConfigurator;
+import de.unibi.citec.clf.bonsai.core.exception.InitializationException;
 import de.unibi.citec.clf.bonsai.ros.RosNode;
-import de.unibi.citec.clf.btl.data.geometry.Rotation3D;
-import de.unibi.citec.clf.btl.data.geometry.Twist3D;
-import de.unibi.citec.clf.btl.data.geometry.AngularVelocity3D;
-import de.unibi.citec.clf.btl.data.geometry.Velocity3D;
+import de.unibi.citec.clf.bonsai.ros.helper.NavigationFuture;
+import de.unibi.citec.clf.bonsai.util.CoordinateSystemConverter;
+import de.unibi.citec.clf.btl.data.geometry.*;
 import de.unibi.citec.clf.btl.data.navigation.*;
 import de.unibi.citec.clf.btl.ros.MsgTypeFactory;
 import de.unibi.citec.clf.btl.ros.RosSerializer;
@@ -20,20 +19,21 @@ import de.unibi.citec.clf.btl.units.RotationalSpeedUnit;
 import de.unibi.citec.clf.btl.units.SpeedUnit;
 import geometry_msgs.Point;
 import geometry_msgs.Pose;
-import geometry_msgs.Twist;
 import geometry_msgs.Quaternion;
+import geometry_msgs.Twist;
 import move_base_msgs.MoveBaseActionFeedback;
 import move_base_msgs.MoveBaseActionGoal;
 import move_base_msgs.MoveBaseActionResult;
 import move_base_msgs.MoveBaseGoal;
 import org.ros.message.Duration;
+import org.ros.message.MessageListener;
 import org.ros.namespace.GraphName;
 import org.ros.node.ConnectedNode;
 import org.ros.node.topic.Publisher;
-import org.ros.concurrent.Rate;
-import org.ros.node.topic.PublisherListener;
+import org.ros.node.topic.Subscriber;
 import std_msgs.Header;
 
+import javax.annotation.Nullable;
 import javax.vecmath.Quat4d;
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
@@ -47,57 +47,163 @@ import java.util.concurrent.TimeoutException;
  */
 public class RosMoveBaseNavigationActuator extends RosNode implements NavigationActuator {
 
-    class CommandResultFuture implements Future<CommandResult> {
+    private class DriveDirectThread implements Future<CommandResult>, MessageListener<Pose> {
 
-        private ActionFuture<MoveBaseActionGoal, MoveBaseActionFeedback, MoveBaseActionResult> fut;
+        private Pose lastPose;
+        private Thread driver;
+        private Runnable task;
+        private geometry_msgs.Twist driveMsg;
+        private geometry_msgs.Twist turnMsg;
+        private geometry_msgs.Twist zeroMsg;
+        private long driveDuration;
+        private long turnDuration;
+        private long republishdelay = 20; //ms
+        private Pose3D targetPose;
 
-        public CommandResultFuture(ActionFuture<MoveBaseActionGoal, MoveBaseActionFeedback, MoveBaseActionResult> fut) {
-            this.fut = fut;
+        public DriveDirectThread() throws RosSerializer.SerializationException {
+            Twist3D zeroTwist = new Twist3D(new Velocity3D(), new AngularVelocity3D());
+            zeroMsg = MsgTypeFactory.getInstance().createMsg(zeroTwist, Twist.class);
+
+            task = () -> {
+                try {
+                    long timeout = System.currentTimeMillis() + driveDuration;
+                    while (System.currentTimeMillis() < timeout) {
+                        moveRelativePublisher.publish(driveMsg);
+                        Thread.sleep(republishdelay);
+                    }
+                    timeout = System.currentTimeMillis() + turnDuration;
+                    while (System.currentTimeMillis() < timeout) {
+                        moveRelativePublisher.publish(turnMsg);
+                        Thread.sleep(republishdelay);
+                    }
+                } catch (InterruptedException e) {
+                    return;
+                } finally {
+                    moveRelativePublisher.publish(zeroMsg);
+                }
+            };
+            driver = new Thread(task);
+        }
+
+
+        public DriveDirectThread drive(@Nullable DriveData drive, @Nullable TurnData turn) throws IOException {
+
+            //Cancel old move
+            if (driver.isAlive()) driver.interrupt();
+            try {
+                driver.join();
+            } catch (InterruptedException e) {
+            }
+
+            try {
+                targetPose = MsgTypeFactory.getInstance().createType(lastPose,Pose3D.class);
+                unpackDrive(drive);
+                unpackTurn(turn);
+            } catch (RosSerializer.SerializationException | RosSerializer.DeserializationException e) {
+                throw new IOException(e);
+            }
+
+            //Start moving
+            driver = new Thread(task);
+            driver.run();
+            return this;
+        }
+
+        private void unpackTurn(TurnData turn) throws RosSerializer.SerializationException {
+            if (turn == null) {
+                turnDuration = 0;
+                turnMsg = zeroMsg;
+                return;
+            }
+
+            double turnSpeed = turn.getSpeed(RotationalSpeedUnit.RADIANS_PER_SEC);
+            double turnAngle = turn.getAngle(AngleUnit.RADIAN);
+
+            //todo 0.5sec for acceleration?
+            turnDuration = (long) ((turnAngle / turnSpeed + 0.5) * 1000);
+            logger.error("turning for " + turnDuration);
+            logger.error("to turn " + turnAngle + "  with " + turnSpeed);
+
+            AngularVelocity3D angVel = new AngularVelocity3D(0.0, 0.0, turnSpeed, RotationalSpeedUnit.RADIANS_PER_SEC);
+            Twist3D turnTwist = new Twist3D(new Velocity3D(), angVel);
+
+            turnMsg = MsgTypeFactory.getInstance().createMsg(turnTwist, Twist.class);
+
+        }
+
+        private void unpackDrive(DriveData drive) throws RosSerializer.SerializationException {
+            if (drive == null) {
+                driveDuration = 0;
+                driveMsg = zeroMsg;
+                return;
+            }
+
+            double driveSpeed = drive.getSpeed(SpeedUnit.METER_PER_SEC);
+            double dist = drive.getDistance(LengthUnit.METER);
+            double distX = drive.getDirection().getX(LengthUnit.METER) / drive.getDirection().getLength(LengthUnit.METER);
+            double distY = drive.getDirection().getY(LengthUnit.METER) / drive.getDirection().getLength(LengthUnit.METER);
+            double velX = driveSpeed * distX;
+            double velY = driveSpeed * distY;
+            //todo 0.5sec for acceleration?
+            driveDuration = (long) ((dist / driveSpeed + 0.5) * 1000);
+
+            //CoordinateSystemConverter.glo
+            //
+
+            Velocity3D vel = new Velocity3D(velX, velY, 0.0, SpeedUnit.METER_PER_SEC);
+            Twist3D driveTwist = new Twist3D(vel, new AngularVelocity3D());
+
+            driveMsg = MsgTypeFactory.getInstance().createMsg(driveTwist, Twist.class);
+
         }
 
         @Override
         public boolean cancel(boolean b) {
-            return fut.cancel(b);
+            driver.interrupt();
+            moveRelativePublisher.publish(zeroMsg);
+            return false;
         }
 
         @Override
         public boolean isCancelled() {
-            return fut.isCancelled();
+            return false;
         }
 
         @Override
         public boolean isDone() {
-            return fut.isDone();
+            return !driver.isAlive();
         }
 
         @Override
         public CommandResult get() throws InterruptedException, ExecutionException {
-            try {
-                return get(0, TimeUnit.SECONDS);
-            } catch (TimeoutException e) {
-                throw new ExecutionException(e);
-            }
+            driver.join();
+            return new CommandResult("SUCCESS", CommandResult.Result.SUCCESS, 0);
         }
 
         @Override
         public CommandResult get(long l, TimeUnit timeUnit) throws InterruptedException, ExecutionException, TimeoutException {
-            MoveBaseActionResult res = fut.get(l, timeUnit);
-            GoalStatus result = res.getStatus();
-            //TODO: USE CORRECT ERROR CODES
-            if (result.getStatus() == GoalStatus.SUCCEEDED) {
-                return new CommandResult("SUCCESS", CommandResult.Result.SUCCESS, 0);
-            } else if (result.getStatus() == GoalStatus.ABORTED) {
-                return new CommandResult("CANCELLED", CommandResult.Result.CANCELLED, 1);
-            } else {
-                return new CommandResult("FAILED", CommandResult.Result.UNKNOWN_ERROR, 2);
+            long timeout = System.currentTimeMillis() + timeUnit.toMillis(l);
+            while (!isDone()) {
+                if (System.currentTimeMillis() > timeout) {
+                    throw new TimeoutException();
+                }
+                Thread.sleep(50);
             }
+            return get();
+        }
+
+        @Override
+        public void onNewMessage(Pose pose) {
+            lastPose = pose;
         }
     }
 
     String topic;
 
     String moveRelativeTopic;
+    private Subscriber<Pose> subscriber;
     private Publisher<geometry_msgs.Twist> moveRelativePublisher;
+    private DriveDirectThread driveDirect;
 
     private GraphName nodeName;
     private ActionClient<MoveBaseActionGoal, MoveBaseActionFeedback, MoveBaseActionResult> ac;
@@ -126,7 +232,16 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
     public void onStart(final ConnectedNode connectedNode) {
         ac = new ActionClient(connectedNode, this.topic, MoveBaseActionGoal._TYPE, MoveBaseActionFeedback._TYPE, MoveBaseActionResult._TYPE);
         moveRelativePublisher = connectedNode.newPublisher(this.moveRelativeTopic, Twist._TYPE);
+        subscriber = connectedNode.newSubscriber(topic, geometry_msgs.Pose._TYPE);
         lastAcGoalId = null;
+
+        try {
+            driveDirect = new DriveDirectThread();
+            subscriber.addMessageListener(driveDirect);
+        } catch (RosSerializer.SerializationException e) {
+            throw new InitializationException(e);
+        }
+
 
         if (ac.waitForActionServerToStart(new Duration(2.0))) {
             initialized = true;
@@ -137,6 +252,8 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
 
     @Override
     public void destroyNode() {
+        if (driveDirect != null) driveDirect.cancel(false);
+        if (moveRelativePublisher != null) moveRelativePublisher.shutdown();
         if (ac != null) ac.finish();
     }
 
@@ -187,136 +304,8 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
     }
 
     @Override
-    public Future<CommandResult> moveRelative(DriveData drive, TurnData turn) {
-        // first drive, then turn
-        double duration = 0.03;
-
-        double velX = 0.0;
-        double velY = 0.0;
-        double dist = 0.0;
-        double driveSpeed = 0.01;
-
-        if (drive != null) {
-            driveSpeed = drive.getSpeed(SpeedUnit.METER_PER_SEC);
-            dist = drive.getDistance(LengthUnit.METER);
-            velX = driveSpeed * drive.getDirection().getX(LengthUnit.METER) / drive.getDirection().getLength(LengthUnit.METER);
-            velY = driveSpeed * drive.getDirection().getY(LengthUnit.METER) / drive.getDirection().getLength(LengthUnit.METER);
-        }
-        int driveNum = (int) ((dist / driveSpeed + 0.5) / duration);
-
-        double turnSpeed = 0.0;
-        double turnAngle = 0.0;
-
-        if (turn != null) {
-            turnSpeed = turn.getSpeed(RotationalSpeedUnit.RADIANS_PER_SEC);
-            turnAngle = turn.getAngle(AngleUnit.RADIAN);
-        }
-        int turnNum;
-        if (turnSpeed != 0) {
-            turnNum = (int) ((turnAngle / turnSpeed + 0.5) / duration);
-        } else {
-            turnNum = 0;
-        }
-
-
-        Velocity3D vel = new Velocity3D(velX, velY, 0.0, SpeedUnit.METER_PER_SEC);
-        AngularVelocity3D angVel = new AngularVelocity3D(0.0, 0.0, turnSpeed, RotationalSpeedUnit.RADIANS_PER_SEC);
-        Twist3D driveTwist = new Twist3D(vel, angVel);
-        driveTwist.setLinear(vel);
-        Twist3D turnTwist = new Twist3D(vel, angVel);
-        turnTwist.setAngular(angVel);
-
-        try {
-            final geometry_msgs.Twist driveMsg = MsgTypeFactory.getInstance().createMsg(driveTwist, Twist.class);
-            final geometry_msgs.Twist turnMsg = MsgTypeFactory.getInstance().createMsg(turnTwist, Twist.class);
-            final boolean done;
-            logger.debug("publish drive: "+driveMsg.getLinear().getX()+", "+driveMsg.getLinear().getY()+", "+driveMsg.getLinear().getZ()+"for "+(duration*driveNum)+" seconds");
-            logger.debug("publish turn: "+driveMsg.getAngular().getX()+", "+driveMsg.getAngular().getY()+", "+driveMsg.getAngular().getZ()+"for "+(duration*turnNum)+" seconds");
-
-            /*final Thread thread = new Thread() {
-                public void run() {
-                    try {
-                        for (int i = 0; i < driveNum; i++) {
-                            moveRelativePublisher.publish(driveMsg);
-                            Thread.sleep(duration * 1000);
-                        }
-                        for (int i = 0; i < turnNum; i++) {
-                            logger.debug("turn "+i);
-                            moveRelativePublisher.publish(turnMsg);
-                            Thread.sleep(duration * 1000);
-                        }
-                    } catch (java.lang.InterruptedException ex) {
-                        return;
-                    }
-                }
-            };*/
-            done = true;
-
-            return new Future<CommandResult>() {
-
-                @Override
-                public boolean cancel(boolean b) {
-                    //thread.interrupt();
-                    return true;
-                }
-
-                @Override
-                public boolean isCancelled() {
-                    return true;
-                }
-
-                @Override
-                public boolean isDone() {
-                    return done;
-                }
-
-                @Override
-                public CommandResult get() throws InterruptedException, ExecutionException {
-                    int millis = (int) (duration * 1000);
-                    logger.debug("publish every "+millis+"seconds");
-                    for (int i = 0; i < driveNum; i++) {
-                        moveRelativePublisher.publish(driveMsg);
-                        Thread.sleep(millis);
-                    }
-                    long time1 = System.currentTimeMillis();
-                    for (int i = 0; i < turnNum; i++) {
-                        moveRelativePublisher.publish(turnMsg);
-                        Thread.sleep(millis);
-                    }
-                    logger.debug("turn took: " + (System.currentTimeMillis()-time1));
-
-                    if (done) {
-                        return new CommandResult("moveRelative", CommandResult.Result.SUCCESS, 0);
-                    } else {
-                        return new CommandResult("moveRelative", CommandResult.Result.UNKNOWN_ERROR, 1);
-                    }
-                }
-
-                @Override
-                public CommandResult get(long l, TimeUnit timeUnit) throws InterruptedException, ExecutionException, TimeoutException {
-                    int millis = (int) (duration * 1000);
-                    logger.debug("publish every "+millis+"seconds");
-                    for (int i = 0; i < driveNum; i++) {
-                        moveRelativePublisher.publish(driveMsg);
-                        Thread.sleep(millis);
-                    }
-                    for (int i = 0; i < turnNum; i++) {
-                        moveRelativePublisher.publish(turnMsg);
-                        Thread.sleep(millis);
-                    }
-                    if (done) {
-                        return new CommandResult("moveRelative", CommandResult.Result.SUCCESS, 0);
-                    } else {
-                        return new CommandResult("moveRelative", CommandResult.Result.UNKNOWN_ERROR, 1);
-                    }
-                }
-            };
-
-        } catch (RosSerializer.SerializationException e) {
-            logger.warn("could not serialize twist");
-        }
-
-        throw new UnsupportedOperationException("move relative could not be executed");
+    public Future<CommandResult> moveRelative(@Nullable DriveData drive, @Nullable TurnData turn) throws IOException {
+        return driveDirect.drive(drive,turn);
     }
 
 
@@ -351,7 +340,7 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
         lastAcGoalId = msg.getGoalId();
         ActionFuture<MoveBaseActionGoal, MoveBaseActionFeedback, MoveBaseActionResult> fut = this.ac.sendGoal(msg);
 
-        return new CommandResultFuture(fut);
+        return new NavigationFuture(fut);
     }
 
     @Override
