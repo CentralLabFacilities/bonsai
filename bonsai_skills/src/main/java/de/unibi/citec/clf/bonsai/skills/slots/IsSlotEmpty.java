@@ -1,4 +1,4 @@
-package de.unibi.citec.clf.bonsai.skills;
+package de.unibi.citec.clf.bonsai.skills.slots;
 
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;

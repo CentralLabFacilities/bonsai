@@ -1,26 +1,28 @@
-package de.unibi.citec.clf.bonsai.skills;
+package de.unibi.citec.clf.bonsai.skills.slots;
 
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
-import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
+import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 
 /**
- * Read from ReadSlot and compare to compareString.
+ * Read from ReadSlot and write content to WriteSlot.
+ * Will write an empty String to the writeSlot if readSlot == null.
  *
  * <pre>
  *
  * Slots:
  *  ReadSlot: [String] [Read]
  *      -> Memory slot the content will be read from
+ *  WriteSlot: [String] [Write]
+ *      -> Memory slot the content will be written to
  *
  * ExitTokens:
- *  success.match:      Entrys are the same
- *  success.mismatch:   Entrys are not the same
- *  error:              ReadSlot was empty
+ *  success:    Copy was successful
+ *  error:      Copy was not successful
  *
  * Sensors:
  *
@@ -30,27 +32,23 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
  *
  * @author pvonneumanncosel
  */
-public class CompareSlot extends AbstractSkill {
+public class CopySlot extends AbstractSkill {
 
-    private ExitToken tokenMisMatch;
-    private ExitToken tokenMatch;
+    private ExitToken tokenSuccess;
     private ExitToken tokenError;
 
-    private static final String KEY_COMPARE_STRING = "#_COMPARE_STRING";
-
     MemorySlotReader<String> readSlot;
+    MemorySlotWriter<String> writeSlot;
 
     private String slotContent;
-    private String compareString;
 
     @Override
     public void configure(ISkillConfigurator configurator) {
-        tokenMatch = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus("match"));
-        tokenMisMatch = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus("misMatch"));
+        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
         tokenError = configurator.requestExitToken(ExitStatus.ERROR());
 
         readSlot = configurator.getReadSlot("ReadSlot", String.class);
-        compareString = configurator.requestValue(KEY_COMPARE_STRING);
+        writeSlot = configurator.getWriteSlot("WriteSlot", String.class);
     }
 
     @Override
@@ -59,7 +57,7 @@ public class CompareSlot extends AbstractSkill {
             slotContent = readSlot.recall();
 
             if (slotContent == null) {
-                logger.warn("your ReadSlot was empty");
+                logger.debug("your ReadSlot was empty");
             }
 
         } catch (CommunicationException ex) {
@@ -71,17 +69,22 @@ public class CompareSlot extends AbstractSkill {
 
     @Override
     public ExitToken execute() {
-        if (slotContent == null) {
-            return tokenError;
-        }
-        if (slotContent.equals(compareString)) {
-            return tokenMatch;
-        }
-        return tokenMisMatch;
+        return tokenSuccess;
     }
 
     @Override
     public ExitToken end(ExitToken curToken) {
+        if (curToken.getExitStatus().isSuccess()) {
+            if(slotContent == null){
+                return tokenError;
+            }
+            try {
+                writeSlot.memorize(slotContent);
+            } catch (CommunicationException ex) {
+                logger.error("Could not memorize slotcontent");
+                return tokenError;
+            }
+        }
         return curToken;
     }
 }

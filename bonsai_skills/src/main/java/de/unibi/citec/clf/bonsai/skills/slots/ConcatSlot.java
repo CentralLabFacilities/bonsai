@@ -1,28 +1,24 @@
-package de.unibi.citec.clf.bonsai.skills;
+package de.unibi.citec.clf.bonsai.skills.slots;
 
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
-import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
+import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 
 /**
- * Read from ReadSlot and write content to WriteSlot.
- * Will write an empty String to the writeSlot if readSlot == null.
+ * Append a string to a slot.
  *
  * <pre>
  *
  * Slots:
- *  ReadSlot: [String] [Read]
- *      -> Memory slot the content will be read from
- *  WriteSlot: [String] [Write]
- *      -> Memory slot the content will be written to
+ *  StringSlot: [String] [Read/Write]
+ *      -> Memory slot the content will be appended to
  *
  * ExitTokens:
- *  success:    Copy was successful
- *  error:      Copy was not successful
+ *  success:            Successfully appended to slot
  *
  * Sensors:
  *
@@ -32,23 +28,27 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
  *
  * @author pvonneumanncosel
  */
-public class CopySlot extends AbstractSkill {
+public class ConcatSlot extends AbstractSkill {
 
     private ExitToken tokenSuccess;
     private ExitToken tokenError;
+
+    private static final String KEY_APPEND = "#_APPEND";
 
     MemorySlotReader<String> readSlot;
     MemorySlotWriter<String> writeSlot;
 
     private String slotContent;
+    private String appendString;
 
     @Override
     public void configure(ISkillConfigurator configurator) {
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
         tokenError = configurator.requestExitToken(ExitStatus.ERROR());
 
-        readSlot = configurator.getReadSlot("ReadSlot", String.class);
-        writeSlot = configurator.getWriteSlot("WriteSlot", String.class);
+        readSlot = configurator.getReadSlot("StringSlot", String.class);
+        writeSlot = configurator.getWriteSlot("StringSlot", String.class);
+        appendString = configurator.requestValue(KEY_APPEND);
     }
 
     @Override
@@ -57,32 +57,36 @@ public class CopySlot extends AbstractSkill {
             slotContent = readSlot.recall();
 
             if (slotContent == null) {
-                logger.debug("your ReadSlot was empty");
+                logger.warn("The slot was empty");
+                slotContent = "";
             }
-
         } catch (CommunicationException ex) {
             logger.fatal("Unable to read from memory: ", ex);
             return false;
         }
+
+        if (appendString.isEmpty()) {
+            logger.error("Nothing to append");
+            return false;
+        }
+
         return true;
     }
 
     @Override
     public ExitToken execute() {
+        slotContent += appendString;
         return tokenSuccess;
     }
 
     @Override
     public ExitToken end(ExitToken curToken) {
         if (curToken.getExitStatus().isSuccess()) {
-            if(slotContent == null){
-                return tokenError;
-            }
             try {
                 writeSlot.memorize(slotContent);
-            } catch (CommunicationException ex) {
-                logger.error("Could not memorize slotcontent");
-                return tokenError;
+            } catch (CommunicationException e) {
+                logger.fatal("Could not write to memory");
+                return ExitToken.fatal();
             }
         }
         return curToken;

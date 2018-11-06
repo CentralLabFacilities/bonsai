@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="SlotIO#writeA">
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="slots.SlotIO#writeA">
     <datamodel>
         <data id="#_STATE_PREFIX" expr="'de.unibi.citec.clf.bonsai.skills.'"/>
         <data id="#_CONFIGURE_AND_VALIDATE" expr="true"/>
@@ -14,35 +14,35 @@
 
     </datamodel>
 
-    <state id="SlotIO#writeA">
+    <state id="slots.SlotIO#writeA">
         <datamodel>
             <data id="#_WRITE" expr="'A'"/>
         </datamodel>
-        <transition event="SlotIO.success" target="SlotIO#writeB"/>
+        <transition event="SlotIO.success" target="slots.SlotIO#writeB"/>
         <transition event="SlotIO.error" target="Fatal"/>
         <transition event="SlotIO.fatal" target="Fatal"/>
     </state>
 
-    <state id="SlotIO#writeB">
+    <state id="slots.SlotIO#writeB">
         <datamodel>
             <data id="#_WRITE" expr="'B'"/>
         </datamodel>
-        <transition event="SlotIO.success" target="CompareSlot#readA"/>
+        <transition event="SlotIO.success" target="slots.CompareSlot#readA"/>
         <transition event="SlotIO.error" target="Fatal"/>
         <transition event="SlotIO.fatal" target="Fatal"/>
     </state>
 
-    <state id="CompareSlot#readA">
+    <state id="slots.CompareSlot#readA">
         <datamodel>
             <data id="#_COMPARE_STRING" expr="'A'"/>
         </datamodel>
-        <transition event="CompareSlot.success.match" target="CompareSlot#readB"/>
+        <transition event="CompareSlot.success.match" target="slots.CompareSlot#readB"/>
         <transition event="CompareSlot.success.misMatch" target="Fatal"/>
         <transition event="CompareSlot.error" target="Fatal"/>
         <transition event="CompareSlot.fatal" target="Fatal"/>
     </state>
 
-    <state id="CompareSlot#readB">
+    <state id="slots.CompareSlot#readB">
         <datamodel>
             <data id="#_COMPARE_STRING" expr="'B'"/>
         </datamodel>

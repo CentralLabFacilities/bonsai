@@ -4,41 +4,41 @@
         <data id="#_STATE_PREFIX" expr="'de.unibi.citec.clf.bonsai.skills.'"/>
         <data id="#_SLOTS">
             <slots>
-                <slot key="StringSlot" state="SlotIO#readA#consume#superConsume"
+                <slot key="StringSlot" state="slots.SlotIO#readA#consume#superConsume"
                 xpath="/test/one"/>
-                <slot key="StringSlot" state="SlotIO#readB#consume#superConsume"
+                <slot key="StringSlot" state="slots.SlotIO#readB#consume#superConsume"
                 xpath="/test/two"/>
-                <slot key="StringSlot" state="SlotIO#writeB#consume#superConsume"
+                <slot key="StringSlot" state="slots.SlotIO#writeB#consume#superConsume"
                 xpath="/test/two"/>
-                <slot key="StringSlot" state="SlotIO#writeA#consume#superConsume"
+                <slot key="StringSlot" state="slots.SlotIO#writeA#consume#superConsume"
                 xpath="/test/one"/>
             </slots>
         </data>
     </datamodel>
     <state id="superConsume" initial="consume#superConsume"> 
-        <state id="consume#superConsume" initial="SlotIO#writeA#consume#superConsume">
-            <state id="SlotIO#writeA#consume#superConsume">
+        <state id="consume#superConsume" initial="slots.SlotIO#writeA#consume#superConsume">
+            <state id="slots.SlotIO#writeA#consume#superConsume">
                 <datamodel>
                     <data id="#_WRITE" expr="'A'"/>
                 </datamodel>
-                <transition event="SlotIO.success" target="SlotIO#writeB#consume#superConsume"/>
+                <transition event="SlotIO.success" target="slots.SlotIO#writeB#consume#superConsume"/>
                 <transition event="SlotIO.error" target="End#consume#superConsume"/>
                 <transition event="SlotIO.fatal" target="Fatal#consume#superConsume"/>
             </state>
-            <state id="SlotIO#writeB#consume#superConsume">
+            <state id="slots.SlotIO#writeB#consume#superConsume">
                 <datamodel>
                     <data id="#_WRITE" expr="'B'"/>
                 </datamodel>
-                <transition event="SlotIO.success" target="SlotIO#readA#consume#superConsume"/>
+                <transition event="SlotIO.success" target="slots.SlotIO#readA#consume#superConsume"/>
                 <transition event="SlotIO.error" target="End#consume#superConsume"/>
                 <transition event="SlotIO.fatal" target="Fatal#consume#superConsume"/>
             </state>
-            <state id="SlotIO#readA#consume#superConsume">
-                <transition event="SlotIO.success" target="SlotIO#readB#consume#superConsume"/>
+            <state id="slots.SlotIO#readA#consume#superConsume">
+                <transition event="SlotIO.success" target="slots.SlotIO#readB#consume#superConsume"/>
                 <transition event="SlotIO.error" target="End#consume#superConsume"/>
                 <transition event="SlotIO.fatal" target="Fatal#consume#superConsume"/>
             </state>
-            <state id="SlotIO#readB#consume#superConsume">
+            <state id="slots.SlotIO#readB#consume#superConsume">
                 <transition event="SlotIO.success" target="End#consume#superConsume"/>
                 <transition event="SlotIO.error" target="End#consume#superConsume"/>
                 <transition event="SlotIO.fatal" target="Fatal#consume#superConsume"/>

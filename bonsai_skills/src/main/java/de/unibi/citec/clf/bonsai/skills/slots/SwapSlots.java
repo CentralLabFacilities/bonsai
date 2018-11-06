@@ -1,8 +1,7 @@
-package de.unibi.citec.clf.bonsai.skills;
+package de.unibi.citec.clf.bonsai.skills.slots;
 
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
-import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
-import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
+import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -10,13 +9,9 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 
 /**
  * Read from ReadSlot and write content to WriteSlot.
+ * Will write an empty String to the writeSlot if readSlot == null.
  *
  * <pre>
- *
- * Parameters:
- *  #_DATA_TYPE: [String]
- *      -> full class-path of the Slot-Type (default: java.lang.String)
- *          e.g. "de.unibi.citec.clf.btl.data.geometry.Point2D"
  *
  * Slots:
  *  ReadSlot: [String] [Read]
@@ -34,46 +29,45 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
  *
  * </pre>
  *
- * @author ffriese, pvonneumanncosel
+ * @author pvonneumanncosel
  */
-public class CopyAnySlot extends AbstractSkill {
+public class SwapSlots extends AbstractSkill {
 
     private ExitToken tokenSuccess;
     private ExitToken tokenError;
 
-    private MemorySlotReader<?> readSlot;
-    private MemorySlotWriter<?> writeSlot;
+    MemorySlot<String> slotA;
+    MemorySlot<String> slotB;
 
-    private final static String KEY_DATA_TYPE = "#_DATA_TYPE";
-
-    private String typeString = "java.lang.String";
-    private Class<?> type;
-    private Object object;
+    private String slotContentA;
+    private String slotContentB;
 
     @Override
     public void configure(ISkillConfigurator configurator) {
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
         tokenError = configurator.requestExitToken(ExitStatus.ERROR());
 
-        typeString = configurator.requestOptionalValue(KEY_DATA_TYPE, typeString);
-
-        try {
-            type = Class.forName(typeString);
-        } catch (ClassNotFoundException e) {
-            logger.error(e);
-            return;
-        }
-        readSlot = configurator.getReadSlot("ReadSlot", type);
-        writeSlot = configurator.getWriteSlot("WriteSlot", type);
+        slotA = configurator.getSlot("SwapSlotA", String.class);
+        slotB = configurator.getSlot("SwapSlotB", String.class);
     }
 
     @Override
     public boolean init() {
         try {
-            object = readSlot.recall();
+            slotContentA = slotA.recall();
+            slotContentB = slotB.recall();
 
-            if (object == null) {
-                logger.warn("your ReadSlot was empty");
+            if (slotContentA == null) {
+                logger.debug("your ReadSlot A was empty. using empty String");
+                slotContentA = "";
+            } else {
+                logger.debug("your ReadSlot A was " + slotContentA);
+            }
+            if (slotContentB == null) {
+                logger.debug("your ReadSlot was empty. using empty String");
+                slotContentB = "";
+            } else {
+                logger.debug("your ReadSlot B was " + slotContentB);
             }
 
         } catch (CommunicationException ex) {
@@ -91,14 +85,11 @@ public class CopyAnySlot extends AbstractSkill {
     @Override
     public ExitToken end(ExitToken curToken) {
         if (curToken.getExitStatus().isSuccess()) {
-            if(object == null){
-                return tokenError;
-            }
             try {
-                MemorySlotWriter<Object> slot = (MemorySlotWriter<Object>) writeSlot;
-                slot.memorize(type.cast(object));
+                slotA.memorize(slotContentB);
+                slotB.memorize(slotContentA);
             } catch (CommunicationException ex) {
-                logger.error("Could not memorize slot content");
+                logger.error("Could not memorize slotcontent");
                 return tokenError;
             }
         }

@@ -1,4 +1,4 @@
-package de.unibi.citec.clf.bonsai.skills;
+package de.unibi.citec.clf.bonsai.skills.nav;
 
 
 

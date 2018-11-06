@@ -1,43 +1,43 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="SlotIO#writeA">
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="slots.SlotIO#writeA">
     <datamodel>
         <data id="#_STATE_PREFIX" expr="'de.unibi.citec.clf.bonsai.skills.'"/>
         <data id="#_SLOTS">
             <slots>
-                <slot key="StringSlot" state="SlotIO#readA" xpath="/test/one"/>
-                <slot key="StringSlot" state="SlotIO#readB" xpath="/test/two"/>
-                <slot key="StringSlot" state="SlotIO#writeB" xpath="/test/two"/>
-                <slot key="StringSlot" state="SlotIO#writeA" xpath="/test/one"/>
+                <slot key="StringSlot" state="slots.SlotIO#readA" xpath="/test/one"/>
+                <slot key="StringSlot" state="slots.SlotIO#readB" xpath="/test/two"/>
+                <slot key="StringSlot" state="slots.SlotIO#writeB" xpath="/test/two"/>
+                <slot key="StringSlot" state="slots.SlotIO#writeA" xpath="/test/one"/>
             </slots>
         </data>
 
     </datamodel>
 
-    <state id="SlotIO#writeA">
+    <state id="slots.SlotIO#writeA">
         <datamodel>
             <data id="#_WRITE" expr="'A'"/>
         </datamodel>
-        <transition event="SlotIO.success" target="SlotIO#writeB"/>
+        <transition event="SlotIO.success" target="slots.SlotIO#writeB"/>
         <transition event="SlotIO.error" target="End"/>
         <transition event="SlotIO.fatal" target="Fatal"/>
     </state>
 
-    <state id="SlotIO#writeB">
+    <state id="slots.SlotIO#writeB">
         <datamodel>
             <data id="#_WRITE" expr="'B'"/>
         </datamodel>
-        <transition event="SlotIO.success" target="SlotIO#readA"/>
+        <transition event="SlotIO.success" target="slots.SlotIO#readA"/>
         <transition event="SlotIO.error" target="End"/>
         <transition event="SlotIO.fatal" target="Fatal"/>
     </state>
 
-    <state id="SlotIO#readA">
-        <transition event="SlotIO.success" target="SlotIO#readB"/>
+    <state id="slots.SlotIO#readA">
+        <transition event="SlotIO.success" target="slots.SlotIO#readB"/>
         <transition event="SlotIO.error" target="End"/>
         <transition event="SlotIO.fatal" target="Fatal"/>
     </state>
 
-    <state id="SlotIO#readB">
+    <state id="slots.SlotIO#readB">
         <transition event="SlotIO.success" target="End"/>
         <transition event="SlotIO.error" target="End"/>
         <transition event="SlotIO.fatal" target="Fatal"/>

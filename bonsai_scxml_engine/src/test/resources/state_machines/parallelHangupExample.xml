@@ -5,7 +5,7 @@
         <data id="#_STATE_PREFIX" expr="'de.unibi.citec.clf.bonsai.skills.'"/>
         <data id="#_SLOTS">
             <slots>
-                <slot key="StringSlot" state="SlotIO" xpath="/null"/>
+                <slot key="StringSlot" state="slots.SlotIO" xpath="/null"/>
             </slots>
         </data>
     </datamodel>
@@ -26,10 +26,10 @@
 
 
                     <state id="Nop">
-                        <transition event="Nop.fatal" target="SlotIO"/>
+                        <transition event="Nop.fatal" target="slots.SlotIO"/>
                     </state>
 
-                    <state id="SlotIO">
+                    <state id="slots.SlotIO">
                         <transition event="SlotIO.fatal" target="Nop"/>
                         <transition event="SlotIO.success" target="Nop"/>
                     </state>
