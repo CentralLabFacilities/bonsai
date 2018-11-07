@@ -1,4 +1,4 @@
-package de.unibi.citec.clf.bonsai.skills.deprecated.map;
+package de.unibi.citec.clf.bonsai.skills.nav.map;
 
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
