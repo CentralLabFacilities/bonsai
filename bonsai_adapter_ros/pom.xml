@@ -119,6 +119,11 @@
             <artifactId>nav_msgs</artifactId>
             <version>[1.12.5,1.13.0)</version>
         </dependency>
+        <dependency>
+            <groupId>org.ros.rosjava_messages</groupId>
+            <artifactId>people_msgs</artifactId>
+            <version>[1.0.10,1.2.0)</version>
+        </dependency>
 
         <dependency>
             <groupId>org.ros.rosjava_messages</groupId>

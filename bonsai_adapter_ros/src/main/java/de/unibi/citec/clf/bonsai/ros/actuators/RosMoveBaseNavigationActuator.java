@@ -248,6 +248,7 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
 
     @Override
     public void onStart(final ConnectedNode connectedNode) {
+        logger.trace("Start " + RosMoveBaseNavigationActuator.class);
         ac = new ActionClient(connectedNode, this.topic, MoveBaseActionGoal._TYPE, MoveBaseActionFeedback._TYPE, MoveBaseActionResult._TYPE);
         moveRelativePublisher = connectedNode.newPublisher(this.moveRelativeTopic, Twist._TYPE);
         subscriber = connectedNode.newSubscriber(poseTopic, geometry_msgs.Pose._TYPE);
@@ -257,6 +258,7 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
             driveDirect = new DriveDirectThread();
             subscriber.addMessageListener(driveDirect);
         } catch (RosSerializer.SerializationException e) {
+            logger.error(e);
             throw new InitializationException(e);
         }
 
