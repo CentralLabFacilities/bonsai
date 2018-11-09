@@ -58,6 +58,26 @@ public class MathTools {
         }
     }
 
+    public static PositionData localToOther(PositionData global, PositionData other) {
+        LengthUnit iLU = LengthUnit.MILLIMETER;
+        AngleUnit iAU = AngleUnit.RADIAN;
+
+        double dy = global.getY(iLU) - other.getY(iLU);
+        double dx = global.getX(iLU) - other.getX(iLU);
+        double angle = global.getYaw(iAU) - other.getYaw(iAU);
+        angle = MathTools.normalizeAngle(angle, iAU);
+
+        double dx1 = MathTools.rotatePointX(dx, dy, -other.getYaw(iAU), iAU);
+        double dy1 = MathTools.rotatePointY(dx, dy, -other.getYaw(iAU), iAU);
+
+        PositionData out = new PositionData(global);
+        out.setFrameId(ReferenceFrame.LOCAL);
+        out.setX(dx1, iLU);
+        out.setY(dy1, iLU);
+        out.setYaw(angle, iAU);
+        return out;
+    }
+
     public static PositionData globalToLocal(PositionData global, PositionData robot) {
         if (!global.getFrameId().equals(ReferenceFrame.GLOBAL.getFrameName())) {
             throw new MathException("given point does not have a global reference frame");

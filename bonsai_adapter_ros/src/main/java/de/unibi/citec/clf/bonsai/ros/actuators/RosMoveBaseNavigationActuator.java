@@ -34,6 +34,7 @@ import org.ros.node.topic.Publisher;
 import org.ros.node.topic.Subscriber;
 import std_msgs.Header;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.vecmath.Quat4d;
 import java.io.IOException;
@@ -313,7 +314,7 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
             ac.sendCancel(lastAcGoalId);
         } else {
             final NavigationGoalData goal = new NavigationGoalData();
-            goal.setFrameId("base_link");
+            goal.setFrameId(PositionData.ReferenceFrame.LOCAL);
             final Future<CommandResult> commandResultFuture = navigateToCoordinate(goal);
             commandResultFuture.cancel(true);
             ac.sendCancel(lastAcGoalId);
@@ -332,12 +333,12 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
 
 
     @Override
-    public Future<CommandResult> navigateToCoordinate(NavigationGoalData data) {
+    public Future<CommandResult> navigateToCoordinate(@Nonnull NavigationGoalData data) {
         MoveBaseActionGoal msg = ac.newGoalMessage();
 
         MoveBaseGoal goal = msg.getGoal();
         try {
-            final Pose pose = MsgTypeFactory.getInstance().createMsg((PositionData) data, Pose.class);
+            final Pose pose = MsgTypeFactory.getInstance().createMsg(data, Pose.class);
             goal.getTargetPose().setPose(pose);
             goal.getTargetPose().getHeader().setFrameId(data.getFrameId());
         } catch (RosSerializer.SerializationException e) {

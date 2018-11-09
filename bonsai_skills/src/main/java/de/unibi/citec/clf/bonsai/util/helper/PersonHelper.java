@@ -144,8 +144,8 @@ public final class PersonHelper {
      */
     public static void sortPersonsByDistance(java.util.List<PersonData> persons, final PositionData robPos) {
         Collections.sort(persons, (o1, o2) -> {
-            PolarCoordinate polar1 = new PolarCoordinate(MathTools.globalToLocal(o1.getPosition(), robPos));
-            PolarCoordinate polar2 = new PolarCoordinate(MathTools.globalToLocal(o2.getPosition(), robPos));
+            PolarCoordinate polar1 = new PolarCoordinate(MathTools.localToOther(o1.getPosition(), robPos));
+            PolarCoordinate polar2 = new PolarCoordinate(MathTools.localToOther(o2.getPosition(), robPos));
             return Double.compare(polar1.getDistance(LengthUnit.MILLIMETER), polar2.getDistance(LengthUnit.MILLIMETER));
         });
     }

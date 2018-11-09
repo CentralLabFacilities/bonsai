@@ -13,8 +13,10 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.bonsai.util.CoordinateSystemConverter;
 import de.unibi.citec.clf.bonsai.util.CoordinateTransformer;
+import de.unibi.citec.clf.bonsai.util.helper.PersonHelper;
 import de.unibi.citec.clf.btl.List;
 import de.unibi.citec.clf.btl.data.geometry.PolarCoordinate;
+import de.unibi.citec.clf.btl.data.geometry.Pose3D;
 import de.unibi.citec.clf.btl.data.navigation.DriveData;
 import de.unibi.citec.clf.btl.data.navigation.NavigationGoalData;
 import de.unibi.citec.clf.btl.data.navigation.PositionData;
@@ -88,7 +90,11 @@ public class FollowPerson extends AbstractSkill {
     private static final String KEY_TALK_DISTANCE = "#_TALK_DISTANCE";
     private static final String KEY_SLOW_DOWN_MESSAGE = "#_SLOW_DOWN_MESSAGE";
     private static final String KEY_STRATEGY = "#_STRATEGY";
+    private static final String KEY_ENABLE_NEAREST = "#_ENABLE_NEAREST_TO_OLD";
+    private static final String KEY_NEAREST_MAXDIST = "#_NEAREST_TO_OLD_DIST";
 
+    private double nearestToOldDist = 400;
+    private boolean useNearestPerson = false;
     private long personLostTimeout = 5000; //200L
     private double stopDistance = 1000; //500
     private double personLostDist = 4000; //2000
@@ -148,6 +154,8 @@ public class FollowPerson extends AbstractSkill {
         talkdistance = configurator.requestOptionalInt(KEY_TALK_DISTANCE, (int) talkdistance);
         slowDownMessage = configurator.requestOptionalValue(KEY_SLOW_DOWN_MESSAGE, slowDownMessage);
         strategy = configurator.requestOptionalValue(KEY_STRATEGY, strategy);
+        useNearestPerson = configurator.requestOptionalBool(KEY_ENABLE_NEAREST,useNearestPerson);
+        nearestToOldDist = configurator.requestOptionalDouble(KEY_NEAREST_MAXDIST,nearestToOldDist);
 
         if (personLostTimeout > 0) {
             tokenErrorPersonLost = configurator.requestExitToken(ExitStatus.ERROR().ps("personLost"));
@@ -178,7 +186,7 @@ public class FollowPerson extends AbstractSkill {
 
         try {
             personFollow = followPersonSlotRead.recall();
-            robotPosition = posSensor.readLast(100);
+            robotPosition = posSensor.readLast(250);
         } catch (CommunicationException | InterruptedException | IOException ex) {
             logger.error(ex);
             return false;
@@ -235,7 +243,10 @@ public class FollowPerson extends AbstractSkill {
         lastPersonPosition = new PositionData(personFollow.getPosition());
         if(!lastPersonPosition.getFrameId().equals("map")) {
             try {
-                tf.transform(lastPersonPosition,"map");
+                Pose3D global = tf.transform(lastPersonPosition,"map");
+                lastPersonPosition.setFrameId("map");
+                lastPersonPosition.setX(global.getTranslation().getX(LengthUnit.METER),LengthUnit.METER);
+                lastPersonPosition.setY(global.getTranslation().getY(LengthUnit.METER),LengthUnit.METER);
             } catch (TransformException e) {
                 logger.error(e);
             }
@@ -243,6 +254,7 @@ public class FollowPerson extends AbstractSkill {
         lastUuid = personFollow.getUuid();
         lastPersonFound = System.currentTimeMillis();
 
+        //todo remove global to locat stuff
         PolarCoordinate polar = new PolarCoordinate(MathTools.globalToLocal(personFollow.getPosition(), robotPosition));
 
         double driveDistance = calculateDriveDistance(polar);
@@ -321,7 +333,7 @@ public class FollowPerson extends AbstractSkill {
 
         PositionData robot = null;
         try {
-            robot = posSensor.readLast(1);
+            robot = posSensor.readLast(50);
         } catch (IOException | InterruptedException ex) {
             logger.error("Could not read robot position", ex);
         }
@@ -343,8 +355,7 @@ public class FollowPerson extends AbstractSkill {
 
         List<PersonData> persons;
         try {
-            persons = personSensor.readLast(1);
-
+            persons = personSensor.readLast(50);
         } catch (IOException | InterruptedException ex) {
             logger.error("Could not read from person sensor", ex);
             return null;
@@ -366,7 +377,33 @@ public class FollowPerson extends AbstractSkill {
             }
         }
 
+        if(useNearestPerson) {
+            return fetchNearestPerson(personFollow,persons);
+        }
+
+        logger.debug("person id " + lastUuid + " not found");
+        for (PersonData person : persons) {
+            logger.debug("person with id " + person.getUuid());
+        }
+
         return null;
+    }
+
+    private PersonData fetchNearestPerson(PersonData personFollow, List<PersonData> persons) {
+        if(personFollow == null || persons.isEmpty()) return null;
+
+        PersonHelper.sortPersonsByDistance(persons,personFollow.getPosition());
+        PersonData candidate = persons.get(0);
+
+        PolarCoordinate polar = new PolarCoordinate(MathTools.localToOther(candidate.getPosition(),personFollow.getPosition()));
+        if(polar.getDistance(LengthUnit.MILLIMETER) <= nearestToOldDist) {
+            return candidate;
+        } else {
+            logger.error("no person near old pose");
+        }
+
+        return null;
+
     }
 
     private void talk() {
@@ -394,7 +431,13 @@ public class FollowPerson extends AbstractSkill {
 
     private void wrapUpPersonLost(PositionData robotPosition, PositionData followPersonPosition) {
 
-        PolarCoordinate polar = new PolarCoordinate(MathTools.globalToLocal(followPersonPosition, robotPosition));
+        PolarCoordinate polar;
+        if(followPersonPosition.getFrameId().equals(PositionData.ReferenceFrame.GLOBAL.getFrameName())) {
+            polar = new PolarCoordinate(MathTools.globalToLocal(followPersonPosition, robotPosition));
+        } else {
+            polar = new PolarCoordinate(followPersonPosition);
+        }
+
 
         double pAngle = polar.getAngle(AU);
         double pDistance = polar.getDistance(LU);
@@ -453,7 +496,13 @@ public class FollowPerson extends AbstractSkill {
     }
 
     private double getLastPersonDirection(){
-        PositionData posDataLocal = CoordinateSystemConverter.globalToLocal(lastPersonPosition, robotPosition);
+        PositionData posDataLocal;
+        if(lastPersonPosition.getFrameId().equals(PositionData.ReferenceFrame.GLOBAL.getFrameName())) {
+            posDataLocal = CoordinateSystemConverter.globalToLocal(lastPersonPosition, robotPosition);
+        } else {
+            posDataLocal = lastPersonPosition;
+        }
+
         return Math.signum(posDataLocal.getYaw(AngleUnit.RADIAN));
     }
 
