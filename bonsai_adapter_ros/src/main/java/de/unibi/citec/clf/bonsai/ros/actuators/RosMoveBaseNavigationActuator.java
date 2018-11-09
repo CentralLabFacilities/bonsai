@@ -266,6 +266,8 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
         if (ac.waitForActionServerToStart(new Duration(2.0))) {
             initialized = true;
             logger.debug("RosMoveBase NavAct started");
+        } else {
+            logger.debug("RosMoveBase NavAct timeout after 2sec " + this.topic);
         }
 
     }
