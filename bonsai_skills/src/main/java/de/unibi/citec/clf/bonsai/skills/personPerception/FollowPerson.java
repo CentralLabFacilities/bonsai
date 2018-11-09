@@ -178,8 +178,14 @@ public class FollowPerson extends AbstractSkill {
 
         try {
             personFollow = followPersonSlotRead.recall();
-        } catch (CommunicationException ex) {
-            logger.error("Could not read person from memory", ex);
+            robotPosition = posSensor.readLast(100);
+        } catch (CommunicationException | InterruptedException | IOException ex) {
+            logger.error(ex);
+            return false;
+        }
+
+        if (robotPosition == null){
+            logger.error("No robot position");
             return false;
         }
 
@@ -421,9 +427,13 @@ public class FollowPerson extends AbstractSkill {
 
     private boolean checkIfRobotMoving() {
         boolean ret = true;
-        if (robotPosition.getDistance(lastRobotPosition, LengthUnit.METER) < 0.05 &&
-                robotPosition.getYaw(AngleUnit.RADIAN) - lastRobotPosition.getYaw(AngleUnit.RADIAN) < 0.02) {
-            ret = false;
+        if(robotPosition!=null && lastRobotPosition!=null){
+            if (robotPosition.getDistance(lastRobotPosition, LengthUnit.METER) < 0.05 &&
+                    robotPosition.getYaw(AngleUnit.RADIAN) - lastRobotPosition.getYaw(AngleUnit.RADIAN) < 0.02) {
+                ret = false;
+            }
+            logger.error("NPE?");
+            return false;
         }
         return ret;
     }
