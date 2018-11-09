@@ -32,7 +32,9 @@ public class PeopleMsgsPositionMeasurement extends RosSerializer<PersonData, Pos
         person.setName(msg.getName());
         person.setUuid(msg.getObjectId());
 
-
+        //TODO legdetector swap?
+        person.setName(msg.getObjectId());
+        person.setUuid(msg.getName());
 
         return person;
     }

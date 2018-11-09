@@ -141,7 +141,7 @@ public class WaitForPerson extends AbstractSkill {
         PolarCoordinate polar;
 
         String personsDebug = "";
-        personsDebug = persons.stream().map((person) -> person.getUuid() + " ").reduce(personsDebug, String::concat);
+        personsDebug = persons.stream().map((person) ->  person.getUuid() + " ").reduce(personsDebug, String::concat);
         logger.info("persons: " + personsDebug);
 
         PersonData front;
@@ -164,7 +164,7 @@ public class WaitForPerson extends AbstractSkill {
 
             polar = new PolarCoordinate(p.getPosition());
 
-            logger.debug("Person " + p.getUuid() + " frame person:" + p.getFrameId()
+            logger.debug("Person " + p.getUuid() + "(" + p.getName() + ") frame person:" + p.getFrameId()
                     + " frame polar: " + polar.getFrameId()
                     + "\n dist:" + polar.getDistance(LengthUnit.METER)
                     + "\n angle:" + polar.getAngle(AngleUnit.RADIAN));
