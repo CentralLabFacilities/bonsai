@@ -19,6 +19,8 @@ public class PeopleMsgsPositionMeasurement extends RosSerializer<PersonData, Pos
     public PersonData deserialize(PositionMeasurement msg) throws DeserializationException {
         PersonData person = new PersonData();
 
+        MsgTypeFactory.setHeader(person,msg.getHeader());
+
         Point3D point = MsgTypeFactory.getInstance().createType(msg.getPos(), Point3D.class);
         PositionData pose = new PositionData();
         pose.setX(point.getX(LengthUnit.METER),LengthUnit.METER);
@@ -27,6 +29,8 @@ public class PeopleMsgsPositionMeasurement extends RosSerializer<PersonData, Pos
 
         person.setName(msg.getName());
         person.setUuid(msg.getObjectId());
+
+
 
         return person;
     }

@@ -1,14 +1,17 @@
 package de.unibi.citec.clf.bonsai.skills.personPerception;
 
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
+import de.unibi.citec.clf.bonsai.core.exception.TransformException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
+import de.unibi.citec.clf.bonsai.core.object.TransformLookup;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.bonsai.util.helper.PersonHelper;
 import de.unibi.citec.clf.btl.List;
+import de.unibi.citec.clf.btl.Type;
 import de.unibi.citec.clf.btl.data.geometry.PolarCoordinate;
 import de.unibi.citec.clf.btl.data.navigation.PositionData;
 import de.unibi.citec.clf.btl.data.person.PersonData;
@@ -61,21 +64,22 @@ public class WaitForPerson extends AbstractSkill {
     private ExitToken tokenSuccessTimeout;
 
     private Sensor<PersonDataList> personSensor;
-    private Sensor<PositionData> positionSensor;
+    //private Sensor<PositionData> positionSensor;
     private MemorySlot<PersonData> currentPersonSlot;
 
     PersonData personInFront = null;
     List<PersonData> persons;
-    PositionData robotPosition;
+    TransformLookup tf;
 
     @Override
     public void configure(ISkillConfigurator configurator) {
+        tf = configurator.getTransform();
 
         // request all tokens that you plan to return from other methods
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
 
         personSensor = configurator.getSensor("PersonSensor", PersonDataList.class);
-        positionSensor = configurator.getSensor("PositionSensor", PositionData.class);
+        //positionSensor = configurator.getSensor("PositionSensor", PositionData.class);
         currentPersonSlot = configurator.getSlot("PersonDataSlot", PersonData.class);
 
         timeout = configurator.requestOptionalInt(KEY_TIMEOUT, (int) timeout);
@@ -114,7 +118,7 @@ public class WaitForPerson extends AbstractSkill {
 
         try {
             persons = personSensor.readLast(200);
-            robotPosition = positionSensor.readLast(200);
+            //robotPosition = positionSensor.readLast(200);
         } catch (IOException | InterruptedException ex) {
             logger.error("Exception while retrieving stuff", ex);
             return ExitToken.fatal();
@@ -128,10 +132,10 @@ public class WaitForPerson extends AbstractSkill {
             logger.debug("No persons found.");
             return ExitToken.loop();
         }
-        if (robotPosition == null) {
-            logger.warn("Not read from position sensor.");
-            return ExitToken.loop();
-        }
+//        if (robotPosition == null) {
+//            logger.warn("Not read from position sensor.");
+//            return ExitToken.loop();
+//        }
 
         personInFront = null;
         PolarCoordinate polar;
@@ -140,11 +144,26 @@ public class WaitForPerson extends AbstractSkill {
         personsDebug = persons.stream().map((person) -> person.getUuid() + " ").reduce(personsDebug, String::concat);
         logger.info("persons: " + personsDebug);
 
-        PersonHelper.sortPersonsByDistance(persons, robotPosition);
+        PersonData front;
+        if(!persons.isEmpty() && !persons.get(0).isInBaseFrame()) {
+            //TODO
+            logger.error("todo: tranform to base link");
+
+//            for (PersonData p : persons) {
+//                try {
+//                    tf.lookup(p.getFrameId(),Type.BASE_FRAME,p.getTimestamp().getUpdated().getTime());
+//                } catch (TransformException e) {
+//                    logger.error("cant Transform from " + p.getFrameId() + " to " + Type.BASE_FRAME + " @" + p.getTimestamp().getUpdated().getTime());
+//                }
+//            }
+
+        }
+
+        PersonHelper.sortPersonsByDistance(persons);
         for (PersonData p : persons) {
 
             polar = new PolarCoordinate(MathTools.globalToLocal(
-                    p.getPosition(), robotPosition));
+                    p.getPosition(), new PositionData()));
 
             logger.debug("Person " + p.getUuid() + " frame person:" + p.getFrameId()
                     + " frame polar: " + polar.getFrameId()
