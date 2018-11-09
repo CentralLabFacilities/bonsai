@@ -162,8 +162,7 @@ public class WaitForPerson extends AbstractSkill {
         PersonHelper.sortPersonsByDistance(persons);
         for (PersonData p : persons) {
 
-            polar = new PolarCoordinate(MathTools.globalToLocal(
-                    p.getPosition(), new PositionData()));
+            polar = new PolarCoordinate(p.getPosition());
 
             logger.debug("Person " + p.getUuid() + " frame person:" + p.getFrameId()
                     + " frame polar: " + polar.getFrameId()

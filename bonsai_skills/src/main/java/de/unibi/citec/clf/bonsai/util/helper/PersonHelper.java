@@ -153,8 +153,8 @@ public final class PersonHelper {
     public static void sortPersonsByDistance(java.util.List<PersonData> persons) {
         Collections.sort(persons, (o1, o2) -> {
             assert(o1.isInBaseFrame() && o2.isInBaseFrame());
-            PolarCoordinate polar1 = new PolarCoordinate(MathTools.globalToLocal(o1.getPosition(), new PositionData()));
-            PolarCoordinate polar2 = new PolarCoordinate(MathTools.globalToLocal(o2.getPosition(), new PositionData()));
+            PolarCoordinate polar1 = new PolarCoordinate(o1.getPosition());
+            PolarCoordinate polar2 = new PolarCoordinate(o2.getPosition());
             return Double.compare(polar1.getDistance(LengthUnit.MILLIMETER), polar2.getDistance(LengthUnit.MILLIMETER));
         });
     }
