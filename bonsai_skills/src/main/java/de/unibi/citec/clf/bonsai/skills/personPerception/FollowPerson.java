@@ -3,6 +3,7 @@ package de.unibi.citec.clf.bonsai.skills.personPerception;
 import de.unibi.citec.clf.bonsai.actuators.NavigationActuator;
 import de.unibi.citec.clf.bonsai.actuators.SpeechActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
+import de.unibi.citec.clf.bonsai.core.exception.TransformException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
@@ -11,6 +12,7 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.bonsai.util.CoordinateSystemConverter;
+import de.unibi.citec.clf.bonsai.util.CoordinateTransformer;
 import de.unibi.citec.clf.btl.List;
 import de.unibi.citec.clf.btl.data.geometry.PolarCoordinate;
 import de.unibi.citec.clf.btl.data.navigation.DriveData;
@@ -133,9 +135,11 @@ public class FollowPerson extends AbstractSkill {
     private long robotPosTimeout;
     private double wiggleAngle = 0.175;
     private boolean alreadyTalked = false;
+    private CoordinateTransformer tf;
 
     @Override
     public void configure(ISkillConfigurator configurator) {
+        tf = (CoordinateTransformer) configurator.getTransform();
 
         stopDistance = configurator.requestOptionalDouble(KEY_STOP_DISTANCE, stopDistance);
         personLostDist = configurator.requestOptionalDouble(KEY_PERSON_LOST_DISTANCE, personLostDist);
@@ -223,8 +227,16 @@ public class FollowPerson extends AbstractSkill {
         }
 
         lastPersonPosition = new PositionData(personFollow.getPosition());
+        if(!lastPersonPosition.getFrameId().equals("map")) {
+            try {
+                tf.transform(lastPersonPosition,"map");
+            } catch (TransformException e) {
+                logger.error(e);
+            }
+        }
         lastUuid = personFollow.getUuid();
         lastPersonFound = System.currentTimeMillis();
+
         PolarCoordinate polar = new PolarCoordinate(MathTools.globalToLocal(personFollow.getPosition(), robotPosition));
 
         double driveDistance = calculateDriveDistance(polar);

@@ -23,6 +23,8 @@ public class PeopleMsgsPositionMeasurement extends RosSerializer<PersonData, Pos
 
         Point3D point = MsgTypeFactory.getInstance().createType(msg.getPos(), Point3D.class);
         PositionData pose = new PositionData();
+
+        MsgTypeFactory.setHeader(pose,msg.getHeader());
         pose.setX(point.getX(LengthUnit.METER),LengthUnit.METER);
         pose.setY(point.getY(LengthUnit.METER),LengthUnit.METER);
         person.setPosition(pose);
