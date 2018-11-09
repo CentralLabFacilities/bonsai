@@ -1,4 +1,4 @@
-package de.unibi.citec.clf.bonsai.skills.deprecated.personPerception;
+package de.unibi.citec.clf.bonsai.skills.personPerception;
 
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
@@ -16,6 +16,7 @@ import de.unibi.citec.clf.btl.data.person.PersonDataList;
 import de.unibi.citec.clf.btl.tools.MathTools;
 import de.unibi.citec.clf.btl.units.AngleUnit;
 import de.unibi.citec.clf.btl.units.LengthUnit;
+
 import java.io.IOException;
 
 /**
@@ -44,9 +45,6 @@ import java.io.IOException;
  * @author lkettenb, lruegeme
  */
 
-// USE SEARCHFORPERSON INSTEAD!!!
-
-@Deprecated
 public class WaitForPerson extends AbstractSkill {
 
     private static final String KEY_TIMEOUT = "#_TIMEOUT";
