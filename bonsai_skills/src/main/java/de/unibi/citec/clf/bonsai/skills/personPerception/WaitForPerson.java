@@ -9,10 +9,12 @@ import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
+import de.unibi.citec.clf.bonsai.util.CoordinateTransformer;
 import de.unibi.citec.clf.bonsai.util.helper.PersonHelper;
 import de.unibi.citec.clf.btl.List;
 import de.unibi.citec.clf.btl.Type;
 import de.unibi.citec.clf.btl.data.geometry.PolarCoordinate;
+import de.unibi.citec.clf.btl.data.geometry.Pose3D;
 import de.unibi.citec.clf.btl.data.navigation.PositionData;
 import de.unibi.citec.clf.btl.data.person.PersonData;
 import de.unibi.citec.clf.btl.data.person.PersonDataList;
@@ -69,11 +71,11 @@ public class WaitForPerson extends AbstractSkill {
 
     PersonData personInFront = null;
     List<PersonData> persons;
-    TransformLookup tf;
+    CoordinateTransformer tf;
 
     @Override
     public void configure(ISkillConfigurator configurator) {
-        tf = configurator.getTransform();
+        tf = (CoordinateTransformer) configurator.getTransform();
 
         // request all tokens that you plan to return from other methods
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
@@ -149,13 +151,14 @@ public class WaitForPerson extends AbstractSkill {
             //TODO
             logger.error("todo: tranform to base link");
 
-//            for (PersonData p : persons) {
-//                try {
-//                    tf.lookup(p.getFrameId(),Type.BASE_FRAME,p.getTimestamp().getUpdated().getTime());
-//                } catch (TransformException e) {
-//                    logger.error("cant Transform from " + p.getFrameId() + " to " + Type.BASE_FRAME + " @" + p.getTimestamp().getUpdated().getTime());
-//                }
-//            }
+            for (PersonData p : persons) {
+                try {
+                    Pose3D pose = tf.transform(p.getPosition(),Type.BASE_FRAME);
+                    p.setPosition(new PositionData(pose.getTranslation().getX(LengthUnit.METER),pose.getTranslation().getY(LengthUnit.METER),0,p.getTimestamp(),LengthUnit.METER,AngleUnit.RADIAN));
+                } catch (TransformException e) {
+                    logger.error("cant Transform from " + p.getFrameId() + " to " + Type.BASE_FRAME + " @" + p.getTimestamp().getUpdated().getTime());
+                }
+            }
 
         }
 
