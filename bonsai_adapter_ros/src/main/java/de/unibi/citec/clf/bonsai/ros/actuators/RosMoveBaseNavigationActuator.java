@@ -378,7 +378,7 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
 
     @Override
     public void clearCostmap() throws IOException {
-        throw new UnsupportedOperationException();
+        return;
     }
 
 }

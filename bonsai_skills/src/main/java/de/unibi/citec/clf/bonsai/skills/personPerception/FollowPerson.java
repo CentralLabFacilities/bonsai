@@ -355,7 +355,7 @@ public class FollowPerson extends AbstractSkill {
 
         List<PersonData> persons;
         try {
-            persons = personSensor.readLast(50);
+            persons = personSensor.readLast(100);
         } catch (IOException | InterruptedException ex) {
             logger.error("Could not read from person sensor", ex);
             return null;
@@ -365,7 +365,7 @@ public class FollowPerson extends AbstractSkill {
             return null;
         }
 
-        if (persons.size() == 0) {
+        if (persons.isEmpty()) {
             logger.warn("########## Person list size is 0 ############");
         }
 
@@ -399,7 +399,7 @@ public class FollowPerson extends AbstractSkill {
         if(polar.getDistance(LengthUnit.MILLIMETER) <= nearestToOldDist) {
             return candidate;
         } else {
-            logger.error("no person near old pose");
+            logger.error("no person near old pose, distance " + polar.getDistance(LengthUnit.MILLIMETER));
         }
 
         return null;
@@ -473,10 +473,8 @@ public class FollowPerson extends AbstractSkill {
         if(robotPosition!=null && lastRobotPosition!=null){
             if (robotPosition.getDistance(lastRobotPosition, LengthUnit.METER) < 0.05 &&
                     robotPosition.getYaw(AngleUnit.RADIAN) - lastRobotPosition.getYaw(AngleUnit.RADIAN) < 0.02) {
-                ret = false;
+                return false;
             }
-            logger.error("NPE?");
-            return false;
         }
         return ret;
     }
