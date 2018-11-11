@@ -3,6 +3,7 @@ package de.unibi.citec.clf.bonsai.ros;
 import de.unibi.citec.clf.bonsai.core.exception.TransformException;
 import de.unibi.citec.clf.bonsai.util.CoordinateTransformer;
 import de.unibi.citec.clf.btl.Transform;
+import de.unibi.citec.clf.btl.ros.MsgTypeFactory;
 import geometry_msgs.TransformStamped;
 import org.apache.log4j.Logger;
 import org.ros.message.MessageListener;
@@ -47,9 +48,10 @@ public class TFTransformer extends CoordinateTransformer {
         public void onStart(ConnectedNode connectedNode) {
             subscriberTf = connectedNode.newSubscriber("/tf", TFMessage._TYPE);
             subscriberTfStatic = connectedNode.newSubscriber("/tf_static", TFMessage._TYPE);
-            subscriberTf.addMessageListener(this, 1);
+            subscriberTf.addMessageListener(this, 500);
             subscriberTfStatic.addMessageListener(this, 1);
             initialized = true;
+
         }
 
         @Override
@@ -65,7 +67,8 @@ public class TFTransformer extends CoordinateTransformer {
 
         public FrameTransform getTransform(String source, String target) throws TransformException {
             FrameTransform transform = currentTree.transform(source, target);
-            logger.debug("fetch tf: " + transform);
+
+            logger.trace("fetch tf: " + transform);
             if (transform != null && transform.getTime() != null) {
                 return transform;
             } else {

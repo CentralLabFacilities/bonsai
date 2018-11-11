@@ -66,22 +66,25 @@ public class WaitForPerson extends AbstractSkill {
     private ExitToken tokenSuccessTimeout;
 
     private Sensor<PersonDataList> personSensor;
-    //private Sensor<PositionData> positionSensor;
+    private Sensor<PositionData> positionSensor;
     private MemorySlot<PersonData> currentPersonSlot;
 
+
+    PositionData robotPosition = null;
     PersonData personInFront = null;
     List<PersonData> persons;
     CoordinateTransformer tf;
 
     @Override
     public void configure(ISkillConfigurator configurator) {
-        tf = (CoordinateTransformer) configurator.getTransform();
+        // odom -> footprint broken?
+         tf = (CoordinateTransformer) configurator.getTransform();
 
         // request all tokens that you plan to return from other methods
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
 
         personSensor = configurator.getSensor("PersonSensor", PersonDataList.class);
-        //positionSensor = configurator.getSensor("PositionSensor", PositionData.class);
+        positionSensor = configurator.getSensor("PositionSensor", PositionData.class);
         currentPersonSlot = configurator.getSlot("PersonDataSlot", PersonData.class);
 
         timeout = configurator.requestOptionalInt(KEY_TIMEOUT, (int) timeout);
@@ -120,7 +123,7 @@ public class WaitForPerson extends AbstractSkill {
 
         try {
             persons = personSensor.readLast(200);
-            //robotPosition = positionSensor.readLast(200);
+            robotPosition = positionSensor.readLast(200);
         } catch (IOException | InterruptedException ex) {
             logger.error("Exception while retrieving stuff", ex);
             return ExitToken.fatal();
@@ -134,10 +137,10 @@ public class WaitForPerson extends AbstractSkill {
             logger.debug("No persons found.");
             return ExitToken.loop();
         }
-//        if (robotPosition == null) {
-//            logger.warn("Not read from position sensor.");
-//            return ExitToken.loop();
-//        }
+        if (robotPosition == null) {
+            logger.warn("Not read from position sensor.");
+            return ExitToken.loop();
+        }
 
         personInFront = null;
         PolarCoordinate polar;
@@ -157,6 +160,7 @@ public class WaitForPerson extends AbstractSkill {
                     p.setPosition(new PositionData(pose.getTranslation().getX(LengthUnit.METER),pose.getTranslation().getY(LengthUnit.METER),0,p.getTimestamp(),LengthUnit.METER,AngleUnit.RADIAN));
                 } catch (TransformException e) {
                     logger.error("cant Transform from " + p.getFrameId() + " to " + Type.BASE_FRAME + " @" + p.getTimestamp().getUpdated().getTime());
+                    p.setPosition(MathTools.globalToLocal(p.getPosition(), robotPosition));
                 }
             }
 
