@@ -59,6 +59,7 @@ public class ExecutePosture extends AbstractSkill {
         if(!blocking){
             return tokenSuccess;
         }
+        logger.debug("check ret is done..");
         if (!ret.isDone()) {
             if (timeout < System.currentTimeMillis()) {
                 return ExitToken.fatal();

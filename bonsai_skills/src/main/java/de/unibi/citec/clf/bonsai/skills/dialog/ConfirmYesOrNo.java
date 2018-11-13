@@ -176,6 +176,7 @@ public class ConfirmYesOrNo extends AbstractSkill {
 
         if (sayingComplete != null) {
             if (!sayingComplete.isDone()) {
+                speechManager.startListening();
                 return ExitToken.loop(50);
             }
         }

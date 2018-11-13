@@ -77,7 +77,7 @@ public class NoStrategy implements DriveStrategy {
     @Override
     public boolean init(NavigationGoalData pTargetGoal) {
         this.targetGoal = pTargetGoal;
-        try {
+        if(robotPositionSensor!= null) try {
             robotPos = robotPositionSensor.readLast(1000);
             if (robotPos == null) {
                 logger.error("RobotPosition is null");
