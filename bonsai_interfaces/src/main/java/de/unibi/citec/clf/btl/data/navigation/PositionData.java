@@ -18,7 +18,7 @@ public class PositionData extends Point2D {
     protected AngleUnit iAU = AngleUnit.RADIAN;
 
     public enum ReferenceFrame {
-        LOCAL(1, "local"),
+        LOCAL(1, "base_link"),
         GLOBAL(2, "map");
 
         private final int refereceId;

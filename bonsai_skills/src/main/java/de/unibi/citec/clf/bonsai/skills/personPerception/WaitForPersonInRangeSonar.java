@@ -43,7 +43,7 @@ import java.io.IOException;
  *
  * @author pvonneumanncosel
  */
-public class WaitForPersonInRange extends AbstractSkill {
+public class WaitForPersonInRangeSonar extends AbstractSkill {
 
     private static final String KEY_RANGE = "#_RANGE";
     private static final String KEY_DIRECTION = "#_DIRECTION";
