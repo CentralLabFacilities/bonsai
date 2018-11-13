@@ -127,6 +127,9 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
 
             double turnSpeed = turn.getSpeed(RotationalSpeedUnit.RADIANS_PER_SEC);
             double turnAngle = turn.getAngle(AngleUnit.RADIAN);
+            if (turnAngle < 0 && turnSpeed > 0) {
+                turnSpeed = -turnSpeed;
+            }
 
             //todo 0.5sec for acceleration?
             turnDuration = (long) ((turnAngle / turnSpeed + 0.5) * 1000);
