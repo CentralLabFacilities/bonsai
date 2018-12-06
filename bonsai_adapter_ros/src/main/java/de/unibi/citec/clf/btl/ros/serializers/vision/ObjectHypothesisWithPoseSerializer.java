@@ -13,12 +13,22 @@ public class ObjectHypothesisWithPoseSerializer extends RosSerializer<ObjectData
 
     @Override
     public vision_msgs.ObjectHypothesisWithPose serialize(ObjectData.Hypothesis data, MessageFactory fact) throws SerializationException {
-        return MsgTypeFactory.getInstance().createMsg(data,ObjectHypothesisWithPose._TYPE);
+        vision_msgs.ObjectHypothesisWithPose msg = fact.newFromType(vision_msgs.ObjectHypothesisWithPose._TYPE);
+        msg.setScore(data.getReliability());
+
+        //todo ID MAPPING
+        msg.setId(Long.valueOf(data.getClassLabel()));
+        //todo pose
+
+        return msg;
     }
 
     @Override
     public ObjectData.Hypothesis deserialize(vision_msgs.ObjectHypothesisWithPose msg) throws DeserializationException {
-        return MsgTypeFactory.getInstance().createType(msg,ObjectData.Hypothesis.class);
+        ObjectData.Hypothesis hyp = new ObjectData.Hypothesis();
+        hyp.setClassLabel(String.valueOf(msg.getId()));
+        hyp.setReliability(msg.getScore());
+        return hyp;
     }
 
     @Override
