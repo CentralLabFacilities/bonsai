@@ -3,6 +3,7 @@ package de.unibi.citec.clf.btl.data.object;
 
 import java.lang.reflect.Method;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.RejectedExecutionException;
 
@@ -50,6 +51,18 @@ public class ObjectData extends Type {
             return "[HYPOTHESIS " + "label: " + getClassLabel() + "timestamp: " + getTimestamp()
                     + " reliability:  " + getReliability() + "]";
 
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            } else if (o != null && this.getClass() == o.getClass()) {
+                Hypothesis hyp = (Hypothesis) o;
+                return (Objects.equals(this.getClassLabel(),hyp.getClassLabel()) && Objects.equals(this.getTimestamp(),hyp.getTimestamp()));
+            } else {
+                return false;
+            }
         }
     }
 
