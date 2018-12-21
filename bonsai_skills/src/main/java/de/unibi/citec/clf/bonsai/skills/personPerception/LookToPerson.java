@@ -5,6 +5,7 @@ import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -121,7 +122,7 @@ public class LookToPerson extends AbstractSkill {
 
         if (initialTimeout > 0) {
             logger.debug("using timeout of " + initialTimeout + " ms");
-            timeout = initialTimeout + System.currentTimeMillis();
+            timeout = initialTimeout + Time.currentTimeMillis();
         }
 
         return true;
@@ -130,7 +131,7 @@ public class LookToPerson extends AbstractSkill {
     @Override
     public ExitToken execute() {
 
-        if (System.currentTimeMillis() > timeout) {
+        if (Time.currentTimeMillis() > timeout) {
             logger.info("Search for person reached timeout");
             return tokenErrorNotFound;
         }
@@ -175,12 +176,12 @@ public class LookToPerson extends AbstractSkill {
                 if(Math.abs(horizontal-lastAngle) < minTurningAngle){
                     logger.debug("Person's angle was not big enough to turn!");
                     gazeActuator.setGazeTargetPitch(vertical);
-                    timeout = initialTimeout + System.currentTimeMillis();
+                    timeout = initialTimeout + Time.currentTimeMillis();
                     return tokenLoopDiLoop;
                 }
                 gazeActuator.setGazeTarget(vertical, (float) horizontal * turnAngleMultiplier, gazeSpeed);
                 lastAngle = horizontal;
-                timeout = initialTimeout + System.currentTimeMillis();
+                timeout = initialTimeout + Time.currentTimeMillis();
                 return tokenLoopDiLoop;
             }
         }

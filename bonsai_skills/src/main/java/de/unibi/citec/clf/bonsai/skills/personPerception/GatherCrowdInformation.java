@@ -5,6 +5,7 @@ import de.unibi.citec.clf.bonsai.actuators.KBaseActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -116,7 +117,7 @@ public class GatherCrowdInformation extends AbstractSkill {
         logger.debug("Detecting Persons");
         try {
             peopleFuture = peopleActuator.getPeople(true, true, 10.0f);
-            timeout += System.currentTimeMillis();
+            timeout += Time.currentTimeMillis();
         } catch (InterruptedException | ExecutionException e) {
             logger.error(e);
             return false;
@@ -128,7 +129,7 @@ public class GatherCrowdInformation extends AbstractSkill {
     public ExitToken execute() {
 
         if(!peopleFuture.isDone()){
-            if(timeout<System.currentTimeMillis()){
+            if(timeout<Time.currentTimeMillis()){
                 return tokenErrorTimeout;
             }
             return ExitToken.loop(50);

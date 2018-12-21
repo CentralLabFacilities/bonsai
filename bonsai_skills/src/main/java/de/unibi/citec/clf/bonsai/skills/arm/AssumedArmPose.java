@@ -2,6 +2,7 @@ package de.unibi.citec.clf.bonsai.skills.arm;
 
 
 import de.unibi.citec.clf.bonsai.actuators.PicknPlaceActuator;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -71,7 +72,7 @@ public class AssumedArmPose extends AbstractSkill {
     @Override
     public boolean init() {
 
-        startTime = System.currentTimeMillis();
+        startTime = Time.currentTimeMillis();
 
         try {
             assumedF = poseAct.findNearestPose();
@@ -92,7 +93,7 @@ public class AssumedArmPose extends AbstractSkill {
                 return ExitToken.fatal();
             }
 
-            if (System.currentTimeMillis() - startTime >= DEFAULT_TIMEOUT) {
+            if (Time.currentTimeMillis() - startTime >= DEFAULT_TIMEOUT) {
                 logger.info("Default timeout was set to 5 seconds. Send timeout. Armpose-controller did not respond. Check if Ros manipulation runs.");
                 return tokenErrorTimeout;
             }

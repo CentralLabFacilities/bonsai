@@ -1,6 +1,7 @@
 package de.unibi.citec.clf.bonsai.ros;
 
 import de.unibi.citec.clf.bonsai.core.exception.TransformException;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.util.CoordinateTransformer;
 import de.unibi.citec.clf.btl.Transform;
 import de.unibi.citec.clf.btl.ros.MsgTypeFactory;
@@ -72,7 +73,7 @@ public class TFTransformer extends CoordinateTransformer {
             if (transform != null && transform.getTime() != null) {
                 return transform;
             } else {
-                throw new TransformException(source, target, System.currentTimeMillis());
+                throw new TransformException(source, target, Time.currentTimeMillis());
             }
         }
 

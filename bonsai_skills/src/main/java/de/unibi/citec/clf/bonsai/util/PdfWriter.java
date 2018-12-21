@@ -142,7 +142,7 @@ public class PdfWriter {
         }
 
         String pathToPDF = path.replace("tex", "pdf");
-        String pathToTempPDF = pathToPDF.replace(".pdf", System.currentTimeMillis() + ".pdf");
+        String pathToTempPDF = pathToPDF.replace(".pdf", Time.currentTimeMillis() + ".pdf");
         File pdfMain = new File(pathToPDF);
         if (pdfMain.exists() && pdfMain.getTotalSpace() > 0) {
             try {
@@ -202,7 +202,7 @@ public class PdfWriter {
 
         String untouchedFileName = path.replaceAll(".*\\/(.*).tex", "$1.pdf");
         String newPath = "/media/" + username + "/" + ret + "/" + untouchedFileName;
-        // String newPath = "/media/" + username + "/" + ret + "/ToBi_Manipulation_Report_" + System.currentTimeMillis() + ".pdf";
+        // String newPath = "/media/" + username + "/" + ret + "/ToBi_Manipulation_Report_" + Time.currentTimeMillis() + ".pdf";
         if ("".equals(ret)) {
             logger.debug("No USB device found, therefore nothing will be copied.");
         } else {

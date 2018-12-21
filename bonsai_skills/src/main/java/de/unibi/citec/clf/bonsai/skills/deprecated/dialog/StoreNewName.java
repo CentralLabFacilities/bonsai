@@ -4,6 +4,7 @@ import de.unibi.citec.clf.bonsai.actuators.SpeechActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -160,15 +161,15 @@ public class StoreNewName extends AbstractSkill {
         if (!askedForName) {
             say(SAY_ASK_FOR_NAME);
             askedForName = true;
-            lastRepeat = System.currentTimeMillis();
+            lastRepeat = Time.currentTimeMillis();
             speechHelperName.startListening();
         }
 
         if (name.isEmpty()) {
             if (!speechHelperName.hasNewUnderstanding()) {
-                if (System.currentTimeMillis() - lastRepeat > repeatTime) {
+                if (Time.currentTimeMillis() - lastRepeat > repeatTime) {
                     say(String.format(SAY_ASK_FOR_NAME_TIMEOUT, name));
-                    lastRepeat = System.currentTimeMillis();
+                    lastRepeat = Time.currentTimeMillis();
                 }
                 return ExitToken.loop();
             }
@@ -185,7 +186,7 @@ public class StoreNewName extends AbstractSkill {
             name = understoodNames.get(0);
             if (tries < MAX_TRIES) {
                 say(String.format(SAY_UNDERSTOOD_NAME, name));
-                lastRepeat = System.currentTimeMillis();
+                lastRepeat = Time.currentTimeMillis();
                 speechHelperConfirm.startListening();
             } else {
                 // force this name
@@ -196,9 +197,9 @@ public class StoreNewName extends AbstractSkill {
             // wait for confirmation of understood name
 
             if (!speechHelperConfirm.hasNewUnderstanding()) {
-                if (System.currentTimeMillis() - lastRepeat > repeatTime) {
+                if (Time.currentTimeMillis() - lastRepeat > repeatTime) {
                     say(String.format(SAY_UNDERSTOOD_NAME_TIMEOUT, name));
-                    lastRepeat = System.currentTimeMillis();
+                    lastRepeat = Time.currentTimeMillis();
                 }
                 return ExitToken.loop();
             }
@@ -207,7 +208,7 @@ public class StoreNewName extends AbstractSkill {
                 return tokenSuccess;
             } else if (!speechHelperConfirm.getUnderstoodWords("confirm_no").isEmpty()) {
                 name = "";
-                lastRepeat = System.currentTimeMillis();
+                lastRepeat = Time.currentTimeMillis();
                 say(SAY_REPEAT_NAME);
                 speechHelperName.startListening();
 

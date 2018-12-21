@@ -5,6 +5,7 @@ import de.unibi.citec.clf.bonsai.actuators.SpeechActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
 
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -42,7 +43,7 @@ public class RecognizePersonInFront extends AbstractSkill {
     private List<PersonData> knownPersonDataList;
     private PersonData foundPerson;
 
-    private Date start = new Date();
+    private Date start = Time.now();
 
     @Override
     public void configure(ISkillConfigurator configurator) {

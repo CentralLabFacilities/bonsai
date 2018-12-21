@@ -1,11 +1,11 @@
 package de.unibi.citec.clf.bonsai.util;
 
 
-
-import java.util.StringTokenizer;
 import nu.xom.Document;
 import nu.xom.Element;
 import nu.xom.Nodes;
+
+import java.util.StringTokenizer;
 
 public class XPathUtilities {
 
@@ -29,7 +29,7 @@ public class XPathUtilities {
             currParent = childElement;
         }
 
-        if(currParent!=null) {
+        if (currParent != null) {
             currParent.appendChild(new Element(t.getRootElement()));
         }
         return new Document(root);
@@ -37,7 +37,8 @@ public class XPathUtilities {
 
     /**
      * Removes xpath prefix from document. Returns null if prefix has no children!
-     * @param t The document to shorten
+     *
+     * @param t     The document to shorten
      * @param xPath The prefix xpath to remove
      * @return The shortened document or null if the prefix has no children.
      */
@@ -46,15 +47,15 @@ public class XPathUtilities {
         Document retDoc = t;
 
         if (!xPath.equals("") && !xPath.equals("/")) {
-        	if (!xPath.startsWith("/")) {
-        		xPath = "/" + xPath;
-        	}
+            if (!xPath.startsWith("/")) {
+                xPath = "/" + xPath;
+            }
             Nodes nodes = t.query(xPath);
             if (nodes.size() > 0 && nodes.get(0).getChildCount() > 0) {
                 Element newRoot = (Element) nodes.get(0).getChild(nodes.get(0).getChildCount() - 1).copy();
                 retDoc = new Document(newRoot);
             } else if (nodes.size() > 0 && nodes.get(0).getChildCount() == 0) {
-            	retDoc = null;
+                retDoc = null;
             }
         }
         return retDoc;

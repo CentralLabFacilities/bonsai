@@ -4,6 +4,7 @@ import de.unibi.citec.clf.bonsai.actuators.FaceIdentificationHumavipsActuator;
 import de.unibi.citec.clf.bonsai.actuators.SpeechActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -51,7 +52,7 @@ public class LearnFaceForNewestPerson extends AbstractSkill {
     private MemorySlot<String> personIdSlot;
 
     private List<PersonData> personDataList;
-    private Date start = new Date();
+    private Date start = Time.now();
 
     private boolean assigned = false;
 
@@ -103,7 +104,7 @@ public class LearnFaceForNewestPerson extends AbstractSkill {
         if (speakHelp) {
             say(STATE_INTRO1, false);
         }
-        start = new Date();
+        start = Time.now();
         if (speakHelp) {
             say(STATE_INTRO3, true);
         }

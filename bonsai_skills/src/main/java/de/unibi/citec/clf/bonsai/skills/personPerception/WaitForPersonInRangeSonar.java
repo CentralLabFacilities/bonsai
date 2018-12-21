@@ -1,6 +1,7 @@
 package de.unibi.citec.clf.bonsai.skills.personPerception;
 
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -82,7 +83,7 @@ public class WaitForPersonInRangeSonar extends AbstractSkill {
     public boolean init() {
         if (timeout > 0) {
             logger.debug("using timeout of " + timeout + " ms");
-            timeout += System.currentTimeMillis();
+            timeout += Time.currentTimeMillis();
         }
 
         return true;
@@ -91,7 +92,7 @@ public class WaitForPersonInRangeSonar extends AbstractSkill {
     @Override
     public ExitToken execute() {
         if (timeout > 0) {
-            if (System.currentTimeMillis() > timeout) {
+            if (Time.currentTimeMillis() > timeout) {
                 logger.debug("Search for person reached timeout");
                 return tokenSuccessTimeout;
             }

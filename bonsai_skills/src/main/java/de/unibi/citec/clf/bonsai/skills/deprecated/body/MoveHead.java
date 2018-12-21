@@ -3,6 +3,7 @@ package de.unibi.citec.clf.bonsai.skills.deprecated.body;
 import de.unibi.citec.clf.bonsai.actuators.JointControllerActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -90,7 +91,7 @@ public class MoveHead extends AbstractSkill {
         }
 
         if (timeout > 0) {
-            timeout += System.currentTimeMillis();
+            timeout += Time.currentTimeMillis();
         }
 
         return true;
@@ -99,7 +100,7 @@ public class MoveHead extends AbstractSkill {
     @Override
     public ExitToken execute() {
         if (!b.isDone()) {
-            if (timeout > 0 && timeout < System.currentTimeMillis()) {
+            if (timeout > 0 && timeout < Time.currentTimeMillis()) {
                 return tokenError;
             }
             return ExitToken.loop();

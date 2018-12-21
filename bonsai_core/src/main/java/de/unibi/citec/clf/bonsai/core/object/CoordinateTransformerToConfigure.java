@@ -1,8 +1,6 @@
-
 package de.unibi.citec.clf.bonsai.core.object;
 
 import java.util.Map;
-import de.unibi.citec.clf.bonsai.core.object.TransformLookup;
 
 /**
  * Class encapsulating an coordinate transformer to configure.
@@ -37,5 +35,5 @@ public class CoordinateTransformerToConfigure {
     public String toString() {
         return "CoordinateTransformerToConfigure [transformerClass=" + transformerClass + ", Options=" + transformerOptions + "]";
     }
-    
+
 }

@@ -9,6 +9,24 @@ import java.util.*
 
 class SkillConfiguratorTest {
 
+    companion object {
+
+        private val requiredParams: Map<String, String> = mapOf(
+            ParameterSkill.KEY_BOOL to "true",
+            ParameterSkill.KEY_DOUBLE to "1.5",
+            ParameterSkill.KEY_INTEGER to "1",
+            ParameterSkill.KEY_VALUE to "foo"
+        )
+
+
+        private val optionalParams: Map<String, String> = mapOf(
+            ParameterSkill.KEY_OPT_BOOL to "false",
+            ParameterSkill.KEY_OPT_DOUBLE to "2.5",
+            ParameterSkill.KEY_OPT_INTEGER to "2",
+            ParameterSkill.KEY_OPT_VALUE to "bar"
+        )
+    }
+
 
     @Test
     fun configureRequiredParamsTest() {
@@ -80,12 +98,6 @@ class SkillConfiguratorTest {
         conf.activateObjectPhase(requiredParams, HashMap())
         skill.configure(conf)
 
-        assertEquals(conf.optionalParams.size.toLong(), 4)
-
-        for (s in conf.optionalParams.keys) {
-            assert(optionalParams.containsKey(s))
-        }
-
         assertEquals(skill.optBool, true)
         assertEquals(skill.optDouble, 1.5, 0.0)
         assertEquals(skill.optInt, 1);
@@ -117,24 +129,6 @@ class SkillConfiguratorTest {
         assertEquals(skill.optString, "bar");
 
 
-    }
-
-    companion object {
-
-        private val requiredParams: Map<String, String> = mapOf(
-            ParameterSkill.KEY_BOOL to "true",
-            ParameterSkill.KEY_DOUBLE to "1.5",
-            ParameterSkill.KEY_INTEGER to "1",
-            ParameterSkill.KEY_VALUE to "foo"
-        )
-
-
-        private val optionalParams: Map<String, String> = mapOf(
-            ParameterSkill.KEY_OPT_BOOL to "false",
-            ParameterSkill.KEY_OPT_DOUBLE to "2.5",
-            ParameterSkill.KEY_OPT_INTEGER to "2",
-            ParameterSkill.KEY_OPT_VALUE to "bar"
-        )
     }
 
 

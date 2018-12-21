@@ -1,17 +1,13 @@
-
 package de.unibi.citec.clf.bonsai.engine.model.config;
 
-import de.unibi.citec.clf.bonsai.core.configuration.*;
-import de.unibi.citec.clf.bonsai.core.exception.ConfigurationException;
 import java.util.HashSet;
 import java.util.Set;
 
 /**
- *
  * @author lruegeme
  */
 public class SkillConfigurationResults {
-    
+
     private Set<SkillConfigurationException> configurationExceptions = new HashSet<>();
 
     public SkillConfigurationResults() {
@@ -44,6 +40,6 @@ public class SkillConfigurationResults {
         }
         return out;
     }
-    
-    
+
+
 }

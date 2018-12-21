@@ -146,4 +146,16 @@ public class StatemachineTest {
         assertEquals(0,res.loadingExceptions.size());
     }
 
+    @Test
+    public void testOptionalParameter() throws TransformerException, TimeoutException {
+        final String sm = "optionalParameter.xml";
+        final String conf = "TestConfig.xml";
+
+        LoadingResults res = TestTools.loadStatemachine(sm);
+        assertTrue(res.success());
+
+        TestListener test = TestListener.newEndFatal();
+        assertTrue(TestTools.testStatemachine(conf, sm, test));
+    }
+
 }

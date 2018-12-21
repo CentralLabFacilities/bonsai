@@ -3,6 +3,7 @@ package de.unibi.citec.clf.bonsai.skills.deprecated.personPerception;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -63,7 +64,7 @@ public class WaitAndStoreMovingPerson extends AbstractSkill {
 
     @Override
     public boolean init() {
-        this.startTime = System.currentTimeMillis();
+        this.startTime = Time.currentTimeMillis();
 
         logger.debug("Waiting for person in front ...");
         return true;
@@ -71,8 +72,8 @@ public class WaitAndStoreMovingPerson extends AbstractSkill {
 
     @Override
     public ExitToken execute() {
-        boolean isNearTimeout = System.currentTimeMillis() - this.startTime > this.nearTimeout;
-        boolean isWalkingTimeout = System.currentTimeMillis() - this.startTime > this.walkingTimeout;
+        boolean isNearTimeout = Time.currentTimeMillis() - this.startTime > this.nearTimeout;
+        boolean isWalkingTimeout = Time.currentTimeMillis() - this.startTime > this.walkingTimeout;
 
         List<PersonData> persons = null;
         try {

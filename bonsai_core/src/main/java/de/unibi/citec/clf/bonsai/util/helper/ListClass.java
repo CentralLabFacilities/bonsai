@@ -1,16 +1,13 @@
 package de.unibi.citec.clf.bonsai.util.helper;
 
 
-
 import de.unibi.citec.clf.btl.Type;
 
 /**
  * A custom class object container for sensors using List types.
- * 
+ *
+ * @param <T> The data type managed by received lists.
  * @author lziegler
- * 
- * @param <T>
- *            The data type managed by received lists.
  */
 public class ListClass<T extends Type> {
 

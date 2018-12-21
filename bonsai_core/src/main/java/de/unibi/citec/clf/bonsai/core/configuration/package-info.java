@@ -1,7 +1,7 @@
 /**
  * Contains interfaces and a default xml-based implementation to configure the
  * {@link de.unibi.airobots.bonsai.core.BonsaiManager}.
- * 
+ *
  * <p>
  * {@link de.unibi.airobots.bonsai.core.configuration.ConfigurationParser}
  * defines the interface for classes that can be used to configure the

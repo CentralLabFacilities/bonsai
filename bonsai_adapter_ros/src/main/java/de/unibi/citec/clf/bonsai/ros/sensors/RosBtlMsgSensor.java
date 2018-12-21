@@ -176,6 +176,7 @@ public class RosBtlMsgSensor<DataType extends Type, MsgType extends Message> ext
             tMsg = t;
         }
 
+
         try {
             final DataType data = MsgTypeFactory.getInstance().createType(t, dataTypeClass);
             queue.push(data);

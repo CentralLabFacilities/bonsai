@@ -11,7 +11,6 @@ import java.util.stream.Collectors;
  * This class represents the semantics of a state id
  *
  * @author lruegeme
- *
  */
 public class StateID {
 
@@ -36,7 +35,7 @@ public class StateID {
     /**
      * Constructs a new instance.
      *
-     * @param prefix A package prefix.
+     * @param prefix      A package prefix.
      * @param canonicalID A canonical id including (partly) package prefix, skill class name and hashes.
      * @throws StateIDException
      */
@@ -56,7 +55,7 @@ public class StateID {
      * Constructs a new instance.
      *
      * @param prefix A package prefix.
-     * @param skill A canonical skill name optionally including (partly) package prefix.
+     * @param skill  A canonical skill name optionally including (partly) package prefix.
      * @param hashes The hashes.
      * @throws StateIDException
      */

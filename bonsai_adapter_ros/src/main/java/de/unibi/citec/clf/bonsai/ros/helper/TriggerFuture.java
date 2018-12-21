@@ -1,6 +1,7 @@
 package de.unibi.citec.clf.bonsai.ros.helper;
 
 
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import org.ros.exception.RemoteException;
 import org.ros.node.service.ServiceResponseListener;
 import std_srvs.TriggerResponse;
@@ -55,9 +56,9 @@ public class TriggerFuture implements Future<Boolean>, ServiceResponseListener<T
 
     @Override
     public Boolean get(long l, TimeUnit tu) throws InterruptedException, ExecutionException, TimeoutException {
-        long timeout = System.currentTimeMillis() + tu.toMillis(l);
+        long timeout = Time.currentTimeMillis() + tu.toMillis(l);
         while (!finished) {
-            if (System.currentTimeMillis() > timeout) {
+            if (Time.currentTimeMillis() > timeout) {
                 throw new TimeoutException();
             }
             Thread.sleep(50);

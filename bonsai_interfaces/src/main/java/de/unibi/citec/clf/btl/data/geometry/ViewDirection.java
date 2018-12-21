@@ -16,6 +16,7 @@ package de.unibi.citec.clf.btl.data.geometry;
 
 
 
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.btl.Type;
 
 
@@ -81,7 +82,7 @@ public class ViewDirection extends Type {
 			Type.absolute,
 			Inertia.none,
 			Purpose.interact,
-			System.currentTimeMillis(),
+			Time.currentTimeMillis(),
 			0,
 			0);
 	}

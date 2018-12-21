@@ -1,5 +1,6 @@
 package de.unibi.citec.clf.btl.data.navigation;
 
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.btl.data.common.Timestamp;
 import de.unibi.citec.clf.btl.data.geometry.Point2D;
 import de.unibi.citec.clf.btl.units.AngleUnit;
@@ -61,7 +62,7 @@ public class PositionData extends Point2D {
      * time.
      */
     public PositionData() {
-        this(0.0, 0.0, 0.0, System.currentTimeMillis(), LengthUnit.METER,
+        this(0.0, 0.0, 0.0, Time.currentTimeMillis(), LengthUnit.METER,
                 AngleUnit.RADIAN, TimeUnit.MILLISECONDS);
         setFrameId(ReferenceFrame.GLOBAL);
     }

@@ -5,6 +5,7 @@ import de.unibi.citec.clf.bonsai.actuators.NavigationActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -105,7 +106,7 @@ public class StoreWavingHandPosition extends AbstractSkill {
 
         if (timeout > 0) {
             logger.info("using timeout of " + timeout + "ms");
-            timeout += System.currentTimeMillis();
+            timeout += Time.currentTimeMillis();
         }
         // Wait for persons in front of sensor
         logger.debug("Waiting for waving ...");
@@ -116,7 +117,7 @@ public class StoreWavingHandPosition extends AbstractSkill {
     @Override
     public ExitToken execute() {
         if (timeout > 0) {
-            if (System.currentTimeMillis() > timeout) {
+            if (Time.currentTimeMillis() > timeout) {
                 logger.info("StoreWavingHandPosition timeout");
                 return tokenSuccessTimeout;
             }

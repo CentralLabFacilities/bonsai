@@ -1,4 +1,3 @@
-
 package de.unibi.citec.clf.bonsai.core.exception;
 
 /**
@@ -23,10 +22,8 @@ public class InitializationException extends RuntimeException {
     /**
      * Constructor.
      *
-     * @param message
-     *            exception description
-     * @param cause
-     *            exception cause
+     * @param message exception description
+     * @param cause   exception cause
      */
     public InitializationException(String message, Throwable cause) {
         super(message, cause);
@@ -35,8 +32,7 @@ public class InitializationException extends RuntimeException {
     /**
      * Constructor.
      *
-     * @param message
-     *            exception description
+     * @param message exception description
      */
     public InitializationException(String message) {
         super(message);
@@ -45,11 +41,10 @@ public class InitializationException extends RuntimeException {
     /**
      * Constructor.
      *
-     * @param cause
-     *            exception cause
+     * @param cause exception cause
      */
     public InitializationException(Throwable cause) {
         super(cause);
     }
-    
+
 }

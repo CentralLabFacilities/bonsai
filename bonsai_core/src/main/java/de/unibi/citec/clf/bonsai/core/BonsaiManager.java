@@ -1,47 +1,26 @@
 package de.unibi.citec.clf.bonsai.core;
 
 
+import de.unibi.citec.clf.bonsai.core.configuration.ConfigurationParser;
 import de.unibi.citec.clf.bonsai.core.configuration.ConfigurationResults;
+import de.unibi.citec.clf.bonsai.core.configuration.FactoryConfigurationResults;
+import de.unibi.citec.clf.bonsai.core.configuration.XmlConfigurationParser;
+import de.unibi.citec.clf.bonsai.core.configuration.data.*;
 import de.unibi.citec.clf.bonsai.core.exception.ConfigurationException;
-import de.unibi.citec.clf.bonsai.core.object.WorkingMemory;
-import de.unibi.citec.clf.bonsai.core.object.Sensor;
-import de.unibi.citec.clf.bonsai.core.object.Actuator;
+import de.unibi.citec.clf.bonsai.core.exception.CoreObjectCreationException;
+import de.unibi.citec.clf.bonsai.core.exception.InitializationException;
+import de.unibi.citec.clf.bonsai.core.exception.ParseException;
+import de.unibi.citec.clf.bonsai.core.object.*;
+import de.unibi.citec.clf.bonsai.util.helper.ListClass;
+import org.apache.log4j.Logger;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Set;
-
-import org.apache.log4j.Logger;
-
-import de.unibi.citec.clf.bonsai.core.object.ActuatorToConfigure;
-import de.unibi.citec.clf.bonsai.core.object.CoordinateTransformerToConfigure;
-import de.unibi.citec.clf.bonsai.core.exception.CoreObjectCreationException;
-import de.unibi.citec.clf.bonsai.core.exception.InitializationException;
-import de.unibi.citec.clf.bonsai.core.object.SensorToConfigure;
-import de.unibi.citec.clf.bonsai.core.object.SlotToConfigure;
-import de.unibi.citec.clf.bonsai.core.object.WorkingMemoryToConfigure;
-import de.unibi.citec.clf.bonsai.core.configuration.FactoryConfigurationResults;
-import de.unibi.citec.clf.bonsai.core.configuration.ConfigurationParser;
-import de.unibi.citec.clf.bonsai.core.exception.ParseException;
-import de.unibi.citec.clf.bonsai.core.configuration.data.CoreObjectData;
-import de.unibi.citec.clf.bonsai.core.configuration.XmlConfigurationParser;
-import de.unibi.citec.clf.bonsai.core.configuration.data.ActuatorData;
-import de.unibi.citec.clf.bonsai.core.configuration.data.BonsaiConfigurationData;
-import de.unibi.citec.clf.bonsai.core.configuration.data.FactoryData;
-import de.unibi.citec.clf.bonsai.core.configuration.data.MemoryData;
-import de.unibi.citec.clf.bonsai.core.configuration.data.SensorData;
-import de.unibi.citec.clf.bonsai.core.configuration.data.TransformerData;
-import de.unibi.citec.clf.bonsai.util.helper.ListClass;
-import java.util.Collection;
-import de.unibi.citec.clf.bonsai.core.object.TransformLookup;
-import java.util.ArrayList;
 
 /**
  * Central access point to the Bonsai classes. This class provides various methods to create {@link Sensor}s and
@@ -49,7 +28,7 @@ import java.util.ArrayList;
  * file. The default parser is XML-based but can be changed if desired. Afterwards the configured {@link Sensor}s and
  * {@link Actuator}s can be retrieved via the <code>create...</code> methods. A {@link Sensor} itself is not thread-safe
  * if not stated otherwise in the implementing class. The same counts for actuators.
- *
+ * <p>
  * This class is implemented as a singleton.
  *
  * @author sebschne
@@ -61,11 +40,10 @@ import java.util.ArrayList;
 public class BonsaiManager {
 
 
-
     private Logger logger = Logger.getLogger(getClass());
     /**
      * The parser instance used for initial configuration.
-     *
+     * <p>
      * {@link BonsaiManager} does not need a {@link ConfigurationParser}. Use      {@link BonsaiManager#configure(java.lang.String,
      * de.unibi.airobots.bonsai.core.configuration.ConfigurationParser)} or
      * {@link BonsaiManager#configure(java.net.URI, de.unibi.airobots.bonsai.core.configuration.ConfigurationParser)}
@@ -125,8 +103,8 @@ public class BonsaiManager {
      *
      * @param parser new parser to use
      * @deprecated {@link BonsaiManager} does not need a {@link ConfigurationParser}. Use      {@link BonsaiManager#configure(java.lang.String,
-     *             de.unibi.airobots.bonsai.core.configuration.ConfigurationParser)} or      {@link BonsaiManager#configure(java.net.URI,
-     *             de.unibi.airobots.bonsai.core.configuration.ConfigurationParser)} instead.
+     * de.unibi.airobots.bonsai.core.configuration.ConfigurationParser)} or      {@link BonsaiManager#configure(java.net.URI,
+     * de.unibi.airobots.bonsai.core.configuration.ConfigurationParser)} instead.
      */
     @Deprecated
     public void setParser(ConfigurationParser parser) {
@@ -134,7 +112,6 @@ public class BonsaiManager {
     }
 
     /**
-     *
      * Returns the parser instance used for initial configuration.
      *
      * @return current parser instance
@@ -162,10 +139,9 @@ public class BonsaiManager {
      * {@link #setParser(ConfigurationParser)}. Default parser is XML based.
      *
      * @param configurationFilename Path to the local configuration file.
-     * @throws IllegalStateException already configured or error while configuring
+     * @throws IllegalStateException  already configured or error while configuring
      * @throws ConfigurationException error configuring the {@link BonsaiManager}. If this is the case, this class is in
-     * an unpredictable state and cannot be used afterwards
-     *
+     *                                an unpredictable state and cannot be used afterwards
      * @deprecated Use {@link BonsaiManager#configure(java.lang.String, ConfigurationParser)} or
      * {@link BonsaiManager#configure(java.net.URI, ConfigurationParser)} instead.
      */
@@ -183,9 +159,9 @@ public class BonsaiManager {
      * {@link #setParser(ConfigurationParser)}. Default parser is XML based.
      *
      * @param configurationFilename Path to the local configuration file.
-     * @param parser Parser to parse the given file.
+     * @param parser                Parser to parse the given file.
      * @throws ConfigurationException error configuring the {@link BonsaiManager}. If this is the case, this class is in
-     * an unpredictable state and cannot be used afterwards
+     *                                an unpredictable state and cannot be used afterwards
      */
     public ConfigurationResults configure(String configurationFilename, ConfigurationParser parser)
             throws ConfigurationException {
@@ -201,10 +177,9 @@ public class BonsaiManager {
      * {@link #setParser(ConfigurationParser)}. Default parser is XML based.
      *
      * @param configurationFile URI of the configuration file
-     * @throws IllegalStateException error while configuring
+     * @throws IllegalStateException  error while configuring
      * @throws ConfigurationException error configuring the {@link BonsaiManager}. If this is the case, this class is in
-     * an unpredictable state and cannot be used afterwards
-     *
+     *                                an unpredictable state and cannot be used afterwards
      * @deprecated Use {@link BonsaiManager#configure(java.lang.String, ConfigurationParser)} or
      * {@link BonsaiManager#configure(java.net.URI, ConfigurationParser)} instead.
      */
@@ -217,9 +192,9 @@ public class BonsaiManager {
      * Configures the factory from a given configuration file.
      *
      * @param configurationFile URI of the configuration file
-     * @param parser Parser to parse the given file.
+     * @param parser            Parser to parse the given file.
      * @throws ConfigurationException error configuring the {@link BonsaiManager}. If this is the case, this class is in
-     * an unpredictable state and cannot be used afterwards.
+     *                                an unpredictable state and cannot be used afterwards.
      */
     public ConfigurationResults configure(URI configurationFile, ConfigurationParser parser)
             throws ConfigurationException {
@@ -230,9 +205,9 @@ public class BonsaiManager {
      * Configures the factory from a given configuration stream.
      *
      * @param configurationStream Stream of the configuration file
-     * @param parser Parser to parse the given file.
+     * @param parser              Parser to parse the given file.
      * @throws ConfigurationException error configuring the {@link BonsaiManager}. If this is the case, this class is in
-     * an unpredictable state and cannot be used afterwards.
+     *                                an unpredictable state and cannot be used afterwards.
      */
     public ConfigurationResults configure(InputStream configurationStream, ConfigurationParser parser)
             throws ConfigurationException {
@@ -243,9 +218,9 @@ public class BonsaiManager {
      * Configures the factory from a given configuration file.
      *
      * @param configuration String of the configuration
-     * @param parser Parser to parse the given file.
+     * @param parser        Parser to parse the given file.
      * @throws ConfigurationException error configuring the {@link BonsaiManager}. If this is the case, this class is in
-     * an unpredictable state and cannot be used afterwards.
+     *                                an unpredictable state and cannot be used afterwards.
      */
     public ConfigurationResults configureByString(String configuration, ConfigurationParser parser)
             throws ConfigurationException {
@@ -256,18 +231,17 @@ public class BonsaiManager {
      * Configures the factory from a given configuration file, but only sensors, actuators and memory slots that are
      * consistent with the given maps. These maps may be set null to configure all sensors, actuators or memory slots.
      *
-     *
      * @param configurationFile Path to the configuration file
-     * @param parser Parser to parse the given file.
-     * @param sensorKeySet Map that contains all required sensor keys.
-     * @param listSensorKeySet Set that contains all required list sensor keys.
-     * @param actuatorKeySet Set that contains all required actuator keys.
-     * @param memoryKeySet Set that contains all required working memory keys.
+     * @param parser            Parser to parse the given file.
+     * @param sensorKeySet      Map that contains all required sensor keys.
+     * @param listSensorKeySet  Set that contains all required list sensor keys.
+     * @param actuatorKeySet    Set that contains all required actuator keys.
+     * @param memoryKeySet      Set that contains all required working memory keys.
      * @throws ConfigurationException error configuring the {@link BonsaiManager}. If this is the case, this class is in
-     * an unpredictable state and cannot be used afterwards.
+     *                                an unpredictable state and cannot be used afterwards.
      */
     public ConfigurationResults configure(String configurationFile, ConfigurationParser parser,
-            Set<String> sensorKeySet, Set<String> listSensorKeySet, Set<String> actuatorKeySet, Set<String> memoryKeySet)
+                                          Set<String> sensorKeySet, Set<String> listSensorKeySet, Set<String> actuatorKeySet, Set<String> memoryKeySet)
             throws ConfigurationException {
 
         return configure(new File(configurationFile).toURI(), parser, sensorKeySet, listSensorKeySet,
@@ -279,19 +253,18 @@ public class BonsaiManager {
      * Configures the factory from a given configuration file, but only sensors, actuators and memory slots that are
      * consistent with the given maps. These maps may be set null to configure all sensors, actuators or memory slots.
      *
-     *
-     * @param configuration String of the configuration file
-     * @param parser Parser to parse the given file.
-     * @param aSensorKeySet Map that contains all required sensor keys.
+     * @param configuration     String of the configuration file
+     * @param parser            Parser to parse the given file.
+     * @param aSensorKeySet     Map that contains all required sensor keys.
      * @param aListSensorKeySet Set that contains all required list sensor keys.
-     * @param aActuatorKeySet Set that contains all required actuator keys.
-     * @param aMemoryKeySet Set that contains all required working memory keys.
+     * @param aActuatorKeySet   Set that contains all required actuator keys.
+     * @param aMemoryKeySet     Set that contains all required working memory keys.
      * @throws ConfigurationException error configuring the {@link BonsaiManager}. If this is the case, this class is in
-     * an unpredictable state and cannot be used afterwards.
+     *                                an unpredictable state and cannot be used afterwards.
      */
     public ConfigurationResults configureByString(String configuration, ConfigurationParser parser,
-            Set<String> aSensorKeySet, Set<String> aListSensorKeySet, Set<String> aActuatorKeySet,
-            Set<String> aMemoryKeySet) throws ConfigurationException {
+                                                  Set<String> aSensorKeySet, Set<String> aListSensorKeySet, Set<String> aActuatorKeySet,
+                                                  Set<String> aMemoryKeySet) throws ConfigurationException {
         logger.info("Parsing configuration file");
         try {
             logger.info("Parsing configuration file");
@@ -313,18 +286,17 @@ public class BonsaiManager {
      * Configures the factory from a given configuration file, but only sensors, actuators and memory slots that are
      * consistent with the given maps. These maps may be set null to configure all sensors, actuators or memory slots.
      *
-     *
      * @param configurationFile URI of the configuration file
-     * @param parser Parser to parse the given file.
-     * @param aSensorKeySet Map that contains all required sensor keys.
+     * @param parser            Parser to parse the given file.
+     * @param aSensorKeySet     Map that contains all required sensor keys.
      * @param aListSensorKeySet Set that contains all required list sensor keys.
-     * @param aActuatorKeySet Set that contains all required actuator keys.
-     * @param aMemoryKeySet Set that contains all required working memory keys.
+     * @param aActuatorKeySet   Set that contains all required actuator keys.
+     * @param aMemoryKeySet     Set that contains all required working memory keys.
      * @throws ConfigurationException error configuring the {@link BonsaiManager}. If this is the case, this class is in
-     * an unpredictable state and cannot be used afterwards.
+     *                                an unpredictable state and cannot be used afterwards.
      */
     public ConfigurationResults configure(URI configurationFile, ConfigurationParser parser, Set<String> aSensorKeySet,
-            Set<String> aListSensorKeySet, Set<String> aActuatorKeySet, Set<String> aMemoryKeySet)
+                                          Set<String> aListSensorKeySet, Set<String> aActuatorKeySet, Set<String> aMemoryKeySet)
             throws ConfigurationException {
         try {
             logger.info("Parsing configuration file");
@@ -334,15 +306,15 @@ public class BonsaiManager {
         } catch (ParseException e) {
             throw new ConfigurationException(
                     "Error parsing the configuration stream. Message (ParseException): "
-                    + e.getMessage(), e);
+                            + e.getMessage(), e);
         } catch (IOException e) {
             throw new ConfigurationException(
                     "Error parsing the configuration stream. Message (IOException): "
-                    + e.getMessage(), e);
+                            + e.getMessage(), e);
         } catch (IllegalStateException e) {
             throw new ConfigurationException(
                     "Error parsing the configuration stream. Message (IllegalStateException): "
-                    + e.getMessage(), e);
+                            + e.getMessage(), e);
         }
     }
 
@@ -350,19 +322,18 @@ public class BonsaiManager {
      * Configures the factory from a given configuration file, but only sensors, actuators and memory slots that are
      * consistent with the given maps. These maps may be set null to configure all sensors, actuators or memory slots.
      *
-     *
      * @param configurationStream Stream of the configuration file
-     * @param parser Parser to parse the given file.
-     * @param aSensorKeySet Map that contains all required sensor keys.
-     * @param aListSensorKeySet Set that contains all required list sensor keys.
-     * @param aActuatorKeySet Set that contains all required actuator keys.
-     * @param aMemoryKeySet Set that contains all required working memory keys.
+     * @param parser              Parser to parse the given file.
+     * @param aSensorKeySet       Map that contains all required sensor keys.
+     * @param aListSensorKeySet   Set that contains all required list sensor keys.
+     * @param aActuatorKeySet     Set that contains all required actuator keys.
+     * @param aMemoryKeySet       Set that contains all required working memory keys.
      * @throws ConfigurationException error configuring the {@link BonsaiManager}. If this is the case, this class is in
-     * an unpredictable state and cannot be used afterwards.
+     *                                an unpredictable state and cannot be used afterwards.
      */
     public ConfigurationResults configure(InputStream configurationStream,
-            ConfigurationParser parser, Set<String> aSensorKeySet, Set<String> aListSensorKeySet,
-            Set<String> aActuatorKeySet, Set<String> aMemoryKeySet) throws ConfigurationException {
+                                          ConfigurationParser parser, Set<String> aSensorKeySet, Set<String> aListSensorKeySet,
+                                          Set<String> aActuatorKeySet, Set<String> aMemoryKeySet) throws ConfigurationException {
         try {
             logger.info("Parsing configuration file");
             parser.parse(configurationStream);
@@ -371,20 +342,20 @@ public class BonsaiManager {
         } catch (ParseException e) {
             throw new ConfigurationException(
                     "Error parsing the configuration stream. Message (ParseException): "
-                    + e.getMessage(), e);
+                            + e.getMessage(), e);
         } catch (IOException e) {
             throw new ConfigurationException(
                     "Error parsing the configuration stream. Message (IOException): "
-                    + e.getMessage(), e);
+                            + e.getMessage(), e);
         } catch (IllegalStateException e) {
             throw new ConfigurationException(
                     "Error parsing the configuration stream. Message (IllegalStateException): "
-                    + e.getMessage(), e);
+                            + e.getMessage(), e);
         }
     }
 
     public ConfigurationResults configure(ConfigurationParser parser, Set<String> aSensorKeySet,
-            Set<String> aListSensorKeySet, Set<String> aActuatorKeySet, Set<String> aMemoryKeySet)
+                                          Set<String> aListSensorKeySet, Set<String> aActuatorKeySet, Set<String> aMemoryKeySet)
             throws ConfigurationException {
 
         ConfigurationResults results = new ConfigurationResults();
@@ -393,16 +364,16 @@ public class BonsaiManager {
         Set<String> listSensorKeySet = aListSensorKeySet == null ? null : new HashSet<>(aListSensorKeySet);
         Set<String> actuatorKeySet = aActuatorKeySet == null ? null : new HashSet<>(aActuatorKeySet);
         Set<String> memoryKeySet = aMemoryKeySet == null ? null : new HashSet<>(aMemoryKeySet);
-        
+
         logger.info("Creating factories");
         createFactories(config.factories.values());
-        
+
         logger.info("Initializing coordinate transformer");
         results.merge(initializeCoordinateTransformer(config.transformer));
-        
+
         // load only bonsais from the given key sets
         Map<String, MemoryData> requiredMemory = new HashMap<>();
-        if(memoryKeySet != null) {
+        if (memoryKeySet != null) {
             for (String m : new ArrayList<>(memoryKeySet)) {
                 if (config.memories.containsKey(m)) {
                     requiredMemory.put(m, config.memories.get(m));
@@ -410,27 +381,27 @@ public class BonsaiManager {
                 }
             }
         } else {
-          requiredMemory = config.memories;      
+            requiredMemory = config.memories;
         }
-        
+
         Map<String, SensorData> requiredSensors = new HashMap<>();
-        if (sensorKeySet != null || listSensorKeySet!=null) {
+        if (sensorKeySet != null || listSensorKeySet != null) {
             for (String s : config.sensors.keySet()) {
-                if (sensorKeySet!=null && sensorKeySet.contains(s)) {
-                    requiredSensors.put(s,config.sensors.get(s));
+                if (sensorKeySet != null && sensorKeySet.contains(s)) {
+                    requiredSensors.put(s, config.sensors.get(s));
                     sensorKeySet.remove(s);
                 }
-                if (listSensorKeySet!=null && listSensorKeySet.contains(s)) {
-                    requiredSensors.put(s,config.sensors.get(s));
+                if (listSensorKeySet != null && listSensorKeySet.contains(s)) {
+                    requiredSensors.put(s, config.sensors.get(s));
                     listSensorKeySet.remove(s);
                 }
             }
         } else {
             requiredSensors = config.sensors;
         }
-        
+
         Map<String, ActuatorData> requiredActuator = new HashMap<>();
-        if(actuatorKeySet != null) {
+        if (actuatorKeySet != null) {
             logger.trace("have required actuators");
             for (String m : new ArrayList<>(actuatorKeySet)) {
                 logger.trace("key: " + m);
@@ -438,17 +409,17 @@ public class BonsaiManager {
                     requiredActuator.put(m, config.actuators.get(m));
                     actuatorKeySet.remove(m);
                 } else {
-                     logger.trace("key not found:");
-                     logger.trace(config.actuators.size());
-                     config.actuators.entrySet().forEach((asd) -> {
-                         logger.trace("have key: " + asd.getKey());
+                    logger.trace("key not found:");
+                    logger.trace(config.actuators.size());
+                    config.actuators.entrySet().forEach((asd) -> {
+                        logger.trace("have key: " + asd.getKey());
                     });
                 }
             }
         } else {
-          requiredActuator = config.actuators;      
+            requiredActuator = config.actuators;
         }
-        
+
 
         logger.info("Initializing working memories");
         results.merge(initializeWorkingMemories(requiredMemory.values()));
@@ -458,7 +429,7 @@ public class BonsaiManager {
 
         logger.info("Initializing actuators per factory");
         results.merge(initializeActuators(requiredActuator.values()));
-        
+
         logger.info("trigger object creation");
         configuredFactoriesByClass.entrySet().stream().map((entry) -> entry.getValue()).forEachOrdered((factory) -> {
             results.otherExceptions.addAll(factory.createAndCacheAllConfiguredObjects().exceptions);
@@ -519,7 +490,7 @@ public class BonsaiManager {
      * Indicates whether the factory can create a sensor with the unique key <code>key</code> and the data type class
      * <code>dataType</code>.
      *
-     * @param key key of the sensor to check
+     * @param key      key of the sensor to check
      * @param dataType data type of the sensor with the given key to return
      * @return <code>true</code> if there is a factory that was configured for sensors with the specified key and return
      * data type, else <code>false</code>
@@ -560,7 +531,7 @@ public class BonsaiManager {
      * Indicates whether the factory can create a sensor with the unique key <code>key</code>, and the list type class
      * <code>listType</code> and the data type class <code>dataType</code>.
      *
-     * @param key key of the sensor to check
+     * @param key      key of the sensor to check
      * @param listType list type of the sensor with the given key to return
      * @param dataType data type of the list values
      * @return <code>true</code> if there is a factory that was configured for sensor with the specified key and return
@@ -604,7 +575,7 @@ public class BonsaiManager {
      * Tests if an actuator of the desired class can be created. The desired class is interpreted as the minimally
      * fulfilled interface.
      *
-     * @param key key of the actuator
+     * @param key           key of the actuator
      * @param actuatorClass minimal interface an actuator under the given key must implement
      * @return <code>true</code> if such an actuator can be created, else <code>false</code>
      */
@@ -683,11 +654,11 @@ public class BonsaiManager {
      * this signature can only be created if a call to {@link #canCreateSensor(String, Class)} returned
      * <code>true</code>.
      *
-     * @param <T> data type of the sensor to create
-     * @param key key under which the sensor is registered in the configuration
+     * @param <T>      data type of the sensor to create
+     * @param key      key under which the sensor is registered in the configuration
      * @param dataType class object representing the data type of the sensor to create
      * @return new instance of the sensor
-     * @throws IllegalArgumentException there is no sensor for the given data type with the provided key
+     * @throws IllegalArgumentException    there is no sensor for the given data type with the provided key
      * @throws CoreObjectCreationException error while creating the requested sensor
      */
     public <T> Sensor<T> createSensor(String key, Class<T> dataType) throws IllegalArgumentException,
@@ -715,13 +686,13 @@ public class BonsaiManager {
      * with this signature can only be created if a call to {@link #canCreateSensor(String, Class, Class)} returned
      * <code>true</code>.
      *
-     * @param <S> list type of the sensor to create
-     * @param <T> data type of the sensor to create
-     * @param key key under which the sensor is registered in the configuration
+     * @param <S>      list type of the sensor to create
+     * @param <T>      data type of the sensor to create
+     * @param key      key under which the sensor is registered in the configuration
      * @param listType class object representing the list type of the sensor to create
      * @param dataType class object representing the data type of the sensor to create
      * @return new instance of the sensor
-     * @throws IllegalArgumentException there is no sensor for the given data type with the provided key
+     * @throws IllegalArgumentException    there is no sensor for the given data type with the provided key
      * @throws CoreObjectCreationException error while creating the requested sensor
      */
     public <S extends List<T>, T> Sensor<S> createSensor(String key, Class<S> listType, Class<T> dataType)
@@ -748,11 +719,11 @@ public class BonsaiManager {
     /**
      * Factory method to create a new actuator of the provided type.
      *
-     * @param <T> type of the actuator to create (minimally implemented interface)
-     * @param key key under which the actuator is registered in the configuration
+     * @param <T>           type of the actuator to create (minimally implemented interface)
+     * @param key           key under which the actuator is registered in the configuration
      * @param actuatorClass class object representing the type of the actuator to create
      * @return new instance of the actuator
-     * @throws IllegalArgumentException there is no actuator for the given type with the provided key
+     * @throws IllegalArgumentException    there is no actuator for the given type with the provided key
      * @throws CoreObjectCreationException error while creating the requested actuator
      */
     public <T extends Actuator> T createActuator(String key, Class<T> actuatorClass) throws IllegalArgumentException,
@@ -780,7 +751,7 @@ public class BonsaiManager {
      *
      * @param key key under which the memory is registered in the configuration
      * @return new instance of the working memory
-     * @throws IllegalArgumentException there is no actuator for the given type with the provided key
+     * @throws IllegalArgumentException    there is no actuator for the given type with the provided key
      * @throws CoreObjectCreationException error while creating the requested actuator
      */
     public <T extends WorkingMemory> T createWorkingMemory(String key) throws IllegalArgumentException,
@@ -802,14 +773,14 @@ public class BonsaiManager {
         return factory.createWorkingMemory(key);
 
     }
-    
+
     /**
      * Factory method to create a new coordinate transformer.
-     * 
+     *
      * @return coordinate transformer
      */
     public TransformLookup createCoordinateTransformer() {
-    	logger.info("Creating a coordinte transformer instance");
+        logger.info("Creating a coordinte transformer instance");
 
         assert coordinateFactory != null;
         if (!coordinateFactory.canCreateCoordinateTransformer()) {
@@ -885,7 +856,7 @@ public class BonsaiManager {
                 if (sensorKeysToFactories.containsKey(sensor.getKey())) {
                     ConfigurationException e = new ConfigurationException(
                             "There is already a sensor configured with key '" + sensor.getKey() + "'. "
-                            + "Cannot initialize another sensor" + " with this key: " + sensor);
+                                    + "Cannot initialize another sensor" + " with this key: " + sensor);
                     logger.error(e.getMessage(), e);
                     results.add(e);
                 } else {
@@ -907,7 +878,7 @@ public class BonsaiManager {
      */
     private ConfigurationResults initializeActuators(Collection<ActuatorData> configuredActuators)
             throws ConfigurationException {
-        
+
         logger.trace("require actuators# " + configuredActuators.size());
         ConfigurationResults results = new ConfigurationResults();
         actuatorKeysToFactories = new HashMap<>();
@@ -945,7 +916,7 @@ public class BonsaiManager {
                 if (actuatorKeysToFactories.containsKey(actuator.getKey())) {
                     ConfigurationException e = new ConfigurationException(
                             "There is already an actuator configured with key '" + actuator.getKey() + "'. "
-                            + "Cannot initialize another actuator " + "with this key: " + actuator);
+                                    + "Cannot initialize another actuator " + "with this key: " + actuator);
                     logger.error(e.getMessage(), e);
                     results.add(e);
                 } else {
@@ -957,15 +928,15 @@ public class BonsaiManager {
         return results;
 
     }
-    
+
     @SuppressWarnings("unchecked")
     private ConfigurationResults initializeCoordinateTransformer(TransformerData configuredTransformer) {
-    	ConfigurationResults results = new ConfigurationResults();
-    	Set<TransformerData> all = new HashSet<>();
-    	if (configuredTransformer != null) {
-    		all.add(configuredTransformer);
-    	}
-    	Map<CoreObjectFactory, Set<CoordinateTransformerToConfigure>> transformersToConfigureByFactory = mapCoreObjectDataToFactories(all, t -> {
+        ConfigurationResults results = new ConfigurationResults();
+        Set<TransformerData> all = new HashSet<>();
+        if (configuredTransformer != null) {
+            all.add(configuredTransformer);
+        }
+        Map<CoreObjectFactory, Set<CoordinateTransformerToConfigure>> transformersToConfigureByFactory = mapCoreObjectDataToFactories(all, t -> {
 
             CoordinateTransformerToConfigure transformer = new CoordinateTransformerToConfigure();
 
@@ -985,8 +956,8 @@ public class BonsaiManager {
             }
             return transformer;
         });
-    	
-    	// initialize transformer in each factory
+
+        // initialize transformer in each factory
         for (Entry<CoreObjectFactory, Set<CoordinateTransformerToConfigure>> factoryEntry : transformersToConfigureByFactory
                 .entrySet()) {
             try {
@@ -1002,7 +973,7 @@ public class BonsaiManager {
                 throw new ConfigurationException(e);
             }
         }
-        
+
         // build a mapping of actuator keys to creating factories
         logger.info("Building map of initialized coordinate transformers");
         for (Entry<CoreObjectFactory, Set<CoordinateTransformerToConfigure>> factoryEntry : transformersToConfigureByFactory.entrySet()) {
@@ -1018,8 +989,8 @@ public class BonsaiManager {
             }
 
         }
-    	
-    	return results;
+
+        return results;
     }
 
     /**
@@ -1067,7 +1038,7 @@ public class BonsaiManager {
                 if (memoryKeysToFactories.containsKey(memory.getKey())) {
                     ConfigurationException e = new ConfigurationException(
                             "There is already an working memory configured with key '" + memory.getKey() + "'. "
-                            + "Cannot initialize another working memory " + "with this key: " + memory);
+                                    + "Cannot initialize another working memory " + "with this key: " + memory);
                     logger.error(e.getMessage(), e);
                     results.add(e);
                 } else {
@@ -1118,21 +1089,21 @@ public class BonsaiManager {
 
         } catch (ExceptionInInitializerError | ClassNotFoundException e) {
             throw new ConfigurationException(e);
-        } 
+        }
         return actuator;
 
     }
 
-     /**
+    /**
      * Maps all configured sensors given to the factory instances that create the sensor.
      *
-     * @param <T> type of the core objects to map
+     * @param <T>               type of the core objects to map
      * @param configuredObjects sensors to map
-     * @param mapper mapper from <code>T</code> to <code>U</code>
+     * @param mapper            mapper from <code>T</code> to <code>U</code>
      * @return map that maps every given {@link ConfiguredSensor} to the factory object that can create it
      * @throws ConfigurationException on of the sensors cannot be mapped to a factory instance
      */
-     private <T extends CoreObjectData, U> Map<CoreObjectFactory, Set<U>> mapConfiguredCoreObjectToFactories(
+    private <T extends CoreObjectData, U> Map<CoreObjectFactory, Set<U>> mapConfiguredCoreObjectToFactories(
             Collection<T> configuredObjects, CoreObjectMapper<T, U> mapper) throws ConfigurationException {
 
         logger.debug("Mapping ConfiguredObject to factories. Got " + configuredObjects.size() + " object(s) to map.");
@@ -1180,9 +1151,9 @@ public class BonsaiManager {
      * An interface describing a method to map one data type to another. This is used to map configuration objects from
      * {@link BonsaiManager} to instances of {@link CoreObjectData}.
      *
-     * @author jwienke
      * @param <T> source data type for the mapping
      * @param <U> target data type for the mapping
+     * @author jwienke
      */
     private interface CoreObjectMapper<T, U> {
 
@@ -1192,9 +1163,9 @@ public class BonsaiManager {
     /**
      * Maps all configured sensors given to the factory instances that create the sensor.
      *
-     * @param <T> type of the core objects to map
+     * @param <T>               type of the core objects to map
      * @param configuredObjects sensors to map
-     * @param mapper mapper from <code>T</code> to <code>U</code>
+     * @param mapper            mapper from <code>T</code> to <code>U</code>
      * @return map that maps every given {@link ConfiguredSensor} to the factory object that can create it
      * @throws ConfigurationException on of the sensors cannot be mapped to a factory instance
      */
@@ -1278,8 +1249,7 @@ public class BonsaiManager {
                         + Sensor.class);
             }
             sensor.setSensorClass((Class<? extends Sensor<?>>) possibleSensorClass);
-            
-            
+
 
         } catch (LinkageError | ClassNotFoundException e) {
             throw new ConfigurationException(e);
@@ -1329,7 +1299,7 @@ public class BonsaiManager {
 
         } catch (ExceptionInInitializerError | ClassNotFoundException e) {
             throw new ConfigurationException(e);
-        } 
+        }
 
         return memory;
 
@@ -1349,7 +1319,7 @@ public class BonsaiManager {
             throw new ConfigurationException("No factories requested by the user. "
                     + "This does not make sense, because then " + "no sensor or actuator can be created.");
         }
-        
+
         configuredFactoriesByClass.values().forEach((fac) -> {
             fac.cleanUp();
         });
@@ -1404,7 +1374,7 @@ public class BonsaiManager {
         } catch (ClassNotFoundException e) {
             logger.debug(e.getClass().getSimpleName(), e);
             throw new ConfigurationException("Could not find a class with name '"
-                    + requestedFactory.type+ "'", e);
+                    + requestedFactory.type + "'", e);
         } catch (LinkageError e) {
             logger.fatal("during " + requestedFactory.type);
             logger.debug(e.getClass().getSimpleName(), e);

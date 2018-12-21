@@ -1,7 +1,5 @@
-
 package de.unibi.citec.clf.bonsai.core.object;
 
-import de.unibi.citec.clf.bonsai.core.object.Sensor;
 import java.util.List;
 import java.util.Map;
 
@@ -32,8 +30,7 @@ public class SensorToConfigure {
     /**
      * Sets the unique key specified by the user for this sensor.
      *
-     * @param key
-     *            new key
+     * @param key new key
      */
     public void setKey(String key) {
         this.key = key;
@@ -51,8 +48,7 @@ public class SensorToConfigure {
     /**
      * Sets the list type produced by the configured sensor.
      *
-     * @param listTypeClass
-     *            list type class that will be produced
+     * @param listTypeClass list type class that will be produced
      */
     public void setListTypeClass(Class<? extends List<?>> listTypeClass) {
         this.listTypeClass = listTypeClass;
@@ -72,7 +68,7 @@ public class SensorToConfigure {
      * output.
      *
      * @return <code>true</code> is list is expected, otherwise
-     *         <code>false</code>.
+     * <code>false</code>.
      */
     public boolean isListSensor() {
         return listTypeClass != null;
@@ -81,8 +77,7 @@ public class SensorToConfigure {
     /**
      * Sets the data type produced by the configured sensor.
      *
-     * @param dataTypeClass
-     *            data type class that will be produced
+     * @param dataTypeClass data type class that will be produced
      */
     public void setDataTypeClass(Class<?> dataTypeClass) {
         this.dataTypeClass = dataTypeClass;
@@ -100,8 +95,7 @@ public class SensorToConfigure {
     /**
      * Sets the implementing class of the sensor.
      *
-     * @param sensorClass
-     *            implenting class
+     * @param sensorClass implenting class
      */
     public void setSensorClass(Class<? extends Sensor<?>> sensorClass) {
         this.sensorClass = sensorClass;
@@ -120,8 +114,7 @@ public class SensorToConfigure {
     /**
      * Sets the user specified map of options for this sensor configuration.
      *
-     * @param sensorOptions
-     *            options
+     * @param sensorOptions options
      */
     public void setSensorOptions(Map<String, String> sensorOptions) {
         this.sensorOptions = sensorOptions;
@@ -134,20 +127,19 @@ public class SensorToConfigure {
     public void setWireClass(Class<?> wireClass) {
         this.wireClass = wireClass;
     }
-    
-    
+
 
     /**
      * {@inheritDoc}
      */
     @Override
     public String toString() {
-        String s = "SensorToConfigure [key=" + key + ", sensorClass=" + sensorClass + ", dataTypeClass=" + dataTypeClass + ", wireClass="+wireClass +",  sensorOptions=" + sensorOptions;
+        String s = "SensorToConfigure [key=" + key + ", sensorClass=" + sensorClass + ", dataTypeClass=" + dataTypeClass + ", wireClass=" + wireClass + ",  sensorOptions=" + sensorOptions;
         if (isListSensor()) {
             s += ", list = true, listTypeClass = " + listTypeClass;
         }
         s += "]";
         return s;
     }
-    
+
 }

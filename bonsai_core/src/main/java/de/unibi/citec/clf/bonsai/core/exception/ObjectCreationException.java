@@ -1,4 +1,3 @@
-
 package de.unibi.citec.clf.bonsai.core.exception;
 
 /**
@@ -15,7 +14,7 @@ public class ObjectCreationException extends ConfigurationException {
     public final String objectType;
 
     public ObjectCreationException(String key, Class<?> object, String objectType) {
-        super("Could not create "+objectType+": '" + key + "' with type '" + object + "'");
+        super("Could not create " + objectType + ": '" + key + "' with type '" + object + "'");
         objectKey = key;
         objectClass = object;
         this.objectType = objectType;

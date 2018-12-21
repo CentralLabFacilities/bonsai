@@ -5,6 +5,7 @@ import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.exception.TransformException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -68,7 +69,7 @@ public class FindEmptyPlane extends AbstractSkill {
     public boolean init() {
         try {
             objectSensor.clear();
-            start = new Date();
+            start = Time.now();
             futureB = clafuActuator.recognize();
 
         } catch (IOException e) {
@@ -80,7 +81,7 @@ public class FindEmptyPlane extends AbstractSkill {
 
     @Override
     public ExitToken execute() {
-        if ((new Date().getTime() - start.getTime()) > timeout) {
+        if ((Time.now().getTime() - start.getTime()) > timeout) {
             return tokenSuccess;
         }
 

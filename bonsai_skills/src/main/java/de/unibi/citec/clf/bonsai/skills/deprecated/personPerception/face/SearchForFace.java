@@ -150,7 +150,7 @@ public class SearchForFace extends AbstractSkill {
             logger.debug("idToSearch  is " + faceIdToSearch);
         }
 
-        this.start = System.currentTimeMillis();
+        this.start = Time.currentTimeMillis();
 
         return true;
     }
@@ -158,7 +158,7 @@ public class SearchForFace extends AbstractSkill {
     @Override
     public ExitToken execute() {
         if (timeout > 0) {
-            if (start + timeout < System.currentTimeMillis()) {
+            if (start + timeout < Time.currentTimeMillis()) {
                 logger.debug("timeout");
                 return tokenErrorTimeout;
             }

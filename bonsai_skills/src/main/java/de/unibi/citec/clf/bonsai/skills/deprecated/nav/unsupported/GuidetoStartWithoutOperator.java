@@ -5,6 +5,7 @@ import de.unibi.citec.clf.bonsai.actuators.SpeechActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -100,7 +101,7 @@ public class GuidetoStartWithoutOperator extends AbstractSkill {
                 robotPosition = positionSensor.readLast(1000);
                 if (nextGoal(lastGoalTime) || (navigationGoal.getDistance(robotPosition, LengthUnit.METER) < 0.7)) {
 
-                    lastGoalTime = System.currentTimeMillis();
+                    lastGoalTime = Time.currentTimeMillis();
                     lastRobotPos = robotPosition;
                     distanceToGoal = robotPosition.getDistance(navigationGoal, LengthUnit.METER);
 
@@ -201,8 +202,8 @@ public class GuidetoStartWithoutOperator extends AbstractSkill {
     }
 
     private boolean nextGoal(long time) {
-        logger.debug("lastgoaltime: " + time + " CurrentTime: " + System.currentTimeMillis());
-        if (time < (System.currentTimeMillis() - 20000)) {
+        logger.debug("lastgoaltime: " + time + " CurrentTime: " + Time.currentTimeMillis());
+        if (time < (Time.currentTimeMillis() - 20000)) {
             logger.debug("20 seconds passed");
             logger.debug(Math.abs(robotPosition.getDistance(navigationGoal, LengthUnit.METER) - distanceToGoal));
             if (navigationGoal == null || Math.abs(robotPosition.getDistance(navigationGoal, LengthUnit.METER) - distanceToGoal) < 0.02) {

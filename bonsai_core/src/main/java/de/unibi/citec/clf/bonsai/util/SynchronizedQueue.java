@@ -2,11 +2,10 @@ package de.unibi.citec.clf.bonsai.util;
 
 
 import de.unibi.citec.clf.bonsai.util.exceptions.QueueClosedException;
+import org.apache.log4j.Logger;
 
 import java.util.LinkedList;
 import java.util.NoSuchElementException;
-
-import org.apache.log4j.Logger;
 
 /**
  * This abstract class provides a queue that orders its elements of a type <T>
@@ -18,10 +17,8 @@ import org.apache.log4j.Logger;
  * already in queue before the call to {@link #close()} occurred is still
  * possible until the queue is empty. All operations on a SynchronizedQueue are
  * synchronized as the name implies.
- * 
- * @param <T>
- *            type of elements
- * 
+ *
+ * @param <T> type of elements
  * @author lkettenb
  * @author swrede
  */
@@ -33,13 +30,13 @@ public class SynchronizedQueue<T> {
 
     /**
      * Tests whether this queue has been closed.
-     * 
+     *
      * @return true if queue is closed; false otherwise.
      */
     public synchronized boolean isClosed() {
         return closed;
     }
-    
+
     public synchronized LinkedList<T> getAllElements() {
         LinkedList<T> list = new LinkedList<>(queue);
 //        java.util.Collections.copy(list, queue);
@@ -67,7 +64,7 @@ public class SynchronizedQueue<T> {
 
     /**
      * Returns the number of elements in this SynchronizedQueue.
-     * 
+     *
      * @return the number of elements
      */
     public synchronized int getSize() {
@@ -77,11 +74,9 @@ public class SynchronizedQueue<T> {
     /**
      * Inserts a given element at the tail of the queue as long as it is not
      * closed. If it is closed a QueueClosedException will be thrown.
-     * 
-     * @param element
-     *            an element to be inserted.
-     * @throws QueueClosedException
-     *             if queue is already closed.
+     *
+     * @param element an element to be inserted.
+     * @throws QueueClosedException if queue is already closed.
      */
     public synchronized void push(T element) {
         if (closed) {
@@ -94,10 +89,9 @@ public class SynchronizedQueue<T> {
     /**
      * Retrieves and removes the head of this queue, or null if it is empty. If
      * the queue is empty and closed a QueueClosedException will be thrown.
-     * 
+     *
      * @return the head of the queue, or null if it is empty, but not closed.
-     * @throws QueueClosedException
-     *             if this queue is empty and closed.
+     * @throws QueueClosedException if this queue is empty and closed.
      */
     public synchronized T pop() {
         if (queue.isEmpty() && closed) {
@@ -110,14 +104,13 @@ public class SynchronizedQueue<T> {
             return null;
         }
     }
-    
+
     /**
      * Retrieves the head of this queue, or null if it is empty. If
      * the queue is empty and closed a QueueClosedException will be thrown.
-     * 
+     *
      * @return the head of the queue, or null if it is empty, but not closed.
-     * @throws QueueClosedException
-     *             if this queue is empty and closed.
+     * @throws QueueClosedException if this queue is empty and closed.
      */
     public synchronized T front() {
         if (queue.isEmpty() && closed) {
@@ -133,7 +126,7 @@ public class SynchronizedQueue<T> {
 
     /**
      * Tests whether the queue has a head element.
-     * 
+     *
      * @return true if queue has a head; false otherwise.
      */
     public synchronized boolean hasNext() {
@@ -143,7 +136,7 @@ public class SynchronizedQueue<T> {
     /**
      * Retrieves and removes the head of this queue. This method differs from
      * the pop method in that it waits for a new element if the queue is empty.
-     * 
+     *
      * @return the head of this queue or null
      * @throws InterruptedException
      */
@@ -156,13 +149,11 @@ public class SynchronizedQueue<T> {
      * the pop method in that it waits for a new element for a given timeout if
      * the queue is empty. When the waiting thread is interrupted an
      * {@link InterruptedException} will be thrown.
-     * 
-     * @param timeout
-     *            the maximum time waiting for a new element in an empty queue
-     *            in milliseconds
+     *
+     * @param timeout the maximum time waiting for a new element in an empty queue
+     *                in milliseconds
      * @return the head of this queue or null
-     * @throws InterruptedException
-     *             if thread is interrupted
+     * @throws InterruptedException if thread is interrupted
      */
     public synchronized T next(long timeout) throws InterruptedException {
         waitForNext(timeout);
@@ -175,12 +166,10 @@ public class SynchronizedQueue<T> {
 
     /**
      * wait until a new element becomes available.
-     * 
+     *
      * @param timeout
-     * @throws InterruptedException
-     *             if this thread was interrupted while waiting
-     * @throws QueueClosedException
-     *             if the queue has been closed
+     * @throws InterruptedException if this thread was interrupted while waiting
+     * @throws QueueClosedException if the queue has been closed
      */
     public synchronized void waitForNext(long timeout) throws InterruptedException {
         if (!closed && queue.isEmpty()) {

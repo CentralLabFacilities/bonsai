@@ -2,6 +2,7 @@ package de.unibi.citec.clf.btl.data.navigation;
 
 
 
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.btl.units.AngleUnit;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 import de.unibi.citec.clf.btl.units.TimeUnit;
@@ -46,7 +47,7 @@ public class NavigationGoalData extends PositionData {
 	public NavigationGoalData(String generator, double x, double y, double yaw,
 			double coordinateTolerance, double yawTolerance, ReferenceFrame frame, LengthUnit lU, AngleUnit aU) {
 
-		super(x, y, yaw, System.currentTimeMillis(),lU,aU, TimeUnit.MILLISECONDS);
+		super(x, y, yaw, Time.currentTimeMillis(),lU,aU, TimeUnit.MILLISECONDS);
 
 		setGenerator(generator);
 

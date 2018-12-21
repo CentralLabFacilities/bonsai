@@ -1,7 +1,6 @@
 package de.unibi.citec.clf.bonsai.core.exception;
 
 /**
- *
  * @author lruegeme
  */
 public class ParameterCastConfigurationException extends ConfigurationException {

@@ -5,6 +5,7 @@ import de.unibi.citec.clf.bonsai.actuators.SpeechActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -64,7 +65,7 @@ public class AddNewFaceToList extends AbstractSkill {
     /**
      * Time when start learning.
      */
-    private Date start = new Date();
+    private Date start = Time.now();
 
     private static Logger logger = Logger.getLogger(StoreNewFace.class);
     // unsupported private FaceIdentificationList faceList = new FaceIdentificationList();
@@ -93,7 +94,7 @@ public class AddNewFaceToList extends AbstractSkill {
     public boolean init() {
 
         say(STATE_INTRO1, false);
-        start = new Date();
+        start = Time.now();
         say(STATE_INTRO3, true);
         
         /*

@@ -4,24 +4,15 @@ import de.unibi.citec.clf.bonsai.core.configuration.IObjectConfigurator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.exception.ConfigurationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
-import de.unibi.citec.clf.btl.Type;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.Serializable;
-
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
-import java.util.logging.Level;
-
 import org.apache.log4j.Logger;
 
+import java.io.*;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+
 /**
- *
- * @author lruegeme
  * @param <T>
+ * @author lruegeme
  */
 public class ObjectSlot<T extends Object> implements MemorySlot<T> {
 
@@ -53,7 +44,7 @@ public class ObjectSlot<T extends Object> implements MemorySlot<T> {
         }
 
         //try different copy methods
-        
+
         Class<T> clazz = (Class<T>) savedObject.getClass();
         try {
             Constructor<?> copyConstructor = clazz.getConstructor(clazz);
@@ -64,7 +55,7 @@ public class ObjectSlot<T extends Object> implements MemorySlot<T> {
             logger.trace(ex);
         }
 
-        
+
         if (savedObject instanceof Serializable) {
 
             ObjectOutputStream oos = null;

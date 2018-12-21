@@ -2,6 +2,7 @@ package de.unibi.citec.clf.bonsai.engine;
 
 import de.unibi.citec.clf.bonsai.core.exception.ConfigurationException;
 import de.unibi.citec.clf.bonsai.core.exception.StateIDException;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -17,7 +18,6 @@ import java.util.*;
  * This class can be run in a thread and invokes the different phases while executing a skill.
  *
  * @author lruegeme
- *
  */
 public class SkillRunner implements Runnable {
 
@@ -54,7 +54,6 @@ public class SkillRunner implements Runnable {
     SkillConfigurator configurator;
 
     /**
-     *
      * @param skill
      * @param stateId
      * @param vars
@@ -64,7 +63,7 @@ public class SkillRunner implements Runnable {
     public SkillRunner(AbstractSkill skill, StateID stateId, Map<String, String> vars, Map<String, String> slotMapping, SkillListener listener) {
         super();
         this.skill = skill;
-        
+
         this.id = stateId;
         this.slotMapping = (slotMapping != null) ? slotMapping : new HashMap<>();
         this.parameters = (vars != null) ? vars : new HashMap<>();
@@ -118,7 +117,7 @@ public class SkillRunner implements Runnable {
             //should not happen eh?
             throw new ClassNotFoundException(stateId.getFullSkill());
         }
-        
+
         this.id = stateId;
         this.slotMapping = (slotMapping != null) ? slotMapping : new HashMap<>();
         this.parameters = (vars != null) ? vars : new HashMap<>();
@@ -139,7 +138,7 @@ public class SkillRunner implements Runnable {
 
     public void configure(SkillConfigurator.Config cfg) throws ConfigurationException {
 
-        configurator = SkillConfigurator.createConfigPhase(cfg,parameters);
+        configurator = SkillConfigurator.createConfigPhase(cfg, parameters);
 
         this.skill.configure(configurator);
         configurator.activateObjectPhase(parameters, slotMapping);
@@ -187,74 +186,74 @@ public class SkillRunner implements Runnable {
     public List<ConfigurationException> getErrors() {
         return configurator.getExceptions();
     }
-    
-    public ExitStatus execute() throws SkillConfigurationException{
-        if(configurator != null && !configurator.isSkillConfigured()) {
+
+    public ExitStatus execute() throws SkillConfigurationException {
+        if (configurator != null && !configurator.isSkillConfigured()) {
             throw new SkillConfigurationException("skill not configured");
         }
-        
+
         String myID = id.getCanonicalID();
-            
-            if(configurator == null) {
-                throw new SkillConfigurationException("skill not configured");
-            }
 
-            ExitToken successToken = configurator.requestExitToken(ExitStatus.SUCCESS());
-            fatalToken = configurator.requestExitToken(ExitStatus.FATAL());
-            loopToken = configurator.requestExitToken(ExitStatus.LOOP());
+        if (configurator == null) {
+            throw new SkillConfigurationException("skill not configured");
+        }
 
-            //
-            // STATE CONFIG PHASE
-            //
-            logger.debug("  " + myID + " -> invoke configure().");
-            skill.configure(configurator);
+        ExitToken successToken = configurator.requestExitToken(ExitStatus.SUCCESS());
+        fatalToken = configurator.requestExitToken(ExitStatus.FATAL());
+        loopToken = configurator.requestExitToken(ExitStatus.LOOP());
 
-            checkPause();
+        //
+        // STATE CONFIG PHASE
+        //
+        logger.debug("  " + myID + " -> invoke configure().");
+        skill.configure(configurator);
 
-            //
-            // INIT PHASE
-            //
-            logger.debug("  " + myID + " -> invoke init()");
-            boolean initStatus = skill.init();
-            logger.debug("  " + myID + " -> init() returned: " + initStatus);
+        checkPause();
 
-            checkPause();
+        //
+        // INIT PHASE
+        //
+        logger.debug("  " + myID + " -> invoke init()");
+        boolean initStatus = skill.init();
+        logger.debug("  " + myID + " -> init() returned: " + initStatus);
 
-            //
-            // EXECUTION PHASE
-            //
-            ExitToken exitToken = (initStatus) ? successToken : fatalToken;
-            if (initStatus) {
-                logger.debug("  " + myID + " -> invoke execute()");
-                exitToken = invokeExecute(exitToken.getExitStatus());
-                logger.debug("  " + myID + " -> execute() returned: " + exitToken.getExitStatus().getStatus());
-            }
+        checkPause();
 
-            checkPause();
+        //
+        // EXECUTION PHASE
+        //
+        ExitToken exitToken = (initStatus) ? successToken : fatalToken;
+        if (initStatus) {
+            logger.debug("  " + myID + " -> invoke execute()");
+            exitToken = invokeExecute(exitToken.getExitStatus());
+            logger.debug("  " + myID + " -> execute() returned: " + exitToken.getExitStatus().getStatus());
+        }
 
-            //
-            // END PHASE
-            //
-            logger.debug("  " + myID + " -> invoke end()");
-            ExitToken endStatus = skill.end(exitToken);
-            logger.debug("  " + myID + " -> end() returned: " + endStatus.getExitStatus().getStatus());
+        checkPause();
 
-            //
-            // CLEAN UP
-            //
-            skill.cleanUp(configurator);
+        //
+        // END PHASE
+        //
+        logger.debug("  " + myID + " -> invoke end()");
+        ExitToken endStatus = skill.end(exitToken);
+        logger.debug("  " + myID + " -> end() returned: " + endStatus.getExitStatus().getStatus());
 
-            ExitStatus finalStatus;
-            if ((exitToken.getExitStatus().isSuccess() && !endStatus.getExitStatus().isSuccess())
-                    || (exitToken.getExitStatus().isSuccess() == endStatus.getExitStatus().isSuccess() && endStatus.getExitStatus().hasProcessingStatus())) {
-                finalStatus = endStatus.getExitStatus();
-            } else {
-                finalStatus = exitToken.getExitStatus();
-            }
-            setExecuted(finalStatus);
-            
-            return finalStatus;
-        
+        //
+        // CLEAN UP
+        //
+        skill.cleanUp(configurator);
+
+        ExitStatus finalStatus;
+        if ((exitToken.getExitStatus().isSuccess() && !endStatus.getExitStatus().isSuccess())
+                || (exitToken.getExitStatus().isSuccess() == endStatus.getExitStatus().isSuccess() && endStatus.getExitStatus().hasProcessingStatus())) {
+            finalStatus = endStatus.getExitStatus();
+        } else {
+            finalStatus = exitToken.getExitStatus();
+        }
+        setExecuted(finalStatus);
+
+        return finalStatus;
+
     }
 
     @Override
@@ -271,7 +270,6 @@ public class SkillRunner implements Runnable {
      * This method invokes the <code>execute()</code> method of this state.
      *
      * @return Exit status returned by <code>execute()</code> method.
-     *
      * @see AbstractSkill#execute()
      * @see ExitStatus
      */
@@ -283,7 +281,7 @@ public class SkillRunner implements Runnable {
         try {
             do {
                 checkPause();
-                long timeExecutionBegin = System.currentTimeMillis();
+                long timeExecutionBegin = Time.currentTimeMillis();
                 tmpExitStatus = skill.execute(currentStatus);
                 checkExecutionTime(timeExecutionBegin);
                 if (tmpExitStatus.getExitStatus().looping() && !isForcedToEnd()) {
@@ -314,7 +312,7 @@ public class SkillRunner implements Runnable {
     }
 
     private void checkExecutionTime(long begin) {
-        long duration = System.currentTimeMillis() - begin;
+        long duration = Time.currentTimeMillis() - begin;
         if (duration > MAX_EXECUTION_TIME) {
             logger.warn("\n\n!!! Skill '" + skill.getClass().getSimpleName() + "' took too long (" + duration
                     + "ms) !!!\n    -> make sure your execute method does not block longer than " + MAX_EXECUTION_TIME

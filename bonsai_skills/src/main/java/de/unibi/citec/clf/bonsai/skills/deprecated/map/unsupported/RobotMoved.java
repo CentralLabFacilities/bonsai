@@ -1,6 +1,7 @@
 package de.unibi.citec.clf.bonsai.skills.deprecated.map.unsupported;
 
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -53,7 +54,7 @@ public class RobotMoved extends AbstractSkill {
             try {
                 logger.info("Use skill for the first time.");
                 lastRobotPosition = positionSensor.readLast(1000);
-                lastTime = System.currentTimeMillis();
+                lastTime = Time.currentTimeMillis();
             } catch (IOException | InterruptedException ex) {
                 Logger.getLogger(RobotMoved.class.getName()).log(Level.SEVERE, null, ex);
 
@@ -74,9 +75,9 @@ public class RobotMoved extends AbstractSkill {
             return ExitToken.loop();
         }
 
-        if ((System.currentTimeMillis() - lastTime) > 30000) {
-            lastTime = System.currentTimeMillis();
-            logger.info("current check: " + System.currentTimeMillis());
+        if ((Time.currentTimeMillis() - lastTime) > 30000) {
+            lastTime = Time.currentTimeMillis();
+            logger.info("current check: " + Time.currentTimeMillis());
             double distance = currentRobotPosition.getDistance(lastRobotPosition, LengthUnit.METER);
             lastRobotPosition = currentRobotPosition;
             logger.info("Distance driven " + distance + "m" + "  minDistance:" + minGoalDistance);

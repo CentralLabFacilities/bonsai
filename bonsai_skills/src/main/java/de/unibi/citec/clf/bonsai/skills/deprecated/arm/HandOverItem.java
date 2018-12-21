@@ -3,6 +3,7 @@ package de.unibi.citec.clf.bonsai.skills.deprecated.arm;
 
 import de.unibi.citec.clf.bonsai.actuators.PicknPlaceActuator;
 import de.unibi.citec.clf.bonsai.actuators.SpeechActuator;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -55,7 +56,7 @@ public class HandOverItem extends AbstractSkill {
             logger.error("IOError in ArmController" + ex.getMessage());
             return false;
         }
-        timeOut = System.currentTimeMillis();
+        timeOut = Time.currentTimeMillis();
         return true;
     }
 
@@ -76,8 +77,8 @@ public class HandOverItem extends AbstractSkill {
                 Thread.sleep(WAIT_THEN_GO_HOME);
             } else {
                 // Loops
-                if ((System.currentTimeMillis() - timeOut) > askTimeout) {
-                    timeOut = System.currentTimeMillis();
+                if ((Time.currentTimeMillis() - timeOut) > askTimeout) {
+                    timeOut = Time.currentTimeMillis();
                     speechActuator.say("Please touch my gripper on both sides");
                 }
                 return ExitToken.loop();

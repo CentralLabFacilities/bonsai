@@ -1,8 +1,5 @@
-
 package de.unibi.citec.clf.bonsai.core.object;
 
-import de.unibi.citec.clf.bonsai.core.object.WorkingMemory;
-import de.unibi.citec.clf.bonsai.core.object.SlotToConfigure;
 import java.util.Map;
 import java.util.Set;
 
@@ -57,5 +54,5 @@ public class WorkingMemoryToConfigure {
     public String toString() {
         return "WorkingMemoryToConfigure [memoryClass=" + memoryClass + ", memoryOptions=" + memoryOptions + ", slots=" + slots + ", key=" + key + "]";
     }
-    
+
 }

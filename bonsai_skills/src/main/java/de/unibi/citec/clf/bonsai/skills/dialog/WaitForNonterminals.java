@@ -3,6 +3,7 @@ package de.unibi.citec.clf.bonsai.skills.dialog;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -88,7 +89,7 @@ public class WaitForNonterminals extends AbstractSkill {
 
         if (timeout > 0) {
             logger.debug("using timeout of " + timeout + " ms");
-            timeout += System.currentTimeMillis();
+            timeout += Time.currentTimeMillis();
         }
         speechManager = new SimpleSpeechHelper(speechSensor, true);
 
@@ -103,7 +104,7 @@ public class WaitForNonterminals extends AbstractSkill {
         if (!speechManager.hasNewUnderstanding()) {
 
             if (timeout > 0) {
-                if (System.currentTimeMillis() > timeout) {
+                if (Time.currentTimeMillis() > timeout) {
                     logger.info("timeout reached");
                     return tokenSuccessPsTimeout;
                 }

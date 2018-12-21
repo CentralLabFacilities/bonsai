@@ -3,6 +3,7 @@ package de.unibi.citec.clf.bonsai.skills.personPerception;
 import de.unibi.citec.clf.bonsai.actuators.DetectPeopleActuator;
 import de.unibi.citec.clf.bonsai.actuators.GazeActuator;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -69,7 +70,7 @@ public class LookToNearestPerson extends AbstractSkill {
     public ExitToken execute() {
 
         if (!peopleFuture.isDone()) {
-            if (timeout < System.currentTimeMillis()) {
+            if (timeout < Time.currentTimeMillis()) {
                 return tokenErrorNoPerson;
             }
             return ExitToken.loop(50);
@@ -126,7 +127,7 @@ public class LookToNearestPerson extends AbstractSkill {
         try {
             currentPersons = null;
             peopleFuture = peopleActuator.getPeople();
-            timeout += System.currentTimeMillis();
+            timeout += Time.currentTimeMillis();
         } catch (InterruptedException | ExecutionException e) {
             logger.error(e);
             return false;

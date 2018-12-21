@@ -5,6 +5,7 @@ import de.unibi.citec.clf.bonsai.actuators.TrackingActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -120,7 +121,7 @@ public class StartPeopleTracking extends AbstractSkill {
 
         if (timeoutRoi > 0) {
             logger.debug("using timeout of " + timeoutRoi + " ms for ROI generation");
-            timeoutRoi = timeoutRoi + System.currentTimeMillis();
+            timeoutRoi = timeoutRoi + Time.currentTimeMillis();
         }
         return true;
     }
@@ -128,7 +129,7 @@ public class StartPeopleTracking extends AbstractSkill {
     @Override
     public ExitToken execute() {
         if (timeoutRoi > 0 && !roiFut.isDone()) {
-            if (System.currentTimeMillis() > timeoutRoi) {
+            if (Time.currentTimeMillis() > timeoutRoi) {
                 logger.info("Roi generatin timed out");
                 return tokenErrorTimeoutRoi;
             }
@@ -168,12 +169,12 @@ public class StartPeopleTracking extends AbstractSkill {
 
             if (timeoutTracker > 0) {
                 logger.debug("using timeout of " + timeoutTracker + " ms for Tracker initialization");
-                timeoutTracker = timeoutTracker + System.currentTimeMillis();
+                timeoutTracker = timeoutTracker + Time.currentTimeMillis();
             }
         }
 
         if (timeoutTracker > 0 && !trackingFut.isDone()) {
-            if (System.currentTimeMillis() > timeoutTracker) {
+            if (Time.currentTimeMillis() > timeoutTracker) {
                 logger.info("Tracker initalizaton timed out");
                 return tokenErrorTimeoutTracker;
             }
@@ -189,13 +190,13 @@ public class StartPeopleTracking extends AbstractSkill {
             logger.info("TRACKER INITALIZE SERVICE CALL RETURNED");
             if (timeoutPersonSensor > 0) {
                 logger.debug("using timeout of " + timeoutPersonSensor + " ms for wait for initial person from person sensor");
-                timeoutPersonSensor = timeoutPersonSensor + System.currentTimeMillis();
+                timeoutPersonSensor = timeoutPersonSensor + Time.currentTimeMillis();
             }
             logger.info("WAITING FOR FIRST PERSON IN PERSON SENSOR");
         }
 
         if (timeoutPersonSensor > 0) {
-            if (System.currentTimeMillis() > timeoutPersonSensor) {
+            if (Time.currentTimeMillis() > timeoutPersonSensor) {
                 logger.info("Wait for first person from person Sensor timed out");
                 return tokenErrorTimeoutPersonSensor;
             }

@@ -5,6 +5,7 @@ import de.unibi.citec.clf.bonsai.actuators.SpeechActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -134,7 +135,7 @@ public class PepperFollowPerson extends AbstractSkill {
             return ExitToken.loop(50);
         }
         
-        if(System.currentTimeMillis() - lasttalk>15000){
+        if(Time.currentTimeMillis() - lasttalk>15000){
             talk();
             
         }
@@ -223,7 +224,7 @@ public class PepperFollowPerson extends AbstractSkill {
                 } catch (IOException ex) {
                     logger.fatal(ex);
                 }
-                lasttalk = System.currentTimeMillis();
+                lasttalk = Time.currentTimeMillis();
             }
         }
     }

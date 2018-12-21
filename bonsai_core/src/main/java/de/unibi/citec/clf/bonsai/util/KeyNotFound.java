@@ -1,9 +1,7 @@
 package de.unibi.citec.clf.bonsai.util;
 
 
-
 /**
- *
  * @author cklarhor
  */
 public class KeyNotFound extends Exception {

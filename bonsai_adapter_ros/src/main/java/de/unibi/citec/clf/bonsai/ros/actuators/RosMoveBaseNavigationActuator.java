@@ -6,6 +6,7 @@ import com.github.rosjava_actionlib.ActionFuture;
 import de.unibi.citec.clf.bonsai.actuators.NavigationActuator;
 import de.unibi.citec.clf.bonsai.core.configuration.IObjectConfigurator;
 import de.unibi.citec.clf.bonsai.core.exception.InitializationException;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.ros.RosNode;
 import de.unibi.citec.clf.bonsai.ros.helper.NavigationFuture;
 import de.unibi.citec.clf.bonsai.util.CoordinateSystemConverter;
@@ -71,14 +72,14 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
             task = () -> {
                 try {
                     logger.info("starting drive");
-                    long timeout = System.currentTimeMillis() + driveDuration;
-                    while (System.currentTimeMillis() < timeout) {
+                    long timeout = Time.currentTimeMillis() + driveDuration;
+                    while (Time.currentTimeMillis() < timeout) {
                         moveRelativePublisher.publish(driveMsg);
                         Thread.sleep(republishdelay);
                     }
                     //todo check target pose
-                    timeout = System.currentTimeMillis() + turnDuration;
-                    while (System.currentTimeMillis() < timeout) {
+                    timeout = Time.currentTimeMillis() + turnDuration;
+                    while (Time.currentTimeMillis() < timeout) {
                         moveRelativePublisher.publish(turnMsg);
                         Thread.sleep(republishdelay);
                     }
@@ -197,9 +198,9 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
 
         @Override
         public CommandResult get(long l, TimeUnit timeUnit) throws InterruptedException, ExecutionException, TimeoutException {
-            long timeout = System.currentTimeMillis() + timeUnit.toMillis(l);
+            long timeout = Time.currentTimeMillis() + timeUnit.toMillis(l);
             while (!isDone()) {
-                if (System.currentTimeMillis() > timeout) {
+                if (Time.currentTimeMillis() > timeout) {
                     throw new TimeoutException();
                 }
                 Thread.sleep(50);

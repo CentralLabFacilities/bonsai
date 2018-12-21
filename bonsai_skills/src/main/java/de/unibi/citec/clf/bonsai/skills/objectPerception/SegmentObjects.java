@@ -5,6 +5,7 @@ import de.unibi.citec.clf.bonsai.actuators.SegmentationActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -107,7 +108,7 @@ public class SegmentObjects extends AbstractSkill {
 
         if (timeout > 0) {
             logger.debug("using timeout of " + timeout + " ms");
-            timeout += System.currentTimeMillis();
+            timeout += Time.currentTimeMillis();
         }
 
         return true;
@@ -116,7 +117,7 @@ public class SegmentObjects extends AbstractSkill {
     @Override
     public ExitToken execute() {
 
-        if (System.currentTimeMillis() > timeout) {
+        if (Time.currentTimeMillis() > timeout) {
             logger.info("reached timeout");
             return tokenSuccessTimeout;
         }

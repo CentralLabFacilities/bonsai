@@ -1,15 +1,14 @@
 package de.unibi.citec.clf.bonsai.engine.model;
 
 
-
 /**
  * Defines the possible exit statuses of a state. It is also possible to add
  * a more specific extension by adding a processing status.
- * 
+ * <p>
  * Example: <code>
  * return ExitStatus.SUCCESS().ps("myStatus");
  * </code>
- * 
+ *
  * @see ExitStatus#withProcessingStatus(java.lang.String)
  */
 public class ExitStatus {
@@ -48,7 +47,7 @@ public class ExitStatus {
 
     /**
      * Create {@link ExitStatus} with status {@link Status#SUCCESS}.
-     * 
+     *
      * @return {@link ExitStatus} with status {@link Status#SUCCESS}.
      */
     public static ExitStatus SUCCESS() {
@@ -57,7 +56,7 @@ public class ExitStatus {
 
     /**
      * Create {@link ExitStatus} with status {@link Status#SUCCESS}.
-     * 
+     *
      * @return {@link ExitStatus} with status {@link Status#SUCCESS}.
      */
     public static ExitStatus LOOP() {
@@ -66,10 +65,8 @@ public class ExitStatus {
 
     /**
      * Create {@link ExitStatus} with status {@link Status#SUCCESS}.
-     * 
-     * @param wait
-     *            Time to wait before executing next iteration.
-     * 
+     *
+     * @param wait Time to wait before executing next iteration.
      * @return {@link ExitStatus} with status {@link Status#SUCCESS}.
      */
     public static ExitStatus LOOP(long wait) {
@@ -78,7 +75,7 @@ public class ExitStatus {
 
     /**
      * Create {@link ExitStatus} with status {@link Status#SUCCESS}.
-     * 
+     *
      * @return {@link ExitStatus} with status {@link Status#SUCCESS}.
      */
     public static ExitStatus ERROR() {
@@ -87,7 +84,7 @@ public class ExitStatus {
 
     /**
      * Create {@link ExitStatus} with status {@link Status#SUCCESS}.
-     * 
+     *
      * @return {@link ExitStatus} with status {@link Status#SUCCESS}.
      */
     public static ExitStatus FATAL() {
@@ -96,16 +93,16 @@ public class ExitStatus {
 
     /**
      * Private constructor to create new {@link ExitStatus}.
-     * 
+     *
      * @param status
      */
     private ExitStatus(ExitStatus.Status status) {
         this.status = status;
     }
-    
+
     /**
      * Private constructor to create new {@link ExitStatus}.
-     * 
+     *
      * @param status
      */
     private ExitStatus(ExitStatus.Status status, long loopDelay) {
@@ -115,9 +112,9 @@ public class ExitStatus {
 
     /**
      * Returns true if current status is {@link Status#SUCCESS}.
-     * 
+     *
      * @return True if current status is {@link Status#SUCCESS}, false
-     *         otherwise.
+     * otherwise.
      */
     public boolean isSuccess() {
         return status == Status.SUCCESS;
@@ -125,40 +122,39 @@ public class ExitStatus {
 
     /**
      * Returns true if current status is {@link Status#LOOP}
-     * 
+     *
      * @return True if current status is {@link Status#LOOP}, false
-     *         otherwise.
+     * otherwise.
      */
     public boolean looping() {
         return status == Status.LOOP;
     }
-    
+
     public boolean isFatal() {
         return status == Status.FATAL;
     }
-    
+
     public long getLoopDelay() {
-    	return loopDelay;
+        return loopDelay;
     }
 
     /**
      * Generates a copy of this status and sets a custom processing status.
-     * 
+     * <p>
      * Use this specification to indicate a more meaningful exits/processing
      * status.
-     * 
+     * <p>
      * By initializing a processing status the full value of the exit status
      * will look like the following:
-     * 
+     *
      * <code>successful.GivenProcessingStatus</code>
-     * 
+     *
      * <p>
      * Be careful! You have to adapt all SCXML files that are using this
      * state, if you change this variable afterwards.
      * </p>
-     * 
-     * @param status
-     *            An arbitrary processing status.
+     *
+     * @param status An arbitrary processing status.
      * @return A copy of this object.
      */
     public ExitStatus withProcessingStatus(String status) {
@@ -168,9 +164,8 @@ public class ExitStatus {
 
     /**
      * Convenience method to set processing status.
-     * 
-     * @param status
-     *            An arbitrary processing status.
+     *
+     * @param status An arbitrary processing status.
      * @return A copy of this object.
      * @see ExitStatus#withProcessingStatus(java.lang.String)
      */
@@ -180,7 +175,7 @@ public class ExitStatus {
 
     /**
      * Returns true if processing status was set, false otherwise.
-     * 
+     *
      * @return True if processing status was set, false otherwise.
      */
     public boolean hasProcessingStatus() {
@@ -189,7 +184,7 @@ public class ExitStatus {
 
     /**
      * Returns processing status or null if not set.
-     * 
+     *
      * @return Processing status or null if not set.
      */
     public String getProcessingStatus() {
@@ -198,7 +193,7 @@ public class ExitStatus {
 
     /**
      * Get current {@link Status}.
-     * 
+     *
      * @return Current {@link Status}.
      */
     public ExitStatus.Status getStatus() {
@@ -208,7 +203,7 @@ public class ExitStatus {
     /**
      * Get the value of a element including the processing status. For
      * example: "success.myprocessingstatus"
-     * 
+     *
      * @return Full status of this {@link ExitStatus}.
      */
     public String getFullStatus() {
@@ -218,9 +213,9 @@ public class ExitStatus {
             return status.toString();
         }
     }
-    
+
     @Override
     public String toString() {
-    	return "ExitStatus:" + status.name() + ":" + procStatus;
+        return "ExitStatus:" + status.name() + ":" + procStatus;
     }
 }

@@ -1,7 +1,5 @@
-
 package de.unibi.citec.clf.bonsai.core.object;
 
-import de.unibi.citec.clf.bonsai.core.object.Actuator;
 import java.util.Map;
 
 /**
@@ -28,8 +26,7 @@ public class ActuatorToConfigure {
     /**
      * Sets the unique key specified by the user for this sensor.
      *
-     * @param key
-     *            new key
+     * @param key new key
      */
     public void setKey(String key) {
         this.key = key;
@@ -47,8 +44,7 @@ public class ActuatorToConfigure {
     /**
      * Sets the implementing class of the actuator.
      *
-     * @param actuatorClass
-     *            implementing class
+     * @param actuatorClass implementing class
      */
     public void setActuatorClass(Class<? extends Actuator> actuatorClass) {
         this.actuatorClass = actuatorClass;
@@ -68,8 +64,7 @@ public class ActuatorToConfigure {
      * Sets the middleware-independent interface implemented by the
      * actuator.
      *
-     * @param interfaceClass
-     *            implemented interface
+     * @param interfaceClass implemented interface
      */
     public void setInterfaceClass(Class<? extends Actuator> interfaceClass) {
         this.interfaceClass = interfaceClass;
@@ -88,8 +83,7 @@ public class ActuatorToConfigure {
     /**
      * Sets the user specified options for this actuator configuration.
      *
-     * @param actuatorOptions
-     *            options
+     * @param actuatorOptions options
      */
     public void setActuatorOptions(Map<String, String> actuatorOptions) {
         this.actuatorOptions = actuatorOptions;
@@ -102,5 +96,5 @@ public class ActuatorToConfigure {
     public String toString() {
         return "ActuatorToConfigure [actuatorClass=" + actuatorClass + ", actuatorOptions=" + actuatorOptions + ", interfaceClass=" + interfaceClass + ", key=" + key + "]";
     }
-    
+
 }

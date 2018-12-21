@@ -1,4 +1,3 @@
-
 package de.unibi.citec.clf.bonsai.core.configuration;
 
 import de.unibi.citec.clf.bonsai.core.exception.ConfigurationException;
@@ -9,11 +8,10 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- *
  * @author lruegeme
  */
 public class ConfigurationResults {
-    
+
     private Set<ConfigurationException> configurationExceptions = new HashSet<>();
     public Set<Exception> otherExceptions = Collections.newSetFromMap(new ConcurrentHashMap<Exception, Boolean>());
 
@@ -52,5 +50,5 @@ public class ConfigurationResults {
         }
         return out;
     }
-    
+
 }

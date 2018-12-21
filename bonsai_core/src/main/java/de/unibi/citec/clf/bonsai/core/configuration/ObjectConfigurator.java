@@ -3,18 +3,12 @@ package de.unibi.citec.clf.bonsai.core.configuration;
 import de.unibi.citec.clf.bonsai.core.exception.ConfigurationException;
 import de.unibi.citec.clf.bonsai.core.exception.MissingKeyConfigurationException;
 import de.unibi.citec.clf.bonsai.core.exception.ParameterCastConfigurationException;
-
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
 import org.apache.log4j.Logger;
 
+import java.util.*;
+import java.util.Map.Entry;
+
 /**
- *
  * @author lruegeme
  */
 public class ObjectConfigurator implements IObjectConfigurator {
@@ -58,7 +52,7 @@ public class ObjectConfigurator implements IObjectConfigurator {
                 } catch (ConfigurationException e) {
                     exceptions.add(new ConfigurationException(
                             "optional parameter: '" + key + "' with type '" + c
-                            + "' could not be parsed, value:'" + value + "'"));
+                                    + "' could not be parsed, value:'" + value + "'"));
                 }
             }
         }
@@ -68,14 +62,14 @@ public class ObjectConfigurator implements IObjectConfigurator {
         unusedKeys.forEach(key -> unusedParams.put(key, params.get(key)));
         optionalParams.keySet().removeAll(params.keySet());
         requestedParams.keySet().removeAll(params.keySet());
-        
+
         for (Entry<String, Class> e : requestedParams.entrySet()) {
-            exceptions.add(new MissingKeyConfigurationException(e.getKey() , e.getValue()));
+            exceptions.add(new MissingKeyConfigurationException(e.getKey(), e.getValue()));
         }
-        if(!exceptions.isEmpty()) {
+        if (!exceptions.isEmpty()) {
             throw new ConfigurationException("error parsing params");
         }
-        
+
         phase = ObjectConfigurationPhase.OBJECT;
 
     }

@@ -2,6 +2,7 @@ package de.unibi.citec.clf.bonsai.util.helper;
 
 import de.unibi.citec.clf.bonsai.actuators.SpeechActuator;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.btl.data.speechrec.GrammarNonTerminal;
 import de.unibi.citec.clf.btl.data.speechrec.GrammarSymbol;
 import de.unibi.citec.clf.btl.data.speechrec.GrammarTree;
@@ -410,7 +411,7 @@ public class SpeechHelper {
     // int waitSteps, long timeout) throws IOException {
     // counter = 0;
     // keyCounter = 1;
-    // long startTime = System.currentTimeMillis();
+    // long startTime = Time.currentTimeMillis();
     // while (!understandSomething()) {
     // if (counter == waitSteps) {
     // if (usePhrase) {
@@ -420,7 +421,7 @@ public class SpeechHelper {
     // }
     // counter++;
     //
-    // if (startTime + timeout < System.currentTimeMillis()) {
+    // if (startTime + timeout < Time.currentTimeMillis()) {
     // return false;
     // }
     //
@@ -445,13 +446,13 @@ public class SpeechHelper {
             long timeout) throws IOException {
         // Will be done by SaySrv automatically
 //        isrActuator.setThresholds(ISR_START_DB_LOW, ISR_UTT_DB_LOW);
-        long startTime = System.currentTimeMillis();
+        long startTime = Time.currentTimeMillis();
         long lastPhraseTime = startTime;
         while (!understandSomething()) {
-        	long currentTime = System.currentTimeMillis();
+        	long currentTime = Time.currentTimeMillis();
             if (usePhrase && currentTime - lastPhraseTime > phraseTimeout) {
                 speechActuator.say(getWaitPhrase());
-                lastPhraseTime = System.currentTimeMillis();
+                lastPhraseTime = Time.currentTimeMillis();
             }
 
             if (currentTime - startTime > timeout) {
@@ -475,9 +476,9 @@ public class SpeechHelper {
     public boolean waitForUnderstanding(long timeout) throws IOException {
         // Will be done by SaySrv automatically
 //        isrActuator.setThresholds(ISR_START_DB_LOW, ISR_UTT_DB_LOW);
-        long startTime = System.currentTimeMillis();
+        long startTime = Time.currentTimeMillis();
         while (!understandSomething()) {
-            if (startTime + timeout < System.currentTimeMillis()) {
+            if (startTime + timeout < Time.currentTimeMillis()) {
                 return false;
             }
         }

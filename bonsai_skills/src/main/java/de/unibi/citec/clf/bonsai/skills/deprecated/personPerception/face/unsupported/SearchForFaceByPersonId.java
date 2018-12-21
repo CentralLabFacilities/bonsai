@@ -3,6 +3,7 @@ package de.unibi.citec.clf.bonsai.skills.deprecated.personPerception.face.unsupp
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -103,7 +104,7 @@ public class SearchForFaceByPersonId extends AbstractSkill {
             return false;
         }
 
-        this.start = System.currentTimeMillis();
+        this.start = Time.currentTimeMillis();
 
         return true;
     }
@@ -111,7 +112,7 @@ public class SearchForFaceByPersonId extends AbstractSkill {
     @Override
     public ExitToken execute() {
         if (timeout > 0) {
-            if (start + timeout < System.currentTimeMillis()) {
+            if (start + timeout < Time.currentTimeMillis()) {
                 logger.debug("SearchForFaceByPersonId #### timeout");
                 return tokenTimeout;
             }

@@ -6,26 +6,26 @@
 	'target' attributes to ensure their uniqueness. -->
 
 <xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
-	version="2.0">
+                version="2.0">
 
-	<xsl:output method="xml" encoding="UTF-8" indent="yes" />
+    <xsl:output method="xml" encoding="UTF-8" indent="yes"/>
 
-	<!-- Copy entire document and apply templates. -->
-	<xsl:template match="node()|@*" name="main">
-		<xsl:copy>
-			<xsl:apply-templates select="node()|@*" />
-		</xsl:copy>
-	</xsl:template>
+    <!-- Copy entire document and apply templates. -->
+    <xsl:template match="node()|@*" name="main">
+        <xsl:copy>
+            <xsl:apply-templates select="node()|@*"/>
+        </xsl:copy>
+    </xsl:template>
 
-	<xsl:template match="Sensors">
+    <xsl:template match="Sensors">
         <xsl:copy-of select="document(@src)/BonsaiConfiguration/Sensor"/>
-	</xsl:template>
+    </xsl:template>
 
-	<xsl:template match="Actuators">
+    <xsl:template match="Actuators">
         <xsl:copy-of select="document(@src)/BonsaiConfiguration/Actuator"/>
-	</xsl:template>
-	
-	<xsl:template match="WorkingMemories">
+    </xsl:template>
+
+    <xsl:template match="WorkingMemories">
         <xsl:copy-of select="document(@src)/BonsaiConfiguration/WorkingMemory"/>
-	</xsl:template>
+    </xsl:template>
 </xsl:stylesheet>

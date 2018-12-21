@@ -3,6 +3,7 @@ package de.unibi.citec.clf.bonsai.skills.deprecated.dialog.unsupported;
 
 import de.unibi.citec.clf.bonsai.actuators.SpeechActuator;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -103,7 +104,7 @@ public class SpeechRepeat extends AbstractSkill {
         speechManager = new SimpleSpeechHelper(speechSensor, true);
         if (timeout > 0) {
             logger.info("using timeout of " + timeout + "ms");
-            timeout += System.currentTimeMillis();
+            timeout += Time.currentTimeMillis();
         }
 
         speechManager.startListening();

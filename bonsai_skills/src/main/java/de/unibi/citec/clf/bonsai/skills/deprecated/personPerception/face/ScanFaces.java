@@ -125,7 +125,7 @@ import java.util.logging.Logger;
 
     @Override
     public ExitToken execute() {
-        millisStart = System.currentTimeMillis();
+        millisStart = Time.currentTimeMillis();
         boolean redo = true;
         boolean skip = false;
         FaceIdentificationList list = null;
@@ -137,7 +137,7 @@ import java.util.logging.Logger;
         logger.debug("Enter scan people");
         while (redo && !skip) {
             //if timeout is over, return tokenSuccess
-            if (millisStart + timeoutS * 1000 < System.currentTimeMillis()) {
+            if (millisStart + timeoutS * 1000 < Time.currentTimeMillis()) {
                 logger.debug("timeout scanface procedure! Add all Faces with Id == -1");
                 skip = true;
             }

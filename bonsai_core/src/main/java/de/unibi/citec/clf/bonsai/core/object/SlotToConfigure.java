@@ -1,7 +1,4 @@
-
 package de.unibi.citec.clf.bonsai.core.object;
-
-import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
 
 /**
  * Class encapsulating an memory slot to configure.
@@ -36,5 +33,5 @@ public class SlotToConfigure {
     public String toString() {
         return "SlotToConfigure [slotClass=" + slotClass + ", dataTypeClass=" + dataTypeClass + "]";
     }
-    
+
 }

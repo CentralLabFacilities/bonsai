@@ -1,4 +1,3 @@
-
 package de.unibi.citec.clf.bonsai.core.exception;
 
 /**
@@ -18,8 +17,7 @@ public class CoreObjectCreationException extends RuntimeException {
     /**
      * Constructor.
      *
-     * @param message
-     *            exception description.
+     * @param message exception description.
      */
     public CoreObjectCreationException(String message) {
         super(message);
@@ -28,10 +26,8 @@ public class CoreObjectCreationException extends RuntimeException {
     /**
      * Constructor.
      *
-     * @param message
-     *            exception description
-     * @param cause
-     *            exception cause
+     * @param message exception description
+     * @param cause   exception cause
      */
     public CoreObjectCreationException(String message, Throwable cause) {
         super(message, cause);
@@ -40,8 +36,7 @@ public class CoreObjectCreationException extends RuntimeException {
     /**
      * Constructor.
      *
-     * @param cause
-     *            exception cause
+     * @param cause exception cause
      */
     public CoreObjectCreationException(Throwable cause) {
         super(cause);
@@ -50,10 +45,8 @@ public class CoreObjectCreationException extends RuntimeException {
     /**
      * Constructor.
      *
-     * @param message
-     *            exception description.
-     * @param key
-     *            Key of the core object that caused the exception.
+     * @param message exception description.
+     * @param key     Key of the core object that caused the exception.
      */
     public CoreObjectCreationException(String message, String key) {
         super(message);
@@ -63,12 +56,9 @@ public class CoreObjectCreationException extends RuntimeException {
     /**
      * Constructor.
      *
-     * @param message
-     *            exception description
-     * @param cause
-     *            exception cause
-     * @param key
-     *            Key of the core object that caused the exception.
+     * @param message exception description
+     * @param cause   exception cause
+     * @param key     Key of the core object that caused the exception.
      */
     public CoreObjectCreationException(String message, Throwable cause, String key) {
         super(message, cause);
@@ -78,10 +68,8 @@ public class CoreObjectCreationException extends RuntimeException {
     /**
      * Constructor.
      *
-     * @param cause
-     *            exception cause
-     * @param key
-     *            Key of the core object that caused the exception.
+     * @param cause exception cause
+     * @param key   Key of the core object that caused the exception.
      */
     public CoreObjectCreationException(Throwable cause, String key) {
         super(cause);
@@ -96,5 +84,5 @@ public class CoreObjectCreationException extends RuntimeException {
     public String getKey() {
         return key;
     }
-    
+
 }

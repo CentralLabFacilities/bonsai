@@ -2,12 +2,12 @@
 
 <BonsaiConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                      xsi:noNamespaceSchemaLocation="BonsaiConfiguration.xsd">
-    
-    <FactoryOptions factoryClass="de.unibi.citec.clf.bonsai.memory.MemoryFactory" />
-    
+
+    <FactoryOptions factoryClass="de.unibi.citec.clf.bonsai.memory.MemoryFactory"/>
+
     <WorkingMemory key="WorkingMemory"
                    factoryClass="de.unibi.citec.clf.bonsai.memory.MemoryFactory"
                    workingMemoryClass="de.unibi.citec.clf.bonsai.memory.DefaultMemory">
     </WorkingMemory>
-      
+
 </BonsaiConfiguration>

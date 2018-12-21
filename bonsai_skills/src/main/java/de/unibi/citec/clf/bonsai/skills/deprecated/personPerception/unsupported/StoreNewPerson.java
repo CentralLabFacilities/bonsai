@@ -4,6 +4,7 @@ package de.unibi.citec.clf.bonsai.skills.deprecated.personPerception.unsupported
 import de.unibi.citec.clf.bonsai.actuators.SpeechActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -69,7 +70,7 @@ public class StoreNewPerson extends AbstractSkill {
     /**
      * Time when start learning.
      */
-    private Date start = new Date();
+    private Date start = Time.now();
     /**
      * Indicates if learning did start already.
      */

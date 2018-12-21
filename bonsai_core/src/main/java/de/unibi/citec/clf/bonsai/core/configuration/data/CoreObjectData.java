@@ -4,7 +4,7 @@ import java.util.Map;
 
 /**
  * Basic configuration result returned by configuration parsers.
- * 
+ *
  * @author jwienke
  */
 public abstract class CoreObjectData {

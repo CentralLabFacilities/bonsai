@@ -3,6 +3,7 @@ package de.unibi.citec.clf.bonsai.skills.nav.drive;
 import de.unibi.citec.clf.bonsai.actuators.NavigationActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -125,7 +126,7 @@ public class DriveDirect extends AbstractSkill {
     public boolean init() {
         if (timeout > 0) {
             logger.debug("using timeout of " + timeout + "ms");
-            timeout += System.currentTimeMillis();
+            timeout += Time.currentTimeMillis();
         }
 
         if (navigationGoalDataSlot != null) {
@@ -160,7 +161,7 @@ public class DriveDirect extends AbstractSkill {
     @Override
     public ExitToken execute() {
         if (timeout > 0) {
-            if (System.currentTimeMillis() > timeout) {
+            if (Time.currentTimeMillis() > timeout) {
                 logger.info("DriveDirect timed out");
                 try {
                     navActuator.manualStop();

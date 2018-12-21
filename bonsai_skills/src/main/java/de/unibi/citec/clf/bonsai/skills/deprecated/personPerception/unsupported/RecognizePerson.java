@@ -4,6 +4,7 @@ package de.unibi.citec.clf.bonsai.skills.deprecated.personPerception.unsupported
 import de.unibi.citec.clf.bonsai.actuators.SpeechActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -49,7 +50,7 @@ public class RecognizePerson extends AbstractSkill {
     /**
      * start time of recognition
      */
-    private Date start = new Date();
+    private Date start = Time.now();
     /**
      * map used to count recognized personIds
      */
@@ -145,7 +146,7 @@ public class RecognizePerson extends AbstractSkill {
             logger.error(ex.getMessage());
             return false;
         }*/
-        start = new Date();
+        start = Time.now();
         recognizingStarted = true;
 
         return true;

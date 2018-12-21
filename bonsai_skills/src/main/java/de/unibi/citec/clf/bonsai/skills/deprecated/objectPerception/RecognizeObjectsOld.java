@@ -4,6 +4,7 @@ import de.unibi.citec.clf.bonsai.actuators.ObjectRecognitionActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -88,7 +89,7 @@ public class RecognizeObjectsOld extends AbstractSkill {
     public boolean init() {
         try {
             objectSensor.clear();
-            start = new Date();
+            start = Time.now();
             b = clafuActuator.recognize();
 
         } catch (IOException e) {
@@ -100,7 +101,7 @@ public class RecognizeObjectsOld extends AbstractSkill {
 
     @Override
     public ExitToken execute() {
-        if ((new Date().getTime() - start.getTime()) > timeout) {
+        if ((Time.now().getTime() - start.getTime()) > timeout) {
             return tokenSuccess;
         }
 
@@ -109,8 +110,8 @@ public class RecognizeObjectsOld extends AbstractSkill {
         }
 
         if (saveImage == true) {
-            String clImage = "/tmp/obj" + System.currentTimeMillis() + ".ppm";
-            String conImage = "/tmp/obj" + System.currentTimeMillis() + ".png";
+            String clImage = "/tmp/obj" + Time.currentTimeMillis() + ".ppm";
+            String conImage = "/tmp/obj" + Time.currentTimeMillis() + ".png";
 
             try {
                 logger.debug("reading image now");
@@ -143,7 +144,7 @@ public class RecognizeObjectsOld extends AbstractSkill {
 
         if (twoD == true) {
 
-            if ((foundObjects != null && foundObjects2d != null) || (new Date().getTime() - start.getTime()) > timeout) {
+            if ((foundObjects != null && foundObjects2d != null) || (Time.now().getTime() - start.getTime()) > timeout) {
                 return tokenSuccess;
             } else {
                 return ExitToken.loop();

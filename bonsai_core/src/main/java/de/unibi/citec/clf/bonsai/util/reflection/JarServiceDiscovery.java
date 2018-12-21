@@ -1,23 +1,21 @@
 package de.unibi.citec.clf.bonsai.util.reflection;
 
 
+import org.apache.log4j.Logger;
+import sun.misc.Service;
 
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 
-import org.apache.log4j.Logger;
-
-import sun.misc.Service;
-
 /**
  * An implementation of {@link ServiceDiscovery} that uses the jar file services
  * mechanism to find services.
- * 
- * @see <a
- *      href="http://java.sun.com/javase/6/docs/technotes/guides/jar/jar.html#Service%20Provider">JAR
- *      File Specification - Service Provider</a>
+ *
  * @author jwienke
+ * @see <a
+ * href="http://java.sun.com/javase/6/docs/technotes/guides/jar/jar.html#Service%20Provider">JAR
+ * File Specification - Service Provider</a>
  */
 @SuppressWarnings("restriction")
 @Deprecated

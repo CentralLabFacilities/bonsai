@@ -1,10 +1,10 @@
 package de.unibi.citec.clf.bonsai.util.reflection;
 
 
-import java.util.Set;
 import org.apache.log4j.Logger;
 import org.reflections.Reflections;
-import org.reflections.scanners.SubTypesScanner;
+
+import java.util.Set;
 
 
 public class ReflectionServiceDiscovery implements ServiceDiscovery {
@@ -20,7 +20,7 @@ public class ReflectionServiceDiscovery implements ServiceDiscovery {
     public <T> Set<Class<? extends T>> discoverServicesByInterface(Class<T> iFace) {
 
         //TODO read package from config or something
-        logger.warn("discoverServicesByInterface is using '"+pkg+"' package");
+        logger.warn("discoverServicesByInterface is using '" + pkg + "' package");
         Reflections reflections = new Reflections(pkg);
 
         //de.unibi.citec.clf.bonsai.rsb.configuration

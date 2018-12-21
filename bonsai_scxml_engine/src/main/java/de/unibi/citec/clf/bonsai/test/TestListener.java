@@ -1,5 +1,6 @@
 package de.unibi.citec.clf.bonsai.test;
 
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import org.apache.commons.scxml.SCXMLListener;
 import org.apache.commons.scxml.model.Transition;
 import org.apache.commons.scxml.model.TransitionTarget;
@@ -29,10 +30,10 @@ public class TestListener implements SCXMLListener {
     }
 
     public boolean waitForStatus(long timeout) throws TimeoutException {
-        final long endtimeout = timeout + System.currentTimeMillis();
+        final long endtimeout = timeout + Time.currentTimeMillis();
         while (state == State.running) {
             Thread.yield();
-            if (System.currentTimeMillis() > endtimeout) {
+            if (Time.currentTimeMillis() > endtimeout) {
                 throw new TimeoutException("Statemachine took too long");
             }
         }

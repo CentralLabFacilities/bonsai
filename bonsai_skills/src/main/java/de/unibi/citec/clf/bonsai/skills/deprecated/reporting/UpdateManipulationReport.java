@@ -2,6 +2,7 @@ package de.unibi.citec.clf.bonsai.skills.deprecated.reporting;
 
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -112,7 +113,7 @@ public class UpdateManipulationReport extends AbstractSkill {
     @Override
     public ExitToken execute() {
         String filename = PATH + PDFNAME;
-        String filenameImage = PATH + "/img" + System.currentTimeMillis() + ".jpg";
+        String filenameImage = PATH + "/img" + Time.currentTimeMillis() + ".jpg";
         logger.debug("DEBUG: TEXFILE WIRD AKTUALISIERT ==============");
         //PdfWriter.writeTextInFile(filename,counter + ". recognized Object: " + object + "\\\\" + "\\\\");
         try {

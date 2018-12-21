@@ -4,6 +4,7 @@ package de.unibi.citec.clf.bonsai.strategies.exploration;
 
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
 import de.unibi.citec.clf.bonsai.core.SensorListener;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.util.Pair;
 import de.unibi.citec.clf.bonsai.util.slam.SlamTools;
 import de.unibi.citec.clf.bonsai.util.slam.SlamTools.Edge;
@@ -74,7 +75,7 @@ public class FrontierBasedExploration implements ExplorationStrategy {
 	private DynamicGridMap currentDataMap;
 	private DynamicGridMap oldDataMap;
 	private Object slamLock = new Object();
-	private Random random = new Random(System.currentTimeMillis());
+	private Random random = new Random(Time.currentTimeMillis());
 	private List<Pair<Integer>> frontiers = new LinkedList<>();
 	private Vector<Double> distancesForMean = new Vector<>();
 	private double meanDistance = 0;
@@ -177,19 +178,19 @@ public class FrontierBasedExploration implements ExplorationStrategy {
 			PositionData currentPosition) throws NoGoalFoundException {
 
 		// do calculation
-		long start = System.currentTimeMillis();
+		long start = Time.currentTimeMillis();
 		updateFrontiers();
-		long stop = System.currentTimeMillis();
+		long stop = Time.currentTimeMillis();
 		logger.debug("update frontiers took " + (stop - start) + MSEC);
 
-		start = System.currentTimeMillis();
+		start = Time.currentTimeMillis();
 		NavigationGoalData goal = chooseGoal(frontiers, currentPosition);
-		stop = System.currentTimeMillis();
+		stop = Time.currentTimeMillis();
 		logger.debug("choose goal took " + (stop - start) + MSEC);
 
-		start = System.currentTimeMillis();
+		start = Time.currentTimeMillis();
 		goal = chooseOrientation(goal);
-		stop = System.currentTimeMillis();
+		stop = Time.currentTimeMillis();
 		logger.debug("choose orientation took " + (stop - start) + MSEC);
 
 		debug(frontiers, goal, currentPosition);
@@ -265,25 +266,25 @@ public class FrontierBasedExploration implements ExplorationStrategy {
 				}
 				try {
 					// calculate shortest path using dijkstra algorithm
-					long start = System.currentTimeMillis();
+					long start = Time.currentTimeMillis();
 					Graph<Node, Edge> graph = SlamTools
 							.generateNavigationGraph(currentSlamMap,
 									options.binsPerNodeInPathPlanning);
-					long stop = System.currentTimeMillis();
+					long stop = Time.currentTimeMillis();
 					logger.debug("generate nav graph took " + (stop - start)
 							+ MSEC);
 
 					int x = currentSlamMap.getBinXFromPosition(currentPosition);
 					int y = currentSlamMap.getBinYFromPosition(currentPosition);
 
-					start = System.currentTimeMillis();
+					start = Time.currentTimeMillis();
 					Map<Node, Number> distances = SlamTools.getDistanceMap(
 							graph, x, y);
-					stop = System.currentTimeMillis();
+					stop = Time.currentTimeMillis();
 					logger.debug("generate dist map took " + (stop - start)
 							+ MSEC);
 
-					start = System.currentTimeMillis();
+					start = Time.currentTimeMillis();
 					double minDistance = Double.MAX_VALUE;
 					distancesForMean.clear();
 					boolean foundReachableFrontier = false;
@@ -308,7 +309,7 @@ public class FrontierBasedExploration implements ExplorationStrategy {
 							chosen = frontier;
 						}
 					}
-					stop = System.currentTimeMillis();
+					stop = Time.currentTimeMillis();
 					logger.debug("find shortest dist took " + (stop - start)
 							+ MSEC);
 					calculateMeanDistance();

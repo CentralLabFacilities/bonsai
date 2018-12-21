@@ -1,5 +1,6 @@
 package de.unibi.citec.clf.bonsai.skills;
 
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -47,14 +48,14 @@ public class Wait extends AbstractSkill {
     public boolean init() {
 
         logger.debug("waiting for " + timeout + "ms");
-        timeout = System.currentTimeMillis() + timeout;
+        timeout = Time.currentTimeMillis() + timeout;
 
         return true;
     }
 
     @Override
     public ExitToken execute() {
-        if (timeout < System.currentTimeMillis()) {
+        if (timeout < Time.currentTimeMillis()) {
             return tokenSuccess;
         }
         return ExitToken.loop(50);

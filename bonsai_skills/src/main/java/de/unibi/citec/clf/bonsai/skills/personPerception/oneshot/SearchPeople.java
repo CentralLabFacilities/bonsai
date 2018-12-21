@@ -4,6 +4,7 @@ import de.unibi.citec.clf.bonsai.actuators.DetectPeopleActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -134,7 +135,7 @@ public class SearchPeople extends AbstractSkill {
         logger.debug("Scanning for persons ... searchDist:" + searchRadius + " searchAngle:" + searchAngle);
         if (search_timeout > 0) {
             logger.debug("using search timeout of " + search_timeout + " ms");
-            search_timeout += System.currentTimeMillis();
+            search_timeout += Time.currentTimeMillis();
         }
         try {
             robotPosition = positionSlot.recall();
@@ -149,7 +150,7 @@ public class SearchPeople extends AbstractSkill {
         try {
             possiblePersons = null;
             peopleFuture = peopleActuator.getPeople(do_gender_age_bool, do_face_id_bool, resize_out_ratio);
-            current_actuator_timeout = actuator_timeout + System.currentTimeMillis();
+            current_actuator_timeout = actuator_timeout + Time.currentTimeMillis();
         } catch (InterruptedException | ExecutionException e) {
             logger.error(e);
             return false;
@@ -162,14 +163,14 @@ public class SearchPeople extends AbstractSkill {
     public ExitToken execute() {
 
         if (search_timeout > 0) {
-            if (System.currentTimeMillis() > search_timeout) {
+            if (Time.currentTimeMillis() > search_timeout) {
                 logger.info("Search for person reached timeout");
                 return tokenSuccessNoPeople;
             }
         }
 
         if (!peopleFuture.isDone()) {
-            if (current_actuator_timeout < System.currentTimeMillis()) {
+            if (current_actuator_timeout < Time.currentTimeMillis()) {
                 return tokenError;
             }
             return ExitToken.loop(50);

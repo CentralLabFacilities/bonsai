@@ -1,13 +1,10 @@
 package de.unibi.citec.clf.bonsai.core;
 
 
-
 /**
  * Class representing the connection status of a component (sensor/actuator).
- * 
+ *
  * @author nkoester
- * 
- * 
  */
 public class ConnectionStatus {
 
@@ -19,9 +16,8 @@ public class ConnectionStatus {
     /**
      * Constructor to create the object with a status. True = active, False =
      * inactive
-     * 
-     * @param componentConnectionStatus
-     *            the connection status of the component
+     *
+     * @param componentConnectionStatus the connection status of the component
      */
     public ConnectionStatus(boolean componentConnectionStatus) {
         this.componentConnectionStatus = componentConnectionStatus;
@@ -30,9 +26,8 @@ public class ConnectionStatus {
     /**
      * Sets the actual connection status of the component. Note: This function
      * is thought to be used _only_ by factories.
-     * 
-     * @param componentConnectionStatus
-     *            the current status of the connectivity
+     *
+     * @param componentConnectionStatus the current status of the connectivity
      */
     protected void setStatus(boolean componentConnectionStatus) {
         this.componentConnectionStatus = componentConnectionStatus;
@@ -40,7 +35,7 @@ public class ConnectionStatus {
 
     /**
      * Returns the actual connection status of the component.
-     * 
+     *
      * @return true if the component is connected, false otherwise
      */
     public boolean getConnectionStatus() {

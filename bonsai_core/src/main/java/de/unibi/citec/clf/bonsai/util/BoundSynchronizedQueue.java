@@ -1,17 +1,17 @@
 package de.unibi.citec.clf.bonsai.util;
 
 
-
 import de.unibi.citec.clf.bonsai.util.exceptions.QueueClosedException;
+
 /**
  * Creates a synchronized bound queue with a limited capacity. Before pushing an
  * object into the queue it removes elements so that the size of the queue is
  * always within the capacity.
  *
+ * @param <T> type of elements contained in this queue
  * @author lkettenb
  * @author marc
  * @author jwienke
- * @param <T> type of elements contained in this queue
  */
 public class BoundSynchronizedQueue<T> extends SynchronizedQueue<T> {
 
@@ -76,7 +76,7 @@ public class BoundSynchronizedQueue<T> extends SynchronizedQueue<T> {
      * the last known position is returned.
      *
      * @param timeout the maximum time waiting for a new element in an empty
-     * queue in milliseconds
+     *                queue in milliseconds
      * @return the head of this queue
      * @throws InterruptedException if thread is interrupted
      */

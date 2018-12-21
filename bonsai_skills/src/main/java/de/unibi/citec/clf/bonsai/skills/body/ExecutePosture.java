@@ -1,6 +1,7 @@
 package de.unibi.citec.clf.bonsai.skills.body;
 
 import de.unibi.citec.clf.bonsai.actuators.PostureActuator;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -49,7 +50,7 @@ public class ExecutePosture extends AbstractSkill {
     @Override
     public boolean init() {
         if(!blocking) logger.warn("EXECUTE NONBLOCKING POSTURE, CAREFUL");
-        timeout += System.currentTimeMillis();
+        timeout += Time.currentTimeMillis();
         ret = poseActuator.executeMotion(pose, group);
         return true;
     }
@@ -61,7 +62,7 @@ public class ExecutePosture extends AbstractSkill {
         }
         logger.debug("check ret is done..");
         if (!ret.isDone()) {
-            if (timeout < System.currentTimeMillis()) {
+            if (timeout < Time.currentTimeMillis()) {
                 return ExitToken.fatal();
             }
             return ExitToken.loop(50);

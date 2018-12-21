@@ -5,6 +5,7 @@ import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -181,7 +182,7 @@ public class NavigateToPerson extends AbstractSkill {
             return tokenSuccess;
         }
 
-        lastPersonFound = System.currentTimeMillis();
+        lastPersonFound = Time.currentTimeMillis();
         PolarCoordinate polar = new PolarCoordinate(MathTools.globalToLocal(personFollow.getPosition(), robotPosition));
 
         double distance = calculateDriveDistance(polar);
@@ -241,7 +242,7 @@ public class NavigateToPerson extends AbstractSkill {
 
     private ExitToken handlePersonMissing() {
 
-        if (personLostTimeout > 0 && System.currentTimeMillis() > lastPersonFound + personLostTimeout) {
+        if (personLostTimeout > 0 && Time.currentTimeMillis() > lastPersonFound + personLostTimeout) {
             logger.info("Person lost! Did not find person. Trying to refind person at old position");
 
             personFollow = findClosestToPosition(initialPosition, refindDistance);

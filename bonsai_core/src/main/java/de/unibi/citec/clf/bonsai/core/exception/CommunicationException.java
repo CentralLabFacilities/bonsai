@@ -24,22 +24,21 @@
  * Forschungsgemeinschaft (DFG) in the context of the German
  * Excellence Initiative.
  *
- * Contributors: Florian Lier, Frederic Siepmann, Leon Ziegler, Matthias 
- * Schoepfer, Adriana-Victoria Dreyer, Agnes Swadzba, Andreas Kipp, Birte 
- * Carlmeyer, Christian Ascheberg, Daniel Nacke, Dennis Wigand, Günes Minareci, 
- * Hendrik ter Horst, Ingo Killmann, Jan Pöppel, Lukas Kettenbach, Michael 
- * Zeunert, Patrick Renner, Philipp Dresselhaus, Robin Schiewer, Sebastian 
- * Meyer zu Borgsen, Soufian Jebbara, Tobias Röhlig, Torben Toeniges, Tristan 
+ * Contributors: Florian Lier, Frederic Siepmann, Leon Ziegler, Matthias
+ * Schoepfer, Adriana-Victoria Dreyer, Agnes Swadzba, Andreas Kipp, Birte
+ * Carlmeyer, Christian Ascheberg, Daniel Nacke, Dennis Wigand, Günes Minareci,
+ * Hendrik ter Horst, Ingo Killmann, Jan Pöppel, Lukas Kettenbach, Michael
+ * Zeunert, Patrick Renner, Philipp Dresselhaus, Robin Schiewer, Sebastian
+ * Meyer zu Borgsen, Soufian Jebbara, Tobias Röhlig, Torben Toeniges, Tristan
  * Walter, Viktor Losing, Viktor Richter
  */
 package de.unibi.citec.clf.bonsai.core.exception;
 
 
-
 public class CommunicationException extends Exception {
     /**
-	 * 
-	 */
+     *
+     */
     private static final long serialVersionUID = -3688578239193984234L;
 
     public CommunicationException() {

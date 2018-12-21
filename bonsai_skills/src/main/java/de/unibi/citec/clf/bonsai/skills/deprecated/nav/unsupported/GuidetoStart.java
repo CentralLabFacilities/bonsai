@@ -5,6 +5,7 @@ import de.unibi.citec.clf.bonsai.actuators.SpeechActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -138,7 +139,7 @@ public class GuidetoStart extends AbstractSkill {
                     logger.debug("blub");
                 }
                 if (nextGoal(lastGoalTime) || (navigationGoal.getDistance(robotPosition, LengthUnit.METER) < 0.7)) {
-                    lastGoalTime = System.currentTimeMillis();
+                    lastGoalTime = Time.currentTimeMillis();
                     lastRobotPos = robotPosition;
                     distanceToGoal = robotPosition.getDistance(navigationGoal, LengthUnit.METER);
 
@@ -195,7 +196,7 @@ public class GuidetoStart extends AbstractSkill {
                 currentPerson.getPosition(), robotPosition));
         currentPersonDistance = polar.getDistance(LengthUnit.MILLIMETER);
 
-        if (lasttalk + 6000 < System.currentTimeMillis()) {
+        if (lasttalk + 6000 < Time.currentTimeMillis()) {
             talk();
         }
         if (oldnav != null && navData != null) {
@@ -300,14 +301,14 @@ public class GuidetoStart extends AbstractSkill {
                 } catch (IOException ex) {
                     logger.fatal(ex);
                 }
-                lasttalk = System.currentTimeMillis();
+                lasttalk = Time.currentTimeMillis();
             }
         }
     }
 
     private boolean nextGoal(long lastGoalTime) {
-        logger.debug("lastgoaltime: " + lastGoalTime + " CurrentTime: " + System.currentTimeMillis());
-        if (lastGoalTime < (System.currentTimeMillis() - 20000)) {
+        logger.debug("lastgoaltime: " + lastGoalTime + " CurrentTime: " + Time.currentTimeMillis());
+        if (lastGoalTime < (Time.currentTimeMillis() - 20000)) {
             logger.debug("20 seconds passed");
             logger.debug(Math.abs(robotPosition.getDistance(navigationGoal, LengthUnit.METER) - distanceToGoal));
             if (navigationGoal == null || Math.abs(robotPosition.getDistance(navigationGoal, LengthUnit.METER) - distanceToGoal) < 0.02) {

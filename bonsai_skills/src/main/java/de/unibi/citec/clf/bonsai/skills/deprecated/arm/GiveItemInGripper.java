@@ -4,6 +4,7 @@ import de.unibi.citec.clf.bonsai.actuators.PicknPlaceActuator;
 import de.unibi.citec.clf.bonsai.actuators.SpeechActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -106,7 +107,7 @@ public class GiveItemInGripper extends AbstractSkill {
 
         armController = new ArmController180(poseAct);
         gripperOpen = false;
-        timeOut = System.currentTimeMillis();
+        timeOut = Time.currentTimeMillis();
         return true;
     }
 
@@ -133,8 +134,8 @@ public class GiveItemInGripper extends AbstractSkill {
                 }
             } else {
                 // Loops
-                if ((System.currentTimeMillis() - timeOut) > ASK_TIMEOUT) {
-                    timeOut = System.currentTimeMillis();
+                if ((Time.currentTimeMillis() - timeOut) > ASK_TIMEOUT) {
+                    timeOut = Time.currentTimeMillis();
                     if (speak) {
                         say(text);
                     }

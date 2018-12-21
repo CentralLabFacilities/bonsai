@@ -4,6 +4,7 @@ import de.unibi.citec.clf.bonsai.actuators.GazeActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -110,7 +111,7 @@ public class LookToPersonHead extends AbstractSkill {
 
         if (initialTimeout > 0) {
             logger.debug("using timeout of " + initialTimeout + " ms");
-            timeout = initialTimeout + System.currentTimeMillis();
+            timeout = initialTimeout + Time.currentTimeMillis();
         }
 
         lastVertical = 0.0;
@@ -121,7 +122,7 @@ public class LookToPersonHead extends AbstractSkill {
     @Override
     public ExitToken execute() {
 
-        if (System.currentTimeMillis() > timeout) {
+        if (Time.currentTimeMillis() > timeout) {
             logger.info("Search for person reached timeout");
             return tokenErrorNotFound;
         }
@@ -193,7 +194,7 @@ public class LookToPersonHead extends AbstractSkill {
                 }*/
 
                 gazeActuator.setGazeTarget((float) vertical, (float) horizontal);
-                timeout = initialTimeout + System.currentTimeMillis();
+                timeout = initialTimeout + Time.currentTimeMillis();
                 //logger.debug("horizontal: "+horizontal+"; vertical: "+vertical);
 
                 //gazeActuator.lookAt(new Pose3D(currentPersons.get(i).getHeadPosition(), new Rotation3D(0,0,0,0, AngleUnit.RADIAN)));

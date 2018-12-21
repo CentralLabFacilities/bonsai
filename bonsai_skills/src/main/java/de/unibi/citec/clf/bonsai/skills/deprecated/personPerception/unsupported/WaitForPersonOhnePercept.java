@@ -2,6 +2,7 @@ package de.unibi.citec.clf.bonsai.skills.deprecated.personPerception.unsupported
 
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
 import de.unibi.citec.clf.bonsai.core.SensorListener;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -64,7 +65,7 @@ public class WaitForPersonOhnePercept extends AbstractSkill implements
 
         if (timeout > 0) {
             logger.info("using timeout of " + timeout + "ms");
-            timeout += System.currentTimeMillis();
+            timeout += Time.currentTimeMillis();
         }
         logger.info("using diff threshold of " + distDiff);
 
@@ -74,7 +75,7 @@ public class WaitForPersonOhnePercept extends AbstractSkill implements
     @Override
     public ExitToken execute() {
         if (timeout > 0) {
-            if (System.currentTimeMillis() > timeout) {
+            if (Time.currentTimeMillis() > timeout) {
                 logger.info("ConfirmYesOrNo timeout");
                 return tokenSuccessTimeout;
             }

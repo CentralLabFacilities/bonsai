@@ -1,18 +1,14 @@
-
 package de.unibi.citec.clf.bonsai.core.configuration;
 
 import java.util.Collections;
-import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- *
  * @author lruegeme
  */
 public class FactoryConfigurationResults {
-    
+
     public Set<Exception> exceptions = Collections.newSetFromMap(new ConcurrentHashMap<Exception, Boolean>());
 
     public boolean success() {
@@ -34,5 +30,5 @@ public class FactoryConfigurationResults {
         }
         return out;
     }
-    
+
 }

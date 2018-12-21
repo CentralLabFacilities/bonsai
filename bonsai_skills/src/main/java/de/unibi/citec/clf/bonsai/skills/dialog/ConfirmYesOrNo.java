@@ -2,6 +2,7 @@ package de.unibi.citec.clf.bonsai.skills.dialog;
 
 import de.unibi.citec.clf.bonsai.actuators.SpeechActuator;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -122,7 +123,7 @@ public class ConfirmYesOrNo extends AbstractSkill {
         speechManager = new SimpleSpeechHelper(speechSensor, true);
         if (timeout > 0) {
             logger.debug("using timeout of " + timeout + " ms");
-            timeout += System.currentTimeMillis();
+            timeout += Time.currentTimeMillis();
         }
 
         speechManager.startListening();
@@ -133,7 +134,7 @@ public class ConfirmYesOrNo extends AbstractSkill {
     public ExitToken execute() {
 
         if (timeout > 0) {
-            if (System.currentTimeMillis() > timeout) {
+            if (Time.currentTimeMillis() > timeout) {
                 logger.info("ConfirmYesOrNo timeout");
                 return tokenSuccessPsTimeout;
             }
@@ -182,14 +183,14 @@ public class ConfirmYesOrNo extends AbstractSkill {
         }
 
         // Ask Again
-        if (System.currentTimeMillis() > nextRepeat) {
+        if (Time.currentTimeMillis() > nextRepeat) {
             if (timesAsked++ < maxRepeats) {
                 try {
                     sayingComplete = speechActuator.sayAsync(confirmText);
                 } catch (IOException ex) {
                     logger.error("IO Exception in speechActuator");
                 }
-                nextRepeat = System.currentTimeMillis() + timeUntilRepeat;
+                nextRepeat = Time.currentTimeMillis() + timeUntilRepeat;
                 return ExitToken.loop(50);
             }
         }

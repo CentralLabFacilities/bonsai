@@ -5,6 +5,7 @@ import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.exception.TransformException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -41,7 +42,7 @@ public class PrintTransform extends AbstractSkill {
     @Override
     public boolean init() {
         try {
-            final Transform lookup = transform.lookup(from, to, System.currentTimeMillis());
+            final Transform lookup = transform.lookup(from, to, Time.currentTimeMillis());
             logger.fatal(lookup);
         } catch (TransformException e) {
             logger.fatal(e);

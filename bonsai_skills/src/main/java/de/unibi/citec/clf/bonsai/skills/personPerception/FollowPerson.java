@@ -7,6 +7,7 @@ import de.unibi.citec.clf.bonsai.core.exception.TransformException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -177,10 +178,10 @@ public class FollowPerson extends AbstractSkill {
 
     @Override
     public boolean init() {
-        lastPersonFound = System.currentTimeMillis();
-        lastGoalSet = System.currentTimeMillis();
-        lastGoalCheckSuccess = System.currentTimeMillis();
-        robotPosTimeout = System.currentTimeMillis();
+        lastPersonFound = Time.currentTimeMillis();
+        lastGoalSet = Time.currentTimeMillis();
+        lastGoalCheckSuccess = Time.currentTimeMillis();
+        robotPosTimeout = Time.currentTimeMillis();
 
         lastGoalUsed = new NavigationGoalData();
 
@@ -231,11 +232,11 @@ public class FollowPerson extends AbstractSkill {
             alreadyTalked = true;
         }
 
-        if (System.currentTimeMillis() - lasttalk > 15000) {
+        if (Time.currentTimeMillis() - lasttalk > 15000) {
             talk();
         }
 
-        if (robotPosTimeout + 5000 < System.currentTimeMillis()) {
+        if (robotPosTimeout + 5000 < Time.currentTimeMillis()) {
             handleNonMovingRobot();
             return tokenLoopDiLoop;
         }
@@ -252,7 +253,7 @@ public class FollowPerson extends AbstractSkill {
             }
         }
         lastUuid = personFollow.getUuid();
-        lastPersonFound = System.currentTimeMillis();
+        lastPersonFound = Time.currentTimeMillis();
 
         //todo remove global to locat stuff
         PolarCoordinate polar = new PolarCoordinate(MathTools.globalToLocal(personFollow.getPosition(), robotPosition));
@@ -291,9 +292,9 @@ public class FollowPerson extends AbstractSkill {
             } catch (IOException e) {
                 e.printStackTrace();
             }
-            lastGoalSet = System.currentTimeMillis();
+            lastGoalSet = Time.currentTimeMillis();
         } else {
-            if (newGoalTimeout > 0 && System.currentTimeMillis() > lastGoalSet + newGoalTimeout) {
+            if (newGoalTimeout > 0 && Time.currentTimeMillis() > lastGoalSet + newGoalTimeout) {
                 logger.debug("no new goal in lastGoalTimeout");
 
                 if (driveDistance > personLostDist) {
@@ -315,7 +316,7 @@ public class FollowPerson extends AbstractSkill {
         double angleDif = Math.abs(lastGoalUsed.getYaw(AU) - goal.getYaw(AU));
         angleDif = angleDif % Math.PI;
 
-        long timeDiff = System.currentTimeMillis() - lastGoalCheckSuccess;
+        long timeDiff = Time.currentTimeMillis() - lastGoalCheckSuccess;
         boolean newGoalPosition = dist > NEW_GOAL_DISTANCE_THRESHOLD;
 
         if (withangle) {
@@ -323,7 +324,7 @@ public class FollowPerson extends AbstractSkill {
         }
         if (newGoalPosition && timeDiff >= MIN_GOAL_SEND_TIME) {
             lastGoalUsed = goal;
-            lastGoalCheckSuccess = System.currentTimeMillis();
+            lastGoalCheckSuccess = Time.currentTimeMillis();
             return true;
         }
         return false;
@@ -340,11 +341,11 @@ public class FollowPerson extends AbstractSkill {
         if (robot != null) {
             if (lastRobotPosition != null) {
                 if (checkIfRobotMoving()) {
-                    robotPosTimeout = System.currentTimeMillis();
+                    robotPosTimeout = Time.currentTimeMillis();
                     lastRobotPosition = robot;
                 }
             } else {
-                robotPosTimeout = System.currentTimeMillis();
+                robotPosTimeout = Time.currentTimeMillis();
                 lastRobotPosition = robot;
             }
         }
@@ -413,13 +414,13 @@ public class FollowPerson extends AbstractSkill {
             } catch (IOException ex) {
                 logger.fatal(ex);
             }
-            lasttalk = System.currentTimeMillis();
+            lasttalk = Time.currentTimeMillis();
         }
     }
 
     private ExitToken handlePersonMissing() {
 
-        if (personLostTimeout > 0 && System.currentTimeMillis() > lastPersonFound + personLostTimeout) {
+        if (personLostTimeout > 0 && Time.currentTimeMillis() > lastPersonFound + personLostTimeout) {
             logger.info("Person lost for " + personLostTimeout + " ms! Did not find person " + lastUuid);
 
             wrapUpPersonLost(robotPosition, lastPersonPosition);
@@ -490,7 +491,7 @@ public class FollowPerson extends AbstractSkill {
             e.printStackTrace();
         }
         logger.info("Wiggle, wiggle, wiggle!");
-        robotPosTimeout = System.currentTimeMillis();
+        robotPosTimeout = Time.currentTimeMillis();
     }
 
     private double getLastPersonDirection(){

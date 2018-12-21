@@ -1,4 +1,3 @@
-
 package de.unibi.citec.clf.bonsai.memory;
 
 import de.unibi.citec.clf.bonsai.core.configuration.IObjectConfigurator;

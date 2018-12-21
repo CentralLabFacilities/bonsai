@@ -1,43 +1,25 @@
 package de.unibi.citec.clf.bonsai.core.configuration;
 
-import de.unibi.citec.clf.bonsai.core.configuration.data.ActuatorData;
-import de.unibi.citec.clf.bonsai.core.configuration.data.BonsaiConfigurationData;
-import de.unibi.citec.clf.bonsai.core.configuration.data.FactoryData;
-import de.unibi.citec.clf.bonsai.core.configuration.data.MemoryData;
-import de.unibi.citec.clf.bonsai.core.configuration.data.SensorData;
-import de.unibi.citec.clf.bonsai.core.configuration.data.TransformerData;
+import de.unibi.citec.clf.bonsai.core.configuration.data.*;
 import de.unibi.citec.clf.bonsai.core.exception.ParseException;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.URI;
-import java.net.URL;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
-import java.util.logging.Level;
+import net.sf.saxon.TransformerFactoryImpl;
+import nu.xom.*;
+import org.apache.log4j.Logger;
+import org.xml.sax.SAXException;
+import org.xml.sax.XMLReader;
+import org.xml.sax.helpers.XMLReaderFactory;
 
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerConfigurationException;
 import javax.xml.transform.TransformerException;
 import javax.xml.transform.stream.StreamResult;
 import javax.xml.transform.stream.StreamSource;
-
-import net.sf.saxon.TransformerFactoryImpl;
-import nu.xom.Builder;
-import nu.xom.Document;
-import nu.xom.Element;
-import nu.xom.Node;
-import nu.xom.Nodes;
-import nu.xom.ParsingException;
-import nu.xom.ValidityException;
-
-import org.apache.log4j.Logger;
-import org.xml.sax.SAXException;
-import org.xml.sax.XMLReader;
-import org.xml.sax.helpers.XMLReaderFactory;
+import java.io.*;
+import java.net.URI;
+import java.net.URL;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.logging.Level;
 
 /**
  * Parser for XML configuration files. A schema is installed with BonSAI specifying the expected format.
@@ -208,6 +190,7 @@ public class XmlConfigurationParser implements ConfigurationParser {
     // public void parse(URI configurationUri) throws IOException, ParseException, IllegalStateException {
     //     parse(configurationUri.toURL().openStream());
     // }
+
     /**
      * Parse the given string. The XML content will not be validated at all!
      */
@@ -493,6 +476,7 @@ public class XmlConfigurationParser implements ConfigurationParser {
 //        return slots;
 //
 //    }
+
     /**
      * Returns a trimmed value of the given string and throws {@link ParseException} for every error that can occur.
      * This may be a <code>null</code> value or an empty string.

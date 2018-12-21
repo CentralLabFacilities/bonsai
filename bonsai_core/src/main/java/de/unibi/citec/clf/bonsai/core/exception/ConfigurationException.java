@@ -1,4 +1,3 @@
-
 package de.unibi.citec.clf.bonsai.core.exception;
 
 /**
@@ -24,7 +23,7 @@ public class ConfigurationException extends RuntimeException {
      * Constructor.
      *
      * @param message exception description
-     * @param cause cause of the exception
+     * @param cause   cause of the exception
      */
     public ConfigurationException(String message, Throwable cause) {
         super(message, cause);
@@ -47,5 +46,5 @@ public class ConfigurationException extends RuntimeException {
     public ConfigurationException(Throwable cause) {
         super(cause);
     }
-    
+
 }

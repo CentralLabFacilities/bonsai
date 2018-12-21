@@ -6,7 +6,6 @@ import de.unibi.citec.clf.bonsai.core.configuration.FactoryConfigurationResults;
 import de.unibi.citec.clf.bonsai.core.exception.CoreObjectCreationException;
 import de.unibi.citec.clf.bonsai.core.exception.InitializationException;
 import de.unibi.citec.clf.bonsai.core.object.*;
-import de.unibi.citec.clf.bonsai.memory.DefaultMemory;
 import de.unibi.citec.clf.bonsai.util.reflection.ReflectionServiceDiscovery;
 import de.unibi.citec.clf.bonsai.util.reflection.ServiceDiscovery;
 import org.apache.log4j.Logger;
@@ -66,7 +65,7 @@ public class TestFactory implements CoreObjectFactory {
     @Override
     public <T extends Actuator> T createActuator(String key, Class<T> actuatorClass)
             throws IllegalArgumentException, CoreObjectCreationException {
-        return  (T) configuredObjectsByKey.get(key);
+        return (T) configuredObjectsByKey.get(key);
     }
 
     /**
@@ -110,7 +109,7 @@ public class TestFactory implements CoreObjectFactory {
     @Override
     public <T extends WorkingMemory> T createWorkingMemory(String key)
             throws IllegalArgumentException, CoreObjectCreationException {
-        
+
         return null;
     }
 
@@ -143,14 +142,13 @@ public class TestFactory implements CoreObjectFactory {
 
     @Override
     public FactoryConfigurationResults configureActuators(Set<ActuatorToConfigure> actuators) throws IllegalArgumentException, CoreObjectCreationException {
-        for(ActuatorToConfigure act : actuators) {
+        for (ActuatorToConfigure act : actuators) {
             try {
-                configuredObjectsByKey.put(act.getKey(),act.getActuatorClass().newInstance());
+                configuredObjectsByKey.put(act.getKey(), act.getActuatorClass().newInstance());
             } catch (InstantiationException | IllegalAccessException e) {
                 logger.warn(e);
             }
         }
-
 
 
         return new FactoryConfigurationResults();

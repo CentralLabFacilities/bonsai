@@ -1,6 +1,7 @@
 package de.unibi.citec.clf.bonsai.skills.deprecated.body;
 
 import de.unibi.citec.clf.bonsai.actuators.GazeActuator;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -42,7 +43,7 @@ public class FocusImagePosition extends AbstractSkill {
 
     @Override
     public boolean init() {
-        timeout += System.currentTimeMillis();
+        timeout += Time.currentTimeMillis();
         gazeActuator.setGazeTarget(azimuth, elevation);
         return true;
     }
@@ -50,7 +51,7 @@ public class FocusImagePosition extends AbstractSkill {
     @Override
     public ExitToken execute() {
         if (true) {
-            if (timeout < System.currentTimeMillis()) {
+            if (timeout < Time.currentTimeMillis()) {
                 return tokenSuccess;
             }
             return ExitToken.loop();

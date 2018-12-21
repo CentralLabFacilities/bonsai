@@ -4,6 +4,7 @@ import de.unibi.citec.clf.bonsai.actuators.NavigationActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -88,7 +89,7 @@ public class TurnTo extends AbstractSkill {
     public boolean init() {
         if (timeout > 0) {
             logger.debug("using timeout of " + timeout + "ms");
-            timeout += System.currentTimeMillis();
+            timeout += Time.currentTimeMillis();
         }
         try {
             targetGoal = navigationGoalDataSlot.recall();
@@ -130,7 +131,7 @@ public class TurnTo extends AbstractSkill {
             return tokenError;
         }
         if (!navResult.isDone()) {
-            if (timeout < System.currentTimeMillis()) {
+            if (timeout < Time.currentTimeMillis()) {
                 logger.info("TurnTo timed out");
                 try {
                     navActuator.manualStop();

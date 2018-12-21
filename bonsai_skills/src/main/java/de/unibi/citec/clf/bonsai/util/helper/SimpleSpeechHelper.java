@@ -3,6 +3,7 @@ package de.unibi.citec.clf.bonsai.util.helper;
 
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
 import de.unibi.citec.clf.bonsai.core.SensorListener;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.btl.Type.NoSourceDocumentException;
 import de.unibi.citec.clf.btl.data.speechrec.GrammarNonTerminal;
 import de.unibi.citec.clf.btl.data.speechrec.GrammarSymbol;
@@ -261,9 +262,9 @@ public class SimpleSpeechHelper implements SensorListener<Utterance> {
         }
         speechSensor.clear();
 
-        long startTime = System.currentTimeMillis();
+        long startTime = Time.currentTimeMillis();
 
-        while (System.currentTimeMillis() - startTime < timeout) {
+        while (Time.currentTimeMillis() - startTime < timeout) {
 
             boolean newDataAvailable = false;
             while (speechSensor.hasNext()) {

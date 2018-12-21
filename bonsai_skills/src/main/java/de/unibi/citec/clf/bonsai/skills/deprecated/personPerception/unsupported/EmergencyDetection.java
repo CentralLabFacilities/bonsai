@@ -4,6 +4,7 @@ import de.unibi.citec.clf.bonsai.actuators.SpeechActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -133,9 +134,9 @@ public class EmergencyDetection extends AbstractSkill {
 
     @Override
     public boolean init() {
-        localStartTime = System.currentTimeMillis();
+        localStartTime = Time.currentTimeMillis();
         if (globalStartTimeEmergencyDetection == -1) {
-            globalStartTimeEmergencyDetection = System.currentTimeMillis();
+            globalStartTimeEmergencyDetection = Time.currentTimeMillis();
         }
 
         try {
@@ -151,7 +152,7 @@ public class EmergencyDetection extends AbstractSkill {
     @Override
     public ExitToken execute() {
 
-        if (System.currentTimeMillis() - globalStartTimeEmergencyDetection > GLOBAL_TIMEOUT) {
+        if (Time.currentTimeMillis() - globalStartTimeEmergencyDetection > GLOBAL_TIMEOUT) {
             if (status == NO_PERSON_FOUND || status == PERSON_FOUND) {
                 globalStartTimeEmergencyDetection = -1;
                 logger.info("Tried " + GLOBAL_TIMEOUT + "ms detecting an accident, could not detect one");
@@ -160,7 +161,7 @@ public class EmergencyDetection extends AbstractSkill {
         }
 
         //check if WAIT_TIME milliseconds have ellapsed since the skill was started
-        if (System.currentTimeMillis() - localStartTime > LOCAL_TIMEOUT) {
+        if (Time.currentTimeMillis() - localStartTime > LOCAL_TIMEOUT) {
             if (status == NO_PERSON_FOUND) {
                 return tokenSuccessNoperson;
             }

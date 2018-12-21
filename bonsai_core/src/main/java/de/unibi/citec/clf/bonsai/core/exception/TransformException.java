@@ -1,12 +1,10 @@
-
 package de.unibi.citec.clf.bonsai.core.exception;
 
 /**
- *
  * @author lruegeme
  */
 public class TransformException extends Exception {
-    
+
     private static final long serialVersionUID = 6531013125916628862L;
 
     public TransformException(String from, String to, long time, String msg) {
@@ -20,5 +18,5 @@ public class TransformException extends Exception {
     public TransformException(String msg) {
         super(msg);
     }
-    
+
 }

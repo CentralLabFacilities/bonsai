@@ -4,6 +4,7 @@ import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -101,7 +102,7 @@ public class SearchPeople extends AbstractSkill {
         logger.debug("Scanning for persons ... searchDist:" + searchRadius + " searchAngle:" + searchAngle);
         if (timeout > 0) {
             logger.debug("using timeout of " + timeout + " ms");
-            timeout += System.currentTimeMillis();
+            timeout += Time.currentTimeMillis();
         }
         try {
             robotPosition = positionSlot.recall();
@@ -116,7 +117,7 @@ public class SearchPeople extends AbstractSkill {
     public ExitToken execute() {
 
         if (timeout > 0) {
-            if (System.currentTimeMillis() > timeout) {
+            if (Time.currentTimeMillis() > timeout) {
                 logger.info("Search for person reached timeout");
                 return tokenError;
             }

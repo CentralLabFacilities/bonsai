@@ -31,7 +31,7 @@ public class SkillConfigurator implements ISkillConfigurator {
      *
      * @author lziegler
      */
-    private enum SkillConfigurationPhase {
+    public enum SkillConfigurationPhase {
 
         /**
          * The global configuration phase in which only a list of requested sensors and actuators is generated.
@@ -48,6 +48,11 @@ public class SkillConfigurator implements ISkillConfigurator {
     }
 
     private static Logger logger = Logger.getLogger(SkillConfigurator.class);
+
+    public SkillConfigurationPhase getPhase() {
+        return phase;
+    }
+
     private SkillConfigurationPhase phase;
 
     boolean isSkillConfigured() {
@@ -213,7 +218,7 @@ public class SkillConfigurator implements ISkillConfigurator {
         //todo use me
         boolean slotError = checkSlots(slotXPathMapping, createDefaultMapping);
 
-        if (!config.activateObjectAnyway && (paramError || slotError) ) {
+        if (!config.activateObjectAnyway && (paramError || slotError)) {
             throw new ConfigurationException("error during skill configuration");
         }
 
@@ -408,13 +413,13 @@ public class SkillConfigurator implements ISkillConfigurator {
             ret = castValue(value, type);
             logger.debug(".. using config value " + value);
         } catch (Exception ex) {
-            logger.debug(".. using config value failed" + ex.getMessage(),ex);
+            logger.debug(".. using config value failed" + ex.getMessage(), ex);
             logger.debug(".. have the following values");
-            for(Map.Entry<String, String> a : configValues.entrySet()) {
-                logger.debug(a.getKey()+"="+a.getValue());
+            for (Map.Entry<String, String> a : configValues.entrySet()) {
+                logger.debug(a.getKey() + "=" + a.getValue());
             }
-            logger.debug("def: "+ def);
-            try{
+            logger.debug("def: " + def);
+            try {
 
             } catch (Exception e) {
                 logger.debug(e);

@@ -1,4 +1,3 @@
-
 package de.unibi.citec.clf.bonsai.core.exception;
 
 /**
@@ -16,8 +15,7 @@ public class ParseException extends RuntimeException {
     /**
      * Constructor.
      *
-     * @param message
-     *            exception description
+     * @param message exception description
      */
     public ParseException(String message) {
         super(message);
@@ -26,10 +24,8 @@ public class ParseException extends RuntimeException {
     /**
      * Constructor.
      *
-     * @param message
-     *            exception description
-     * @param cause
-     *            exception cause
+     * @param message exception description
+     * @param cause   exception cause
      */
     public ParseException(String message, Throwable cause) {
         super(message, cause);
@@ -38,11 +34,10 @@ public class ParseException extends RuntimeException {
     /**
      * Constructor.
      *
-     * @param cause
-     *            exception cause
+     * @param cause exception cause
      */
     public ParseException(Throwable cause) {
         super(cause);
     }
-    
+
 }

@@ -4,6 +4,7 @@ import de.unibi.citec.clf.bonsai.actuators.SpeechActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -101,7 +102,7 @@ public class TurnTowardsFace extends AbstractSkill {
     public boolean init() {
         if (timeout > 0) {
             logger.info("using timeout of " + timeout + "ms");
-            timeout += System.currentTimeMillis();
+            timeout += Time.currentTimeMillis();
         }
 
         logger.fatal("1");
@@ -157,7 +158,7 @@ public class TurnTowardsFace extends AbstractSkill {
     public ExitToken execute() {
         /*
         if (timeout > 0) {
-            if (System.currentTimeMillis() > timeout) {
+            if (Time.currentTimeMillis() > timeout) {
                 logger.info("WaitForPerson timeout");
                 return tokenSuccessTimeout;
             }

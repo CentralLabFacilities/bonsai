@@ -3,6 +3,7 @@ package de.unibi.citec.clf.bonsai.util;
 
 
 import de.unibi.citec.clf.bonsai.core.exception.TransformException;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.btl.data.geometry.Point3D;
 import de.unibi.citec.clf.btl.data.geometry.Pose3D;
 import de.unibi.citec.clf.btl.data.geometry.Rotation3D;
@@ -20,7 +21,7 @@ public abstract class CoordinateTransformer implements TransformLookup {
 
 	public Point3D transform(Point3D data, String csTo) throws TransformException {
 		LengthUnit m = LengthUnit.METER;
-		long time = System.currentTimeMillis() - 300;
+		long time = Time.currentTimeMillis() - 300;
 		Transform3D t = lookup(data.getFrameId(), csTo, time).getTransform();
 
 		Vector4d vec = new Vector4d(data.getX(m), data.getY(m), data.getZ(m), 1.0);
@@ -36,7 +37,7 @@ public abstract class CoordinateTransformer implements TransformLookup {
 	}
 
 	public Rotation3D transform(Rotation3D data, String csTo) throws TransformException {
-		long time = System.currentTimeMillis() - 300;
+		long time = Time.currentTimeMillis() - 300;
 		Transform3D t = lookup(data.getFrameId(), csTo, time).getTransform();
 
 		Matrix3d transformRot = new Matrix3d();
