@@ -2,6 +2,9 @@ package de.unibi.citec.clf.btl.data.knowledgebase;
 
 import de.unibi.citec.clf.btl.Type;
 import de.unibi.citec.clf.btl.data.geometry.Point2D;
+import de.unibi.citec.clf.btl.data.map.Viewpoint;
+import de.unibi.citec.clf.btl.units.LengthUnit;
+
 import java.util.LinkedList;
 import java.util.Objects;
 
@@ -148,6 +151,34 @@ public class Arena extends Type {
             }
         }
         return ret;
+    }
+
+    /**
+     * Returns the viewpoint a specified Point is nearest to. Can be used with the
+     * current robot position to get the location the robot is nearest to.
+     *
+     * @param p the point to which the nearest viewpoint shall be retrieved
+     * @return the viewpoint which this point is closest to  (as it is
+     * stored in this database). If the point lies in no location, "not at any
+     * location" will be returned.
+     */
+    public Viewpoint getNearestViewpoint(Point2D p) {
+        // TODO: once no mini fake room at origin is used, do not hardcode room_name
+        //String room_name = getCurrentRoom(p);
+        String room_name = "arena";
+        Room room = getSpecificRoom(room_name);
+
+        Viewpoint closest = null;
+        double min_dist = Double.MAX_VALUE;
+        for (Viewpoint vp : room.getAnnotation().getViewpoints()) {
+            double dist = vp.getDistance(p, LengthUnit.METER);
+            if (dist < min_dist) {
+                closest = vp;
+                min_dist = dist;
+            }
+        }
+
+        return closest;
     }
 
     public Location getSpecificLocation(String name) {
