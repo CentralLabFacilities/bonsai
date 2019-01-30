@@ -1,16 +1,14 @@
-package de.unibi.citec.clf.bonsai.skills.body;
+package de.unibi.citec.clf.bonsai.skills.deprecated.body;
 
 import de.unibi.citec.clf.bonsai.actuators.GazeActuator;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
-import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
+import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException;
+
 import java.io.IOException;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * Set the robot gaze.
@@ -42,6 +40,7 @@ import java.util.logging.Logger;
  *
  * @author jkummert
  */
+@Deprecated
 public class SetRobotGaze extends AbstractSkill {
 
     private static final String KEY_HORIZONTAL = "#_HORIZONTAL";

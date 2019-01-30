@@ -1,4 +1,4 @@
-package de.unibi.citec.clf.bonsai.skills.body;
+package de.unibi.citec.clf.bonsai.skills.deprecated.body;
 
 import de.unibi.citec.clf.bonsai.actuators.GazeActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
@@ -9,32 +9,34 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.bonsai.util.CoordinateSystemConverter;
-import de.unibi.citec.clf.btl.data.navigation.NavigationGoalData;
 import de.unibi.citec.clf.btl.data.navigation.PositionData;
-import de.unibi.citec.clf.btl.units.AngleUnit;
 import de.unibi.citec.clf.btl.units.LengthUnit;
+
 import java.io.IOException;
 import java.util.concurrent.Future;
 
 /**
- * Turn head towards a navigation goal.
+ * Turn head towards a position.
  *
  * <pre>
  *
  * Options:
  *  #_BLOCKING:     [boolean] Optional (default: true)
  *                      -> If true skill ends after gaze was completed
+ *  #_VERTICAL:     [String] Optional (Default: 0)
+ *                      -> Vertical direction to look to in rad
+ *
  *
  * Slots:
- *  NavigationGoalDataSlot: [NavigationGoalData] [Read]
- *      -> The Navigation Goal to look towards to
+ *  PositionDataSlot: [PositionData] [Read]
+ *      -> The position to look towards to
  *
  * ExitTokens:
- *  success:    Turned head to goal
+ *  success:    Turned head to position
  *
  * Sensors:
  *  PositionSensor: [PositionData]
- *      -> Read current robot position to determine relation of robot to goal
+ *      -> Read current robot position to determine relation of robot to position
  *
  * Actuators:
  *  GazeActuator: [GazeActuator]
@@ -44,22 +46,25 @@ import java.util.concurrent.Future;
  *
  * @author jkummert
  */
-public class LookToGoal extends AbstractSkill {
+@Deprecated
+public class LookToPosition extends AbstractSkill {
 
     private static final String KEY_BLOCKING = "#_BLOCKING";
+    private static final String KEY_VERTICAL = "#_VERTICAL";
 
     private boolean blocking = true;
+    private double vertical = 0.0;
 
     private ExitToken tokenSuccess;
 
-    private MemorySlotReader<NavigationGoalData> navigationMemorySlot;
+    private MemorySlotReader<PositionData> positionSlot;
 
     private GazeActuator gazeActuator;
 
     private Sensor<PositionData> positionSensor;
 
     private PositionData robotPos;
-    private NavigationGoalData navGoal;
+    private PositionData posToLook;
 
     private Future<Boolean> gazeDone;
 
@@ -67,10 +72,11 @@ public class LookToGoal extends AbstractSkill {
     public void configure(ISkillConfigurator configurator) {
 
         blocking = configurator.requestOptionalBool(KEY_BLOCKING, blocking);
+        vertical = configurator.requestOptionalDouble(KEY_VERTICAL, vertical);
 
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
 
-        navigationMemorySlot = configurator.getReadSlot("NavigationGoalDataSlot", NavigationGoalData.class);
+        positionSlot = configurator.getReadSlot("PositionDataSlot", PositionData.class);
 
         gazeActuator = configurator.getActuator("GazeActuator", GazeActuator.class);
 
@@ -81,9 +87,9 @@ public class LookToGoal extends AbstractSkill {
     public boolean init() {
 
         try {
-            navGoal = navigationMemorySlot.recall();
+            posToLook = positionSlot.recall();
         } catch (CommunicationException ex) {
-            logger.error("nav goal empty");
+            logger.error("Could not read position data from memory", ex);
             return false;
         }
 
@@ -93,24 +99,23 @@ public class LookToGoal extends AbstractSkill {
             logger.error("Not read from position sensor.", ex);
             return false;
         }
-        PositionData posData = new PositionData(navGoal.getX(LengthUnit.METER), navGoal.getY(LengthUnit.METER), 0, LengthUnit.METER, AngleUnit.RADIAN);
 
-        PositionData posDataLocal = CoordinateSystemConverter.globalToLocal(posData, robotPos);
+        PositionData posDataLocal = CoordinateSystemConverter.globalToLocal(posToLook, robotPos);
 
-        double vertical = Math.atan2(posDataLocal.getY(LengthUnit.METER), posDataLocal.getX(LengthUnit.METER));
-        double horizontal = Math.atan2(-0.25, posDataLocal.getX(LengthUnit.METER));
+        double horizontal = Math.atan2(posDataLocal.getY(LengthUnit.METER), posDataLocal.getX(LengthUnit.METER));
 
         gazeDone = gazeActuator.setGazeTargetAsync((float) vertical, (float) horizontal);
+        logger.info("looking horizontally to: \"" + horizontal + "\"");
 
         return true;
     }
 
     @Override
     public ExitToken execute() {
-
         if (!gazeDone.isDone() && blocking) {
             return ExitToken.loop(50);
         }
+
         return tokenSuccess;
     }
 
