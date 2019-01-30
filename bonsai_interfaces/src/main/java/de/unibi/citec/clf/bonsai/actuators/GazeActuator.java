@@ -3,7 +3,8 @@ package de.unibi.citec.clf.bonsai.actuators;
 
 
 import de.unibi.citec.clf.bonsai.core.object.Actuator;
-import de.unibi.citec.clf.btl.data.geometry.Pose3D;
+import de.unibi.citec.clf.btl.data.geometry.Point3D;
+
 import java.io.IOException;
 
 import java.util.concurrent.Future;
@@ -14,19 +15,16 @@ import java.util.concurrent.Future;
  * @author lruegeme
  */
 public interface GazeActuator extends Actuator {
-
-
-    //TODO should be Point3D
-
-    Future<Void> lookAt(Pose3D pose);
+    
+    Future<Void> lookAt(Point3D point);
 
     /**
      *
-     * @param pose
-     * @param duration in ms
+     * @param point
+     * @param duration movement duration in ms
      * @return
      */
-    Future<Void> lookAt(Pose3D pose, long duration);
+    Future<Void> lookAt(Point3D point, long duration);
 
     void manualStop() throws IOException;
 
