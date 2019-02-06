@@ -51,7 +51,7 @@ import java.util.concurrent.locks.Lock;
  */
 public class RosMoveBaseNavigationActuator extends RosNode implements NavigationActuator {
 
-    private class DriveDirectThread implements Future<CommandResult>, MessageListener<Pose> {
+    class DriveDirectThread implements Future<CommandResult>, MessageListener<Pose> {
 
         private Lock poseLock = new NonReentrantLock();
         private Pose lastPose = null;
@@ -222,15 +222,15 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
     String topic;
 
     String moveRelativeTopic;
-    private Subscriber<Pose> subscriber;
-    private String poseTopic = "/robot_pose";
-    private Publisher<geometry_msgs.Twist> moveRelativePublisher;
-    private DriveDirectThread driveDirect;
+    Subscriber<Pose> subscriber;
+    String poseTopic = "/robot_pose";
+    Publisher<geometry_msgs.Twist> moveRelativePublisher;
+    DriveDirectThread driveDirect;
 
-    private GraphName nodeName;
-    private ActionClient<MoveBaseActionGoal, MoveBaseActionFeedback, MoveBaseActionResult> ac;
+    GraphName nodeName;
+    ActionClient<MoveBaseActionGoal, MoveBaseActionFeedback, MoveBaseActionResult> ac;
 
-    private GoalID lastAcGoalId;
+    GoalID lastAcGoalId;
 
     private org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger(getClass());
 
