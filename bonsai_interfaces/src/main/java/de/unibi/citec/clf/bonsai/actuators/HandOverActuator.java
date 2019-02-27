@@ -13,4 +13,10 @@ public interface HandOverActuator extends Actuator {
 
     Future<Boolean> handOver(String group_name, byte type) throws IOException;
 
+    /**
+     *  measures force change in the given group
+     *  using value at call time as zero
+     */
+    Future<Boolean> checkForce(String group_name, float threshold) throws IOException;
+
 }
