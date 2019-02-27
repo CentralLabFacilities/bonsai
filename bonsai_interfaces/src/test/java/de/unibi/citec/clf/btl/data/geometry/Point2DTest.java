@@ -1,7 +1,6 @@
 package de.unibi.citec.clf.btl.data.geometry;
 
 import de.unibi.citec.clf.btl.units.LengthUnit;
-import javafx.geometry.Point2DBuilder;
 import org.junit.Test;
 
 import static org.junit.Assert.*;

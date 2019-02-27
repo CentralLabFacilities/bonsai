@@ -17,7 +17,6 @@ import de.unibi.citec.clf.btl.data.knowledgebase.Room;
 import de.unibi.citec.clf.btl.data.person.PersonAttribute;
 import de.unibi.citec.clf.btl.data.person.PersonData;
 import de.unibi.citec.clf.btl.data.person.PersonDataList;
-import sun.security.provider.PolicyParser;
 
 import java.util.LinkedList;
 import java.util.List;

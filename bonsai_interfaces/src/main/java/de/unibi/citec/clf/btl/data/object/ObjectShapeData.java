@@ -13,8 +13,7 @@ import de.unibi.citec.clf.btl.units.UnitConverter;
 
 /**
  * Results of the object recognition. This class is meat so define the location
- * of the object in the detector's camera image and contain shape information in
- * 3D! The given polygon describes the objects's location in pixel coordinates!
+ * of the object and contain shape information
  *
  * @author lziegler
  */

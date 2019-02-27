@@ -39,6 +39,15 @@
             <version>2.33</version>
         </dependency>
 
+        <!-- JFX -->
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-fxml</artifactId>
+            <version>11.0.2</version>
+        </dependency>
+
+
+
         <dependency>
             <groupId>commons-scxml</groupId>
             <artifactId>commons-scxml</artifactId>
