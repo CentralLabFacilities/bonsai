@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<BonsaiConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                     xsi:noNamespaceSchemaLocation="BonsaiConfiguration.xsd">
+
+    <Sensor key="Sensor2" dataTypeClass="A"
+            factoryClass="B"
+            sensorClass="C"
+            wireTypeClass="D">
+    </Sensor>
+
+    <Actuator key="Actuator" factoryClass="A"
+              actuatorClass="B"
+              actuatorInterface="C">
+    </Actuator>
+
+</BonsaiConfiguration>

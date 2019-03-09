@@ -18,17 +18,17 @@
     </xsl:template>
 
     <xsl:template match="Sensors">
+        <xsl:apply-templates select="document(@src)/BonsaiConfiguration/Sensors"/>
         <xsl:copy-of select="document(@src)/BonsaiConfiguration/Sensor"/>
-        <xsl:copy-of select="document(@src)/BonsaiConfiguration/sensorSource"/>
     </xsl:template>
 
     <xsl:template match="Actuators">
+        <xsl:apply-templates select="document(@src)/BonsaiConfiguration/Actuators"/>
         <xsl:copy-of select="document(@src)/BonsaiConfiguration/Actuator"/>
-        <xsl:copy-of select="document(@src)/BonsaiConfiguration/actuatorSource"/>
     </xsl:template>
 
     <xsl:template match="WorkingMemories">
+        <xsl:apply-templates select="document(@src)/BonsaiConfiguration/WorkingMemories"/>
         <xsl:copy-of select="document(@src)/BonsaiConfiguration/WorkingMemory"/>
-        <xsl:copy-of select="document(@src)/BonsaiConfiguration/workingmemorySource"/>
     </xsl:template>
 </xsl:stylesheet>
