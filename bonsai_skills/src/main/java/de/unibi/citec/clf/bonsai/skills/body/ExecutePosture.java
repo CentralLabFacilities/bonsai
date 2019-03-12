@@ -24,6 +24,7 @@ public class ExecutePosture extends AbstractSkill {
     private static final String KEY_BLOCKING = "#_BLOCKING";
     private static final String KEY_POSE = "#_POSE";
     private static final String KEY_GROUP = "#_GROUP";
+    private static final String KEY_TIMEOUT = "#_TIMEOUT";
 
     //default values
     private boolean blocking = true;
@@ -44,6 +45,7 @@ public class ExecutePosture extends AbstractSkill {
         blocking = configurator.requestOptionalBool(KEY_BLOCKING, blocking);
         pose = configurator.requestValue(KEY_POSE);
         group = configurator.requestOptionalValue(KEY_GROUP, group);
+        timeout = configurator.requestOptionalInt(KEY_TIMEOUT, (int)timeout);
 
     }
 
