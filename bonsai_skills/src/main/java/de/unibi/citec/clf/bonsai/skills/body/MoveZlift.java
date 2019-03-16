@@ -34,7 +34,6 @@ public class MoveZlift extends AbstractSkill {
 
     private float pos;
     private long timeout = 7000;
-    private float height;
     Future<Boolean> b;
 
     private MemorySlot<Double> heightSlot;
@@ -43,7 +42,7 @@ public class MoveZlift extends AbstractSkill {
     @Override
 
     public void configure(ISkillConfigurator configurator) throws SkillConfigurationException {
-        jointcontroller = configurator.getActuator("MekaJointActuator", JointControllerActuator.class);
+        jointcontroller = configurator.getActuator("ZLiftActuator", JointControllerActuator.class);
 
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
         tokenError = configurator.requestExitToken(ExitStatus.ERROR());
@@ -65,18 +64,14 @@ public class MoveZlift extends AbstractSkill {
         if (readHeightSlot) {
 
             try {
-                height = (float) (double) heightSlot.recall();
+                pos = (float) (double) heightSlot.recall();
             } catch (CommunicationException | NumberFormatException ex) {
                 Logger.getLogger(MoveZlift.class.getName()).log(Level.SEVERE, null, ex);
-            }
-            logger.error("height: " + height);
-            if (height > 0.15 && height < 0.5) {
-                pos = height;
             }
         }
 
         try {
-            b = jointcontroller.goToZliftHeight(pos);
+            b = jointcontroller.moveTo(pos, null);
         } catch (IOException ex) {
             logger.error(ex);
             return false;

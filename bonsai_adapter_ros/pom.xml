@@ -131,6 +131,14 @@
             <artifactId>vision_msgs</artifactId>
             <version>0.0.1</version>
         </dependency>
+
+        <dependency>
+            <groupId>org.ros.rosjava_messages</groupId>
+            <artifactId>control_msgs</artifactId>
+            <version>1.4.0</version>
+        </dependency>
+
+
         <dependency>
             <groupId>org.jetbrains.kotlin</groupId>
             <artifactId>kotlin-stdlib-jdk8</artifactId>
