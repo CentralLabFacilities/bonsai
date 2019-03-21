@@ -81,6 +81,7 @@ public class DescribeObjects extends AbstractSkill {
 
     @Override
     public ExitToken execute() {
+        logger.debug("entered method execute()");
         filterByLabel();
         say("there are " + filtered.size() + " objects");
 
@@ -141,7 +142,8 @@ public class DescribeObjects extends AbstractSkill {
     private void say(String text) {
         try {
             speechActuator.say(text);
-        } catch (IOException ex) {
+        } catch (Exception ex) {
+            logger.debug("Exception in say()");
             // Not so bad. The robot just says nothing.
             logger.warn(ex.getMessage());
 
@@ -149,6 +151,7 @@ public class DescribeObjects extends AbstractSkill {
     }
 
     private void describeLabels() {
+        logger.debug("entered method describeLabels()");
         String labels = "";
         int uk = 0;
 
