@@ -135,7 +135,7 @@
         <dependency>
             <groupId>org.ros.rosjava_messages</groupId>
             <artifactId>control_msgs</artifactId>
-            <version>1.4.0</version>
+            <version>LATEST</version>
         </dependency>
 
 
