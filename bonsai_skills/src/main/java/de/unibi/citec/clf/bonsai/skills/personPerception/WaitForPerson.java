@@ -157,8 +157,10 @@ public class WaitForPerson extends AbstractSkill {
 
             for (PersonData p : persons) {
                 try {
-                    Pose3D pose = tf.transform(p.getPosition(),Type.BASE_FRAME);
-                    p.setPosition(new PositionData(pose.getTranslation().getX(LengthUnit.METER),pose.getTranslation().getY(LengthUnit.METER),0,p.getTimestamp(),LengthUnit.METER,AngleUnit.RADIAN));
+                    if (!p.getPosition().getFrameId().equals(Type.BASE_FRAME)) {
+                        Pose3D pose = tf.transform(p.getPosition(),Type.BASE_FRAME);
+                        p.setPosition(new PositionData(pose.getTranslation().getX(LengthUnit.METER),pose.getTranslation().getY(LengthUnit.METER),0,p.getTimestamp(),LengthUnit.METER,AngleUnit.RADIAN));
+                    }
                 } catch (TransformException e) {
                     logger.error("cant Transform from " + p.getFrameId() + " to " + Type.BASE_FRAME + " @" + p.getTimestamp().getUpdated().getTime());
                     p.setPosition(MathTools.globalToLocal(p.getPosition(), robotPosition));
