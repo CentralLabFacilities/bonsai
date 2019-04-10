@@ -3,7 +3,7 @@ package de.unibi.citec.clf.btl.util;
 public class StoringGroceriesResult {
 
     public enum Result {
-        SUCCESS, PLAN_FAILED, GRASP_FAILED, NAV_FAILED
+        SUCCESS, PICK_FAILED, PLACE_FAILED, NO_OBJECT_FOUND, NO_PLACE_LOC_FOUND, MOVE_FAILED
     }
 
     private final Result resultType;
