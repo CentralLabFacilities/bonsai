@@ -256,7 +256,13 @@ public class FollowPerson extends AbstractSkill {
         lastPersonFound = Time.currentTimeMillis();
 
         //todo remove global to locat stuff
-        PolarCoordinate polar = new PolarCoordinate(MathTools.globalToLocal(personFollow.getPosition(), robotPosition));
+        try {
+            personFollow.setPosition(MathTools.globalToLocal(personFollow.getPosition(), robotPosition));
+        } catch (MathTools.MathException ex) {
+            //Already in local
+
+        }
+        PolarCoordinate polar = new PolarCoordinate(personFollow.getPosition());
 
         double driveDistance = calculateDriveDistance(polar);
 
