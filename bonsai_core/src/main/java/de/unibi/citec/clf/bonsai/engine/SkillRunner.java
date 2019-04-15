@@ -260,7 +260,7 @@ public class SkillRunner implements Runnable {
     public void run() {
         try {
             execute();
-        } catch (Exception e) {
+        } catch (Throwable e) {
             setAborted(e);
             logger.fatal("An exception occurred while executing state: " + id.getCanonicalID() + ": " + e.getMessage(), e);
         }
