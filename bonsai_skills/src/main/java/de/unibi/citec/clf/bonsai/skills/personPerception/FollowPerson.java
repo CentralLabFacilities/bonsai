@@ -93,6 +93,7 @@ public class FollowPerson extends AbstractSkill {
     private static final String KEY_STRATEGY = "#_STRATEGY";
     private static final String KEY_ENABLE_NEAREST = "#_ENABLE_NEAREST_TO_OLD";
     private static final String KEY_NEAREST_MAXDIST = "#_NEAREST_TO_OLD_DIST";
+    private static final String KEY_UUID = "#_UUID";
 
     private double nearestToOldDist = 400;
     private boolean useNearestPerson = false;
@@ -158,6 +159,8 @@ public class FollowPerson extends AbstractSkill {
         useNearestPerson = configurator.requestOptionalBool(KEY_ENABLE_NEAREST,useNearestPerson);
         nearestToOldDist = configurator.requestOptionalDouble(KEY_NEAREST_MAXDIST,nearestToOldDist);
 
+        lastUuid = configurator.requestOptionalValue(KEY_UUID, null);
+
         if (personLostTimeout > 0) {
             tokenErrorPersonLost = configurator.requestExitToken(ExitStatus.ERROR().ps("personLost"));
         }
@@ -204,7 +207,13 @@ public class FollowPerson extends AbstractSkill {
         }
 
         lastPersonPosition = new PositionData(personFollow.getPosition());
-        lastUuid = personFollow.getUuid();
+
+        if (lastUuid == null) {
+            lastUuid = personFollow.getUuid();
+        } else {
+            logger.info("Ignoring person from slot because UUID to follow was provided: "+lastUuid);
+        }
+
         logger.debug("Following person: " + personFollow.getUuid());
         return true;
     }
