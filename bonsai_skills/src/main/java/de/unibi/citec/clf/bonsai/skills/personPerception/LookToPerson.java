@@ -12,11 +12,13 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.bonsai.util.CoordinateSystemConverter;
 import de.unibi.citec.clf.btl.List;
+import de.unibi.citec.clf.btl.data.geometry.Point3D;
 import de.unibi.citec.clf.btl.data.navigation.PositionData;
 import de.unibi.citec.clf.btl.data.person.PersonData;
 import de.unibi.citec.clf.btl.data.person.PersonDataList;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 import java.io.IOException;
+import java.util.concurrent.Future;
 
 /**
  * Continually turn head towards a person.
@@ -61,10 +63,11 @@ public class LookToPerson extends AbstractSkill {
     private String KEY_MIN_ANGLE = "#_MIN_ANGLE";
     private String KEY_MIN_TURNING_ANGLE = "#_MIN_TURNING_ANGLE";
     private String KEY_TIMEOUT = "#_TIMEOUT";
+    private String KEY_UUID = "#_UUID";
 
     private ExitToken tokenErrorNotFound;
     //set loop time to 14hz
-    private ExitToken tokenLoopDiLoop = ExitToken.loop(71);
+    private ExitToken tokenLoopDiLoop = ExitToken.loop(200);
 
     private MemorySlotReader<PersonData> targetPersonSlot;
 
@@ -85,7 +88,8 @@ public class LookToPerson extends AbstractSkill {
     private long timeout;
     private long initialTimeout = 3000;
     private float turnAngleMultiplier = 0.75f;
-    private float gazeSpeed = 0.06f; //was 0.125 per default in actuator
+    private long gazeSpeed = 100; //was 0.125 per default in actuator
+    private Future<Void> gazeFuture;
 
     @Override
     public void configure(ISkillConfigurator configurator) {
@@ -103,16 +107,22 @@ public class LookToPerson extends AbstractSkill {
 
         personSensor = configurator.getSensor("PersonSensor", PersonDataList.class);
         positionSensor = configurator.getSensor("PositionSensor", PositionData.class);
+
+        targetID = configurator.requestOptionalValue(KEY_UUID, null);
     }
 
     @Override
     public boolean init() {
 
-        try {
-            targetID = targetPersonSlot.recall().getUuid();
-        } catch (CommunicationException ex) {
-            logger.warn("Could not read target id from slot.", ex);
-            return false;
+        if (targetID == null) {
+            try {
+                targetID = targetPersonSlot.recall().getUuid();
+            } catch (CommunicationException ex) {
+                logger.warn("Could not read target id from slot.", ex);
+                return false;
+            }
+        } else {
+            logger.info("Using provided UUID: "+targetID);
         }
 
         if (targetID == null){
@@ -161,12 +171,18 @@ public class LookToPerson extends AbstractSkill {
 
         for (int i = 0; i < currentPersons.size(); ++i) {
             if (currentPersons.get(i).getUuid().equals(targetID)) {
-                PositionData posData = currentPersons.get(i).getPosition();
+                PositionData posDataLocal = currentPersons.get(i).getPosition();
 
-                PositionData posDataLocal = CoordinateSystemConverter.globalToLocal(posData, robotPos);
+                if (posDataLocal == null) {
+                    return tokenLoopDiLoop;
+                }
+
+                if (!posDataLocal.getFrameId().equals(PositionData.BASE_FRAME)) {
+                    posDataLocal = CoordinateSystemConverter.globalToLocal(posDataLocal, robotPos);
+                }
 
                 double horizontal = Math.atan2(posDataLocal.getY(LengthUnit.METER), posDataLocal.getX(LengthUnit.METER));
-                float vertical = 0.2617993877991f;
+                float vertical = 0;
 
                 if (horizontal > maxAngle) {
                     horizontal = maxAngle;
@@ -175,13 +191,27 @@ public class LookToPerson extends AbstractSkill {
                 }
                 if(Math.abs(horizontal-lastAngle) < minTurningAngle){
                     logger.debug("Person's angle was not big enough to turn!");
-                    gazeActuator.setGazeTargetPitch(vertical);
+                    //gazeActuator.setGazeTargetPitch(vertical);
                     timeout = initialTimeout + Time.currentTimeMillis();
+
                     return tokenLoopDiLoop;
                 }
-                gazeActuator.setGazeTarget(vertical, (float) horizontal * turnAngleMultiplier, gazeSpeed);
+
+                int scaling_factor = 10;
+
+                float x_rel = (float)Math.cos(horizontal) * scaling_factor;
+                float y_rel = (float)Math.sin(horizontal) * scaling_factor;
+                float z_rel = (float)Math.sin(vertical) * scaling_factor;
+
+                Point3D target = new Point3D(x_rel, y_rel, z_rel, LengthUnit.METER, "torso_lift_link");
+
+                logger.info("Looking at point: (x: " + x_rel+ " / y: " +y_rel+ " / z:  "+ z_rel +" / frame: torso_lift_link) with duration: " + gazeSpeed);
+
+                gazeFuture = gazeActuator.lookAt(target, gazeSpeed);
+
                 lastAngle = horizontal;
                 timeout = initialTimeout + Time.currentTimeMillis();
+
                 return tokenLoopDiLoop;
             }
         }
