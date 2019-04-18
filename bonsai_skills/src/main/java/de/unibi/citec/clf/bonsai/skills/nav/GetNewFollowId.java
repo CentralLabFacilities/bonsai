@@ -87,6 +87,7 @@ public class GetNewFollowId extends AbstractSkill {
             return false;
         }
 
+        logger.debug("Last known position: " + personPos);
         return personPos != null;
     }
 
@@ -110,6 +111,8 @@ public class GetNewFollowId extends AbstractSkill {
             for (PersonData p : personList) {
                 PositionData pos = p.getPosition();
                 double dist = pos.getDistance(old, LU);
+                logger.debug("Person: " + p);
+                logger.debug("Person dist: " + dist);
 
                 if (dist < cur) {
                     cur = dist;
