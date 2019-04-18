@@ -102,7 +102,11 @@ public class FollowPerson extends AbstractSkill {
     private double personLostDist = 4000; //2000
     private long newGoalTimeout = -1L;
     private long talkdistance = 2500; //1900
+    private long talkdistanceFar = 5000; //1900
+    private boolean isFar = false;
     private String slowDownMessage = "Please move slower!";
+    private String stopMessage = "Please wait for me to catch up!";
+    private String continueMessage = "Please go ahead!";
     private String strategy = "NearestToTarget";
 
     private ExitToken tokenErrorPersonLost;
@@ -422,16 +426,36 @@ public class FollowPerson extends AbstractSkill {
 
     }
 
+    private void say(String txt){
+        try {
+            speechActuator.sayAsync(slowDownMessage);
+        } catch (IOException ex) {
+            logger.fatal(ex);
+        }
+        lasttalk = Time.currentTimeMillis();
+    }
+
     private void talk() {
-        if (personFollow != null && currentPersonDistance > talkdistance) {
-            try {
-                speechActuator.sayAsync(slowDownMessage);
-            } catch (IOException ex) {
-                logger.fatal(ex);
+        if(personFollow == null) return;
+
+        if (isFar) {
+            if(currentPersonDistance < talkdistance) {
+                isFar = false;
+                say(continueMessage);
+            } else {
+                say(stopMessage);
             }
-            lasttalk = Time.currentTimeMillis();
+        } else if (currentPersonDistance > talkdistance) {
+            if(currentPersonDistance > talkdistanceFar) {
+                isFar = true;
+                say(stopMessage);
+            } else {
+                say(slowDownMessage);
+            }
         }
     }
+
+    
 
     private ExitToken handlePersonMissing() {
 
