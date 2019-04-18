@@ -54,6 +54,7 @@ public class ExecutePosture extends AbstractSkill {
         if(!blocking) logger.warn("EXECUTE NONBLOCKING POSTURE, CAREFUL");
         timeout += Time.currentTimeMillis();
         ret = poseActuator.executeMotion(pose, group);
+        if(blocking) logger.debug("waiting until pose is executed..");
         return true;
     }
 
@@ -62,7 +63,7 @@ public class ExecutePosture extends AbstractSkill {
         if(!blocking){
             return tokenSuccess;
         }
-        logger.debug("check ret is done..");
+        
         if (!ret.isDone()) {
             if (timeout < Time.currentTimeMillis()) {
                 return ExitToken.fatal();

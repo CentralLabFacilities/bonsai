@@ -56,13 +56,14 @@ public class Talk extends AbstractSkill {
 
         text = configurator.requestValue(KEY_MESSAGE);
         blocking = configurator.requestOptionalBool(KEY_BLOCKING, blocking);
-        logger.debug(text);
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
         speechActuator = configurator.getActuator("SpeechActuator", SpeechActuator.class);
+        text = text.trim().replaceAll(" +", " ");
     }
 
     @Override
     public boolean init() {
+        logger.debug("saying: " + text);
         try {
             sayingComplete = speechActuator.sayAsync(text);
         } catch (IOException ex) {
