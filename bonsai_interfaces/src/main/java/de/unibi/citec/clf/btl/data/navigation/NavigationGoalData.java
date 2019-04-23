@@ -16,7 +16,7 @@ public class NavigationGoalData extends PositionData {
 
 	private double coordinateTolerance = 7.0;
 	private double yawTolerance = 0.15;
-	public static final LengthUnit iLU = LengthUnit.CENTIMETER;
+	public static final LengthUnit iLU = LengthUnit.METER;
 	public static final AngleUnit iAU = AngleUnit.RADIAN;
 
 
