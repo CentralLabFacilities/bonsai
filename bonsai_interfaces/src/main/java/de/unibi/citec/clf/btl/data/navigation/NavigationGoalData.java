@@ -3,6 +3,8 @@ package de.unibi.citec.clf.btl.data.navigation;
 
 
 import de.unibi.citec.clf.bonsai.core.time.Time;
+import de.unibi.citec.clf.btl.Type;
+import de.unibi.citec.clf.btl.data.common.Timestamp;
 import de.unibi.citec.clf.btl.units.AngleUnit;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 import de.unibi.citec.clf.btl.units.TimeUnit;
@@ -16,6 +18,7 @@ public class NavigationGoalData extends PositionData {
 	private double yawTolerance = 0.15;
 	public static final LengthUnit iLU = LengthUnit.CENTIMETER;
 	public static final AngleUnit iAU = AngleUnit.RADIAN;
+
 
 	/**
 	 * Constructs a new navigation goal. This is either achieved using just
@@ -54,6 +57,20 @@ public class NavigationGoalData extends PositionData {
 		this.coordinateTolerance = UnitConverter.convert(coordinateTolerance, lU, iLU);
 		this.yawTolerance = UnitConverter.convert(yawTolerance, aU, iAU);
 		setFrameId(frame);
+	}
+
+	/**
+	 * Copy type.
+	 */
+	public NavigationGoalData(NavigationGoalData other) {
+		super(other.x, other.y, other.yaw, other.timestamp.getUpdated(TimeUnit.MILLISECONDS),iLU,iAU, TimeUnit.MILLISECONDS);
+
+		this.generator = other.generator;
+
+		this.coordinateTolerance = other.coordinateTolerance;
+		this.yawTolerance = other.yawTolerance;
+		setFrameId(other.frameId);
+
 	}
 
 	/**
