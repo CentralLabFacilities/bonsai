@@ -31,50 +31,26 @@ import java.util.concurrent.*;
  */
 public class RosFactory implements CoreObjectFactory {
 
-    private Logger logger = Logger.getLogger(getClass());
-
     static final String SERVICE_PKG_SENSOR = "de.unibi.citec.clf.bonsai.ros.sensors";
     static final String SERVICE_PKG_ACTUATOR = "de.unibi.citec.clf.bonsai.ros.actuators";
+    //
+    private static final String KEY_NODE_INIT_TIMEOUT = "NODE_INIT_TIMEOUT";
+    private static final String KEY_INIT_SLEEP_TIME = "INIT_SLEEP_TIME";
     protected ServiceDiscovery serviceDiscoverySensor = new ReflectionServiceDiscovery(SERVICE_PKG_SENSOR);
     protected ServiceDiscovery serviceDiscoveryActuator = new ReflectionServiceDiscovery(SERVICE_PKG_ACTUATOR);
-
     protected Set<Class<? extends RosNode>> knownActuators = new HashSet<>();
     protected Set<Class<? extends RosSensor>> knownSensors = new HashSet<>();
-
-    private NodeMainExecutor nodeMainExecutor;
-    private URI rosMasterUri;
-
     protected Map<String, Boolean> isActuatorInitialized = new ConcurrentHashMap<>();
     protected Map<String, Actuator> initializedActuatorsByKey = new ConcurrentHashMap<>();
-
     protected Map<String, Boolean> isSensorInitialized = new ConcurrentHashMap<>();
     protected Map<String, Sensor> initializedSensorsByKey = new ConcurrentHashMap<>();
-
     protected Map<String, ConfiguredObject> configuredObjectsByKey = new ConcurrentHashMap<>();
+    private Logger logger = Logger.getLogger(getClass());
+    private NodeMainExecutor nodeMainExecutor;
+    private URI rosMasterUri;
     private TFTransformer coordinateTransformer;
-
-
-    //
-    private static final String KEY_INIT_TIMEOUT = "#_INIT_TIMEOUT";
-    private long initTimeout = 3000;
-
-    private class ConfiguredObject {
-
-        public Class clazz;
-        public ObjectConfigurator conf;
-    }
-
-    private class ConfiguredActuator extends ConfiguredObject {
-
-        public Class implemented = null;
-    }
-
-    private class ConfiguredSensor extends ConfiguredObject {
-
-        public Class wire;
-        public Class data;
-        public Class list;
-    }
+    private long nodeInitTimeout = 5000;
+    private long sleepTime = 1000;
 
     /**
      * Constructor.
@@ -122,10 +98,10 @@ public class RosFactory implements CoreObjectFactory {
         c.setNodeName(node.getDefaultNodeName());
         nodeMainExecutor.execute(node, c);
         //wait for node to be initialized
-        if (wait && !node.isInitialised().get(initTimeout, TimeUnit.MILLISECONDS)) {
-            throw new ExecutionException(new TimeoutException("could not start node in 2s"));
+        if (wait && !node.isInitialised().get(nodeInitTimeout, TimeUnit.MILLISECONDS)) {
+            throw new ExecutionException(new TimeoutException("could not start node in " + nodeInitTimeout));
         }
-        logger.debug(node.getDefaultNodeName() + ", should be started");
+        logger.debug(node.getDefaultNodeName() + " started");
     }
 
     /**
@@ -156,7 +132,6 @@ public class RosFactory implements CoreObjectFactory {
     @Override
     public boolean canCreateSensor(String key, Class<? extends List<?>> listType, Class<?> dataType) {
         return false;
-
     }
 
     /**
@@ -220,7 +195,7 @@ public class RosFactory implements CoreObjectFactory {
                     }
 
                     for (Map.Entry<String, Class> entry : configured.conf.getUnusedOptionalParams().entrySet()) {
-                        logger.trace("unused opt param: " + entry.getKey());
+                        logger.debug("unused opt param: " + entry.getKey());
                     }
                     continue actuatorLoop;
                 } catch (IllegalAccessException | InstantiationException | NoSuchMethodException | SecurityException | InvocationTargetException ex) {
@@ -532,42 +507,17 @@ public class RosFactory implements CoreObjectFactory {
             throws IllegalArgumentException, InitializationException {
 
         try {
-            initTimeout = MapReader.readConfigLong(KEY_INIT_TIMEOUT,initTimeout,options);
+            nodeInitTimeout = MapReader.readConfigLong(KEY_NODE_INIT_TIMEOUT, nodeInitTimeout, options);
+            sleepTime = MapReader.readConfigLong(KEY_INIT_SLEEP_TIME, sleepTime, options);
         } catch (MapReader.KeyNotFound keyNotFound) {
             throw new IllegalArgumentException(keyNotFound);
         }
-        logger.info("set init timeout to " + initTimeout);
+        logger.info("set node init timeout to " + nodeInitTimeout);
+        logger.info("set init sleep time to " + sleepTime);
+
 
         knownActuators = serviceDiscoveryActuator.discoverServicesByInterface(RosNode.class);
         knownSensors = serviceDiscoverySensor.discoverServicesByInterface(RosSensor.class);
-//        try {
-//            createAllNodes = MapReader.readConfigBool("createAllNodes", createAllNodes, options);
-//
-//        } catch (MapReader.KeyNotFound ex) {
-//            java.util.logging.Logger.getLogger(RosFactory.class.getName()).log(Level.SEVERE, null, ex);
-//        }
-
-
-
-        logger.debug("Ros factory initialize");
-        logger.trace("found " + knownActuators.size() + " actuators:");
-        for (Class c : knownActuators) {
-            logger.debug("found " + c);
-        }
-//        knownWorkingMemories = serviceDiscovery
-//                .discoverServicesByInterface(ConfiguredRsbWorkingMemory.class);
-//        knownTransformers = serviceDiscovery
-//                .discoverServicesByInterface(ConfiguredRsbCoordinateTransformer.class);
-//
-//        // search for subclasses of ConfiguredRsbSensorListable
-//        for (Class<? extends ConfiguredRsbSensor> clazz : knownSensors) {
-//            if (ConfiguredRsbSensorListable.class.isAssignableFrom(clazz)) {
-//                knownListSensors
-//                        .add((Class<? extends ConfiguredRsbSensorListable>) clazz);
-//            }
-//
-//        }
-
         this.cleanUp();
 
     }
@@ -668,10 +618,12 @@ public class RosFactory implements CoreObjectFactory {
             }
         });
 
+        logger.debug("Waiting for all nodes to connect in " + nodeInitTimeout + "ms");
+
         nodesQuene.parallelStream().forEach((node) -> {
             String key = node.getKey();
             try {
-                if (!node.isInitialised().get(initTimeout, TimeUnit.MILLISECONDS)) {
+                if (!node.isInitialised().get(nodeInitTimeout, TimeUnit.MILLISECONDS)) {
                     logger.warn("node is not started " + key);
                     res.exceptions.add(new CoreObjectCreationException("node is not started " + key));
                 } else {
@@ -691,15 +643,33 @@ public class RosFactory implements CoreObjectFactory {
             }
         });
 
-        logger.debug("Sleep additional 2sec");
+        logger.debug("Sleep additional " + sleepTime);
         try {
-            TimeUnit.SECONDS.sleep(2);
+            TimeUnit.MILLISECONDS.sleep(sleepTime);
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
         }
 
         logger.debug("all nodes should be started now");
         return res;
+    }
+
+    private class ConfiguredObject {
+
+        public Class clazz;
+        public ObjectConfigurator conf;
+    }
+
+    private class ConfiguredActuator extends ConfiguredObject {
+
+        public Class implemented = null;
+    }
+
+    private class ConfiguredSensor extends ConfiguredObject {
+
+        public Class wire;
+        public Class data;
+        public Class list;
     }
 
 }
