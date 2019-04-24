@@ -53,8 +53,14 @@ public class NearestToTarget extends DriveStrategyWithTryGoal {
                 if (closerSteps < closerMaxSteps) {
                     logger.warn("Could not make plan. Setting Target nearer to robot");
 
-                    PolarCoordinate targetPolar = new PolarCoordinate(MathTools.globalToLocal(
-                            targetGoal, robotPos));
+                    PolarCoordinate targetPolar;
+                    //If targetGoal is already a LOCAL target, the conversion globalToLocal is not necessary
+                    if(targetGoal.getFrameId().equals(PositionData.ReferenceFrame.LOCAL.getFrameName())) {
+                        targetPolar = new PolarCoordinate(targetGoal);
+                    } else {
+                        targetPolar = new PolarCoordinate(MathTools.globalToLocal(
+                                targetGoal, robotPos));
+                    }
 
                     double distance = targetPolar.getDistance(LengthUnit.METER);
                     logger.debug("Old goal distance: " + distance);
