@@ -24,6 +24,7 @@ public class NoStrategy implements DriveStrategy {
 
     public NoStrategy(NavigationActuator nav, Sensor<PositionData> robotPositionSensor) {
         this.nav = nav;
+        this.robotPositionSensor=robotPositionSensor;
     }
 
     @Override
@@ -77,14 +78,18 @@ public class NoStrategy implements DriveStrategy {
     @Override
     public boolean init(NavigationGoalData pTargetGoal) {
         this.targetGoal = pTargetGoal;
-        if(robotPositionSensor!= null) try {
-            robotPos = robotPositionSensor.readLast(1000);
-            if (robotPos == null) {
-                logger.error("RobotPosition is null");
+        if(robotPositionSensor!= null) {
+            try {
                 robotPos = robotPositionSensor.readLast(1000);
+                if (robotPos == null) {
+                    logger.error("RobotPosition is null");
+                    robotPos = robotPositionSensor.readLast(1000);
+                }
+            } catch (IOException | InterruptedException ex) {
+                logger.error(ex);
             }
-        } catch (IOException | InterruptedException ex) {
-            logger.error(ex);
+        } else {
+            logger.error("init(): robotPositionSensor is null");
         }
         if (pTargetGoal == null) {
             logger.fatal("targetGoal is null");
@@ -94,7 +99,9 @@ public class NoStrategy implements DriveStrategy {
             targetGoal.setX(pos.getX(LengthUnit.METER), LengthUnit.METER);
             targetGoal.setY(pos.getY(LengthUnit.METER), LengthUnit.METER);
             targetGoal.setYaw(pos.getYaw(AngleUnit.RADIAN), AngleUnit.RADIAN);
+            targetGoal.setFrameId("map");
         }
+        logger.info("init(): targetGoal="+targetGoal+", robotPos="+robotPos);
         return true;
     }
 }
