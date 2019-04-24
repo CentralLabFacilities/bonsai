@@ -22,12 +22,12 @@ public class PositionData extends Point2D {
         LOCAL(1, "base_link"),
         GLOBAL(2, "map");
 
-        private final int refereceId;
+        private final int referenceId;
         private final String referenceFrameName;
 
 
         ReferenceFrame(int value, String name) {
-            this.refereceId = value;
+            this.referenceId = value;
             this.referenceFrameName = name;
         }
 
@@ -47,7 +47,7 @@ public class PositionData extends Point2D {
 
     @Override
     public void setFrameId(String frameId){
-        // to olny allow frameid's that are based on the ReferenceFrame Enum convert once to and from it. (Exception will be raised if that doesn't work)
+        // to only allow frameid's that are based on the ReferenceFrame Enum convert once to and from it. (Exception will be raised if that doesn't work)
         ReferenceFrame frame = ReferenceFrame.fromString(frameId);
         String referenceName = frame.getFrameName();
         super.setFrameId(referenceName);
