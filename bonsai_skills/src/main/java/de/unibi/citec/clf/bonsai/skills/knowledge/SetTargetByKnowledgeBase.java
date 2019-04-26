@@ -9,6 +9,8 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException;
+import de.unibi.citec.clf.btl.data.knowledgebase.Location;
+import de.unibi.citec.clf.btl.data.knowledgebase.Room;
 import de.unibi.citec.clf.btl.data.map.Viewpoint;
 import de.unibi.citec.clf.btl.data.navigation.NavigationGoalData;
 
@@ -152,7 +154,34 @@ public class SetTargetByKnowledgeBase extends AbstractSkill {
         try {
             viewpoint = kBaseActuator.getViewpoint(locationName, viewpointName);
         } catch (KBaseActuator.BDONotFoundException e) {
-            logger.error("Did not find a Location with name " + locationName);
+            boolean locationFound = false;
+            String locationList = "";
+            String roomList = "";
+            for (Location loc: kBaseActuator.getArena().getLocations()) {
+                locationList += loc.getName();
+                locationList += ";";
+                if (loc.getName().equals(locationName)) {
+                    locationFound = true;
+                    break;
+                }
+            }
+            if (!locationFound) {
+                for (Room room : kBaseActuator.getArena().getRooms()) {
+                    roomList += room.getName();
+                    roomList += ";";
+                    if (room.getName().equals(locationName)) {
+                        locationFound = true;
+                        break;
+                    }
+                }
+            }
+            if (locationFound) {
+                logger.error("Did not find viewpoint " + viewpointName + " in given location " + locationName);
+            } else {
+                logger.error("Did not find a location with name " + locationName);
+                logger.debug("Known locations:" + locationList);
+                logger.debug("Known rooms:" + roomList);
+            }
             return tokenErrorNoSuchLocation;
         } catch (KBaseActuator.NoAreaFoundException e) {
             logger.error("Shall never ever occur: " + e.getMessage());
