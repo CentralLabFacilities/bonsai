@@ -165,6 +165,11 @@ public class LookToPerson extends AbstractSkill {
             return tokenLoopDiLoop;
         }
 
+        if (robotPos == null) {
+            logger.warn("Got no robot position");
+            return tokenLoopDiLoop;
+        }
+
         if (currentPersons.size() == 0) {
             logger.warn("########## Person list size is 0 ############");
         }
