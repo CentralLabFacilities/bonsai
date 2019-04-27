@@ -200,7 +200,7 @@ public class SetTargetByObjectShapeData extends AbstractSkill {
 
         PositionData robot = null;
         try {
-            robot = -1);
+            robot = posSensor.readLast(-1);
         } catch (IOException | InterruptedException ex) {
             logger.error("Could not read robot position", ex);
         }

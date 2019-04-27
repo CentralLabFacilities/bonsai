@@ -121,7 +121,7 @@ public class WaitAndStoreMovingPerson extends AbstractSkill {
     private PositionData getRobotPosition() {
         PositionData robotPosition = null;
         try {
-            robotPosition = -1);
+            robotPosition = posSensor.readLast(-1);
         } catch (IOException | InterruptedException ex) {
             logger.fatal(
                     "Exception while retrieving robot position!",

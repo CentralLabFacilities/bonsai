@@ -165,7 +165,7 @@ public class PepperFollowPerson extends AbstractSkill {
     private PositionData getRobotPosition() {
         PositionData robot = null;
         try {
-            robot = -1);
+            robot = posSensor.readLast(-1);
         } catch (IOException | InterruptedException ex) {
             logger.warn("Exception while retrieving robot pos!", ex);
         }

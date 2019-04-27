@@ -79,7 +79,7 @@ public class GetNewFollowIdFromWaving extends AbstractSkill {
             handPos = handPosSlot.recall();
 
             try {
-                robotPos = -1);
+                robotPos = posSensor.readLast(-1);
             } catch (IOException ex) {
                 Logger.getLogger(GetNewFollowIdFromWaving.class.getName()).log(Level.SEVERE, null, ex);
                 logger.fatal("robotPos problem");
@@ -113,7 +113,7 @@ public class GetNewFollowIdFromWaving extends AbstractSkill {
         PersonData best = null;
         List<PersonData> personList = getPersons();
         try {
-            robotPos = -1);
+            robotPos = posSensor.readLast(-1);
         } catch (IOException ex) {
             Logger.getLogger(GetNewFollowIdFromWaving.class.getName()).log(Level.SEVERE, null, ex);
             logger.fatal("Problem with posSensor");

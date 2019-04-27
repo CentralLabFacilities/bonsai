@@ -208,7 +208,7 @@ public class NavigateToPerson extends AbstractSkill {
 
         PositionData robot = null;
         try {
-            robot = -1);
+            robot = posSensor.readLast(-1q);
         } catch (IOException | InterruptedException ex) {
             logger.error("Could not read robot position", ex);
         }
