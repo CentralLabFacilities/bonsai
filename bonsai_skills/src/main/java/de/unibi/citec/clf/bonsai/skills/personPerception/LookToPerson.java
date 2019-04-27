@@ -171,14 +171,10 @@ public class LookToPerson extends AbstractSkill {
 
         for (int i = 0; i < currentPersons.size(); ++i) {
             if (currentPersons.get(i).getUuid().equals(targetID)) {
-                PositionData posDataLocal = currentPersons.get(i).getPosition();
+                PositionData posDataLocal = getLocalPosition(currentPersons.get(i).getPosition(), robotPos);
 
                 if (posDataLocal == null) {
                     return tokenLoopDiLoop;
-                }
-
-                if (!posDataLocal.getFrameId().equals(PositionData.BASE_FRAME)) {
-                    posDataLocal = CoordinateSystemConverter.globalToLocal(posDataLocal, robotPos);
                 }
 
                 double horizontal = Math.atan2(posDataLocal.getY(LengthUnit.METER), posDataLocal.getX(LengthUnit.METER));
@@ -219,6 +215,14 @@ public class LookToPerson extends AbstractSkill {
         logger.warn("No found person matched the UUID I am looking for");
         return tokenLoopDiLoop;
 
+    }
+
+    private PositionData getLocalPosition(PositionData position, PositionData reference) {
+        if(position.getFrameId().equals(PositionData.ReferenceFrame.LOCAL.getFrameName())) {
+            return position;
+        } else {
+            return CoordinateSystemConverter.globalToLocal(position, reference);
+        }
     }
 
     @Override
