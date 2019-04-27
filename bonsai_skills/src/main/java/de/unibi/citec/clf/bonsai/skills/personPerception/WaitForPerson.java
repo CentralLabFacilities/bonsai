@@ -4,12 +4,12 @@ import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.exception.TransformException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
-import de.unibi.citec.clf.bonsai.core.object.TransformLookup;
 import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
+import de.unibi.citec.clf.bonsai.util.CoordinateSystemConverter;
 import de.unibi.citec.clf.bonsai.util.CoordinateTransformer;
 import de.unibi.citec.clf.bonsai.util.helper.PersonHelper;
 import de.unibi.citec.clf.btl.List;
@@ -150,21 +150,9 @@ public class WaitForPerson extends AbstractSkill {
         personsDebug = persons.stream().map((person) ->  person.getUuid() + " ").reduce(personsDebug, String::concat);
         logger.info("persons: " + personsDebug);
 
-        PersonData front;
         if(!persons.isEmpty() && !persons.get(0).isInBaseFrame()) {
-            //TODO
-            logger.error("todo: tranform to base link");
-
             for (PersonData p : persons) {
-                try {
-                    if (!p.getPosition().getFrameId().equals(Type.BASE_FRAME)) {
-                        Pose3D pose = tf.transform(p.getPosition(),Type.BASE_FRAME);
-                        p.setPosition(new PositionData(pose.getTranslation().getX(LengthUnit.METER),pose.getTranslation().getY(LengthUnit.METER),0,p.getTimestamp(),LengthUnit.METER,AngleUnit.RADIAN));
-                    }
-                } catch (TransformException e) {
-                    logger.error("cant Transform from " + p.getFrameId() + " to " + Type.BASE_FRAME + " @" + p.getTimestamp().getUpdated().getTime());
-                    p.setPosition(MathTools.globalToLocal(p.getPosition(), robotPosition));
-                }
+                p.setPosition(getLocalPosition(p.getPosition()));
             }
 
         }
@@ -193,6 +181,14 @@ public class WaitForPerson extends AbstractSkill {
             return ExitToken.loop();
         }
 
+    }
+
+    private PositionData getLocalPosition(PositionData position) {
+        if(position.getFrameId().equals(PositionData.ReferenceFrame.LOCAL.getFrameName())) {
+            return position;
+        } else {
+            return CoordinateSystemConverter.globalToLocal(position, robotPosition);
+        }
     }
 
     @Override
