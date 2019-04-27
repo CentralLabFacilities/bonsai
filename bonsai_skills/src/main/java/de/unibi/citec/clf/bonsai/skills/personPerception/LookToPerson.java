@@ -154,7 +154,7 @@ public class LookToPerson extends AbstractSkill {
         }
         
         try {
-            robotPos = positionSensor.readLast(50);
+            robotPos = positionSensor.readLast(-1);
         } catch (IOException | InterruptedException ex) {
             logger.warn("Could not read from position sensor.", ex);
             return tokenLoopDiLoop;
