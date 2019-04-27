@@ -67,7 +67,7 @@ public class LookToPerson extends AbstractSkill {
 
     private ExitToken tokenErrorNotFound;
     //set loop time to 14hz
-    private ExitToken tokenLoopDiLoop = ExitToken.loop(200);
+    private ExitToken tokenLoopDiLoop = ExitToken.loop(800);
 
     private MemorySlotReader<PersonData> targetPersonSlot;
 
@@ -86,6 +86,8 @@ public class LookToPerson extends AbstractSkill {
     private double lastAngle = 0.0;
 
     private long timeout;
+    private long noPersonTimeout = 2000;
+    private long lastPersonTime;
     private long initialTimeout = 3000;
     private float turnAngleMultiplier = 0.75f;
     private long gazeSpeed = 100; //was 0.125 per default in actuator
@@ -133,6 +135,11 @@ public class LookToPerson extends AbstractSkill {
         if (initialTimeout > 0) {
             logger.debug("using timeout of " + initialTimeout + " ms");
             timeout = initialTimeout + Time.currentTimeMillis();
+        }
+
+        if (noPersonTimeout > 0) {
+            logger.debug("using no person timeout of " + noPersonTimeout + " ms");
+            lastPersonTime = Time.currentTimeMillis();
         }
 
         return true;
@@ -213,15 +220,18 @@ public class LookToPerson extends AbstractSkill {
 
                 lastAngle = horizontal;
                 timeout = initialTimeout + Time.currentTimeMillis();
+                lastPersonTime = Time.currentTimeMillis();
 
                 return tokenLoopDiLoop;
             }
         }
 
         logger.warn("No found person matched the UUID I am looking for");
-        //look straight
-        Point3D target = new Point3D(10, 0, 0, LengthUnit.METER, "torso_lift_link");
-        gazeFuture = gazeActuator.lookAt(target, gazeSpeed);
+        if(lastPersonTime + noPersonTimeout > Time.currentTimeMillis()) {
+            //look straight
+            Point3D target = new Point3D(10, 0, 0, LengthUnit.METER, "torso_lift_link");
+            gazeFuture = gazeActuator.lookAt(target, gazeSpeed);
+        }
 
         return tokenLoopDiLoop;
 
