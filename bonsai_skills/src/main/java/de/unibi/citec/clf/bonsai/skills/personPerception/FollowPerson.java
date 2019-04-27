@@ -194,7 +194,7 @@ public class FollowPerson extends AbstractSkill {
 
         try {
             personFollow = followPersonSlotRead.recall();
-            robotPosition = posSensor.readLast(250);
+            robotPosition = -1);
         } catch (CommunicationException | InterruptedException | IOException ex) {
             logger.error(ex);
             return false;
@@ -353,7 +353,7 @@ public class FollowPerson extends AbstractSkill {
 
         PositionData robot = null;
         try {
-            robot = posSensor.readLast(50);
+            robot = -1);
         } catch (IOException | InterruptedException ex) {
             logger.error("Could not read robot position", ex);
         }

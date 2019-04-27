@@ -152,7 +152,7 @@ public class FollowPersonTurnOnly extends AbstractSkill {
     private PositionData getRobotPosition() {
         PositionData robotPosition = null;
         try {
-            robotPosition = posSensor.readLast(1);
+            robotPosition = -1);
         } catch (IOException | InterruptedException ex) {
             logger.warn("Could not read robot position", ex);
         }

@@ -156,7 +156,7 @@ public class CheckIfDoorInRange extends AbstractSkill {
     private PositionData getRobotPosition() {
         PositionData robot = null;
         try {
-            robot = posSensor.readLast(5000);
+            robot = -1);
         } catch (IOException | InterruptedException ex) {
             logger.warn("Exception while retrieving robot pos!", ex);
         }
