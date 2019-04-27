@@ -219,6 +219,10 @@ public class LookToPerson extends AbstractSkill {
         }
 
         logger.warn("No found person matched the UUID I am looking for");
+        //look straight
+        Point3D target = new Point3D(10, 0, 0, LengthUnit.METER, "torso_lift_link");
+        gazeFuture = gazeActuator.lookAt(target, gazeSpeed);
+
         return tokenLoopDiLoop;
 
     }
