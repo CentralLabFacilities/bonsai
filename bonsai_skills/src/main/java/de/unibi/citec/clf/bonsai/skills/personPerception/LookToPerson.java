@@ -171,6 +171,7 @@ public class LookToPerson extends AbstractSkill {
 
         for (int i = 0; i < currentPersons.size(); ++i) {
             if (currentPersons.get(i).getUuid().equals(targetID)) {
+                logger.info("person position: " + currentPersons.get(i).getPosition().toString() + "robot position: " + robotPos.toString());
                 PositionData posDataLocal = getLocalPosition(currentPersons.get(i).getPosition(), robotPos);
 
                 if (posDataLocal == null) {
