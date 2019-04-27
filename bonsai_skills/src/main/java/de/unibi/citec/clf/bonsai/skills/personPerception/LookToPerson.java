@@ -147,14 +147,14 @@ public class LookToPerson extends AbstractSkill {
         }
 
         try {
-            currentPersons = personSensor.readLast(1);
+            currentPersons = personSensor.readLast(100);
         } catch (IOException | InterruptedException ex) {
             logger.warn("Could not read from person sensor.", ex);
             return ExitToken.fatal();
         }
         
         try {
-            robotPos = positionSensor.readLast(1);
+            robotPos = positionSensor.readLast(50);
         } catch (IOException | InterruptedException ex) {
             logger.warn("Could not read from position sensor.", ex);
             return tokenLoopDiLoop;
