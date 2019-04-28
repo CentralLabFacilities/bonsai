@@ -82,8 +82,9 @@ class RosJointPositionControl(private val nodeName: GraphName) : RosNode(), Join
             var traj = MsgTypeFactory.getInstance().newMessage<JointTrajectoryPoint>(JointTrajectoryPoint._TYPE)
             traj.positions = doubleArrayOf(pose.toDouble())
 
-            val delta = abs(getPosition() - pose)
-            val duration_sec = delta / (speed?:1f)
+            //val delta = abs(getPosition() - pose)
+            //val duration_sec = delta / (speed?:1f)
+            val duration_sec = 1f / (speed?:0.25f)
 
             traj.timeFromStart = Duration.fromMillis((duration_sec * 1000).toLong())
 
@@ -113,7 +114,8 @@ class RosJointPositionControl(private val nodeName: GraphName) : RosNode(), Join
 
     override fun getPosition(): Float {
         //TODO
-        return 0.0f
+        //return 0.0f
+        throw NotImplementedError()
     }
 
 }
