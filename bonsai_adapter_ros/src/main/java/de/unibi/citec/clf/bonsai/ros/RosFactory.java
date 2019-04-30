@@ -90,9 +90,9 @@ public class RosFactory implements CoreObjectFactory {
             if (local == null || local.isEmpty()) {
                 logger.warn("basepc not set, using 127.0.0.1");
                 try {
-                    local = InetAddressFactory.newLoopback().getHostName();
-                } catch (org.ros.exception.RosRuntimeException e) {
                     local = InetAddressFactory.newNonLoopback().getHostName();
+                } catch (org.ros.exception.RosRuntimeException e) {
+                    local = InetAddressFactory.newLoopback().getHostName();
                 }
 
             }
