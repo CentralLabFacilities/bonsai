@@ -89,7 +89,12 @@ public class RosFactory implements CoreObjectFactory {
             local = System.getenv("basepc");
             if (local == null || local.isEmpty()) {
                 logger.warn("basepc not set, using 127.0.0.1");
-                local = InetAddressFactory.newNonLoopback().getHostName();
+                try {
+                    local = InetAddressFactory.newLoopback().getHostName();
+                } catch (org.ros.exception.RosRuntimeException e) {
+                    local = InetAddressFactory.newNonLoopback().getHostName();
+                }
+
             }
         }
 
@@ -624,7 +629,7 @@ public class RosFactory implements CoreObjectFactory {
             String key = node.getKey();
             try {
                 if (!node.isInitialised().get(nodeInitTimeout, TimeUnit.MILLISECONDS)) {
-                    logger.warn("node is not started " + key);
+                    logger.warn("node is not started " + key + " " + node.initialized);
                     res.exceptions.add(new CoreObjectCreationException("node is not started " + key));
                 } else {
                     if (node instanceof Sensor) {
@@ -639,7 +644,7 @@ public class RosFactory implements CoreObjectFactory {
                 logger.warn(ex);
                 res.exceptions.add(ex);
             } catch (TimeoutException ex) {
-                res.exceptions.add(new CoreObjectCreationException("node is not started: " + node.getKey() + " check stderr for output"));
+                res.exceptions.add(new CoreObjectCreationException("node is not started: " + node.getKey() + " " + node.initialized + " check stderr for output"));
             }
         });
 
