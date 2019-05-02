@@ -3,6 +3,7 @@ package de.unibi.citec.clf.bonsai.skills.body;
 import de.unibi.citec.clf.bonsai.actuators.JointControllerActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
+import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
 import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
@@ -36,7 +37,7 @@ public class MoveZlift extends AbstractSkill {
     private long timeout = 7000;
     Future<Boolean> b;
 
-    private MemorySlot<Double> heightSlot;
+    private MemorySlotReader<Double> heightSlot;
     private Boolean readHeightSlot;
 
     @Override
@@ -51,7 +52,8 @@ public class MoveZlift extends AbstractSkill {
         readHeightSlot = configurator.requestOptionalBool(KEY_SLOT, false);
 
         if (readHeightSlot) {
-            heightSlot = configurator.getSlot("ZLiftHeight", Double.class);
+            //heightSlot = configurator.getSlot("ZLiftHeight", Double.class);
+            heightSlot = configurator.getReadSlot("ZLiftHeight", Double.class);
         } else {
             pos = (float) configurator.requestDouble(KEY_POSITION);
         }
