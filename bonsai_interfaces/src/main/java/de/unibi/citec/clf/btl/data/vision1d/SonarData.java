@@ -16,7 +16,6 @@ public class SonarData extends Type {
 
 	private double distanceRight;
 	private double distanceLeft;
-	private String frameId;
 	private LengthUnit iLU = LengthUnit.MILLIMETER;
 	
 	public SonarData() {
@@ -59,10 +58,6 @@ public class SonarData extends Type {
 
 	public void setDistanceLeft(double distanceLeft,LengthUnit lU) {
 		this.distanceLeft = UnitConverter.convert(distanceLeft, lU, iLU);
-	}
-
-	public void setFrameId(String frameId) {
-		this.frameId = frameId;
 	}
 
 	/**
