@@ -22,6 +22,7 @@ public class RangeSerializer extends RosSerializer<SonarData, sensor_msgs.Range>
         SonarData sD = new SonarData();
         sD.setDistanceLeft(msg.getRange(), LengthUnit.METER);
         sD.setDistanceRight(msg.getRange(), LengthUnit.METER);
+        sD.setFrameId(msg.getHeader().getFrameId());
         return sD;
     }
 

@@ -16,6 +16,7 @@ public class SonarData extends Type {
 
 	private double distanceRight;
 	private double distanceLeft;
+	private String frameId;
 	private LengthUnit iLU = LengthUnit.MILLIMETER;
 	
 	public SonarData() {
@@ -25,6 +26,13 @@ public class SonarData extends Type {
 		super();
 		this.distanceRight = UnitConverter.convert(distanceRight,lU,iLU);
 		this.distanceLeft = UnitConverter.convert(distanceLeft,lU,iLU);
+	}
+
+	public SonarData(double distanceRight, double distanceLeft,LengthUnit lU, String frameId) {
+		super();
+		this.distanceRight = UnitConverter.convert(distanceRight,lU,iLU);
+		this.distanceLeft = UnitConverter.convert(distanceLeft,lU,iLU);
+		this.frameId = frameId;
 	}
 
 	/**
@@ -51,6 +59,10 @@ public class SonarData extends Type {
 
 	public void setDistanceLeft(double distanceLeft,LengthUnit lU) {
 		this.distanceLeft = UnitConverter.convert(distanceLeft, lU, iLU);
+	}
+
+	public void setFrameId(String frameId) {
+		this.frameId = frameId;
 	}
 
 	/**
