@@ -110,6 +110,10 @@ public class WaitForPersonInRangeSonar extends AbstractSkill {
             return ExitToken.loop(50);
         }
 
+        if (!sonarData.getFrameId().equals("base_sonar_02_link")) {
+            return ExitToken.loop(50);
+        }
+
         if (sonarData.getDistanceLeft(LengthUnit.METER) <= range) {
             logger.debug("CHECK RANGE: " + sonarData.getDistanceLeft(LengthUnit.METER) + " <= " + range);
             return tokenSuccessInRange;
