@@ -131,7 +131,7 @@ public class SCXMLOverviewController implements IStateListener {
                     return true;
                 }
 
-                logger.warn(id + ": score below min ("+minScore+")");
+                logger.trace(id + ": score below min ("+minScore+")");
 
                 return false; // Does not match.
             });
