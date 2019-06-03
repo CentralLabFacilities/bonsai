@@ -25,6 +25,11 @@ public class ObjectData extends Type {
             this.classLabel = hyp.classLabel;
         }
 
+        public Hypothesis(String classLabel, double reliability) {
+            this.classLabel = classLabel;
+            this.reliability = reliability;
+        }
+
         public Hypothesis() {
 
         }

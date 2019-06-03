@@ -2,17 +2,13 @@ package de.unibi.citec.clf.btl.data.object;
 
 
 import de.unibi.citec.clf.btl.data.geometry.BoundingBox3D;
-import java.util.HashSet;
-import java.util.Set;
 
 import de.unibi.citec.clf.btl.data.geometry.Point3D;
 import de.unibi.citec.clf.btl.data.geometry.Pose3D;
-import de.unibi.citec.clf.btl.data.geometry.Rotation3D;
 import de.unibi.citec.clf.btl.units.LengthUnit;
-import de.unibi.citec.clf.btl.units.UnitConverter;
 
 /**
- * Results of the object recognition. This class is meat so define the location
+ * Results of the object recognition. This class is meant so define the location
  * of the object and contain shape information
  *
  * @author lziegler
