@@ -70,7 +70,7 @@ public class StoreLocation extends AbstractSkill {
     private PositionData posData;
     private Location location;
     private String viewpointName = "";
-    private String locationName = "arena";
+    private String locationName = "saved location";
 
     @Override
     public void configure(ISkillConfigurator configurator) throws SkillConfigurationException {
@@ -80,11 +80,12 @@ public class StoreLocation extends AbstractSkill {
         positionSlot = configurator.getReadSlot("PositionDataSlot", PositionData.class);
 
         locationName = configurator.requestOptionalValue(KEY_ANAME, locationName);
+        locationName = locationName.toLowerCase();
 
         try {
             viewpointName = configurator.requestValue(KEY_NAME);
         } catch (SkillConfigurationException e) {
-            logger.info("no location name give, using slot");
+            logger.info("no location name given, using slot");
             nameSlot = configurator.getReadSlot("LocationNameSlot", String.class);
             useSlot = true;
         }
@@ -122,7 +123,6 @@ public class StoreLocation extends AbstractSkill {
             return false;
         }
 
-
         for (Location loc : kBaseActuator.getArena().getLocations()) {
             if(loc.getName().equals(locationName)) {
                 location = loc;
@@ -132,6 +132,7 @@ public class StoreLocation extends AbstractSkill {
 
         Viewpoint vp = new Viewpoint(posData);
         vp.setLabel(viewpointName);
+
 
         if(location == null ) {
             // create location, or rather necessary stuff for the location
@@ -165,8 +166,6 @@ public class StoreLocation extends AbstractSkill {
     @Override
     public ExitToken execute() {
 
-        location.setRoom(locationName);
-
         if(location.getRoom() == null) {
             Room room = null;
             try {
@@ -179,7 +178,7 @@ public class StoreLocation extends AbstractSkill {
             }
 
             if (room == null) {
-                location.setRoom("outside");
+                location.setRoom("arena");
             } else {
                 location.setRoom(room.getName());
             }
