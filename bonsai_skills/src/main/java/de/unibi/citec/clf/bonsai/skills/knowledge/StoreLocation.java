@@ -54,12 +54,13 @@ import java.util.LinkedList;
 public class StoreLocation extends AbstractSkill {
 
     private static final String KEY_NAME = "#_NAME";
+    private static final String KEY_ANAME = "#_LOCATION";
     private static final String KEY_SLOT = "#_USE_SLOT";
 
     private ExitToken tokenSuccess;
     private ExitToken tokenError;
 
-    private boolean useSlot = true;
+    private boolean useSlot = false;
 
     private MemorySlotReader<PositionData> positionSlot;
     private MemorySlotReader<String> nameSlot;
@@ -68,23 +69,24 @@ public class StoreLocation extends AbstractSkill {
 
     private PositionData posData;
     private Location location;
-    private String locationName = "";
+    private String viewpointName = "";
+    private String locationName = "arena";
 
     @Override
     public void configure(ISkillConfigurator configurator) throws SkillConfigurationException {
 
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
         tokenError = configurator.requestExitToken(ExitStatus.ERROR());
-
         positionSlot = configurator.getReadSlot("PositionDataSlot", PositionData.class);
-        useSlot = configurator.requestOptionalBool(KEY_SLOT, useSlot);
-        locationName = configurator.requestOptionalValue(KEY_NAME, locationName);
 
-        if (useSlot) {
-            if (!locationName.isEmpty()) {
-                logger.warn("label overwritten via slot");
-            }
+        locationName = configurator.requestOptionalValue(KEY_ANAME, locationName);
+
+        try {
+            viewpointName = configurator.requestValue(KEY_NAME);
+        } catch (SkillConfigurationException e) {
+            logger.info("no location name give, using slot");
             nameSlot = configurator.getReadSlot("LocationNameSlot", String.class);
+            useSlot = true;
         }
 
         kBaseActuator = configurator.getActuator("KBaseActuator", KBaseActuator.class);
@@ -107,10 +109,10 @@ public class StoreLocation extends AbstractSkill {
         }
         try {
             if (useSlot) {
-                locationName = nameSlot.recall();
+                viewpointName = nameSlot.recall();
             }
 
-            if (locationName == null) {
+            if (viewpointName == null) {
                 logger.error("your LocationNameSlot was empty");
                 return false;
             }
@@ -120,43 +122,70 @@ public class StoreLocation extends AbstractSkill {
             return false;
         }
 
-        // create location, or rather necessary stuff for the location
-        LinkedList<Viewpoint> vps = new LinkedList<>();
+
+        for (Location loc : kBaseActuator.getArena().getLocations()) {
+            if(loc.getName().equals(locationName)) {
+                location = loc;
+                break;
+            }
+        }
+
         Viewpoint vp = new Viewpoint(posData);
-        vp.setLabel("main");
-        vps.add(vp);
+        vp.setLabel(viewpointName);
 
-        Annotation annot = new Annotation();
-        annot.setPolygon(createArea(posData));
-        annot.setLabel("unimportant");
-        annot.setViewpoints(vps);
+        if(location == null ) {
+            // create location, or rather necessary stuff for the location
+            LinkedList<Viewpoint> vps = new LinkedList<>();
+            vps.add(vp);
 
-        location = new Location();
-        location.setAnnotation(annot);
-        location.setIsBeacon(true);
-        location.setIsPlacement(false);
-        location.setName(locationName);
+            Annotation annot = new Annotation();
+            annot.setPolygon(createArea(posData));
+            annot.setLabel("unimportant");
+            annot.setViewpoints(vps);
+
+            location = new Location();
+            location.setAnnotation(annot);
+            location.setIsBeacon(true);
+            location.setIsPlacement(false);
+            location.setName(locationName);
+        } else {
+            LinkedList<Viewpoint> vps = location.getAnnotation().getViewpoints();
+            for (int i = 0; i < vps.size(); i++) {
+                if (vps.get(i).getLabel().equals(viewpointName)) {
+                    vps.remove(i);
+                    break;
+                }
+            }
+            vps.add(vp);
+        }
 
         return true;
     }
 
     @Override
     public ExitToken execute() {
-        Room room = null;
-        try {
-            Point2D position = new Point2D(posData);
-            room = kBaseActuator.getRoomForPoint(position);
-        } catch (KBaseActuator.BDONotFoundException e) {
-            logger.error("Shall never ever occur: " + e.getMessage());
-        } catch (KBaseActuator.NoAreaFoundException e) {
-            logger.error("Given Position , lets just hope the knowledgebase has a room named outside or is good at error handling. " + e.getMessage());
+
+        location.setRoom(locationName);
+
+        if(location.getRoom() == null) {
+            Room room = null;
+            try {
+                Point2D position = new Point2D(posData);
+                room = kBaseActuator.getRoomForPoint(position);
+            } catch (KBaseActuator.BDONotFoundException e) {
+                logger.error("Shall never ever occur: " + e.getMessage());
+            } catch (KBaseActuator.NoAreaFoundException e) {
+                logger.error("Given Position , lets just hope the knowledgebase has a room named outside or is good at error handling. " + e.getMessage());
+            }
+
+            if (room == null) {
+                location.setRoom("outside");
+            } else {
+                location.setRoom(room.getName());
+            }
+
         }
 
-        if (room == null) {
-            location.setRoom("outside");
-        } else {
-            location.setRoom(room.getName());
-        }
         try {
             kBaseActuator.storeBDO(location);
         } catch (KBaseActuator.BDOHasInvalidAttributesException e) {
