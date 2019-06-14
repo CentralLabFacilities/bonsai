@@ -693,5 +693,10 @@ public class SkillConfigurator implements ISkillConfigurator {
         return ExitToken.createToken(status, this);
     }
 
+    @Override
+    public boolean hasConfigurationKey(String key) {
+        return configValues.containsKey(key);
+    }
+
 
 }

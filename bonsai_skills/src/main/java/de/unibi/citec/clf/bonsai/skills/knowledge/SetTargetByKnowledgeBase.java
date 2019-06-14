@@ -2,6 +2,7 @@ package de.unibi.citec.clf.bonsai.skills.knowledge;
 
 import de.unibi.citec.clf.bonsai.actuators.KBaseActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
+import de.unibi.citec.clf.bonsai.core.exception.ConfigurationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
@@ -57,10 +58,8 @@ public class SetTargetByKnowledgeBase extends AbstractSkill {
     private static final String KEY_USE_SPECIFIC_VIEWPOINT = "#_USE_SPECIFIC_VIEWPOINT";
     private static final String KEY_LOCATION = "#_LOCATION";
     private static final String KEY_VIEWPOINT = "#_VIEWPOINT";
-    private static final String KEY_SLOT = "#_USE_SLOT";
 
     private boolean useSpecificViewpoint = false;
-    private boolean useSlot = true;
 
     private ExitToken tokenSuccess;
     private ExitToken tokenErrorNoSuchLocation;
@@ -79,22 +78,26 @@ public class SetTargetByKnowledgeBase extends AbstractSkill {
     public void configure(ISkillConfigurator configurator) throws SkillConfigurationException {
 
         useSpecificViewpoint = configurator.requestOptionalBool(KEY_USE_SPECIFIC_VIEWPOINT, useSpecificViewpoint);
-        logger.debug("############ requested use specific viewpoint " + useSpecificViewpoint);
+
 
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
         tokenErrorNoSuchLocation = configurator.requestExitToken(ExitStatus.ERROR().ps("NoSuchLocation"));
 
         navigationGoalDataSlot = configurator.getWriteSlot("NavigationGoalDataSlot", NavigationGoalData.class);
 
-        useSlot = configurator.requestOptionalBool(KEY_SLOT, useSlot);
-        locationName = configurator.requestOptionalValue(KEY_LOCATION, locationName);
-        viewpointName = configurator.requestOptionalValue(KEY_VIEWPOINT, viewpointName);
-
-        if (useSlot) {
-            logger.debug("############ configurating location slot");
+        if(configurator.hasConfigurationKey(KEY_LOCATION)) {
+            locationName = configurator.requestValue(KEY_LOCATION);
+        } else {
+            logger.debug("no key " + KEY_LOCATION + " given, request slot");
             locationNameSlot = configurator.getReadSlot("LocationNameSlot", String.class);
-            if (useSpecificViewpoint) {
-                logger.debug("############ configurating viewpoint slot");
+        }
+
+        if (useSpecificViewpoint) {
+            logger.debug("requested use specific viewpoint ");
+            if(configurator.hasConfigurationKey(KEY_VIEWPOINT)) {
+                viewpointName = configurator.requestValue(KEY_VIEWPOINT);
+            } else {
+                logger.debug("no key " + KEY_VIEWPOINT + " given, request slot");
                 viewpointNameSlot = configurator.getReadSlot("ViewpointNameSlot", String.class);
             }
         }
@@ -106,41 +109,28 @@ public class SetTargetByKnowledgeBase extends AbstractSkill {
     @Override
     public boolean init() {
         try {
-            if (useSlot) {
-                logger.debug("################################ using slots to retrieve location name");
-                locationName = locationNameSlot.recall();
+            if (viewpointNameSlot != null && useSpecificViewpoint) {
+                logger.debug("using slots to retrieve viewpoint name");
+                viewpointName = viewpointNameSlot.recall();
+                if (viewpointName == null) {
+                    logger.error("your viewpointNameSlot was empty");
+                    return false;
+                }
             }
 
-            if (locationName == null) {
-                logger.error("your LocationNameSlot was empty");
-                return false;
-            } else {
-                logger.debug("## recalled location slot " + locationName);
+            if (locationNameSlot != null) {
+                logger.debug("using slots to retrieve location name");
+                locationName = locationNameSlot.recall();
+                if (locationName == null) {
+                    logger.error("your LocationNameSlot was empty");
+                    return false;
+                }
             }
+
 
         } catch (CommunicationException ex) {
             logger.fatal("Unable to read from memory: ", ex);
             return false;
-        }
-        if (useSpecificViewpoint) {
-            logger.debug("################################ using specific viewpoint");
-            try {
-                if (useSlot) {
-                    logger.debug("################################ using slots to retrieve viewpoint name");
-                    viewpointName = viewpointNameSlot.recall();
-                }
-
-                if (viewpointName == null) {
-                    logger.error("your ViewpointNameSlot was empty");
-                    return false;
-                } else {
-                    logger.debug("## recalled viewpoint slot " + locationName);
-                }
-
-            } catch (CommunicationException ex) {
-                logger.fatal("Unable to read from memory: ", ex);
-                return false;
-            }
         }
 
         logger.debug("initialized locationName: " + locationName);

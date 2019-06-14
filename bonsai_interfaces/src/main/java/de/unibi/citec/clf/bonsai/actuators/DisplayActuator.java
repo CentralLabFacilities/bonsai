@@ -13,6 +13,8 @@ import java.util.Map;
  */
 public interface DisplayActuator extends Actuator {
 
+    void setWindowText(String txt);
+
     void displayChoice(String layout,
                        String caption,
                        Byte caption_mode,

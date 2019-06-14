@@ -60,8 +60,6 @@ public class StoreLocation extends AbstractSkill {
     private ExitToken tokenSuccess;
     private ExitToken tokenError;
 
-    private boolean useSlot = false;
-
     private MemorySlotReader<PositionData> positionSlot;
     private MemorySlotReader<String> nameSlot;
 
@@ -82,12 +80,11 @@ public class StoreLocation extends AbstractSkill {
         locationName = configurator.requestOptionalValue(KEY_ANAME, locationName);
         locationName = locationName.toLowerCase();
 
-        try {
+        if (configurator.hasConfigurationKey(KEY_NAME)) {
             viewpointName = configurator.requestValue(KEY_NAME);
-        } catch (SkillConfigurationException e) {
+        } else {
             logger.info("no location name given, using slot");
             nameSlot = configurator.getReadSlot("LocationNameSlot", String.class);
-            useSlot = true;
         }
 
         kBaseActuator = configurator.getActuator("KBaseActuator", KBaseActuator.class);
@@ -109,7 +106,7 @@ public class StoreLocation extends AbstractSkill {
             return false;
         }
         try {
-            if (useSlot) {
+            if (nameSlot != null) {
                 viewpointName = nameSlot.recall();
             }
 
