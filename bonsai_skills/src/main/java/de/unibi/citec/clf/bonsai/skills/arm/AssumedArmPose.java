@@ -19,7 +19,7 @@ import java.util.concurrent.TimeoutException;
  *
  * RETURNS:
  *
- * SUCESS.HOME SUCESS.GRASPUP SUCESS.CARRY ERROR FATAL
+ * SUCCESS.HOME SUCCESS.GRASPUP SUCCESS.CARRY ERROR FATAL
  *
  * TODO: untobify
  * 
@@ -45,7 +45,7 @@ public class AssumedArmPose extends AbstractSkill {
     final long DEFAULT_TIMEOUT = 5000;
 
     /*
-     * Starttime for timout.
+     * Starttime for timeout.
      */
     long startTime = -1;
 

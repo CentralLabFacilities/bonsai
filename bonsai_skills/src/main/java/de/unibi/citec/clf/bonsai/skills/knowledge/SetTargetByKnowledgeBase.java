@@ -26,7 +26,7 @@ import de.unibi.citec.clf.btl.data.navigation.NavigationGoalData;
  *  #_VIEWPOINT:                [String] Optional (default: "")
  *                                  -> Name of viewpoint to drive to. Only if #_USE_SPECIFIC_VIEWPOINT is true
  *  #_USE_SLOT:                 [boolean] Optional (default: true)
- *                                  -> Whether to read location and viewpoint name from memeory. Set to false to use #_LOCATION and #_VIEWPOINT.
+ *                                  -> Whether to read location and viewpoint name from memory. Set to false to use #_LOCATION and #_VIEWPOINT.
  *
  *
  * Slots:

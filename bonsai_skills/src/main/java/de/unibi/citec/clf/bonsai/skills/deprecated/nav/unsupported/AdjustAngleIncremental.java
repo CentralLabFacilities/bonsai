@@ -15,7 +15,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * The robot adjust his angle a litte bit (angleIncrement) to left and right and writes the angle into a slot.
+ * The robot adjust his angle a little bit (angleIncrement) to left and right and writes the angle into a slot.
  *
  * @author climber
  */

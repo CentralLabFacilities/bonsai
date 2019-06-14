@@ -30,7 +30,7 @@ import java.util.logging.Logger;
  *
  * <pre>
  *
- * optiones: Key possible Values Description
+ * options: Key possible Values Description
  *      #_SAY_INFO [false default, true]
  *              -> Enables the "SpecificPositionSlot" which will be used to set a specific viewport of the goal to navigate to
  *TODO more
@@ -38,7 +38,7 @@ import java.util.logging.Logger;
  * possible return states are:
  *      success.noPeople -> robot has not seen any persons
  *      success.peopleFound -> robot has seen any amount of people != 0
- *      error -> some error has occured
+ *      error -> some error has occurred
  *      fatal -> a hard error occurred e.g. Slot communication error
  *
  * TODO more

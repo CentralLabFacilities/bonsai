@@ -13,7 +13,7 @@ import de.unibi.citec.clf.btl.data.object.ObjectShapeList;
 import java.io.IOException;
 
 /**
- * Adds objects to a list of objects (unique labels, ignore unkown, only use bestlabel)
+ * Adds objects to a list of objects (unique labels, ignore unknown, only use bestlabel)
  *
  * @author pvonneumanncosel
  */

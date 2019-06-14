@@ -71,20 +71,20 @@ public class DriveToTable extends AbstractSkill {
             logger.error("robotPosition was null --> loop");
             return ExitToken.loop(250);
         }
-        PlanePatch tabel = null;
+        PlanePatch table = null;
         try {
-            tabel = tableSlot.recall();
+            table = tableSlot.recall();
         } catch (CommunicationException ex) {
             logger.info(ex.getMessage());
         }
-        if (tabel == null) {
+        if (table == null) {
             logger.error("table is null");
             return tokenErrorNoTable;
         }
 
-        Point3D center = tabel.calculateCenterPoint();
+        Point3D center = table.calculateCenterPoint();
         //   try {
-        logger.debug("table: " + tabel);
+        logger.debug("table: " + table);
         logger.debug("table center: " + center);
 
         //transformation doesnt work because of reasons. currently working on a fix.
