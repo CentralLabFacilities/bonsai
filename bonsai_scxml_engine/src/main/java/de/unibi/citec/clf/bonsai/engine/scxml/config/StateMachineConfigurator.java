@@ -357,31 +357,31 @@ public class StateMachineConfigurator {
 
             SkillConfigFaults s = new SkillConfigFaults(id,
                     "Error while configuring a State! Instantiation Error: " + e.getMessage());
-            logger.error(s.getErrorMessage(), e);
+            logger.debug(s.getErrorMessage(), e);
             results.add(s);
             return results;
         } catch (ClassNotFoundException e) {
             SkillConfigFaults s = new SkillConfigFaults(id,
                     "Error while configuring a State! Class not found: " + e.getMessage());
-            logger.error(s.getErrorMessage(), e);
+            logger.debug(s.getErrorMessage(), e);
             //results.add(s); //REMOVED DOUBLE ERROR MESSAGE (instantiating and configure)
             return results;
         } catch (IllegalArgumentException e) {
             SkillConfigFaults s = new SkillConfigFaults(id,
                     "Error while configuring a State! Illegal Argument: " + e.getMessage());
-            logger.error(s.getErrorMessage(), e);
+            logger.debug(s.getErrorMessage(), e);
             results.add(s);
             return results;
         } catch (IllegalAccessException e) {
             SkillConfigFaults s = new SkillConfigFaults(id,
                     "Error while configuring a State! Illegal Access: " + e.getMessage());
-            logger.error(s.getErrorMessage(), e);
+            logger.debug(s.getErrorMessage(), e);
             results.add(s);
             return results;
         } catch (InvocationTargetException e) {
             SkillConfigFaults s = new SkillConfigFaults(id,
                     "Error while configuring a State! Invocation Target Exception: " + e.getMessage());
-            logger.error(s.getErrorMessage(), e);
+            logger.debug(s.getErrorMessage(), e);
             results.add(s);
             return results;
         }

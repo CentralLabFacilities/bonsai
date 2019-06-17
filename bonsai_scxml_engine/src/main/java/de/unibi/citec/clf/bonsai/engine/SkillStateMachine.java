@@ -375,18 +375,18 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
             results.showDefaultSlotWarnings = showDefaultSlotWarnings;
         }
 
-        logger.debug("\n#########RESULTS:#########\n" + results.toString());
+        logger.info("\n#########RESULTS:#########\n" + results.toString());
         if (enableSkillWarnings) {
-            logger.debug(results.validationResult.getWarnings());
+            logger.info(results.validationResult.getWarnings());
         }
 
         String a = results.stateMachineResults.generateSlotHint(this.statePrefix, false);
         if (!a.isEmpty()) {
-            logger.debug("\nHint: Missing the following Slots:\n" + a);
+            logger.info("\nHint: Missing the following Slots:\n" + a);
         }
         a = results.validationResult.generateTransitionHints();
         if (!a.isEmpty()) {
-            logger.debug("\nHint: Missing the following Transitions:\n" + a);
+            logger.info("\nHint: Missing the following Transitions:\n" + a);
         }
 
         return results;
