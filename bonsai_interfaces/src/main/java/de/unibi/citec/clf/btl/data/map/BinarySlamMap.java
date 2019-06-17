@@ -41,7 +41,7 @@ public class BinarySlamMap extends PositionData {
      *            The robots X position (in world coordinates), as determined by
      *            Slam.
      * @param y
-     *            The robots Y position (in world coordinates), as determinded
+     *            The robots Y position (in world coordinates), as determined
      *            by Slam.
      * @param yaw
      *            The robots orientation, as determined by Slam.

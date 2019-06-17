@@ -305,7 +305,7 @@ public class EmergencyDetection extends AbstractSkill {
 
             globalStartTimeEmergencyDetection = -1;
 
-            // try to memorize global postion of found person
+            // try to memorize global position of found person
             try {
                 memorySlot.memorize(globalGoal);
                 positionDataSlot.memorize(position);

@@ -169,7 +169,7 @@ public class Rotation3D extends Type {
 	 * Returns the rotation in axis/angle representation.
 	 * 
 	 * @param unit
-	 *            The desired unit of the rotaion angle.
+	 *            The desired unit of the rotation angle.
 	 * @return A vecmath object representing the rotation values.
 	 */
 	public AxisAngle4d getAxisAngle(AngleUnit unit) {

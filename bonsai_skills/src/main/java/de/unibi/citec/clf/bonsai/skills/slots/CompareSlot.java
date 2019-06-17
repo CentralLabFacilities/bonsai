@@ -17,8 +17,8 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
  *      -> Memory slot the content will be read from
  *
  * ExitTokens:
- *  success.match:      Entrys are the same
- *  success.mismatch:   Entrys are not the same
+ *  success.match:      Entries are the same
+ *  success.mismatch:   Entries are not the same
  *  error:              ReadSlot was empty
  *
  * Sensors:

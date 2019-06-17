@@ -22,7 +22,7 @@ import java.util.List;
  *
  * Options:
  *  #_NONTERMINALS:     [String[]] Required
- *                          -> List of nonterminals to listen for seperated by ';'
+ *                          -> List of nonterminals to listen for separated by ';'
  *  #_SENSOR:           [String] Optional (default: "SpeechSensor")
  *                          -> Name of the speech sensor to use for understanding
  *  #_TIMEOUT           [long] Optional (default: -1)

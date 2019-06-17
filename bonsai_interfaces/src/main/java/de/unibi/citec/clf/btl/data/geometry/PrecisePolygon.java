@@ -629,7 +629,7 @@ public class PrecisePolygon extends Type implements Iterable<Point2D> {
         for (int i = 0; i < list.size(); i++) {//i is P1
 
             //taken from https://en.wikipedia.org/wiki/Distance_from_a_point_to_a_line#Line_defined_by_two_points
-            //first, intruduce the points
+            //first, introduce the points
             Point2D p0 = point;
             Point2D p1 = list.get(i);
             Point2D p2 = list.get((i + 1) % list.size());

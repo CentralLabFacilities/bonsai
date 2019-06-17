@@ -14,7 +14,7 @@ import de.unibi.citec.clf.btl.data.person.PersonData;
 import java.io.IOException;
 
 /**
- * In this state, the robot says Information about all persons in persondatalist (MemorySlot), wich was recorded by the skill ScanFaces.
+ * In this state, the robot says Information about all persons in persondatalist (MemorySlot), which was recorded by the skill ScanFaces.
  *
  * @author climberg
  */

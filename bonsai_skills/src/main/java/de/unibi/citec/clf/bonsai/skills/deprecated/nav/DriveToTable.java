@@ -87,7 +87,7 @@ public class DriveToTable extends AbstractSkill {
         logger.debug("table: " + table);
         logger.debug("table center: " + center);
 
-        //transformation doesnt work because of reasons. currently working on a fix.
+        //transformation doesn't work because of reasons. currently working on a fix.
 //            center = coordinateTransformer.transform(center, "katana_base_link");
         logger.debug("table (katana_base_link): " + center);
 

@@ -27,8 +27,8 @@ import java.util.concurrent.Future;
  * Search can be narrowed down by specifying max angle and distance to the person.
  * The yaw of the person position is adjusted to face to the person. for that the robot position has to be written in the correct slot before.
  *
- * You can spefiy if you also want to do face identification and/or gender and age detection
- * You can also specify the resize out ratio, which affects the speed of the computation and the quility of the skeleton matching
+ * You can specify if you also want to do face identification and/or gender and age detection
+ * You can also specify the resize out ratio, which affects the speed of the computation and the quality of the skeleton matching
  *
  * <p>
  * ONESHOT
