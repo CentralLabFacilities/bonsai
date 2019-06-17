@@ -3,6 +3,7 @@ package de.unibi.citec.clf.btl.data.geometry;
 
 
 import de.unibi.citec.clf.btl.Type;
+import de.unibi.citec.clf.btl.units.LengthUnit;
 
 import java.util.Objects;
 
@@ -63,6 +64,10 @@ public class BoundingBox3D extends Type {
 
 	public void setSize(Point3D size) {
 		this.size = size;
+	}
+
+	public double volume(LengthUnit lu) {
+		return size.getX(lu) * size.getY(lu) * size.getZ(lu);
 	}
 
 	@Override
