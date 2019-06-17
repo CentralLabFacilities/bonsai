@@ -26,15 +26,15 @@ import java.util.LinkedList;
  *
  * Options:
  *  #_NAME:         [String] Optional (default: "")
- *                      -> Name of location to be stored
- *  #_USE_SLOT:     [boolean] Optional (default: true)
- *                      -> Whether to read location name from memeory. Set to false to use #_NAME.
+ *                      -> Name of viewpoint to be stored
+ *  #_LOCATION      [String] Optional (default: "saved location")
+ *                      -> Name of the location the vp is stored under
  * 
  * Slots:
  *  PositionDataSlot: [PositionData] [Read]
  *      -> Memory slot with position to store
- *  LocationNameSlot: [String] [Read]
- *      -> Memory slot with name the Location should be stored under
+ *  ViewpointNameSlot: [String] [Read]
+ *      -> Memory slot with name the Location should be stored under only used if option #_NAME is not given
  *
  * ExitTokens:
  *  success:    Position saved successfully
@@ -55,7 +55,6 @@ public class StoreLocation extends AbstractSkill {
 
     private static final String KEY_NAME = "#_NAME";
     private static final String KEY_ANAME = "#_LOCATION";
-    private static final String KEY_SLOT = "#_USE_SLOT";
 
     private ExitToken tokenSuccess;
     private ExitToken tokenError;
@@ -83,8 +82,8 @@ public class StoreLocation extends AbstractSkill {
         if (configurator.hasConfigurationKey(KEY_NAME)) {
             viewpointName = configurator.requestValue(KEY_NAME);
         } else {
-            logger.info("no location name given, using slot");
-            nameSlot = configurator.getReadSlot("LocationNameSlot", String.class);
+            logger.info("no viewpoint name given, using slot");
+            nameSlot = configurator.getReadSlot("ViewpointNameSlot", String.class);
         }
 
         kBaseActuator = configurator.getActuator("KBaseActuator", KBaseActuator.class);
