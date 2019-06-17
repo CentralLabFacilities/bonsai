@@ -10,11 +10,11 @@ import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
-import de.unibi.citec.clf.btl.List;
 import de.unibi.citec.clf.btl.data.person.PersonData;
 import de.unibi.citec.clf.btl.data.person.PersonDataList;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
@@ -139,31 +139,30 @@ public class StartPeopleTracking extends AbstractSkill {
             return ExitToken.loop(50);
         }
 
+        List<Integer> roi;
+        try {
+            roi = roiFut.get();
+        } catch (InterruptedException | ExecutionException e) {
+            logger.error(e);
+            return ExitToken.fatal();
+        }
+
         //ROI is done now send tracker init service call and wait for future
         if(trackingFut == null){
-            try {
-                logger.info("OPENPOSE SERVICE CALL ROI RETURNED: " + roiFut.get().get(0) + " " + roiFut.get().get(1) + " " + roiFut.get().get(2) + " " + roiFut.get().get(3));
+                logger.info("OPENPOSE SERVICE CALL ROI RETURNED: " + roi.get(0) + " " + roi.get(1) + " " + roi.get(2) + " " + roi.get(3));
                 //if ROI is 0 0 0 0 == no person
-                if(roiFut.get().get(0) == 0 && roiFut.get().get(1) == 0 && roiFut.get().get(2) == 0 && roiFut.get().get(3) == 0){
+                if(roi.get(0) == 0 && roi.get(1) == 0 && roi.get(2) == 0 && roi.get(3) == 0){
                     return tokenErrorNoPerson;
                 }
                 // check width is enough
-                if(roiFut.get().get(3) < 80) {
-                    int diff = 80-roiFut.get().get(3);
-                    roiFut.get().set(0, (int) (roiFut.get().get(0) - diff/2));
-                    roiFut.get().set(3, roiFut.get().get(3) + diff);
+                if(roi.get(3) < 80) {
+                    int diff = 80-roi.get(3);
+                    roi.set(0, (int) (roi.get(0) - diff/2));
+                    roi.set(3, roi.get(3) + diff);
                 }
-            } catch (InterruptedException | ExecutionException e) {
-                logger.error("could not reach detect people actuator for roi generation service call ", e);
-                return tokenError;
-            }
 
-            try {
-                trackingFut = trackingActuator.startTracking(roiFut.get());
-            } catch (InterruptedException | ExecutionException e) {
-                logger.error("could not reach tracking actuator ", e);
-                return tokenError;
-            }
+                trackingFut = trackingActuator.startTracking(roi);
+
 
             logger.debug("TRACKER INITALIZE SERVICE CALL TRIGGERED");
 
