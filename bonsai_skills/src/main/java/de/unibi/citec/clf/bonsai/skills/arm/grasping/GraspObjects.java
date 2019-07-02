@@ -107,91 +107,92 @@ public class GraspObjects extends AbstractSkill {
             targets = targetsSlot.recall();
         } catch (CommunicationException ex) {
             logger.error("Could not read objects for grasping" + ex.getMessage());
-            return false;}
+            return false;
+        }
 
-            if (targets == null || targets.isEmpty()) {
-                logger.error("no targets");
-                return false;
-            }
+        if (targets == null || targets.isEmpty()) {
+            logger.error("no targets");
+            return false;
+        }
 
-            logger.info("have " + targets.size() + " wanted objects");
+        logger.info("have " + targets.size() + " wanted objects");
 
-            curTarget = targets.get(curIdx);
+        curTarget = targets.get(curIdx);
+        try {
+            firstOrTarget.memorize(curTarget);
+        } catch (CommunicationException ex) {
+            logger.error(ex);
+            return false;
+        }
+
+        logger.info("trying " + curIdx + "of " + targets.size() + " \n\t" + curTarget.getId() + " is " + curTarget.getBestLabel() + "(" + curTarget.getBestRel() + ") at " + curTarget.getCenter());
+        try {
+            returnFuture = graspAct.graspObject(curTarget, group);
+        } catch (IOException e) {
+            return false;
+        }
+
+        return true;
+    }
+
+    @Override
+    public ExitToken execute() {
+
+        if (!returnFuture.isDone()) {
+            logger.debug("grasping is not done yet");
+            return ExitToken.loop(LOOP_TIME);
+        }
+
+        GraspActuator.MoveitResult GRT;
+        try {
+            GRT = returnFuture.get();
+        } catch (InterruptedException | ExecutionException ex) {
+            logger.fatal("could not get furure after isDone");
+            return ExitToken.fatal();
+        }
+
+        logger.info("Grasping: " + GRT.toString());
+        switch (GRT) {
+            case SUCCESS:
+                return tokenSuccess;
+            default:
+                try {
+                    return getNext();
+                } catch (IOException e) {
+                    logger.error(e);
+                    return ExitToken.fatal();
+                }
+        }
+
+    }
+
+    @Override
+    public ExitToken end(ExitToken curToken) {
+        if (!curToken.getExitStatus().isFatal()) {
             try {
                 firstOrTarget.memorize(curTarget);
             } catch (CommunicationException ex) {
                 logger.error(ex);
-                return false;
-            }
-
-            logger.info("trying " + curIdx + "of " + targets.size() + " \n\t" + curTarget.getId() + " is " + curTarget.getBestLabel() + "(" + curTarget.getBestRel() + ") at " + curTarget.getCenter());
-            try {
-                returnFuture = graspAct.graspObject(curTarget, group);
-            } catch (IOException e) {
-                return false;
-            }
-
-            return true;
-        }
-
-        @Override
-        public ExitToken execute () {
-
-            if (!returnFuture.isDone()) {
-                logger.debug("grasping is not done yet");
-                return ExitToken.loop(LOOP_TIME);
-            }
-
-            GraspActuator.MoveitResult GRT;
-            try {
-                GRT = returnFuture.get();
-            } catch (InterruptedException | ExecutionException ex) {
-                logger.fatal("could not get furure after isDone");
                 return ExitToken.fatal();
             }
-
-            logger.info("Grasping: " + GRT.toString());
-            switch (GRT) {
-                case SUCCESS:
-                    return tokenSuccess;
-                default:
-                    try {
-                        return getNext();
-                    } catch (IOException e) {
-                        logger.error(e);
-                        return ExitToken.fatal();
-                    }
-            }
-
         }
-
-        @Override
-        public ExitToken end (ExitToken curToken){
-            if (!curToken.getExitStatus().isFatal()) {
-                try {
-                    firstOrTarget.memorize(curTarget);
-                } catch (CommunicationException ex) {
-                    logger.error(ex);
-                    return ExitToken.fatal();
-                }
-            }
-            return curToken;
-        }
-
-        private ExitToken getNext () throws IOException {
-            if (!tryAll) {
-                logger.error("!tryall, tried only first in targets");
-                return tokenErrorCantGrasp;
-            }
-
-            if (++curIdx >= targets.size()) {
-                logger.error("no more objects in targets");
-                return tokenErrorCantGrasp;
-            }
-            curTarget = targets.get(curIdx);
-            logger.info("trying " + curIdx + "of " + targets.size() + " \n\t" + curTarget.getId() + " is " + curTarget.getBestLabel() + "(" + curTarget.getBestRel() + ") at " + curTarget.getCenter());
-            returnFuture = graspAct.graspObject(curTarget, group);
-            return ExitToken.loop(50);
-        }
-
+        return curToken;
     }
+
+    private ExitToken getNext() throws IOException {
+        if (!tryAll) {
+            logger.error("!tryall, tried only first in targets");
+            return tokenErrorCantGrasp;
+        }
+
+        if (++curIdx >= targets.size()) {
+            logger.error("no more objects in targets");
+            return tokenErrorCantGrasp;
+        }
+        curTarget = targets.get(curIdx);
+        logger.info("trying " + curIdx + "of " + targets.size() + " \n\t" + curTarget.getId() + " is " + curTarget.getBestLabel() + "(" + curTarget.getBestRel() + ") at " + curTarget.getCenter());
+        returnFuture = graspAct.graspObject(curTarget, group);
+        return ExitToken.loop(50);
+    }
+
+}
