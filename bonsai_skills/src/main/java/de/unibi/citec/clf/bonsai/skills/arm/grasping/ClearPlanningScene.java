@@ -45,6 +45,7 @@ public class ClearPlanningScene extends AbstractSkill {
     public boolean init() {
 
         returnFuture = graspAct.clearScene();
+        logger.debug("clearing planning scene...");
 
         return true;
     }
@@ -53,7 +54,6 @@ public class ClearPlanningScene extends AbstractSkill {
     public ExitToken execute() {
 
         if (!returnFuture.isDone()) {
-            logger.debug("grasping is not done yet");
             return ExitToken.loop();
         }
 
