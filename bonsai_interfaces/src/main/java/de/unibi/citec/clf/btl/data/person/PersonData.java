@@ -15,7 +15,7 @@ import de.unibi.citec.clf.btl.units.LengthUnit;
  */
 public class PersonData extends BDO {
 
-
+    private double reliability = 0.0;
     private String uuid;
     private String name = "";
     private Point3D headPosition;
@@ -27,6 +27,13 @@ public class PersonData extends BDO {
 
     public PersonData() {
 
+    }
+
+    public double getReliability() {return reliability;}
+    public void setReliability(double rel) {
+        if(rel < 0) reliability = 0;
+        else if(rel > 1.0) reliability = 1;
+        else reliability = rel;
     }
 
     public String getName() {

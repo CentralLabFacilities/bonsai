@@ -53,11 +53,11 @@ public class RosSendData extends RosNode implements SendDataActuator {
 
     @Override
     public void sendData(Type data) throws IOException {
-        logger.fatal("send " + data);
-        logger.fatal("type " + rostype);
+        logger.trace("send " + data);
+        logger.trace("type " + rostype);
         try {
             Object msg = MsgTypeFactory.getInstance().createMsg(data,rostype);
-            logger.info("publishing " + msg);
+            logger.debug("publishing " + msg);
             publisher.publish(msg);
         } catch (RosSerializer.SerializationException e) {
             throw new IOException(e);
