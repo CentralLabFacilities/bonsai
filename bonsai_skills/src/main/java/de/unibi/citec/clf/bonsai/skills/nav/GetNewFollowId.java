@@ -47,6 +47,8 @@ import java.io.IOException;
  */
 public class GetNewFollowId extends AbstractSkill {
 
+    private static final String KEY_USE_PERSON_SLOT = "use_person_slot";
+
     private ExitToken tokenSuccess;
     private ExitToken tokenError;
 
@@ -59,6 +61,7 @@ public class GetNewFollowId extends AbstractSkill {
     private Sensor<PersonDataList> personSensor;
 
     private MemorySlotReader<PositionData> positionSlotRead;
+    private MemorySlotReader<PersonData> followPersonRead = null;
     private MemorySlotWriter<PersonData> followPersonSlotWrite;
 
     private PositionData personPos;
@@ -70,9 +73,15 @@ public class GetNewFollowId extends AbstractSkill {
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
         tokenError = configurator.requestExitToken(ExitStatus.ERROR());
 
+        if(configurator.requestOptionalBool(KEY_USE_PERSON_SLOT,false)) {
+            followPersonRead = configurator.getReadSlot("PersonInput", PersonData.class);
+        } else {
+            positionSlotRead = configurator.getReadSlot("LastPersonPositionSlot", PositionData.class);
+        }
+
         personSensor = configurator.getSensor("PersonSensor", PersonDataList.class);
 
-        positionSlotRead = configurator.getReadSlot("LastPersonPositionSlot", PositionData.class);
+
         followPersonSlotWrite = configurator.getWriteSlot("PersonDataSlot", PersonData.class);
 
         maxDist = configurator.requestOptionalDouble(KEY_MAX_DISTANCE, maxDist);
@@ -81,7 +90,14 @@ public class GetNewFollowId extends AbstractSkill {
     @Override
     public boolean init() {
         try {
-            personPos = positionSlotRead.recall();
+
+            if (followPersonRead != null) {
+                PersonData p = followPersonRead.recall();
+                personPos = p.getPosition();
+            } else {
+                personPos = positionSlotRead.recall();
+            }
+
         } catch (CommunicationException ex) {
             logger.error("Could not read person to follow from slot", ex);
             return false;
