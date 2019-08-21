@@ -36,7 +36,7 @@ public class Pose3DSerializer extends RosSerializer<Pose3D, geometry_msgs.Pose> 
     public Pose serialize(Pose3D data, MessageFactory fact) throws SerializationException {
         Pose pose = fact.newFromType(Pose._TYPE);
         pose.setOrientation(MsgTypeFactory.getInstance().createMsg(data.getRotation(), geometry_msgs.Quaternion.class));
-        pose.setPosition(MsgTypeFactory.getInstance().createMsg(data.getRotation(), geometry_msgs.Point.class));
+        pose.setPosition(MsgTypeFactory.getInstance().createMsg(data.getTranslation(), geometry_msgs.Point.class));
         return pose;
     }
 }

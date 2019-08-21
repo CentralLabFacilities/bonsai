@@ -53,21 +53,33 @@ public class RosSerializerRepository {
         RosSerializer<T, M> ret = null;
 
         Map<String, RosSerializer<? extends Type, ? extends Message>> submap = serializers.get(baseType);
+
+        if(submap == null) return null;
         for (Map.Entry<String, RosSerializer<? extends Type, ? extends Message>> entry : submap.entrySet()) {
-            ret = (RosSerializer<T, M>) entry.getValue();
             if (type.equals(entry.getKey())) {
+                ret = (RosSerializer<T, M>) entry.getValue();
                 break;
             }
-
         }
+        //Again
+        if(ret == null) for(Map.Entry<String, RosSerializer<? extends Type, ? extends Message>> entry : submap.entrySet()){
+            String matcher = entry.getKey();
+            matcher = matcher.substring(10); //remove "interface "
+            matcher = matcher.replaceAll("\\.","/");
+            if(type.equals(matcher)) {
+                ret = (RosSerializer<T, M>) entry.getValue();
+                break;
+            }
+        }
+
         String print = (ret != null) ? ret.getClass().toString() : "NULL";
         logger.debug("fetched: " + print);
         return ret;
     }
 
     public static <T extends Type, M extends Message> RosSerializer<T, M> getMsgSerializer(Class<T> baseType, Class<M> msgType) {
-        RosSerializer<T, M> ret = (RosSerializer<T, M>) serializers.get(baseType).get(msgType.toString());
         logger.debug("fetch: " + baseType + ", " + msgType);
+        RosSerializer<T, M> ret = (RosSerializer<T, M>) serializers.get(baseType).get(msgType.toString());
         String print = (ret != null) ? ret.getClass().toString() : "NULL";
         logger.debug("fetched: " + print);
 
