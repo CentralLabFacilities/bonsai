@@ -2,6 +2,10 @@
 Coding Guidelines
 =================
 
+.. note::
+
+    Some things are Team ToBI (Robocupathome Team of Bielefeld) specific
+
 All Skills and behaviours in bonsai-skills shall be properly documented.
 
 Skills
