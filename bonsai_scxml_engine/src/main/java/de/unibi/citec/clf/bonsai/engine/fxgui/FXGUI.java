@@ -11,6 +11,7 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Scene;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
+import javafx.scene.image.Image;
 import javafx.scene.layout.AnchorPane;
 import javafx.stage.Stage;
 import javafx.stage.WindowEvent;
@@ -53,6 +54,9 @@ public class FXGUI extends Application implements IStateControlListener {
     public void start(Stage primaryStage) {
         FXGUI.primaryStage = primaryStage;
         FXGUI.primaryStage.setTitle("BonSAI - FX");
+        try {
+            primaryStage.getIcons().add(new Image("icons/logo.png"));
+        } catch (Exception ignored) { logger.warn("Exception when setting bonsai icon (probably image file not found)"); }
 
         primaryStage.setOnCloseRequest((WindowEvent we) -> {
             Platform.exit();
