@@ -35,7 +35,7 @@ import java.io.IOException;
  * (optional) #_MAX_ANGLE(rad)    -> max Person Angle (in both directions)
  *
  * slots:
- * PersonData currentPersonSlot -> saves the found person.
+ * PersonData PersonDataSlot -> saves the found person.
  *
  * possible return states are:
  * success             -> person found
