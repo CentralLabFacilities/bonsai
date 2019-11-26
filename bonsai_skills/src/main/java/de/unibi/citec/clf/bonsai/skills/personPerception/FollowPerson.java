@@ -124,6 +124,7 @@ public class FollowPerson extends AbstractSkill {
     private MemorySlotReader<PersonData> followPersonSlotRead;
     private MemorySlotWriter<PositionData> lastPersonPositionSlot;
     private MemorySlotWriter<NavigationGoalData> lastGoalSlot;
+    private MemorySlotWriter<PositionData> lastPersonPositionPredictionSlot;
 
     private Sensor<PersonDataList> personSensor;
     private Sensor<PositionData> posSensor;
@@ -133,6 +134,7 @@ public class FollowPerson extends AbstractSkill {
 
     private PersonData personFollow = null;
     private PositionData lastPersonPosition;
+    private PositionData lastPersonPositionPrediction;
     private String lastUuid;
     private NavigationGoalData lastGoalUsed;
 
@@ -174,6 +176,7 @@ public class FollowPerson extends AbstractSkill {
 
         followPersonSlotRead = configurator.getReadSlot("FollowPersonSlot", PersonData.class);
         lastPersonPositionSlot = configurator.getWriteSlot("LastPersonPositionSlot", PositionData.class);
+        lastPersonPositionPredictionSlot = configurator.getWriteSlot("LastPersonPositionPredictionSlot", PositionData.class);
         lastGoalSlot = configurator.getWriteSlot("LastGoalSlot", NavigationGoalData.class);
 
         personSensor = configurator.getSensor("PersonSensor", PersonDataList.class);
@@ -210,7 +213,10 @@ public class FollowPerson extends AbstractSkill {
             return false;
         }
 
-        lastPersonPosition = new PositionData(personFollow.getPosition());
+        lastPersonPositionPrediction = new PositionData(personFollow.getPosition());
+        if (personFollow.getReliability() > 0.85) {
+            lastPersonPosition = new PositionData(personFollow.getPosition());
+        }
 
         if (lastUuid == null) {
             lastUuid = personFollow.getUuid();
@@ -558,6 +564,13 @@ public class FollowPerson extends AbstractSkill {
                 lastPersonPositionSlot.memorize(lastPersonPosition);
             } catch (CommunicationException ex) {
                 logger.fatal("Could not store last person position", ex);
+            }
+        }
+        if (lastPersonPositionPrediction != null) {
+            try {
+                lastPersonPositionPredictionSlot.memorize(lastPersonPositionPrediction);
+            } catch (CommunicationException ex) {
+                logger.fatal("Could not store last person position prediction", ex);
             }
         }
 
