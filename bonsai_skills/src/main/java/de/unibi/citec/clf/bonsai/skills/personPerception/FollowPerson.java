@@ -38,6 +38,8 @@ import java.io.IOException;
  * <pre>
  *
  * Options:
+ *  #_RELIABILITY_THRESHOLD:    [double] Optional (default: 0.7)
+ *                                  -> Threshold that separates predictions from trustworthy last positions
  *  #_PERSON_LOST_TIMEOUT:      [long] Optional (default: 100)
  *                                  -> Time passed in ms without seeing the person to follow before exiting
  *  #_STOP_DISTANCE:            [double] Optional (default: 500)
@@ -84,6 +86,7 @@ import java.io.IOException;
  */
 public class FollowPerson extends AbstractSkill {
 
+    private static final String KEY_RELIABILITY_THRESHOLD = "#_RELIABILITY_THRESHOLD";
     private static final String KEY_PERSON_LOST_TIMEOUT = "#_PERSON_LOST_TIMEOUT";
     private static final String KEY_STOP_DISTANCE = "#_STOP_DISTANCE";
     private static final String KEY_PERSON_LOST_DISTANCE = "#_PERSON_LOST_DISTANCE";
@@ -148,6 +151,7 @@ public class FollowPerson extends AbstractSkill {
     private double currentPersonDistance = 0;
     private long robotPosTimeout;
     private double wiggleAngle = 0.175;
+    private double reliability_threshold = 0.7;
     private boolean alreadyTalked = false;
     private CoordinateTransformer tf;
 
@@ -164,6 +168,7 @@ public class FollowPerson extends AbstractSkill {
         strategy = configurator.requestOptionalValue(KEY_STRATEGY, strategy);
         useNearestPerson = configurator.requestOptionalBool(KEY_ENABLE_NEAREST,useNearestPerson);
         nearestToOldDist = configurator.requestOptionalDouble(KEY_NEAREST_MAXDIST,nearestToOldDist);
+        reliability_threshold = configurator.requestOptionalDouble(KEY_RELIABILITY_THRESHOLD, reliability_threshold);
 
         lastUuid = configurator.requestOptionalValue(KEY_UUID, null);
 
@@ -214,7 +219,7 @@ public class FollowPerson extends AbstractSkill {
         }
 
         lastPersonPositionPrediction = new PositionData(personFollow.getPosition());
-        if (personFollow.getReliability() > 0.85) {
+        if (personFollow.getReliability() > reliability_threshold) {
             lastPersonPosition = new PositionData(personFollow.getPosition());
         }
 
