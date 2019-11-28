@@ -1,49 +1,48 @@
 package de.unibi.citec.clf.bonsai.skills.arm.grasping;
 
-import de.unibi.citec.clf.bonsai.actuators.GraspActuator;
 import de.unibi.citec.clf.bonsai.actuators.PlanningSceneActuator;
-import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
-import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
-import de.unibi.citec.clf.btl.units.LengthUnit;
 
-import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 /**
- * Gasp an object by id.
+ * Clear the planning scene.
+ *
+ * ExitTokens:
+ *  success:    Clearing successful
+ *  error       Clearing not successful
+ *
+ * Sensors:
+ *
+ * Actuators:
+ *  PlanningSceneActuator
  *
  * @author lruegeme
  */
 public class ClearPlanningScene extends AbstractSkill {
 
-    // used tokens   
+    // used tokens
     private ExitToken tokenSuccess;
+    private ExitToken tokenError;
 
     private PlanningSceneActuator graspAct;
-
-
-    private static final LengthUnit mm = LengthUnit.MILLIMETER;
 
     private Future<Boolean> returnFuture;
 
     @Override
     public void configure(ISkillConfigurator configurator) {
-
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
+        tokenError = configurator.requestExitToken(ExitStatus.ERROR());
 
         graspAct = configurator.getActuator("PlanningSceneActuator", PlanningSceneActuator.class);
-
-
     }
 
     @Override
     public boolean init() {
-
         returnFuture = graspAct.clearScene();
         logger.debug("clearing planning scene...");
 
@@ -52,13 +51,18 @@ public class ClearPlanningScene extends AbstractSkill {
 
     @Override
     public ExitToken execute() {
-
         if (!returnFuture.isDone()) {
             return ExitToken.loop();
         }
-
-       return tokenSuccess;
-
+        try {
+            if (returnFuture.get()) {
+                return tokenSuccess;
+            } else {
+                return tokenError;
+            }
+        } catch (InterruptedException | ExecutionException e) {
+            return tokenError;
+        }
     }
 
     @Override
@@ -68,6 +72,4 @@ public class ClearPlanningScene extends AbstractSkill {
         }
         return curToken;
     }
-
-
 }
