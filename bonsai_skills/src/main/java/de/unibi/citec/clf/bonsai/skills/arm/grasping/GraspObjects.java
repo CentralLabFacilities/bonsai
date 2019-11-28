@@ -20,7 +20,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Gasp an object from the list.
+ * Grasp an object from the list.
  *
  * @author lruegeme
  */
