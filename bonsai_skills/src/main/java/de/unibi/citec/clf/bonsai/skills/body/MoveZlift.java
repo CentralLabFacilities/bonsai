@@ -33,7 +33,7 @@ import java.util.logging.Logger;
  * Slots:
  *
  * ExitTokens:
- *  success:    Head movement completed successfully
+ *  success:    z-lift movement completed successfully
  *  error
  *
  * Sensors:

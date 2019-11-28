@@ -17,25 +17,23 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 /**
- * Robot recognizes objects
+ * Robot detects objects
  * <pre>
- *
  *
  * Slots:
  *  ObjectShapeListSlot: [ObjectShapeList] [Write]
- *      -> Memory slot the recognized objects will be written to
+ *      -> Memory slot the detected objects will be written to
  *
  * ExitTokens:
- *  success:                Successfully recognized at least one Object
- *  success.noObjects:      Successfully recognized no object (i.e. there was no error and no object)
- *  error:                  Could not successfully recognize
+ *  success:                Successfully detected at least one Object
+ *  success.noObjects:      Successfully detected no object (i.e. there was no error and no object)
+ *  error:                  Could not successfully detect
  *
  * Sensors:
  *
  * Actuators:
- *  RecognizeObjectsActuator: [RecognizeObjectsActuator]
- *      -> Called to recognize the objects
- *
+ *  ObjectDetectionActuator: [ObjectDetectionActuator]
+ *      -> Called to detect the objects
  *
  * </pre>
  *

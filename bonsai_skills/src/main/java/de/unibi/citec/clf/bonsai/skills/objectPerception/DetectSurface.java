@@ -8,7 +8,6 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.btl.data.geometry.BoundingBox3D;
-import de.unibi.citec.clf.btl.data.object.ObjectShapeList;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 
 import java.io.IOException;
@@ -17,6 +16,23 @@ import java.util.concurrent.Future;
 
 /**
  * Robot recognizes a surface in front of him e.g. table
+ * <pre>
+ *
+ * Slots:
+ *  TableBox: [BoundingBox3D] [Write]
+ *      -> Memory slot the detected surface will be written to
+ *
+ * ExitTokens:
+ *  success:            Successfully detected table
+ *  error:              An error occurred, e.g. no table was found
+ *
+ * Sensors:
+ *
+ * Actuators:
+ *  ObjectDetectionActuator: [ObjectDetectionActuator]
+ *      -> Called to detect the surface
+ *
+ * </pre>
  *
  * @author lruegeme
  */
