@@ -2,7 +2,6 @@ package de.unibi.citec.clf.bonsai.skills.arm.grasping;
 
 import de.unibi.citec.clf.bonsai.actuators.GraspActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
-import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
@@ -11,7 +10,6 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.btl.data.object.ObjectShapeData;
 import de.unibi.citec.clf.btl.data.object.ObjectShapeList;
-import de.unibi.citec.clf.btl.units.LengthUnit;
 
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
@@ -21,6 +19,35 @@ import java.util.logging.Logger;
 
 /**
  * Grasp an object from the list.
+ * <pre>
+ *
+ * Options:
+ *  #_TRY_ALL:      [boolean] Optional (Default: false)
+ *                      -> Specify whether the robot should only try to grasp the first object of the targets or try all of them
+ *  #_CHOOSE_GROUP: [boolean] Optional (Default: false)
+ *                      -> If true, read the name of the planning group to use from GroupSlot, else use the default group
+ *
+ * Slots:
+ *  ObjectShapeListSlot: [ObjectShapeList] [Read]
+ *      -> A list of previously detected objects
+ *  TargetObjectsSlot: [ObjectShapeList] [Read]
+ *      -> A list of objects the robots should try to grasp
+ *  GraspObjectSlot: [ObjectShapeData] [Write]
+ *      -> The object that the robot tried to grasp last (whether that was successful or not)
+ *  GroupSlot: [String] [Read]
+ *      -> The name of the planning group to use. Only read if CHOOSE_GROUP is true
+ *
+ * ExitTokens:
+ *  success:            Successfully grasped objects
+ *  error.cantGrasp:    Cannot grasp
+ *
+ * Sensors:
+ *
+ * Actuators:
+ *  GraspActuator: [GraspActuator]
+ *      -> Called to grasp the objects
+ *
+ * </pre>
  *
  * @author lruegeme
  */
@@ -45,9 +72,7 @@ public class GraspObjects extends AbstractSkill {
     private MemorySlotReader<ObjectShapeList> targetsSlot;
     private MemorySlotReader<ObjectShapeList> objectsRecognizedSlot;
     private MemorySlotWriter<ObjectShapeData> firstOrTarget;
-    private MemorySlot<String> groupSlot;
-
-    private static final LengthUnit mm = LengthUnit.MILLIMETER;
+    private MemorySlotReader<String> groupSlot;
 
     private int curIdx = 0;
     private ObjectShapeList targets = null;
@@ -71,7 +96,7 @@ public class GraspObjects extends AbstractSkill {
         overrideGroup = configurator.requestOptionalBool(KEY_CHOOSE_GROUP, overrideGroup);
 
         if (overrideGroup) {
-            groupSlot = configurator.getSlot("GroupSlot", String.class);
+            groupSlot = configurator.getReadSlot("GroupSlot", String.class);
             logger.info("using group slot!");
         }
 
@@ -99,7 +124,7 @@ public class GraspObjects extends AbstractSkill {
         }
 
         if (recognized == null) {
-            logger.error("Could not read the ObjectList ");
+            logger.error("Could not read the ObjectList");
             //return tokenError;
         }
 
@@ -125,7 +150,8 @@ public class GraspObjects extends AbstractSkill {
             return false;
         }
 
-        logger.info("trying " + curIdx + "of " + targets.size() + " \n\t" + curTarget.getId() + " is " + curTarget.getBestLabel() + "(" + curTarget.getBestRel() + ") at " + curTarget.getCenter());
+        logger.info("trying " + curIdx + "of " + targets.size() + " \n\t" + curTarget.getId() + " is " +
+                curTarget.getBestLabel() + "(" + curTarget.getBestRel() + ") at " + curTarget.getCenter());
         try {
             returnFuture = graspAct.graspObject(curTarget, group);
         } catch (IOException e) {
@@ -139,7 +165,7 @@ public class GraspObjects extends AbstractSkill {
     public ExitToken execute() {
 
         if (!returnFuture.isDone()) {
-            logger.debug("grasping is not done yet");
+            //logger.debug("grasping is not done yet");
             return ExitToken.loop(LOOP_TIME);
         }
 
@@ -147,7 +173,7 @@ public class GraspObjects extends AbstractSkill {
         try {
             GRT = returnFuture.get();
         } catch (InterruptedException | ExecutionException ex) {
-            logger.fatal("could not get furure after isDone");
+            logger.fatal("could not get future after isDone");
             return ExitToken.fatal();
         }
 
