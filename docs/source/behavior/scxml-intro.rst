@@ -46,7 +46,7 @@ States can have Substates. The initial Attribute is required and needs to be a c
     </state>
 
 -  If a child is active all parent states are active as well.
--  States may have ``onenty`` and  ``onexit`` elements which may contain actions(`executable content`_) to be executed on entry or exit of the state.
+-  States may have ``onentry`` and  ``onexit`` elements which may contain actions(`executable content`_) to be executed on entry or exit of the state.
 
 .. _`executable content`: https://www.w3.org/TR/scxml/#executable
 
