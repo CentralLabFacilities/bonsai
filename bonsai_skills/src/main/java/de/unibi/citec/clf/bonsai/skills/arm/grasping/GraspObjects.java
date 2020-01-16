@@ -150,7 +150,7 @@ public class GraspObjects extends AbstractSkill {
             return false;
         }
 
-        logger.info("trying " + curIdx + "of " + targets.size() + " \n\t" + curTarget.getId() + " is " +
+        logger.info("trying " + curIdx + " of " + targets.size() + " \n\t" + curTarget.getId() + " is " +
                 curTarget.getBestLabel() + "(" + curTarget.getBestRel() + ") at " + curTarget.getCenter());
         try {
             returnFuture = graspAct.graspObject(curTarget, group);
