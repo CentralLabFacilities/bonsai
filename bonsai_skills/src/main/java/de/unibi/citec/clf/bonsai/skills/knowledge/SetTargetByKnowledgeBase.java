@@ -2,7 +2,6 @@ package de.unibi.citec.clf.bonsai.skills.knowledge;
 
 import de.unibi.citec.clf.bonsai.actuators.KBaseActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
-import de.unibi.citec.clf.bonsai.core.exception.ConfigurationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
@@ -26,12 +25,10 @@ import de.unibi.citec.clf.btl.data.navigation.NavigationGoalData;
  *                                  -> Name of location to drive to
  *  #_VIEWPOINT:                [String] Optional (default: "")
  *                                  -> Name of viewpoint to drive to. Only if #_USE_SPECIFIC_VIEWPOINT is true
- *  #_USE_SLOT:                 [boolean] Optional (default: true)
- *                                  -> Whether to read location and viewpoint name from memory. Set to false to use #_LOCATION and #_VIEWPOINT.
  *
  *
  * Slots:
- *  LocationNameSlot: [String] [Read]
+ *  LocationNameSlot: [String] [Read], optional
  *      -> Memory slot to read the name of a specific location
  *  ViewpointNameSlot: [String] [Read], optional
  *      -> Memory slot to read the name of a specific viewpoint. Only needed when #_USE_SPECIFIC_VIEWPOINT is true
