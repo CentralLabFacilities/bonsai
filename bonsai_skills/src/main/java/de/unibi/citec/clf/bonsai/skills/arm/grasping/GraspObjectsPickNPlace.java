@@ -4,6 +4,8 @@ import de.unibi.citec.clf.bonsai.actuators.GraspActuator;
 import de.unibi.citec.clf.bonsai.actuators.PicknPlaceActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
+import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
+import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -44,12 +46,10 @@ public class GraspObjectsPickNPlace extends AbstractSkill {
     private ArmController180 armController;
     private PicknPlaceActuator poseAct;
 
-    private MemorySlot<ObjectShapeList> targetsSlot;
-    private MemorySlot<ObjectShapeList> objectsRecognizedSlot;
-    private MemorySlot<ObjectShapeData> firstOrTarget;
-    private MemorySlot<String> groupSlot;
-
-    private static final LengthUnit mm = LengthUnit.MILLIMETER;
+    private MemorySlotReader<ObjectShapeList> targetsSlot;
+    private MemorySlotReader<ObjectShapeList> objectsRecognizedSlot;
+    private MemorySlotWriter<ObjectShapeData> firstOrTarget;
+    private MemorySlotReader<String> groupSlot;
 
     private int curIdx = 0;
     private ObjectShapeList targets = null;
@@ -65,15 +65,15 @@ public class GraspObjectsPickNPlace extends AbstractSkill {
 
         poseAct = configurator.getActuator("PoseActuatorTobi", PicknPlaceActuator.class);
 
-        firstOrTarget = configurator.getSlot("GraspObjectSlot", ObjectShapeData.class);
-        targetsSlot = configurator.getSlot("TargetObjectsSlot", ObjectShapeList.class);
-        objectsRecognizedSlot = configurator.getSlot("ObjectShapeListSlot", ObjectShapeList.class);
+        firstOrTarget = configurator.getWriteSlot("GraspObjectSlot", ObjectShapeData.class);
+        targetsSlot = configurator.getReadSlot("TargetObjectsSlot", ObjectShapeList.class);
+        objectsRecognizedSlot = configurator.getReadSlot("ObjectShapeListSlot", ObjectShapeList.class);
 
         tryAll = configurator.requestOptionalBool(KEY_TRY_ALL, tryAll);
         overrideGroup = configurator.requestOptionalBool(KEY_CHOOSE_GROUP, overrideGroup);
         
         if (overrideGroup){
-            groupSlot = configurator.getSlot("GroupSlot", String.class);
+            groupSlot = configurator.getReadSlot("GroupSlot", String.class);
             logger.info("using group slot!");
         }
         

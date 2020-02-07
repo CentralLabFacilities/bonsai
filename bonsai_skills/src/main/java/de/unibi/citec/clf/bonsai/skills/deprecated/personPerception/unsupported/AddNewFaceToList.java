@@ -3,6 +3,7 @@ package de.unibi.citec.clf.bonsai.skills.deprecated.personPerception.unsupported
 
 import de.unibi.citec.clf.bonsai.actuators.SpeechActuator;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
+import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
 import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
@@ -49,7 +50,7 @@ public class AddNewFaceToList extends AbstractSkill {
 
     // unsupported private MemorySlot<FaceIdentificationList> knownPersonMemorySlot;
     
-    private MemorySlot<String> newIndex;
+    private MemorySlotWriter<String> newIndex;
 
     /**
      * Additional time to learn person.
@@ -78,7 +79,7 @@ public class AddNewFaceToList extends AbstractSkill {
         knownPersonMemorySlot = configurator.getSlot(
                 "faceList", FaceIdentificationList.class);*/
 
-        newIndex = configurator.getSlot(
+        newIndex = configurator.getWriteSlot(
                 "newIndex", String.class);
         
         // request all tokens that you plan to return from other methods

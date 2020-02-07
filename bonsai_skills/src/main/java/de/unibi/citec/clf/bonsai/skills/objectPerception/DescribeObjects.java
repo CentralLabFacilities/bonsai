@@ -2,7 +2,7 @@ package de.unibi.citec.clf.bonsai.skills.objectPerception;
 
 import de.unibi.citec.clf.bonsai.actuators.SpeechActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
-import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
+import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
@@ -33,7 +33,7 @@ public class DescribeObjects extends AbstractSkill {
     // used tokens
     private ExitToken tokenSuccess;
 
-    private MemorySlot<ObjectShapeList> objectsRecognizedSlot;
+    private MemorySlotReader<ObjectShapeList> objectsRecognizedSlot;
     private SpeechActuator speechActuator;
 
     private ObjectShapeList foundObjects;
@@ -46,7 +46,7 @@ public class DescribeObjects extends AbstractSkill {
 
         speechActuator = configurator.getActuator("SpeechActuator", SpeechActuator.class);
 
-        objectsRecognizedSlot = configurator.getSlot("ObjectShapeListSlot", ObjectShapeList.class);
+        objectsRecognizedSlot = configurator.getReadSlot("ObjectShapeListSlot", ObjectShapeList.class);
 
         byPosition = configurator.requestOptionalBool(KEY_BY_POSITION, byPosition);
         minRel = configurator.requestOptionalDouble(KEY_MINREL, minRel);
