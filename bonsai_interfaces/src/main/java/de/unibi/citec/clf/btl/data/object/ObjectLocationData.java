@@ -1,9 +1,6 @@
 package de.unibi.citec.clf.btl.data.object;
 
 
-import java.util.HashSet;
-import java.util.Set;
-
 import de.unibi.citec.clf.btl.data.geometry.PrecisePolygon;
 
 /**

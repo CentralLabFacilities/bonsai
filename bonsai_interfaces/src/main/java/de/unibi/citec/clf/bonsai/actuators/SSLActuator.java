@@ -6,7 +6,6 @@ import de.unibi.citec.clf.bonsai.actuators.data.SoundSourceLocalizationResult;
 import de.unibi.citec.clf.bonsai.core.object.Actuator;
 import de.unibi.citec.clf.btl.data.common.Timestamp;
 
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 /**

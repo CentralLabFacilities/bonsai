@@ -2,8 +2,6 @@ package de.unibi.citec.clf.bonsai.skills.deprecated.personPerception.openpose;
 
 import de.unibi.citec.clf.bonsai.actuators.GetCrowdAttributesActuator;
 import de.unibi.citec.clf.bonsai.actuators.KBaseActuator;
-import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
-import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
 import de.unibi.citec.clf.bonsai.actuators.SpeechActuator;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
@@ -11,7 +9,6 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.btl.List;
-import de.unibi.citec.clf.btl.data.knowledgebase.KBase;
 import de.unibi.citec.clf.btl.data.knowledgebase.Crowd;
 import de.unibi.citec.clf.btl.data.person.PersonData;
 import de.unibi.citec.clf.btl.data.navigation.PositionData;

@@ -2,7 +2,6 @@ package de.unibi.citec.clf.bonsai.skills.body;
 
 import de.unibi.citec.clf.bonsai.actuators.JointControllerActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
-import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
 import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;

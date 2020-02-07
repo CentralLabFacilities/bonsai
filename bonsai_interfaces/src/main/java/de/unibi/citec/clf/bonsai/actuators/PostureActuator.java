@@ -3,7 +3,6 @@ package de.unibi.citec.clf.bonsai.actuators;
 
 
 import de.unibi.citec.clf.bonsai.core.object.Actuator;
-import java.io.IOException;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;

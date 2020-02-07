@@ -1,19 +1,12 @@
 package de.unibi.citec.clf.bonsai.engine.scxml;
 
-import de.unibi.citec.clf.bonsai.core.exception.ConfigurationException;
 import de.unibi.citec.clf.bonsai.engine.LoadingResults;
-import de.unibi.citec.clf.bonsai.engine.SCXMLDecoder;
-import de.unibi.citec.clf.bonsai.engine.SkillStateMachine;
-import de.unibi.citec.clf.bonsai.engine.control.StateMachineController;
 import de.unibi.citec.clf.bonsai.test.TestListener;
-import org.apache.commons.scxml.model.SCXML;
 import org.apache.log4j.PropertyConfigurator;
 import org.junit.Before;
 import org.junit.Test;
 
 import javax.xml.transform.TransformerException;
-import java.io.File;
-import java.util.HashMap;
 import java.util.concurrent.TimeoutException;
 
 import static junit.framework.TestCase.assertFalse;

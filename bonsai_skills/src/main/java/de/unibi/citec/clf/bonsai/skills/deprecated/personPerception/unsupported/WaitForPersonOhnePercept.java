@@ -6,14 +6,11 @@ import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
-import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
-import de.unibi.citec.clf.bonsai.util.MapReader;
 import de.unibi.citec.clf.btl.data.hardwareinfo.LaserInfo.OutOfRangeException;
 import de.unibi.citec.clf.btl.data.vision1d.LaserData;
 import de.unibi.citec.clf.btl.units.AngleUnit;
 import static de.unibi.citec.clf.btl.units.LengthUnit.METER;
-import java.util.Map;
 
 /**
  * Use this state to wait until the door opens.

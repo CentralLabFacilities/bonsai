@@ -14,7 +14,6 @@ import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException
 import de.unibi.citec.clf.bonsai.skills.deprecated.personPerception.openpose.SearchForPerson;
 import de.unibi.citec.clf.bonsai.util.CoordinateSystemConverter;
 import de.unibi.citec.clf.btl.List;
-import de.unibi.citec.clf.btl.data.geometry.Point2D;
 import de.unibi.citec.clf.btl.data.knowledgebase.Arena;
 import de.unibi.citec.clf.btl.data.knowledgebase.Crowd;
 import de.unibi.citec.clf.btl.data.navigation.PositionData;
@@ -23,7 +22,6 @@ import de.unibi.citec.clf.btl.data.person.PersonDataList;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 
 import java.io.IOException;
-import java.util.LinkedList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.logging.Level;

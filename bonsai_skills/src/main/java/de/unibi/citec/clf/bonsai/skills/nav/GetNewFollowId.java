@@ -1,6 +1,5 @@
 package de.unibi.citec.clf.bonsai.skills.nav;
 
-import de.unibi.citec.clf.bonsai.core.BonsaiManager;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;

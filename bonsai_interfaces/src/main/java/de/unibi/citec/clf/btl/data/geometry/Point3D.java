@@ -1,6 +1,5 @@
 package de.unibi.citec.clf.btl.data.geometry;
 
-import de.unibi.citec.clf.btl.Type;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 import de.unibi.citec.clf.btl.units.UnitConverter;
 import java.util.Objects;

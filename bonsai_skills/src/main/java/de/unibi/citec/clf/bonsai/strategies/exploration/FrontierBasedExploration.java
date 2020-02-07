@@ -3,7 +3,6 @@ package de.unibi.citec.clf.bonsai.strategies.exploration;
 
 
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
-import de.unibi.citec.clf.bonsai.core.SensorListener;
 import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.util.Pair;
 import de.unibi.citec.clf.bonsai.util.slam.SlamTools;
@@ -30,7 +29,6 @@ import java.io.IOException;
 import static java.lang.Math.cos;
 import static java.lang.Math.sin;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;

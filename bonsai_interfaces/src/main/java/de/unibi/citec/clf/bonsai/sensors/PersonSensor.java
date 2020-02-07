@@ -2,10 +2,8 @@ package de.unibi.citec.clf.bonsai.sensors;
 
 
 
-import de.unibi.citec.clf.btl.List;
 import de.unibi.citec.clf.btl.data.navigation.PositionData;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
-import de.unibi.citec.clf.btl.data.person.PersonData;
 import de.unibi.citec.clf.btl.data.person.PersonDataList;
 
 /**

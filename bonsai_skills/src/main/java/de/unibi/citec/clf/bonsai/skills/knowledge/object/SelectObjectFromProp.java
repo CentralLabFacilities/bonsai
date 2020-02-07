@@ -11,9 +11,6 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException;
 import de.unibi.citec.clf.btl.List;
 import de.unibi.citec.clf.btl.data.knowledgebase.RCObject;
-import de.unibi.citec.clf.btl.data.object.ObjectShapeData;
-
-import java.util.LinkedList;
 
 /**
  * This Skill is used to filter a List of RCObjects by one or more specific attributes.

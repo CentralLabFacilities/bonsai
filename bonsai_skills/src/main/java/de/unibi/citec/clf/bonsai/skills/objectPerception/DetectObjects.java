@@ -1,7 +1,6 @@
 package de.unibi.citec.clf.bonsai.skills.objectPerception;
 
 import de.unibi.citec.clf.bonsai.actuators.ObjectDetectionActuator;
-import de.unibi.citec.clf.bonsai.actuators.RecognizeObjectsActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;

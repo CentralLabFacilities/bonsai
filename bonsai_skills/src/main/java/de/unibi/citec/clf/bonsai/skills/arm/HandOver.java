@@ -1,6 +1,5 @@
 package de.unibi.citec.clf.bonsai.skills.arm;
 
-import de.unibi.citec.clf.bonsai.skills.deprecated.csra.*;
 import de.unibi.citec.clf.bonsai.actuators.HandOverActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
@@ -8,11 +7,8 @@ import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
-import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException;
-import de.unibi.citec.clf.bonsai.util.MapReader;
 
 import java.io.IOException;
-import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.logging.Level;

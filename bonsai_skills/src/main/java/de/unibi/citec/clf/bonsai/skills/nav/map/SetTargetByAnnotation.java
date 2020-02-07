@@ -7,14 +7,12 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
-import de.unibi.citec.clf.bonsai.util.MapReader;
 import de.unibi.citec.clf.bonsai.util.helper.AnnotationHelper;
 import de.unibi.citec.clf.btl.data.map.Annotation;
 import de.unibi.citec.clf.btl.data.map.AnnotationList;
 import de.unibi.citec.clf.btl.data.map.Viewpoint;
 import de.unibi.citec.clf.btl.data.navigation.NavigationGoalData;
 import de.unibi.citec.clf.btl.data.navigation.PositionData;
-import java.util.Map;
 
 /**
  * Use this state to write the {@link PositionData} of an {@link Annotation} its {@link Viewpoint} to memory.

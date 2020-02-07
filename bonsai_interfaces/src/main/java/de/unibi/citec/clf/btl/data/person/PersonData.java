@@ -6,7 +6,6 @@ import de.unibi.citec.clf.btl.data.knowledgebase.BDO;
 import org.apache.log4j.Logger;
 
 import de.unibi.citec.clf.btl.data.navigation.PositionData;
-import de.unibi.citec.clf.btl.units.LengthUnit;
 
 /**
  *
