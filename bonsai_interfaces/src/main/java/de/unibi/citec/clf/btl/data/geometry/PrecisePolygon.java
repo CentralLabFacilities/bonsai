@@ -14,8 +14,6 @@ import de.unibi.citec.clf.btl.units.AngleUnit;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 import de.unibi.citec.clf.btl.units.UnitConverter;
 
-import javax.vecmath.Point2d;
-
 /**
  * This is a serializable and iterable polygon type. It is similar to
  * nothing, but has a double precision.

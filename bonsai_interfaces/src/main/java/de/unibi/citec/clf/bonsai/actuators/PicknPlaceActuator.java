@@ -1,7 +1,6 @@
 package de.unibi.citec.clf.bonsai.actuators;
 
 
-import de.unibi.citec.clf.bonsai.core.object.Actuator;
 import de.unibi.citec.clf.btl.data.geometry.Pose3D;
 import de.unibi.citec.clf.btl.data.grasp.GraspReturnType;
 import de.unibi.citec.clf.btl.data.grasp.KatanaGripperData;

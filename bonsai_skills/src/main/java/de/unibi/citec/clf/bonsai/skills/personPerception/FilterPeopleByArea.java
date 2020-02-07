@@ -14,12 +14,8 @@ import de.unibi.citec.clf.btl.data.geometry.PrecisePolygon;
 import de.unibi.citec.clf.btl.data.knowledgebase.Arena;
 import de.unibi.citec.clf.btl.data.knowledgebase.Location;
 import de.unibi.citec.clf.btl.data.knowledgebase.Room;
-import de.unibi.citec.clf.btl.data.person.PersonAttribute;
 import de.unibi.citec.clf.btl.data.person.PersonData;
 import de.unibi.citec.clf.btl.data.person.PersonDataList;
-
-import java.util.LinkedList;
-import java.util.List;
 
 /**
  * This skill is intended to remove persons from a persondata list that are not in a given area string. can be a location or room name.

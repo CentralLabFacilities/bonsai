@@ -1,22 +1,5 @@
 package de.unibi.citec.clf.bonsai.skills.deprecated.reporting;
 
-import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
-import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
-import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
-import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
-import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
-import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
-import de.unibi.citec.clf.bonsai.util.PdfWriter;
-import de.unibi.citec.clf.btl.data.vision2d.ImageData;
-import java.io.File;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-
 /**
  * TODO
  *

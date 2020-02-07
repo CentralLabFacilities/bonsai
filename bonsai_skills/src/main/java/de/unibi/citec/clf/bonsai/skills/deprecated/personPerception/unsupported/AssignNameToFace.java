@@ -1,15 +1,6 @@
 package de.unibi.citec.clf.bonsai.skills.deprecated.personPerception.unsupported;
 
 
-import de.unibi.citec.clf.bonsai.actuators.SpeechActuator;
-import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
-import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
-import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
-import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
-import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
-import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
-import java.io.IOException;
-
 /**
  * Set the name of a given FaceId.
  *

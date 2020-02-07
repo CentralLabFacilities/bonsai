@@ -26,8 +26,6 @@ import de.unibi.citec.clf.btl.units.LengthUnit;
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * Drive to a given person.

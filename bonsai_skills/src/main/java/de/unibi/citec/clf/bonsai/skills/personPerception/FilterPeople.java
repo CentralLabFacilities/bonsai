@@ -1,6 +1,5 @@
 package de.unibi.citec.clf.bonsai.skills.personPerception;
 
-import de.unibi.citec.clf.bonsai.actuators.GetPersonAttributesActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
@@ -16,7 +15,6 @@ import de.unibi.citec.clf.btl.data.person.PersonDataList;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 
 /**
  * This Skill is used to filter a List of Persons by one or more specific attributes.

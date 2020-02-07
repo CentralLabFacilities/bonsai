@@ -1,18 +1,5 @@
 package de.unibi.citec.clf.bonsai.skills.deprecated.personPerception.face;
 
-import de.unibi.citec.clf.bonsai.actuators.SpeechActuator;
-import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
-import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
-import de.unibi.citec.clf.bonsai.core.object.Sensor;
-import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
-import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
-import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
-import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException;
-import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
-import java.io.IOException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
 /**
  * In this state the robot tries to recognize the person standing in front of him.
  *

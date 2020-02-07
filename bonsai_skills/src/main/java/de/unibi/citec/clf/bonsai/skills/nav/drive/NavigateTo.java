@@ -15,7 +15,6 @@ import de.unibi.citec.clf.bonsai.util.helper.DriveStrategyBuilder;
 import de.unibi.citec.clf.btl.data.navigation.NavigationGoalData;
 import de.unibi.citec.clf.btl.data.navigation.PositionData;
 import java.io.IOException;
-import java.util.Map;
 
 /**
  * Plan and navigate to a navigation goal.

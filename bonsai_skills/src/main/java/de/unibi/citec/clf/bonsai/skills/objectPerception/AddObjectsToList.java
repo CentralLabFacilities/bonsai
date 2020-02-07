@@ -10,8 +10,6 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.btl.data.object.ObjectShapeData;
 import de.unibi.citec.clf.btl.data.object.ObjectShapeList;
 
-import java.io.IOException;
-
 /**
  * Adds objects to a list of objects (unique labels, ignore unknown, only use bestlabel)
  *

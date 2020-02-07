@@ -1,23 +1,13 @@
 package de.unibi.citec.clf.bonsai.skills.personPerception;
 
-import de.unibi.citec.clf.bonsai.actuators.GazeActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
-import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
-import de.unibi.citec.clf.bonsai.core.object.Sensor;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
-import de.unibi.citec.clf.bonsai.util.CoordinateSystemConverter;
-import de.unibi.citec.clf.btl.List;
-import de.unibi.citec.clf.btl.data.navigation.PositionData;
 import de.unibi.citec.clf.btl.data.person.PersonData;
-import de.unibi.citec.clf.btl.data.person.PersonDataList;
-import de.unibi.citec.clf.btl.units.LengthUnit;
-
-import java.io.IOException;
 
 /**
  * Continually turn head towards a person.

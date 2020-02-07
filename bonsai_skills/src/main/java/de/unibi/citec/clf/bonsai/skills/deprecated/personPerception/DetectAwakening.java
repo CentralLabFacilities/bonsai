@@ -1,13 +1,5 @@
 package de.unibi.citec.clf.bonsai.skills.deprecated.personPerception;
 
-import de.unibi.citec.clf.bonsai.core.object.Sensor;
-import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
-import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
-import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
-import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
-import de.unibi.citec.clf.bonsai.util.helper.PersonHelper;
-import java.io.IOException;
-
 /**
  * In this state the robot tries to recognize, when a person lying in front of him, stands up.
  *

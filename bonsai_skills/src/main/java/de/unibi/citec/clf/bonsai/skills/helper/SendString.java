@@ -8,11 +8,9 @@ import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
-import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
-import de.unibi.citec.clf.bonsai.util.MapReader;
+
 import java.io.IOException;
-import java.util.Map;
 
 /**
  * @author lruegeme

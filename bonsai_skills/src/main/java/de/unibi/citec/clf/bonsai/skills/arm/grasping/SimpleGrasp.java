@@ -2,22 +2,16 @@ package de.unibi.citec.clf.bonsai.skills.arm.grasping;
 
 import de.unibi.citec.clf.bonsai.actuators.GraspActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
-import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
-import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
-import de.unibi.citec.clf.btl.data.object.ObjectShapeData;
-import de.unibi.citec.clf.btl.data.object.ObjectShapeList;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * Gasp an object by id.

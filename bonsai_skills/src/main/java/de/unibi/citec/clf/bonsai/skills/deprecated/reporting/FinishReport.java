@@ -8,7 +8,6 @@ import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
-import de.unibi.citec.clf.bonsai.util.PdfWriter;
 import de.unibi.citec.clf.btl.data.object.ObjectShapeList;
 import java.util.logging.Level;
 import java.util.logging.Logger;

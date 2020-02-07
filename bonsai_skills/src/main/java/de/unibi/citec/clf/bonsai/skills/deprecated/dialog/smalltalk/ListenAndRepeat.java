@@ -9,7 +9,6 @@ import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
-import de.unibi.citec.clf.bonsai.util.MapReader;
 import de.unibi.citec.clf.bonsai.util.helper.SimpleSpeechHelper;
 import de.unibi.citec.clf.btl.data.speechrec.GrammarNonTerminal;
 import de.unibi.citec.clf.btl.data.speechrec.Utterance;

@@ -8,7 +8,6 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 
-import java.io.IOException;
 import java.util.regex.Matcher;
 
 /**

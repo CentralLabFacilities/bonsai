@@ -1,17 +1,5 @@
 package de.unibi.citec.clf.bonsai.skills.deprecated.personPerception.face;
 
-import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
-import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
-import de.unibi.citec.clf.bonsai.core.object.Sensor;
-import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
-import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
-import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
-import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
-import de.unibi.citec.clf.btl.data.vision2d.ImageData;
-import java.io.IOException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
 /**
  * In this state, the robot scans all seen faces of a given minimal size and saves it into Memory slot.
  *

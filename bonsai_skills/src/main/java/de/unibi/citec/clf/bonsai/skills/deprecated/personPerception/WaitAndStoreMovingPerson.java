@@ -17,7 +17,6 @@ import de.unibi.citec.clf.btl.tools.MathTools;
 import de.unibi.citec.clf.btl.units.AngleUnit;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 import java.io.IOException;
-import java.util.Map;
 
 /**
  * Use this state to wait until a moving person is recognized in front of the robot. Timouts are used to switch to far

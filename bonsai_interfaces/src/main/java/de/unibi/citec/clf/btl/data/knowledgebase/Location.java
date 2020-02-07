@@ -1,8 +1,5 @@
 package de.unibi.citec.clf.btl.data.knowledgebase;
 
-import de.unibi.citec.clf.btl.data.geometry.Point2D;
-import de.unibi.citec.clf.btl.data.map.Annotation;
-import de.unibi.citec.clf.btl.units.LengthUnit;
 import java.util.Objects;
 
 

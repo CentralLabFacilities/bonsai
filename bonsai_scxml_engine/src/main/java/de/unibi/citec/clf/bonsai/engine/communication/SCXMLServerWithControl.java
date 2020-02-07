@@ -2,9 +2,6 @@ package de.unibi.citec.clf.bonsai.engine.communication;
 
 
 import de.unibi.citec.clf.bonsai.engine.control.StateMachineController;
-import de.unibi.citec.clf.bonsai.engine.scxml.BonsaiTransition;
-
-import java.util.List;
 
 /**
  * @author lruegeme

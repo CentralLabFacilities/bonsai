@@ -1,10 +1,6 @@
 package de.unibi.citec.clf.bonsai.skills.helper;
 
-import de.unibi.citec.clf.bonsai.actuators.StringActuator;
-import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.exception.TransformException;
-import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
-import de.unibi.citec.clf.bonsai.core.object.Sensor;
 import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
@@ -12,8 +8,6 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.bonsai.util.CoordinateTransformer;
 import de.unibi.citec.clf.btl.Transform;
-
-import java.io.IOException;
 
 /**
  * @author lruegeme

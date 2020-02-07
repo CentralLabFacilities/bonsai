@@ -3,8 +3,6 @@ package de.unibi.citec.clf.btl.data.navigation;
 
 
 import de.unibi.citec.clf.bonsai.core.time.Time;
-import de.unibi.citec.clf.btl.Type;
-import de.unibi.citec.clf.btl.data.common.Timestamp;
 import de.unibi.citec.clf.btl.units.AngleUnit;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 import de.unibi.citec.clf.btl.units.TimeUnit;

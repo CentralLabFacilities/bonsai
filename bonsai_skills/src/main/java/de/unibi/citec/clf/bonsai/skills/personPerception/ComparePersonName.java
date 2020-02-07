@@ -1,19 +1,13 @@
 package de.unibi.citec.clf.bonsai.skills.personPerception;
 
-import de.unibi.citec.clf.bonsai.actuators.KBaseActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
-import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException;
-import de.unibi.citec.clf.btl.data.knowledgebase.Room;
 import de.unibi.citec.clf.btl.data.person.PersonData;
-import de.unibi.citec.clf.btl.data.person.PersonDataList;
-
-import java.util.List;
 
 /**
  * This skill compares the name field of a person data with a name in a slot and return success.equal if they are same same and success.notEqual if they dont.

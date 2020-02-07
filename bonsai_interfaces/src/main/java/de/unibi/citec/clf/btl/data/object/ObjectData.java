@@ -1,11 +1,9 @@
 package de.unibi.citec.clf.btl.data.object;
 
 
-import java.lang.reflect.Method;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.RejectedExecutionException;
 
 import de.unibi.citec.clf.btl.Type;
 

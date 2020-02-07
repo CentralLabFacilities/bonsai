@@ -4,9 +4,8 @@ import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
-import de.unibi.citec.clf.bonsai.util.PdfWriter;
+
 import java.util.Date;
-import java.util.Map;
 
 /**
  * Adds a new line to the report. TYPE: decides which text to use: fire or
