@@ -21,7 +21,7 @@ import de.unibi.citec.clf.btl.data.navigation.PositionData;
  *
  * Slots:
  *  ViewpointNameSlot: [String] [Write]
- *      -> Memory slot the name of the location will be writen to
+ *      -> Memory slot the name of the location will be written to
  *  PositionDataSlot: [PositionData] [Read]
  *      -> Memory slot with the position the nearest location of should be retrieved from
  *

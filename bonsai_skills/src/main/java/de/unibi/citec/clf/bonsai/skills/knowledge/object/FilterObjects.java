@@ -16,7 +16,7 @@ import java.util.LinkedList;
 /**
  * This Skill is used to filter a List of RCObjects by one or more specific attributes.
  * These Attributes can be any of the Attributes found in RCObject, i.e. category, location, shape, size and
- * weight. They are read via Slots (see below). Multiple values can be given, if the e.g. categories are seperated by
+ * weight. They are read via Slots (see below). Multiple values can be given, if the e.g. categories are separated by
  * colons (":")
  * <pre>
  *
@@ -153,7 +153,7 @@ public class FilterObjects extends AbstractSkill {
             categoryString = categorySlot.recall();
 
             if (categoryString == null || categoryString.isEmpty() || categoryString.toLowerCase().equals("object")  || categoryString.toLowerCase().equals("objects")) {
-                logger.debug("your CategorySlot was empty or did hold the litaral string object or objects, will not filter by category");
+                logger.debug("your CategorySlot was empty or did hold the literal string object or objects, will not filter by category");
             } else {
                 logger.info("will filter by categories: " + categoryString);
                 for (String cat : categoryString.split(";")) {

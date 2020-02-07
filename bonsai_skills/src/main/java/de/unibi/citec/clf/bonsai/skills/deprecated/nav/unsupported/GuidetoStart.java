@@ -116,7 +116,7 @@ public class GuidetoStart extends AbstractSkill {
     public ExitToken execute() {
         navigationGoal = null;
         if (viewpoints == null) {
-            logger.debug("tokenSucces : viewpoints = null");
+            logger.debug("tokenSuccess : viewpoints = null");
             return tokenSuccess;
         }
         try {

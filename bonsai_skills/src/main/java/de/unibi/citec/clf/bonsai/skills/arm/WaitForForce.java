@@ -25,7 +25,7 @@ import java.util.concurrent.Future;
  * Slots:
  *
  * ExitTokens:
- *  success:            A force greater than the treshold was detetected
+ *  success:            A force greater than the threshold was detected
  *  success.timeout:    No force was detected during the timeout time
  *  error:              Waiting for force failed
  *

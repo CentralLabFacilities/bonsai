@@ -57,7 +57,7 @@ public class PersonData extends BDO {
     }
 
     /**
-     * A setter for the global position of a person. This is the postion where
+     * A setter for the global position of a person. This is the position where
      * the robot has seen this person last
      * @param positionData global position of a person
      */
