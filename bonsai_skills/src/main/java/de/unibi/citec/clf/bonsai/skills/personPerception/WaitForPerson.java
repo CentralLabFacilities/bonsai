@@ -1,8 +1,7 @@
 package de.unibi.citec.clf.bonsai.skills.personPerception;
 
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
-import de.unibi.citec.clf.bonsai.core.exception.TransformException;
-import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
+import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
 import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
@@ -13,13 +12,10 @@ import de.unibi.citec.clf.bonsai.util.CoordinateSystemConverter;
 import de.unibi.citec.clf.bonsai.util.CoordinateTransformer;
 import de.unibi.citec.clf.bonsai.util.helper.PersonHelper;
 import de.unibi.citec.clf.btl.List;
-import de.unibi.citec.clf.btl.Type;
 import de.unibi.citec.clf.btl.data.geometry.PolarCoordinate;
-import de.unibi.citec.clf.btl.data.geometry.Pose3D;
 import de.unibi.citec.clf.btl.data.navigation.PositionData;
 import de.unibi.citec.clf.btl.data.person.PersonData;
 import de.unibi.citec.clf.btl.data.person.PersonDataList;
-import de.unibi.citec.clf.btl.tools.MathTools;
 import de.unibi.citec.clf.btl.units.AngleUnit;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 
@@ -35,7 +31,7 @@ import java.io.IOException;
  * (optional) #_MAX_ANGLE(rad)    -> max Person Angle (in both directions)
  *
  * slots:
- * PersonData PersonDataSlot -> saves the found person.
+ * PersonDataSlot: [PersonData] [Write] -> saves the found person to this slot
  *
  * possible return states are:
  * success             -> person found
@@ -68,7 +64,7 @@ public class WaitForPerson extends AbstractSkill {
 
     private Sensor<PersonDataList> personSensor;
     private Sensor<PositionData> positionSensor;
-    private MemorySlot<PersonData> currentPersonSlot;
+    private MemorySlotWriter<PersonData> currentPersonSlot;
 
 
     PositionData robotPosition = null;
@@ -86,7 +82,7 @@ public class WaitForPerson extends AbstractSkill {
 
         personSensor = configurator.getSensor("PersonSensor", PersonDataList.class);
         positionSensor = configurator.getSensor("PositionSensor", PositionData.class);
-        currentPersonSlot = configurator.getSlot("PersonDataSlot", PersonData.class);
+        currentPersonSlot = configurator.getWriteSlot("PersonDataSlot", PersonData.class);
 
         timeout = configurator.requestOptionalInt(KEY_TIMEOUT, (int) timeout);
         maxDist = configurator.requestOptionalDouble(KEY_DIST, maxDist);
