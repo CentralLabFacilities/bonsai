@@ -2,8 +2,8 @@ package de.unibi.citec.clf.bonsai.skills.arm;
 
 import de.unibi.citec.clf.bonsai.actuators.HandOverActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
+import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
-import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
@@ -32,7 +32,7 @@ public class HandOver extends AbstractSkill {
     private static final String KEY_CHOOSE_GROUP = "#_CHOOSE_GROUP";
     private static final String KEY_TYPE = "#_TYPE";
     
-    private MemorySlot<String> groupSlot;
+    private MemorySlotReader<String> groupSlot;
     private boolean overrideGroup = false;    
     private String group = "left_arm";
     private int type = 1;
@@ -48,7 +48,7 @@ public class HandOver extends AbstractSkill {
         type = configurator.requestOptionalInt(KEY_TYPE, type);
   
         if (overrideGroup){
-            groupSlot = configurator.getSlot("GroupSlot", String.class);
+            groupSlot = configurator.getReadSlot("GroupSlot", String.class);
             logger.info("using group slot!");
         }
         
