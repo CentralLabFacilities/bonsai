@@ -160,7 +160,7 @@ public class GraspObjectsPickNPlace extends AbstractSkill {
         try {
             GRT = returnFuture.get();
         } catch (InterruptedException | ExecutionException ex) {
-            logger.fatal("could not get furure after isDone");
+            logger.fatal("could not get future after isDone");
             return ExitToken.fatal();
         }
 

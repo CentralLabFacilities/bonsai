@@ -39,9 +39,9 @@ import java.util.concurrent.Future;
  *  #_MAX_ANGLE:        [double] Optional (default: Double.MAX_VALUE)
  *                          -> Person must be inside this angle cone in front of the robot in rad
  *  #_DO_FACE_ID:       [int] Optional (default: 1)
- *                          -> Wether face id gets called or not [0 = false, 1 = true]
+ *                          -> Whether face id gets called or not [0 = false, 1 = true]
  *  #_DO_GENDER_AGE:    [int] Optional (default: 1)
- *                          -> Wether gender and age gets called or not [0 = false, 1 = true]
+ *                          -> Whether gender and age gets called or not [0 = false, 1 = true]
  *  #_RESIZE_OUT_RATION:[double] Optional (default: 8.0)
  *                          -> Affects the speed and the quality of the person detection; values to use:
  *                          4.0 -> quick (approx 2 secs)

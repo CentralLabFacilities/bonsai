@@ -154,7 +154,7 @@ public class Point3D extends Point2D {
     }
 
     /**
-     * Return a Point which will have the x, y and z coordinates of this and the given point devided by each other.
+     * Return a Point which will have the x, y and z coordinates of this and the given point divided by each other.
      * Clarification: The new point will have this points coordinates / the other points coordinates.
      *
      * @param p the other point

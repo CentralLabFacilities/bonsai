@@ -39,7 +39,7 @@ import java.util.concurrent.Future;
  * Slots:
  *
  * ExitTokens:
- *  success.confirmYes: Recieved confirmation
+ *  success.confirmYes: Received confirmation
  *  success.confirmNo:  Received denial
  *  success.timeout:    Timeout reached (only used when #_TIMEOUT is set to positive value)
  *

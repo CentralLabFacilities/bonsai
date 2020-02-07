@@ -80,7 +80,7 @@ public class ArmController180 {
                 logger.debug("ArmServer thinks we have something in gripper");
                 return true;
             } else {
-                logger.debug("ArmServer thinkgs we dont have an object in the gripper.");
+                logger.debug("ArmServer thinks we don't have an object in the gripper.");
                 return false;
             }
         } catch (IOException | InterruptedException | ExecutionException e) {
@@ -158,11 +158,11 @@ public class ArmController180 {
      */
     public void recoverPose() {
         try {
-            lastKnownPose = getAssumePostion();
-            logger.warn("ArmControler.getAssumePosition is triggered!! New Posture set to: "
+            lastKnownPose = getAssumePosition();
+            logger.warn("ArmController.getAssumePosition is triggered!! New Posture set to: "
                     + lastKnownPose);
         } catch (IOException ex) {
-            logger.error("ArmControler.recoverPose / getAsummePosition wont work: "
+            logger.error("ArmController.recoverPose / getAssumePosition wont work: "
                     + ex.getMessage());
         }
 
@@ -174,7 +174,7 @@ public class ArmController180 {
      * @return the pose which is most likey
      * @throws java.io.IOException poseActuator can not be read
      */
-    public String getAssumePostion() throws IOException {
+    public String getAssumePosition() throws IOException {
         try {
             Future<String> assumed = poseActuator.findNearestPose();
             logger.debug("assumed position: " + assumed);
