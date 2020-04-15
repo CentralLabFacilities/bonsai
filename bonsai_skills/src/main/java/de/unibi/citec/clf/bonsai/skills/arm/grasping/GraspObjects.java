@@ -216,7 +216,7 @@ public class GraspObjects extends AbstractSkill {
             return tokenErrorCantGrasp;
         }
         curTarget = targets.get(curIdx);
-        logger.info("trying " + curIdx + "of " + targets.size() + " \n\t" + curTarget.getId() + " is " + curTarget.getBestLabel() + "(" + curTarget.getBestRel() + ") at " + curTarget.getCenter());
+        logger.info("trying " + curIdx + " of " + targets.size() + " \n\t" + curTarget.getId() + " is " + curTarget.getBestLabel() + "(" + curTarget.getBestRel() + ") at " + curTarget.getCenter());
         returnFuture = graspAct.graspObject(curTarget, group);
         return ExitToken.loop(50);
     }
