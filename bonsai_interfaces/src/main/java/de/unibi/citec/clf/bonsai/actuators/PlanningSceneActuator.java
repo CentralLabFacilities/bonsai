@@ -14,7 +14,7 @@ import java.util.concurrent.Future;
  */
 public interface PlanningSceneActuator extends Actuator{
 
-    Future<Boolean> clearScene();
+    Future<Boolean> clearScene(boolean keep_attached_objects);
     Future<Boolean> addObjects(ObjectShapeList objects);
     
     Future<Boolean> manage();
