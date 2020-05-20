@@ -1,6 +1,6 @@
 package de.unibi.citec.clf.bonsai.skills.arm.grasping;
 
-import de.unibi.citec.clf.bonsai.actuators.GraspActuator;
+import de.unibi.citec.clf.bonsai.actuators.ManipulationActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
@@ -30,13 +30,13 @@ public class SimpleGrasp extends AbstractSkill {
     private ExitToken tokenSuccess;
     private ExitToken tokenError;
 
-    private GraspActuator graspAct;
+    private ManipulationActuator graspAct;
 
     private MemorySlotReader<String> idSlot;
 
     private static final LengthUnit mm = LengthUnit.MILLIMETER;
 
-    private Future<GraspActuator.MoveitResult> returnFuture;
+    private Future<ManipulationActuator.MoveitResult> returnFuture;
 
     @Override
     public void configure(ISkillConfigurator configurator) {
@@ -44,7 +44,7 @@ public class SimpleGrasp extends AbstractSkill {
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
         tokenError = configurator.requestExitToken(ExitStatus.ERROR());
 
-        graspAct = configurator.getActuator("GraspActuator", GraspActuator.class);
+        graspAct = configurator.getActuator("GraspActuator", ManipulationActuator.class);
 
         if(configurator.hasConfigurationKey(KEY_ID)) {
             id = configurator.requestValue(KEY_ID);
@@ -93,7 +93,7 @@ public class SimpleGrasp extends AbstractSkill {
             return ExitToken.loop();
         }
 
-        GraspActuator.MoveitResult GRT;
+        ManipulationActuator.MoveitResult GRT;
         try {
             GRT = returnFuture.get();
         } catch (InterruptedException | ExecutionException ex) {

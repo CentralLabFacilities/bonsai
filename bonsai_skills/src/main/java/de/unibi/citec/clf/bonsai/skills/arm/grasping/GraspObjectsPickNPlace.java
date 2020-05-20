@@ -1,9 +1,8 @@
 package de.unibi.citec.clf.bonsai.skills.arm.grasping;
 
-import de.unibi.citec.clf.bonsai.actuators.GraspActuator;
+import de.unibi.citec.clf.bonsai.actuators.ManipulationActuator;
 import de.unibi.citec.clf.bonsai.actuators.PicknPlaceActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
-import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
@@ -13,7 +12,6 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.bonsai.util.arm.ArmController180;
 import de.unibi.citec.clf.btl.data.object.ObjectShapeData;
 import de.unibi.citec.clf.btl.data.object.ObjectShapeList;
-import de.unibi.citec.clf.btl.units.LengthUnit;
 
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -55,7 +53,7 @@ public class GraspObjectsPickNPlace extends AbstractSkill {
     private ObjectShapeList targets = null;
     private ObjectShapeData curTarget;
     private ObjectShapeList recognized = null;
-    private Future<GraspActuator.MoveitResult> returnFuture;
+    private Future<ManipulationActuator.MoveitResult> returnFuture;
 
     @Override
     public void configure(ISkillConfigurator configurator) {
@@ -156,7 +154,7 @@ public class GraspObjectsPickNPlace extends AbstractSkill {
             return ExitToken.loop(LOOP_TIME);
         }
 
-        GraspActuator.MoveitResult GRT;
+        ManipulationActuator.MoveitResult GRT;
         try {
             GRT = returnFuture.get();
         } catch (InterruptedException | ExecutionException ex) {

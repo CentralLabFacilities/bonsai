@@ -1,6 +1,6 @@
 package de.unibi.citec.clf.bonsai.skills.arm.grasping;
 
-import de.unibi.citec.clf.bonsai.actuators.GraspActuator;
+import de.unibi.citec.clf.bonsai.actuators.ManipulationActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
@@ -67,7 +67,7 @@ public class GraspObjects extends AbstractSkill {
     private ExitToken tokenSuccess;
     private ExitToken tokenErrorCantGrasp;
 
-    private GraspActuator graspAct;
+    private ManipulationActuator graspAct;
 
     private MemorySlotReader<ObjectShapeList> targetsSlot;
     private MemorySlotReader<ObjectShapeList> objectsRecognizedSlot;
@@ -78,7 +78,7 @@ public class GraspObjects extends AbstractSkill {
     private ObjectShapeList targets = null;
     private ObjectShapeData curTarget;
     private ObjectShapeList recognized = null;
-    private Future<GraspActuator.MoveitResult> returnFuture;
+    private Future<ManipulationActuator.MoveitResult> returnFuture;
 
     @Override
     public void configure(ISkillConfigurator configurator) {
@@ -86,7 +86,7 @@ public class GraspObjects extends AbstractSkill {
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
         tokenErrorCantGrasp = configurator.requestExitToken(ExitStatus.ERROR().ps("cantGrasp"));
 
-        graspAct = configurator.getActuator("GraspActuator", GraspActuator.class);
+        graspAct = configurator.getActuator("GraspActuator", ManipulationActuator.class);
 
         firstOrTarget = configurator.getWriteSlot("GraspObjectSlot", ObjectShapeData.class);
         targetsSlot = configurator.getReadSlot("TargetObjectsSlot", ObjectShapeList.class);
@@ -169,7 +169,7 @@ public class GraspObjects extends AbstractSkill {
             return ExitToken.loop(LOOP_TIME);
         }
 
-        GraspActuator.MoveitResult GRT;
+        ManipulationActuator.MoveitResult GRT;
         try {
             GRT = returnFuture.get();
         } catch (InterruptedException | ExecutionException ex) {
