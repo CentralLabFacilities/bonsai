@@ -1,7 +1,7 @@
 package de.unibi.citec.clf.bonsai.util.arm;
 
 
-import de.unibi.citec.clf.bonsai.actuators.GraspActuator;
+import de.unibi.citec.clf.bonsai.actuators.ManipulationActuator;
 import de.unibi.citec.clf.bonsai.actuators.PicknPlaceActuator;
 import de.unibi.citec.clf.btl.data.geometry.Point3D;
 import de.unibi.citec.clf.btl.data.grasp.GraspReturnType;
@@ -422,9 +422,9 @@ public class ArmController180 {
      * @param objectToGraspId the id of the object we want to grasp
      * @return
      */
-    public Future<GraspActuator.MoveitResult> graspObject(ObjectShapeData shape, String group) {
+    public Future<ManipulationActuator.MoveitResult> graspObject(ObjectShapeData shape, String group) {
 
-        Future<GraspActuator.MoveitResult> grt = null;
+        Future<ManipulationActuator.MoveitResult> grt = null;
 
         try {
             String objectName = shape.getId();

@@ -10,7 +10,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.Future;
 
-public interface PicknPlaceActuator extends GraspActuator {
+public interface PicknPlaceActuator extends ManipulationActuator {
 
     /**
      * Move a Joint of the arm.

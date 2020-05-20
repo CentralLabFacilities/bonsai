@@ -16,7 +16,7 @@ import java.util.concurrent.Future;
  *
  * @author lruegeme
  */
-public interface GraspActuator extends Actuator {
+public interface ManipulationActuator extends Actuator {
 
     public enum MoveitResult {
         SUCCESS(1),
