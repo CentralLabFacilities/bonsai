@@ -2,6 +2,8 @@ package de.unibi.citec.clf.bonsai.actuators;
 
 
 import de.unibi.citec.clf.bonsai.core.object.Actuator;
+import de.unibi.citec.clf.btl.data.geometry.BoundingBox3D;
+import de.unibi.citec.clf.btl.data.geometry.Pose3D;
 import de.unibi.citec.clf.btl.data.object.ObjectShapeData;
 
 import javax.annotation.Nonnull;
@@ -65,4 +67,45 @@ public interface GraspActuator extends Actuator {
 
     Future<MoveitResult> graspObject(@Nonnull String objectName, @Nullable String group) throws IOException;
 
+    /**
+     * Place the object somewhere on the given surface.
+     *
+     * @param supportSurface name of the surface
+     * @param group Group to use (for multiple arms)
+     * @return
+     * @throws IOException
+     */
+    Future<MoveitResult> placeObject(@Nonnull String supportSurface, @Nullable String group) throws IOException;
+
+    /**
+     *  Place the object on the given pose.
+     *
+     * @param position position to place at
+     * @param supportSurface name of the surface to place onto
+     * @param group Group to use (for multiple arms)
+     * @return
+     * @throws IOException
+     */
+    Future<MoveitResult> placeObject(@Nonnull Pose3D position, @Nullable String supportSurface, @Nullable String group) throws IOException;
+
+    /**
+     * Places the Object ontop of the given area center.
+     *
+     * @param area
+     * @param supportSurface name of the surface to place onto
+     * @param group Group to use (for multiple arms)
+     * @return
+     * @throws IOException
+     */
+    Future<MoveitResult> placeObjectOnArea(@Nonnull BoundingBox3D area, @Nullable String supportSurface, @Nullable String group) throws IOException;
+
+    /**
+     * Places the Object into the given box.
+     *
+     * @param area to place the object in
+     * @param group Moveit Group to use (for multiple arms)
+     * @return
+     * @throws IOException
+     */
+    Future<MoveitResult> placeObjectInArea(@Nonnull BoundingBox3D area, @Nullable String group) throws IOException;
 }
