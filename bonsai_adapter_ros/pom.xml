@@ -104,7 +104,7 @@
         <dependency>
             <groupId>org.ros.rosjava_messages</groupId>
             <artifactId>moveit_msgs</artifactId>
-            <version>[0.7.0,0.10.0]</version>
+            <version>[0.7.0,0.10.1]</version>
         </dependency>
         <dependency>
             <groupId>org.ros.rosjava_messages</groupId>
