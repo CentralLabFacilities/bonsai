@@ -111,7 +111,7 @@ public class SCXMLValidator {
 
         for (String id : map.keySet()) {
 
-            logger.debug("Found TranistionTarget: " + id);
+            logger.debug("Found TransitionTarget: " + id);
             if (map.get(id) instanceof Parallel) {
                 logger.debug("... is instance of parallel.");
                 continue;
