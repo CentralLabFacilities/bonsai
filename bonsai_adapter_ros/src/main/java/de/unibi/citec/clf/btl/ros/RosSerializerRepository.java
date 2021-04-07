@@ -6,6 +6,7 @@ import org.reflections.Reflections;
 import org.ros.internal.message.Message;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -28,10 +29,10 @@ public class RosSerializerRepository {
         Set<Class<? extends RosSerializer>> allClasses = reflections.getSubTypesOf(RosSerializer.class);
         for (Class<? extends RosSerializer> c : allClasses) {
             try {
-                RosSerializer s = c.newInstance();
+                RosSerializer s = c.getDeclaredConstructor().newInstance();
                 Class<? extends Type> dataType = s.getDataType();
                 addSerializer(dataType, s.getMessageType(), s);
-            } catch (InstantiationException | SecurityException | ExceptionInInitializerError | IllegalAccessException e) {
+            } catch (InstantiationException | SecurityException | ExceptionInInitializerError | IllegalAccessException | NoSuchMethodException | InvocationTargetException e) {
                 logger.error("Can not instantiate class " + c.getSimpleName());
                 logger.debug("Can not instantiate class " + c.getSimpleName(), e);
             }
@@ -85,11 +86,11 @@ public class RosSerializerRepository {
 
         if (ret == null) {
             try {
-                Object o = msgType.newInstance();
+                Object o = msgType.getDeclaredConstructor().newInstance();
                 Field f = msgType.getField("_TYPE");
                 String t = (String) f.get(o);
                 ret = getMsgSerializer(baseType, t);
-            } catch (InstantiationException | IllegalAccessException | NoSuchFieldException | SecurityException ex) {
+            } catch (InstantiationException | IllegalAccessException | NoSuchFieldException | SecurityException | NoSuchMethodException | InvocationTargetException ex) {
                 logger.error(ex);
             }
         }
