@@ -286,7 +286,7 @@ public class SCXMLValidator {
         boolean successPS = false;
 
         //FIXME special cases
-        if (state.getCanonicalSkill().equals("End") || state.getCanonicalSkill().equals("Fatal")) {
+        if (state.getCanonicalSkill().equals("End") || state.getCanonicalSkill().equals("Fatal") || state.getCanonicalSkill().equals("Error")) {
             return errors;
         }
 
