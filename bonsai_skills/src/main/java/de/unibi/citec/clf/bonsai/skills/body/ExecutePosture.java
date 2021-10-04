@@ -7,6 +7,7 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 /**
@@ -71,7 +72,15 @@ public class ExecutePosture extends AbstractSkill {
             return ExitToken.loop(50);
         }
 
-        return tokenSuccess;
+        try {
+            if(ret.get()) return tokenSuccess;
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } catch (ExecutionException e) {
+            e.printStackTrace();
+        }
+
+        return ExitToken.fatal();
     }
 
     @Override

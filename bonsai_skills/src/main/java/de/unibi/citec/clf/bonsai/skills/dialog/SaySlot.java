@@ -90,6 +90,8 @@ public class SaySlot extends AbstractSkill {
         sayStr = sayText.replaceAll(Matcher.quoteReplacement(REPLACE_STRING), sayStr);
         sayStr = sayStr.replaceAll("_", " ");
 
+        logger.info("saying: " + sayStr);
+
         try {
             sayingComplete = speechActuator.sayAsync(sayStr);
         } catch (IOException e) {
