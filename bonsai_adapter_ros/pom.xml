@@ -99,7 +99,7 @@
         <dependency>
             <groupId>org.ros.rosjava_messages</groupId>
             <artifactId>move_base_msgs</artifactId>
-            <version>[1.12.0,1.15.0)</version> <!-- 1.14 is custom clf version -->
+            <version>[1.12.0,2.1.0)</version> <!-- 2.0.1 is custom clf version -->
         </dependency>
         <dependency>
             <groupId>org.ros.rosjava_messages</groupId>
