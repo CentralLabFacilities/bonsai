@@ -2,7 +2,7 @@
 Changes
 =======
 
-Bonsai v1 to v2 Changes
+Bonsai Legacy Changes
 
 Modules
 -------

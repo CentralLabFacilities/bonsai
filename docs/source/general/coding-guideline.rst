@@ -107,7 +107,7 @@ Recalling and memorizing should always be followed by by a check if the recalled
 Statemachines
 -------------
 
-- Skills should *NOT* be given scxml data parameter ``@DATA`` if this changes the configure requests after LOAD eg. the data gets assigned to a different value during runtime.
+- Skills should *NOT* be given scxml data parameter ``@DATA`` if this changes the configure requests.
 
 *ExampleSkill* ``Configure()``:
 
