@@ -9,9 +9,9 @@ BonSAI Docu
 
     QuickStart <quickstart>
 
-    Changes <changes>
+    Bonsai <general>
+    SCXML Behavior Engine <behavior>
 
-    Bonsai <bonsai>
 
 .. |logo| image:: /_static/img/bonsai-l1.png
     :width: 256
