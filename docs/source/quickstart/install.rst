@@ -21,8 +21,8 @@ Setup
     Robocup at Bielefeld only repositories::
 
         git clone https://github.com/CentralLabFacilities/bonsai_addons.git
-        git clone http://projects.cit-ec.uni-bielefeld.de/git/pepper.bonsai.git
-        git clone http://projects.cit-ec.uni-bielefeld.de/git/robocupathome.robocup-dist.git
+        git clone https://gitlab.ub.uni-bielefeld.de/CLF/Robocup/robocuptasks.git
+        git clone https://gitlab.ub.uni-bielefeld.de/CLF/Robocup/Students/ws22/bonsai_exercise.git
 
 3. Copy tutorials and patch the path::
 
@@ -59,13 +59,13 @@ Prerequisites
 
         source /vol/<DIST>/setup.bash
 
-1. install ros-kinetic-desktop
+1. install ros-*version*-desktop
 
 2. create and initialize a catkin workspace::
 
     mkdir ws_bonsai
     cd ws_bonsai
-    source /opt/ros/kinetic/setup.bash
+    source /opt/ros/*version*/setup.bash
     mkdir src
     catkin init
 
