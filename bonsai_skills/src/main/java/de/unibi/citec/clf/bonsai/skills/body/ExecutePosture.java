@@ -67,6 +67,7 @@ public class ExecutePosture extends AbstractSkill {
         
         if (!ret.isDone()) {
             if (timeout < Time.currentTimeMillis()) {
+                logger.fatal("timeout reached");
                 return ExitToken.fatal();
             }
             return ExitToken.loop(50);
