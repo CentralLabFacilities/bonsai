@@ -3,6 +3,7 @@ package de.unibi.citec.clf.bonsai.actuators;
 
 
 
+
 import de.unibi.citec.clf.bonsai.core.object.Actuator;
 
 import de.unibi.citec.clf.btl.List;
@@ -14,9 +15,8 @@ import java.util.concurrent.ExecutionException;
  *
  * @author jkummert
  */
-public interface RecognizeObjectsActuator extends Actuator{
-    
-    List<ObjectShapeData> recognize() throws InterruptedException, ExecutionException;
-        
-    PlanePatchList getLastDetectedPlanes();
+@Deprecated public interface RecognizeObjectsActuator extends Actuator{
+
+    @Deprecated List<ObjectShapeData> recognize() throws InterruptedException, ExecutionException;
+    @Deprecated PlanePatchList getLastDetectedPlanes();
 }
