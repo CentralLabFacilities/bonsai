@@ -14,7 +14,7 @@ import java.util.concurrent.TimeoutException;
  */
 public abstract class RosNode extends AbstractNodeMain {
 
-    public boolean initialized = true;
+    public boolean initialized = false;
     public static final String NODE_PREFIX = "/bonsai/ros/";
     private String key = "";
 
