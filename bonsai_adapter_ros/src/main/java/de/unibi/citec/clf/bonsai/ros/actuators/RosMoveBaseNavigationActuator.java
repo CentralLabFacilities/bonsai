@@ -342,7 +342,8 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
 
         MoveBaseGoal goal = msg.getGoal();
         try {
-            final Pose pose = MsgTypeFactory.getInstance().createMsg(data, Pose.class);
+            PositionData p = new PositionData(data);
+            final Pose pose = MsgTypeFactory.getInstance().createMsg(p, Pose.class);
             goal.getTargetPose().setPose(pose);
             goal.getTargetPose().getHeader().setFrameId(data.getFrameId());
         } catch (RosSerializer.SerializationException | NullPointerException e) {
