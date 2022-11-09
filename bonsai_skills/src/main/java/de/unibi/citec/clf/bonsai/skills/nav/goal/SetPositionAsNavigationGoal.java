@@ -49,6 +49,9 @@ public class SetPositionAsNavigationGoal extends AbstractSkill {
     private static final String KEY_Y = "#_Y";
     private static final String KEY_YAW = "#_YAW";
 
+    private static final String KEY_USE_RELATIVE = "#_RELATIVE";
+
+    private boolean relative = false;
     private double x = Double.NaN;
     private double y = Double.NaN;
     private double yaw = Double.NaN;
@@ -68,6 +71,7 @@ public class SetPositionAsNavigationGoal extends AbstractSkill {
         x = configurator.requestOptionalDouble(KEY_X, x);
         y = configurator.requestOptionalDouble(KEY_Y, y);
         yaw = configurator.requestOptionalDouble(KEY_YAW, yaw);
+        relative = configurator.requestOptionalBool(KEY_USE_RELATIVE,relative);
 
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
         tokenError = configurator.requestExitToken(ExitStatus.ERROR());
@@ -105,7 +109,7 @@ public class SetPositionAsNavigationGoal extends AbstractSkill {
 
         logger.debug("position to navgoal: " + (posData.toString()));
         navData = new NavigationGoalData(posData);
-        navData.setFrameId(PositionData.ReferenceFrame.GLOBAL);
+        if (relative) navData.setFrameId(PositionData.ReferenceFrame.LOCAL); else navData.setFrameId(PositionData.ReferenceFrame.GLOBAL);
         logger.info("navgoal: " + navData.toString());
         return tokenSuccess;
     }
