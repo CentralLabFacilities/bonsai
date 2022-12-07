@@ -149,7 +149,7 @@ Send
 
 Send is used to create events
 
-::
+.. code-block:: xml
 
     <send event="A"/>
 
@@ -160,7 +160,7 @@ Assign
 
 Assign is used to update data entrys
 
-::
+.. code-block:: xml
 
     <assign name="number" expr="2"/>
 
@@ -173,11 +173,11 @@ You can source other xmls in a state
 
 Example:
 
-::
+.. code-block:: xml
 
     Document a.xml:
     <scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="A">
-        <state id="A" src="b.xml"/>
+        <state id="A" src="${MAPPING}/b.xml"/>
     </scxml>
 
     Document b.xml:
@@ -189,7 +189,10 @@ Example:
         </state>
     </scxml>
 
-    Result:
+Result:
+
+.. code-block:: xml
+
     <scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="A">
         <state id="A" initial="B#A">
             <state id="B#A">
@@ -200,12 +203,14 @@ Example:
         </state>
     </scxml>
 
--  send actions using events beginning with *success*, *error* and *fatal* get prefixed by the sourcing state ``id`` (A)
--  All states get suffixed by the sourcing state ``id`` (this includes hashes)
--  There are some special cases to keep in mind when sourcing:
+- send actions using events beginning with *success*, *error* and *fatal* get prefixed by the sourcing state ``id`` (A)
+- All states get suffixed by the sourcing state ``id`` (this includes hashes)
+- There are some special cases to keep in mind when sourcing:
 
-   -  dont use #suffix in a sourcing state
-   -  dont use regex for transition for send events
+  - dont use #suffix in a sourcing state
+  - dont use regex for transition for send events
+
+- different ``MAPPING`` path variables can be defined in your ``localMapping.properties`` or with the ``-m`` commandline parameter
 
 Connect Skill to State
 -----
@@ -220,7 +225,7 @@ Connect Skill to State
 
 Example:
 
-::
+.. code-block:: xml
 
      ...
 
@@ -251,8 +256,8 @@ The Commons SCXML implementation generates a ``.entry`` event when any state is 
 
 Similarly to the ``.entry`` and ``.exit`` event the Commons SCXML implementation generates a ``.change`` event when a piece of any data model changes, which means one can watch some part of the datamodel for an update for triggering a transition. This is quite useful for communicating across regions etc.
 
-::
-
+.. code-block:: xml
+    
     <scxml xmlns="http://www.w3.org/2005/07/scxml"
         version="1.0" initial="main">
 

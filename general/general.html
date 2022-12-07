@@ -14,7 +14,9 @@
         <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
         <script src="../_static/jquery.js"></script>
         <script src="../_static/underscore.js"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="../_static/doctools.js"></script>
+        <script src="../_static/sphinx_highlight.js"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -89,19 +91,19 @@
            <div itemprop="articleBody">
              
   <div class="section" id="bonsai-core-tutorial">
-<h1>Bonsai Core Tutorial<a class="headerlink" href="#bonsai-core-tutorial" title="Permalink to this headline"></a></h1>
+<h1>Bonsai Core Tutorial<a class="headerlink" href="#bonsai-core-tutorial" title="Permalink to this heading"></a></h1>
 <p>Bonsai is a multi layered approach for behavior modelling of complex systems.</p>
 <p>Behavior Layer - Action Layer - Interface Layer - Funcional Component Layer - Hardware Layer</p>
 <p>The Bonsai framework uses <code class="docutils literal notranslate"><span class="pre">skills</span></code> as the <code class="docutils literal notranslate"><span class="pre">Action</span> <span class="pre">Layer</span></code> which represent reuseable actions for some type of hardware. These Skills use different In/Output interfaces (<code class="docutils literal notranslate"><span class="pre">Sensors</span></code> and <code class="docutils literal notranslate"><span class="pre">Actuators</span></code> of the <code class="docutils literal notranslate"><span class="pre">Interface</span> <span class="pre">Layer</span></code>). To Create complex behavior Bonsai skills can be in different control layers e.g. FSM/HSM such as <code class="docutils literal notranslate"><span class="pre">SCXML</span></code></p>
 <div class="section" id="configuration">
-<h2>Configuration<a class="headerlink" href="#configuration" title="Permalink to this headline"></a></h2>
+<h2>Configuration<a class="headerlink" href="#configuration" title="Permalink to this heading"></a></h2>
 <p>The BonSAI system must be configured. Usually you can use the <code class="docutils literal notranslate"><span class="pre">BasicActuators.xml</span></code> and the <code class="docutils literal notranslate"><span class="pre">BasicSensors.xml</span></code></p>
 <div class="section" id="scxml">
-<h3>SCXML<a class="headerlink" href="#scxml" title="Permalink to this headline"></a></h3>
+<h3>SCXML<a class="headerlink" href="#scxml" title="Permalink to this heading"></a></h3>
 <p>Finite state machines with described in an xml-like state machine language apache-scxml.</p>
 </div>
 <div class="section" id="structure">
-<h3>Structure<a class="headerlink" href="#structure" title="Permalink to this headline"></a></h3>
+<h3>Structure<a class="headerlink" href="#structure" title="Permalink to this heading"></a></h3>
 <p>The RoboCup [Exercise] project has the following structure:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">PROJECT</span><span class="o">/</span><span class="n">src</span><span class="o">/</span><span class="n">main</span><span class="o">/</span>
            <span class="o">|---</span> <span class="n">config</span><span class="o">/</span>
@@ -113,7 +115,7 @@
 </div>
 </div>
 <div class="section" id="test-statemachine-during-developement">
-<h2>Test Statemachine during developement<a class="headerlink" href="#test-statemachine-during-developement" title="Permalink to this headline"></a></h2>
+<h2>Test Statemachine during developement<a class="headerlink" href="#test-statemachine-during-developement" title="Permalink to this heading"></a></h2>
 <p>in the RobocupathomeDist <code class="docutils literal notranslate"><span class="pre">Robocup&#64;home</span> <span class="pre">[BIN]</span></code> module.</p>
 <p>Copy “resource/localMapping.default.properties” as “localMapping.properties” and enter the path to your cloned repositories</p>
 <ul class="simple">
@@ -121,7 +123,7 @@
 </ul>
 </div>
 <div class="section" id="using-rsb-version">
-<h2>Using RSB version<a class="headerlink" href="#using-rsb-version" title="Permalink to this headline"></a></h2>
+<h2>Using RSB version<a class="headerlink" href="#using-rsb-version" title="Permalink to this heading"></a></h2>
 <ul class="simple">
 <li><p>configure rsb to use the vdemo spread port:</p></li>
 </ul>
@@ -159,7 +161,7 @@
 
   <div role="contentinfo">
     <p>&#169; Copyright 2018, Leroy Rügemer.
-      <span class="lastupdated">Last updated on Sep 22, 2022.
+      <span class="lastupdated">Last updated on Dec 07, 2022.
       </span></p>
   </div>
 

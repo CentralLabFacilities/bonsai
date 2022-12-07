@@ -14,7 +14,9 @@
         <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
         <script src="../_static/jquery.js"></script>
         <script src="../_static/underscore.js"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="../_static/doctools.js"></script>
+        <script src="../_static/sphinx_highlight.js"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" /> 
@@ -70,43 +72,43 @@
            <div itemprop="articleBody">
              
   <div class="section" id="behavior-abstraction-layer">
-<h1>Behavior Abstraction Layer<a class="headerlink" href="#behavior-abstraction-layer" title="Permalink to this headline"></a></h1>
+<h1>Behavior Abstraction Layer<a class="headerlink" href="#behavior-abstraction-layer" title="Permalink to this heading"></a></h1>
 <p>BehaviorAL is used to expose robot behaviors to extern users (e.x Apartment)
 It can be used to trigger statemachines remotely.</p>
 <p>Params:</p>
-<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="nd">@Option</span><span class="o">(</span><span class="n">name</span> <span class="o">=</span> <span class="s">&quot;-l&quot;</span><span class="o">,</span> <span class="n">aliases</span> <span class="o">=</span> <span class="o">{</span><span class="s">&quot;--logging&quot;</span><span class="o">},</span> <span class="n">metaVar</span> <span class="o">=</span> <span class="s">&quot;PATH&quot;</span><span class="o">,</span> <span class="n">usage</span> <span class="o">=</span> <span class="s">&quot;path to a log4j properties file&quot;</span><span class="o">)</span>
-<span class="nd">@Option</span><span class="o">(</span><span class="n">name</span> <span class="o">=</span> <span class="s">&quot;-c&quot;</span><span class="o">,</span> <span class="n">aliases</span> <span class="o">=</span> <span class="o">{</span><span class="s">&quot;--config&quot;</span><span class="o">},</span> <span class="n">metaVar</span> <span class="o">=</span> <span class="s">&quot;PATH&quot;</span><span class="o">,</span> <span class="n">usage</span> <span class="o">=</span> <span class="s">&quot;path to the bahaviorAL config file&quot;</span><span class="o">)</span>
-<span class="nd">@Option</span><span class="o">(</span><span class="n">name</span> <span class="o">=</span> <span class="s">&quot;-s&quot;</span><span class="o">,</span> <span class="n">aliases</span> <span class="o">=</span> <span class="o">{</span><span class="s">&quot;--server_scope&quot;</span><span class="o">},</span> <span class="n">metaVar</span> <span class="o">=</span> <span class="s">&quot;VALUE&quot;</span><span class="o">,</span> <span class="n">usage</span> <span class="o">=</span> <span class="s">&quot;scope for server, default is: &#39;/bonsai&#39;&quot;</span><span class="o">)</span>
-<span class="nd">@Option</span><span class="o">(</span><span class="n">name</span> <span class="o">=</span> <span class="s">&quot;-b&quot;</span><span class="o">,</span> <span class="n">aliases</span> <span class="o">=</span> <span class="o">{</span><span class="s">&quot;--bonsai_server&quot;</span><span class="o">},</span> <span class="n">metaVar</span> <span class="o">=</span> <span class="s">&quot;VALUE&quot;</span><span class="o">,</span> <span class="n">usage</span> <span class="o">=</span> <span class="s">&quot;scope for bonsai (the server that gets the xml files), default is: &#39;/behavioral/server&#39;&quot;</span><span class="o">)</span>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="nd">@Option</span><span class="p">(</span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;-l&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">aliases</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="s">&quot;--logging&quot;</span><span class="p">},</span><span class="w"> </span><span class="n">metaVar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;PATH&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">usage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;path to a log4j properties file&quot;</span><span class="p">)</span><span class="w"></span>
+<span class="nd">@Option</span><span class="p">(</span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;-c&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">aliases</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="s">&quot;--config&quot;</span><span class="p">},</span><span class="w"> </span><span class="n">metaVar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;PATH&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">usage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;path to the bahaviorAL config file&quot;</span><span class="p">)</span><span class="w"></span>
+<span class="nd">@Option</span><span class="p">(</span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;-s&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">aliases</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="s">&quot;--server_scope&quot;</span><span class="p">},</span><span class="w"> </span><span class="n">metaVar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;VALUE&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">usage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;scope for server, default is: &#39;/bonsai&#39;&quot;</span><span class="p">)</span><span class="w"></span>
+<span class="nd">@Option</span><span class="p">(</span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;-b&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">aliases</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="s">&quot;--bonsai_server&quot;</span><span class="p">},</span><span class="w"> </span><span class="n">metaVar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;VALUE&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">usage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;scope for bonsai (the server that gets the xml files), default is: &#39;/behavioral/server&#39;&quot;</span><span class="p">)</span><span class="w"></span>
 </pre></div>
 </div>
 <p>Example config file:</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">autoload</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">example</span>
-<span class="nt">statemachines</span><span class="p">:</span>
-        <span class="p p-Indicator">-</span> <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">example</span>
-                <span class="l l-Scalar l-Scalar-Plain">task</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">${PATH_TO_CSRA_SCXML}/example.xml</span>
-                <span class="l l-Scalar l-Scalar-Plain">config</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">${PATH_TO_CSRA_CONFIG}/csra/CSRAMekaConfig.xml</span>
-                <span class="l l-Scalar l-Scalar-Plain">actions</span><span class="p p-Indicator">:</span>
-                        <span class="p p-Indicator">-</span> <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">talk</span>
-                                <span class="l l-Scalar l-Scalar-Plain">target</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">ExecuteSpeak</span>
-                                <span class="l l-Scalar l-Scalar-Plain">params</span><span class="p p-Indicator">:</span>
-                                        <span class="nt">text</span><span class="p">:</span> <span class="s">&quot;hello&quot;</span>
-                        <span class="p p-Indicator">-</span> <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">gotoannotation</span>
-                                <span class="l l-Scalar l-Scalar-Plain">target</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">ExecuteNavToAnnotation</span>
-                                <span class="l l-Scalar l-Scalar-Plain">params</span><span class="p p-Indicator">:</span>
-                                        <span class="nt">location</span><span class="p">:</span> <span class="s">&quot;start&quot;</span>
-                        <span class="p p-Indicator">-</span> <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">stop</span>
-                                <span class="l l-Scalar l-Scalar-Plain">target</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">ExecuteStop</span>
-                        <span class="p p-Indicator">-</span> <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">test</span>
-                                <span class="l l-Scalar l-Scalar-Plain">target</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">MemoryTest</span>
-        <span class="p p-Indicator">-</span> <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">test</span>
-                <span class="l l-Scalar l-Scalar-Plain">task</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">${PATH_TO_CSRA_SCXML}/test2.xml</span>
-                <span class="l l-Scalar l-Scalar-Plain">config</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">${PATH_TO_CSRA_CONFIG}/csra/CSRATest.xml</span>
-                <span class="l l-Scalar l-Scalar-Plain">actions</span><span class="p p-Indicator">:</span>
-                        <span class="p p-Indicator">-</span> <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">start</span>
-                                <span class="l l-Scalar l-Scalar-Plain">target</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">init</span>
-                                <span class="l l-Scalar l-Scalar-Plain">params</span><span class="p p-Indicator">:</span>
-                                        <span class="nt">object</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">blaanything</span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">autoload</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">example</span><span class="w"></span>
+<span class="nt">statemachines</span><span class="p">:</span><span class="w"></span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">example</span><span class="w"></span>
+<span class="w">                </span><span class="l l-Scalar l-Scalar-Plain">task</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${PATH_TO_CSRA_SCXML}/example.xml</span><span class="w"></span>
+<span class="w">                </span><span class="l l-Scalar l-Scalar-Plain">config</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${PATH_TO_CSRA_CONFIG}/csra/CSRAMekaConfig.xml</span><span class="w"></span>
+<span class="w">                </span><span class="l l-Scalar l-Scalar-Plain">actions</span><span class="p p-Indicator">:</span><span class="w"></span>
+<span class="w">                        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">talk</span><span class="w"></span>
+<span class="w">                                </span><span class="l l-Scalar l-Scalar-Plain">target</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ExecuteSpeak</span><span class="w"></span>
+<span class="w">                                </span><span class="l l-Scalar l-Scalar-Plain">params</span><span class="p p-Indicator">:</span><span class="w"></span>
+<span class="w">                                        </span><span class="nt">text</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;hello&quot;</span><span class="w"></span>
+<span class="w">                        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gotoannotation</span><span class="w"></span>
+<span class="w">                                </span><span class="l l-Scalar l-Scalar-Plain">target</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ExecuteNavToAnnotation</span><span class="w"></span>
+<span class="w">                                </span><span class="l l-Scalar l-Scalar-Plain">params</span><span class="p p-Indicator">:</span><span class="w"></span>
+<span class="w">                                        </span><span class="nt">location</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;start&quot;</span><span class="w"></span>
+<span class="w">                        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stop</span><span class="w"></span>
+<span class="w">                                </span><span class="l l-Scalar l-Scalar-Plain">target</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ExecuteStop</span><span class="w"></span>
+<span class="w">                        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test</span><span class="w"></span>
+<span class="w">                                </span><span class="l l-Scalar l-Scalar-Plain">target</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">MemoryTest</span><span class="w"></span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test</span><span class="w"></span>
+<span class="w">                </span><span class="l l-Scalar l-Scalar-Plain">task</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${PATH_TO_CSRA_SCXML}/test2.xml</span><span class="w"></span>
+<span class="w">                </span><span class="l l-Scalar l-Scalar-Plain">config</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${PATH_TO_CSRA_CONFIG}/csra/CSRATest.xml</span><span class="w"></span>
+<span class="w">                </span><span class="l l-Scalar l-Scalar-Plain">actions</span><span class="p p-Indicator">:</span><span class="w"></span>
+<span class="w">                        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">start</span><span class="w"></span>
+<span class="w">                                </span><span class="l l-Scalar l-Scalar-Plain">target</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">init</span><span class="w"></span>
+<span class="w">                                </span><span class="l l-Scalar l-Scalar-Plain">params</span><span class="p p-Indicator">:</span><span class="w"></span>
+<span class="w">                                        </span><span class="nt">object</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">blaanything</span><span class="w"></span>
 </pre></div>
 </div>
 <p>This configuration will automatically load the <code class="docutils literal notranslate"><span class="pre">example</span></code> statemachine. As the loading takes some time to verify config etc. you can configure the multiple initial states that can be triggered (<code class="docutils literal notranslate"><span class="pre">actions</span></code>). Each behavior should end with a final state to indicate when the <code class="docutils literal notranslate"><span class="pre">action</span></code> is finished. A final <code class="docutils literal notranslate"><span class="pre">End</span></code> state indicates that the <code class="docutils literal notranslate"><span class="pre">action</span></code> finished without errors.</p>
@@ -120,7 +122,7 @@ It can be used to trigger statemachines remotely.</p>
 </pre></div>
 </div>
 <div class="section" id="rsb-interface">
-<h2>RSB Interface<a class="headerlink" href="#rsb-interface" title="Permalink to this headline"></a></h2>
+<h2>RSB Interface<a class="headerlink" href="#rsb-interface" title="Permalink to this heading"></a></h2>
 <p>RPCserver runs on (default) /behavioral/server</p>
 <ul class="simple">
 <li><dl class="simple">
@@ -193,7 +195,7 @@ It can be used to trigger statemachines remotely.</p>
 
   <div role="contentinfo">
     <p>&#169; Copyright 2018, Leroy Rügemer.
-      <span class="lastupdated">Last updated on Sep 22, 2022.
+      <span class="lastupdated">Last updated on Dec 07, 2022.
       </span></p>
   </div>
 
