@@ -32,6 +32,7 @@ public class StateChangePublisherROS extends StateChangePublisher {
         @Override
         public void onStart(ConnectedNode connectedNode) {
             pub = connectedNode.newPublisher(topic, Transition._TYPE);
+            initialized = true;
         }
 
         @Override
