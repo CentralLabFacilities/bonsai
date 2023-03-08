@@ -47,11 +47,11 @@ class RosJointPositionControl(private val nodeName: GraphName) : RosNode(), Join
         )
 
 
-        if (ac?.waitForActionServerToStart(Duration(2.0)) == true) {
+        if (ac?.waitForActionServerToStart(Duration(20.0)) == true) {
             logger.info("RosJointController connected to $control_topic")
             initialized = true
         } else {
-            logger.warn("RosJointController not started to $control_topic")
+            logger.error("RosJointController not started to $control_topic")
         }
 
     }
