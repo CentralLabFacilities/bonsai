@@ -343,7 +343,11 @@ public class RosFactory implements CoreObjectFactory {
         logger.trace("create actuator: " + actuatorClass);
         //check if actuator was already initialized
         if (isActuatorInitialized.get(key)) {
-            return (T) initializedActuatorsByKey.get(key);
+            if (!((RosNode) initializedActuatorsByKey.get(key)).initialized) {
+                isActuatorInitialized.put(key,false);
+            } else {
+                return (T) initializedActuatorsByKey.get(key);
+            }
         }
 
         // first check that the requested actuator can be created
@@ -371,9 +375,9 @@ public class RosFactory implements CoreObjectFactory {
         if (actuator instanceof RosNode) {
             try {
                 spawnRosNode((RosNode) actuator, wait);
-                if (wait) {
-                    TimeUnit.SECONDS.sleep(2);
-                }
+                //if (wait) {
+                //    TimeUnit.SECONDS.sleep(2);
+                //}
             } catch (InterruptedException | ExecutionException | TimeoutException ex) {
                 logger.error(ex);
                 throw new CoreObjectCreationException("cant execute node for: " + actuator.getClass());
@@ -451,9 +455,9 @@ public class RosFactory implements CoreObjectFactory {
         if (sensor instanceof RosNode) {
             try {
                 spawnRosNode((RosNode) sensor, wait);
-                if (wait) {
-                    TimeUnit.SECONDS.sleep(2);
-                }
+                //if (wait) {
+                //    TimeUnit.SECONDS.sleep(2);
+                //}
             } catch (InterruptedException | ExecutionException | TimeoutException ex) {
                 logger.error(ex);
                 throw new CoreObjectCreationException("cant execute node for: " + sensor.getClass());
