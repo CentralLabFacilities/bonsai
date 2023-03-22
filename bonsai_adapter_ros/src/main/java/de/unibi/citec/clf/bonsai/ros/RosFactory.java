@@ -357,6 +357,8 @@ public class RosFactory implements CoreObjectFactory {
                     + "' can be created by this factory.");
         }
 
+        logger.warn("create actuator: " + actuatorClass + " have no initialized actuator of this type");
+
         ConfiguredObject obj = configuredObjectsByKey.get(key);
         Actuator actuator;
 
@@ -375,9 +377,9 @@ public class RosFactory implements CoreObjectFactory {
         if (actuator instanceof RosNode) {
             try {
                 spawnRosNode((RosNode) actuator, wait);
-                //if (wait) {
-                //    TimeUnit.SECONDS.sleep(2);
-                //}
+                if (wait) {
+                   TimeUnit.SECONDS.sleep(2);
+                }
             } catch (InterruptedException | ExecutionException | TimeoutException ex) {
                 logger.error(ex);
                 throw new CoreObjectCreationException("cant execute node for: " + actuator.getClass());
