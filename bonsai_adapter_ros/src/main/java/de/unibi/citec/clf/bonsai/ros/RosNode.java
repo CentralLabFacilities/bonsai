@@ -1,6 +1,7 @@
 package de.unibi.citec.clf.bonsai.ros;
 
 
+import org.apache.log4j.Logger;
 import org.ros.node.AbstractNodeMain;
 import org.ros.node.ConnectedNode;
 
@@ -14,6 +15,7 @@ import java.util.concurrent.TimeoutException;
  */
 public abstract class RosNode extends AbstractNodeMain {
 
+    private Logger logger = Logger.getLogger(getClass());
     public boolean initialized = false;
     public static final String NODE_PREFIX = "/bonsai/ros/";
     private String key = "";
@@ -62,13 +64,18 @@ public abstract class RosNode extends AbstractNodeMain {
 
             @Override
             public Boolean get(long l, TimeUnit tu) throws InterruptedException, ExecutionException, TimeoutException {
-                long timeout = 0;
-                while (!initialized && timeout < l) {
-                    tu.sleep(l / 10);
-                    timeout += l / 10;
+                long sleep_millies = tu.toMillis(l);
+                long sleep_step = sleep_millies / 10;
+                logger.error("get isInitialized for  " + l + tu.toString());
+                while (!initialized && sleep_millies > 0) {
+                    sleep_millies -= sleep_step;
+                    Thread.sleep(sleep_step);
                 }
 
-                if (!initialized) throw new TimeoutException("not initialized after " + l + tu.toString());
+                if (!initialized) {
+                    logger.error("isInitialized false after " + l + tu.toString());
+                    throw new TimeoutException("not initialized after " + l + tu.toString());
+                }
                 return initialized;
             }
         };
