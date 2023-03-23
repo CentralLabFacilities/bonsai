@@ -435,7 +435,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
         configureSkills = MapReader.readConfigBool("#_CONFIGURE_AND_VALIDATE", configureSkills, data);
         logger.debug("Enable full configuration and validation: " + configureSkills);
 
-        hashSkillconfigurations = MapReader.readConfigBool("#_ENABLE_CONFIG_CACHE", generateDefaultSlots, data);
+        hashSkillconfigurations = MapReader.readConfigBool("#_ENABLE_CONFIG_CACHE", hashSkillconfigurations, data);
         logger.debug("Enable configuration cache: " + hashSkillconfigurations);
     }
 
