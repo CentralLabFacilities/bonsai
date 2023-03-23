@@ -34,6 +34,10 @@ public abstract class RosNode extends AbstractNodeMain {
     public final void cleanUp() {
     }
 
+    public boolean connectionsAlive() {
+        return true;
+    }
+
     public abstract void destroyNode();
 
     public Future<Boolean> isInitialised() {
