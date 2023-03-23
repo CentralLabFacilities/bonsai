@@ -34,6 +34,10 @@ public abstract class RosNode extends AbstractNodeMain {
     public final void cleanUp() {
     }
 
+    public boolean connectionsAlive() {
+        return true;
+    }
+
     public abstract void destroyNode();
 
     public Future<Boolean> isInitialised() {
@@ -66,14 +70,14 @@ public abstract class RosNode extends AbstractNodeMain {
             public Boolean get(long l, TimeUnit tu) throws InterruptedException, ExecutionException, TimeoutException {
                 long sleep_millies = tu.toMillis(l);
                 long sleep_step = sleep_millies / 10;
-                logger.error("get isInitialized for  " + l + tu.toString());
+                logger.trace("get isInitialized for  " + l + tu.toString());
                 while (!initialized && sleep_millies > 0) {
                     sleep_millies -= sleep_step;
                     Thread.sleep(sleep_step);
                 }
 
                 if (!initialized) {
-                    logger.error("isInitialized false after " + l + tu.toString());
+                    logger.trace("isInitialized false after " + l + tu.toString());
                     throw new TimeoutException("not initialized after " + l + tu.toString());
                 }
                 return initialized;
