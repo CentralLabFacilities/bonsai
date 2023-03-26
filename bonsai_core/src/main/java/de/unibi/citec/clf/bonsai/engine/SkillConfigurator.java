@@ -409,7 +409,8 @@ public class SkillConfigurator implements ISkillConfigurator {
         }
 
         try {
-            String value = configValues.getOrDefault(key, String.valueOf(def));
+            String def_string = (def == null) ? null : String.valueOf(def);
+            String value = configValues.getOrDefault(key, def_string);
             ret = castValue(value, type);
             logger.debug(".. using config value " + value);
         } catch (Exception ex) {
