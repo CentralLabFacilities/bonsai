@@ -704,7 +704,18 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
                 //checkEventTransitions(((Send) a).getEvent());
             } else if (a instanceof Assign) {
                 Assign action = (Assign) a;
-                logger.info("## ASSIGN ## Name:" + action.getName() + " Expr:" + action.getExpr());
+                if(action.getExpr().startsWith("'")) {
+                    logger.info("## ASSIGN ## Name:" + action.getName() + " Expr:" + action.getExpr());
+                } else {
+                    Context ctx = scxmlExecutor.getRootContext();
+                    Evaluator eval = scxmlExecutor.getEvaluator();
+                    try {
+                        logger.warn("## ASSIGN ## Name:" + action.getName() + " VALUE OF:'" + action.getExpr()+ "' = " + eval.eval(ctx,action.getExpr()));
+                    } catch (SCXMLExpressionException e) {
+                        logger.warn("## ASSIGN ## Name:" + action.getName() + " VALUE OF:'" + action.getExpr()+ "' = NULL");
+                    }
+                }
+
             }
         }); //logger.trace("possible actions: " + actionsStr);
     }
