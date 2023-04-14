@@ -341,9 +341,20 @@ public class RosFactory implements CoreObjectFactory {
     public <T extends Actuator> T createActuator(String key, Class<T> actuatorClass, boolean wait)
             throws IllegalArgumentException, CoreObjectCreationException {
         logger.trace("create actuator: " + actuatorClass);
-        //check if actuator was already initialized
+
         if (isActuatorInitialized.get(key)) {
-            return (T) initializedActuatorsByKey.get(key);
+            //check if actuator is still connected
+            if (((RosNode) initializedActuatorsByKey.get(key)).connectionsAlive() ) {
+                return (T) initializedActuatorsByKey.get(key);
+            } else {
+                // lost connection, shutdown
+                logger.error("Actuator: " + key + " class: " + actuatorClass + ", seems to has lost its connections, shutdown and restart");
+                isActuatorInitialized.put(key,false);
+                ((RosNode) initializedActuatorsByKey.get(key)).destroyNode();
+                initializedActuatorsByKey.remove(key);
+            }
+        } else {
+            logger.warn("create actuator: " + key + " class: " + actuatorClass + ", have no initialized actuator of this type");
         }
 
         // first check that the requested actuator can be created
@@ -352,6 +363,8 @@ public class RosFactory implements CoreObjectFactory {
                     + "' and interface class '" + actuatorClass
                     + "' can be created by this factory.");
         }
+
+
 
         ConfiguredObject obj = configuredObjectsByKey.get(key);
         Actuator actuator;
@@ -372,7 +385,7 @@ public class RosFactory implements CoreObjectFactory {
             try {
                 spawnRosNode((RosNode) actuator, wait);
                 if (wait) {
-                    TimeUnit.SECONDS.sleep(2);
+                   TimeUnit.MILLISECONDS.sleep(sleepTime);
                 }
             } catch (InterruptedException | ExecutionException | TimeoutException ex) {
                 logger.error(ex);
@@ -452,7 +465,7 @@ public class RosFactory implements CoreObjectFactory {
             try {
                 spawnRosNode((RosNode) sensor, wait);
                 if (wait) {
-                    TimeUnit.SECONDS.sleep(2);
+                    TimeUnit.MILLISECONDS.sleep(sleepTime);
                 }
             } catch (InterruptedException | ExecutionException | TimeoutException ex) {
                 logger.error(ex);
