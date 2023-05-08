@@ -89,7 +89,7 @@ public class Pose3D extends Type {
 	 */
 	@Override
 	public String toString() {
-		return "[" + getClass().getSimpleName() + " timestamp: " + getTimestamp()
+		return "[" + getClass().getSimpleName() + " timestamp: " + getTimestamp() + " frameId: " + getFrameId()
 				+ " Translation: " + translation + " Rotation: " + rotation + "]";
 
 	}
