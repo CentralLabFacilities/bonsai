@@ -59,6 +59,7 @@ class TFTransformer(gn: GraphName) : CoordinateTransformer() {
         override fun onNewMessage(tfMessage: TFMessage) {
             val transforms = tfMessage.transforms
             for (ts in transforms) {
+                logger.trace("got tf " + ts.header.frameId + " -> " + ts.childFrameId)
                 currentTree.update(ts)
             }
         }
