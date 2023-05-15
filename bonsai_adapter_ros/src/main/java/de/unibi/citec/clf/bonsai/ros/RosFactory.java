@@ -7,6 +7,7 @@ import de.unibi.citec.clf.bonsai.core.exception.ConfigurationException;
 import de.unibi.citec.clf.bonsai.core.exception.CoreObjectCreationException;
 import de.unibi.citec.clf.bonsai.core.exception.InitializationException;
 import de.unibi.citec.clf.bonsai.core.object.*;
+import de.unibi.citec.clf.bonsai.util.CoordinateTransformer;
 import de.unibi.citec.clf.bonsai.util.MapReader;
 import de.unibi.citec.clf.bonsai.util.reflection.ReflectionServiceDiscovery;
 import de.unibi.citec.clf.bonsai.util.reflection.ServiceDiscovery;
@@ -48,7 +49,7 @@ public class RosFactory implements CoreObjectFactory {
     private Logger logger = Logger.getLogger(getClass());
     private NodeMainExecutor nodeMainExecutor;
     private URI rosMasterUri;
-    private TFTransformer coordinateTransformer;
+    private CoordinateTransformer coordinateTransformer;
     private long nodeInitTimeout = 5000;
     private long sleepTime = 1000;
 
@@ -329,8 +330,11 @@ public class RosFactory implements CoreObjectFactory {
 
         if (transformer.getTransformerClass().equals(TFTransformer.class)) {
             coordinateTransformer = new TFTransformer(GraphName.of(RosNode.NODE_PREFIX + "Transformer"));
-            coordinateTransformer.getNode().setKey("Transformer");
-        } else {
+            ((TFTransformer)coordinateTransformer).getNode().setKey("Transformer");
+        } else if (transformer.getTransformerClass().equals(RosjavaTfWrapper.class)){
+            coordinateTransformer = new RosjavaTfWrapper(GraphName.of(RosNode.NODE_PREFIX + "Transformer"));
+            ((RosjavaTfWrapper)coordinateTransformer).getNode().setKey("Transformer");
+        }else {
             throw new IllegalArgumentException("can only create " + TFTransformer.class +
                     " but requested is: " + transformer.getTransformerClass());
         }
@@ -560,13 +564,27 @@ public class RosFactory implements CoreObjectFactory {
         if (coordinateTransformer == null)
             throw new CoreObjectCreationException("no ros transformer configured");
 
-        if (!coordinateTransformer.getNode().initialized) {
-            try {
-                spawnRosNode(coordinateTransformer.getNode(), true);
-            } catch (TimeoutException | ExecutionException | InterruptedException e) {
-                throw new CoreObjectCreationException(e);
+        if(coordinateTransformer instanceof TFTransformer) {
+            TFTransformer c = (TFTransformer) coordinateTransformer;
+            if (!c.getNode().initialized) {
+                try {
+                    spawnRosNode(c.getNode(), true);
+                } catch (TimeoutException | ExecutionException | InterruptedException e) {
+                    throw new CoreObjectCreationException(e);
+                }
+            }
+        } else {
+            RosjavaTfWrapper c = (RosjavaTfWrapper) coordinateTransformer;
+            if (!c.getNode().initialized) {
+                try {
+                    spawnRosNode(c.getNode(), true);
+                } catch (TimeoutException | ExecutionException | InterruptedException e) {
+                    throw new CoreObjectCreationException(e);
+                }
             }
         }
+
+
 
         return (T) coordinateTransformer;
 
@@ -589,7 +607,14 @@ public class RosFactory implements CoreObjectFactory {
         });
 
         if (coordinateTransformer != null) {
-            coordinateTransformer.getNode().destroyNode();
+            if(coordinateTransformer instanceof TFTransformer) {
+                TFTransformer c = (TFTransformer) coordinateTransformer;
+                c.getNode().destroyNode();
+            } else {
+                RosjavaTfWrapper c = (RosjavaTfWrapper) coordinateTransformer;
+                c.getNode().destroyNode();
+            }
+
         }
 
         if (nodeMainExecutor != null) {
@@ -604,12 +629,20 @@ public class RosFactory implements CoreObjectFactory {
         Queue<RosNode> nodesQuene = new ConcurrentLinkedQueue<>();
 
         if (coordinateTransformer != null) {
+            RosNode node;
+            if(coordinateTransformer instanceof TFTransformer) {
+                TFTransformer c = (TFTransformer) coordinateTransformer;
+                node = c.getNode();
+            } else {
+                RosjavaTfWrapper c = (RosjavaTfWrapper) coordinateTransformer;
+                node = c.getNode();
+            }
             try {
-                spawnRosNode(coordinateTransformer.getNode(), false);
+                spawnRosNode(node, false);
             } catch (TimeoutException | ExecutionException | InterruptedException e) {
                 logger.error(e);
             }
-            nodesQuene.add(coordinateTransformer.getNode());
+            nodesQuene.add(node);
         }
 
         configuredObjectsByKey.entrySet().parallelStream().forEach((entry) -> {

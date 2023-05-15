@@ -40,6 +40,11 @@
             <type>jar</type>
         </dependency>
 
+        <dependency>
+            <groupId>org.ros.rosjava.tf</groupId>
+            <artifactId>rosjava_tf_core</artifactId>
+            <version>0.2.3</version>
+        </dependency>
 
         <dependency>
             <groupId>org.ros.rosjava_core</groupId>
