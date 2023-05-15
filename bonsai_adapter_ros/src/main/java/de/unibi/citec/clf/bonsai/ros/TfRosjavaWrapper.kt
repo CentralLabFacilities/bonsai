@@ -1,18 +1,12 @@
 package de.unibi.citec.clf.bonsai.ros
 
 import de.unibi.citec.clf.bonsai.core.exception.TransformException
-import de.unibi.citec.clf.bonsai.core.time.Time
 import de.unibi.citec.clf.bonsai.util.CoordinateTransformer
 import de.unibi.citec.clf.btl.Transform
 import org.apache.log4j.Logger
-import org.ros.message.MessageListener
 import org.ros.namespace.GraphName
 import org.ros.node.ConnectedNode
-import org.ros.node.topic.Subscriber
 import org.ros.rosjava.tf.pubsub.TransformListener
-import org.ros.rosjava_geometry.FrameTransform
-import org.ros.rosjava_geometry.FrameTransformTree
-import tf2_msgs.TFMessage
 import java.lang.RuntimeException
 import javax.media.j3d.Transform3D
 import javax.vecmath.Quat4d
@@ -21,7 +15,7 @@ import javax.vecmath.Vector3d
 /**
  * Created by lruegeme on 1/18/18.
  */
-class RosjavaTfWrapper(gn: GraphName) : CoordinateTransformer() {
+class TfRosjavaWrapper(gn: GraphName) : CoordinateTransformer() {
     private val logger = Logger.getLogger(javaClass)
 
     //gosch
