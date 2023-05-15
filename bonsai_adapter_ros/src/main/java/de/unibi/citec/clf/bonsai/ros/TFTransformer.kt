@@ -31,7 +31,7 @@ class TFTransformer(gn: GraphName) : CoordinateTransformer() {
         override fun onStart(connectedNode: ConnectedNode) {
             subscriberTf = connectedNode.newSubscriber("/tf", TFMessage._TYPE)
             subscriberTfStatic = connectedNode.newSubscriber("/tf_static", TFMessage._TYPE)
-            subscriberTf?.addMessageListener(this, 500)
+            subscriberTf?.addMessageListener(this, 10)
             subscriberTfStatic?.addMessageListener(this, 1)
             initialized = true
         }
@@ -49,11 +49,7 @@ class TFTransformer(gn: GraphName) : CoordinateTransformer() {
         fun getTransform(source: String?, target: String?): FrameTransform {
             val transform = currentTree.transform(source, target)
             logger.trace("fetch tf: $transform")
-            return if (transform != null && transform.time != null) {
-                transform
-            } else {
-                throw TransformException(source, target, Time.currentTimeMillis())
-            }
+            return transform ?: throw TransformException(source, target, Time.currentTimeMillis())
         }
 
         override fun onNewMessage(tfMessage: TFMessage) {
@@ -78,6 +74,7 @@ class TFTransformer(gn: GraphName) : CoordinateTransformer() {
 
     @Throws(TransformException::class)
     override fun lookup(from: String, to: String, time: Long): Transform {
+        logger.debug("lookup $from -> $to")
         val ftf = node.getTransform(from, to)
         val translation = ftf.transform.translation
         val rotationAndScale = ftf.transform.rotationAndScale
