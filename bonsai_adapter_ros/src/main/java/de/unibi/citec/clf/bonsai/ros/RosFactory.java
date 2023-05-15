@@ -329,11 +329,10 @@ public class RosFactory implements CoreObjectFactory {
         FactoryConfigurationResults results = new FactoryConfigurationResults();
 
         if (transformer.getTransformerClass().equals(TFTransformer.class)) {
-            coordinateTransformer = new TFTransformer(GraphName.of(RosNode.NODE_PREFIX + "Transformer"));
-            ((TFTransformer)coordinateTransformer).getNode().setKey("Transformer");
-        } else if (transformer.getTransformerClass().equals(RosjavaTfWrapper.class)){
-            coordinateTransformer = new RosjavaTfWrapper(GraphName.of(RosNode.NODE_PREFIX + "Transformer"));
-            ((RosjavaTfWrapper)coordinateTransformer).getNode().setKey("Transformer");
+            coordinateTransformer = new TFTransformer(GraphName.of(RosNode.NODE_PREFIX + "tf"), GraphName.of(RosNode.NODE_PREFIX + "tf2"));
+        } else if (transformer.getTransformerClass().equals(TfRosjavaWrapper.class)){
+            coordinateTransformer = new TfRosjavaWrapper(GraphName.of(RosNode.NODE_PREFIX + "Transformer"));
+            ((TfRosjavaWrapper)coordinateTransformer).getNode().setKey("Transformer");
         }else {
             throw new IllegalArgumentException("can only create " + TFTransformer.class +
                     " but requested is: " + transformer.getTransformerClass());
@@ -569,12 +568,13 @@ public class RosFactory implements CoreObjectFactory {
             if (!c.getNode().initialized) {
                 try {
                     spawnRosNode(c.getNode(), true);
+                    spawnRosNode(c.getNode2(), true);
                 } catch (TimeoutException | ExecutionException | InterruptedException e) {
                     throw new CoreObjectCreationException(e);
                 }
             }
         } else {
-            RosjavaTfWrapper c = (RosjavaTfWrapper) coordinateTransformer;
+            TfRosjavaWrapper c = (TfRosjavaWrapper) coordinateTransformer;
             if (!c.getNode().initialized) {
                 try {
                     spawnRosNode(c.getNode(), true);
@@ -610,8 +610,9 @@ public class RosFactory implements CoreObjectFactory {
             if(coordinateTransformer instanceof TFTransformer) {
                 TFTransformer c = (TFTransformer) coordinateTransformer;
                 c.getNode().destroyNode();
+                c.getNode2().destroyNode();
             } else {
-                RosjavaTfWrapper c = (RosjavaTfWrapper) coordinateTransformer;
+                TfRosjavaWrapper c = (TfRosjavaWrapper) coordinateTransformer;
                 c.getNode().destroyNode();
             }
 
@@ -629,20 +630,27 @@ public class RosFactory implements CoreObjectFactory {
         Queue<RosNode> nodesQuene = new ConcurrentLinkedQueue<>();
 
         if (coordinateTransformer != null) {
-            RosNode node;
             if(coordinateTransformer instanceof TFTransformer) {
                 TFTransformer c = (TFTransformer) coordinateTransformer;
-                node = c.getNode();
+                try {
+                    spawnRosNode(c.getNode(), false);
+                    spawnRosNode(c.getNode2(), false);
+                } catch (TimeoutException | ExecutionException | InterruptedException e) {
+                    logger.error(e);
+                }
+                nodesQuene.add(c.getNode());
+                nodesQuene.add(c.getNode2());
             } else {
-                RosjavaTfWrapper c = (RosjavaTfWrapper) coordinateTransformer;
-                node = c.getNode();
+                TfRosjavaWrapper c = (TfRosjavaWrapper) coordinateTransformer;
+                try {
+                    spawnRosNode(c.getNode(), false);
+                } catch (TimeoutException | ExecutionException | InterruptedException e) {
+                    logger.error(e);
+                }
+                nodesQuene.add(c.getNode());
             }
-            try {
-                spawnRosNode(node, false);
-            } catch (TimeoutException | ExecutionException | InterruptedException e) {
-                logger.error(e);
-            }
-            nodesQuene.add(node);
+
+
         }
 
         configuredObjectsByKey.entrySet().parallelStream().forEach((entry) -> {
