@@ -111,7 +111,7 @@ class TFTransformer(gn: GraphName, gn2: GraphName) : CoordinateTransformer(), Me
 
         //todo check scale
         val tf3d = Transform3D(quat, vec, 1.0)
-        return Transform(tf3d, from, to, ftf.time.totalNsecs())
+        return Transform(tf3d, from, to, 0)
     }
 
     init {
