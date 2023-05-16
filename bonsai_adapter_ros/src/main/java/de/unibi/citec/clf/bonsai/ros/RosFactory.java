@@ -7,6 +7,7 @@ import de.unibi.citec.clf.bonsai.core.exception.ConfigurationException;
 import de.unibi.citec.clf.bonsai.core.exception.CoreObjectCreationException;
 import de.unibi.citec.clf.bonsai.core.exception.InitializationException;
 import de.unibi.citec.clf.bonsai.core.object.*;
+import de.unibi.citec.clf.bonsai.util.CoordinateTransformer;
 import de.unibi.citec.clf.bonsai.util.MapReader;
 import de.unibi.citec.clf.bonsai.util.reflection.ReflectionServiceDiscovery;
 import de.unibi.citec.clf.bonsai.util.reflection.ServiceDiscovery;
@@ -48,7 +49,7 @@ public class RosFactory implements CoreObjectFactory {
     private Logger logger = Logger.getLogger(getClass());
     private NodeMainExecutor nodeMainExecutor;
     private URI rosMasterUri;
-    private TFTransformer coordinateTransformer;
+    private CoordinateTransformer coordinateTransformer;
     private long nodeInitTimeout = 5000;
     private long sleepTime = 1000;
 
@@ -328,9 +329,11 @@ public class RosFactory implements CoreObjectFactory {
         FactoryConfigurationResults results = new FactoryConfigurationResults();
 
         if (transformer.getTransformerClass().equals(TFTransformer.class)) {
-            coordinateTransformer = new TFTransformer(GraphName.of(RosNode.NODE_PREFIX + "Transformer"));
-            coordinateTransformer.getNode().setKey("Transformer");
-        } else {
+            coordinateTransformer = new TFTransformer(GraphName.of(RosNode.NODE_PREFIX + "tf"), GraphName.of(RosNode.NODE_PREFIX + "tf2"));
+        } else if (transformer.getTransformerClass().equals(TfRosjavaWrapper.class)){
+            coordinateTransformer = new TfRosjavaWrapper(GraphName.of(RosNode.NODE_PREFIX + "Transformer"));
+            ((TfRosjavaWrapper)coordinateTransformer).getNode().setKey("Transformer");
+        }else {
             throw new IllegalArgumentException("can only create " + TFTransformer.class +
                     " but requested is: " + transformer.getTransformerClass());
         }
@@ -560,13 +563,28 @@ public class RosFactory implements CoreObjectFactory {
         if (coordinateTransformer == null)
             throw new CoreObjectCreationException("no ros transformer configured");
 
-        if (!coordinateTransformer.getNode().initialized) {
-            try {
-                spawnRosNode(coordinateTransformer.getNode(), true);
-            } catch (TimeoutException | ExecutionException | InterruptedException e) {
-                throw new CoreObjectCreationException(e);
+        if(coordinateTransformer instanceof TFTransformer) {
+            TFTransformer c = (TFTransformer) coordinateTransformer;
+            if (!c.getNode().initialized) {
+                try {
+                    spawnRosNode(c.getNode(), true);
+                    spawnRosNode(c.getNode2(), true);
+                } catch (TimeoutException | ExecutionException | InterruptedException e) {
+                    throw new CoreObjectCreationException(e);
+                }
+            }
+        } else {
+            TfRosjavaWrapper c = (TfRosjavaWrapper) coordinateTransformer;
+            if (!c.getNode().initialized) {
+                try {
+                    spawnRosNode(c.getNode(), true);
+                } catch (TimeoutException | ExecutionException | InterruptedException e) {
+                    throw new CoreObjectCreationException(e);
+                }
             }
         }
+
+
 
         return (T) coordinateTransformer;
 
@@ -589,7 +607,15 @@ public class RosFactory implements CoreObjectFactory {
         });
 
         if (coordinateTransformer != null) {
-            coordinateTransformer.getNode().destroyNode();
+            if(coordinateTransformer instanceof TFTransformer) {
+                TFTransformer c = (TFTransformer) coordinateTransformer;
+                c.getNode().destroyNode();
+                c.getNode2().destroyNode();
+            } else {
+                TfRosjavaWrapper c = (TfRosjavaWrapper) coordinateTransformer;
+                c.getNode().destroyNode();
+            }
+
         }
 
         if (nodeMainExecutor != null) {
@@ -604,12 +630,27 @@ public class RosFactory implements CoreObjectFactory {
         Queue<RosNode> nodesQuene = new ConcurrentLinkedQueue<>();
 
         if (coordinateTransformer != null) {
-            try {
-                spawnRosNode(coordinateTransformer.getNode(), false);
-            } catch (TimeoutException | ExecutionException | InterruptedException e) {
-                logger.error(e);
+            if(coordinateTransformer instanceof TFTransformer) {
+                TFTransformer c = (TFTransformer) coordinateTransformer;
+                try {
+                    spawnRosNode(c.getNode(), false);
+                    spawnRosNode(c.getNode2(), false);
+                } catch (TimeoutException | ExecutionException | InterruptedException e) {
+                    logger.error(e);
+                }
+                nodesQuene.add(c.getNode());
+                nodesQuene.add(c.getNode2());
+            } else {
+                TfRosjavaWrapper c = (TfRosjavaWrapper) coordinateTransformer;
+                try {
+                    spawnRosNode(c.getNode(), false);
+                } catch (TimeoutException | ExecutionException | InterruptedException e) {
+                    logger.error(e);
+                }
+                nodesQuene.add(c.getNode());
             }
-            nodesQuene.add(coordinateTransformer.getNode());
+
+
         }
 
         configuredObjectsByKey.entrySet().parallelStream().forEach((entry) -> {

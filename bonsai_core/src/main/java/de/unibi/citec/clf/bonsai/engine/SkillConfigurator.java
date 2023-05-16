@@ -680,6 +680,11 @@ public class SkillConfigurator implements ISkillConfigurator {
     }
 
     @Override
+    public <T> MemorySlot<T> getReadWriteSlot(String slotName, Class<T> slotType) throws SkillConfigurationException {
+        return getSlot(slotName, slotType, SlotDirection.BI);
+    }
+
+    @Override
     public <T> MemorySlotWriter<T> getWriteSlot(String slotName, Class<T> slotType) throws SkillConfigurationException {
         return getSlot(slotName, slotType, SlotDirection.OUT);
     }
