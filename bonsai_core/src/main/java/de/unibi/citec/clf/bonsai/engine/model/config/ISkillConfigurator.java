@@ -19,6 +19,8 @@ public interface ISkillConfigurator extends IObjectConfigurator {
 
     <T> MemorySlotReader<T> getReadSlot(String slotName, Class<T> slotType) throws SkillConfigurationException;
 
+    <T> MemorySlot<T> getReadWriteSlot(String slotName, Class<T> slotType) throws SkillConfigurationException;
+
     <T> MemorySlotWriter<T> getWriteSlot(String slotName, Class<T> slotType) throws SkillConfigurationException;
 
     public TransformLookup getTransform() throws SkillConfigurationException;

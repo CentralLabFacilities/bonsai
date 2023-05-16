@@ -40,6 +40,11 @@
             <type>jar</type>
         </dependency>
 
+        <dependency>
+            <groupId>org.ros.rosjava.tf</groupId>
+            <artifactId>rosjava_tf_core</artifactId>
+            <version>0.2.3</version>
+        </dependency>
 
         <dependency>
             <groupId>org.ros.rosjava_core</groupId>
@@ -74,6 +79,11 @@
             <groupId>org.ros.rosjava_messages</groupId>
             <artifactId>tf2_msgs</artifactId>
             <version>[0.3.0,0.8)</version>
+        </dependency>
+        <dependency>
+            <groupId>org.ros.rosjava_messages</groupId>
+            <artifactId>tf</artifactId>
+            <version>[1.12.0,1.14.0)</version>
         </dependency>
         <dependency>
             <groupId>org.ros.rosjava_messages</groupId>
