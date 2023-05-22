@@ -14,6 +14,8 @@ import java.util.concurrent.Future;
  * Executes a prerecorded movement.
  * 
  * @author lruegeme
+ *  see https://github.com/CentralLabFacilities/tiago_ros_pkgs/blob/master/tiago_clf_launch/config/tiago_motions.yaml
+ *  for available poses
  *
  *
  */
