@@ -1,7 +1,7 @@
 package de.unibi.citec.clf.bonsai.skills.arm.grasping;
 
 import de.unibi.citec.clf.bonsai.actuators.ManipulationActuator;
-import de.unibi.citec.clf.bonsai.actuators.PicknPlaceActuator;
+import de.unibi.citec.clf.bonsai.actuators.deprecated.PicknPlaceActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;

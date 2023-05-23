@@ -1,4 +1,4 @@
-package de.unibi.citec.clf.bonsai.actuators;
+package de.unibi.citec.clf.bonsai.actuators.deprecated;
 
 
 
@@ -11,6 +11,7 @@ import de.unibi.citec.clf.bonsai.core.object.Actuator;
  * 
  * @author lkettenb
  */
+@Deprecated
 public interface RPCActuator extends Actuator {
 
     /**

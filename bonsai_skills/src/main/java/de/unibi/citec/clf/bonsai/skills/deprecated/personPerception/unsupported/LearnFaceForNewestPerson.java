@@ -1,6 +1,6 @@
 package de.unibi.citec.clf.bonsai.skills.deprecated.personPerception.unsupported;
 
-import de.unibi.citec.clf.bonsai.actuators.FaceIdentificationHumavipsActuator;
+import de.unibi.citec.clf.bonsai.actuators.deprecated.FaceIdentificationHumavipsActuator;
 import de.unibi.citec.clf.bonsai.actuators.SpeechActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlot;

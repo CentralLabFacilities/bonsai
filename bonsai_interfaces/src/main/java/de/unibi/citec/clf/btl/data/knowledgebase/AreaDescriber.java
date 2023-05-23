@@ -9,6 +9,7 @@ import de.unibi.citec.clf.btl.units.LengthUnit;
  *
  * A class to capsulate some methods of Rooms, Locations and Doors, which are tied to the annotation of those classes.
  */
+@Deprecated
 public abstract class AreaDescriber extends BDO {
 
     protected Annotation annotation;
