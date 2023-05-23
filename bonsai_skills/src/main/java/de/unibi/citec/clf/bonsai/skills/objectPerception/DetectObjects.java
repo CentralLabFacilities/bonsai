@@ -40,9 +40,13 @@ import java.util.concurrent.Future;
  */
 public class DetectObjects extends AbstractSkill {
 
+    private static final String KEY_MINREL = "#_MIN_REL";
+
     private ExitToken tokenSuccess;
     private ExitToken tokenSuccessNoObjects;
     private ExitToken tokenError;
+
+    private double minRel = 0.0;
 
     private MemorySlotWriter<ObjectShapeList> objectsRecognizedSlot;
 
@@ -58,6 +62,8 @@ public class DetectObjects extends AbstractSkill {
         tokenSuccessNoObjects = configurator.requestExitToken(ExitStatus.SUCCESS().ps("noObjects"));
         tokenError = configurator.requestExitToken(ExitStatus.ERROR());
 
+        minRel = configurator.requestOptionalDouble(KEY_MINREL, minRel);
+
         objectsRecognizedSlot = configurator.getWriteSlot("ObjectShapeListSlot", ObjectShapeList.class);
         detectObjectsActuator = configurator.getActuator("ObjectDetectionActuator", ObjectDetectionActuator.class);
     }
@@ -65,7 +71,7 @@ public class DetectObjects extends AbstractSkill {
     @Override
     public boolean init() {
         try {
-            ret = detectObjectsActuator.detectObjects(null);
+            ret = detectObjectsActuator.detectObjects(minRel, null);
         } catch (IOException e) {
             logger.error(e);
             return false;

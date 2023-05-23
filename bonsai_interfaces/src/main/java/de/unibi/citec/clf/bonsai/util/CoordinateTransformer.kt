@@ -20,7 +20,7 @@ abstract class CoordinateTransformer : TransformLookup {
     @JvmOverloads
     fun transform(data: Point3D, csTo: String, timestamp: Long? = null): Point3D {
         val m = LengthUnit.METER
-        val time = timestamp ?: data.timestamp?.created?.time ?: Time.currentTimeMillis() - 300
+        val time = timestamp ?: data.timestamp?.created?.time ?: (Time.currentTimeMillis() - 300)
         val t = lookup(data.frameId, csTo, time).transform
 
         val vec = Vector4d(data.getX(m), data.getY(m), data.getZ(m), 1.0)
@@ -38,7 +38,7 @@ abstract class CoordinateTransformer : TransformLookup {
     @Throws(TransformException::class)
     @JvmOverloads
     fun transform(data: Rotation3D, csTo: String, timestamp: Long? = null): Rotation3D {
-        val time = timestamp ?: data.timestamp?.created?.time ?: Time.currentTimeMillis() - 300
+        val time = timestamp ?: data.timestamp?.created?.time ?: (Time.currentTimeMillis() - 300)
         val t = lookup(data.frameId, csTo, time).transform
 
         val transformRot = Matrix3d()
@@ -59,7 +59,7 @@ abstract class CoordinateTransformer : TransformLookup {
     @JvmOverloads
     fun transform(data: Pose3D, csTo: String, timestamp: Long? = null): Pose3D {
 
-        val time = timestamp ?: data.timestamp?.created?.time ?: Time.currentTimeMillis() - 300
+        val time = timestamp ?: data.timestamp?.created?.time ?: (Time.currentTimeMillis() - 300)
 
         val t = transform(data.translation, csTo)
         val r = transform(data.rotation, csTo)
@@ -75,7 +75,7 @@ abstract class CoordinateTransformer : TransformLookup {
     @JvmOverloads
     fun transform(data: PositionData, csTo: String, timestamp: Long? = null): Pose3D {
 
-        val time = timestamp ?: data.timestamp?.created?.time ?: Time.currentTimeMillis() - 300
+        val time = timestamp ?: data.timestamp?.created?.time ?: (Time.currentTimeMillis() - 300)
 
         val m = LengthUnit.METER
         val x = data.getX(m)

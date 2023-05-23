@@ -1,4 +1,4 @@
-package de.unibi.citec.clf.bonsai.actuators;
+package de.unibi.citec.clf.bonsai.actuators.deprecated;
 
 
 
@@ -6,7 +6,7 @@ import de.unibi.citec.clf.bonsai.core.object.Actuator;
 
 import java.util.List;
 import java.util.concurrent.Future;
-
+@Deprecated
 public interface TWMActuator extends Actuator {
 
     List<String> getAllEntityNames();

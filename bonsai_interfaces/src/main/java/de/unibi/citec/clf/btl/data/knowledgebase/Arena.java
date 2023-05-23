@@ -13,6 +13,7 @@ import java.util.Objects;
  *
  * @author rfeldhans
  */
+@Deprecated
 public class Arena extends Type {
 
     private LinkedList<Room> rooms;

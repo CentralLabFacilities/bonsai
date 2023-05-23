@@ -8,6 +8,7 @@ import java.util.Objects;
  *
  * @author rfeldhans
  */
+@Deprecated
 public class KBase extends Type {
 
     private Arena arena;

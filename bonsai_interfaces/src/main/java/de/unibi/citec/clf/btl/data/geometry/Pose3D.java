@@ -52,6 +52,13 @@ public class Pose3D extends Type {
 		this.rotation = rotation;
 	}
 
+	public Pose3D(Point3D translation, Rotation3D rotation, String frameId) {
+		super();
+		this.translation = translation;
+		this.rotation = rotation;
+		this.frameId = frameId;
+	}
+
 	public Point3D getTranslation() {
 		return translation;
 	}

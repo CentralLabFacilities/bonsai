@@ -1,7 +1,7 @@
 package de.unibi.citec.clf.bonsai.skills.objectPerception;
 
 
-import de.unibi.citec.clf.bonsai.actuators.SegmentationActuator;
+import de.unibi.citec.clf.bonsai.actuators.deprecated.SegmentationActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;

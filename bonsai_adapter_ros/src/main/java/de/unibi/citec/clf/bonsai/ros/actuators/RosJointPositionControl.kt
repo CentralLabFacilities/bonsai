@@ -93,7 +93,6 @@ class RosJointPositionControl(private val nodeName: GraphName) : RosNode(), Join
 
             goal.goal.goalTimeTolerance = Duration.fromMillis(1000)
 
-
             val sendGoal = client.sendGoal(goal)
 
             logger.info("Ros Joint Position Control: $goal")

@@ -2,7 +2,7 @@ package de.unibi.citec.clf.bonsai.util.arm;
 
 
 import de.unibi.citec.clf.bonsai.actuators.ManipulationActuator;
-import de.unibi.citec.clf.bonsai.actuators.PicknPlaceActuator;
+import de.unibi.citec.clf.bonsai.actuators.deprecated.PicknPlaceActuator;
 import de.unibi.citec.clf.btl.data.geometry.Point3D;
 import de.unibi.citec.clf.btl.data.grasp.GraspReturnType;
 import de.unibi.citec.clf.btl.data.grasp.GraspReturnType.GraspResult;
@@ -25,6 +25,7 @@ import org.apache.log4j.Logger;
  *
  * @author dwigand, semeyerz, nrasic
  */
+@Deprecated
 public class ArmController180 {
 
     private static final Logger logger = Logger.getLogger(ArmController180.class);

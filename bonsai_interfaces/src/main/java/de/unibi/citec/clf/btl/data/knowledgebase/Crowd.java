@@ -13,6 +13,7 @@ import de.unibi.citec.clf.btl.data.person.PersonData;
  *
  * @author rfeldhans
  */
+@Deprecated
 public class Crowd extends Type {
 
     private List<PersonData> persons;

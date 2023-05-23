@@ -1,4 +1,4 @@
-package de.unibi.citec.clf.bonsai.actuators;
+package de.unibi.citec.clf.bonsai.actuators.deprecated;
 
 
 
@@ -12,6 +12,7 @@ import de.unibi.citec.clf.bonsai.core.object.Actuator;
  * 
  * @author lziegler
  */
+@Deprecated
 public interface FaceIdentificationHumavipsActuator extends Actuator {
 
     /**
