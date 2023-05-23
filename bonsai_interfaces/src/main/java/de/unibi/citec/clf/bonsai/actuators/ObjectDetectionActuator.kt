@@ -15,7 +15,7 @@ import java.util.concurrent.Future
  */
 interface ObjectDetectionActuator : Actuator {
     @Throws(IOException::class)
-    fun detectObjects(roi: BoundingBox3D? = null): Future<List<ObjectShapeData>>
+    fun detectObjects(minConf: Double = 0.0, roi: BoundingBox3D? = null): Future<List<ObjectShapeData>>
 
     @Throws(IOException::class)
     fun detectSurface() : Future<BoundingBox3D>
