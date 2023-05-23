@@ -1,4 +1,4 @@
-package de.unibi.citec.clf.bonsai.actuators;
+package de.unibi.citec.clf.bonsai.actuators.deprecated;
 
 
 
@@ -16,6 +16,7 @@ import de.unibi.citec.clf.btl.data.person.PersonData;
  * @author ffriese
  * @author rfeldhans
  */
+@Deprecated
 public interface KBaseActuator extends Actuator {
 
     /*

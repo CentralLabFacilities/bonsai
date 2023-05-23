@@ -7,6 +7,7 @@ import java.util.Objects;
  *
  * @author rfeldhans
  */
+@Deprecated
 public class Door extends AreaDescriber {
 
     private String roomOne;

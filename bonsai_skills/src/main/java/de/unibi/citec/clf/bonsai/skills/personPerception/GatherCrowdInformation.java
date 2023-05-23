@@ -1,7 +1,7 @@
 package de.unibi.citec.clf.bonsai.skills.personPerception;
 
 import de.unibi.citec.clf.bonsai.actuators.DetectPeopleActuator;
-import de.unibi.citec.clf.bonsai.actuators.KBaseActuator;
+import de.unibi.citec.clf.bonsai.actuators.deprecated.KBaseActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;

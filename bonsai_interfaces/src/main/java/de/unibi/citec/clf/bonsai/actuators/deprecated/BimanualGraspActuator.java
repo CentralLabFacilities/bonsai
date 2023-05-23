@@ -1,4 +1,4 @@
-package de.unibi.citec.clf.bonsai.actuators;
+package de.unibi.citec.clf.bonsai.actuators.deprecated;
 
 
 import de.unibi.citec.clf.bonsai.core.object.Actuator;
@@ -12,6 +12,7 @@ import java.util.concurrent.Future;
  * 
  * @author ffriese
  */
+@Deprecated
 public interface BimanualGraspActuator extends Actuator {
 
     Future<List<String>> planBimanualGrasp(String object_uuid);

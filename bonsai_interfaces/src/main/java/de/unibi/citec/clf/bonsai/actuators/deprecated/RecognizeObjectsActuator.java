@@ -1,5 +1,5 @@
 
-package de.unibi.citec.clf.bonsai.actuators;
+package de.unibi.citec.clf.bonsai.actuators.deprecated;
 
 
 
