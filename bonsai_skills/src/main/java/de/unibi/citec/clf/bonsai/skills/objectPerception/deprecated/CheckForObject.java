@@ -1,4 +1,4 @@
-package de.unibi.citec.clf.bonsai.skills.objectPerception;
+package de.unibi.citec.clf.bonsai.skills.objectPerception.deprecated;
 
 import de.unibi.citec.clf.bonsai.actuators.KBaseActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
