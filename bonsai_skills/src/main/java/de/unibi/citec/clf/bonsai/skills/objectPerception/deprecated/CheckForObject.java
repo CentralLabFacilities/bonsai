@@ -1,6 +1,6 @@
 package de.unibi.citec.clf.bonsai.skills.objectPerception.deprecated;
 
-import de.unibi.citec.clf.bonsai.actuators.KBaseActuator;
+import de.unibi.citec.clf.bonsai.actuators.deprecated.KBaseActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;

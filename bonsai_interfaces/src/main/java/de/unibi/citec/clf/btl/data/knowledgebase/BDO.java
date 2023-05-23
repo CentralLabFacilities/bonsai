@@ -8,6 +8,7 @@ import de.unibi.citec.clf.btl.Type;
  * RCObjects, Locations, Rooms, Doors and Persons (PersonData)
  * @author rfeldhans
  */
+@Deprecated
 public abstract class BDO extends Type {
 
 }

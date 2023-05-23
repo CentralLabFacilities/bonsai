@@ -44,7 +44,7 @@ package de.unibi.citec.clf.bonsai.skills.helper;
  * Tobias Röhlig, Torben Toeniges, Viktor Losing, Viktor Richter
  * %LICENSE#
  */
-import de.unibi.citec.clf.bonsai.actuators.KBaseActuator;
+import de.unibi.citec.clf.bonsai.actuators.deprecated.KBaseActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;

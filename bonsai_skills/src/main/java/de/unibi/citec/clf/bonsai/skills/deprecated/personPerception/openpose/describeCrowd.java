@@ -1,7 +1,7 @@
 package de.unibi.citec.clf.bonsai.skills.deprecated.personPerception.openpose;
 
 import de.unibi.citec.clf.bonsai.actuators.GetCrowdAttributesActuator;
-import de.unibi.citec.clf.bonsai.actuators.KBaseActuator;
+import de.unibi.citec.clf.bonsai.actuators.deprecated.KBaseActuator;
 import de.unibi.citec.clf.bonsai.actuators.SpeechActuator;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;

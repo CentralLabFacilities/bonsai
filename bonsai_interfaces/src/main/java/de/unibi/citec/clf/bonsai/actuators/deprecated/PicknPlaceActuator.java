@@ -1,6 +1,7 @@
-package de.unibi.citec.clf.bonsai.actuators;
+package de.unibi.citec.clf.bonsai.actuators.deprecated;
 
 
+import de.unibi.citec.clf.bonsai.actuators.ManipulationActuator;
 import de.unibi.citec.clf.btl.data.geometry.Pose3D;
 import de.unibi.citec.clf.btl.data.grasp.GraspReturnType;
 import de.unibi.citec.clf.btl.data.grasp.KatanaGripperData;
@@ -9,7 +10,7 @@ import de.unibi.citec.clf.btl.data.object.ObjectShapeData;
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.Future;
-
+@Deprecated
 public interface PicknPlaceActuator extends ManipulationActuator {
 
     /**

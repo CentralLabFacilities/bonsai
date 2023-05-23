@@ -9,6 +9,7 @@ import java.util.Objects;
  *
  * @author rfeldhans
  */
+@Deprecated
 public class Context extends Type {
 
     private String lastquestion;

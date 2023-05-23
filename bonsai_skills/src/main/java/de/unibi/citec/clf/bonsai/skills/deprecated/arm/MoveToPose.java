@@ -1,6 +1,6 @@
 package de.unibi.citec.clf.bonsai.skills.deprecated.arm;
 
-import de.unibi.citec.clf.bonsai.actuators.PicknPlaceActuator;
+import de.unibi.citec.clf.bonsai.actuators.deprecated.PicknPlaceActuator;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
