@@ -48,7 +48,7 @@ public class NearestToTarget extends DriveStrategyWithTryGoal {
         } catch (InterruptedException | ExecutionException e) {
             logger.error("Could not recieve global plan ", e);
         }
-        if (planToTarget == null || planToTarget.isEmpty()) {
+        if (planToTarget == null || planToTarget.size() <= 1) {
             if (oldPlan == null || oldPlan.isEmpty()) {
                 if (closerSteps < closerMaxSteps) {
                     logger.warn("Could not make plan. Setting Target nearer to robot");
