@@ -69,7 +69,9 @@ public class PersonAttribute extends Type {
         RAISING_LEFT_ARM(3, "raising left arm"),
         RAISING_RIGHT_ARM(4, "raising right arm"),
         WAVING(5, "waving"),
-        NEUTRAL(6, "neutral");
+        NEUTRAL(6, "neutral"),
+        POINTING_LEFT_DOWN(7, "pointing_left_down"),
+        POINTING_RIGHT_DOWN(8, "pointing_right_down");
 
         private final int gestureId;
         private final String gestureName;
