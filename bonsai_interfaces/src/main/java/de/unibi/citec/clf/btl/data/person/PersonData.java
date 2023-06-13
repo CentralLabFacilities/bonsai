@@ -18,6 +18,8 @@ public class PersonData extends BDO {
     private String uuid;
     private String name = "";
     private Point3D headPosition;
+    private Point3D rightHandPosition;
+    private Point3D leftHandPosition;
     protected PersonAttribute attributes = new PersonAttribute();
 
     private PositionData position = new PositionData();
@@ -47,6 +49,20 @@ public class PersonData extends BDO {
     }
     public void setHeadPosition(Point3D headPosition){
         this.headPosition = headPosition;
+    }
+
+    public Point3D getRightHandPosition(){
+        return rightHandPosition;
+    }
+    public void setRightHandPosition(Point3D rightHandPosition){
+        this.rightHandPosition = rightHandPosition;
+    }
+
+    public Point3D getLeftHandPosition(){
+        return leftHandPosition;
+    }
+    public void setLeftHandPosition(Point3D leftHandPosition){
+        this.leftHandPosition = leftHandPosition;
     }
 
     public void setPersonAttribute(PersonAttribute attributes) {
