@@ -106,7 +106,13 @@ public class NavigateTo extends AbstractSkill {
             return false;
         }
 
-        return driveStrategy.init(targetGoal);
+        boolean res = driveStrategy.init(targetGoal);
+
+        if (!res) {
+            logger.fatal("driveStrategy.init returned false, goal was: " + targetGoal);
+        }
+
+        return res;
     }
 
     @Override
