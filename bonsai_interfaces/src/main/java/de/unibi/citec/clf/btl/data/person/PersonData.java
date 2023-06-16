@@ -20,6 +20,7 @@ public class PersonData extends BDO {
     private Point3D headPosition;
     private Point3D rightHandPosition;
     private Point3D leftHandPosition;
+    private Double estimate_angle;
     protected PersonAttribute attributes = new PersonAttribute();
 
     private PositionData position = new PositionData();
@@ -71,6 +72,9 @@ public class PersonData extends BDO {
     public PersonAttribute getPersonAttribute() {
         return this.attributes;
     }
+
+    public double getEstimateAngle() {return estimate_angle; }
+    public void setEstimateAngle(Double estimate_angle){this.estimate_angle=estimate_angle;}
 
     /**
      * A setter for the global position of a person. This is the position where
