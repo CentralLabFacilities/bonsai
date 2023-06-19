@@ -61,6 +61,10 @@ abstract class CoordinateTransformer : TransformLookup {
 
         val time = timestamp ?: data.timestamp?.created?.time ?: (Time.currentTimeMillis() - 300)
 
+        // make sure frames are consistent
+        data.translation.frameId = data.frameId
+        data.rotation.frameId = data.frameId
+
         val t = transform(data.translation, csTo)
         val r = transform(data.rotation, csTo)
 
