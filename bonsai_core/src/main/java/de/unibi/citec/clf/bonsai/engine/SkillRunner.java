@@ -362,7 +362,7 @@ public class SkillRunner implements Runnable {
             }
 
             logger.debug("waiting for skill to quit");
-            wait();
+            wait(1000);
 
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
