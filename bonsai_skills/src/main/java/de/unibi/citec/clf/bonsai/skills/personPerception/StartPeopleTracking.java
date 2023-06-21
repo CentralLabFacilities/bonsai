@@ -245,8 +245,9 @@ public class StartPeopleTracking extends AbstractSkill {
         }
         //returning first person in list, because tracker only puplished single persons in the list anyway
         for (PersonData person : persons) {
-            person.setUuid("trackedPerson");
+            //person.setUuid("trackedPerson");
             personData = person;
+            logger.fatal("Got Persondata: " + person);
             logger.debug("Got Person from personsensor; custom uuid: " + personData.getUuid() + "; pos: " + personData.getPosition().toString());
             return person;
         }

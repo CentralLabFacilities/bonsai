@@ -77,6 +77,10 @@ public class SelectNearestPerson extends AbstractSkill {
                 logger.error("your PositionDataSlot was empty");
                 return false;
             }
+            if (Double.isNaN(positionData.getX(LengthUnit.METER)) || Double.isNaN(positionData.getY(LengthUnit.METER))) {
+                logger.error("your PositionDataSlot was NaN");
+                return false;
+            }
         } catch (CommunicationException ex) {
             logger.error("Unable to read from memory: " + ex.getMessage());
             return false;

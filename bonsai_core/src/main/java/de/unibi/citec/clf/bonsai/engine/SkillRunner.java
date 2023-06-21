@@ -263,6 +263,7 @@ public class SkillRunner implements Runnable {
         } catch (Throwable e) {
             setAborted(e);
             logger.fatal("An exception occurred while executing state: " + id.getCanonicalID() + ": " + e.getMessage(), e);
+            e.printStackTrace();
         }
     }
 
