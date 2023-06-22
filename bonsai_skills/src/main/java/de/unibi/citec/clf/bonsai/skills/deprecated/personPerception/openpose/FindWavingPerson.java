@@ -1,20 +1,32 @@
 package de.unibi.citec.clf.bonsai.skills.deprecated.personPerception.openpose;
 
 
+import de.unibi.citec.clf.bonsai.actuators.DetectPeopleActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
+import de.unibi.citec.clf.bonsai.core.exception.TransformException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
+import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
+import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.bonsai.util.CoordinateSystemConverter;
+import de.unibi.citec.clf.bonsai.util.CoordinateTransformer;
 import de.unibi.citec.clf.btl.data.geometry.Point2D;
+import de.unibi.citec.clf.btl.data.geometry.Point3D;
+import de.unibi.citec.clf.btl.data.geometry.Pose3D;
 import de.unibi.citec.clf.btl.data.navigation.PositionData;
+import de.unibi.citec.clf.btl.data.person.PersonAttribute;
+import de.unibi.citec.clf.btl.data.person.PersonData;
+import de.unibi.citec.clf.btl.data.person.PersonDataList;
 import de.unibi.citec.clf.btl.units.AngleUnit;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 import de.unibi.citec.clf.btl.data.navigation.NavigationGoalData;
 import java.io.IOException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -27,123 +39,101 @@ import java.util.logging.Logger;
  */
 public class FindWavingPerson extends AbstractSkill {
 
-    // used tokens
-    private ExitToken tokenError;
     private ExitToken tokenSuccessNotFound;
     private ExitToken tokenSuccessFound;
 
-    /*
-     * Slots used by this state.
-     */
+    private long actuator_timeout = 20000;
+
     private MemorySlot<NavigationGoalData> navigationGoalSlot;
     NavigationGoalData globalGoal;
 
-    /*
-     * Sensors used by this state.
-     */
-    private Sensor<PositionData> positionSensor;
-    private PositionData robotPos;
+    private DetectPeopleActuator peopleActuator;
 
-    /*
-     * Actuators used by this state.
-     */
-    //private DetectPeopleActuator detectPeopleActuator;
+    private Future<PersonDataList> peopleFuture;
 
-    //List<BodySkeleton> peopleList;
+    private CoordinateTransformer coordTransformer;
 
     @Override
     public void configure(ISkillConfigurator configurator) {
 
         // request all tokens that you plan to return from other methods
-        tokenError = configurator.requestExitToken(ExitStatus.ERROR());
         tokenSuccessNotFound = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus("notFound"));
         tokenSuccessFound = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus("found"));
 
-
-        // Initialize slots
         navigationGoalSlot = configurator.getSlot("NavigationGoalDataSlot", NavigationGoalData.class);
 
-        // Initialize actuators
-        //detectPeopleActuator = configurator.getActuator("DetectPeopleActuator", DetectPeopleActuator.class);
+        coordTransformer = (CoordinateTransformer) configurator.getTransform();
 
-        positionSensor = configurator.getSensor("PositionSensor", PositionData.class);
+        peopleActuator = configurator.getActuator("PeopleActuator", DetectPeopleActuator.class);
     }
 
     @Override
     public boolean init() {
-        logger.debug("Searching Persons");
+        actuator_timeout += Time.currentTimeMillis();
         try {
-            robotPos = positionSensor.readLast(1000);
-        } catch (IOException | InterruptedException ex) {
-            Logger.getLogger(SearchForPerson.class.getName()).log(Level.SEVERE, null, ex);
+            peopleFuture = peopleActuator.getPeople(false, false);
+        } catch (InterruptedException | ExecutionException e) {
+            logger.error(e);
+            return false;
         }
         return true;
     }
 
     @Override
     public ExitToken execute() {
-/*
-        peopleList = new List(BodySkeleton.class);
+
+        PersonDataList people;
+
+        if (!peopleFuture.isDone()) {
+            if (actuator_timeout < Time.currentTimeMillis()) {
+                return ExitToken.fatal();
+            }
+            return ExitToken.loop(50);
+        }
+
         try {
-            peopleList = detectPeopleActuator.getPeople();
-        } catch (InterruptedException | ExecutionException ex) {
-            Logger.getLogger(SearchForPerson.class.getName()).log(Level.SEVERE, null, ex);
+            people = peopleFuture.get();
+        } catch (InterruptedException | ExecutionException e) {
+            logger.error(e);
+            return ExitToken.fatal();
         }
 
-        if (peopleList.isEmpty()) {
-            return tokenSuccessNotFound;
+        for(PersonData p : people) {
+            if(!p.getPersonAttribute().getGestures().stream().anyMatch(gesture -> gesture.equals(PersonAttribute.Gesture.WAVING)
+            || gesture.equals(PersonAttribute.Gesture.RAISING_LEFT_ARM)
+            || gesture.equals(PersonAttribute.Gesture.RAISING_RIGHT_ARM))) continue;
+
+            if (!p.getPosition().isInBaseFrame()) {
+                //PositionData pose = p.getPosition();
+                //Point3D point = new Point3D()
+                //try {
+                //    p.setPosition(coordTransformer.transform(p.getPosition(), "base_link"));
+                //} catch (TransformException e) {
+                //    throw new RuntimeException(e);
+                //}
+                logger.fatal("please implement me");
+            }
+
+            try {
+                navigationGoalSlot.memorize(createNavGoal(p.getPosition()));
+            } catch (CommunicationException e) {
+                throw new RuntimeException(e);
+            }
         }
-
-        globalGoal = getWavingPersonPosition();
-
-        if (globalGoal == null) {
-            return tokenSuccessNotFound;
-        }*/
         return tokenSuccessFound;
     }
 
-    NavigationGoalData getWavingPersonPosition() {
 
-        double minDist = Double.POSITIVE_INFINITY;
-        boolean found = false;
-        /*
-        BodySkeleton closest = new BodySkeleton();
-        for (BodySkeleton spookySkeleton : peopleList) {
-            if (spookySkeleton.getWaving()) {
-                found = true;
-                logger.debug("Person: " + spookySkeleton.toString() + "\nDist: " + spookySkeleton.getDistanceToRobot() + " Center of Mass: " + spookySkeleton.calculateCenterOfMass());
-                double dist = spookySkeleton.getDistanceToRobot();
-                if (minDist > dist) {
-                    minDist = dist;
-                    closest = spookySkeleton;
-                }
-            }
-        }*/
-        return null;
-        /*
-        if (found) {
-            return createNavGoal(closest.getPosition());
-        } else {
-            return null;
-        }*/
-    }
 
-    NavigationGoalData createNavGoal(Point2D pos) {
-        PositionData closestPos = new PositionData(pos.getX(LengthUnit.METER), pos.getY(LengthUnit.METER),
-                0, robotPos.getTimestamp(), LengthUnit.METER, AngleUnit.RADIAN);
-        closestPos.setYaw(closestPos.getRelativeAngle(closestPos, AngleUnit.RADIAN), AngleUnit.RADIAN);
-        PositionData closestGlobalPos = CoordinateSystemConverter.localToGlobal(closestPos, robotPos);
-        //NavigationGoalData  bla = new NavigationGoalData(closestGlobalPos);
-
-        double distance = robotPos.getDistance(closestGlobalPos, LengthUnit.METER);
-        double angle = robotPos.getRelativeAngle(closestGlobalPos, AngleUnit.RADIAN);
-        logger.error("Distance: " + distance + " Angle " + angle);
-        return globalGoal = CoordinateSystemConverter
-                .polar2NavigationGoalData(
-                        robotPos,
-                        angle,
-                        distance,
-                        AngleUnit.RADIAN, LengthUnit.METER);
+    NavigationGoalData createNavGoal(PositionData pos) {
+        Pose3D goal;
+        try {
+            goal = (coordTransformer.transform(pos, "map"));
+        } catch (TransformException e) {
+            throw new RuntimeException(e);
+        }
+        NavigationGoalData nav = new NavigationGoalData("", goal.getTranslation().getX(LengthUnit.METER), goal.getTranslation().getY(LengthUnit.METER), 0, 0.2, Math.PI, PositionData.ReferenceFrame.GLOBAL, LengthUnit.METER, AngleUnit.RADIAN);
+        return nav;
     }
 
     @Override
