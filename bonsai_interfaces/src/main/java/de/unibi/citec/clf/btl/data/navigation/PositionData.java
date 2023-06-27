@@ -160,6 +160,9 @@ public class PositionData extends Point2D {
         AngleUnit au = AngleUnit.RADIAN;
         double angle = getGlobalAngle(otherPosition, au) - getYaw(au);
         angle = (angle + Math.PI) % (Math.PI * 2) - Math.PI;
+        while (angle < -Math.PI) {
+            angle += 2*Math.PI;
+        }
         return UnitConverter.convert(angle, AngleUnit.RADIAN, unit);
     }
 
