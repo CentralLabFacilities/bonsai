@@ -145,6 +145,9 @@ public class SCXMLDecoder {
             out = mergeDataModels(new ByteArrayInputStream(out.toByteArray()));
             String xml = out.toString();
             logger.trace("transformed: \n" + xml);
+            PrintWriter pw = new PrintWriter("/tmp/lastscxml.xml");
+            pw.println(xml);
+            pw.close();
             return xml;
         } catch (IOException | SAXException | ParsingException ex) {
             logger.error(ex);
