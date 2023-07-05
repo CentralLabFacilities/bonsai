@@ -134,7 +134,7 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
             }
 
             //todo 0.5sec for acceleration?
-            turnDuration = (long) ((turnAngle / turnSpeed + 0.5) * 1000);
+            turnDuration = (long) ((turnAngle / turnSpeed ) * 1000);
 
             AngularVelocity3D angVel = new AngularVelocity3D(0.0, 0.0, turnSpeed, RotationalSpeedUnit.RADIANS_PER_SEC);
             Twist3D turnTwist = new Twist3D(new Velocity3D(), angVel);
@@ -159,7 +159,7 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
             double velX = driveSpeed * distX;
             double velY = driveSpeed * distY;
             //todo 0.5sec for acceleration?
-            driveDuration = (long) ((dist / driveSpeed + 0.5) * 1000);
+            driveDuration = (long) ((dist / driveSpeed ) * 1000);
 
             Velocity3D vel = new Velocity3D(velX, velY, 0.0, SpeedUnit.METER_PER_SEC);
             Twist3D driveTwist = new Twist3D(vel, new AngularVelocity3D());
