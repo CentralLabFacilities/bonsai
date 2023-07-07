@@ -115,7 +115,7 @@ public class TurnTo extends AbstractSkill {
         } catch (IOException ex) {
             logger.error(ex);
         }
-        TurnData turnData = new TurnData(angle, AngleUnit.RADIAN, 1, RotationalSpeedUnit.RADIANS_PER_SEC);
+        TurnData turnData = new TurnData(angle, AngleUnit.RADIAN, .6, RotationalSpeedUnit.RADIANS_PER_SEC);
         try {
             navResult = navActuator.moveRelative(null, turnData);
         } catch (IOException e) {
