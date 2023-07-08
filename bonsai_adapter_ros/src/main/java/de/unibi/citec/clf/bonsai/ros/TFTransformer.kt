@@ -134,7 +134,7 @@ class TFTransformer(gn: GraphName, gn2: GraphName) : CoordinateTransformer(), Me
         for (ts in transforms) {
             if(!map && ts.header.frameId == "map" && ts.childFrameId == "odom" ) {
                 map = true
-                logger.fatal("got tf2 map " + ts.header.frameId + " -> " + ts.childFrameId)
+                logger.fatal("got tf2  map " + ts.header.frameId + " -> " + ts.childFrameId)
             }
             if(!odom && ts.header.frameId == "odom" && ts.childFrameId == "base_footprint" ) {
                 odom = true
