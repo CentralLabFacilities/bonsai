@@ -24,6 +24,8 @@ import javax.vecmath.Vector3d
 class TFTransformer(gn: GraphName, gn2: GraphName) : CoordinateTransformer(), MessageListener<List<TransformStamped>> {
     private val logger = Logger.getLogger(javaClass)
     private val currentTree: FrameTransformTree = FrameTransformTree()
+    private var map = false;
+    private var odom = false;
 
     private inner class TfOneNode(gn: GraphName, ml: MessageListener<List<TransformStamped>>) : RosNode(), MessageListener<tf.tfMessage> {
         private val nodeName: GraphName
@@ -66,6 +68,8 @@ class TFTransformer(gn: GraphName, gn2: GraphName) : CoordinateTransformer(), Me
 
         private var subscriberTf: Subscriber<TFMessage>? = null
         private var subscriberTfStatic: Subscriber<TFMessage>? = null
+
+
         override fun onStart(connectedNode: ConnectedNode) {
 
             subscriberTf = connectedNode.newSubscriber("/tf", TFMessage._TYPE)
@@ -128,6 +132,14 @@ class TFTransformer(gn: GraphName, gn2: GraphName) : CoordinateTransformer(), Me
 
     override fun onNewMessage(transforms: List<TransformStamped>) {
         for (ts in transforms) {
+            if(!map && ts.header.frameId == "map" && ts.childFrameId == "odom" ) {
+                map = true
+                logger.fatal("got tf " + ts.header.frameId + " -> " + ts.childFrameId)
+            }
+            if(!odom && ts.header.frameId == "odom" && ts.childFrameId == "base_link" ) {
+                odom = true
+                logger.fatal("got tf " + ts.header.frameId + " -> " + ts.childFrameId)
+            }
             logger.trace("got tf " + ts.header.frameId + " -> " + ts.childFrameId)
             currentTree.update(ts)
         }
