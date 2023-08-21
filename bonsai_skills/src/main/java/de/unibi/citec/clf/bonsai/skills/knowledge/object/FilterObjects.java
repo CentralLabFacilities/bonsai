@@ -58,6 +58,7 @@ import java.util.LinkedList;
  *
  * @author rfeldhans
  */
+@Deprecated
 public class FilterObjects extends AbstractSkill {
     private ExitToken tokenSuccess;
     private ExitToken tokenSuccessNoObject;

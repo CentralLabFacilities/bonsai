@@ -7,8 +7,6 @@
 SCXML Definitions
 =================
 
-SCXML (State Chart XML) can be used to describe Statemachines in a XML document.
-
 We use Apache Commons XML to create our robot behavior.
 
 The Bonsai Engine reads these files to couple simple skills to rich robot behavior.

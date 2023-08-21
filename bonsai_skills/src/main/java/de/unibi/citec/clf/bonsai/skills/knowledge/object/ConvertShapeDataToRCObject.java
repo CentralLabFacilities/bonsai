@@ -42,6 +42,7 @@ import de.unibi.citec.clf.btl.data.object.ObjectShapeList;
  *
  * @author rfeldhans
  */
+@Deprecated
 public class ConvertShapeDataToRCObject extends AbstractSkill {
 
     private ExitToken tokenSuccess;

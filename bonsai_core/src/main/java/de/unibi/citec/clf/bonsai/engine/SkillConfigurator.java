@@ -670,6 +670,7 @@ public class SkillConfigurator implements ISkillConfigurator {
      * @return The requested slot or null, if no slot with the given name exists.
      */
     @Override
+    @Deprecated
     public <T> MemorySlot<T> getSlot(String slotName, Class<T> slotType) throws SkillConfigurationException {
         return getSlot(slotName, slotType, SlotDirection.BI);
     }

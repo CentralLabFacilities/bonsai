@@ -42,6 +42,7 @@ import de.unibi.citec.clf.btl.units.LengthUnit;
  * @author saschroeder
  * @author rfeldhans
  */
+@Deprecated
 public class CheckRoomOfNavgoal extends AbstractSkill {
 
     private ExitToken tokenSuccessInsideArena;
