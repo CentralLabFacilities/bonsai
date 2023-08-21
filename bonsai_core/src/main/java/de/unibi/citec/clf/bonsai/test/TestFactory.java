@@ -10,6 +10,7 @@ import de.unibi.citec.clf.bonsai.util.reflection.ReflectionServiceDiscovery;
 import de.unibi.citec.clf.bonsai.util.reflection.ServiceDiscovery;
 import org.apache.log4j.Logger;
 
+import java.lang.reflect.InvocationTargetException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -144,8 +145,8 @@ public class TestFactory implements CoreObjectFactory {
     public FactoryConfigurationResults configureActuators(Set<ActuatorToConfigure> actuators) throws IllegalArgumentException, CoreObjectCreationException {
         for (ActuatorToConfigure act : actuators) {
             try {
-                configuredObjectsByKey.put(act.getKey(), act.getActuatorClass().newInstance());
-            } catch (InstantiationException | IllegalAccessException e) {
+                configuredObjectsByKey.put(act.getKey(), act.getActuatorClass().getDeclaredConstructor().newInstance());
+            } catch (InstantiationException | IllegalAccessException | NoSuchMethodException | InvocationTargetException e) {
                 logger.warn(e);
             }
         }

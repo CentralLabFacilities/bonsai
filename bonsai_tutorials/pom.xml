@@ -4,7 +4,7 @@
 
     <!-- The Basics -->
     <groupId>de.unibi.citec.clf</groupId>
-    <version>0.6-SNAPSHOT</version>
+    <version>0.7-SNAPSHOT</version>
     <artifactId>bonsai_tutorials</artifactId>
     <packaging>jar</packaging>
 
@@ -20,8 +20,8 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.source>11</maven.compiler.source>
-        <maven.compiler.target>11</maven.compiler.target>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
         <dir>target</dir>
     </properties>
 
@@ -31,21 +31,21 @@
         <dependency>
           <groupId>de.unibi.citec.clf</groupId>
           <artifactId>bonsai_scxml_ros</artifactId>
-          <version>0.6-SNAPSHOT</version>
+          <version>0.7-SNAPSHOT</version>
         </dependency>
 
         <!-- Skill Modules -->
         <dependency>
             <groupId>de.unibi.citec.clf</groupId>
             <artifactId>bonsai_skills</artifactId>
-          <version>0.6-SNAPSHOT</version>
+          <version>0.7-SNAPSHOT</version>
         </dependency>
 
         <!-- Used Adapters -->
         <dependency>
             <groupId>de.unibi.citec.clf</groupId>
             <artifactId>bonsai_adapter_ros</artifactId>
-          <version>0.6-SNAPSHOT</version>
+          <version>0.7-SNAPSHOT</version>
         </dependency>
         <!--<dependency>
           <groupId>de.unibi.citec.clf</groupId>

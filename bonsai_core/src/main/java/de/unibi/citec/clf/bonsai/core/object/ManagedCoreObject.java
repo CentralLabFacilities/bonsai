@@ -4,6 +4,8 @@ import de.unibi.citec.clf.bonsai.core.ConnectionStatus;
 import de.unibi.citec.clf.bonsai.core.configuration.IObjectConfigurator;
 import de.unibi.citec.clf.bonsai.core.exception.ConfigurationException;
 
+import java.io.IOException;
+
 
 /**
  * Interface for actuators and sensors.
@@ -25,5 +27,5 @@ public interface ManagedCoreObject {
     /**
      * Close all communication channels.
      */
-    void cleanUp();
+    void cleanUp() throws IOException;
 }

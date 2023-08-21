@@ -57,6 +57,7 @@ import de.unibi.citec.clf.btl.data.knowledgebase.RCObject;
  *
  * @author pvonneumanncosel
  */
+@Deprecated
 public class SelectObjectFromProp extends AbstractSkill {
     private ExitToken tokenSuccess;
     private ExitToken tokenError;
