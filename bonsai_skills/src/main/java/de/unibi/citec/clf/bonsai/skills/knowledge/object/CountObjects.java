@@ -37,6 +37,7 @@ import de.unibi.citec.clf.btl.data.knowledgebase.RCObject;
  *
  * @author rfeldhans
  */
+@Deprecated
 public class CountObjects extends AbstractSkill {
 
     private ExitToken tokenSuccess;

@@ -40,6 +40,7 @@ import de.unibi.citec.clf.btl.data.navigation.PositionData;
  *
  * @author rfeldhans
  */
+@Deprecated
 public class GetNearestLocation extends AbstractSkill {
 
     private ExitToken tokenSuccess;

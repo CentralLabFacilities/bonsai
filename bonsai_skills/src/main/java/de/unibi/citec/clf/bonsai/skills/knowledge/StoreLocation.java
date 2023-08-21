@@ -51,6 +51,7 @@ import java.util.LinkedList;
  *
  * @author rfeldhans
  */
+@Deprecated
 public class StoreLocation extends AbstractSkill {
 
     private static final String KEY_NAME = "#_NAME";

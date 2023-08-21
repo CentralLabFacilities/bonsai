@@ -46,6 +46,7 @@ import de.unibi.citec.clf.btl.units.LengthUnit;
  *
  * @author rfeldhans
  */
+@Deprecated
 public class GetRoomEntryPoint extends AbstractSkill {
 
     private ExitToken tokenSuccess;

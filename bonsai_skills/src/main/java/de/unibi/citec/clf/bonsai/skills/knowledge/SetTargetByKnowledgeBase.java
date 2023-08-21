@@ -50,6 +50,7 @@ import de.unibi.citec.clf.btl.data.navigation.NavigationGoalData;
  *
  * @author rfeldhans
  */
+@Deprecated
 public class SetTargetByKnowledgeBase extends AbstractSkill {
 
     private static final String KEY_USE_SPECIFIC_VIEWPOINT = "#_USE_SPECIFIC_VIEWPOINT";

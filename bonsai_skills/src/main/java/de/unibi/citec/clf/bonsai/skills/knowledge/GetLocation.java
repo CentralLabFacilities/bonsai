@@ -39,6 +39,7 @@ import de.unibi.citec.clf.btl.data.navigation.PositionData;
  *
  * @author rfeldhans
  */
+@Deprecated
 public class GetLocation extends AbstractSkill {
 
     private ExitToken tokenSuccess;

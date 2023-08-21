@@ -1,6 +1,6 @@
 <package format="2">
   <name>bonsai_scxml_ros</name>
-  <version>0.6-SNAPSHOT</version>
+  <version>0.7-SNAPSHOT</version>
   <description>
   This package provides foo capability.
   </description>

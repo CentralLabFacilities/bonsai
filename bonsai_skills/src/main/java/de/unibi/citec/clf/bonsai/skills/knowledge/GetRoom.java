@@ -38,6 +38,7 @@ import de.unibi.citec.clf.btl.data.navigation.PositionData;
  *
  * @author rfeldhans
  */
+@Deprecated
 public class GetRoom extends AbstractSkill {
 
     private ExitToken tokenSuccess;
