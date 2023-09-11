@@ -47,6 +47,14 @@
             <artifactId>bonsai_adapter_ros</artifactId>
           <version>0.7-SNAPSHOT</version>
         </dependency>
+
+        <dependency>
+            <groupId>de.unibi.citec.clf</groupId>
+            <artifactId>bonsai_adapter_ros2</artifactId>
+            <version>0.7-SNAPSHOT</version>
+        </dependency>
+
+
         <!--<dependency>
           <groupId>de.unibi.citec.clf</groupId>
           <artifactId>bonsai2-adapter-ros-extra</artifactId>

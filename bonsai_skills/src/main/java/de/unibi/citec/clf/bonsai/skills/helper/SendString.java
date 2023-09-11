@@ -34,7 +34,7 @@ public class SendString extends AbstractSkill {
     private Sensor<String> rsbSensor = null;
     private MemorySlot<String> replySlot;
     private MemorySlot<String> msgSlot;
-    private Boolean writeSlot;
+    private Boolean writeSlot = true;
 
     private ExitToken tokenSuccess;
     private ExitToken tokenErrorTimeout;
@@ -82,9 +82,7 @@ public class SendString extends AbstractSkill {
                 return false;
             }
         }
-        if (timeout > 0) {
-            timeout += Time.currentTimeMillis();
-        }
+
 
         logger.info("sending [" + msg + "] over " + rsbSender.getTarget());
         try {
@@ -95,7 +93,10 @@ public class SendString extends AbstractSkill {
         }
 
         if (rsbSensor != null) {
-            logger.info("Listen on: " + sensor);
+            logger.info("Waiting for message on: " + rsbSensor.getTarget() + ((timeout > 0)? "" : " for" + timeout + "ms"));
+        }
+        if (timeout > 0) {
+            timeout += Time.currentTimeMillis();
         }
 
         return true;

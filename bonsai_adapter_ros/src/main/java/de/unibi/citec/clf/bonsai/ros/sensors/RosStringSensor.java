@@ -73,6 +73,11 @@ public class RosStringSensor extends RosSensor<String, std_msgs.String> implemen
         listeners.clear();
     }
 
+    @Override
+    public String getTarget() {
+        return topic;
+    }
+
     /**
      * {@inheritDoc}
      */
