@@ -191,4 +191,9 @@ public class RosBtlMsgSensor<DataType extends Type, MsgType extends Message> ext
         }
 
     }
+
+    @Override
+    public String getTarget() {
+        return topic;
+    }
 }
