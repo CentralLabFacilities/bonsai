@@ -65,6 +65,11 @@ public class StringSensor extends Ros2Sensor<String, StringMessage>  {
         listeners.clear();
     }
 
+    @Override
+    public String getTarget() {
+        return topic;
+    }
+
     /**
      * {@inheritDoc}
      */

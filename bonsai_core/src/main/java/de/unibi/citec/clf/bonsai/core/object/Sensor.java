@@ -25,6 +25,8 @@ public interface Sensor<T> extends ManagedCoreObject {
      */
     Class<T> getDataType();
 
+    String getTarget();
+
     // synchronous api ---------------------------------------------------------
 
     /**

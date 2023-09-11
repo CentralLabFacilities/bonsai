@@ -79,6 +79,11 @@ public class BtlMsgSensor<DataType extends Type, MsgType extends Message> extend
         listeners.remove(listener);
     }
 
+    @Override
+    public String getTarget() {
+        return topic;
+    }
+
     /**
      * {@inheritDoc}
      */
