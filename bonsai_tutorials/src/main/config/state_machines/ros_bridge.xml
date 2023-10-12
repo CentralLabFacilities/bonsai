@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="read1Send2">
+    <datamodel>
+        <data id="#_STATE_PREFIX" expr="'de.unibi.citec.clf.bonsai.skills.'"/>
+        <data id="#_SLOTS">
+            <slots>
+                <slot key="StringReply" state="helper.SendString#ReadFromRos" xpath="/slot"/>
+                <slot key="StringMessage" state="helper.SendString#WriteToRos2" xpath="/slot"/>
+            </slots>
+        </data>
+
+    </datamodel>
+
+
+    <state id="read1Send2" initial="helper.SendString#ReadFromRos">
+        <state id="helper.SendString#ReadFromRos">
+            <datamodel>
+                <data id="#_MSG" expr="'A'"/>
+                <data id="#_ACTUATOR" expr="'Ros1StringAct'"/>
+                <data id="#_SENSOR" expr="'Ros1StringSensor'"/>
+                <data id="#_WRITESLOT" expr="True"/>
+            </datamodel>
+            <transition event="SendString.*" target="helper.SendString#WriteToRos2"/>
+        </state>
+
+        <state id="helper.SendString#WriteToRos2">
+            <datamodel>
+                <data id="#_ACTUATOR" expr="'Ros2StringAct'"/>
+            </datamodel>
+            <transition event="SendString.*" target="End"/>
+        </state>
+    </state>
+
+    <state id="read2Send1" initial="helper.SendString#ReadFromRos2">
+        <state id="helper.SendString#ReadFromRos2">
+            <datamodel>
+                <data id="#_MSG" expr="'A'"/>
+                <data id="#_ACTUATOR" expr="'Ros2StringAct'"/>
+                <data id="#_SENSOR" expr="'Ros2StringSensor'"/>
+                <data id="#_WRITESLOT" expr="True"/>
+            </datamodel>
+            <transition event="SendString.*" target="helper.SendString#WriteToRos1"/>
+        </state>
+
+        <state id="helper.SendString#WriteToRos1">
+            <datamodel>
+                <data id="#_ACTUATOR" expr="'Ros1StringAct'"/>
+            </datamodel>
+            <transition event="SendString.*" target="End"/>
+        </state>
+    </state>
+
+
+
+    <state id="Fatal" final="true"/>
+
+    <state id="End" final="true"/>
+</scxml>
