@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bonsai Core Tutorial &mdash; Bonsai Docs 2.0 documentation</title>
+  <title>Bonsai Core Tutorial &mdash; Bonsai Docs 0.7-SNAPSHOT documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
     <link rel="shortcut icon" href="../_static/favicon.ico"/>
@@ -14,13 +15,11 @@
         <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
         <script src="../_static/jquery.js"></script>
         <script src="../_static/underscore.js"></script>
-        <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="../_static/doctools.js"></script>
-        <script src="../_static/sphinx_highlight.js"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="&lt;no title&gt;" href="core.html" />
+    <link rel="next" title="Bonsai Core" href="core.html" />
     <link rel="prev" title="Coding Guidelines" href="coding-guideline.html" /> 
 </head>
 
@@ -29,15 +28,19 @@
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
-            <a href="../index.html" class="icon icon-home"> Bonsai Docs
-            <img src="../_static/bonsai-l1s.png" class="logo" alt="Logo"/>
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Bonsai Docs
+              <img src="../_static/bonsai-l1s.png" class="logo" alt="Logo"/>
           </a>
               <div class="version">
-                2.0
+                0.7
               </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
-    <input type="text" name="q" placeholder="Search docs" />
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
     <input type="hidden" name="check_keywords" value="yes" />
     <input type="hidden" name="area" value="default" />
   </form>
@@ -55,12 +58,11 @@
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#test-statemachine-during-developement">Test Statemachine during developement</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#using-rsb-version">Using RSB version</a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="core.html">Core</a></li>
 <li class="toctree-l2"><a class="reference internal" href="skills.html">Skills</a></li>
 <li class="toctree-l2"><a class="reference internal" href="memory.html">Memory</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changes.html">Github Changes</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../behavior.html">SCXML Behavior Engine</a></li>
@@ -79,9 +81,9 @@
         <div class="rst-content">
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
-      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
-          <li><a href="../general.html">Bonsai 2 - Bielefeld Sensor Actuator Interface</a> &raquo;</li>
-      <li>Bonsai Core Tutorial</li>
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../general.html">Bonsai - Bielefeld Sensor Actuator Interface</a></li>
+      <li class="breadcrumb-item active">Bonsai Core Tutorial</li>
       <li class="wy-breadcrumbs-aside">
       </li>
   </ul>
@@ -90,78 +92,57 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <div class="section" id="bonsai-core-tutorial">
-<h1>Bonsai Core Tutorial<a class="headerlink" href="#bonsai-core-tutorial" title="Permalink to this heading"></a></h1>
+  <section id="bonsai-core-tutorial">
+<h1>Bonsai Core Tutorial<a class="headerlink" href="#bonsai-core-tutorial" title="Permalink to this headline"></a></h1>
 <p>Bonsai is a multi layered approach for behavior modelling of complex systems.</p>
 <p>Behavior Layer - Action Layer - Interface Layer - Funcional Component Layer - Hardware Layer</p>
-<p>The Bonsai framework uses <code class="docutils literal notranslate"><span class="pre">skills</span></code> as the <code class="docutils literal notranslate"><span class="pre">Action</span> <span class="pre">Layer</span></code> which represent reuseable actions for some type of hardware. These Skills use different In/Output interfaces (<code class="docutils literal notranslate"><span class="pre">Sensors</span></code> and <code class="docutils literal notranslate"><span class="pre">Actuators</span></code> of the <code class="docutils literal notranslate"><span class="pre">Interface</span> <span class="pre">Layer</span></code>). To Create complex behavior Bonsai skills can be in different control layers e.g. FSM/HSM such as <code class="docutils literal notranslate"><span class="pre">SCXML</span></code></p>
-<div class="section" id="configuration">
-<h2>Configuration<a class="headerlink" href="#configuration" title="Permalink to this heading"></a></h2>
+<p>The Bonsai framework uses <code class="docutils literal notranslate"><span class="pre">skills</span></code> as the <code class="docutils literal notranslate"><span class="pre">Action</span> <span class="pre">Layer</span></code> which represent reuseable actions for some type of hardware. These Skills use different In/Output interfaces (<code class="docutils literal notranslate"><span class="pre">Types</span></code>, <code class="docutils literal notranslate"><span class="pre">Sensors</span></code> and <code class="docutils literal notranslate"><span class="pre">Actuators</span></code> of the <code class="docutils literal notranslate"><span class="pre">Interface</span> <span class="pre">Layer</span></code>). To Create complex behavior Bonsai skills can be in different control layers such as <code class="docutils literal notranslate"><span class="pre">SCXML</span></code>
+Interfaces are implemented for different middlewares. They include serializer between middleware specific and bonsai <code class="docutils literal notranslate"><span class="pre">Types</span></code>.</p>
+<section id="configuration">
+<h2>Configuration<a class="headerlink" href="#configuration" title="Permalink to this headline"></a></h2>
 <p>The BonSAI system must be configured. Usually you can use the <code class="docutils literal notranslate"><span class="pre">BasicActuators.xml</span></code> and the <code class="docutils literal notranslate"><span class="pre">BasicSensors.xml</span></code></p>
-<div class="section" id="scxml">
-<h3>SCXML<a class="headerlink" href="#scxml" title="Permalink to this heading"></a></h3>
-<p>Finite state machines with described in an xml-like state machine language apache-scxml.</p>
-</div>
-<div class="section" id="structure">
-<h3>Structure<a class="headerlink" href="#structure" title="Permalink to this heading"></a></h3>
+<section id="scxml">
+<h3>SCXML<a class="headerlink" href="#scxml" title="Permalink to this headline"></a></h3>
+<p>Combination of finite state machines and harel statecharts, described in an xml-like state machine language apache-scxml.</p>
+</section>
+<section id="structure">
+<h3>Structure<a class="headerlink" href="#structure" title="Permalink to this headline"></a></h3>
 <p>The RoboCup [Exercise] project has the following structure:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">PROJECT</span><span class="o">/</span><span class="n">src</span><span class="o">/</span><span class="n">main</span><span class="o">/</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">SCXML</span><span class="o">/</span><span class="n">src</span><span class="o">/</span><span class="n">main</span><span class="o">/</span>
            <span class="o">|---</span> <span class="n">config</span><span class="o">/</span>
                  <span class="o">|---</span>  <span class="n">bonsai_configs</span><span class="o">/</span> <span class="p">(</span><span class="n">BonSAI</span> <span class="n">configuration</span> <span class="n">files</span><span class="p">)</span>
                  <span class="o">|---</span>  <span class="n">state_machines</span><span class="o">/</span> <span class="p">(</span><span class="n">SCXML</span> <span class="n">files</span><span class="p">)</span>
+<span class="n">SKILLS</span><span class="o">/</span><span class="n">src</span><span class="o">/</span><span class="n">main</span><span class="o">/</span>
            <span class="o">|---</span> <span class="n">java</span><span class="o">/</span><span class="n">de</span><span class="o">/</span><span class="n">unibi</span><span class="o">/</span><span class="n">citec</span><span class="o">/</span><span class="n">clf</span><span class="o">/</span><span class="n">bonsai</span><span class="o">/</span><span class="n">skills</span><span class="o">/</span> <span class="p">(</span><span class="n">implementations</span><span class="p">)</span>
+<span class="n">BIN</span><span class="o">/</span><span class="n">src</span><span class="o">/</span><span class="n">main</span><span class="o">/</span>
+           <span class="o">|---</span> <span class="n">java</span><span class="o">/</span><span class="n">de</span><span class="o">/</span><span class="n">unibi</span><span class="o">/</span><span class="n">citec</span><span class="o">/</span><span class="n">clf</span><span class="o">/</span><span class="n">bonsai</span><span class="o">/</span><span class="n">LaunchLocal</span><span class="o">.</span><span class="n">java</span> <span class="p">(</span><span class="n">executeable</span><span class="p">)</span>
 </pre></div>
 </div>
-</div>
-</div>
-<div class="section" id="test-statemachine-during-developement">
-<h2>Test Statemachine during developement<a class="headerlink" href="#test-statemachine-during-developement" title="Permalink to this heading"></a></h2>
+</section>
+</section>
+<section id="test-statemachine-during-developement">
+<h2>Test Statemachine during developement<a class="headerlink" href="#test-statemachine-during-developement" title="Permalink to this headline"></a></h2>
 <p>in the RobocupathomeDist <code class="docutils literal notranslate"><span class="pre">Robocup&#64;home</span> <span class="pre">[BIN]</span></code> module.</p>
-<p>Copy “resource/localMapping.default.properties” as “localMapping.properties” and enter the path to your cloned repositories</p>
+<p>Copy “resource/localMapping.default.properties” as “localMapping.properties” and enter the path to your local repositories</p>
 <ul class="simple">
 <li><p>Use <code class="docutils literal notranslate"><span class="pre">LaunchLocal</span></code> to start the client.</p></li>
 </ul>
-</div>
-<div class="section" id="using-rsb-version">
-<h2>Using RSB version<a class="headerlink" href="#using-rsb-version" title="Permalink to this heading"></a></h2>
-<ul class="simple">
-<li><p>configure rsb to use the vdemo spread port:</p></li>
-</ul>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="o">.</span><span class="n">config</span><span class="o">/</span><span class="n">rsb</span><span class="o">.</span><span class="n">conf</span><span class="p">}</span>
-
-<span class="p">[</span><span class="n">plugins</span><span class="o">.</span><span class="n">cpp</span><span class="p">]</span>
-<span class="n">load</span> <span class="o">=</span> <span class="n">rsbspread</span>
-
-<span class="p">[</span><span class="n">transport</span><span class="o">.</span><span class="n">socket</span><span class="p">]</span>
-<span class="n">enabled</span> <span class="o">=</span> <span class="mi">0</span>
-
-<span class="p">[</span><span class="n">transport</span><span class="o">.</span><span class="n">spread</span><span class="p">]</span>
-<span class="n">enabled</span> <span class="o">=</span> <span class="mi">1</span>
-<span class="n">host</span> <span class="o">=</span> <span class="n">localhost</span>
-<span class="n">port</span> <span class="o">=</span> <span class="mi">4803</span>
-</pre></div>
-</div>
-<ul class="simple">
-<li><p>Start spread and roscore with vdemo</p></li>
-<li><p>Load and start your statemachine and config in netbeans by running the Bonsai and the FXGUI launchfile</p></li>
-<li><p>if you simply changed your xml code reload using the gui (STOP/LOAD), restart Bonsai server after changes to skills</p></li>
-</ul>
-</div>
-</div>
+</section>
+</section>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="coding-guideline.html" class="btn btn-neutral float-left" title="Coding Guidelines" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="core.html" class="btn btn-neutral float-right" title="&lt;no title&gt;" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="core.html" class="btn btn-neutral float-right" title="Bonsai Core" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2018, Leroy Rügemer.
-      <span class="lastupdated">Last updated on Dec 07, 2022.
+    <p>&#169; Copyright 2023, Leroy Rügemer.
+      <span class="lastupdated">Last updated on Oct 31, 2023.
       </span></p>
   </div>
 

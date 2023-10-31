@@ -1,7 +1,8 @@
-.. _bonsai2-index:
-============
-BonSAI Docu
-============
+.. _bonsai-index:
+
+====================
+BonSAI Documentation
+====================
 
 .. toctree::
     :maxdepth: 2
@@ -13,6 +14,6 @@ BonSAI Docu
     SCXML Behavior Engine <behavior>
 
 
-.. |logo| image:: /_static/img/bonsai-l1.png
+.. |logo| image:: /_static/img/bonsai-l1s.png
     :width: 256
     :alt: BonSAI

@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SCXML Definitions &mdash; Bonsai Docs 2.0 documentation</title>
+  <title>SCXML Definitions &mdash; Bonsai Docs 0.7-SNAPSHOT documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
     <link rel="shortcut icon" href="../_static/favicon.ico"/>
@@ -14,13 +15,11 @@
         <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
         <script src="../_static/jquery.js"></script>
         <script src="../_static/underscore.js"></script>
-        <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="../_static/doctools.js"></script>
-        <script src="../_static/sphinx_highlight.js"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="prev" title="Bonsai 2 - Bielefeld Sensor Actuator Interface" href="../behavior.html" /> 
+    <link rel="prev" title="Bonsai - SCXML" href="../behavior.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -28,15 +27,19 @@
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
-            <a href="../index.html" class="icon icon-home"> Bonsai Docs
-            <img src="../_static/bonsai-l1s.png" class="logo" alt="Logo"/>
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Bonsai Docs
+              <img src="../_static/bonsai-l1s.png" class="logo" alt="Logo"/>
           </a>
               <div class="version">
-                2.0
+                0.7
               </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
-    <input type="text" name="q" placeholder="Search docs" />
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
     <input type="hidden" name="check_keywords" value="yes" />
     <input type="hidden" name="area" value="default" />
   </form>
@@ -89,9 +92,9 @@
         <div class="rst-content">
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
-      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
-          <li><a href="../behavior.html">Bonsai 2 - Bielefeld Sensor Actuator Interface</a> &raquo;</li>
-      <li>SCXML Definitions</li>
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../behavior.html">Bonsai - SCXML</a></li>
+      <li class="breadcrumb-item active">SCXML Definitions</li>
       <li class="wy-breadcrumbs-aside">
       </li>
   </ul>
@@ -100,14 +103,13 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <div class="section" id="scxml-definitions">
-<h1>SCXML Definitions<a class="headerlink" href="#scxml-definitions" title="Permalink to this heading"></a></h1>
-<p>SCXML (State Chart XML) can be used to describe Statemachines in a XML document.</p>
+  <section id="scxml-definitions">
+<h1>SCXML Definitions<a class="headerlink" href="#scxml-definitions" title="Permalink to this headline"></a></h1>
 <p>We use Apache Commons XML to create our robot behavior.</p>
 <p>The Bonsai Engine reads these files to couple simple skills to rich robot behavior.
 BonsaiSCXML is not utilizing the whole <a class="reference external" href="http://www.w3.org/TR/scxml/">spec</a>. This page introduces all the relevant parts of SCXML</p>
-<div class="section" id="state">
-<h2>State<a class="headerlink" href="#state" title="Permalink to this heading"></a></h2>
+<section id="state">
+<h2>State<a class="headerlink" href="#state" title="Permalink to this headline"></a></h2>
 <p>States define the possible “situations” (or states) the Statemachine can be in.</p>
 <p>If the Statemachine is running all current states are called active.</p>
 <p>Example State:</p>
@@ -133,8 +135,8 @@ BonsaiSCXML is not utilizing the whole <a class="reference external" href="http:
 <li><p>If a child is active all parent states are active as well.</p></li>
 <li><p>States may have <code class="docutils literal notranslate"><span class="pre">onentry</span></code> and  <code class="docutils literal notranslate"><span class="pre">onexit</span></code> elements which may contain actions(<a class="reference external" href="https://www.w3.org/TR/scxml/#executable">executable content</a>) to be executed on entry or exit of the state.</p></li>
 </ul>
-<div class="section" id="parallel">
-<h3>Parallel<a class="headerlink" href="#parallel" title="Permalink to this heading"></a></h3>
+<section id="parallel">
+<h3>Parallel<a class="headerlink" href="#parallel" title="Permalink to this headline"></a></h3>
 <p>The <code class="docutils literal notranslate"><span class="pre">&lt;parallel&gt;</span></code> element encapsulates a set of child states which are simultaneously active when the parent element is active.</p>
 <ul class="simple">
 <li><p>Parallel has to be exited from the parallel state. (transition outside parallel cant happen in child states)</p></li>
@@ -154,10 +156,10 @@ BonsaiSCXML is not utilizing the whole <a class="reference external" href="http:
 <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;three&quot;</span><span class="nt">/&gt;</span>
 </pre></div>
 </div>
-</div>
-</div>
-<div class="section" id="datamodel">
-<h2>Datamodel<a class="headerlink" href="#datamodel" title="Permalink to this heading"></a></h2>
+</section>
+</section>
+<section id="datamodel">
+<h2>Datamodel<a class="headerlink" href="#datamodel" title="Permalink to this headline"></a></h2>
 <p>The data model is defined via the <code class="docutils literal notranslate"><span class="pre">&lt;datamodel&gt;</span></code> element, which contains zero or more elements, each of which defines a single data element and assigns an initial value to it.</p>
 <ul class="simple">
 <li><p>If you want to use the data in guard conditions define the needed data entrys in the root element.</p></li>
@@ -173,9 +175,9 @@ BonsaiSCXML is not utilizing the whole <a class="reference external" href="http:
 <ul class="simple">
 <li><p>The <code class="docutils literal notranslate"><span class="pre">expr</span></code> attribute should use additional single quotes</p></li>
 </ul>
-</div>
-<div class="section" id="event-transition">
-<h2>Event/Transition<a class="headerlink" href="#event-transition" title="Permalink to this heading"></a></h2>
+</section>
+<section id="event-transition">
+<h2>Event/Transition<a class="headerlink" href="#event-transition" title="Permalink to this headline"></a></h2>
 <ul class="simple">
 <li><p>Transitions are triggered by events</p></li>
 <li><p>They may contain actions, which are executed when the transition is taken</p></li>
@@ -189,16 +191,16 @@ BonsaiSCXML is not utilizing the whole <a class="reference external" href="http:
 <div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">&quot;one&quot;</span> <span class="na">target=</span><span class="s">&quot;b&quot;</span><span class="nt">/&gt;</span>
 </pre></div>
 </div>
-<div class="section" id="regex">
-<h3>Regex<a class="headerlink" href="#regex" title="Permalink to this heading"></a></h3>
+<section id="regex">
+<h3>Regex<a class="headerlink" href="#regex" title="Permalink to this headline"></a></h3>
 <p>You can use Regex to define events:</p>
 <div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">&quot;A.*&quot;</span><span class="nt">&gt;</span>
 </pre></div>
 </div>
 <p>This should be used with caution as there are some <a class="reference internal" href="#implicit-events">Implicit events</a></p>
-</div>
-<div class="section" id="condition">
-<h3>Condition<a class="headerlink" href="#condition" title="Permalink to this heading"></a></h3>
+</section>
+<section id="condition">
+<h3>Condition<a class="headerlink" href="#condition" title="Permalink to this headline"></a></h3>
 <p>Transition can be conditionalized via guard conditions</p>
 <p>Example:</p>
 <div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">&quot;one&quot;</span> <span class="na">cond=</span><span class="s">&quot;number==1&quot;</span> <span class="na">target=</span><span class="s">&quot;b&quot;</span><span class="nt">/&gt;</span>
@@ -207,16 +209,16 @@ BonsaiSCXML is not utilizing the whole <a class="reference external" href="http:
 <ul class="simple">
 <li><p>we use <a class="reference external" href="https://commons.apache.org/proper/commons-jexl/reference/syntax.html">JEXL</a> operators</p></li>
 </ul>
-</div>
-</div>
-<div class="section" id="actions">
-<h2>Actions<a class="headerlink" href="#actions" title="Permalink to this heading"></a></h2>
+</section>
+</section>
+<section id="actions">
+<h2>Actions<a class="headerlink" href="#actions" title="Permalink to this headline"></a></h2>
 <p>Actions is the nane of executable content inside <code class="docutils literal notranslate"><span class="pre">onentry</span></code> <code class="docutils literal notranslate"><span class="pre">transition</span></code> and <code class="docutils literal notranslate"><span class="pre">onexit</span></code> elements.</p>
 <ul class="simple">
 <li><p>we use <a class="reference external" href="https://www.w3.org/TR/scxml/#assign">assign</a> and <a class="reference external" href="https://www.w3.org/TR/scxml/#send">send</a></p></li>
 </ul>
-<div class="section" id="id1">
-<h3>Send<a class="headerlink" href="#id1" title="Permalink to this heading"></a></h3>
+<section id="id1">
+<h3>Send<a class="headerlink" href="#id1" title="Permalink to this headline"></a></h3>
 <p>Send is used to create events</p>
 <div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;send</span> <span class="na">event=</span><span class="s">&quot;A&quot;</span><span class="nt">/&gt;</span>
 </pre></div>
@@ -224,17 +226,17 @@ BonsaiSCXML is not utilizing the whole <a class="reference external" href="http:
 <ul class="simple">
 <li><p>used in behavior Statemachines</p></li>
 </ul>
-</div>
-<div class="section" id="id2">
-<h3>Assign<a class="headerlink" href="#id2" title="Permalink to this heading"></a></h3>
+</section>
+<section id="id2">
+<h3>Assign<a class="headerlink" href="#id2" title="Permalink to this headline"></a></h3>
 <p>Assign is used to update data entrys</p>
 <div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;assign</span> <span class="na">name=</span><span class="s">&quot;number&quot;</span> <span class="na">expr=</span><span class="s">&quot;2&quot;</span><span class="nt">/&gt;</span>
 </pre></div>
 </div>
-</div>
-</div>
-<div class="section" id="sourcing">
-<h2>Sourcing<a class="headerlink" href="#sourcing" title="Permalink to this heading"></a></h2>
+</section>
+</section>
+<section id="sourcing">
+<h2>Sourcing<a class="headerlink" href="#sourcing" title="Permalink to this headline"></a></h2>
 <p>You can source other xmls in a state</p>
 <p>Example:</p>
 <div class="highlight-xml notranslate"><div class="highlight"><pre><span></span>Document a.xml:
@@ -275,9 +277,9 @@ Document b.xml:
 </li>
 <li><p>different <code class="docutils literal notranslate"><span class="pre">MAPPING</span></code> path variables can be defined in your <code class="docutils literal notranslate"><span class="pre">localMapping.properties</span></code> or with the <code class="docutils literal notranslate"><span class="pre">-m</span></code> commandline parameter</p></li>
 </ul>
-</div>
-<div class="section" id="connect-skill-to-state">
-<h2>Connect Skill to State<a class="headerlink" href="#connect-skill-to-state" title="Permalink to this heading"></a></h2>
+</section>
+<section id="connect-skill-to-state">
+<h2>Connect Skill to State<a class="headerlink" href="#connect-skill-to-state" title="Permalink to this headline"></a></h2>
 <ul class="simple">
 <li><p>Skills are Java Classes that implement <code class="docutils literal notranslate"><span class="pre">AbstraktSkill</span></code>.</p></li>
 <li><p>You will find basic skills in Bonsai [Core Skill].</p></li>
@@ -305,16 +307,16 @@ Document b.xml:
 ...
 </pre></div>
 </div>
-</div>
-<div class="section" id="implicit-events">
-<h2>Implicit events<a class="headerlink" href="#implicit-events" title="Permalink to this heading"></a></h2>
+</section>
+<section id="implicit-events">
+<h2>Implicit events<a class="headerlink" href="#implicit-events" title="Permalink to this headline"></a></h2>
 <p>Commons SCXML provides some <strong>interesting</strong> extensions, generating some internal events automatically. As they are named &lt;ID&gt;.&lt;event&gt; you may accidentally cause transitions while using regex as transition events for Skills (e.x. <code class="docutils literal notranslate"><span class="pre">id=&quot;Wait&quot;</span></code>) or Compount States (<a class="reference internal" href="#sourcing">Sourcing</a>)</p>
-<div class="section" id="entry-and-exit">
-<h3>.entry and .exit<a class="headerlink" href="#entry-and-exit" title="Permalink to this heading"></a></h3>
+<section id="entry-and-exit">
+<h3>.entry and .exit<a class="headerlink" href="#entry-and-exit" title="Permalink to this headline"></a></h3>
 <p>The Commons SCXML implementation generates a <code class="docutils literal notranslate"><span class="pre">.entry</span></code> event when any state is entered and a <code class="docutils literal notranslate"><span class="pre">.exit</span></code> when a state is exited.</p>
-</div>
-<div class="section" id="change">
-<h3>.change<a class="headerlink" href="#change" title="Permalink to this heading"></a></h3>
+</section>
+<section id="change">
+<h3>.change<a class="headerlink" href="#change" title="Permalink to this headline"></a></h3>
 <p>Similarly to the <code class="docutils literal notranslate"><span class="pre">.entry</span></code> and <code class="docutils literal notranslate"><span class="pre">.exit</span></code> event the Commons SCXML implementation generates a <code class="docutils literal notranslate"><span class="pre">.change</span></code> event when a piece of any data model changes, which means one can watch some part of the datamodel for an update for triggering a transition. This is quite useful for communicating across regions etc.</p>
 <div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;scxml</span> <span class="na">xmlns=</span><span class="s">&quot;http://www.w3.org/2005/07/scxml&quot;</span>
     <span class="na">version=</span><span class="s">&quot;1.0&quot;</span> <span class="na">initial=</span><span class="s">&quot;main&quot;</span><span class="nt">&gt;</span>
@@ -363,22 +365,22 @@ Document b.xml:
 <span class="nt">&lt;/scxml&gt;</span>
 </pre></div>
 </div>
-</div>
-</div>
-</div>
+</section>
+</section>
+</section>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="../behavior.html" class="btn btn-neutral float-left" title="Bonsai 2 - Bielefeld Sensor Actuator Interface" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../behavior.html" class="btn btn-neutral float-left" title="Bonsai - SCXML" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
     </div>
 
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2018, Leroy Rügemer.
-      <span class="lastupdated">Last updated on Dec 07, 2022.
+    <p>&#169; Copyright 2023, Leroy Rügemer.
+      <span class="lastupdated">Last updated on Oct 31, 2023.
       </span></p>
   </div>
 

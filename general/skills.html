@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Skills &mdash; Bonsai Docs 2.0 documentation</title>
+  <title>Skills &mdash; Bonsai Docs 0.7-SNAPSHOT documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
     <link rel="shortcut icon" href="../_static/favicon.ico"/>
@@ -14,9 +15,7 @@
         <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
         <script src="../_static/jquery.js"></script>
         <script src="../_static/underscore.js"></script>
-        <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="../_static/doctools.js"></script>
-        <script src="../_static/sphinx_highlight.js"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -29,15 +28,19 @@
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
-            <a href="../index.html" class="icon icon-home"> Bonsai Docs
-            <img src="../_static/bonsai-l1s.png" class="logo" alt="Logo"/>
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Bonsai Docs
+              <img src="../_static/bonsai-l1s.png" class="logo" alt="Logo"/>
           </a>
               <div class="version">
-                2.0
+                0.7
               </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
-    <input type="text" name="q" placeholder="Search docs" />
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
     <input type="hidden" name="check_keywords" value="yes" />
     <input type="hidden" name="area" value="default" />
   </form>
@@ -49,6 +52,7 @@
 <li class="toctree-l1 current"><a class="reference internal" href="../general.html">Bonsai</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="coding-guideline.html">Coding Guideline</a></li>
 <li class="toctree-l2"><a class="reference internal" href="general.html">General</a></li>
+<li class="toctree-l2"><a class="reference internal" href="core.html">Core</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Skills</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#skillparts">Skillparts</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#configuration">Configuration</a><ul>
@@ -64,7 +68,6 @@
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="memory.html">Memory</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changes.html">Github Changes</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../behavior.html">SCXML Behavior Engine</a></li>
@@ -83,9 +86,9 @@
         <div class="rst-content">
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
-      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
-          <li><a href="../general.html">Bonsai 2 - Bielefeld Sensor Actuator Interface</a> &raquo;</li>
-      <li>Skills</li>
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../general.html">Bonsai - Bielefeld Sensor Actuator Interface</a></li>
+      <li class="breadcrumb-item active">Skills</li>
       <li class="wy-breadcrumbs-aside">
       </li>
   </ul>
@@ -94,65 +97,66 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <div class="section" id="skills">
-<h1>Skills<a class="headerlink" href="#skills" title="Permalink to this heading"></a></h1>
-<p>Skills are javaclasses, which mine the smallest parts of a statemachine. Each state of the statemachine is able to envoke an instance of a skill.
-Combined skills are able to build more complex behaviours, which themselves can be represented as a single state.</p>
-<div class="section" id="skillparts">
-<h2>Skillparts<a class="headerlink" href="#skillparts" title="Permalink to this heading"></a></h2>
-<p>Each skill extends AbstractSkill and needs some predefined components:</p>
-<ul class="simple">
-<li><p>Actuators that will be used</p></li>
-<li><p>Sensors, which informations will be used</p></li>
-<li><p>ExitTokens, that will be returned to the statemachine</p></li>
-<li><p>datamodels and other variables you want to use</p></li>
-</ul>
+  <section id="skills">
+<h1>Skills<a class="headerlink" href="#skills" title="Permalink to this headline"></a></h1>
+<p>Skill execute code using sensors and actuators and finish with one defined ExitStatus. They can use aditional input/output with slots.</p>
+<section id="skillparts">
+<h2>Skillparts<a class="headerlink" href="#skillparts" title="Permalink to this headline"></a></h2>
 <p>The Skill methods gets invoked in the following order</p>
-<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">configure</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">init</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">execute</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">end</span><span class="w"></span>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">configure</span> <span class="o">-&gt;</span> <span class="n">init</span> <span class="o">-&gt;</span> <span class="n">execute</span> <span class="o">-&gt;</span> <span class="n">end</span>
 </pre></div>
 </div>
 <ul class="simple">
 <li><p>The skill stops if configure throws an exception</p></li>
 <li><p>if init return false the execute method is skipped, <code class="docutils literal notranslate"><span class="pre">end(Token.Fatal())</span></code> is then called</p></li>
-<li><p>execute is able to loop until a non loop token is returned</p></li>
+<li><p>execute is repeatedly called until a non loop token is returned</p></li>
 </ul>
-</div>
-<div class="section" id="configuration">
-<h2>Configuration<a class="headerlink" href="#configuration" title="Permalink to this heading"></a></h2>
-<div class="section" id="void-configure-skillconfigurator">
-<h3>void configure(SkillConfigurator)<a class="headerlink" href="#void-configure-skillconfigurator" title="Permalink to this heading"></a></h3>
-<p>Configure is already called, when loading a statemachine, therefore errors can be handled before execution. Here you should handle your exit Tokens and the data get trough the statemachine</p>
-<div class="section" id="actuators-and-sensors">
-<h4>Actuators and Sensors<a class="headerlink" href="#actuators-and-sensors" title="Permalink to this heading"></a></h4>
+<p>Each skill extends AbstractSkill and uses some predefined components:</p>
+<ul class="simple">
+<li><p>Actuators that will be used</p></li>
+<li><p>Sensors, which informations will be used</p></li>
+<li><p>Slots for data in and output</p></li>
+<li><p>ExitTokens, that can be returned</p></li>
+<li><p>Define Parameters you want to use</p></li>
+</ul>
+<p>Which are initialized during the configure step.</p>
+</section>
+<section id="configuration">
+<h2>Configuration<a class="headerlink" href="#configuration" title="Permalink to this headline"></a></h2>
+<section id="void-configure-skillconfigurator">
+<h3>void configure(SkillConfigurator)<a class="headerlink" href="#void-configure-skillconfigurator" title="Permalink to this headline"></a></h3>
+<p>Configure is already called before during load, therefore errors can be handled before execution.</p>
+<section id="actuators-and-sensors">
+<h4>Actuators and Sensors<a class="headerlink" href="#actuators-and-sensors" title="Permalink to this headline"></a></h4>
 <p>The usable Actuators and Sensors are usually defined in an bonsai config file and are usable as Javaobjects:</p>
-<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kd">private</span><span class="w"> </span><span class="kd">static</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">ACTUATOR_SPEECHACTUATOR</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;SpeechActuator&quot;</span><span class="p">;</span><span class="w"></span>
-<span class="kd">private</span><span class="w"> </span><span class="kd">static</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">SENSOR_SPEECHSENSORCONFIRM</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;SpeechSensorConfirm&quot;</span><span class="p">;</span><span class="w"></span>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kd">private</span> <span class="kd">static</span> <span class="kd">final</span> <span class="n">String</span> <span class="n">ACTUATOR_SPEECHACTUATOR</span> <span class="o">=</span> <span class="s">&quot;SpeechActuator&quot;</span><span class="p">;</span>
+<span class="kd">private</span> <span class="kd">static</span> <span class="kd">final</span> <span class="n">String</span> <span class="n">SENSOR_SPEECHSENSORCONFIRM</span> <span class="o">=</span> <span class="s">&quot;SpeechSensorConfirm&quot;</span><span class="p">;</span>
 
-<span class="nd">@Override</span><span class="w"></span>
-<span class="kd">public</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">configure</span><span class="p">(</span><span class="n">SkillConfigurator</span><span class="w"> </span><span class="n">configurator</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="n">speechSensor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">configurator</span><span class="p">.</span><span class="na">getSensor</span><span class="p">(</span><span class="n">SENSOR_SPEECHSENSORCONFIRM</span><span class="p">,</span><span class="w"> </span><span class="n">Utterance</span><span class="p">.</span><span class="na">class</span><span class="p">);</span><span class="w"></span>
-<span class="w">    </span><span class="n">speechActuator</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">configurator</span><span class="p">.</span><span class="na">getActuator</span><span class="p">(</span><span class="n">ACTUATOR_SPEECHACTUATOR</span><span class="p">,</span><span class="w"> </span><span class="n">SpeechActuator</span><span class="p">.</span><span class="na">class</span><span class="p">);</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="nd">@Override</span>
+<span class="kd">public</span> <span class="kt">void</span> <span class="nf">configure</span><span class="p">(</span><span class="n">SkillConfigurator</span> <span class="n">configurator</span><span class="p">)</span> <span class="p">{</span>
+    <span class="n">speechSensor</span> <span class="o">=</span> <span class="n">configurator</span><span class="p">.</span><span class="na">getSensor</span><span class="p">(</span><span class="n">SENSOR_SPEECHSENSORCONFIRM</span><span class="p">,</span> <span class="n">Utterance</span><span class="p">.</span><span class="na">class</span><span class="p">);</span>
+    <span class="n">speechActuator</span> <span class="o">=</span> <span class="n">configurator</span><span class="p">.</span><span class="na">getActuator</span><span class="p">(</span><span class="n">ACTUATOR_SPEECHACTUATOR</span><span class="p">,</span> <span class="n">SpeechActuator</span><span class="p">.</span><span class="na">class</span><span class="p">);</span>
+<span class="p">}</span>
 </pre></div>
 </div>
-</div>
-<div class="section" id="exittoken">
-<h4>ExitToken<a class="headerlink" href="#exittoken" title="Permalink to this heading"></a></h4>
+</section>
+<section id="exittoken">
+<h4>ExitToken<a class="headerlink" href="#exittoken" title="Permalink to this headline"></a></h4>
 <p>ExitToken are used to create events after the skill is finished. To make sure all possible exit events are captured in the scxml the tokens have to be requested in the configuration method.</p>
-<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="nd">@Override</span><span class="w"></span>
-<span class="kd">public</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">configure</span><span class="p">(</span><span class="n">SkillConfigurator</span><span class="w"> </span><span class="n">configurator</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="c1">// request all tokens that you plan to return from other methods</span><span class="w"></span>
-<span class="w">    </span><span class="n">tokenSuccessPsYes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">configurator</span><span class="p">.</span><span class="na">requestExitToken</span><span class="p">(</span><span class="n">ExitStatus</span><span class="p">.</span><span class="na">SUCCESS</span><span class="p">().</span><span class="na">withProcessingStatus</span><span class="p">(</span><span class="n">PS_YES</span><span class="p">));</span><span class="w"></span>
-<span class="w">    </span><span class="n">tokenSuccessPsNo</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">configurator</span><span class="p">.</span><span class="na">requestExitToken</span><span class="p">(</span><span class="n">ExitStatus</span><span class="p">.</span><span class="na">SUCCESS</span><span class="p">().</span><span class="na">withProcessingStatus</span><span class="p">(</span><span class="n">PS_NO</span><span class="p">));</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="nd">@Override</span>
+<span class="kd">public</span> <span class="kt">void</span> <span class="nf">configure</span><span class="p">(</span><span class="n">SkillConfigurator</span> <span class="n">configurator</span><span class="p">)</span> <span class="p">{</span>
+    <span class="c1">// request all tokens that you plan to return from other methods</span>
+    <span class="n">tokenSuccessPsYes</span> <span class="o">=</span> <span class="n">configurator</span><span class="p">.</span><span class="na">requestExitToken</span><span class="p">(</span><span class="n">ExitStatus</span><span class="p">.</span><span class="na">SUCCESS</span><span class="p">().</span><span class="na">withProcessingStatus</span><span class="p">(</span><span class="n">PS_YES</span><span class="p">));</span>
+    <span class="n">tokenSuccessPsNo</span> <span class="o">=</span> <span class="n">configurator</span><span class="p">.</span><span class="na">requestExitToken</span><span class="p">(</span><span class="n">ExitStatus</span><span class="p">.</span><span class="na">SUCCESS</span><span class="p">().</span><span class="na">withProcessingStatus</span><span class="p">(</span><span class="n">PS_NO</span><span class="p">));</span>
+<span class="p">}</span>
 </pre></div>
 </div>
-</div>
-<div class="section" id="parameter">
-<h4>Parameter<a class="headerlink" href="#parameter" title="Permalink to this heading"></a></h4>
+</section>
+<section id="parameter">
+<h4>Parameter<a class="headerlink" href="#parameter" title="Permalink to this headline"></a></h4>
 <p>Skills are able to read parameter in the configure method</p>
 <dl>
-<dt>::</dt><dd><p>private String KEY_TEXT = “#_KEY”</p>
+<dt>::</dt><dd><p>private String KEY_TEXT = “KEY”</p>
 <dl class="simple">
 <dt>public void configure(SkillConfigurator configurator) {</dt><dd><p>text = configurator.requestValue(KEY_TEXT);
 blocking = configurator.requestOptionalBool(KEY_BLOCKING, blocking);</p>
@@ -164,87 +168,87 @@ blocking = configurator.requestOptionalBool(KEY_BLOCKING, blocking);</p>
 <ul class="simple">
 <li><p>there are different requestTYPE methods for different types <code class="docutils literal notranslate"><span class="pre">requestValue()</span></code> reads the value as String.</p></li>
 <li><p>Requested parameter have to be given</p></li>
-<li><p>You can request Optinal with defaults if the data with the supplied id is not found</p></li>
+<li><p>You can request Optinals with defaults if the parameter is not supplied</p></li>
 </ul>
 <p>SCXML:
-We have the option to read the local datamodel of the state that invokes the skill. Example:</p>
+In BonsaiSCXML parameters are read from local datamodel of the state that invokes the skill. Example:</p>
 <div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;SomeSkill&quot;</span><span class="nt">&gt;</span>
     <span class="nt">&lt;datamodel&gt;</span>
-        <span class="nt">&lt;data</span> <span class="na">id=</span><span class="s">&quot;#_KEY&quot;</span> <span class="na">expr=</span><span class="s">&quot;&#39;value&#39;&quot;</span> <span class="nt">/&gt;</span>
+        <span class="nt">&lt;data</span> <span class="na">id=</span><span class="s">&quot;KEY&quot;</span> <span class="na">expr=</span><span class="s">&quot;&#39;value&#39;&quot;</span> <span class="nt">/&gt;</span>
     <span class="nt">&lt;/datamodel&gt;</span>
 <span class="nt">&lt;/state&gt;</span>
 </pre></div>
 </div>
-</div>
-</div>
-</div>
+</section>
+</section>
+</section>
 <hr class="docutils" />
-<div class="section" id="methods">
-<h2>Methods<a class="headerlink" href="#methods" title="Permalink to this heading"></a></h2>
-<div class="section" id="boolean-init">
-<h3>boolean init()<a class="headerlink" href="#boolean-init" title="Permalink to this heading"></a></h3>
+<section id="methods">
+<h2>Methods<a class="headerlink" href="#methods" title="Permalink to this headline"></a></h2>
+<section id="boolean-init">
+<h3>boolean init()<a class="headerlink" href="#boolean-init" title="Permalink to this headline"></a></h3>
 <p>Init initalizes the skill and should be used as a place to define your pre nonlogic structures.</p>
-<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="nd">@Override</span><span class="w"></span>
-<span class="kd">public</span><span class="w"> </span><span class="kt">boolean</span><span class="w"> </span><span class="nf">init</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="n">speechManager</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">SimpleSpeechHelper</span><span class="p">(</span><span class="n">speechSensor</span><span class="p">,</span><span class="w"> </span><span class="kc">true</span><span class="p">);</span><span class="w"></span>
-<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">timeout</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="n">logger</span><span class="p">.</span><span class="na">info</span><span class="p">(</span><span class="s">&quot;using timeout of &quot;</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">timeout</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="s">&quot;ms&quot;</span><span class="p">);</span><span class="w"></span>
-<span class="w">        </span><span class="n">timeout</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">System</span><span class="p">.</span><span class="na">currentTimeMillis</span><span class="p">();</span><span class="w"></span>
-<span class="w">    </span><span class="p">}</span><span class="w"></span>
-<span class="w">    </span><span class="n">speechManager</span><span class="p">.</span><span class="na">startListening</span><span class="p">();</span><span class="w"></span>
-<span class="w">    </span><span class="n">logger</span><span class="p">.</span><span class="na">debug</span><span class="p">(</span><span class="s">&quot;simple: &quot;</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">simpleYesOrNo</span><span class="p">);</span><span class="w"></span>
-<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="kc">true</span><span class="p">;</span><span class="w"></span>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="nd">@Override</span>
+<span class="kd">public</span> <span class="kt">boolean</span> <span class="nf">init</span><span class="p">()</span> <span class="p">{</span>
+    <span class="n">speechManager</span> <span class="o">=</span> <span class="k">new</span> <span class="n">SimpleSpeechHelper</span><span class="p">(</span><span class="n">speechSensor</span><span class="p">,</span> <span class="kc">true</span><span class="p">);</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">timeout</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">logger</span><span class="p">.</span><span class="na">info</span><span class="p">(</span><span class="s">&quot;using timeout of &quot;</span> <span class="o">+</span> <span class="n">timeout</span> <span class="o">+</span> <span class="s">&quot;ms&quot;</span><span class="p">);</span>
+        <span class="n">timeout</span> <span class="o">+=</span> <span class="n">System</span><span class="p">.</span><span class="na">currentTimeMillis</span><span class="p">();</span>
+    <span class="p">}</span>
+    <span class="n">speechManager</span><span class="p">.</span><span class="na">startListening</span><span class="p">();</span>
+    <span class="n">logger</span><span class="p">.</span><span class="na">debug</span><span class="p">(</span><span class="s">&quot;simple: &quot;</span> <span class="o">+</span> <span class="n">simpleYesOrNo</span><span class="p">);</span>
+    <span class="k">return</span> <span class="kc">true</span><span class="p">;</span>
 
-<span class="p">}</span><span class="w"></span>
+<span class="p">}</span>
 </pre></div>
 </div>
-</div>
-<div class="section" id="exittoken-execute">
-<h3>ExitToken execute()<a class="headerlink" href="#exittoken-execute" title="Permalink to this heading"></a></h3>
-<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="nd">@Override</span><span class="w"></span>
-<span class="kd">public</span><span class="w"> </span><span class="n">ExitToken</span><span class="w"> </span><span class="nf">execute</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">timeout</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">System</span><span class="p">.</span><span class="na">currentTimeMillis</span><span class="p">()</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">timeout</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">            </span><span class="n">logger</span><span class="p">.</span><span class="na">info</span><span class="p">(</span><span class="s">&quot;ConfirmYesOrNo timeout&quot;</span><span class="p">);</span><span class="w"></span>
-<span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="n">tokenSuccessPsTimeout</span><span class="p">;</span><span class="w"></span>
-<span class="w">        </span><span class="p">}</span><span class="w"></span>
-<span class="w">    </span><span class="p">}</span><span class="w"></span>
-<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">simpleYesOrNo</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="c1">// call simple yes or no confirmation</span><span class="w"></span>
-<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">simpleYesNo</span><span class="p">();</span><span class="w"></span>
-<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="c1">// call confirm yes or no with limited number of retries and</span><span class="w"></span>
-<span class="w">        </span><span class="c1">// conformations from robot</span><span class="w"></span>
-<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">confirmYesNo</span><span class="p">();</span><span class="w"></span>
-<span class="w">    </span><span class="p">}</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+</section>
+<section id="exittoken-execute">
+<h3>ExitToken execute()<a class="headerlink" href="#exittoken-execute" title="Permalink to this headline"></a></h3>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="nd">@Override</span>
+<span class="kd">public</span> <span class="n">ExitToken</span> <span class="nf">execute</span><span class="p">()</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">timeout</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">System</span><span class="p">.</span><span class="na">currentTimeMillis</span><span class="p">()</span> <span class="o">&gt;</span> <span class="n">timeout</span><span class="p">)</span> <span class="p">{</span>
+            <span class="n">logger</span><span class="p">.</span><span class="na">info</span><span class="p">(</span><span class="s">&quot;ConfirmYesOrNo timeout&quot;</span><span class="p">);</span>
+            <span class="k">return</span> <span class="n">tokenSuccessPsTimeout</span><span class="p">;</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">simpleYesOrNo</span><span class="p">)</span> <span class="p">{</span>
+        <span class="c1">// call simple yes or no confirmation</span>
+        <span class="k">return</span> <span class="n">simpleYesNo</span><span class="p">();</span>
+    <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+        <span class="c1">// call confirm yes or no with limited number of retries and</span>
+        <span class="c1">// conformations from robot</span>
+        <span class="k">return</span> <span class="n">confirmYesNo</span><span class="p">();</span>
+    <span class="p">}</span>
+<span class="p">}</span>
 </pre></div>
 </div>
-</div>
-<div class="section" id="exittoken-end-exittoken">
-<h3>ExitToken end(ExitToken)<a class="headerlink" href="#exittoken-end-exittoken" title="Permalink to this heading"></a></h3>
-<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="nd">@Override</span><span class="w"></span>
-<span class="kd">public</span><span class="w"> </span><span class="n">ExitToken</span><span class="w"> </span><span class="nf">end</span><span class="p">(</span><span class="n">ExitToken</span><span class="w"> </span><span class="n">curToken</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="n">speechManager</span><span class="p">.</span><span class="na">removeHelper</span><span class="p">();</span><span class="w"></span>
-<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">curToken</span><span class="p">;</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+</section>
+<section id="exittoken-end-exittoken">
+<h3>ExitToken end(ExitToken)<a class="headerlink" href="#exittoken-end-exittoken" title="Permalink to this headline"></a></h3>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="nd">@Override</span>
+<span class="kd">public</span> <span class="n">ExitToken</span> <span class="nf">end</span><span class="p">(</span><span class="n">ExitToken</span> <span class="n">curToken</span><span class="p">)</span> <span class="p">{</span>
+    <span class="n">speechManager</span><span class="p">.</span><span class="na">removeHelper</span><span class="p">();</span>
+    <span class="k">return</span> <span class="n">curToken</span><span class="p">;</span>
+<span class="p">}</span>
 
-<span class="kd">private</span><span class="w"> </span><span class="n">ExitToken</span><span class="w"> </span><span class="nf">simpleYesNo</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">speechManager</span><span class="p">.</span><span class="na">hasNewUnderstanding</span><span class="p">())</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">ExitToken</span><span class="p">.</span><span class="na">loop</span><span class="p">();</span><span class="w"></span>
-<span class="w">    </span><span class="p">}</span><span class="w"></span>
-<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">speechManager</span><span class="p">.</span><span class="na">getUnderstoodWords</span><span class="p">(</span><span class="n">NT_YES</span><span class="p">).</span><span class="na">isEmpty</span><span class="p">())</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">tokenSuccessPsYes</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">speechManager</span><span class="p">.</span><span class="na">getUnderstoodWords</span><span class="p">(</span><span class="n">NT_NO</span><span class="p">).</span><span class="na">isEmpty</span><span class="p">())</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">tokenSuccessPsNo</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="p">}</span><span class="w"></span>
-<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">ExitToken</span><span class="p">.</span><span class="na">loop</span><span class="p">();</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="kd">private</span> <span class="n">ExitToken</span> <span class="nf">simpleYesNo</span><span class="p">()</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">speechManager</span><span class="p">.</span><span class="na">hasNewUnderstanding</span><span class="p">())</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="n">ExitToken</span><span class="p">.</span><span class="na">loop</span><span class="p">();</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">speechManager</span><span class="p">.</span><span class="na">getUnderstoodWords</span><span class="p">(</span><span class="n">NT_YES</span><span class="p">).</span><span class="na">isEmpty</span><span class="p">())</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="n">tokenSuccessPsYes</span><span class="p">;</span>
+    <span class="p">}</span> <span class="k">else</span> <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">speechManager</span><span class="p">.</span><span class="na">getUnderstoodWords</span><span class="p">(</span><span class="n">NT_NO</span><span class="p">).</span><span class="na">isEmpty</span><span class="p">())</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="n">tokenSuccessPsNo</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">ExitToken</span><span class="p">.</span><span class="na">loop</span><span class="p">();</span>
+<span class="p">}</span>
 </pre></div>
 </div>
-</div>
-</div>
-</div>
+</section>
+</section>
+</section>
 
 
            </div>
@@ -257,8 +261,8 @@ We have the option to read the local datamodel of the state that invokes the ski
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2018, Leroy Rügemer.
-      <span class="lastupdated">Last updated on Dec 07, 2022.
+    <p>&#169; Copyright 2023, Leroy Rügemer.
+      <span class="lastupdated">Last updated on Oct 31, 2023.
       </span></p>
   </div>
 

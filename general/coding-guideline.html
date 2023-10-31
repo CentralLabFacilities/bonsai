@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Coding Guidelines &mdash; Bonsai Docs 2.0 documentation</title>
+  <title>Coding Guidelines &mdash; Bonsai Docs 0.7-SNAPSHOT documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
     <link rel="shortcut icon" href="../_static/favicon.ico"/>
@@ -14,14 +15,12 @@
         <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
         <script src="../_static/jquery.js"></script>
         <script src="../_static/underscore.js"></script>
-        <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="../_static/doctools.js"></script>
-        <script src="../_static/sphinx_highlight.js"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Bonsai Core Tutorial" href="general.html" />
-    <link rel="prev" title="Bonsai 2 - Bielefeld Sensor Actuator Interface" href="../general.html" /> 
+    <link rel="prev" title="Bonsai - Bielefeld Sensor Actuator Interface" href="../general.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -29,15 +28,19 @@
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
-            <a href="../index.html" class="icon icon-home"> Bonsai Docs
-            <img src="../_static/bonsai-l1s.png" class="logo" alt="Logo"/>
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Bonsai Docs
+              <img src="../_static/bonsai-l1s.png" class="logo" alt="Logo"/>
           </a>
               <div class="version">
-                2.0
+                0.7
               </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
-    <input type="text" name="q" placeholder="Search docs" />
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
     <input type="hidden" name="check_keywords" value="yes" />
     <input type="hidden" name="area" value="default" />
   </form>
@@ -51,6 +54,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#skills">Skills</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#usage-documentation">Usage Documentation</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#code-comments">Code Comments</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#naming-of-variables">Naming of Variables</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#ordering-of-variables">Ordering of Variables</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#order-of-methods">Order of methods</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#how-to-use-init-execute-and-end">How to use init(), execute() and end()</a></li>
@@ -65,9 +69,9 @@
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="general.html">General</a></li>
+<li class="toctree-l2"><a class="reference internal" href="core.html">Core</a></li>
 <li class="toctree-l2"><a class="reference internal" href="skills.html">Skills</a></li>
 <li class="toctree-l2"><a class="reference internal" href="memory.html">Memory</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changes.html">Github Changes</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../behavior.html">SCXML Behavior Engine</a></li>
@@ -86,9 +90,9 @@
         <div class="rst-content">
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
-      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
-          <li><a href="../general.html">Bonsai 2 - Bielefeld Sensor Actuator Interface</a> &raquo;</li>
-      <li>Coding Guidelines</li>
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../general.html">Bonsai - Bielefeld Sensor Actuator Interface</a></li>
+      <li class="breadcrumb-item active">Coding Guidelines</li>
       <li class="wy-breadcrumbs-aside">
       </li>
   </ul>
@@ -97,22 +101,22 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <div class="section" id="coding-guidelines">
-<h1>Coding Guidelines<a class="headerlink" href="#coding-guidelines" title="Permalink to this heading"></a></h1>
+  <section id="coding-guidelines">
+<h1>Coding Guidelines<a class="headerlink" href="#coding-guidelines" title="Permalink to this headline"></a></h1>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>Some things are Team ToBI (Robocupathome Team of Bielefeld) specific</p>
 </div>
 <p>All Skills and behaviours in bonsai-skills shall be properly documented.</p>
-<div class="section" id="skills">
-<h2>Skills<a class="headerlink" href="#skills" title="Permalink to this heading"></a></h2>
+<section id="skills">
+<h2>Skills<a class="headerlink" href="#skills" title="Permalink to this headline"></a></h2>
 <p>Reference Skills:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">knowledge</span><span class="o">.</span><span class="n">SetTargetByKnowledgeBase</span>
 <span class="n">nav</span><span class="o">.</span><span class="n">drive</span><span class="o">.</span><span class="n">NavigateTo</span>
 </pre></div>
 </div>
-<div class="section" id="usage-documentation">
-<h3>Usage Documentation<a class="headerlink" href="#usage-documentation" title="Permalink to this heading"></a></h3>
+<section id="usage-documentation">
+<h3>Usage Documentation<a class="headerlink" href="#usage-documentation" title="Permalink to this headline"></a></h3>
 <p>Above the class declaration of the skill there should be a short paragraph highlighting the usage of the skill. It shall be of the form:</p>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>A short summary of what this skill does exactly.
 
@@ -140,13 +144,21 @@ Analogous to  Actuators.
 &lt;/pre&gt;
 </pre></div>
 </div>
-</div>
-<div class="section" id="code-comments">
-<h3>Code Comments<a class="headerlink" href="#code-comments" title="Permalink to this heading"></a></h3>
+</section>
+<section id="code-comments">
+<h3>Code Comments<a class="headerlink" href="#code-comments" title="Permalink to this headline"></a></h3>
 <p>Please only comment complex code fragments and avoid only declarative statements such as <cite>retrieving slot</cite>, <cite>keys</cite> / <cite>exittokens</cite>/ <cite>actuators</cite> as they clutter the skill and should be obvious if the other guidelines are respected. Other often used code blocks, such as blocks to retrieve slot contents should not be commented, as they are widely used and their usage should be obvious.</p>
-</div>
-<div class="section" id="ordering-of-variables">
-<h3>Ordering of Variables<a class="headerlink" href="#ordering-of-variables" title="Permalink to this heading"></a></h3>
+</section>
+<section id="naming-of-variables">
+<h3>Naming of Variables<a class="headerlink" href="#naming-of-variables" title="Permalink to this headline"></a></h3>
+<ul class="simple">
+<li><p>Parameter Keys should be prefixed with <cite>KEY_</cite>
+- The Key value should be prefixed with <cite>#_</cite></p></li>
+<li><p>ExitTokens should start with <cite>token</cite></p></li>
+</ul>
+</section>
+<section id="ordering-of-variables">
+<h3>Ordering of Variables<a class="headerlink" href="#ordering-of-variables" title="Permalink to this headline"></a></h3>
 <p>Variables shall be declared (and used in configure) in the following order:</p>
 <ol class="arabic simple">
 <li><p>Keys</p></li>
@@ -158,9 +170,9 @@ Analogous to  Actuators.
 <li><p>Variables used</p></li>
 </ol>
 <p>Each kind of variable should form a block (no blank lines) and be seperated by others via a blank line.</p>
-</div>
-<div class="section" id="order-of-methods">
-<h3>Order of methods<a class="headerlink" href="#order-of-methods" title="Permalink to this heading"></a></h3>
+</section>
+<section id="order-of-methods">
+<h3>Order of methods<a class="headerlink" href="#order-of-methods" title="Permalink to this headline"></a></h3>
 <p>The methods of a skill shall always be in the following order:</p>
 <ol class="arabic simple">
 <li><p>configure()</p></li>
@@ -169,40 +181,40 @@ Analogous to  Actuators.
 <li><p>end()</p></li>
 <li><p>other custom methods used by the skill</p></li>
 </ol>
-</div>
-<div class="section" id="how-to-use-init-execute-and-end">
-<h3>How to use init(), execute() and end()<a class="headerlink" href="#how-to-use-init-execute-and-end" title="Permalink to this heading"></a></h3>
-<div class="section" id="init">
-<h4>init()<a class="headerlink" href="#init" title="Permalink to this heading"></a></h4>
+</section>
+<section id="how-to-use-init-execute-and-end">
+<h3>How to use init(), execute() and end()<a class="headerlink" href="#how-to-use-init-execute-and-end" title="Permalink to this headline"></a></h3>
+<section id="init">
+<h4>init()<a class="headerlink" href="#init" title="Permalink to this headline"></a></h4>
 <p>init() shall mainly be used to retrieve slots and prepare acutator calls.</p>
-</div>
-<div class="section" id="execute">
-<h4>execute()<a class="headerlink" href="#execute" title="Permalink to this heading"></a></h4>
+</section>
+<section id="execute">
+<h4>execute()<a class="headerlink" href="#execute" title="Permalink to this headline"></a></h4>
 <p>execute() shall never block. Actuator calls should always either return a Future, over which should be looped, or timeout after some time. Looping because of waiting should never be done inside execute(), but rather be realized via returning ExitToken.loop(). Because of this, it is best practice to call an actuator in init and return ExitToken.loop() as long as the Future returned by the actuator call is not done.</p>
-</div>
-<div class="section" id="end">
-<h4>end()<a class="headerlink" href="#end" title="Permalink to this heading"></a></h4>
+</section>
+<section id="end">
+<h4>end()<a class="headerlink" href="#end" title="Permalink to this headline"></a></h4>
 <p>end() shall mainly be used for memorizing data. Please note that end is invoked even if init returns false. This means that in most cases you would want to check for the given ExitToken before you e.g. memorize some variable.</p>
-</div>
-</div>
-<div class="section" id="defensive-recalling-and-memorizing-of-slots">
-<h3>Defensive recalling and memorizing of slots<a class="headerlink" href="#defensive-recalling-and-memorizing-of-slots" title="Permalink to this heading"></a></h3>
+</section>
+</section>
+<section id="defensive-recalling-and-memorizing-of-slots">
+<h3>Defensive recalling and memorizing of slots<a class="headerlink" href="#defensive-recalling-and-memorizing-of-slots" title="Permalink to this headline"></a></h3>
 <p>Recalling and memorizing should always be followed by by a check if the recalled object is null, in case the recalled slot was emtpy. It shall also always be accompanied by understandable logger outputs, at least in the case of an error/ exception.</p>
-</div>
-</div>
-<div class="section" id="statemachines">
-<h2>Statemachines<a class="headerlink" href="#statemachines" title="Permalink to this heading"></a></h2>
+</section>
+</section>
+<section id="statemachines">
+<h2>Statemachines<a class="headerlink" href="#statemachines" title="Permalink to this headline"></a></h2>
 <ul class="simple">
 <li><p>Skills should <em>NOT</em> be given scxml data parameter <code class="docutils literal notranslate"><span class="pre">&#64;DATA</span></code> if this changes the configure requests.</p></li>
 </ul>
 <p><em>ExampleSkill</em> <code class="docutils literal notranslate"><span class="pre">Configure()</span></code>:</p>
-<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">useAct</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">configurator</span><span class="p">.</span><span class="na">requestOptionalBool</span><span class="p">(</span><span class="s">&quot;#_USE&quot;</span><span class="p">,</span><span class="w"> </span><span class="kc">false</span><span class="p">);</span><span class="w"></span>
-<span class="k">if</span><span class="p">(</span><span class="n">useAct</span><span class="p">)</span><span class="w"> </span><span class="n">act</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">configurator</span><span class="p">.</span><span class="na">getActuator</span><span class="p">(</span><span class="s">&quot;Foo&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">Bar</span><span class="p">.</span><span class="na">class</span><span class="p">);</span><span class="w"></span>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">useAct</span> <span class="o">=</span> <span class="n">configurator</span><span class="p">.</span><span class="na">requestOptionalBool</span><span class="p">(</span><span class="s">&quot;#_USE&quot;</span><span class="p">,</span> <span class="kc">false</span><span class="p">);</span>
+<span class="k">if</span><span class="p">(</span><span class="n">useAct</span><span class="p">)</span> <span class="n">act</span> <span class="o">=</span> <span class="n">configurator</span><span class="p">.</span><span class="na">getActuator</span><span class="p">(</span><span class="s">&quot;Foo&quot;</span><span class="p">,</span> <span class="n">Bar</span><span class="p">.</span><span class="na">class</span><span class="p">);</span>
 </pre></div>
 </div>
 <p>If <code class="docutils literal notranslate"><span class="pre">#_USE</span></code> is set to <code class="docutils literal notranslate"><span class="pre">&#64;DATA</span></code> with expression <code class="docutils literal notranslate"><span class="pre">false</span></code> during LOAD but gets changed to <code class="docutils literal notranslate"><span class="pre">true</span></code> with <code class="docutils literal notranslate"><span class="pre">&lt;assign&gt;</span></code> the State will not function properly</p>
-<div class="section" id="location">
-<h3>Location<a class="headerlink" href="#location" title="Permalink to this heading"></a></h3>
+<section id="location">
+<h3>Location<a class="headerlink" href="#location" title="Permalink to this headline"></a></h3>
 <ul class="simple">
 <li><p>Robocup Task SCXML should be created in the <code class="docutils literal notranslate"><span class="pre">robocupathome-dist/scxml</span></code> project</p></li>
 <li><p>Documented Behavior SCXML that uses _only_ core skills should be moved to the <code class="docutils literal notranslate"><span class="pre">scxml-common</span></code> project</p></li>
@@ -212,9 +224,9 @@ Analogous to  Actuators.
 <span class="n">knowledge</span><span class="o">.</span><span class="n">storeCurrentPosition</span>
 </pre></div>
 </div>
-</div>
-<div class="section" id="id1">
-<h3>Usage Documentation<a class="headerlink" href="#id1" title="Permalink to this heading"></a></h3>
+</section>
+<section id="id1">
+<h3>Usage Documentation<a class="headerlink" href="#id1" title="Permalink to this headline"></a></h3>
 <p>Above the statemachine there should always be a short paragraph to describe the behaviour. It shall be of the form:</p>
 <div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="cm">&lt;!--&gt;</span>
 <span class="cm">A summary what this behaviour exactly does.</span>
@@ -243,23 +255,23 @@ Analogous to  Actuators.
 <span class="cm">&lt;!--&gt;</span>
 </pre></div>
 </div>
-</div>
-</div>
-</div>
+</section>
+</section>
+</section>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="../general.html" class="btn btn-neutral float-left" title="Bonsai 2 - Bielefeld Sensor Actuator Interface" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../general.html" class="btn btn-neutral float-left" title="Bonsai - Bielefeld Sensor Actuator Interface" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="general.html" class="btn btn-neutral float-right" title="Bonsai Core Tutorial" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2018, Leroy Rügemer.
-      <span class="lastupdated">Last updated on Dec 07, 2022.
+    <p>&#169; Copyright 2023, Leroy Rügemer.
+      <span class="lastupdated">Last updated on Oct 31, 2023.
       </span></p>
   </div>
 

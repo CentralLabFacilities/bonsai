@@ -7,8 +7,6 @@
 SCXML Definitions
 =================
 
-SCXML (State Chart XML) can be used to describe Statemachines in a XML document.
-
 We use Apache Commons XML to create our robot behavior.
 
 The Bonsai Engine reads these files to couple simple skills to rich robot behavior.
@@ -213,7 +211,7 @@ Result:
 - different ``MAPPING`` path variables can be defined in your ``localMapping.properties`` or with the ``-m`` commandline parameter
 
 Connect Skill to State
------
+----------------------
 
 - Skills are Java Classes that implement ``AbstraktSkill``. 
 - You will find basic skills in Bonsai [Core Skill].
