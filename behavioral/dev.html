@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Behavior Abstraction Layer &mdash; Bonsai Docs 2.0 documentation</title>
+  <title>Behavior Abstraction Layer &mdash; Bonsai Docs 0.7-SNAPSHOT documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
     <link rel="shortcut icon" href="../_static/favicon.ico"/>
@@ -14,9 +15,7 @@
         <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
         <script src="../_static/jquery.js"></script>
         <script src="../_static/underscore.js"></script>
-        <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="../_static/doctools.js"></script>
-        <script src="../_static/sphinx_highlight.js"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" /> 
@@ -27,15 +26,19 @@
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
-            <a href="../index.html" class="icon icon-home"> Bonsai Docs
-            <img src="../_static/bonsai-l1s.png" class="logo" alt="Logo"/>
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Bonsai Docs
+              <img src="../_static/bonsai-l1s.png" class="logo" alt="Logo"/>
           </a>
               <div class="version">
-                2.0
+                0.7
               </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
-    <input type="text" name="q" placeholder="Search docs" />
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
     <input type="hidden" name="check_keywords" value="yes" />
     <input type="hidden" name="area" value="default" />
   </form>
@@ -61,8 +64,8 @@
         <div class="rst-content">
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
-      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
-      <li>Behavior Abstraction Layer</li>
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Behavior Abstraction Layer</li>
       <li class="wy-breadcrumbs-aside">
       </li>
   </ul>
@@ -71,15 +74,15 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <div class="section" id="behavior-abstraction-layer">
-<h1>Behavior Abstraction Layer<a class="headerlink" href="#behavior-abstraction-layer" title="Permalink to this heading"></a></h1>
+  <section id="behavior-abstraction-layer">
+<h1>Behavior Abstraction Layer<a class="headerlink" href="#behavior-abstraction-layer" title="Permalink to this headline"></a></h1>
 <p>BehaviorAL is used to expose robot behaviors to extern users (e.x Apartment)
 It can be used to trigger statemachines remotely.</p>
 <p>Params:</p>
-<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="nd">@Option</span><span class="p">(</span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;-l&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">aliases</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="s">&quot;--logging&quot;</span><span class="p">},</span><span class="w"> </span><span class="n">metaVar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;PATH&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">usage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;path to a log4j properties file&quot;</span><span class="p">)</span><span class="w"></span>
-<span class="nd">@Option</span><span class="p">(</span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;-c&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">aliases</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="s">&quot;--config&quot;</span><span class="p">},</span><span class="w"> </span><span class="n">metaVar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;PATH&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">usage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;path to the bahaviorAL config file&quot;</span><span class="p">)</span><span class="w"></span>
-<span class="nd">@Option</span><span class="p">(</span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;-s&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">aliases</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="s">&quot;--server_scope&quot;</span><span class="p">},</span><span class="w"> </span><span class="n">metaVar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;VALUE&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">usage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;scope for server, default is: &#39;/bonsai&#39;&quot;</span><span class="p">)</span><span class="w"></span>
-<span class="nd">@Option</span><span class="p">(</span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;-b&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">aliases</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="s">&quot;--bonsai_server&quot;</span><span class="p">},</span><span class="w"> </span><span class="n">metaVar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;VALUE&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">usage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;scope for bonsai (the server that gets the xml files), default is: &#39;/behavioral/server&#39;&quot;</span><span class="p">)</span><span class="w"></span>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="nd">@Option</span><span class="p">(</span><span class="n">name</span> <span class="o">=</span> <span class="s">&quot;-l&quot;</span><span class="p">,</span> <span class="n">aliases</span> <span class="o">=</span> <span class="p">{</span><span class="s">&quot;--logging&quot;</span><span class="p">},</span> <span class="n">metaVar</span> <span class="o">=</span> <span class="s">&quot;PATH&quot;</span><span class="p">,</span> <span class="n">usage</span> <span class="o">=</span> <span class="s">&quot;path to a log4j properties file&quot;</span><span class="p">)</span>
+<span class="nd">@Option</span><span class="p">(</span><span class="n">name</span> <span class="o">=</span> <span class="s">&quot;-c&quot;</span><span class="p">,</span> <span class="n">aliases</span> <span class="o">=</span> <span class="p">{</span><span class="s">&quot;--config&quot;</span><span class="p">},</span> <span class="n">metaVar</span> <span class="o">=</span> <span class="s">&quot;PATH&quot;</span><span class="p">,</span> <span class="n">usage</span> <span class="o">=</span> <span class="s">&quot;path to the bahaviorAL config file&quot;</span><span class="p">)</span>
+<span class="nd">@Option</span><span class="p">(</span><span class="n">name</span> <span class="o">=</span> <span class="s">&quot;-s&quot;</span><span class="p">,</span> <span class="n">aliases</span> <span class="o">=</span> <span class="p">{</span><span class="s">&quot;--server_scope&quot;</span><span class="p">},</span> <span class="n">metaVar</span> <span class="o">=</span> <span class="s">&quot;VALUE&quot;</span><span class="p">,</span> <span class="n">usage</span> <span class="o">=</span> <span class="s">&quot;scope for server, default is: &#39;/bonsai&#39;&quot;</span><span class="p">)</span>
+<span class="nd">@Option</span><span class="p">(</span><span class="n">name</span> <span class="o">=</span> <span class="s">&quot;-b&quot;</span><span class="p">,</span> <span class="n">aliases</span> <span class="o">=</span> <span class="p">{</span><span class="s">&quot;--bonsai_server&quot;</span><span class="p">},</span> <span class="n">metaVar</span> <span class="o">=</span> <span class="s">&quot;VALUE&quot;</span><span class="p">,</span> <span class="n">usage</span> <span class="o">=</span> <span class="s">&quot;scope for bonsai (the server that gets the xml files), default is: &#39;/behavioral/server&#39;&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>Example config file:</p>
@@ -121,8 +124,8 @@ It can be used to trigger statemachines remotely.</p>
 <div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;data</span> <span class="na">id=</span><span class="s">&quot;#_MESSAGE&quot;</span> <span class="na">expr=</span><span class="s">&quot;&#39;@text&#39;&quot;</span> <span class="nt">/&gt;</span>
 </pre></div>
 </div>
-<div class="section" id="rsb-interface">
-<h2>RSB Interface<a class="headerlink" href="#rsb-interface" title="Permalink to this heading"></a></h2>
+<section id="rsb-interface">
+<h2>RSB Interface<a class="headerlink" href="#rsb-interface" title="Permalink to this headline"></a></h2>
 <p>RPCserver runs on (default) /behavioral/server</p>
 <ul class="simple">
 <li><dl class="simple">
@@ -183,8 +186,8 @@ It can be used to trigger statemachines remotely.</p>
 </dl>
 </li>
 </ul>
-</div>
-</div>
+</section>
+</section>
 
 
            </div>
@@ -194,8 +197,8 @@ It can be used to trigger statemachines remotely.</p>
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2018, Leroy Rügemer.
-      <span class="lastupdated">Last updated on Dec 07, 2022.
+    <p>&#169; Copyright 2023, Leroy Rügemer.
+      <span class="lastupdated">Last updated on Oct 31, 2023.
       </span></p>
   </div>
 

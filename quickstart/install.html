@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Install &mdash; Bonsai Docs 2.0 documentation</title>
+  <title>Install &mdash; Bonsai Docs 0.7-SNAPSHOT documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
     <link rel="shortcut icon" href="../_static/favicon.ico"/>
@@ -14,14 +15,12 @@
         <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
         <script src="../_static/jquery.js"></script>
         <script src="../_static/underscore.js"></script>
-        <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="../_static/doctools.js"></script>
-        <script src="../_static/sphinx_highlight.js"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Examples" href="examples.html" />
-    <link rel="prev" title="Bonsai 2 - Bielefeld Sensor Actuator Interface" href="../quickstart.html" /> 
+    <link rel="prev" title="Bonsai - Bielefeld Sensor Actuator Interface" href="../quickstart.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -29,15 +28,19 @@
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
-            <a href="../index.html" class="icon icon-home"> Bonsai Docs
-            <img src="../_static/bonsai-l1s.png" class="logo" alt="Logo"/>
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Bonsai Docs
+              <img src="../_static/bonsai-l1s.png" class="logo" alt="Logo"/>
           </a>
               <div class="version">
-                2.0
+                0.7
               </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
-    <input type="text" name="q" placeholder="Search docs" />
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
     <input type="hidden" name="check_keywords" value="yes" />
     <input type="hidden" name="area" value="default" />
   </form>
@@ -86,9 +89,9 @@
         <div class="rst-content">
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
-      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
-          <li><a href="../quickstart.html">Bonsai 2 - Bielefeld Sensor Actuator Interface</a> &raquo;</li>
-      <li>Install</li>
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../quickstart.html">Bonsai - Bielefeld Sensor Actuator Interface</a></li>
+      <li class="breadcrumb-item active">Install</li>
       <li class="wy-breadcrumbs-aside">
       </li>
   </ul>
@@ -97,10 +100,10 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <div class="section" id="install">
-<h1>Install<a class="headerlink" href="#install" title="Permalink to this heading"></a></h1>
-<div class="section" id="setup">
-<h2>Setup<a class="headerlink" href="#setup" title="Permalink to this heading"></a></h2>
+  <section id="install">
+<h1>Install<a class="headerlink" href="#install" title="Permalink to this headline"></a></h1>
+<section id="setup">
+<h2>Setup<a class="headerlink" href="#setup" title="Permalink to this headline"></a></h2>
 <ol class="arabic" start="0">
 <li><p>add repositories to settings.xml, see <a class="reference internal" href="#maven"><span class="std std-ref">Maven</span></a>.</p></li>
 <li><p>Create a directory for bonsai and change into the dir:</p>
@@ -139,8 +142,8 @@
 </div>
 </li>
 </ol>
-<div class="section" id="running">
-<h3>Running<a class="headerlink" href="#running" title="Permalink to this heading"></a></h3>
+<section id="running">
+<h3>Running<a class="headerlink" href="#running" title="Permalink to this headline"></a></h3>
 <ol class="arabic" start="5">
 <li><p>Start a roscore in another terminal</p></li>
 <li><p>Run example statemachine:</p>
@@ -150,12 +153,12 @@
 </li>
 </ol>
 <p>You can also start LaunchLocal.java from within your IDE</p>
-</div>
-</div>
-<div class="section" id="building-all-projects">
-<h2>Building all projects<a class="headerlink" href="#building-all-projects" title="Permalink to this heading"></a></h2>
-<div class="section" id="prerequisites">
-<h3>Prerequisites<a class="headerlink" href="#prerequisites" title="Permalink to this heading"></a></h3>
+</section>
+</section>
+<section id="building-all-projects">
+<h2>Building all projects<a class="headerlink" href="#building-all-projects" title="Permalink to this headline"></a></h2>
+<section id="prerequisites">
+<h3>Prerequisites<a class="headerlink" href="#prerequisites" title="Permalink to this headline"></a></h3>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>Robocup at Bielefeld: sourcing your distribution satisfies all prerequisites:</p>
@@ -197,9 +200,9 @@
 </div>
 </li>
 </ol>
-</div>
-<div class="section" id="building">
-<h3>Building<a class="headerlink" href="#building" title="Permalink to this heading"></a></h3>
+</section>
+<section id="building">
+<h3>Building<a class="headerlink" href="#building" title="Permalink to this headline"></a></h3>
 <ol class="arabic">
 <li><p>clone bonsai projects:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">git</span> <span class="n">clone</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">CentralLabFacilities</span><span class="o">/</span><span class="n">bonsai</span><span class="o">.</span><span class="n">git</span> <span class="n">src</span><span class="o">/</span><span class="n">bonsai</span>
@@ -220,12 +223,12 @@
 </div>
 </li>
 </ol>
-</div>
-</div>
-<div class="section" id="robocup-at-bielefeld">
-<h2>Robocup at Bielefeld<a class="headerlink" href="#robocup-at-bielefeld" title="Permalink to this heading"></a></h2>
-<div class="section" id="pepper">
-<h3>Pepper<a class="headerlink" href="#pepper" title="Permalink to this heading"></a></h3>
+</section>
+</section>
+<section id="robocup-at-bielefeld">
+<h2>Robocup at Bielefeld<a class="headerlink" href="#robocup-at-bielefeld" title="Permalink to this headline"></a></h2>
+<section id="pepper">
+<h3>Pepper<a class="headerlink" href="#pepper" title="Permalink to this headline"></a></h3>
 <ol class="arabic" start="0">
 <li><p>Setup Jenkins</p></li>
 <li><p>Install IntelliJ IDEA</p></li>
@@ -246,12 +249,12 @@
 </li>
 <li><p>Idea should now start with every bonsai module loaded. Delete the modules you are not working on (FILE-&gt;Project Structure / Modules)</p></li>
 </ol>
-</div>
-</div>
-<div class="section" id="misc">
-<h2>Misc<a class="headerlink" href="#misc" title="Permalink to this heading"></a></h2>
-<div class="section" id="maven">
-<span id="id1"></span><h3>Maven<a class="headerlink" href="#maven" title="Permalink to this heading"></a></h3>
+</section>
+</section>
+<section id="misc">
+<h2>Misc<a class="headerlink" href="#misc" title="Permalink to this headline"></a></h2>
+<section id="maven">
+<span id="id1"></span><h3>Maven<a class="headerlink" href="#maven" title="Permalink to this headline"></a></h3>
 <p>To fetch the dependencies of bonsai add the following repositories to your <code class="docutils literal notranslate"><span class="pre">.m2/settings.xml</span></code></p>
 <p>Repositories:</p>
 <div class="highlight-xml notranslate"><div class="highlight"><pre><span></span>...
@@ -292,23 +295,23 @@
 ...
 </pre></div>
 </div>
-</div>
-</div>
-</div>
+</section>
+</section>
+</section>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="../quickstart.html" class="btn btn-neutral float-left" title="Bonsai 2 - Bielefeld Sensor Actuator Interface" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../quickstart.html" class="btn btn-neutral float-left" title="Bonsai - Bielefeld Sensor Actuator Interface" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="examples.html" class="btn btn-neutral float-right" title="Examples" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2018, Leroy Rügemer.
-      <span class="lastupdated">Last updated on Dec 07, 2022.
+    <p>&#169; Copyright 2023, Leroy Rügemer.
+      <span class="lastupdated">Last updated on Oct 31, 2023.
       </span></p>
   </div>
 

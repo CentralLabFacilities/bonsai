@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bonsai 2 - Bielefeld Sensor Actuator Interface &mdash; Bonsai Docs 2.0 documentation</title>
+  <title>Bonsai - Bielefeld Sensor Actuator Interface &mdash; Bonsai Docs 0.7-SNAPSHOT documentation</title>
       <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
     <link rel="shortcut icon" href="_static/favicon.ico"/>
@@ -14,9 +15,7 @@
         <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
         <script src="_static/jquery.js"></script>
         <script src="_static/underscore.js"></script>
-        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="_static/doctools.js"></script>
-        <script src="_static/sphinx_highlight.js"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -29,15 +28,19 @@
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
-            <a href="index.html" class="icon icon-home"> Bonsai Docs
-            <img src="_static/bonsai-l1s.png" class="logo" alt="Logo"/>
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            Bonsai Docs
+              <img src="_static/bonsai-l1s.png" class="logo" alt="Logo"/>
           </a>
               <div class="version">
-                2.0
+                0.7
               </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
-    <input type="text" name="q" placeholder="Search docs" />
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
     <input type="hidden" name="check_keywords" value="yes" />
     <input type="hidden" name="area" value="default" />
   </form>
@@ -49,9 +52,9 @@
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Bonsai</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="general/coding-guideline.html">Coding Guideline</a></li>
 <li class="toctree-l2"><a class="reference internal" href="general/general.html">General</a></li>
+<li class="toctree-l2"><a class="reference internal" href="general/core.html">Core</a></li>
 <li class="toctree-l2"><a class="reference internal" href="general/skills.html">Skills</a></li>
 <li class="toctree-l2"><a class="reference internal" href="general/memory.html">Memory</a></li>
-<li class="toctree-l2"><a class="reference internal" href="general/changes.html">Github Changes</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="behavior.html">SCXML Behavior Engine</a></li>
@@ -70,8 +73,8 @@
         <div class="rst-content">
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
-      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
-      <li>Bonsai 2 - Bielefeld Sensor Actuator Interface</li>
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Bonsai - Bielefeld Sensor Actuator Interface</li>
       <li class="wy-breadcrumbs-aside">
       </li>
   </ul>
@@ -80,71 +83,34 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <div class="section" id="bonsai-2-bielefeld-sensor-actuator-interface">
-<h1>Bonsai 2 - Bielefeld Sensor Actuator Interface<a class="headerlink" href="#bonsai-2-bielefeld-sensor-actuator-interface" title="Permalink to this heading"></a></h1>
+  <section id="bonsai-bielefeld-sensor-actuator-interface">
+<h1>Bonsai - Bielefeld Sensor Actuator Interface<a class="headerlink" href="#bonsai-bielefeld-sensor-actuator-interface" title="Permalink to this headline"></a></h1>
 <div class="toctree-wrapper compound">
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="general/coding-guideline.html">Coding Guideline</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="general/coding-guideline.html#skills">Skills</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="general/coding-guideline.html#usage-documentation">Usage Documentation</a></li>
-<li class="toctree-l3"><a class="reference internal" href="general/coding-guideline.html#code-comments">Code Comments</a></li>
-<li class="toctree-l3"><a class="reference internal" href="general/coding-guideline.html#ordering-of-variables">Ordering of Variables</a></li>
-<li class="toctree-l3"><a class="reference internal" href="general/coding-guideline.html#order-of-methods">Order of methods</a></li>
-<li class="toctree-l3"><a class="reference internal" href="general/coding-guideline.html#how-to-use-init-execute-and-end">How to use init(), execute() and end()</a></li>
-<li class="toctree-l3"><a class="reference internal" href="general/coding-guideline.html#defensive-recalling-and-memorizing-of-slots">Defensive recalling and memorizing of slots</a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="general/coding-guideline.html#statemachines">Statemachines</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="general/coding-guideline.html#location">Location</a></li>
-<li class="toctree-l3"><a class="reference internal" href="general/coding-guideline.html#id1">Usage Documentation</a></li>
-</ul>
-</li>
+<li class="toctree-l2"><a class="reference internal" href="general/coding-guideline.html#skills">Skills</a></li>
+<li class="toctree-l2"><a class="reference internal" href="general/coding-guideline.html#statemachines">Statemachines</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="general/general.html">General</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="general/general.html#configuration">Configuration</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="general/general.html#scxml">SCXML</a></li>
-<li class="toctree-l3"><a class="reference internal" href="general/general.html#structure">Structure</a></li>
-</ul>
-</li>
+<li class="toctree-l2"><a class="reference internal" href="general/general.html#configuration">Configuration</a></li>
 <li class="toctree-l2"><a class="reference internal" href="general/general.html#test-statemachine-during-developement">Test Statemachine during developement</a></li>
-<li class="toctree-l2"><a class="reference internal" href="general/general.html#using-rsb-version">Using RSB version</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="general/core.html">Core</a></li>
 <li class="toctree-l1"><a class="reference internal" href="general/skills.html">Skills</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="general/skills.html#skillparts">Skillparts</a></li>
-<li class="toctree-l2"><a class="reference internal" href="general/skills.html#configuration">Configuration</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="general/skills.html#void-configure-skillconfigurator">void configure(SkillConfigurator)</a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="general/skills.html#methods">Methods</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="general/skills.html#boolean-init">boolean init()</a></li>
-<li class="toctree-l3"><a class="reference internal" href="general/skills.html#exittoken-execute">ExitToken execute()</a></li>
-<li class="toctree-l3"><a class="reference internal" href="general/skills.html#exittoken-end-exittoken">ExitToken end(ExitToken)</a></li>
-</ul>
-</li>
+<li class="toctree-l2"><a class="reference internal" href="general/skills.html#configuration">Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="general/skills.html#methods">Methods</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="general/memory.html">Memory</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="general/memory.html#scxml">SCXML</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="general/changes.html">Github Changes</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="general/changes.html#modules">Modules</a></li>
-<li class="toctree-l2"><a class="reference internal" href="general/changes.html#scxml">SCXML</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="general/changes.html#sourcing">Sourcing</a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="general/changes.html#core">Core</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="general/changes.html#skills">Skills</a></li>
-<li class="toctree-l3"><a class="reference internal" href="general/changes.html#sensors">Sensors</a></li>
-</ul>
-</li>
-</ul>
-</li>
 </ul>
 </div>
-</div>
+</section>
 
 
            </div>
@@ -157,8 +123,8 @@
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2018, Leroy Rügemer.
-      <span class="lastupdated">Last updated on Dec 07, 2022.
+    <p>&#169; Copyright 2023, Leroy Rügemer.
+      <span class="lastupdated">Last updated on Oct 31, 2023.
       </span></p>
   </div>
 

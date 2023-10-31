@@ -1,9 +1,9 @@
-==============================================
-Bonsai 2 - Bielefeld Sensor Actuator Interface
-==============================================
+============================================
+Bonsai - Bielefeld Sensor Actuator Interface
+============================================
 
 .. toctree::
-    :maxdepth: 3
+    :maxdepth: 2
 
     Coding Guideline <general/coding-guideline>
 
@@ -15,7 +15,5 @@ Bonsai 2 - Bielefeld Sensor Actuator Interface
     Skills <general/skills>
 
     Memory <general/memory>
-
-    Github Changes <general/changes>
 
 ..    Behavior Abstraction Layer <behavioral.rst>
