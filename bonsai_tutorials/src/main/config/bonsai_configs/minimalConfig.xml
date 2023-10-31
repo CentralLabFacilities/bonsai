@@ -28,7 +28,7 @@
     <Sensor key="Ros2StringSensor" dataTypeClass="java.lang.String"
             factoryClass="de.unibi.citec.clf.bonsai.ros2.Ros2Factory"
             sensorClass="de.unibi.citec.clf.bonsai.ros2.sensors.StringSensor"
-            wireTypeClass="std_msgs.String">
+            wireTypeClass="id.jrosmessages.std_msgs.StringMessage">
         <Options>
             <Option key="topic">/ros2/in</Option>
         </Options>

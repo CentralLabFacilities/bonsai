@@ -1,6 +1,6 @@
-==============================================
-Bonsai 2 - Bielefeld Sensor Actuator Interface
-==============================================
+============================================
+Bonsai - Bielefeld Sensor Actuator Interface
+============================================
 
 .. toctree::
     :maxdepth: 1

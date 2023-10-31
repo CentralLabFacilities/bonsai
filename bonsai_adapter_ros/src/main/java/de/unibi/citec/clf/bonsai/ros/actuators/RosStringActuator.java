@@ -40,7 +40,7 @@ public class RosStringActuator extends RosNode implements StringActuator {
             std_msgs.String str = publisher.newMessage();
             str.setData(data);
             publisher.publish(str);
-            logger.info("published " + data);
+            logger.fatal("ros1 published " + str);
         }
 
     }

@@ -6,6 +6,8 @@
             <slots>
                 <slot key="StringReply" state="helper.SendString#ReadFromRos" xpath="/slot"/>
                 <slot key="StringMessage" state="helper.SendString#WriteToRos2" xpath="/slot"/>
+                <slot key="StringReply" state="helper.SendString#ReadFromRos2" xpath="/slot"/>
+                <slot key="StringMessage" state="helper.SendString#WriteToRos1" xpath="/slot"/>
             </slots>
         </data>
 
@@ -15,8 +17,6 @@
     <state id="read1Send2" initial="helper.SendString#ReadFromRos">
         <state id="helper.SendString#ReadFromRos">
             <datamodel>
-                <data id="#_MSG" expr="'A'"/>
-                <data id="#_ACTUATOR" expr="'Ros1StringAct'"/>
                 <data id="#_SENSOR" expr="'Ros1StringSensor'"/>
                 <data id="#_WRITESLOT" expr="True"/>
             </datamodel>
@@ -34,8 +34,6 @@
     <state id="read2Send1" initial="helper.SendString#ReadFromRos2">
         <state id="helper.SendString#ReadFromRos2">
             <datamodel>
-                <data id="#_MSG" expr="'A'"/>
-                <data id="#_ACTUATOR" expr="'Ros2StringAct'"/>
                 <data id="#_SENSOR" expr="'Ros2StringSensor'"/>
                 <data id="#_WRITESLOT" expr="True"/>
             </datamodel>

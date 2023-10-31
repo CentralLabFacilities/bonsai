@@ -54,6 +54,13 @@ Code Comments
 
 Please only comment complex code fragments and avoid only declarative statements such as `retrieving slot`, `keys` / `exittokens`/ `actuators` as they clutter the skill and should be obvious if the other guidelines are respected. Other often used code blocks, such as blocks to retrieve slot contents should not be commented, as they are widely used and their usage should be obvious.
 
+Naming of Variables
+~~~~~~~~~~~~~~~~~~~~~
+
+- Parameter Keys should be prefixed with `KEY_`
+  - The Key value should be prefixed with `#_`
+- ExitTokens should start with `token`
+
 Ordering of Variables
 ~~~~~~~~~~~~~~~~~~~~~
 

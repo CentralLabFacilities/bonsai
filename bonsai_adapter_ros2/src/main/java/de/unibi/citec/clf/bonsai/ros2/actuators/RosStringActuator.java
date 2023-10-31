@@ -54,7 +54,7 @@ public class RosStringActuator extends Ros2Node implements StringActuator {
 
     @Override
     public void cleanUp() throws IOException {
-        client.unpublish(publisher);
+        //client.unpublish(publisher);
         client.close();
     }
 }
