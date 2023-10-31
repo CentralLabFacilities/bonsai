@@ -4,18 +4,10 @@ Skills
 
 .. highlight:: java
 
-Skills are javaclasses, which mine the smallest parts of a statemachine. Each state of the statemachine is able to envoke an instance of a skill.
-Combined skills are able to build more complex behaviours, which themselves can be represented as a single state.
+Skill execute code using sensors and actuators and finish with one defined ExitStatus. They can use aditional input/output with slots.
 
 Skillparts
 ----------
-
-Each skill extends AbstractSkill and needs some predefined components:
-
--  Actuators that will be used
--  Sensors, which informations will be used
--  ExitTokens, that will be returned to the statemachine
--  datamodels and other variables you want to use
 
 The Skill methods gets invoked in the following order
 
@@ -25,7 +17,17 @@ The Skill methods gets invoked in the following order
 
 -  The skill stops if configure throws an exception
 -  if init return false the execute method is skipped, ``end(Token.Fatal())`` is then called
--  execute is able to loop until a non loop token is returned
+-  execute is repeatedly called until a non loop token is returned
+
+Each skill extends AbstractSkill and uses some predefined components:
+
+-  Actuators that will be used
+-  Sensors, which informations will be used
+-  Slots for data in and output
+-  ExitTokens, that can be returned
+-  Define Parameters you want to use
+
+Which are initialized during the configure step.
 
 Configuration
 -------------
@@ -33,7 +35,7 @@ Configuration
 void configure(SkillConfigurator)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Configure is already called, when loading a statemachine, therefore errors can be handled before execution. Here you should handle your exit Tokens and the data get trough the statemachine
+Configure is already called before during load, therefore errors can be handled before execution.
 
 Actuators and Sensors
 .....................
@@ -71,26 +73,27 @@ Parameter
 Skills are able to read parameter in the configure method
 
 ::
-    private String KEY_TEXT = "#_KEY"
+    private String KEY_TEXT = "KEY"
 
     public void configure(SkillConfigurator configurator) {
         text = configurator.requestValue(KEY_TEXT);
         blocking = configurator.requestOptionalBool(KEY_BLOCKING, blocking);
     }
 
+
 - there are different requestTYPE methods for different types ``requestValue()`` reads the value as String.
 - Requested parameter have to be given
-- You can request Optinal with defaults if the data with the supplied id is not found
+- You can request Optinals with defaults if the parameter is not supplied
 
 
 SCXML:
-We have the option to read the local datamodel of the state that invokes the skill. Example:
+In BonsaiSCXML parameters are read from local datamodel of the state that invokes the skill. Example:
 
 .. code-block:: xml
 
     <state id="SomeSkill">
         <datamodel>
-            <data id="#_KEY" expr="'value'" />
+            <data id="KEY" expr="'value'" />
         </datamodel>
     </state>
 

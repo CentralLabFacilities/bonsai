@@ -126,7 +126,7 @@ public class RosStringSensor extends RosSensor<String, std_msgs.String> implemen
     //Message Handler
     @Override
     public void onNewMessage(std_msgs.String t) {
-        logger.fatal("received data: " + t.getData());
+        logger.trace("received data: " + t.getData());
         queue.push(t.getData());
         listeners.forEach((SensorListener<String> l) -> {
             l.newDataAvailable(t.getData());

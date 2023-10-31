@@ -211,7 +211,7 @@ Result:
 - different ``MAPPING`` path variables can be defined in your ``localMapping.properties`` or with the ``-m`` commandline parameter
 
 Connect Skill to State
------
+----------------------
 
 - Skills are Java Classes that implement ``AbstraktSkill``. 
 - You will find basic skills in Bonsai [Core Skill].

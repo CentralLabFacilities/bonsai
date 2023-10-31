@@ -33,7 +33,6 @@ public class StringSensor extends Ros2Sensor<String, StringMessage>  {
     public StringSensor(Class<String> typeClass, Class<StringMessage> rosType, JRos2Client client) {
         super(String.class, StringMessage.class, client);
         initialized = false;
-
     }
 
     @Override
@@ -100,7 +99,7 @@ public class StringSensor extends Ros2Sensor<String, StringMessage>  {
             client.subscribe(new TopicSubscriber<>(StringMessage.class, topic) {
                 @Override
                 public void onNext(StringMessage s) {
-                    logger.info("received data: " + s.data);
+                    logger.trace("received data: " + s.data);
                     queue.push(s.data);
 
                     listeners.forEach((SensorListener<String> l) -> {

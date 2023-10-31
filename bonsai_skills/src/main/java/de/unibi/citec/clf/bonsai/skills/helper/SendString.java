@@ -26,11 +26,11 @@ public class SendString extends AbstractSkill {
     //defaults
     long timeout = -1;
     String sensor = "";
-    String actuator;
+    String actuator = "";
     String msg = "";
     Boolean writeslot = false;
 
-    private StringActuator rsbSender;
+    private StringActuator rsbSender = null;
     private Sensor<String> rsbSensor = null;
     private MemorySlot<String> replySlot;
     private MemorySlot<String> msgSlot;
@@ -45,21 +45,25 @@ public class SendString extends AbstractSkill {
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
 
         msg = configurator.requestOptionalValue(KEY_MESSAGE, msg);
-        actuator = configurator.requestValue(KEY_ACTUATOR);
+        actuator = configurator.requestOptionalValue(KEY_ACTUATOR, actuator);
         sensor = configurator.requestOptionalValue(KEY_SENSOR, sensor);
         timeout = configurator.requestOptionalInt(KEY_TIMEOUT, (int) timeout);
         writeSlot = configurator.requestOptionalBool(KEY_WRITESLOT, writeslot);
 
-        if (msg.isEmpty()) {
+        if (msg.isEmpty() && !actuator.isEmpty()) {
             msgSlot = configurator.getSlot("StringMessage", String.class);
         }
 
-        rsbSender = configurator.getActuator(actuator, StringActuator.class);
+
         if (!sensor.isEmpty()) {
             rsbSensor = configurator.getSensor(sensor, String.class);
             if (writeSlot) {
                 replySlot = configurator.getSlot("StringReply", String.class);
             }
+        }
+
+        if (!actuator.isEmpty()) {
+            rsbSender = configurator.getActuator(actuator, StringActuator.class);
         }
 
         if (timeout > 0) {
@@ -70,7 +74,7 @@ public class SendString extends AbstractSkill {
 
     @Override
     public boolean init() {
-        if (msg.isEmpty()) {
+        if (msg.isEmpty() && rsbSender != null) {
             try {
                 msg = msgSlot.recall();
             } catch (CommunicationException e) {
@@ -83,13 +87,14 @@ public class SendString extends AbstractSkill {
             }
         }
 
-
-        logger.info("sending [" + msg + "] over " + rsbSender.getTarget());
-        try {
-            rsbSender.sendString(msg);
-        } catch (IOException e) {
-            logger.fatal(e);
-            return false;
+        if(rsbSender != null) {
+            logger.info("sending [" + msg + "] over " + rsbSender.getTarget());
+            try {
+                rsbSender.sendString(msg);
+            } catch (IOException e) {
+                logger.fatal(e);
+                return false;
+            }
         }
 
         if (rsbSensor != null) {
