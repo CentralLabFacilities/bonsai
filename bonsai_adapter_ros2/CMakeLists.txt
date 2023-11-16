@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(bonsai_adapter_ros)
+project(bonsai_adapter_ros2)
 
 find_package(catkin REQUIRED rosjava_build_tools)
 
