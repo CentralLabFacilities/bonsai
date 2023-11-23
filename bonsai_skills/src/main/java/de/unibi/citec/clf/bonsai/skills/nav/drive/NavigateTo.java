@@ -56,7 +56,7 @@ public class NavigateTo extends AbstractSkill {
     private static final String KEY_STRATEGY = "#_STRATEGY";
     private final static String KEY_TIMEOUT = "#_TIMEOUT";
 
-    private String strategy = "NearestToTarget";
+    private String strategy = "NoStrategy";
     private long timeout = -1L;
 
     private ExitToken tokenError;
