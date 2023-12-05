@@ -1,6 +1,6 @@
 package de.unibi.citec.clf.bonsai.skills.deprecated.arm;
 
-import de.unibi.citec.clf.bonsai.actuators.PicknPlaceActuator;
+import de.unibi.citec.clf.bonsai.actuators.deprecated.PicknPlaceActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;

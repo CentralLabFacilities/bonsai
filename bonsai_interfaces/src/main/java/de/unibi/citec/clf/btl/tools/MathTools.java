@@ -7,10 +7,7 @@ import javax.vecmath.Quat4d;
 import javax.vecmath.Vector2d;
 import javax.vecmath.Vector3d;
 
-import de.unibi.citec.clf.btl.data.geometry.Point2D;
-import de.unibi.citec.clf.btl.data.geometry.Point3D;
-import de.unibi.citec.clf.btl.data.geometry.PolarCoordinate;
-import de.unibi.citec.clf.btl.data.geometry.Rotation3D;
+import de.unibi.citec.clf.btl.data.geometry.*;
 import de.unibi.citec.clf.btl.data.navigation.PositionData;
 import de.unibi.citec.clf.btl.data.navigation.PositionData.ReferenceFrame;
 import de.unibi.citec.clf.btl.units.AngleUnit;
@@ -328,5 +325,11 @@ public class MathTools {
     public static Point3D applyAddition(Point3D p0, Point3D p1) {
     	LengthUnit m = LengthUnit.METER;
     	return new Point3D(p0.getX(m) + p1.getX(m), p0.getY(m) + p1.getY(m), p0.getZ(m) + p1.getZ(m), m, p0.getFrameId());
+    }
+
+    public static Pose3D positionToPose (PositionData position) {
+        Point3D point = new Point3D(position.getX(LengthUnit.METER), position.getY(LengthUnit.METER), 0, LengthUnit.METER);
+        Rotation3D rotation = new Rotation3D(new Vector3d(0,0,1), position.getYaw(AngleUnit.RADIAN), AngleUnit.RADIAN);
+        return new Pose3D(point, rotation, position.getFrameId());
     }
 }

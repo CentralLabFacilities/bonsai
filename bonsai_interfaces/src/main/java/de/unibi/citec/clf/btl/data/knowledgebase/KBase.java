@@ -1,6 +1,8 @@
 package de.unibi.citec.clf.btl.data.knowledgebase;
 
 import de.unibi.citec.clf.btl.Type;
+import kotlin.internal.DynamicExtension;
+
 import java.util.Objects;
 
 
@@ -8,6 +10,7 @@ import java.util.Objects;
  *
  * @author rfeldhans
  */
+@Deprecated
 public class KBase extends Type {
 
     private Arena arena;

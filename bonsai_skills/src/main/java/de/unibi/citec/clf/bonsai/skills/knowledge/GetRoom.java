@@ -1,7 +1,7 @@
 package de.unibi.citec.clf.bonsai.skills.knowledge;
 
 
-import de.unibi.citec.clf.bonsai.actuators.KBaseActuator;
+import de.unibi.citec.clf.bonsai.actuators.deprecated.KBaseActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
@@ -38,6 +38,7 @@ import de.unibi.citec.clf.btl.data.navigation.PositionData;
  *
  * @author rfeldhans
  */
+@Deprecated
 public class GetRoom extends AbstractSkill {
 
     private ExitToken tokenSuccess;

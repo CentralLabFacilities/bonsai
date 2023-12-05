@@ -4,6 +4,7 @@
                      xsi:noNamespaceSchemaLocation="BonsaiConfiguration.xsd">
     
     <FactoryOptions factoryClass="de.unibi.citec.clf.bonsai.ros.RosFactory" />
+    <FactoryOptions factoryClass="de.unibi.citec.clf.bonsai.ros2.Ros2Factory" />
     <FactoryOptions factoryClass="de.unibi.citec.clf.bonsai.memory.MemoryFactory" />
 
     <CoordinateTransformer factoryClass="de.unibi.citec.clf.bonsai.ros.RosFactory"
@@ -14,8 +15,41 @@
                    factoryClass="de.unibi.citec.clf.bonsai.memory.MemoryFactory"
                    workingMemoryClass="de.unibi.citec.clf.bonsai.memory.DefaultMemory">
     </WorkingMemory>
-    
-    <Actuator key="RepeatPrinter" factoryClass="de.unibi.citec.clf.bonsai.ros.RosFactory"
-              actuatorClass="" actuatorInterface=""/>
-      
+
+    <Sensor key="Ros1StringSensor" dataTypeClass="java.lang.String"
+            factoryClass="de.unibi.citec.clf.bonsai.ros.RosFactory"
+            sensorClass="de.unibi.citec.clf.bonsai.ros.sensors.RosStringSensor"
+            wireTypeClass="std_msgs.String">
+        <Options>
+            <Option key="topic">/ros1/in</Option>
+        </Options>
+    </Sensor>
+
+    <Sensor key="Ros2StringSensor" dataTypeClass="java.lang.String"
+            factoryClass="de.unibi.citec.clf.bonsai.ros2.Ros2Factory"
+            sensorClass="de.unibi.citec.clf.bonsai.ros2.sensors.StringSensor"
+            wireTypeClass="id.jrosmessages.std_msgs.StringMessage">
+        <Options>
+            <Option key="topic">/ros2/in</Option>
+        </Options>
+    </Sensor>
+
+    <Actuator key="Ros1StringAct" factoryClass="de.unibi.citec.clf.bonsai.ros.RosFactory"
+              actuatorClass="de.unibi.citec.clf.bonsai.ros.actuators.RosStringActuator"
+              actuatorInterface="de.unibi.citec.clf.bonsai.actuators.StringActuator">
+        <Options>
+            <Option key="topic">/ros1/out</Option>
+        </Options>
+    </Actuator>
+
+    <Actuator key="Ros2StringAct" factoryClass="de.unibi.citec.clf.bonsai.ros2.Ros2Factory"
+              actuatorClass="de.unibi.citec.clf.bonsai.ros2.actuators.RosStringActuator"
+              actuatorInterface="de.unibi.citec.clf.bonsai.actuators.StringActuator">
+        <Options>
+            <Option key="topic">/ros2/out</Option>
+        </Options>
+    </Actuator>
+
+
+
 </BonsaiConfiguration>

@@ -26,7 +26,6 @@ import move_base_msgs.MoveBaseActionFeedback;
 import move_base_msgs.MoveBaseActionGoal;
 import move_base_msgs.MoveBaseActionResult;
 import move_base_msgs.MoveBaseGoal;
-import org.jboss.netty.util.internal.NonReentrantLock;
 import org.ros.message.Duration;
 import org.ros.message.MessageListener;
 import org.ros.namespace.GraphName;
@@ -39,10 +38,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.vecmath.Quat4d;
 import java.io.IOException;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.*;
 import java.util.concurrent.locks.Lock;
 
 
@@ -53,7 +49,7 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
 
     class DriveDirectThread implements Future<CommandResult>, MessageListener<Pose> {
 
-        private Lock poseLock = new NonReentrantLock();
+        private Semaphore poseLock = new Semaphore(1);
         private Pose lastPose = null;
         private Thread driver;
         private Runnable task;
@@ -104,14 +100,16 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
             }
 
             try {
-                poseLock.lock();
+                poseLock.acquire();
                 if(lastPose != null) targetPose = MsgTypeFactory.getInstance().createType(lastPose,Pose3D.class);
                 unpackDrive(drive);
                 unpackTurn(turn);
             } catch (RosSerializer.SerializationException | RosSerializer.DeserializationException e) {
                 throw new IOException(e);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
             } finally {
-                poseLock.unlock();
+                poseLock.release();
             }
 
             //Start moving
@@ -134,7 +132,7 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
             }
 
             //todo 0.5sec for acceleration?
-            turnDuration = (long) ((turnAngle / turnSpeed + 0.5) * 1000);
+            turnDuration = (long) ((turnAngle / turnSpeed ) * 1000);
 
             AngularVelocity3D angVel = new AngularVelocity3D(0.0, 0.0, turnSpeed, RotationalSpeedUnit.RADIANS_PER_SEC);
             Twist3D turnTwist = new Twist3D(new Velocity3D(), angVel);
@@ -159,7 +157,7 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
             double velX = driveSpeed * distX;
             double velY = driveSpeed * distY;
             //todo 0.5sec for acceleration?
-            driveDuration = (long) ((dist / driveSpeed + 0.5) * 1000);
+            driveDuration = (long) ((dist / driveSpeed ) * 1000);
 
             Velocity3D vel = new Velocity3D(velX, velY, 0.0, SpeedUnit.METER_PER_SEC);
             Twist3D driveTwist = new Twist3D(vel, new AngularVelocity3D());
@@ -210,9 +208,9 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
 
         @Override
         public void onNewMessage(Pose pose) {
-            if(poseLock.tryLock()) {
+            if(poseLock.tryAcquire()) {
                 lastPose = pose;
-                poseLock.unlock();
+                poseLock.release();
             }
 
 

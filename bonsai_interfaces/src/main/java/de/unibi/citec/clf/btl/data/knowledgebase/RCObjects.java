@@ -10,6 +10,7 @@ import java.util.Objects;
  *
  * @author rfeldhans
  */
+@Deprecated
 public class RCObjects extends Type {
 
     private Comparator<RCObject> compSize = (o1, o2) -> {

@@ -36,6 +36,7 @@ import de.unibi.citec.clf.btl.data.knowledgebase.RCObject;
  *
  * @author pvonneumanncosel
  */
+@Deprecated
 public class GetObjectName extends AbstractSkill {
 
     private ExitToken tokenSuccess;

@@ -152,5 +152,9 @@ public class RosDoubleSensor extends RosSensor<Double, std_msgs.Float64> impleme
         });
     }
 
+    @Override
+    public String getTarget() {
+        return topic;
+    }
 
 }

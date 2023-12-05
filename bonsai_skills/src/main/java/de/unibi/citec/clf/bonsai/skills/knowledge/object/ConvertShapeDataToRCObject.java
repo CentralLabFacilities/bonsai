@@ -1,6 +1,6 @@
 package de.unibi.citec.clf.bonsai.skills.knowledge.object;
 
-import de.unibi.citec.clf.bonsai.actuators.KBaseActuator;
+import de.unibi.citec.clf.bonsai.actuators.deprecated.KBaseActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
@@ -42,6 +42,7 @@ import de.unibi.citec.clf.btl.data.object.ObjectShapeList;
  *
  * @author rfeldhans
  */
+@Deprecated
 public class ConvertShapeDataToRCObject extends AbstractSkill {
 
     private ExitToken tokenSuccess;

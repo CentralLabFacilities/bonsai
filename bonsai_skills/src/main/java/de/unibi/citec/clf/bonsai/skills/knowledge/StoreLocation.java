@@ -1,6 +1,6 @@
 package de.unibi.citec.clf.bonsai.skills.knowledge;
 
-import de.unibi.citec.clf.bonsai.actuators.KBaseActuator;
+import de.unibi.citec.clf.bonsai.actuators.deprecated.KBaseActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
@@ -51,6 +51,7 @@ import java.util.LinkedList;
  *
  * @author rfeldhans
  */
+@Deprecated
 public class StoreLocation extends AbstractSkill {
 
     private static final String KEY_NAME = "#_NAME";

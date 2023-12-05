@@ -1,5 +1,10 @@
 target/
 .vscode
+*.iml
+
+install/
+log/
+.colcon_root
 
 ### Eclipse ###
 

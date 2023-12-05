@@ -196,7 +196,11 @@ public class SearchPeople extends AbstractSkill {
 
         for (PersonData currentPerson : possiblePersons) {
             PositionData localPersonPos = currentPerson.getPosition();
-            PositionData globalPersonPos = CoordinateSystemConverter.localToGlobal(localPersonPos, robotPosition);
+            PositionData globalPersonPos = localPersonPos;
+            if(localPersonPos.isInBaseFrame()) {
+                globalPersonPos = CoordinateSystemConverter.localToGlobal(localPersonPos, robotPosition);
+            }
+
             logger.info("I saw a person - checking angle now; searchangle= " + searchAngle + ". Local Person position "
                     + localPersonPos.toString() + ". Global Person position " + globalPersonPos.toString());
             double angle = robotPosition.getRelativeAngle(globalPersonPos, AngleUnit.RADIAN);
