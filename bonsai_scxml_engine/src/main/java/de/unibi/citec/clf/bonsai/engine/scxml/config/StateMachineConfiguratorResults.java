@@ -1,6 +1,7 @@
 package de.unibi.citec.clf.bonsai.engine.scxml.config;
 
 import de.unibi.citec.clf.bonsai.core.exception.StateIDException;
+import de.unibi.citec.clf.bonsai.engine.model.StateID;
 import de.unibi.citec.clf.bonsai.engine.scxml.SkillConfigFaults;
 
 import java.util.HashSet;
@@ -47,6 +48,30 @@ public class StateMachineConfiguratorResults {
 
     public boolean success(boolean warn) {
         return (warn) ? errors + warnings == 0 : errors == 0;
+    }
+
+
+    public String generateUnreachedWarning(Set<StateID> unreachedStates, boolean warnings) {
+        StringBuilder output = new StringBuilder();
+        boolean gen = false;
+        boolean warn = false;
+        for (SkillConfigFaults e : stateMachineConfigErrors) {
+            if (!e.getNoSlotDefinitions().isEmpty()) {
+                gen = true;
+            }
+            if (warnings && !e.getDefaultSlotWarnings().isEmpty()) {
+                warn = true;
+            }
+        }
+        if (gen || warn) {
+            if (!unreachedStates.isEmpty()) {
+                output.append("Unreached States:\n");
+                for (StateID state : unreachedStates) {
+                    output.append(state.getCanonicalSkill() + "\n");
+                }
+            }
+        }
+        return output.toString();
     }
 
     public String generateSlotHint(String prefixToRemove, boolean warnings) {

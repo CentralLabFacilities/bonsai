@@ -1,6 +1,8 @@
 package de.unibi.citec.clf.bonsai.engine.scxml.config;
 
+import de.unibi.citec.clf.bonsai.engine.model.StateID;
 import de.unibi.citec.clf.bonsai.engine.scxml.exception.StateNotFoundException;
+// import de.unibi.citec.clf.bonsai.engine.scxml.exception.StateNotReachedWarning;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -14,6 +16,8 @@ public class ValidationResult {
 
     public Set<StateNotFoundException> stateNotFoundException = new HashSet<>();
     public Set<TransitionError> transitionNotFoundException = new HashSet<>();
+
+    public Set<StateID> unreachedStates = new HashSet<>();
 
     public boolean success() {
         boolean valid = stateNotFoundException.isEmpty();
