@@ -128,6 +128,7 @@ public class CoordinateSystemConverter {
         return dist;
     }
 
+    @Deprecated
     public static PositionData localToGlobal(PositionData src, PositionData currentPosition) {
 
         LengthUnit meter = LengthUnit.METER;
@@ -141,6 +142,7 @@ public class CoordinateSystemConverter {
                 rad);
         return tgt;
     }
+
     
       public static PositionData armToRobotLocal(Point3D src) {
 
