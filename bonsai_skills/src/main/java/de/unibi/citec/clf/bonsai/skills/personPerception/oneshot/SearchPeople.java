@@ -4,6 +4,7 @@ import de.unibi.citec.clf.bonsai.actuators.DetectPeopleActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
+import de.unibi.citec.clf.bonsai.core.object.Sensor;
 import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
@@ -17,6 +18,7 @@ import de.unibi.citec.clf.btl.data.person.PersonDataList;
 import de.unibi.citec.clf.btl.units.AngleUnit;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 
+import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
@@ -99,13 +101,14 @@ public class SearchPeople extends AbstractSkill {
     private DetectPeopleActuator peopleActuator;
 
     private MemorySlotWriter<PersonDataList> personDataListSlot;
-    private MemorySlotReader<PositionData> positionSlot;
 
     private Future<PersonDataList> peopleFuture;
     private PersonDataList possiblePersons;
 
     private PersonDataList foundPersons = new PersonDataList();
     private PositionData robotPosition;
+
+    private Sensor<PositionData> positionSensor;
 
     @Override
     public void configure(ISkillConfigurator configurator) {
@@ -124,9 +127,11 @@ public class SearchPeople extends AbstractSkill {
         tokenError = configurator.requestExitToken(ExitStatus.ERROR());
 
         personDataListSlot = configurator.getWriteSlot("PersonDataListSlot", PersonDataList.class);
-        positionSlot = configurator.getReadSlot("PositionDataSlot", PositionData.class);
+
 
         peopleActuator = configurator.getActuator("PeopleActuator", DetectPeopleActuator.class);
+
+        positionSensor = configurator.getSensor("PositionSensor", PositionData.class);
     }
 
     @Override
@@ -137,9 +142,10 @@ public class SearchPeople extends AbstractSkill {
             search_timeout += Time.currentTimeMillis();
         }
         try {
-            robotPosition = positionSlot.recall();
-        } catch (CommunicationException ex) {
-            logger.error("Unable to read from memory: " + ex.getMessage());
+            robotPosition = positionSensor.readLast(200);
+        } catch (IOException | InterruptedException e) {
+            logger.error("could not read robot position");
+            return false;
         }
         do_face_id_bool = (do_face_id == 1);
         do_gender_age_bool = (do_gender_age == 1);
