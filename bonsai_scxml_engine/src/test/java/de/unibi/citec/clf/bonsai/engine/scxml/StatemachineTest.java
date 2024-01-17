@@ -123,6 +123,23 @@ public class StatemachineTest {
     }
 
     @Test
+    public void testMissingIncomingTransition() throws TransformerException, TimeoutException {
+        final String sm = "missingIncomingTransition.xml";
+
+        LoadingResults res = TestTools.loadStatemachine(sm);
+
+        assertFalse(res.success());
+
+        assertEquals(0,res.configurationResults.getConfigurationExceptions().size());
+        assertEquals(0,res.configurationResults.otherExceptions.size());
+        assertEquals(0,res.validationResult.transitionNotFoundException.size());
+        assertEquals(1,res.validationResult.unreachedStates.size());
+        assertEquals(0,res.stateMachineResults.numErrors());
+        assertEquals(0,res.stateMachineResults.numWarnings());
+        assertEquals(0,res.loadingExceptions.size());
+    }
+
+    @Test
     public void testMissingParameter() throws TransformerException, TimeoutException {
         final String sm = "missingParameter.xml";
 

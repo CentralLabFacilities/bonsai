@@ -109,6 +109,9 @@ public class SCXMLValidator {
 
         boolean isValid = results.transitionNotFoundException.isEmpty();
 
+        // Set<StateID> unreachedStates = unreachedStates(aSCXML);
+        results.unreachedStates = unreachedStates(aSCXML);
+
         for (String id : map.keySet()) {
 
             logger.debug("Found TransitionTarget: " + id);
@@ -124,7 +127,7 @@ public class SCXMLValidator {
                     continue;
                 }
                 StateID state = new StateID(prefix, id);
-                // if state does not exists, no need to check transitions
+                // if state does not exist, no need to check transitions
                 try {
                     if (vExistance) {
                         isValid &= validateExistance(state);
@@ -389,4 +392,108 @@ public class SCXMLValidator {
         return errors;
 
     }
+
+    /**
+     * Finds and returns a set of unreached states in the given SCXML.
+     *
+     * @param aSCXML The SCXML to analyze.
+     * @return A set of unreached states.
+     */
+    public Set<StateID> unreachedStates(SCXML aSCXML) throws StateIDException {
+        Set<StateID> allStates = getAllStates(aSCXML);
+        Set<StateID> reachedStates = getReachedStates(aSCXML);
+
+        Set<StateID> unreachedStates = new HashSet<>(allStates);
+        unreachedStates.removeAll(reachedStates);
+
+        logger.error("UNREACHED STATE IDs: " + unreachedStates);
+
+        return unreachedStates;
+    }
+
+    /**
+     * Retrieves a set of all states in the given SCXML.
+     *
+     * @param aSCXML The SCXML to analyze.
+     * @return A set of all states.
+     */
+    private Set<StateID> getAllStates(SCXML aSCXML) throws StateIDException {
+        Set<StateID> allStates = new HashSet<>();
+
+        Map<String, TransitionTarget> map = aSCXML.getTargets();
+        for (String id : map.keySet()) {
+            if (map.get(id) instanceof State) {
+                State currentState = (State) map.get(id);
+                allStates.add(new StateID(prefix, id));
+            }
+        }
+        return allStates;
+    }
+
+    /**
+     * Retrieves a set of reached states in the given SCXML.
+     *
+     * @param aSCXML The SCXML to analyze.
+     * @return A set of reached states.
+     */
+    private Set<StateID> getReachedStates(SCXML aSCXML) {
+        Set<StateID> reachedStates = new HashSet<>();
+
+        Map<String, TransitionTarget> map = aSCXML.getTargets();
+        for (String id : map.keySet()) {
+            TransitionTarget target = map.get(id);
+
+            // Add post-states of transitions
+            target.getTransitionsList().forEach(t -> {
+                Transition transition = (Transition) t;
+                String postStateId = transition.getNext();
+                if (postStateId != null) {
+                    try {
+                        // System.out.println("DELME postStateId: " + postStateId);
+                        reachedStates.add(new StateID(prefix, postStateId));
+                    } catch (StateIDException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            });
+
+            // Add post-states of onEntry actions
+            OnEntry onEntry = target.getOnEntry();
+            if (onEntry != null) {
+                onEntry.getActions().forEach(action -> {
+                    if (action instanceof TransitionTarget) {
+                        String postStateId = ((TransitionTarget) action).getId();
+                        if (postStateId != null) {
+                            try {
+                                reachedStates.add(new StateID(prefix, postStateId));
+                            } catch (StateIDException e) {
+                                throw new RuntimeException(e);
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Add post-states of onExit actions
+            OnExit onExit = target.getOnExit();
+            if (onExit != null) {
+                onExit.getActions().forEach(action -> {
+                    if (action instanceof TransitionTarget) {
+                        String postStateId = ((TransitionTarget) action).getId();
+                        if (postStateId != null) {
+                            try {
+                                reachedStates.add(new StateID(prefix, postStateId));
+                            } catch (StateIDException e) {
+                                throw new RuntimeException(e);
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        // System.out.println("Reached states: " + reachedStates);
+        return reachedStates;
+    }
+
 }
