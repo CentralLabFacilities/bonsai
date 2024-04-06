@@ -6,6 +6,7 @@ import de.unibi.citec.clf.btl.data.object.ObjectShapeData;
 import de.unibi.citec.clf.btl.ros.MsgTypeFactory;
 import de.unibi.citec.clf.btl.ros.RosSerializer;
 import de.unibi.citec.clf.btl.units.LengthUnit;
+import org.apache.log4j.Logger;
 import org.ros.message.MessageFactory;
 import vision_msgs.Detection3D;
 import vision_msgs.ObjectHypothesisWithPose;
@@ -17,6 +18,8 @@ import java.util.List;
  * @author lruegeme
  */
 public class Detection3DSerializer extends RosSerializer<ObjectShapeData, vision_msgs.Detection3D> {
+
+    private Logger logger = Logger.getLogger(getClass());
 
     final LengthUnit lum = LengthUnit.METER;
     @Override
@@ -41,25 +44,22 @@ public class Detection3DSerializer extends RosSerializer<ObjectShapeData, vision
 
     @Override
     public ObjectShapeData deserialize(vision_msgs.Detection3D msg) throws DeserializationException {
-        MsgTypeFactory fac = MsgTypeFactory.getInstance();
-
-
         ObjectShapeData data = new ObjectShapeData();
-        fac.setHeader(data,msg.getHeader());
 
+        // OSD header
+        MsgTypeFactory.setHeader(data,msg.getHeader());
+
+        // Bounding box
+        logger.debug("deserialize Detection3D bb.c.pose.x=" + msg.getBbox().getCenter().getPosition().getX());
+        data.setBoundingBox(MsgTypeFactory.getInstance().createType(msg.getBbox(),BoundingBox3D.class));
+        MsgTypeFactory.setHeader(data.getBoundingBox(),msg.getHeader());
+        MsgTypeFactory.setHeader(data.getBoundingBox().getPose(),msg.getHeader());
+        logger.debug("deserialized Detection3D osd.bb.c.pose.x=" + data.getCenter().getX(lum));
+
+        // Hypotheses
         for(ObjectHypothesisWithPose hyp : msg.getResults()) {
-            data.addHypothesis(fac.createType(hyp,ObjectData.Hypothesis.class));
+            data.addHypothesis(MsgTypeFactory.getInstance().createType(hyp,ObjectData.Hypothesis.class));
         }
-
-        data.setBoundingBox(fac.createType(msg.getBbox(),BoundingBox3D.class));
-        fac.setHeader(data.getBoundingBox(),msg.getHeader());
-        fac.setHeader(data.getBoundingBox().getPose(),msg.getHeader());
-
-        data.getCenter().setX(data.getBoundingBox().getPose().getTranslation().getX(lum),lum);
-        data.getCenter().setY(data.getBoundingBox().getPose().getTranslation().getY(lum),lum);
-        data.getCenter().setZ(data.getBoundingBox().getPose().getTranslation().getZ(lum),lum);
-        data.getCenter().setFrameId(data.getFrameId());
-
 
         //TODO
         //data.setId();
