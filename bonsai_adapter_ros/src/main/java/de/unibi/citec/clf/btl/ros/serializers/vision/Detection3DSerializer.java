@@ -5,6 +5,7 @@ import de.unibi.citec.clf.btl.data.object.ObjectData;
 import de.unibi.citec.clf.btl.data.object.ObjectShapeData;
 import de.unibi.citec.clf.btl.ros.MsgTypeFactory;
 import de.unibi.citec.clf.btl.ros.RosSerializer;
+import de.unibi.citec.clf.btl.units.LengthUnit;
 import org.ros.message.MessageFactory;
 import vision_msgs.Detection3D;
 import vision_msgs.ObjectHypothesisWithPose;
@@ -17,6 +18,7 @@ import java.util.List;
  */
 public class Detection3DSerializer extends RosSerializer<ObjectShapeData, vision_msgs.Detection3D> {
 
+    final LengthUnit lum = LengthUnit.METER;
     @Override
     public vision_msgs.Detection3D serialize(ObjectShapeData data, MessageFactory fact) throws SerializationException {
         vision_msgs.Detection3D msg = fact.newFromType(vision_msgs.Detection3D._TYPE);
@@ -50,6 +52,14 @@ public class Detection3DSerializer extends RosSerializer<ObjectShapeData, vision
         }
 
         data.setBoundingBox(fac.createType(msg.getBbox(),BoundingBox3D.class));
+        fac.setHeader(data.getBoundingBox(),msg.getHeader());
+        fac.setHeader(data.getBoundingBox().getPose(),msg.getHeader());
+
+        data.getCenter().setX(data.getBoundingBox().getPose().getTranslation().getX(lum),lum);
+        data.getCenter().setY(data.getBoundingBox().getPose().getTranslation().getY(lum),lum);
+        data.getCenter().setZ(data.getBoundingBox().getPose().getTranslation().getZ(lum),lum);
+        data.getCenter().setFrameId(data.getFrameId());
+
 
         //TODO
         //data.setId();
