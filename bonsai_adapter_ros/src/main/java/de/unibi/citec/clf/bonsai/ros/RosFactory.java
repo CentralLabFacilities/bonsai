@@ -578,6 +578,16 @@ public class RosFactory implements CoreObjectFactory {
                     throw new CoreObjectCreationException(e);
                 }
             }
+        } else  if (coordinateTransformer instanceof TFTransformerTimestamps) {
+            TFTransformerTimestamps c = (TFTransformerTimestamps) coordinateTransformer;
+            if (!c.getNode().initialized) {
+                try {
+                    spawnRosNode(c.getNode(), true);
+                    spawnRosNode(c.getNode2(), true);
+                } catch (TimeoutException | ExecutionException | InterruptedException e) {
+                    throw new CoreObjectCreationException(e);
+                }
+            }
         } else {
             TfRosjavaWrapper c = (TfRosjavaWrapper) coordinateTransformer;
             if (!c.getNode().initialized) {
@@ -632,6 +642,7 @@ public class RosFactory implements CoreObjectFactory {
 
         FactoryConfigurationResults res = new FactoryConfigurationResults();
         Queue<RosNode> nodesQuene = new ConcurrentLinkedQueue<>();
+
 
         if (coordinateTransformer != null) {
             if (coordinateTransformer instanceof TFTransformer) {
