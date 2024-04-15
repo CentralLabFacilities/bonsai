@@ -1,6 +1,7 @@
 package de.unibi.citec.clf.btl.ros;
 
 import de.unibi.citec.clf.btl.Type;
+import de.unibi.citec.clf.btl.data.common.Timestamp;
 import de.unibi.citec.clf.btl.ros.RosSerializer.DeserializationException;
 import de.unibi.citec.clf.btl.ros.RosSerializer.SerializationException;
 import de.unibi.citec.clf.btl.units.TimeUnit;
@@ -177,7 +178,7 @@ public class MsgTypeFactory {
     public std_msgs.Header makeHeader(Type t) {
         std_msgs.Header header = newMessage(std_msgs.Header._TYPE);
         header.setFrameId(t.getFrameId());
-        header.setStamp(new Time(t.getTimestamp().getCreated(TimeUnit.SECONDS)));
+        header.setStamp(fromTimestamp(t.getTimestamp()));
         return header;
     }
 
@@ -190,7 +191,19 @@ public class MsgTypeFactory {
      */
     public static Type setHeader(Type type, std_msgs.Header header) {
         type.setFrameId(header.getFrameId());
-        type.setTimestamp(header.getStamp().secs, TimeUnit.SECONDS);
+        type.setTimestamp(fromTime(header.getStamp()));
         return type;
+    }
+
+    public static Time fromTimestamp(Timestamp stamp) {
+        int sec = (int) stamp.getCreated(TimeUnit.SECONDS);
+        int nsec = (int) stamp.getCreated(TimeUnit.NANOSECONDS);
+        return new Time(sec, nsec);
+    }
+
+    public static Timestamp fromTime(Time time) {
+        long msec = time.secs / 1000L;
+        msec += time.nsecs * 1000L;
+        return new Timestamp(msec, TimeUnit.MILLISECONDS);
     }
 }

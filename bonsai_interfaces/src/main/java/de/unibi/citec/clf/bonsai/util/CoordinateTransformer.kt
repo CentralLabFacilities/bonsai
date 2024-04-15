@@ -4,12 +4,14 @@ package de.unibi.citec.clf.bonsai.util
 import de.unibi.citec.clf.bonsai.core.`object`.TransformLookup
 import de.unibi.citec.clf.bonsai.core.exception.TransformException
 import de.unibi.citec.clf.bonsai.core.time.Time
+import de.unibi.citec.clf.btl.data.common.Timestamp
 import de.unibi.citec.clf.btl.data.geometry.Point3D
 import de.unibi.citec.clf.btl.data.geometry.Pose3D
 import de.unibi.citec.clf.btl.data.geometry.Rotation3D
 import de.unibi.citec.clf.btl.data.navigation.PositionData
 import de.unibi.citec.clf.btl.units.AngleUnit
 import de.unibi.citec.clf.btl.units.LengthUnit
+import de.unibi.citec.clf.btl.units.TimeUnit
 import javax.vecmath.Matrix3d
 import javax.vecmath.Vector3d
 import javax.vecmath.Vector4d
@@ -31,7 +33,7 @@ abstract class CoordinateTransformer : TransformLookup {
         newData.setY(vec.y, m)
         newData.setZ(vec.z, m)
         newData.frameId = csTo
-
+        newData.timestamp = Timestamp(time, TimeUnit.MILLISECONDS)
         return newData
     }
 
@@ -51,7 +53,7 @@ abstract class CoordinateTransformer : TransformLookup {
 
         val newRotation = Rotation3D(resultRot)
         newRotation.frameId = csTo
-
+        newRotation.timestamp = Timestamp(time, TimeUnit.MILLISECONDS)
         return newRotation
     }
 
@@ -72,6 +74,9 @@ abstract class CoordinateTransformer : TransformLookup {
         pose.translation = t
         pose.rotation = r
         pose.frameId = csTo
+
+        pose.timestamp = Timestamp(time, TimeUnit.MILLISECONDS)
+
         return pose
     }
 
@@ -94,7 +99,7 @@ abstract class CoordinateTransformer : TransformLookup {
         position.frameId = csTo
         position.generator = data.generator
         position.memoryId = data.memoryId
-        position.timestamp = data.timestamp
+        position.timestamp = Timestamp(time, TimeUnit.MILLISECONDS)
         return position
     }
 }

@@ -203,260 +203,160 @@ public class UnitConverter {
 
     private static double convertFrom(double value, LengthUnit unit)
             throws UnknownUnitException {
-        switch (unit) {
-            case METER:
-                return value * 1000d;
-            case CENTIMETER:
-                return value * 10d;
-            case MILLIMETER:
-                return value;
-            default:
-                throw new UnknownUnitException("Don't know how to convert from "
-                        + unit.name());
-        }
+        return switch (unit) {
+            case METER -> value * 1000d;
+            case CENTIMETER -> value * 10d;
+            case MILLIMETER -> value;
+        };
     }
 
     private static double convertTo(double value, LengthUnit unit)
             throws UnknownUnitException {
-        switch (unit) {
-            case METER:
-                return value / 1000d;
-            case CENTIMETER:
-                return value / 10d;
-            case MILLIMETER:
-                return value;
-            default:
-                throw new UnknownUnitException("Don't know how to convert to "
-                        + unit.name());
-        }
+        return switch (unit) {
+            case METER -> value / 1000d;
+            case CENTIMETER -> value / 10d;
+            case MILLIMETER -> value;
+        };
     }
 
     private static float convertFrom(float value, LengthUnit unit)
             throws UnknownUnitException {
-        switch (unit) {
-            case METER:
-                return value * 1000f;
-            case CENTIMETER:
-                return value * 10f;
-            case MILLIMETER:
-                return value;
-            default:
-                throw new UnknownUnitException("Don't know how to convert from "
-                        + unit.name());
-        }
+        return switch (unit) {
+            case METER -> value * 1000f;
+            case CENTIMETER -> value * 10f;
+            case MILLIMETER -> value;
+        };
     }
 
     private static float convertTo(float value, LengthUnit unit)
             throws UnknownUnitException {
-        switch (unit) {
-            case METER:
-                return value / 1000f;
-            case CENTIMETER:
-                return value / 10f;
-            case MILLIMETER:
-                return value;
-            default:
-                throw new UnknownUnitException("Don't know how to convert to "
-                        + unit.name());
-        }
+        return switch (unit) {
+            case METER -> value / 1000f;
+            case CENTIMETER -> value / 10f;
+            case MILLIMETER -> value;
+        };
     }
 
     private static double convertFrom(double value, AngleUnit unit)
             throws UnknownUnitException {
-        switch (unit) {
-            case DEGREE:
-                return value / 180.0 * Math.PI;
-            case RADIAN:
-                return value;
-            default:
-                throw new UnknownUnitException("Don't know how to convert from "
-                        + unit.name());
-        }
+        return switch (unit) {
+            case DEGREE -> value / 180.0 * Math.PI;
+            case RADIAN -> value;
+        };
     }
 
     private static double convertTo(double value, AngleUnit unit)
             throws UnknownUnitException {
-        switch (unit) {
-            case DEGREE:
-                return value / Math.PI * 180.0;
-            case RADIAN:
-                return value;
-            default:
-                throw new UnknownUnitException("Don't know how to convert to "
-                        + unit.name());
-        }
+        return switch (unit) {
+            case DEGREE -> value / Math.PI * 180.0;
+            case RADIAN -> value;
+        };
     }
 
     private static float convertFrom(float value, AngleUnit unit)
             throws UnknownUnitException {
-        switch (unit) {
-            case DEGREE:
-                return value / 180f * (float) Math.PI;
-            case RADIAN:
-                return value;
-            default:
-                throw new UnknownUnitException("Don't know how to convert from "
-                        + unit.name());
-        }
+        return switch (unit) {
+            case DEGREE -> value / 180f * (float) Math.PI;
+            case RADIAN -> value;
+        };
     }
 
     private static float convertTo(float value, AngleUnit unit)
             throws UnknownUnitException {
-        switch (unit) {
-            case DEGREE:
-                return value / (float) Math.PI * 180f;
-            case RADIAN:
-                return value;
-            default:
-                throw new UnknownUnitException("Don't know how to convert to "
-                        + unit.name());
-        }
+        return switch (unit) {
+            case DEGREE -> value / (float) Math.PI * 180f;
+            case RADIAN -> value;
+        };
     }
 
 
     private static double convertFrom(double value, SpeedUnit unit)
             throws UnknownUnitException {
-        switch (unit) {
-            case METER_PER_SEC:
-                return value;
-            case KILOMETER_PER_HOUR:
-                return value / 3.6;
-            default:
-                throw new UnknownUnitException("Don't know how to convert from "
-                        + unit.name());
-        }
+        return switch (unit) {
+            case METER_PER_SEC -> value;
+            case KILOMETER_PER_HOUR -> value / 3.6;
+        };
     }
 
     private static double convertTo(double value, SpeedUnit unit)
             throws UnknownUnitException {
-        switch (unit) {
-            case METER_PER_SEC:
-                return value;
-            case KILOMETER_PER_HOUR:
-                return value * 3.6;
-            default:
-                throw new UnknownUnitException("Don't know how to convert to "
-                        + unit.name());
-        }
+        return switch (unit) {
+            case METER_PER_SEC -> value;
+            case KILOMETER_PER_HOUR -> value * 3.6;
+        };
     }
 
     private static float convertFrom(float value, SpeedUnit unit)
             throws UnknownUnitException {
-        switch (unit) {
-            case METER_PER_SEC:
-                return value;
-            case KILOMETER_PER_HOUR:
-                return value / 3.6f;
-            default:
-                throw new UnknownUnitException("Don't know how to convert from "
-                        + unit.name());
-        }
+        return switch (unit) {
+            case METER_PER_SEC -> value;
+            case KILOMETER_PER_HOUR -> value / 3.6f;
+        };
     }
 
     private static float convertTo(float value, SpeedUnit unit)
             throws UnknownUnitException {
-        switch (unit) {
-            case METER_PER_SEC:
-                return value;
-            case KILOMETER_PER_HOUR:
-                return value * 3.6f;
-            default:
-                throw new UnknownUnitException("Don't know how to convert to "
-                        + unit.name());
-        }
+        return switch (unit) {
+            case METER_PER_SEC -> value;
+            case KILOMETER_PER_HOUR -> value * 3.6f;
+        };
     }
 
     private static float convertFrom(float value, RotationalSpeedUnit unit)
             throws UnknownUnitException {
-        switch (unit) {
-            case RADIANS_PER_SEC:
-                return value;
-            case DEGREES_PER_SEC:
-                return value / 180f * (float) Math.PI;
-            default:
-                throw new UnknownUnitException("Don't know how to convert from "
-                        + unit.name());
-        }
+        return switch (unit) {
+            case RADIANS_PER_SEC -> value;
+            case DEGREES_PER_SEC -> value / 180f * (float) Math.PI;
+        };
     }
 
     private static float convertTo(float value, RotationalSpeedUnit unit)
             throws UnknownUnitException {
-        switch (unit) {
-            case RADIANS_PER_SEC:
-                return value;
-            case DEGREES_PER_SEC:
-                return value / (float) Math.PI * 180f;
-            default:
-                throw new UnknownUnitException("Don't know how to convert to "
-                        + unit.name());
-        }
+        return switch (unit) {
+            case RADIANS_PER_SEC -> value;
+            case DEGREES_PER_SEC -> value / (float) Math.PI * 180f;
+        };
     }
 
     private static double convertFrom(double value, RotationalSpeedUnit unit)
             throws UnknownUnitException {
-        switch (unit) {
-            case RADIANS_PER_SEC:
-                return value;
-            case DEGREES_PER_SEC:
-                return value / 180f * (double) Math.PI;
-            default:
-                throw new UnknownUnitException("Don't know how to convert from "
-                        + unit.name());
-        }
+        return switch (unit) {
+            case RADIANS_PER_SEC -> value;
+            case DEGREES_PER_SEC -> value / 180f * (double) Math.PI;
+        };
     }
 
     private static double convertTo(double value, RotationalSpeedUnit unit)
             throws UnknownUnitException {
-        switch (unit) {
-            case RADIANS_PER_SEC:
-                return value;
-            case DEGREES_PER_SEC:
-                return value / (double) Math.PI * 180f;
-            default:
-                throw new UnknownUnitException("Don't know how to convert to "
-                        + unit.name());
-        }
+        return switch (unit) {
+            case RADIANS_PER_SEC -> value;
+            case DEGREES_PER_SEC -> value / (double) Math.PI * 180f;
+        };
     }
 
     private static long convertTo(long value, TimeUnit unit)
             throws UnknownUnitException {
-        switch (unit) {
-            case MICROSECONDS:
-                return value;
-            case MILLISECONDS:
-                return value / 1000L;
-            case SECONDS:
-                return convertTo(value, TimeUnit.MILLISECONDS) / 1000L;
-            case MINUTES:
-                return convertTo(value, TimeUnit.SECONDS) / 60L;
-            case HOURS:
-                return convertTo(value, TimeUnit.MINUTES) / 60L;
-            case DAYS:
-                return convertTo(value, TimeUnit.HOURS) / 24L;
-            default:
-                throw new UnknownUnitException("Don't know how to convert to "
-                        + unit.name());
-        }
+        return switch (unit) {
+            case NANOSECONDS -> value * 1000L;
+            case MICROSECONDS -> value;
+            case MILLISECONDS -> value / 1000L;
+            case SECONDS -> convertTo(value, TimeUnit.MILLISECONDS) / 1000L;
+            case MINUTES -> convertTo(value, TimeUnit.SECONDS) / 60L;
+            case HOURS -> convertTo(value, TimeUnit.MINUTES) / 60L;
+            case DAYS -> convertTo(value, TimeUnit.HOURS) / 24L;
+        };
     }
 
     private static long convertFrom(long value, TimeUnit unit)
             throws UnknownUnitException {
-        switch (unit) {
-            case MICROSECONDS:
-                return value;
-            case MILLISECONDS:
-                return value * 1000L;
-            case SECONDS:
-                return convertFrom(value, TimeUnit.MILLISECONDS) * 1000L;
-            case MINUTES:
-                return convertFrom(value, TimeUnit.SECONDS) * 60L;
-            case HOURS:
-                return convertFrom(value, TimeUnit.MINUTES) * 60L;
-            case DAYS:
-                return convertFrom(value, TimeUnit.HOURS) * 24L;
-            default:
-                throw new UnknownUnitException("Don't know how to convert to "
-                        + unit.name());
-        }
+        return switch (unit) {
+            case NANOSECONDS -> value / 1000L;
+            case MICROSECONDS -> value;
+            case MILLISECONDS -> value * 1000L;
+            case SECONDS -> convertFrom(value, TimeUnit.MILLISECONDS) * 1000L;
+            case MINUTES -> convertFrom(value, TimeUnit.SECONDS) * 60L;
+            case HOURS -> convertFrom(value, TimeUnit.MINUTES) * 60L;
+            case DAYS -> convertFrom(value, TimeUnit.HOURS) * 24L;
+        };
     }
 }
