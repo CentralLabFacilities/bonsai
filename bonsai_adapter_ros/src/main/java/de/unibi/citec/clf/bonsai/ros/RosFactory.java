@@ -338,7 +338,7 @@ public class RosFactory implements CoreObjectFactory {
         } else if (transformer.getTransformerClass().equals(TFTransformerTimestamps.class)) {
             coordinateTransformer = new TFTransformerTimestamps(GraphName.of(RosNode.NODE_PREFIX + "tf"), GraphName.of(RosNode.NODE_PREFIX + "tf2"));
         } else {
-            throw new IllegalArgumentException("can only create " + TFTransformer.class + " or " + TFTransformerTimestamps.class + " or " + TfRosjavaWrapper.class
+            throw new IllegalArgumentException("can only create " + TFTransformer.class + " or " + TFTransformerTimestamps.class + " or " + TfRosjavaWrapper.class +
                     " but requested is: " + transformer.getTransformerClass());
         }
 
