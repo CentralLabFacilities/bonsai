@@ -105,7 +105,7 @@ class TFTransformerTimestamps(gn: GraphName, gn2: GraphName) : CoordinateTransfo
 
     @Throws(TransformException::class)
     override fun lookup(from: String, to: String, time: Long): Transform {
-        logger.debug("lookup $from -> $to")
+        logger.debug("lookup $from -> $to @ $time")
         val ftf = getTransform(from, to, time)
         val translation = ftf.transform.translation
         val rotationAndScale = ftf.transform.rotationAndScale
@@ -125,9 +125,10 @@ class TFTransformerTimestamps(gn: GraphName, gn2: GraphName) : CoordinateTransfo
 
     @Throws(TransformException::class)
     fun getTransform(source: String?, target: String?, time: Long): FrameTransform {
-        val transform = currentTree.transform(source, target, MsgTypeFactory.fromTimestamp(Timestamp(time, TimeUnit.MILLISECONDS)))
+        val rostime = MsgTypeFactory.fromTimestamp(Timestamp(time, TimeUnit.MILLISECONDS))
+        val transform = currentTree.transform(source, target, rostime)
         logger.trace("fetch tf: $transform")
-        return transform ?: throw TransformException(source, target, Time.currentTimeMillis())
+        return transform ?: throw TransformException(source, target, time)
     }
 
     override fun onNewMessage(transforms: List<TransformStamped>) {
