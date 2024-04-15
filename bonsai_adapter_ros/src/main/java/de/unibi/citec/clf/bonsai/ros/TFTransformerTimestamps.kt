@@ -6,6 +6,9 @@ import de.unibi.citec.clf.bonsai.core.time.Time
 import de.unibi.citec.clf.bonsai.ros.helper.FrameTransformTree
 import de.unibi.citec.clf.bonsai.util.CoordinateTransformer
 import de.unibi.citec.clf.btl.Transform
+import de.unibi.citec.clf.btl.data.common.Timestamp
+import de.unibi.citec.clf.btl.ros.MsgTypeFactory
+import de.unibi.citec.clf.btl.units.TimeUnit
 import geometry_msgs.TransformStamped
 import org.apache.log4j.Logger
 import org.ros.exception.RosMessageRuntimeException
@@ -122,7 +125,7 @@ class TFTransformerTimestamps(gn: GraphName, gn2: GraphName) : CoordinateTransfo
 
     @Throws(TransformException::class)
     fun getTransform(source: String?, target: String?, time: Long): FrameTransform {
-        val transform = currentTree.transform(source, target, org.ros.message.Time())
+        val transform = currentTree.transform(source, target, MsgTypeFactory.fromTimestamp(Timestamp(time, TimeUnit.MILLISECONDS)))
         logger.trace("fetch tf: $transform")
         return transform ?: throw TransformException(source, target, Time.currentTimeMillis())
     }
