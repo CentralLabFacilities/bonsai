@@ -65,8 +65,8 @@ abstract class CoordinateTransformer : TransformLookup {
         data.translation.frameId = data.frameId
         data.rotation.frameId = data.frameId
 
-        val t = transform(data.translation, csTo)
-        val r = transform(data.rotation, csTo)
+        val t = transform(data.translation, csTo, time)
+        val r = transform(data.rotation, csTo, time)
 
         val pose = Pose3D(data)
         pose.translation = t
@@ -87,8 +87,8 @@ abstract class CoordinateTransformer : TransformLookup {
         val yaw = data.getYaw(AngleUnit.RADIAN)
         val csFrom = data.frameId
 
-        val t = transform(Point3D(x, y, 0.0, m, csFrom), csTo)
-        val r = transform(Rotation3D(Vector3d(0.0, 0.0, 1.0), yaw, AngleUnit.RADIAN, csFrom), csTo)
+        val t = transform(Point3D(x, y, 0.0, m, csFrom), csTo, time)
+        val r = transform(Rotation3D(Vector3d(0.0, 0.0, 1.0), yaw, AngleUnit.RADIAN, csFrom), csTo, time)
 
         val position = Pose3D(t, r)
         position.frameId = csTo
