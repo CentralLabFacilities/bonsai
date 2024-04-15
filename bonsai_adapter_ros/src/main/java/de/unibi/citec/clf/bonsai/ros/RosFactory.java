@@ -644,7 +644,18 @@ public class RosFactory implements CoreObjectFactory {
                 }
                 nodesQuene.add(c.getNode());
                 nodesQuene.add(c.getNode2());
-            } else {
+            } else  if (coordinateTransformer instanceof TFTransformerTimestamps) {
+                TFTransformerTimestamps c = (TFTransformerTimestamps) coordinateTransformer;
+                try {
+                    spawnRosNode(c.getNode(), false);
+                    spawnRosNode(c.getNode2(), false);
+                } catch (TimeoutException | ExecutionException | InterruptedException e) {
+                    logger.error(e);
+                }
+                nodesQuene.add(c.getNode());
+                nodesQuene.add(c.getNode2());
+
+            }else {
                 TfRosjavaWrapper c = (TfRosjavaWrapper) coordinateTransformer;
                 try {
                     spawnRosNode(c.getNode(), false);
