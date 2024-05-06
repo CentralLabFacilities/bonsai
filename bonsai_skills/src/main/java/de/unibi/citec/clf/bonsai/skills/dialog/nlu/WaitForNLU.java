@@ -1,4 +1,4 @@
-package de.unibi.citec.clf.bonsai.skills.dialog;
+package de.unibi.citec.clf.bonsai.skills.dialog.nlu;
 
 import de.unibi.citec.clf.bonsai.core.SensorListener;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
