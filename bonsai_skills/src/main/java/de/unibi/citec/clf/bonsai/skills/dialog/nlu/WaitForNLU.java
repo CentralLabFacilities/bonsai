@@ -23,9 +23,9 @@ import java.util.List;
  * <pre>
  *
  * Options:
- *  intents:            [String[]] Required
+ *  #_INTENTS:            [String[]] Required
  *                          -> List of intents to listen for separated by ';'
- *  timeout             [long] Optional (default: -1)
+ *  #_TIMEOUT:            [long] Optional (default: -1)
  *                          -> Amount of time waited to understand something
  *
  * Slots:
@@ -42,8 +42,8 @@ import java.util.List;
  */
 public class WaitForNLU extends AbstractSkill implements SensorListener<NLU> {
 
-    private static final String KEY_DEFAULT = "intents";
-    private static final String KEY_TIMEOUT = "timeout";
+    private static final String KEY_DEFAULT = "#_INTENTS";
+    private static final String KEY_TIMEOUT = "#_TIMEOUT";
 
     private String[] possible_intents;
     private String speechSensorName = "NLUSensor";
