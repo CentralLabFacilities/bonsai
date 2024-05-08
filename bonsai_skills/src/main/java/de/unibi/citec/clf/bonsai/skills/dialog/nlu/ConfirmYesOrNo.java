@@ -61,7 +61,7 @@ import java.util.concurrent.Future;
  * @author rfeldhans
  * @author jkummert
  */
-public class ConfirmYesOrNoNLU extends AbstractSkill implements SensorListener<NLU> {
+public class ConfirmYesOrNo extends AbstractSkill implements SensorListener<NLU> {
 
     private static final String KEY_TEXT = "#_MESSAGE";
     private static final String KEY_SIMPLE = "#_USESIMPLE";
