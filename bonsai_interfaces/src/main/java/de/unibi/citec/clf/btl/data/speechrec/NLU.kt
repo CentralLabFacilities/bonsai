@@ -7,23 +7,21 @@ import de.unibi.citec.clf.btl.Type
  *
  * @author lruegeme
  */
-class NLU() : Type(), Iterable<NLUEntity?> {
-    private var entityMap = HashMap<String, NLUEntity>()
-    var text: String? = null
-    var intent: String? = null
+class NLU() : Type(), Iterable<NLUEntity?>, Cloneable {
+    private var entities : MutableList<NLUEntity> = ArrayList()
+    var text: String = ""
+    var intent: String = ""
     var confidence = 0.0f
 
-    constructor(t: String, i: String, conf: Float, entities: List<NLUEntity>) : this() {
+    constructor(t: String, i: String, conf: Float, es: List<NLUEntity>) : this() {
         text = t
         intent = i
         confidence = conf
-        for (e in entities) {
-            entityMap[e.key] = e
-        }
+        entities.addAll(es)
     }
 
     override fun iterator(): MutableIterator<NLUEntity> {
-        return entityMap.values.iterator()
+        return entities.iterator()
     }
 
     override fun equals(other: Any?): Boolean {
@@ -33,7 +31,7 @@ class NLU() : Type(), Iterable<NLUEntity?> {
 
         other as NLU
 
-        if (entityMap != other.entityMap) return false
+        if (entities != other.entities) return false
         if (text != other.text) return false
         if (intent != other.intent) return false
 
@@ -42,7 +40,7 @@ class NLU() : Type(), Iterable<NLUEntity?> {
 
     override fun hashCode(): Int {
         var result = super.hashCode()
-        result = 31 * result + entityMap.hashCode()
+        result = 31 * result + entities.hashCode()
         result = 31 * result + (text?.hashCode() ?: 0)
         result = 31 * result + (intent?.hashCode() ?: 0)
         result = 31 * result + confidence.hashCode()
@@ -50,8 +48,19 @@ class NLU() : Type(), Iterable<NLUEntity?> {
     }
 
     override fun toString(): String {
-        return "NLU(intent=$intent, confidence=$confidence text:'$text', entities ${entityMap.values})"
+        return "NLU(intent=$intent, confidence=$confidence text:'$text', entities ${entities})"
     }
 
+    override fun clone(): NLU {
+        return NLU(text,intent, confidence, entities).also { it.frameId = frameId }
+    }
+
+    fun hasEntity(key: String): Boolean {
+        return entities.any { it.key == key }
+    }
+
+    fun hasAllEntities(keys : Collection<String>): Boolean {
+        return entities.map { it.key }.containsAll(keys)
+    }
 
 }
