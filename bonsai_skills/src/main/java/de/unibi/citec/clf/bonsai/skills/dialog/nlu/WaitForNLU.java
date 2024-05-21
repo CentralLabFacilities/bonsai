@@ -71,7 +71,7 @@ public class WaitForNLU extends AbstractSkill implements SensorListener<NLU> {
         }
 
         if (timeout > 0) {
-            tokenSuccessPsTimeout = configurator.requestExitToken(ExitStatus.SUCCESS().ps("timeout"));
+            tokenSuccessPsTimeout = configurator.requestExitToken(ExitStatus.ERROR().ps("timeout"));
         }
     }
 
