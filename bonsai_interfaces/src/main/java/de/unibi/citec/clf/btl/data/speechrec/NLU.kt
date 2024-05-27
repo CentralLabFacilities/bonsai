@@ -63,4 +63,9 @@ class NLU() : Type(), Iterable<NLUEntity?>, Cloneable {
         return entities.map { it.key }.containsAll(keys)
     }
 
+    fun getEntities() : List<NLUEntity> {
+        return entities
+    }
+
+
 }

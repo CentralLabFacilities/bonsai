@@ -9,6 +9,7 @@ import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
+import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException;
 import de.unibi.citec.clf.bonsai.util.helper.SimpleNLUHelper;
 import de.unibi.citec.clf.bonsai.util.helper.SimpleSpeechHelper;
 import de.unibi.citec.clf.btl.data.speechrec.GrammarNonTerminal;
@@ -23,7 +24,9 @@ import java.util.List;
  * <pre>
  *
  * Options:
- *  #_INTENTS:            [String[]] Required
+ *  #_ANY:                [boolean] (default: false)
+ *                          -> Listen to any NLU, disables #_INTENTS
+ *  #_INTENTS:            [String[]] Required (when not #_ANY)
  *                          -> List of intents to listen for separated by ';'
  *  #_TIMEOUT:            [long] Optional (default: -1)
  *                          -> Amount of time waited to understand something
@@ -45,9 +48,12 @@ public class WaitForNLU extends AbstractSkill implements SensorListener<NLU> {
     private static final String KEY_DEFAULT = "#_INTENTS";
     private static final String KEY_TIMEOUT = "#_TIMEOUT";
 
+    private static final String KEY_ANY = "#_ANY";
+
     private String[] possible_intents;
     private String speechSensorName = "NLUSensor";
     private long timeout = -1;
+    private boolean any = false;
 
     private SimpleNLUHelper helper;
 
@@ -59,16 +65,24 @@ public class WaitForNLU extends AbstractSkill implements SensorListener<NLU> {
 
     @Override
     public void configure(ISkillConfigurator configurator) {
+        any = configurator.requestOptionalBool(KEY_ANY, any);
+        if(!any) {
+            possible_intents = configurator.requestValue(KEY_DEFAULT).split(";");
+            for (String nt : possible_intents) {
+                tokenMap.put(nt, configurator.requestExitToken(ExitStatus.SUCCESS().ps(nt)));
+            }
+        } else if (configurator.hasConfigurationKey(KEY_DEFAULT)) {
+            throw new SkillConfigurationException("cant use #_ANY and #_INTENTS");
+        } else {
+            tokenMap.put("any", configurator.requestExitToken(ExitStatus.SUCCESS()));
+        }
 
-        possible_intents = configurator.requestValue(KEY_DEFAULT).split(";");
         timeout = configurator.requestOptionalInt(KEY_TIMEOUT, (int) timeout);
 
         speechSensor = configurator.getSensor(speechSensorName, NLU.class);
         nluSlot = configurator.getWriteSlot("NLUSlot", NLU.class);
 
-        for (String nt : possible_intents) {
-            tokenMap.put(nt, configurator.requestExitToken(ExitStatus.SUCCESS().ps(nt)));
-        }
+
 
         if (timeout > 0) {
             tokenSuccessPsTimeout = configurator.requestExitToken(ExitStatus.ERROR().ps("timeout"));
@@ -103,13 +117,20 @@ public class WaitForNLU extends AbstractSkill implements SensorListener<NLU> {
         }
 
         List<NLU> understood = helper.getAllNLUs();
-        for (String intent : possible_intents) {
+        if (any) {
+            try {
+                nluSlot.memorize(understood.get(0));
+                return tokenMap.get("any");
+            } catch (CommunicationException e) {
+                return ExitToken.fatal();
+            }
+        } else for (String intent : possible_intents) {
             for (NLU nt : understood) {
                 if (intent.equals(nt.getIntent())) {
                     try {
                         nluSlot.memorize(nt);
                     } catch (CommunicationException e) {
-                        logger.error("Can not write terminals " + intent.toString() + " to memory.", e);
+                        logger.error("Can not write terminals " + intent + " to memory.", e);
                         return ExitToken.fatal();
                     }
                     logger.info("understood \"" + nt + "\"");
