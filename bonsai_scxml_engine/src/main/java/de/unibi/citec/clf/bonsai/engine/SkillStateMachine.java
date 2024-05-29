@@ -471,9 +471,8 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
                 continue;
             }
             String expr = data.getExpr();
-            if (expr == null ) {
-                if(!data.getId().equalsIgnoreCase("#_SLOTS")) logger.error("expr from Data is null! data:" + data.getId());
-                continue;
+            if (expr == null) {
+                expr = "";
             }
 
             String name = expr.replaceAll("'", "");
