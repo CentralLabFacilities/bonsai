@@ -515,7 +515,10 @@ public class StateMachineConfigurator {
         @SuppressWarnings("unchecked")
         List<Data> dataList = model.getData();
         for (Data data : dataList) {
-            String name = data.getExpr().replaceAll("'", "");
+            logger.error("reading variable: " + data.getId());
+            String exp = data.getExpr();
+            if (exp == null) exp = "";
+            String name = exp.replaceAll("'", "");
             if (name.startsWith(symbol)) {
                 name = name.replaceFirst(symbol, "");
 
@@ -527,7 +530,7 @@ public class StateMachineConfigurator {
                     logger.info("variable " + name + " not found in root datamodel");
                 }
             } else {
-                map.put(data.getId(), data.getExpr().replaceAll("^'", "").replaceAll("'$", ""));
+                map.put(data.getId(), exp.replaceAll("^'", "").replaceAll("'$", ""));
             }
         }
         return map;

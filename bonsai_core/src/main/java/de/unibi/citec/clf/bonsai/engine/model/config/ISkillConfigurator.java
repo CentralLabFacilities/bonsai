@@ -28,4 +28,6 @@ public interface ISkillConfigurator extends IObjectConfigurator {
     ExitToken requestExitToken(ExitStatus status) throws SkillConfigurationException;
 
     boolean hasConfigurationKey(String key);
+
+    Iterable<String> getConfigurationKeys();
 }

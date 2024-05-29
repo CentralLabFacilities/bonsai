@@ -705,5 +705,9 @@ public class SkillConfigurator implements ISkillConfigurator {
         return configValues.containsKey(key);
     }
 
+    @Override
+    public Iterable<String> getConfigurationKeys() {
+        return configValues.keySet();
+    }
 
 }
