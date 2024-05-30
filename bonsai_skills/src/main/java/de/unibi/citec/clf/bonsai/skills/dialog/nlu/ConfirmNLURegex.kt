@@ -31,6 +31,8 @@ import java.util.concurrent.Future
  * <pre>
  *
  * Options:
+ *  #_USE_DEFAULT   [Boolean] Optional (default true)
+ *                          -> use the default mapping (otherwise send error.unlisted)
  *  #_MESSAGE:      [String] Optional (default: "You said $T?")
  *                          -> Text said by the robot before waiting for confirmation
  *  #_TIMEOUT       [long] Optional (default: -1)
@@ -49,6 +51,7 @@ import java.util.concurrent.Future
  *  success.confirmNo:  Received denial
  *  error.timeout:    Timeout reached (only used when #_TIMEOUT is set to positive value)
  *  error.compute:    Some entity is missing or duplicate (e.g. '#E:object' while nlu has multiple object entities)
+ *  error.unlisted:   The intent is not mapped (only when #_USE_DEFAULT is false)
  *
 </pre> *
  *
@@ -68,6 +71,7 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
     private var tokenSuccessPsYes: ExitToken? = null
     private var tokenSuccessPsNo: ExitToken? = null
     private var tokenErrorPsMissing: ExitToken? = null
+    private var tokenErrorUnlisted: ExitToken? = null
     private var helper: SimpleNLUHelper? = null
     private var speechSensor: Sensor<NLU>? = null
     private var speechActuator: SpeechActuator? = null
@@ -77,10 +81,14 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
     private var nluSlot: MemorySlotReader<NLU>? = null
     private var intentMapping: MutableMap<String, String> = HashMap()
     private var computed = false
+    private var useDefault = true
+    private var foundMapping = true
 
     private lateinit var nlu: NLU
 
     override fun configure(configurator: ISkillConfigurator) {
+        useDefault = configurator.requestOptionalBool(KEY_USE_DEFAULT, useDefault)
+        if(!useDefault) tokenErrorUnlisted = configurator.requestExitToken(ExitStatus.ERROR().ps("unlisted"))
         nluSlot = configurator.getReadSlot("NLUSlot", NLU::class.java)
         timeout = configurator.requestOptionalInt(KEY_TIMEOUT, timeout.toInt()).toLong()
         timeUntilRepeat = configurator.requestOptionalInt(KEY_REPEAT, timeUntilRepeat.toInt()).toLong()
@@ -103,7 +111,7 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
                 .replace("""\s+""".toRegex(), " ")
 
         for (m in mappings.split(";")) {
-            if (m.isEmpty()) continue // last string after ;
+            if (m.isBlank()) continue // last string after ;
             logger.debug("add mapping: $m")
             val s = m.trim().split("=")
             if (s.size != 2) throw SkillConfigurationException("error in intentMapping for '$m' size:${s.size} != 2")
@@ -148,14 +156,24 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
         helper!!.startListening()
 
         nlu = nluSlot?.recall<NLU>() ?: return false
-        val mapping = intentMapping.getOrDefault(nlu.intent, defaultMapping)
+        val mapping =
+            if (useDefault) intentMapping.getOrDefault(nlu.intent, defaultMapping) else intentMapping[nlu.intent]
+                ?: run {
+                    logger.info("intent not mapped: '${nlu.intent}'")
+                    foundMapping = false
+                    return true
+                }
+
         logger.info("nlu is '${nlu}'")
         logger.info("confirmText for ${nlu.intent} is: '$mapping'")
         confirmText = confirmText.replace("#M", mapping)
+
         return true
     }
 
     override fun execute(): ExitToken {
+        if(!foundMapping) return tokenErrorUnlisted!!
+
         if (!computed) {
             try {
                 confirmText = compute(confirmText)
@@ -225,6 +243,7 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
         private const val KEY_TIMEOUT = "#_TIMEOUT"
         private const val KEY_REPEAT = "#_REPEAT_AFTER"
         private const val KEY_MAXREP = "#_REPEATS"
+        private const val KEY_USE_DEFAULT = "#_USE_DEFAULT"
 
         private const val KEY_INTENT_NO = "#_INTENT_NO"
         private const val KEY_INTENT_YES = "#_INTENT_YES"
