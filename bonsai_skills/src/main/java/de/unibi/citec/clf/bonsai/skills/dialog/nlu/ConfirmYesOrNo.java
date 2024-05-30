@@ -61,7 +61,7 @@ import java.util.concurrent.Future;
  * @author rfeldhans
  * @author jkummert
  */
-public class ConfirmYesOrNo extends AbstractSkill implements SensorListener<NLU> {
+public class ConfirmYesOrNo extends AbstractSkill  {
 
     private static final String KEY_TEXT = "#_MESSAGE";
     private static final String KEY_SIMPLE = "#_USESIMPLE";
@@ -158,7 +158,7 @@ public class ConfirmYesOrNo extends AbstractSkill implements SensorListener<NLU>
 
     @Override
     public ExitToken end(ExitToken curToken) {
-        speechSensor.removeSensorListener(this);
+        speechSensor.removeSensorListener(helper);
         return curToken;
     }
 
@@ -212,11 +212,6 @@ public class ConfirmYesOrNo extends AbstractSkill implements SensorListener<NLU>
             }
         }
         return ExitToken.loop(50);
-
-    }
-
-    @Override
-    public void newDataAvailable(NLU nluEntities) {
 
     }
 }

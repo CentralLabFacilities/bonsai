@@ -16,24 +16,29 @@ import java.io.IOException
 import java.util.concurrent.Future
 
 /**
- * Wait for confirmation of an understood NLU using simple rules.
+ *  Wait for confirmation of an understood NLU construct the question using rules and the given NLU.
  *
- *  build message using the given intent mappings
+ *  build the confirm message using the given intent mappings
  *
- *  example mapping: "pick_and_place=you want the #E:object from the #E:location:arrival;confirm_yes=#T what?"
- *  default mapping is "#T"
- *  variables:
+ *  example: "pick_and_place=you want the #E:object from the #E:location:arrival;confirm_yes=#T what?"
+ *  the default message is "You want ME to: #M?"
+ *  the default mapping is "#T"
+ *
+ *  some additional words in the final message are replaced:
+ *  'me' -> 'you'
+ *
+ *  usable variables:
  *  #M = intent mapping
  *  #I = nlu.intent
  *  #T = nlu.text
- *  #E:key = nlu.entity with key
+ *  #E:key:role:group = nlu.entity with key (role and group optional)
  *
  * <pre>
  *
  * Options:
  *  #_USE_DEFAULT   [Boolean] Optional (default true)
  *                          -> use the default mapping (otherwise send error.unlisted)
- *  #_MESSAGE:      [String] Optional (default: "You said $T?")
+ *  #_MESSAGE:      [String] Optional (default: "YOU want ME to: #M?")
  *                          -> Text said by the robot before waiting for confirmation
  *  #_TIMEOUT       [long] Optional (default: -1)
  *                          -> Amount of time robot waits for confirmation in ms
@@ -42,7 +47,7 @@ import java.util.concurrent.Future
  *  #_REPEATS:      [int] Optional (default: 1)
  *                          -> Amount of times #_TEXT is asked
  *  #_INTENT_MAPPING:    [String[]] Optional (default: "")
- *                          -> List of intents mappings 'intent=mapping' separated by ';'
+ *                          -> List of intent mappings 'intent=mapping' separated by ';'
  *
  * Slots:
  *
@@ -58,7 +63,26 @@ import java.util.concurrent.Future
  * @author lruegeme
  */
 class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
-    private val finalReplacements = mapOf("me" to "you")
+    companion object {
+        private const val KEY_MAPPING = "#_INTENT_MAPPING"
+        private const val KEY_TEXT = "#_MESSAGE"
+        private const val KEY_TIMEOUT = "#_TIMEOUT"
+        private const val KEY_REPEAT = "#_REPEAT_AFTER"
+        private const val KEY_MAXREP = "#_REPEATS"
+        private const val KEY_USE_DEFAULT = "#_USE_DEFAULT"
+
+        private const val KEY_INTENT_NO = "#_INTENT_NO"
+        private const val KEY_INTENT_YES = "#_INTENT_YES"
+        private const val KEY_SPEECH_SENSOR = "#_SPEECH_SENSOR"
+
+        private const val ACTUATOR_SPEECHACTUATOR = "SpeechActuator"
+        private const val PS_TIMEOUT = "timeout"
+        private const val PS_MISSING = "compute"
+        private const val PS_NO = "confirmNo"
+        private const val PS_YES = "confirmYes"
+    }
+
+    private val finalReplacements = mapOf("me" to "you", "you" to "me")
     private var confirmText = "You want Me to: #M?"
     private var defaultMapping = "#T"
     private var timeout: Long = -1
@@ -237,22 +261,5 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
 
     override fun newDataAvailable(nluEntities: NLU?) {}
 
-    companion object {
-        private const val KEY_MAPPING = "#_INTENT_MAPPING"
-        private const val KEY_TEXT = "#_MESSAGE"
-        private const val KEY_TIMEOUT = "#_TIMEOUT"
-        private const val KEY_REPEAT = "#_REPEAT_AFTER"
-        private const val KEY_MAXREP = "#_REPEATS"
-        private const val KEY_USE_DEFAULT = "#_USE_DEFAULT"
 
-        private const val KEY_INTENT_NO = "#_INTENT_NO"
-        private const val KEY_INTENT_YES = "#_INTENT_YES"
-        private const val KEY_SPEECH_SENSOR = "#_SPEECH_SENSOR"
-
-        private const val ACTUATOR_SPEECHACTUATOR = "SpeechActuator"
-        private const val PS_TIMEOUT = "timeout"
-        private const val PS_MISSING = "compute"
-        private const val PS_NO = "confirmNo"
-        private const val PS_YES = "confirmYes"
-    }
 }

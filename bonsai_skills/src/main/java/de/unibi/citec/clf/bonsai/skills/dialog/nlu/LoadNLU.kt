@@ -11,24 +11,27 @@ import de.unibi.citec.clf.btl.data.speechrec.NLU
 import de.unibi.citec.clf.btl.data.speechrec.NLUEntity
 
 /**
- *  Load an NLU into SLOT
+ *  Load an NLU with the given #_INTENT into a slot.
  *
  *  Takes Parametes of the form #ENTITY:ROLE:GROUP" to create entities
  *
  *  example:
+ *  <pre>
  *      <datamodel>
  *             <data id="#object" expr="'apple'"/>
  *             <data id="#location:destination" expr="'me'"/>
  *             <data id="#location:departure" expr="'table'"/>
  *             <data id="#_INTENT" expr="'pick_place'"/>
  *      </datamodel>
+ *  </pre>
  *
  * <pre>
  *
  * Options:
  *  #_INTENT:               [String]
- *                          -> the intent
+ *                              -> the intent
  *  'ENTITY[:ROLE][:GROUP]':
+ *                              -> Entities to create (see example)
  *
  * Slots:
  *  NLUSlot
