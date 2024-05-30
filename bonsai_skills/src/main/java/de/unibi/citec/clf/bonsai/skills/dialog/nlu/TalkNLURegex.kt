@@ -13,36 +13,40 @@ import java.io.IOException
 import java.util.concurrent.Future
 
 /**
- *  Talk using the given NLU using simple rules.
+ *  Talk, constructs the message using rules and the given NLU.
  *
  *  build message using the given intent mappings
  *
  *  example mapping: "pick_and_place=you want the #E:object from the #E:location:arrival;confirm_yes=#T what?"
  *  default mapping is "#T"
- *  variables:
+ *
+ *  some additional words in the final message are replaced:
+ *  'me' -> 'you'
+ *
+ *  usable variables:
  *  #M = intent mapping
  *  #I = nlu.intent
  *  #T = nlu.text
- *  #E:key = nlu.entity with key
+ *  #E:key:role:group = nlu.entity with key (role and group optional)
  *
  * <pre>
  *
  * Options:
  *  #_USE_DEFAULT   [Boolean] Optional (default true)
  *                          -> use the default mapping (otherwise send error.unlisted)
- *  #_MESSAGE:      [String] Optional (default: "You said $T?")
+ *  #_MESSAGE:      [String] Optional (default: "#M?")
  *                          -> Text said by the robot before waiting for confirmation
  *  #_INTENT_MAPPING:    [String[]] Optional (default: "")
- *                          -> List of intents mappings 'intent=mapping' separated by ';'
+ *                          -> List of intent mappings 'intent=mapping' separated by ';'
+ *  #_DEFAULT:      [String] Optional (default: "#T")
+ *                          -> Default mapping if no mapping for the intent is found
  *
  * Slots:
  *
  * ExitTokens:
- *  success.confirmYes: Received confirmation
- *  success.confirmNo:  Received denial
- *  error.timeout:    Timeout reached (only used when #_TIMEOUT is set to positive value)
+ *  success:
+ *  error.unlisted:   Intent is not in the mappings (if USE_DEFAULT==false)
  *  error.compute:    Some entity is missing or duplicate (e.g. '#E:object' while nlu has multiple object entities)
- *  error.unlisted:   The intent is not mapped (only when #_USE_DEFAULT is false)
  *
 </pre> *
  *

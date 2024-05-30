@@ -8,21 +8,19 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
 import de.unibi.citec.clf.btl.data.speechrec.NLU
 
 /**
- * Check Intent if NLU has one of the given intents
+ * Check if NLU has one of the given intents
  *
  * <pre>
  *
  * Options:
- *  #_INTENTS:            [String[]] Required
- *                          -> List of intents to listen for separated by ';'
+ *  #_INTENTS:              [String[]] Required
+ *                              -> List of allowed intents separated by ';'
  *
  * Slots:
- *  NLUSlot: [NLU] [Read]
- *      -> Get the understood NLU
- *3
- * 2
+ *  NLUSlot:                [NLU] (Read)
+ *
  * ExitTokens:
- *  success.{understood}:   intent {understood} given in intents was understood
+ *  success.{intent}:       NLU has the specified intent
  *  error.other:            intent is not listed
  *
  * </pre>
@@ -30,6 +28,10 @@ import de.unibi.citec.clf.btl.data.speechrec.NLU
  * @author lruegeme
  */
 class CheckIntent : AbstractSkill() {
+    companion object {
+        private const val KEY_DEFAULT = "#_INTENTS"
+    }
+
     private var possibleIntents: List<String> = listOf()
     private var intent = ""
 
@@ -49,10 +51,8 @@ class CheckIntent : AbstractSkill() {
     }
 
     override fun init(): Boolean {
-
         intent = nluSlot?.recall<NLU>()?.intent ?: return false
-        logger.info("intent is '$intent'")
-
+        logger.info("nlu.intent is '$intent'")
         return true
     }
 
@@ -60,7 +60,6 @@ class CheckIntent : AbstractSkill() {
         if (possibleIntents.contains(intent)) {
             return tokenMap[intent]!!
         }
-
         return tokenError!!
     }
 
@@ -68,7 +67,5 @@ class CheckIntent : AbstractSkill() {
         return curToken
     }
 
-    companion object {
-        private const val KEY_DEFAULT = "#_INTENTS"
-    }
+
 }

@@ -9,32 +9,37 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
 import de.unibi.citec.clf.btl.data.speechrec.NLU
 
 /**
- *  Unpacks NLU into different Slots
+ *  Unpacks Entities from NLU into Slots
  *
- *  Takes Parametes of the form #ENTITY:ROLE:GROUP = "" to unpack entities into specific slots
+ *  Takes Parametes of the form #ENTITY:ROLE:GROUP to unpack entities into specific slots
+ *
  *
  *  example:
+ *  <pre>
  *      <datamodel>
  *             <data id="#object"/>
  *             <data id="#location:destination"/>
  *             <data id="#location:departure"/>
  *             <data id="#_INTENT" expr="'pick_place'"/>
  *      </datamodel>
+ *  </pre>
+ *
  *
  * <pre>
  *
  * Options:
  *  #_INTENT:               [String] (optional)
- *                          -> check for matching intent
+ *                              -> check for matching intent
  *  'ENTITY[:ROLE][:GROUP]':
- *
+ *                              -> Entities to unpack (see example)
  * Slots:
- *  all defined slots
+ *  all defined Parameters as WriteSlot [String]
+ *                              -> value of the entity
  *
  * ExitTokens:
  *  success
- *  error.missing.entity.role.group
- *  error.wrongIntent
+ *  error.missing.entity.role.group     Specific Entity is missing from NLU
+ *  error.wrongIntent:                  Intent is not #_INTENT (if defined)
  *
  * </pre>
  *
@@ -74,7 +79,6 @@ class UnpackNLU : AbstractSkill() {
             val status = item.replace(':', '.')
             tokenMap[item] = configurator.requestExitToken(ExitStatus.ERROR().ps(status))
         }
-
     }
 
     override fun init(): Boolean {
@@ -104,6 +108,7 @@ class UnpackNLU : AbstractSkill() {
                 logger.error("${if (filtered.isEmpty()) "missing" else "multiple"} entity with key:$key role:$role group:$group")
                 return tokenMap[item]!!
             }
+
             val value = filtered.first().value
             logger.info("memorize '$value' to slot '$item'")
             slotMapping[item]?.memorize(value)

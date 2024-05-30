@@ -51,7 +51,6 @@ class ConfirmNLUSimple : AbstractSkill(), SensorListener<NLU?> {
     private var maxRepeats = 1
     private var intentNo = "confirm_no"
     private var intentYes = "confirm_yes"
-    private var speechSensorName = "NLUSensor"
     private var tokenSuccessPsTimeout: ExitToken? = null
     private var tokenSuccessPsYes: ExitToken? = null
     private var tokenSuccessPsNo: ExitToken? = null
@@ -71,13 +70,12 @@ class ConfirmNLUSimple : AbstractSkill(), SensorListener<NLU?> {
         confirmText = configurator.requestOptionalValue(KEY_TEXT, confirmText)
         intentNo = configurator.requestOptionalValue(KEY_INTENT_NO, intentNo)
         intentYes = configurator.requestOptionalValue(KEY_INTENT_YES, intentYes)
-        speechSensorName = configurator.requestOptionalValue(KEY_SPEECH_SENSOR, speechSensorName)
         tokenSuccessPsYes = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus(PS_YES))
         tokenSuccessPsNo = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus(PS_NO))
         if (timeout > 0) {
             tokenSuccessPsTimeout = configurator.requestExitToken(ExitStatus.SUCCESS().ps(PS_TIMEOUT))
         }
-        speechSensor = configurator.getSensor<NLU>(speechSensorName, NLU::class.java)
+        speechSensor = configurator.getSensor<NLU>(SENSOR_NLU, NLU::class.java)
         speechActuator = configurator.getActuator<SpeechActuator>(ACTUATOR_SPEECHACTUATOR, SpeechActuator::class.java)
     }
 
@@ -155,8 +153,10 @@ class ConfirmNLUSimple : AbstractSkill(), SensorListener<NLU?> {
         private const val KEY_MAXREP = "#_REPEATS"
         private const val KEY_INTENT_NO = "#_INTENT_NO"
         private const val KEY_INTENT_YES = "#_INTENT_YES"
-        private const val KEY_SPEECH_SENSOR = "#_SPEECH_SENSOR"
+
         private const val ACTUATOR_SPEECHACTUATOR = "SpeechActuator"
+        private const val SENSOR_NLU = "NLUSensor"
+
         private const val PS_TIMEOUT = "timeout"
         private const val PS_NO = "confirmNo"
         private const val PS_YES = "confirmYes"
