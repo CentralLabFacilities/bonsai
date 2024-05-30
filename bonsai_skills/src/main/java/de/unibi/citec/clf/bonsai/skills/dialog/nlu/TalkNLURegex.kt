@@ -1,22 +1,19 @@
 package de.unibi.citec.clf.bonsai.skills.dialog.nlu
 
 import de.unibi.citec.clf.bonsai.actuators.SpeechActuator
-import de.unibi.citec.clf.bonsai.core.SensorListener
 import de.unibi.citec.clf.bonsai.core.`object`.MemorySlotReader
-import de.unibi.citec.clf.bonsai.core.`object`.Sensor
 import de.unibi.citec.clf.bonsai.core.time.Time
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
 import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException
-import de.unibi.citec.clf.bonsai.util.helper.SimpleNLUHelper
 import de.unibi.citec.clf.btl.data.speechrec.NLU
 import java.io.IOException
 import java.util.concurrent.Future
 
 /**
- * Wait for confirmation of an understood NLU using simple rules.
+ *  Talk using the given NLU using simple rules.
  *
  *  build message using the given intent mappings
  *
@@ -35,12 +32,6 @@ import java.util.concurrent.Future
  *                          -> use the default mapping (otherwise send error.unlisted)
  *  #_MESSAGE:      [String] Optional (default: "You said $T?")
  *                          -> Text said by the robot before waiting for confirmation
- *  #_TIMEOUT       [long] Optional (default: -1)
- *                          -> Amount of time robot waits for confirmation in ms
- *  #_REPEAT_AFTER: [long] Optional (default: 5000)
- *                          -> Time between the robot asking #_TEXT again in ms
- *  #_REPEATS:      [int] Optional (default: 1)
- *                          -> Amount of times #_TEXT is asked
  *  #_INTENT_MAPPING:    [String[]] Optional (default: "")
  *                          -> List of intents mappings 'intent=mapping' separated by ';'
  *
@@ -57,26 +48,15 @@ import java.util.concurrent.Future
  *
  * @author lruegeme
  */
-class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
+class TalkNLURegex : AbstractSkill() {
     private val finalReplacements = mapOf("me" to "you")
-    private var confirmText = "You want Me to: #M?"
+    private var message = "#M"
     private var defaultMapping = "#T"
-    private var timeout: Long = -1
-    private var timeUntilRepeat: Long = 5000
-    private var maxRepeats = 1
-    private var intentNo = "confirm_no"
-    private var intentYes = "confirm_yes"
-    private var speechSensorName = "NLUSensor"
-    private var tokenErrorPsTimeout: ExitToken? = null
-    private var tokenSuccessPsYes: ExitToken? = null
-    private var tokenSuccessPsNo: ExitToken? = null
+
+    private var tokenSuccess: ExitToken? = null
     private var tokenErrorPsMissing: ExitToken? = null
     private var tokenErrorUnlisted: ExitToken? = null
-    private var helper: SimpleNLUHelper? = null
-    private var speechSensor: Sensor<NLU>? = null
     private var speechActuator: SpeechActuator? = null
-    private var nextRepeat: Long = 0
-    private var timesAsked = 0
     private var sayingComplete: Future<Void>? = null
     private var nluSlot: MemorySlotReader<NLU>? = null
     private var intentMapping: MutableMap<String, String> = HashMap()
@@ -87,24 +67,18 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
     private lateinit var nlu: NLU
 
     override fun configure(configurator: ISkillConfigurator) {
+        defaultMapping = configurator.requestOptionalValue(KEY_DEFAULT_MAPPING, defaultMapping)
+            .replace("""\n""".toRegex(), "")
+            .replace("""\s+""".toRegex(), " ")
         useDefault = configurator.requestOptionalBool(KEY_USE_DEFAULT, useDefault)
         if(!useDefault) tokenErrorUnlisted = configurator.requestExitToken(ExitStatus.ERROR().ps("unlisted"))
         nluSlot = configurator.getReadSlot("NLUSlot", NLU::class.java)
-        timeout = configurator.requestOptionalInt(KEY_TIMEOUT, timeout.toInt()).toLong()
-        timeUntilRepeat = configurator.requestOptionalInt(KEY_REPEAT, timeUntilRepeat.toInt()).toLong()
-        maxRepeats = configurator.requestOptionalInt(KEY_MAXREP, maxRepeats)
-        confirmText = configurator.requestOptionalValue(KEY_TEXT, confirmText)
-        intentNo = configurator.requestOptionalValue(KEY_INTENT_NO, intentNo)
-        intentYes = configurator.requestOptionalValue(KEY_INTENT_YES, intentYes)
-        speechSensorName = configurator.requestOptionalValue(KEY_SPEECH_SENSOR, speechSensorName)
-        tokenSuccessPsYes = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus(PS_YES))
-        tokenSuccessPsNo = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus(PS_NO))
-        if (timeout > 0) {
-            tokenErrorPsTimeout = configurator.requestExitToken(ExitStatus.ERROR().ps(PS_TIMEOUT))
-        }
+        message = configurator.requestOptionalValue(KEY_TEXT, message)
+            .replace("""\n""".toRegex(), "")
+            .replace("""\s+""".toRegex(), " ")
+        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
         tokenErrorPsMissing = configurator.requestExitToken(ExitStatus.ERROR().ps(PS_MISSING))
-        speechSensor = configurator.getSensor<NLU>(speechSensorName, NLU::class.java)
-        speechActuator = configurator.getActuator<SpeechActuator>(ACTUATOR_SPEECHACTUATOR, SpeechActuator::class.java)
+        speechActuator = configurator.getActuator(ACTUATOR_SPEECHACTUATOR, SpeechActuator::class.java)
 
         val mappings = configurator.requestOptionalValue(KEY_MAPPING, "")
                 .replace("""\n""".toRegex(), "")
@@ -148,13 +122,6 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
     }
 
     override fun init(): Boolean {
-        if (timeout > 0) {
-            logger.debug("using timeout of $timeout ms")
-            timeout += Time.currentTimeMillis()
-        }
-        helper = SimpleNLUHelper(speechSensor, true)
-        helper!!.startListening()
-
         nlu = nluSlot?.recall<NLU>() ?: return false
         val mapping =
             if (useDefault) intentMapping.getOrDefault(nlu.intent, defaultMapping) else intentMapping[nlu.intent]
@@ -163,10 +130,9 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
                     foundMapping = false
                     return true
                 }
-
         logger.info("nlu is '${nlu}'")
-        logger.info("confirmText for ${nlu.intent} is: '$mapping'")
-        confirmText = confirmText.replace("#M", mapping)
+        logger.info("text for ${nlu.intent} is: '$mapping'")
+        message = message.replace("#M", mapping)
 
         return true
     }
@@ -176,7 +142,7 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
 
         if (!computed) {
             try {
-                confirmText = compute(confirmText)
+                message = compute(message)
             } catch (e: Exception) {
                 logger.error(e.message)
                 return tokenErrorPsMissing!!
@@ -184,75 +150,29 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
             computed = true
         }
 
-        if (timeout > 0) {
-            if (Time.currentTimeMillis() > timeout) {
-                logger.info("ConfirmYesOrNo timeout")
-                return tokenErrorPsTimeout!!
-            }
+        if(sayingComplete == null) {
+            sayingComplete = speechActuator!!.sayAsync(message)
         }
-        return confirmYesNo()!!
+
+        if(!sayingComplete!!.isDone) {
+            return ExitToken.loop(50)
+        }
+
+        return tokenSuccess!!
     }
 
     override fun end(curToken: ExitToken): ExitToken {
-        speechSensor!!.removeSensorListener(this)
         return curToken
     }
-
-    private fun confirmYesNo(): ExitToken? {
-        if (sayingComplete != null) {
-            if (!sayingComplete!!.isDone) {
-                helper!!.startListening()
-                return ExitToken.loop(50)
-            }
-        }
-
-        // Ask Again
-        if (Time.currentTimeMillis() > nextRepeat) {
-            if (timesAsked++ < maxRepeats) {
-                try {
-                    sayingComplete = speechActuator!!.sayAsync(confirmText)
-                } catch (ex: IOException) {
-                    logger.error("IO Exception in speechActuator")
-                }
-                nextRepeat = Time.currentTimeMillis() + timeUntilRepeat
-                return ExitToken.loop(50)
-            }
-        }
-
-        // Loop if no new Understandings
-        if (helper!!.hasNewUnderstanding()) {
-            if (helper!!.allUnderstoodIntents.contains(intentYes)) {
-                return tokenSuccessPsYes
-            } else if (helper!!.allUnderstoodIntents.contains(intentNo)) {
-                return tokenSuccessPsNo
-            }
-            try {
-                sayingComplete = speechActuator!!.sayAsync("Sorry, please repeat!")
-            } catch (ex: IOException) {
-                logger.error("IO Exception in speechActuator")
-            }
-        }
-        return ExitToken.loop(50)
-    }
-
-    override fun newDataAvailable(nluEntities: NLU?) {}
 
     companion object {
         private const val KEY_MAPPING = "#_INTENT_MAPPING"
         private const val KEY_TEXT = "#_MESSAGE"
-        private const val KEY_TIMEOUT = "#_TIMEOUT"
-        private const val KEY_REPEAT = "#_REPEAT_AFTER"
-        private const val KEY_MAXREP = "#_REPEATS"
         private const val KEY_USE_DEFAULT = "#_USE_DEFAULT"
-
-        private const val KEY_INTENT_NO = "#_INTENT_NO"
-        private const val KEY_INTENT_YES = "#_INTENT_YES"
-        private const val KEY_SPEECH_SENSOR = "#_SPEECH_SENSOR"
+        private const val KEY_DEFAULT_MAPPING = "#_DEFAULT"
 
         private const val ACTUATOR_SPEECHACTUATOR = "SpeechActuator"
-        private const val PS_TIMEOUT = "timeout"
+
         private const val PS_MISSING = "compute"
-        private const val PS_NO = "confirmNo"
-        private const val PS_YES = "confirmYes"
     }
 }
