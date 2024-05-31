@@ -48,7 +48,8 @@ import java.util.concurrent.Future
  *                          -> Amount of times #_TEXT is asked
  *  #_INTENT_MAPPING:    [String[]] Optional (default: "")
  *                          -> List of intent mappings 'intent=mapping' separated by ';'
- *
+ *  #_DO_REPLACEMENTS:   [Boolean] Optional (default true)
+ *                          -> replace some words like 'me' -> 'you'
  * Slots:
  *
  * ExitTokens:
@@ -70,6 +71,7 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
         private const val KEY_REPEAT = "#_REPEAT_AFTER"
         private const val KEY_MAXREP = "#_REPEATS"
         private const val KEY_USE_DEFAULT = "#_USE_DEFAULT"
+        private const val KEY_DO_FINAL_REPLACEMENTS = "#_DO_REPLACEMENTS"
 
         private const val KEY_INTENT_NO = "#_INTENT_NO"
         private const val KEY_INTENT_YES = "#_INTENT_YES"
@@ -83,6 +85,7 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
     }
 
     private val finalReplacements = mapOf("""\bme\b""" to "you", """\byou\b""" to "me")
+    private var doFinalReplacements = true
     private var confirmText = "You want Me to: #M?"
     private var defaultMapping = "#T"
     private var timeout: Long = -1
@@ -112,6 +115,7 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
 
     override fun configure(configurator: ISkillConfigurator) {
         useDefault = configurator.requestOptionalBool(KEY_USE_DEFAULT, useDefault)
+        doFinalReplacements = configurator.requestOptionalBool(KEY_DO_FINAL_REPLACEMENTS, doFinalReplacements)
         if(!useDefault) tokenErrorUnlisted = configurator.requestExitToken(ExitStatus.ERROR().ps("unlisted"))
         nluSlot = configurator.getReadSlot("NLUSlot", NLU::class.java)
         timeout = configurator.requestOptionalInt(KEY_TIMEOUT, timeout.toInt()).toLong()
@@ -164,7 +168,7 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
             }
         }
         logger.info("computed: '$result'")
-        for (replacement in finalReplacements) {
+        if (doFinalReplacements) for (replacement in finalReplacements) {
             result = result.replace(replacement.key.toRegex(), replacement.value)
         }
         logger.info("after final replacements: '$result'")
