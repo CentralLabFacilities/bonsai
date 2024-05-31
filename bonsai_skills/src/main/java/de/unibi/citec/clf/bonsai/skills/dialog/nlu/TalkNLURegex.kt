@@ -53,7 +53,7 @@ import java.util.concurrent.Future
  * @author lruegeme
  */
 class TalkNLURegex : AbstractSkill() {
-    private val finalReplacements = mapOf("me" to "you")
+    private val finalReplacements = mapOf("""\bme\b""" to "you", """\byou\b""" to "me")
     private var message = "#M"
     private var defaultMapping = "#T"
 
@@ -119,7 +119,7 @@ class TalkNLURegex : AbstractSkill() {
         }
         logger.info("computed: '$result'")
         for (replacement in finalReplacements) {
-            result = result.replace(replacement.key, replacement.value)
+            result = result.replace(replacement.key.toRegex(), replacement.value)
         }
         logger.info("after final replacements: '$result'")
         return result
