@@ -54,6 +54,7 @@ import java.util.concurrent.Future
  */
 class TalkNLURegex : AbstractSkill() {
     private val finalReplacements = mapOf("""\bme\b""" to "you", """\byou\b""" to "me")
+    private var doFinalReplacements = true
     private var message = "#M"
     private var defaultMapping = "#T"
 
@@ -71,6 +72,7 @@ class TalkNLURegex : AbstractSkill() {
     private lateinit var nlu: NLU
 
     override fun configure(configurator: ISkillConfigurator) {
+        doFinalReplacements = configurator.requestOptionalBool(KEY_DO_FINAL_REPLACEMENTS, doFinalReplacements)
         defaultMapping = configurator.requestOptionalValue(KEY_DEFAULT_MAPPING, defaultMapping)
             .replace("""\n""".toRegex(), "")
             .replace("""\s+""".toRegex(), " ")
@@ -118,7 +120,7 @@ class TalkNLURegex : AbstractSkill() {
             }
         }
         logger.info("computed: '$result'")
-        for (replacement in finalReplacements) {
+        if(doFinalReplacements) for (replacement in finalReplacements) {
             result = result.replace(replacement.key.toRegex(), replacement.value)
         }
         logger.info("after final replacements: '$result'")
@@ -174,6 +176,7 @@ class TalkNLURegex : AbstractSkill() {
         private const val KEY_TEXT = "#_MESSAGE"
         private const val KEY_USE_DEFAULT = "#_USE_DEFAULT"
         private const val KEY_DEFAULT_MAPPING = "#_DEFAULT"
+        private const val KEY_DO_FINAL_REPLACEMENTS = "#_DO_REPLACEMENTS"
 
         private const val ACTUATOR_SPEECHACTUATOR = "SpeechActuator"
 
