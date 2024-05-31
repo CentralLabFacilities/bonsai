@@ -7,6 +7,7 @@ import de.unibi.citec.clf.bonsai.engine.control.StateMachineController;
 import de.unibi.citec.clf.bonsai.test.TestListener;
 
 import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
 public class TestTools {
@@ -27,7 +28,11 @@ public class TestTools {
         final String pathSM = PATH_TO_SM + "/" + scxml;
         final String pathToConfig = PATH_TO_CF + "/" + config;
 
-        SkillStateMachine skillStateMachine = new SkillStateMachine(new HashMap<>());
+        Map<String,String> mapping = Map.of(
+                "TEST", PATH_TO_SM
+        );
+
+        SkillStateMachine skillStateMachine = new SkillStateMachine(mapping);
         try {
             return skillStateMachine.initalize(pathSM,pathToConfig);
         }  catch (Exception t) {
@@ -41,7 +46,11 @@ public class TestTools {
         final String pathSM = PATH_TO_SM + "/" + scxml;
         final String pathToConfig = PATH_TO_CF + "/" + config;
 
-        SkillStateMachine skillStateMachine = new SkillStateMachine(new HashMap<>());
+        Map<String,String> mapping = Map.of(
+                "TEST", PATH_TO_SM
+        );
+
+        SkillStateMachine skillStateMachine = new SkillStateMachine(mapping);
 
         StateMachineController stateMachineController = new StateMachineController(skillStateMachine, pathToConfig,
                 pathSM, false);
