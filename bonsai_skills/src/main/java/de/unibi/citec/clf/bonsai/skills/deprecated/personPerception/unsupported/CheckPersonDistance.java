@@ -82,8 +82,15 @@ public class CheckPersonDistance extends AbstractSkill {
                 logger.fatal("PositionSensor timed out (1000ms) -> looping");
                 return ExitToken.loop();
             }
-            PolarCoordinate polar = new PolarCoordinate(MathTools.globalToLocal(
-                    personData.getPosition(), currentRobotPosition));
+            PolarCoordinate polar;
+            if (personData.isInBaseFrame()) {
+                logger.info("Person is in base_link" + personData.getPosition());
+                polar = new PolarCoordinate(personData.getPosition());
+            } else {
+                logger.info("Person is not base_link, using globalToLocal" + personData.getPosition());
+                polar = new PolarCoordinate(MathTools.globalToLocal(
+                        personData.getPosition(), currentRobotPosition));
+            }
 
             double distance = polar.getDistance(LengthUnit.METER);
             if (distance < minGoalDistance) {
