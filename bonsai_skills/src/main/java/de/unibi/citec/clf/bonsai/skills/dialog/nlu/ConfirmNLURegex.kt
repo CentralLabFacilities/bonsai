@@ -82,7 +82,7 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
         private const val PS_YES = "confirmYes"
     }
 
-    private val finalReplacements = mapOf("me" to "you", "you" to "me")
+    private val finalReplacements = mapOf("""\bme\b""" to "you", """\byou\b""" to "me")
     private var confirmText = "You want Me to: #M?"
     private var defaultMapping = "#T"
     private var timeout: Long = -1
@@ -165,7 +165,7 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
         }
         logger.info("computed: '$result'")
         for (replacement in finalReplacements) {
-            result = result.replace(replacement.key, replacement.value)
+            result = result.replace(replacement.key.toRegex(), replacement.value)
         }
         logger.info("after final replacements: '$result'")
         return result
@@ -225,8 +225,10 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
     private fun confirmYesNo(): ExitToken? {
         if (sayingComplete != null) {
             if (!sayingComplete!!.isDone) {
-                helper!!.startListening()
                 return ExitToken.loop(50)
+            } else {
+                sayingComplete = null
+                helper!!.startListening()
             }
         }
 

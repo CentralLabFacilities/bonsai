@@ -110,8 +110,10 @@ class ConfirmNLUSimple : AbstractSkill(), SensorListener<NLU?> {
     private fun confirmYesNo(): ExitToken? {
         if (sayingComplete != null) {
             if (!sayingComplete!!.isDone) {
-                helper!!.startListening()
                 return ExitToken.loop(50)
+            } else {
+                sayingComplete = null
+                helper!!.startListening()
             }
         }
 
