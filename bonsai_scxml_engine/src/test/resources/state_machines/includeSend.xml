@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0"
+       initial="consume">
+    <datamodel>
+        <data id="#_STATE_PREFIX" expr="'de.unibi.citec.clf.bonsai.skills.'"/>
+    </datamodel>
+
+    <state id="consume" src="${TEST}/partialSend.xml">
+        <transition event="consume.success" target="End"/>
+        <transition event="consume.error" target="Fatal"/>
+    </state>
+
+    <state id="Fatal" final="true"/>
+
+    <state id="End" final="true"/>
+</scxml>

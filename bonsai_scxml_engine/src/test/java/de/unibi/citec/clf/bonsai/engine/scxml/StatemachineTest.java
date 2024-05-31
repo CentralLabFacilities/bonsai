@@ -61,6 +61,15 @@ public class StatemachineTest {
     }
 
     @Test
+    public void includeSendEventTransition() throws TransformerException, TimeoutException {
+        final String sm = "includeSend.xml";
+        final String conf = "TestConfig.xml";
+
+        LoadingResults res = TestTools.loadStatemachine(sm);
+        assertTrue(res.success());
+    }
+
+    @Test
     public void sendEventTransition() throws TransformerException, TimeoutException {
         final String sm = "sendEventTransition.xml";
         final String conf = "TestConfig.xml";

@@ -88,9 +88,17 @@ the 'src' attribute of states. - Appends a suffix to all sourced 'id' and
     <xsl:template match="send/@event">
         <xsl:param name="prefix" tunnel="yes"/>
         <xsl:attribute name="event">
-            <xsl:variable name="vApos">'</xsl:variable>
-            <xsl:value-of
-                    select="concat($vApos, $prefix , translate(current(),$vApos,''), $vApos)"/>
+            <xsl:choose>
+                <xsl:when test="starts-with(current(), 'success') or starts-with(current(), 'error') or starts-with(current(), 'fatal')">
+                    <xsl:variable name="vApos">'</xsl:variable>
+                    <xsl:value-of
+                            select="concat($vApos, $prefix , translate(current(),$vApos,''), $vApos)"/>
+                </xsl:when>
+                <xsl:otherwise>
+                    <xsl:value-of
+                        select="current()"/>
+                </xsl:otherwise>
+            </xsl:choose>
         </xsl:attribute>
     </xsl:template>
 
