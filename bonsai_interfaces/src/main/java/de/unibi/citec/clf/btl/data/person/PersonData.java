@@ -31,6 +31,16 @@ public class PersonData extends BDO {
 
     }
 
+    @Override
+    public String getFrameId() {
+        return getPosition().getFrameId();
+    }
+
+    @Override
+    public void setFrameId(String frame) {
+        getPosition().setFrameId(frame);
+    }
+
     public double getReliability() {return reliability;}
     public void setReliability(double rel) {
         if(rel < 0) reliability = 0;
