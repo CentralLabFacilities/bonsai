@@ -12,13 +12,15 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
 import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException
 import de.unibi.citec.clf.bonsai.util.helper.SimpleNLUHelper
 import de.unibi.citec.clf.btl.data.speechrec.NLU
+import net.sf.saxon.functions.ConstantFunction.True
 import java.io.IOException
 import java.util.concurrent.Future
+import java.util.concurrent.TimeUnit
 
 /**
  *  Wait for confirmation of an understood NLU construct the question using rules and the given NLU.
  *
- *  build the confirm message using the given intent mappings
+ *  build the confirmation message using the given intent mappings
  *
  *  example: "pick_and_place=you want the #E:object from the #E:location:arrival;confirm_yes=#T what?"
  *  the default message is "You want ME to: #M?"
@@ -232,6 +234,11 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
                 return ExitToken.loop(50)
             } else {
                 sayingComplete = null
+                try {
+                    speechActuator?.enableASR(true)?.get(500, TimeUnit.MILLISECONDS)
+                } catch (ex: Exception) {
+                    logger.warn(ex)
+                }
                 helper!!.startListening()
             }
         }
