@@ -44,6 +44,8 @@ import java.util.concurrent.Future;
  *
  * @author dleins
  */
+
+@Deprecated
 public class LookToPosition extends AbstractSkill {
 
     private static final String KEY_DURATION = "#_DURATION";
@@ -87,7 +89,7 @@ public class LookToPosition extends AbstractSkill {
         Point3D pointToLookAt = new Point3D(
                 (float)posToLook.getX(LengthUnit.METER),
                 (float)posToLook.getY(LengthUnit.METER),
-                (float)posToLook.getY(LengthUnit.METER)
+                1.5F
         );
 
         gazeDone = gazeActuator.lookAt(pointToLookAt, duration);

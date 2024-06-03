@@ -25,6 +25,7 @@ public interface GazeActuator extends Actuator {
      * @return
      */
     Future<Void> lookAt(Point3D point, long duration);
+    Future<Void> lookAt(Point3D point, double maxVelocity, long minDuration);
 
     void manualStop() throws IOException;
 
