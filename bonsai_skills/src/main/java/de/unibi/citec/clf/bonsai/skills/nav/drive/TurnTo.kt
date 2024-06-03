@@ -109,7 +109,7 @@ class TurnTo<IOException> : AbstractSkill() {
 
     override fun execute(): ExitToken {
         if (navResult?.isDone != true) {
-            if (timeout < Time.currentTimeMillis()) {
+            if(timeout > 0 && timeout < Time.currentTimeMillis()) {
                 logger.info("TurnTo timed out")
                 return tokenSuccessPsTimeout!!
             }
