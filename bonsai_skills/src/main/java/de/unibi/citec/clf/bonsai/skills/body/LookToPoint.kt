@@ -23,7 +23,6 @@ class LookToPoint : AbstractSkill() {
     private var tokenSuccess: ExitToken? = null
     private var tokenErrorPsTimeout: ExitToken? = null
 
-
     var velocity = 1.0
     var frame = ""
     var x = 0.0
@@ -46,6 +45,7 @@ class LookToPoint : AbstractSkill() {
 
         val xyzf = setOf(KEY_X, KEY_Y, KEY_Z, KEY_FRAME)
         if (configurator.configurationKeys.any() { it in xyzf}) {
+            logger.debug("has configuration for point data, not using slot")
             frame = configurator.requestOptionalValue(KEY_FRAME, frame)
             x = configurator.requestOptionalDouble(KEY_X, x)
             y = configurator.requestOptionalDouble(KEY_Y, y)
@@ -65,9 +65,10 @@ class LookToPoint : AbstractSkill() {
         }
 
         val pointToLookAt : Point3D = slot?.recall<Point3D>() ?: run {
-            logger.info("slot null, building point")
+            logger.debug("slot null, building point from $x, $y, $z in $frame")
             Point3D(x, y, z, LengthUnit.METER, this.frame)
         }
+        logger.info("looking at point${pointToLookAt}")
         gazeDone = gazeActuator?.lookAt(pointToLookAt, duration.toLong())
         return true
     }
@@ -75,8 +76,7 @@ class LookToPoint : AbstractSkill() {
     override fun execute(): ExitToken {
         if (timeout > 0) {
             if (Time.currentTimeMillis() > timeout) {
-                logger.info("WaitForForce timed out")
-                gazeDone?.cancel(true)
+                logger.info("LookToPoint timed out")
                 return tokenErrorPsTimeout!!
             }
         }
@@ -87,6 +87,7 @@ class LookToPoint : AbstractSkill() {
     }
 
     override fun end(curToken: ExitToken): ExitToken {
+        if (blocking) gazeDone?.cancel(true)
         return curToken
     }
 
