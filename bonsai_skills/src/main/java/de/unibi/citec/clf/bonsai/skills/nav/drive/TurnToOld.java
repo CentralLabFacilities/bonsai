@@ -8,14 +8,15 @@ import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
-import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
+import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException;
 import de.unibi.citec.clf.btl.data.navigation.CommandResult;
 import de.unibi.citec.clf.btl.data.navigation.NavigationGoalData;
 import de.unibi.citec.clf.btl.data.navigation.PositionData;
 import de.unibi.citec.clf.btl.data.navigation.TurnData;
 import de.unibi.citec.clf.btl.units.AngleUnit;
 import de.unibi.citec.clf.btl.units.RotationalSpeedUnit;
+
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -50,7 +51,7 @@ import java.util.concurrent.Future;
  *
  * @author lruegeme, jkummert
  */
-public class TurnTo extends AbstractSkill {
+public class TurnToOld extends AbstractSkill {
 
     private static final String KEY_TIMEOUT = "#_TIMEOUT";
 
