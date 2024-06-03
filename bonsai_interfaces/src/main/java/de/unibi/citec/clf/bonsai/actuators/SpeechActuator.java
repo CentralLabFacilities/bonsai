@@ -30,6 +30,17 @@ public interface SpeechActuator extends Actuator {
     Future<Void> sayAsync(@Nonnull String text) throws IOException;
 
     /**
+     * Enable or disable ASR
+     *
+     * @param enable
+     *
+     * @return
+     * @throws IOException
+     *              communication error
+     */
+    Future<Boolean> enableASR(@Nonnull Boolean enable) throws IOException;
+
+    /**
      * Synchronous say method. Returns after the complete text was said.
      * 
      * @param text

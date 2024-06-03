@@ -1,5 +1,6 @@
 package de.unibi.citec.clf.bonsai.skills.dialog.nlu
 
+import de.unibi.citec.clf.bonsai.actuators.SpeechActuator
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException
 import de.unibi.citec.clf.bonsai.core.`object`.MemorySlotWriter
 import de.unibi.citec.clf.bonsai.core.`object`.Sensor
@@ -11,6 +12,8 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
 import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException
 import de.unibi.citec.clf.bonsai.util.helper.SimpleNLUHelper
 import de.unibi.citec.clf.btl.data.speechrec.NLU
+import java.lang.Exception
+import java.util.concurrent.TimeUnit
 
 /**
  * Wait for the robot to understand something with certain intents.
@@ -46,6 +49,7 @@ class WaitForNLU : AbstractSkill() {
         private const val KEY_ANY = "#_ANY"
     }
 
+    private var speechActuator: SpeechActuator? = null
     private var possible_intents: List<String> = mutableListOf()
 
     private var timeout: Long = -1
@@ -81,6 +85,8 @@ class WaitForNLU : AbstractSkill() {
         if (timeout > 0) {
             tokenSuccessPsTimeout = configurator.requestExitToken(ExitStatus.ERROR().ps("timeout"))
         }
+
+        speechActuator = configurator.getActuator("SpeechActuator", SpeechActuator::class.java)
     }
 
     override fun init(): Boolean {
@@ -88,6 +94,14 @@ class WaitForNLU : AbstractSkill() {
             logger.debug("using timeout of $timeout ms")
             timeout += Time.currentTimeMillis()
         }
+
+        try {
+            logger.debug("Enabling ASR")
+            speechActuator?.enableASR(true)?.get(500,TimeUnit.MILLISECONDS)
+        } catch (ex: Exception) {
+            logger.warn(ex)
+        }
+
         helper = SimpleNLUHelper(speechSensor, true)
         helper!!.startListening()
         return true
