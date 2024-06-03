@@ -18,7 +18,7 @@ import java.util.concurrent.Future
  */
 
 class LookToPoint : AbstractSkill() {
-    private var blocking = false
+    private var blocking = true
     private var duration = 0
     private var tokenSuccess: ExitToken? = null
     private var tokenErrorPsTimeout: ExitToken? = null
