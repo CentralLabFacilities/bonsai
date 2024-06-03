@@ -61,6 +61,7 @@ class LookToPoint : AbstractSkill() {
 
     override fun init(): Boolean {
         if (timeout > 0) {
+            logger.info("Timeout in ${timeout}ms")
             timeout += Time.currentTimeMillis()
         }
 
@@ -69,7 +70,7 @@ class LookToPoint : AbstractSkill() {
             Point3D(x, y, z, LengthUnit.METER, this.frame)
         }
         logger.info("looking at point${pointToLookAt}")
-        gazeDone = gazeActuator?.lookAt(pointToLookAt, duration.toLong())
+        gazeDone = gazeActuator?.lookAt(pointToLookAt, velocity, duration.toLong())
         return true
     }
 
