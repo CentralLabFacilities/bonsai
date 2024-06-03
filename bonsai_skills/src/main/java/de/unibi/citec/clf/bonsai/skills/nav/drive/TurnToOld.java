@@ -132,7 +132,7 @@ public class TurnToOld extends AbstractSkill {
             return tokenError;
         }
         if (!navResult.isDone()) {
-            if (timeout < Time.currentTimeMillis()) {
+            if (timeout > 0 && timeout < Time.currentTimeMillis()) {
                 logger.info("TurnTo timed out");
                 try {
                     navActuator.manualStop();
