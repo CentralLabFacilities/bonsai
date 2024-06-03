@@ -75,10 +75,8 @@ public class ExecutePosture extends AbstractSkill {
 
         try {
             if(ret.get()) return tokenSuccess;
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        } catch (ExecutionException e) {
-            e.printStackTrace();
+        } catch (InterruptedException | ExecutionException e) {
+            logger.fatal(e);
         }
 
         return ExitToken.fatal();
@@ -86,6 +84,7 @@ public class ExecutePosture extends AbstractSkill {
 
     @Override
     public ExitToken end(ExitToken curToken) {
+        if(blocking) ret.cancel(true);
         return curToken;
     }
 
