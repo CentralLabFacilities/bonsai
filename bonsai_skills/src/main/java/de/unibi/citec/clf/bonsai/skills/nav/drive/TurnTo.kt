@@ -15,6 +15,7 @@ import de.unibi.citec.clf.btl.data.geometry.PolarCoordinate
 import de.unibi.citec.clf.btl.data.navigation.CommandResult
 import de.unibi.citec.clf.btl.data.navigation.NavigationGoalData
 import de.unibi.citec.clf.btl.data.navigation.PositionData
+import de.unibi.citec.clf.btl.tools.MathTools
 import de.unibi.citec.clf.btl.units.AngleUnit
 import de.unibi.citec.clf.btl.units.LengthUnit
 import java.util.concurrent.Future
@@ -87,22 +88,24 @@ class TurnTo<IOException> : AbstractSkill() {
         targetGoal = navigationGoalDataSlot?.recall<NavigationGoalData>() ?: return false
         pos = robotPositionSensor?.readLast(1000) ?: return false
 
-
         logger.debug("robot: $pos")
         logger.debug("goal: $targetGoal")
 
         val local = CoordinateSystemConverter.globalToLocal(targetGoal, pos)
         val polar = PolarCoordinate(local)
         val angle = polar.getAngle(AngleUnit.RADIAN)
+        logger.debug("local goal: $local, angle: $angle")
 
         val finalGoal = NavigationGoalData()
         finalGoal.setYawTolerance(0.1, AngleUnit.RADIAN)
         finalGoal.setCoordinateTolerance(1.0, LengthUnit.METER)
-        finalGoal.setYaw(angle, AngleUnit.RADIAN)
+
+        finalGoal.setYaw(pos!!.getYaw(AngleUnit.RADIAN) + angle, AngleUnit.RADIAN)
         finalGoal.setX(pos!!.getX(LengthUnit.METER), LengthUnit.METER)
         finalGoal.setY(pos!!.getY(LengthUnit.METER), LengthUnit.METER)
 
-        navActuator?.manualStop()
+        logger.debug("final goal: $finalGoal")
+
         navResult = navActuator?.navigateToCoordinate(finalGoal) ?: return false
         return true
     }
