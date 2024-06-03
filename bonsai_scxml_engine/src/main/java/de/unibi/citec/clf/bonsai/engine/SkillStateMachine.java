@@ -700,6 +700,9 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
             if (a instanceof Send) {
                 logger.info("## SEND ## Event:"
                         + ((Send) a).getEvent());
+                //Somehow we dont always execute event actions and fire events?
+                //So we just fire manually
+                fireEvent(((Send) a).getEvent());
                 //checkEventTransitions(((Send) a).getEvent());
             } else if (a instanceof Assign) {
                 Assign action = (Assign) a;
