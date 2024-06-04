@@ -49,8 +49,7 @@ public class WaitForForce extends AbstractSkill {
     private double threshold = 2;
 
     private ExitToken tokenSuccess;
-    private ExitToken tokenSuccessPsTimeout;
-    private ExitToken tokenError;
+    private ExitToken tokenErrorPsTimeout;
 
     private HandOverActuator hand;
 
@@ -60,7 +59,6 @@ public class WaitForForce extends AbstractSkill {
     @Override
     public void configure(ISkillConfigurator configurator) {
 
-        tokenError = configurator.requestExitToken(ExitStatus.ERROR());
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
         hand = configurator.getActuator("HandOver", HandOverActuator.class);
 
@@ -69,7 +67,7 @@ public class WaitForForce extends AbstractSkill {
         group = configurator.requestOptionalValue(KEY_GROUP, group);
 
         if (timeout > 0) {
-            tokenSuccessPsTimeout = configurator.requestExitToken(ExitStatus.SUCCESS().ps("timeout"));
+            tokenErrorPsTimeout = configurator.requestExitToken(ExitStatus.ERROR().ps("timeout"));
         }
     }
 
@@ -97,23 +95,21 @@ public class WaitForForce extends AbstractSkill {
         if (timeout > 0) {
             if (Time.currentTimeMillis() > timeout) {
                 logger.info("WaitForForce timed out");
-                future.cancel(true);
-
-                return tokenSuccessPsTimeout;
+                return tokenErrorPsTimeout;
             }
         }
 
         logger.info("##### waiting for force torque above threshold...");
 
-        while (!future.isDone()) {
-            return ExitToken.loop();
+        if (!future.isDone()) {
+            return ExitToken.loop(100);
         }
 
         try {
             if (future.get()) {
                 return tokenSuccess;
             } else {
-                return tokenError;
+                return ExitToken.fatal();
             }
         } catch (InterruptedException | ExecutionException e) {
             logger.error(e.getMessage());
@@ -123,6 +119,7 @@ public class WaitForForce extends AbstractSkill {
 
     @Override
     public ExitToken end(ExitToken curToken) {
+        future.cancel(true);
         return curToken;
     }
 }
