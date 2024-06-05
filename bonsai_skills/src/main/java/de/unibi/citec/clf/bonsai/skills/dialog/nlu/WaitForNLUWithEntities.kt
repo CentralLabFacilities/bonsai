@@ -93,7 +93,6 @@ class WaitForNLUWithEntities : AbstractSkill(){
         }
 
         val understood = helper!!.allNLUs
-        helper!!.clearBuffer()
 
         for (nt in understood) {
             if (intent == nt.intent) {
