@@ -178,8 +178,10 @@ public class ConfirmYesOrNo extends AbstractSkill  {
 
         if (sayingComplete != null) {
             if (!sayingComplete.isDone()) {
-                helper.startListening();
                 return ExitToken.loop(50);
+            } else {
+                helper.startListening();
+                sayingComplete = null;
             }
         }
 
