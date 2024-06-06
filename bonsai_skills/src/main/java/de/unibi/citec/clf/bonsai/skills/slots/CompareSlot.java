@@ -33,7 +33,6 @@ public class CompareSlot extends AbstractSkill {
 
     private ExitToken tokenMisMatch;
     private ExitToken tokenMatch;
-    private ExitToken tokenError;
 
     private static final String KEY_COMPARE_STRING = "#_COMPARE_STRING";
 
@@ -46,7 +45,7 @@ public class CompareSlot extends AbstractSkill {
     public void configure(ISkillConfigurator configurator) {
         tokenMatch = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus("match"));
         tokenMisMatch = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus("misMatch"));
-        tokenError = configurator.requestExitToken(ExitStatus.ERROR());
+
 
         readSlot = configurator.getReadSlot("ReadSlot", String.class);
         compareString = configurator.requestValue(KEY_COMPARE_STRING);
@@ -59,6 +58,7 @@ public class CompareSlot extends AbstractSkill {
 
             if (slotContent == null) {
                 logger.warn("your ReadSlot was empty");
+                return false;
             }
 
         } catch (CommunicationException ex) {
@@ -70,9 +70,6 @@ public class CompareSlot extends AbstractSkill {
 
     @Override
     public ExitToken execute() {
-        if (slotContent == null) {
-            return tokenError;
-        }
         if (slotContent.equals(compareString)) {
             return tokenMatch;
         }

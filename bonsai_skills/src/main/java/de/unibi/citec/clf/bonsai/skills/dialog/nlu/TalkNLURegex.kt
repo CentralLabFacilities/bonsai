@@ -53,7 +53,7 @@ import java.util.concurrent.Future
  * @author lruegeme
  */
 class TalkNLURegex : AbstractSkill() {
-    private val finalReplacements = mapOf("""\bme\b""" to "you", """\byou\b""" to "me")
+    private val finalReplacements = mapOf("""\bme\b""" to "YOU", """\byou\b""" to "ME")
     private var doFinalReplacements = true
     private var message = "#M"
     private var defaultMapping = "#T"
