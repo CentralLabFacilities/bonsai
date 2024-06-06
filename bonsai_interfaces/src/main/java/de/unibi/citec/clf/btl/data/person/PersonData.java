@@ -37,6 +37,11 @@ public class PersonData extends BDO {
     }
 
     @Override
+    public boolean isInBaseFrame() {
+        return getPosition().isInBaseFrame();
+    }
+
+    @Override
     public void setFrameId(String frame) {
         getPosition().setFrameId(frame);
     }
