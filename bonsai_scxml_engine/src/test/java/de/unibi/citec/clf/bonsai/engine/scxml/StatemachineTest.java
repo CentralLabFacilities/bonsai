@@ -160,4 +160,28 @@ public class StatemachineTest {
         assertTrue(TestTools.testStatemachine(conf, sm, test));
     }
 
+//    @Test
+//    public void testParallelWorking() throws TransformerException, TimeoutException {
+//        final String sm = "parallelWorking.xml";
+//        final String conf = "TestConfig.xml";
+//
+//        LoadingResults res = TestTools.loadStatemachine(sm);
+//        assertTrue(res.success());
+//
+//        TestListener test = TestListener.newEndFatal();
+//        assertTrue(TestTools.testStatemachine(conf, sm, test));
+//    }
+//
+//    @Test
+//    public void testParallelBugged() throws TransformerException, TimeoutException {
+//        final String sm = "parallelBugged.xml";
+//        final String conf = "TestConfig.xml";
+//
+//        LoadingResults res = TestTools.loadStatemachine(sm);
+//        assertTrue(res.success());
+//
+//        TestListener test = TestListener.newEndFatal();
+//        assertTrue(TestTools.testStatemachine(conf, sm, test));
+//    }
+
 }

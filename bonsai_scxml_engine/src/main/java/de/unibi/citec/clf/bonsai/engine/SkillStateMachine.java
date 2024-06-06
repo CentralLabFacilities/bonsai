@@ -518,6 +518,16 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
         TriggerEvent evts = new TriggerEvent(event, TriggerEvent.SIGNAL_EVENT);
         try {
             logger.debug("FIRE SKILL Event: " + event);
+            logger.trace("All Current states:");
+            if (logger.isTraceEnabled()) for(Object s : scxmlExecutor.getCurrentStatus().getAllStates()) {
+                if (s instanceof State) {
+                    State state = (State) s;
+                    logger.trace("- " + state.getId());
+                } else {
+                    logger.trace(s);
+                }
+
+            }
             //checkEventTransitions(event);
             scxmlExecutor.triggerEvent(evts);
         } catch (ModelException me) {
@@ -702,7 +712,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
                         + ((Send) a).getEvent());
                 //Somehow we dont always execute event actions and fire events?
                 //So we just fire manually
-                fireEvent(((Send) a).getEvent());
+                //fireEvent(((Send) a).getEvent());
                 //checkEventTransitions(((Send) a).getEvent());
             } else if (a instanceof Assign) {
                 Assign action = (Assign) a;
@@ -732,10 +742,15 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     public void onEntry(final TransitionTarget entered) {
 
         logger.debug("#OnEntry: " + entered.getId());
-        logger.trace("Current states:");
-        if (logger.isTraceEnabled()) for(Object s : scxmlExecutor.getCurrentStatus().getStates()) {
-            State state = (State) s;
-            logger.trace("- " + state.getId());
+        logger.trace("All Current states:");
+        if (logger.isTraceEnabled()) for(Object s : scxmlExecutor.getCurrentStatus().getAllStates()) {
+            if (s instanceof State) {
+                State state = (State) s;
+                logger.trace("- " + state.getId());
+            } else {
+                logger.trace(s);
+            }
+
         }
         logger.debug(this.scxmlExecutor.getCurrentStatus().toString());
         actionCheck(entered.getOnEntry().getActions());
@@ -806,13 +821,21 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
             if (exited instanceof Parallel) {
                 Parallel parallel = (Parallel) exited;
                 logger.trace("exited is instance of parallel " + exited.getId());
+                this.pauseMachine();
                 for (Object s : parallel.getChildren()) {
                     if (s instanceof TransitionTarget) {
                         TransitionTarget t = (TransitionTarget) s;
+
                         StateID stateId = new StateID(statePrefix, t.getId());
                         stopAndRemoveState(stateId, true);
                     }
                 }
+                // Removing all active states to be sure
+                Set<StateID> keys = new HashSet<>(activeStates.keySet());
+                for (StateID key : keys) {
+                    stopAndRemoveState(key, true);
+                }
+                this.continueStateMachine();
             } else {
                 logger.trace("exited is not parallel " + exited.getId() + " "
                         + exited.getClass().getSimpleName());
