@@ -106,7 +106,7 @@ public class StateID {
     }
 
     private void setName(String name) throws StateIDException {
-        if (name.isEmpty() || !name.matches("^[a-zA-Z0-9]*$")) {
+        if (name.isEmpty() || !name.matches("^[a-zA-Z0-9_]*$")) {
             throw new StateIDException("name must be a canonical class "
                     + "name (received: \"" + name + "\")");
         }
