@@ -732,6 +732,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     public void onEntry(final TransitionTarget entered) {
 
         logger.debug("#OnEntry: " + entered.getId());
+        //logger.debug(this.);
         actionCheck(entered.getOnEntry().getActions());
 
         while (PAUSE && running) {
