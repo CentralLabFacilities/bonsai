@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="init">
+    <datamodel>
+        <data id="#_STATE_PREFIX" expr="'de.unibi.citec.clf.bonsai.skills.'"/>
+        <data id="condition1" expr="false"/>
+        <data id="condition2" expr="false"/>
+        <data id="condition3" expr="false"/>
+    </datamodel>
+
+    <state id="init" initial="Nop#init">
+        <state id="Nop#init">
+            <transition event="Nop.fatal" target="Parallel"/>
+        </state>
+    </state>
+
+    <parallel id="Parallel">
+        <onentry>
+            <assign name="condition1" expr="false"/>
+            <assign name="condition2" expr="false"/>
+            <assign name="condition3" expr="false"/>
+        </onentry>
+
+        <!-- Transitions that leave parallel have to be defined on the parallel state -->
+        <transition event="strand.done" cond="condition1 and condition2 and condition3" target="Wait#After"/>
+
+        <state id="Nop">
+            <transition event="Nop.fatal">
+                <assign name="condition1" expr="true"/>
+                <send event="strand.done" delay="1000"/>
+            </transition>
+
+        </state>
+
+        <state id="Wait">
+            <datamodel>
+                <data id="#_TIMEOUT" expr="'1000'"/>
+            </datamodel>
+            <transition event="Wait.success">
+                <assign name="condition2" expr="true"/>
+                <send event="strand.done" delay="1000"/>
+            </transition>
+            <transition event="Wait.fatal"/>
+        </state>
+
+        <state id="Wait2">
+            <datamodel>
+                <data id="#_TIMEOUT" expr="'10000'"/>
+            </datamodel>
+            <transition event="Wait2.success">
+                <assign name="condition3" expr="true"/>
+                <send event="strand.done" delay="1000"/>
+            </transition>
+            <transition event="Wait2.fatal"/>
+        </state>
+    </parallel>
+
+    <state id="Wait#After">
+        <transition event="Wait.success" target="End"/>
+        <transition event="Wait.fatal"/>
+    </state>
+
+    <state id="Fatal" final="true"/>
+
+    <state id="End" final="true"/>
+</scxml>
