@@ -515,7 +515,7 @@ public class StateMachineConfigurator {
         @SuppressWarnings("unchecked")
         List<Data> dataList = model.getData();
         for (Data data : dataList) {
-            logger.error("reading variable: " + data.getId());
+            logger.info("reading variable: " + data.getId());
             String exp = data.getExpr();
             if (exp == null) exp = "";
             String name = exp.replaceAll("'", "");
