@@ -86,7 +86,7 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
         private const val PS_YES = "confirmYes"
     }
 
-    private val finalReplacements = mapOf("""\bme\b""" to "you", """\byou\b""" to "me")
+    private val finalReplacements = mapOf("""\bme\b""" to "YOU", """\byou\b""" to "ME")
     private var doFinalReplacements = true
     private var confirmText = "You want Me to: #M?"
     private var defaultMapping = "#T"
@@ -142,7 +142,7 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
 
         for (m in mappings.split(";")) {
             if (m.isBlank()) continue // last string after ;
-            logger.debug("add mapping: $m")
+            logger.trace("add mapping: $m")
             val s = m.trim().split("=")
             if (s.size != 2) throw SkillConfigurationException("error in intentMapping for '$m' size:${s.size} != 2")
             intentMapping[s.first()] = s.last()
@@ -170,10 +170,12 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
             }
         }
         logger.info("computed: '$result'")
-        if (doFinalReplacements) for (replacement in finalReplacements) {
-            result = result.replace(replacement.key.toRegex(), replacement.value)
+        if (doFinalReplacements) {
+            for (replacement in finalReplacements) {
+                result = result.replace(replacement.key.toRegex(), replacement.value)
+            }
+            logger.info("text after final replacements: '$result'")
         }
-        logger.info("after final replacements: '$result'")
         return result
     }
 
