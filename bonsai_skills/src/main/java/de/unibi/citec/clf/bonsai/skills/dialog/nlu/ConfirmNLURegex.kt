@@ -266,7 +266,7 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
                 return tokenSuccessPsNo
             }
             try {
-                sayingComplete = speechActuator!!.sayAsync("Sorry, please repeat!")
+                sayingComplete = speechActuator!!.sayAsync("Please answer with yes or no!")
             } catch (ex: IOException) {
                 logger.error("IO Exception in speechActuator")
             }
