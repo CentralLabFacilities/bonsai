@@ -1,21 +1,24 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+<html class="writer-html5" lang="en" data-content_root="../">
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Install &mdash; Bonsai Docs 0.7-SNAPSHOT documentation</title>
-      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=19f00094" />
+
+  
     <link rel="shortcut icon" href="../_static/favicon.ico"/>
   <!--[if lt IE 9]>
     <script src="../_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
-        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
-        <script src="../_static/jquery.js"></script>
-        <script src="../_static/underscore.js"></script>
-        <script src="../_static/doctools.js"></script>
+        <script src="../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../_static/documentation_options.js?v=b90832ea"></script>
+        <script src="../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -101,9 +104,9 @@
            <div itemprop="articleBody">
              
   <section id="install">
-<h1>Install<a class="headerlink" href="#install" title="Permalink to this headline"></a></h1>
+<h1>Install<a class="headerlink" href="#install" title="Link to this heading"></a></h1>
 <section id="setup">
-<h2>Setup<a class="headerlink" href="#setup" title="Permalink to this headline"></a></h2>
+<h2>Setup<a class="headerlink" href="#setup" title="Link to this heading"></a></h2>
 <ol class="arabic" start="0">
 <li><p>add repositories to settings.xml, see <a class="reference internal" href="#maven"><span class="std std-ref">Maven</span></a>.</p></li>
 <li><p>Create a directory for bonsai and change into the dir:</p>
@@ -143,7 +146,7 @@
 </li>
 </ol>
 <section id="running">
-<h3>Running<a class="headerlink" href="#running" title="Permalink to this headline"></a></h3>
+<h3>Running<a class="headerlink" href="#running" title="Link to this heading"></a></h3>
 <ol class="arabic" start="5">
 <li><p>Start a roscore in another terminal</p></li>
 <li><p>Run example statemachine:</p>
@@ -156,9 +159,9 @@
 </section>
 </section>
 <section id="building-all-projects">
-<h2>Building all projects<a class="headerlink" href="#building-all-projects" title="Permalink to this headline"></a></h2>
+<h2>Building all projects<a class="headerlink" href="#building-all-projects" title="Link to this heading"></a></h2>
 <section id="prerequisites">
-<h3>Prerequisites<a class="headerlink" href="#prerequisites" title="Permalink to this headline"></a></h3>
+<h3>Prerequisites<a class="headerlink" href="#prerequisites" title="Link to this heading"></a></h3>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>Robocup at Bielefeld: sourcing your distribution satisfies all prerequisites:</p>
@@ -202,7 +205,7 @@
 </ol>
 </section>
 <section id="building">
-<h3>Building<a class="headerlink" href="#building" title="Permalink to this headline"></a></h3>
+<h3>Building<a class="headerlink" href="#building" title="Link to this heading"></a></h3>
 <ol class="arabic">
 <li><p>clone bonsai projects:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">git</span> <span class="n">clone</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">CentralLabFacilities</span><span class="o">/</span><span class="n">bonsai</span><span class="o">.</span><span class="n">git</span> <span class="n">src</span><span class="o">/</span><span class="n">bonsai</span>
@@ -226,9 +229,9 @@
 </section>
 </section>
 <section id="robocup-at-bielefeld">
-<h2>Robocup at Bielefeld<a class="headerlink" href="#robocup-at-bielefeld" title="Permalink to this headline"></a></h2>
+<h2>Robocup at Bielefeld<a class="headerlink" href="#robocup-at-bielefeld" title="Link to this heading"></a></h2>
 <section id="pepper">
-<h3>Pepper<a class="headerlink" href="#pepper" title="Permalink to this headline"></a></h3>
+<h3>Pepper<a class="headerlink" href="#pepper" title="Link to this heading"></a></h3>
 <ol class="arabic" start="0">
 <li><p>Setup Jenkins</p></li>
 <li><p>Install IntelliJ IDEA</p></li>
@@ -252,45 +255,45 @@
 </section>
 </section>
 <section id="misc">
-<h2>Misc<a class="headerlink" href="#misc" title="Permalink to this headline"></a></h2>
+<h2>Misc<a class="headerlink" href="#misc" title="Link to this heading"></a></h2>
 <section id="maven">
-<span id="id1"></span><h3>Maven<a class="headerlink" href="#maven" title="Permalink to this headline"></a></h3>
+<span id="id1"></span><h3>Maven<a class="headerlink" href="#maven" title="Link to this heading"></a></h3>
 <p>To fetch the dependencies of bonsai add the following repositories to your <code class="docutils literal notranslate"><span class="pre">.m2/settings.xml</span></code></p>
 <p>Repositories:</p>
 <div class="highlight-xml notranslate"><div class="highlight"><pre><span></span>...
 <span class="nt">&lt;profiles&gt;</span>
-    <span class="nt">&lt;profile&gt;</span>
-        ...
-        <span class="nt">&lt;repositories&gt;</span>
+<span class="w">    </span><span class="nt">&lt;profile&gt;</span>
+<span class="w">        </span>...
+<span class="w">        </span><span class="nt">&lt;repositories&gt;</span>
 
-            <span class="nt">&lt;repository&gt;</span>
-                <span class="nt">&lt;id&gt;</span>citec<span class="nt">&lt;/id&gt;</span>
-                <span class="nt">&lt;name&gt;</span>citec<span class="nt">&lt;/name&gt;</span>
-                <span class="nt">&lt;url&gt;</span>https://mvn.cit-ec.de/nexus/content/repositories/releases<span class="nt">&lt;/url&gt;</span>
-                <span class="nt">&lt;layout&gt;</span>default<span class="nt">&lt;/layout&gt;</span>
-                <span class="nt">&lt;releases&gt;</span>
-                    <span class="nt">&lt;updatePolicy&gt;</span>always<span class="nt">&lt;/updatePolicy&gt;</span>
-                    <span class="nt">&lt;enabled&gt;</span>true<span class="nt">&lt;/enabled&gt;</span>
-                <span class="nt">&lt;/releases&gt;</span>
-            <span class="nt">&lt;/repository&gt;</span>
+<span class="w">            </span><span class="nt">&lt;repository&gt;</span>
+<span class="w">                </span><span class="nt">&lt;id&gt;</span>citec<span class="nt">&lt;/id&gt;</span>
+<span class="w">                </span><span class="nt">&lt;name&gt;</span>citec<span class="nt">&lt;/name&gt;</span>
+<span class="w">                </span><span class="nt">&lt;url&gt;</span>https://mvn.cit-ec.de/nexus/content/repositories/releases<span class="nt">&lt;/url&gt;</span>
+<span class="w">                </span><span class="nt">&lt;layout&gt;</span>default<span class="nt">&lt;/layout&gt;</span>
+<span class="w">                </span><span class="nt">&lt;releases&gt;</span>
+<span class="w">                    </span><span class="nt">&lt;updatePolicy&gt;</span>always<span class="nt">&lt;/updatePolicy&gt;</span>
+<span class="w">                    </span><span class="nt">&lt;enabled&gt;</span>true<span class="nt">&lt;/enabled&gt;</span>
+<span class="w">                </span><span class="nt">&lt;/releases&gt;</span>
+<span class="w">            </span><span class="nt">&lt;/repository&gt;</span>
 
-            <span class="nt">&lt;repository&gt;</span>
-                <span class="nt">&lt;id&gt;</span>citec-snapshots<span class="nt">&lt;/id&gt;</span>
-                <span class="nt">&lt;name&gt;</span>citec-snapshots<span class="nt">&lt;/name&gt;</span>
-                <span class="nt">&lt;url&gt;</span>https://mvn.cit-ec.de/nexus/content/repositories/snapshots<span class="nt">&lt;/url&gt;</span>
-                <span class="nt">&lt;layout&gt;</span>default<span class="nt">&lt;/layout&gt;</span>
-                <span class="nt">&lt;releases&gt;</span>
-                    <span class="nt">&lt;enabled&gt;</span>false<span class="nt">&lt;/enabled&gt;</span>
-                <span class="nt">&lt;/releases&gt;</span>
-                <span class="nt">&lt;snapshots&gt;</span>
-                    <span class="nt">&lt;enabled&gt;</span>true<span class="nt">&lt;/enabled&gt;</span>
-                    <span class="nt">&lt;updatePolicy&gt;</span>always<span class="nt">&lt;/updatePolicy&gt;</span>
-                <span class="nt">&lt;/snapshots&gt;</span>
-            <span class="nt">&lt;/repository&gt;</span>
+<span class="w">            </span><span class="nt">&lt;repository&gt;</span>
+<span class="w">                </span><span class="nt">&lt;id&gt;</span>citec-snapshots<span class="nt">&lt;/id&gt;</span>
+<span class="w">                </span><span class="nt">&lt;name&gt;</span>citec-snapshots<span class="nt">&lt;/name&gt;</span>
+<span class="w">                </span><span class="nt">&lt;url&gt;</span>https://mvn.cit-ec.de/nexus/content/repositories/snapshots<span class="nt">&lt;/url&gt;</span>
+<span class="w">                </span><span class="nt">&lt;layout&gt;</span>default<span class="nt">&lt;/layout&gt;</span>
+<span class="w">                </span><span class="nt">&lt;releases&gt;</span>
+<span class="w">                    </span><span class="nt">&lt;enabled&gt;</span>false<span class="nt">&lt;/enabled&gt;</span>
+<span class="w">                </span><span class="nt">&lt;/releases&gt;</span>
+<span class="w">                </span><span class="nt">&lt;snapshots&gt;</span>
+<span class="w">                    </span><span class="nt">&lt;enabled&gt;</span>true<span class="nt">&lt;/enabled&gt;</span>
+<span class="w">                    </span><span class="nt">&lt;updatePolicy&gt;</span>always<span class="nt">&lt;/updatePolicy&gt;</span>
+<span class="w">                </span><span class="nt">&lt;/snapshots&gt;</span>
+<span class="w">            </span><span class="nt">&lt;/repository&gt;</span>
 
-        <span class="nt">&lt;/repositories&gt;</span>
-        ...
-    <span class="nt">&lt;/profile&gt;</span>
+<span class="w">        </span><span class="nt">&lt;/repositories&gt;</span>
+<span class="w">        </span>...
+<span class="w">    </span><span class="nt">&lt;/profile&gt;</span>
 <span class="nt">&lt;/profiles&gt;</span>
 ...
 </pre></div>
@@ -311,7 +314,7 @@
 
   <div role="contentinfo">
     <p>&#169; Copyright 2023, Leroy Rügemer.
-      <span class="lastupdated">Last updated on Oct 31, 2023.
+      <span class="lastupdated">Last updated on Jun 09, 2024.
       </span></p>
   </div>
 
