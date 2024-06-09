@@ -208,7 +208,7 @@ public class ConfirmYesOrNo extends AbstractSkill  {
             }
 
             try {
-                sayingComplete = speechActuator.sayAsync("Sorry, please repeat!");
+                sayingComplete = speechActuator.sayAsync("Please answer with yes or no!");
             } catch (IOException ex) {
                 logger.error("IO Exception in speechActuator");
             }

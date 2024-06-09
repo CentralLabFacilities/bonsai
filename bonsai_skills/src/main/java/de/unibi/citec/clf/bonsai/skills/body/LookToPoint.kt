@@ -18,6 +18,7 @@ import java.util.concurrent.Future
  */
 
 class LookToPoint : AbstractSkill() {
+    private var actuator = "GazeActuator"
     private var blocking = true
     private var duration = 0
     private var tokenSuccess: ExitToken? = null
@@ -41,7 +42,8 @@ class LookToPoint : AbstractSkill() {
         velocity = configurator.requestOptionalDouble(KEY_VELOCITY,velocity)
         blocking = configurator.requestOptionalBool(KEY_BLOCKING, blocking)
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
-        gazeActuator = configurator.getActuator("GazeActuator", GazeActuator::class.java)
+        actuator = configurator.requestOptionalValue(KEY_ACTUATOR,actuator)
+        gazeActuator = configurator.getActuator(actuator, GazeActuator::class.java)
 
         val xyzf = setOf(KEY_X, KEY_Y, KEY_Z, KEY_FRAME)
         if (configurator.configurationKeys.any() { it in xyzf}) {
@@ -93,6 +95,7 @@ class LookToPoint : AbstractSkill() {
     }
 
     companion object {
+        private const val KEY_ACTUATOR = "#_ACTUATOR"
         private const val KEY_TIMEOUT = "#_TIMEOUT"
         private const val KEY_DURATION = "#_DURATION"
         private const val KEY_VELOCITY = "#_VELOCITY"
