@@ -10,6 +10,7 @@ The Bonsai SCXML utilises this to couple skills to rich behavior.
 
 
 .. toctree::
-    :maxdepth: 3
+    :maxdepth: 2
 
     Intro <behavior/scxml-intro>
+    Statemachine Configuration <behavior/config>
