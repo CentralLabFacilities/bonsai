@@ -44,6 +44,7 @@ import java.util.concurrent.Future
  *
  * @author lruegeme
  */
+@Deprecated("superseded, use ConfirmNLURegex without mappings", ReplaceWith("ConfirmNLURegex"))
 class ConfirmNLUSimple : AbstractSkill(), SensorListener<NLU?> {
     private var confirmText = "You said: \$T ?"
     private var timeout: Long = -1
@@ -138,7 +139,7 @@ class ConfirmNLUSimple : AbstractSkill(), SensorListener<NLU?> {
                 return tokenSuccessPsNo
             }
             try {
-                sayingComplete = speechActuator!!.sayAsync("Sorry, please repeat!")
+                sayingComplete = speechActuator!!.sayAsync("Please answer with yes or no!")
             } catch (ex: IOException) {
                 logger.error("IO Exception in speechActuator")
             }
