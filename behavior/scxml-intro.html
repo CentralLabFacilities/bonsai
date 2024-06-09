@@ -1,24 +1,28 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+<html class="writer-html5" lang="en" data-content_root="../">
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SCXML Definitions &mdash; Bonsai Docs 0.7-SNAPSHOT documentation</title>
-      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=19f00094" />
+
+  
     <link rel="shortcut icon" href="../_static/favicon.ico"/>
   <!--[if lt IE 9]>
     <script src="../_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
-        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
-        <script src="../_static/jquery.js"></script>
-        <script src="../_static/underscore.js"></script>
-        <script src="../_static/doctools.js"></script>
+        <script src="../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../_static/documentation_options.js?v=b90832ea"></script>
+        <script src="../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="SCXML Configuration" href="config.html" />
     <link rel="prev" title="Bonsai - SCXML" href="../behavior.html" /> 
 </head>
 
@@ -75,6 +79,7 @@
 </li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="config.html">Statemachine Configuration</a></li>
 </ul>
 </li>
 </ul>
@@ -104,16 +109,16 @@
            <div itemprop="articleBody">
              
   <section id="scxml-definitions">
-<h1>SCXML Definitions<a class="headerlink" href="#scxml-definitions" title="Permalink to this headline"></a></h1>
+<h1>SCXML Definitions<a class="headerlink" href="#scxml-definitions" title="Link to this heading"></a></h1>
 <p>We use Apache Commons XML to create our robot behavior.</p>
 <p>The Bonsai Engine reads these files to couple simple skills to rich robot behavior.
 BonsaiSCXML is not utilizing the whole <a class="reference external" href="http://www.w3.org/TR/scxml/">spec</a>. This page introduces all the relevant parts of SCXML</p>
 <section id="state">
-<h2>State<a class="headerlink" href="#state" title="Permalink to this headline"></a></h2>
+<h2>State<a class="headerlink" href="#state" title="Link to this heading"></a></h2>
 <p>States define the possible “situations” (or states) the Statemachine can be in.</p>
 <p>If the Statemachine is running all current states are called active.</p>
 <p>Example State:</p>
-<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;A&quot;</span><span class="nt">/&gt;</span>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;A&quot;</span><span class="nt">/&gt;</span>
 </pre></div>
 </div>
 <ul class="simple">
@@ -121,13 +126,13 @@ BonsaiSCXML is not utilizing the whole <a class="reference external" href="http:
 <li><p>The Attribute <code class="docutils literal notranslate"><span class="pre">id</span></code> is required and defines the <code class="docutils literal notranslate"><span class="pre">StateID</span></code>.</p></li>
 </ul>
 <p>The root element requires an attribute to denote the starting State of the Statemachine.</p>
-<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;scxml</span> <span class="na">xmlns=</span><span class="s">&quot;http://www.w3.org/2005/07/scxml&quot;</span> <span class="na">version=</span><span class="s">&quot;1.0&quot;</span> <span class="na">initial=</span><span class="s">&quot;A&quot;</span><span class="nt">&gt;</span>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;scxml</span><span class="w"> </span><span class="na">xmlns=</span><span class="s">&quot;http://www.w3.org/2005/07/scxml&quot;</span><span class="w"> </span><span class="na">version=</span><span class="s">&quot;1.0&quot;</span><span class="w"> </span><span class="na">initial=</span><span class="s">&quot;A&quot;</span><span class="nt">&gt;</span>
 </pre></div>
 </div>
 <p>States can have Substates. The initial Attribute is required and needs to be a child of the parent.</p>
-<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;A&quot;</span> <span class="na">initial=</span><span class="s">&quot;B&quot;</span><span class="nt">&gt;</span>
-    <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;B&quot;</span><span class="nt">/&gt;</span>
-    <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;C&quot;</span><span class="nt">/&gt;</span>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;A&quot;</span><span class="w"> </span><span class="na">initial=</span><span class="s">&quot;B&quot;</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;B&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;C&quot;</span><span class="nt">/&gt;</span>
 <span class="nt">&lt;/state&gt;</span>
 </pre></div>
 </div>
@@ -136,39 +141,39 @@ BonsaiSCXML is not utilizing the whole <a class="reference external" href="http:
 <li><p>States may have <code class="docutils literal notranslate"><span class="pre">onentry</span></code> and  <code class="docutils literal notranslate"><span class="pre">onexit</span></code> elements which may contain actions(<a class="reference external" href="https://www.w3.org/TR/scxml/#executable">executable content</a>) to be executed on entry or exit of the state.</p></li>
 </ul>
 <section id="parallel">
-<h3>Parallel<a class="headerlink" href="#parallel" title="Permalink to this headline"></a></h3>
+<h3>Parallel<a class="headerlink" href="#parallel" title="Link to this heading"></a></h3>
 <p>The <code class="docutils literal notranslate"><span class="pre">&lt;parallel&gt;</span></code> element encapsulates a set of child states which are simultaneously active when the parent element is active.</p>
 <ul class="simple">
 <li><p>Parallel has to be exited from the parallel state. (transition outside parallel cant happen in child states)</p></li>
 <li><p>More exactly: first child states of parallel should not have transitions.</p></li>
 </ul>
 <p>Example:</p>
-<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;parallel</span> <span class="na">id=</span><span class="s">&quot;one&quot;</span><span class="nt">&gt;</span>
-    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">&quot;A&quot;</span> <span class="na">target=</span><span class="s">&quot;three&quot;</span><span class="nt">/&gt;</span>
-    <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;twoA&quot;</span> <span class="na">initial=</span><span class="s">&quot;two#1&quot;</span><span class="nt">&gt;</span>
-        <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;two#1&quot;</span><span class="nt">&gt;</span>
-            <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">&quot;B&quot;</span> <span class="na">target=</span><span class="s">&quot;two#2&quot;</span><span class="nt">/&gt;</span>
-        <span class="nt">&lt;/state&gt;</span>
-        <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;two#2&quot;</span><span class="nt">/&gt;</span>
-    <span class="nt">&lt;/state&gt;</span>
-    <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;twoB&quot;</span><span class="nt">/&gt;</span>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;parallel</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;one&quot;</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;A&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;three&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;twoA&quot;</span><span class="w"> </span><span class="na">initial=</span><span class="s">&quot;two#1&quot;</span><span class="nt">&gt;</span>
+<span class="w">        </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;two#1&quot;</span><span class="nt">&gt;</span>
+<span class="w">            </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;B&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;two#2&quot;</span><span class="nt">/&gt;</span>
+<span class="w">        </span><span class="nt">&lt;/state&gt;</span>
+<span class="w">        </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;two#2&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/state&gt;</span>
+<span class="w">    </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;twoB&quot;</span><span class="nt">/&gt;</span>
 <span class="nt">&lt;/parallel&gt;</span>
-<span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;three&quot;</span><span class="nt">/&gt;</span>
+<span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;three&quot;</span><span class="nt">/&gt;</span>
 </pre></div>
 </div>
 </section>
 </section>
 <section id="datamodel">
-<h2>Datamodel<a class="headerlink" href="#datamodel" title="Permalink to this headline"></a></h2>
+<h2>Datamodel<a class="headerlink" href="#datamodel" title="Link to this heading"></a></h2>
 <p>The data model is defined via the <code class="docutils literal notranslate"><span class="pre">&lt;datamodel&gt;</span></code> element, which contains zero or more elements, each of which defines a single data element and assigns an initial value to it.</p>
 <ul class="simple">
 <li><p>If you want to use the data in guard conditions define the needed data entrys in the root element.</p></li>
 <li><p>They can then be updated via the assign action.</p></li>
 </ul>
 <p>Example:</p>
-<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;scxml</span> <span class="na">xmlns=</span><span class="s">&quot;http://www.w3.org/2005/07/scxml&quot;</span> <span class="na">version=</span><span class="s">&quot;1.0&quot;</span> <span class="na">initial=</span><span class="s">&quot;one&quot;</span><span class="nt">&gt;</span>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;scxml</span><span class="w"> </span><span class="na">xmlns=</span><span class="s">&quot;http://www.w3.org/2005/07/scxml&quot;</span><span class="w"> </span><span class="na">version=</span><span class="s">&quot;1.0&quot;</span><span class="w"> </span><span class="na">initial=</span><span class="s">&quot;one&quot;</span><span class="nt">&gt;</span>
 <span class="nt">&lt;datamodel&gt;</span>
-    <span class="nt">&lt;data</span> <span class="na">id=</span><span class="s">&quot;number&quot;</span> <span class="na">expr=</span><span class="s">&quot;&#39;1&#39;&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;data</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;number&quot;</span><span class="w"> </span><span class="na">expr=</span><span class="s">&quot;&#39;1&#39;&quot;</span><span class="nt">/&gt;</span>
 <span class="nt">&lt;/datamodel&gt;</span>
 </pre></div>
 </div>
@@ -177,7 +182,7 @@ BonsaiSCXML is not utilizing the whole <a class="reference external" href="http:
 </ul>
 </section>
 <section id="event-transition">
-<h2>Event/Transition<a class="headerlink" href="#event-transition" title="Permalink to this headline"></a></h2>
+<h2>Event/Transition<a class="headerlink" href="#event-transition" title="Link to this heading"></a></h2>
 <ul class="simple">
 <li><p>Transitions are triggered by events</p></li>
 <li><p>They may contain actions, which are executed when the transition is taken</p></li>
@@ -185,25 +190,25 @@ BonsaiSCXML is not utilizing the whole <a class="reference external" href="http:
 <li><p>If the Transition has the target attribute, a state change is triggered and the active state changes.</p></li>
 </ul>
 <p>Example:</p>
-<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">&quot;one&quot;</span><span class="nt">/&gt;</span>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;one&quot;</span><span class="nt">/&gt;</span>
 </pre></div>
 </div>
-<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">&quot;one&quot;</span> <span class="na">target=</span><span class="s">&quot;b&quot;</span><span class="nt">/&gt;</span>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;one&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;b&quot;</span><span class="nt">/&gt;</span>
 </pre></div>
 </div>
 <section id="regex">
-<h3>Regex<a class="headerlink" href="#regex" title="Permalink to this headline"></a></h3>
+<h3>Regex<a class="headerlink" href="#regex" title="Link to this heading"></a></h3>
 <p>You can use Regex to define events:</p>
-<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">&quot;A.*&quot;</span><span class="nt">&gt;</span>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;A.*&quot;</span><span class="nt">&gt;</span>
 </pre></div>
 </div>
 <p>This should be used with caution as there are some <a class="reference internal" href="#implicit-events">Implicit events</a></p>
 </section>
 <section id="condition">
-<h3>Condition<a class="headerlink" href="#condition" title="Permalink to this headline"></a></h3>
+<h3>Condition<a class="headerlink" href="#condition" title="Link to this heading"></a></h3>
 <p>Transition can be conditionalized via guard conditions</p>
 <p>Example:</p>
-<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">&quot;one&quot;</span> <span class="na">cond=</span><span class="s">&quot;number==1&quot;</span> <span class="na">target=</span><span class="s">&quot;b&quot;</span><span class="nt">/&gt;</span>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;one&quot;</span><span class="w"> </span><span class="na">cond=</span><span class="s">&quot;number==1&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;b&quot;</span><span class="nt">/&gt;</span>
 </pre></div>
 </div>
 <ul class="simple">
@@ -212,15 +217,15 @@ BonsaiSCXML is not utilizing the whole <a class="reference external" href="http:
 </section>
 </section>
 <section id="actions">
-<h2>Actions<a class="headerlink" href="#actions" title="Permalink to this headline"></a></h2>
+<h2>Actions<a class="headerlink" href="#actions" title="Link to this heading"></a></h2>
 <p>Actions is the nane of executable content inside <code class="docutils literal notranslate"><span class="pre">onentry</span></code> <code class="docutils literal notranslate"><span class="pre">transition</span></code> and <code class="docutils literal notranslate"><span class="pre">onexit</span></code> elements.</p>
 <ul class="simple">
 <li><p>we use <a class="reference external" href="https://www.w3.org/TR/scxml/#assign">assign</a> and <a class="reference external" href="https://www.w3.org/TR/scxml/#send">send</a></p></li>
 </ul>
 <section id="id1">
-<h3>Send<a class="headerlink" href="#id1" title="Permalink to this headline"></a></h3>
+<h3>Send<a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
 <p>Send is used to create events</p>
-<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;send</span> <span class="na">event=</span><span class="s">&quot;A&quot;</span><span class="nt">/&gt;</span>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;send</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;A&quot;</span><span class="nt">/&gt;</span>
 </pre></div>
 </div>
 <ul class="simple">
@@ -228,41 +233,41 @@ BonsaiSCXML is not utilizing the whole <a class="reference external" href="http:
 </ul>
 </section>
 <section id="id2">
-<h3>Assign<a class="headerlink" href="#id2" title="Permalink to this headline"></a></h3>
+<h3>Assign<a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
 <p>Assign is used to update data entrys</p>
-<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;assign</span> <span class="na">name=</span><span class="s">&quot;number&quot;</span> <span class="na">expr=</span><span class="s">&quot;2&quot;</span><span class="nt">/&gt;</span>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;assign</span><span class="w"> </span><span class="na">name=</span><span class="s">&quot;number&quot;</span><span class="w"> </span><span class="na">expr=</span><span class="s">&quot;2&quot;</span><span class="nt">/&gt;</span>
 </pre></div>
 </div>
 </section>
 </section>
 <section id="sourcing">
-<h2>Sourcing<a class="headerlink" href="#sourcing" title="Permalink to this headline"></a></h2>
+<span id="scxml-sourcing"></span><h2>Sourcing<a class="headerlink" href="#sourcing" title="Link to this heading"></a></h2>
 <p>You can source other xmls in a state</p>
 <p>Example:</p>
-<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span>Document a.xml:
-<span class="nt">&lt;scxml</span> <span class="na">xmlns=</span><span class="s">&quot;http://www.w3.org/2005/07/scxml&quot;</span> <span class="na">version=</span><span class="s">&quot;1.0&quot;</span> <span class="na">initial=</span><span class="s">&quot;A&quot;</span><span class="nt">&gt;</span>
-    <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;A&quot;</span> <span class="na">src=</span><span class="s">&quot;${MAPPING}/b.xml&quot;</span><span class="nt">/&gt;</span>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span>Document<span class="w"> </span>a.xml:
+<span class="nt">&lt;scxml</span><span class="w"> </span><span class="na">xmlns=</span><span class="s">&quot;http://www.w3.org/2005/07/scxml&quot;</span><span class="w"> </span><span class="na">version=</span><span class="s">&quot;1.0&quot;</span><span class="w"> </span><span class="na">initial=</span><span class="s">&quot;A&quot;</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;A&quot;</span><span class="w"> </span><span class="na">src=</span><span class="s">&quot;${MAPPING}/b.xml&quot;</span><span class="nt">/&gt;</span>
 <span class="nt">&lt;/scxml&gt;</span>
 
-Document b.xml:
-<span class="nt">&lt;scxml</span> <span class="na">xmlns=</span><span class="s">&quot;http://www.w3.org/2005/07/scxml&quot;</span> <span class="na">version=</span><span class="s">&quot;1.0&quot;</span> <span class="na">initial=</span><span class="s">&quot;B&quot;</span><span class="nt">&gt;</span>
-    <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;B&quot;</span><span class="nt">&gt;</span>
-        <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">&quot;one&quot;</span><span class="nt">&gt;</span>
-            <span class="nt">&lt;send</span> <span class="na">event=</span><span class="s">&quot;success&quot;</span><span class="nt">/&gt;</span>
-        <span class="nt">&lt;/transition&gt;</span>
-    <span class="nt">&lt;/state&gt;</span>
+Document<span class="w"> </span>b.xml:
+<span class="nt">&lt;scxml</span><span class="w"> </span><span class="na">xmlns=</span><span class="s">&quot;http://www.w3.org/2005/07/scxml&quot;</span><span class="w"> </span><span class="na">version=</span><span class="s">&quot;1.0&quot;</span><span class="w"> </span><span class="na">initial=</span><span class="s">&quot;B&quot;</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;B&quot;</span><span class="nt">&gt;</span>
+<span class="w">        </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;one&quot;</span><span class="nt">&gt;</span>
+<span class="w">            </span><span class="nt">&lt;send</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;success&quot;</span><span class="nt">/&gt;</span>
+<span class="w">        </span><span class="nt">&lt;/transition&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/state&gt;</span>
 <span class="nt">&lt;/scxml&gt;</span>
 </pre></div>
 </div>
 <p>Result:</p>
-<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;scxml</span> <span class="na">xmlns=</span><span class="s">&quot;http://www.w3.org/2005/07/scxml&quot;</span> <span class="na">version=</span><span class="s">&quot;1.0&quot;</span> <span class="na">initial=</span><span class="s">&quot;A&quot;</span><span class="nt">&gt;</span>
-    <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;A&quot;</span> <span class="na">initial=</span><span class="s">&quot;B#A&quot;</span><span class="nt">&gt;</span>
-        <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;B#A&quot;</span><span class="nt">&gt;</span>
-            <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">&quot;one&quot;</span><span class="nt">&gt;</span>
-                 <span class="nt">&lt;send</span> <span class="na">event=</span><span class="s">&quot;A.success&quot;</span><span class="nt">/&gt;</span>
-            <span class="nt">&lt;/transition&gt;</span>
-        <span class="nt">&lt;/state&gt;</span>
-    <span class="nt">&lt;/state&gt;</span>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;scxml</span><span class="w"> </span><span class="na">xmlns=</span><span class="s">&quot;http://www.w3.org/2005/07/scxml&quot;</span><span class="w"> </span><span class="na">version=</span><span class="s">&quot;1.0&quot;</span><span class="w"> </span><span class="na">initial=</span><span class="s">&quot;A&quot;</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;A&quot;</span><span class="w"> </span><span class="na">initial=</span><span class="s">&quot;B#A&quot;</span><span class="nt">&gt;</span>
+<span class="w">        </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;B#A&quot;</span><span class="nt">&gt;</span>
+<span class="w">            </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;one&quot;</span><span class="nt">&gt;</span>
+<span class="w">                 </span><span class="nt">&lt;send</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;A.success&quot;</span><span class="nt">/&gt;</span>
+<span class="w">            </span><span class="nt">&lt;/transition&gt;</span>
+<span class="w">        </span><span class="nt">&lt;/state&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/state&gt;</span>
 <span class="nt">&lt;/scxml&gt;</span>
 </pre></div>
 </div>
@@ -279,7 +284,7 @@ Document b.xml:
 </ul>
 </section>
 <section id="connect-skill-to-state">
-<h2>Connect Skill to State<a class="headerlink" href="#connect-skill-to-state" title="Permalink to this headline"></a></h2>
+<h2>Connect Skill to State<a class="headerlink" href="#connect-skill-to-state" title="Link to this heading"></a></h2>
 <ul class="simple">
 <li><p>Skills are Java Classes that implement <code class="docutils literal notranslate"><span class="pre">AbstraktSkill</span></code>.</p></li>
 <li><p>You will find basic skills in Bonsai [Core Skill].</p></li>
@@ -294,14 +299,14 @@ Document b.xml:
 <p>Example:</p>
 <div class="highlight-xml notranslate"><div class="highlight"><pre><span></span>...
 
-<span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;nav.Drive#toKitchen&quot;</span><span class="nt">&gt;</span>
-   ...
+<span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;nav.Drive#toKitchen&quot;</span><span class="nt">&gt;</span>
+<span class="w">   </span>...
 <span class="nt">&lt;/state&gt;</span>
 
 ...
 
-<span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;nav.Drive#away&quot;</span><span class="nt">&gt;</span>
-   ...
+<span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;nav.Drive#away&quot;</span><span class="nt">&gt;</span>
+<span class="w">   </span>...
 <span class="nt">&lt;/state&gt;</span>
 
 ...
@@ -309,57 +314,57 @@ Document b.xml:
 </div>
 </section>
 <section id="implicit-events">
-<h2>Implicit events<a class="headerlink" href="#implicit-events" title="Permalink to this headline"></a></h2>
+<h2>Implicit events<a class="headerlink" href="#implicit-events" title="Link to this heading"></a></h2>
 <p>Commons SCXML provides some <strong>interesting</strong> extensions, generating some internal events automatically. As they are named &lt;ID&gt;.&lt;event&gt; you may accidentally cause transitions while using regex as transition events for Skills (e.x. <code class="docutils literal notranslate"><span class="pre">id=&quot;Wait&quot;</span></code>) or Compount States (<a class="reference internal" href="#sourcing">Sourcing</a>)</p>
 <section id="entry-and-exit">
-<h3>.entry and .exit<a class="headerlink" href="#entry-and-exit" title="Permalink to this headline"></a></h3>
+<h3>.entry and .exit<a class="headerlink" href="#entry-and-exit" title="Link to this heading"></a></h3>
 <p>The Commons SCXML implementation generates a <code class="docutils literal notranslate"><span class="pre">.entry</span></code> event when any state is entered and a <code class="docutils literal notranslate"><span class="pre">.exit</span></code> when a state is exited.</p>
 </section>
 <section id="change">
-<h3>.change<a class="headerlink" href="#change" title="Permalink to this headline"></a></h3>
+<h3>.change<a class="headerlink" href="#change" title="Link to this heading"></a></h3>
 <p>Similarly to the <code class="docutils literal notranslate"><span class="pre">.entry</span></code> and <code class="docutils literal notranslate"><span class="pre">.exit</span></code> event the Commons SCXML implementation generates a <code class="docutils literal notranslate"><span class="pre">.change</span></code> event when a piece of any data model changes, which means one can watch some part of the datamodel for an update for triggering a transition. This is quite useful for communicating across regions etc.</p>
-<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;scxml</span> <span class="na">xmlns=</span><span class="s">&quot;http://www.w3.org/2005/07/scxml&quot;</span>
-    <span class="na">version=</span><span class="s">&quot;1.0&quot;</span> <span class="na">initial=</span><span class="s">&quot;main&quot;</span><span class="nt">&gt;</span>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;scxml</span><span class="w"> </span><span class="na">xmlns=</span><span class="s">&quot;http://www.w3.org/2005/07/scxml&quot;</span>
+<span class="w">    </span><span class="na">version=</span><span class="s">&quot;1.0&quot;</span><span class="w"> </span><span class="na">initial=</span><span class="s">&quot;main&quot;</span><span class="nt">&gt;</span>
 
 <span class="nt">&lt;datamodel&gt;</span>
-    <span class="nt">&lt;data</span> <span class="na">name=</span><span class="s">&quot;current&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;data</span><span class="w"> </span><span class="na">name=</span><span class="s">&quot;current&quot;</span><span class="nt">/&gt;</span>
 <span class="nt">&lt;/datamodel&gt;</span>
 
-<span class="nt">&lt;parallel</span> <span class="na">id=</span><span class="s">&quot;main&quot;</span><span class="nt">&gt;</span>
+<span class="nt">&lt;parallel</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;main&quot;</span><span class="nt">&gt;</span>
 
-    <span class="cm">&lt;!-- &quot;master&quot; state machine --&gt;</span>
-    <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;master&quot;</span> <span class="na">initial=</span><span class="s">&quot;state_1&quot;</span><span class="nt">&gt;</span>
-        <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;state_1&quot;</span><span class="nt">&gt;</span>
-            <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">&quot;someevent&quot;</span> <span class="na">target=</span><span class="s">&quot;state_2&quot;</span><span class="nt">/&gt;</span>
-        <span class="nt">&lt;/state&gt;</span>
-        <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;state_2&quot;</span><span class="nt">&gt;</span>
-            <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">&quot;someevent&quot;</span> <span class="na">target=</span><span class="s">&quot;state_3&quot;</span><span class="nt">/&gt;</span>
-        <span class="nt">&lt;/state&gt;</span>
-        <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;state_3&quot;</span><span class="nt">&gt;</span>
-            <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">&quot;someevent&quot;</span> <span class="na">target=</span><span class="s">&quot;state_1&quot;</span><span class="nt">/&gt;</span>
-        <span class="nt">&lt;/state&gt;</span>
-    <span class="nt">&lt;/state&gt;</span> <span class="cm">&lt;!-- end state master --&gt;</span>
+<span class="w">    </span><span class="cm">&lt;!-- &quot;master&quot; state machine --&gt;</span>
+<span class="w">    </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;master&quot;</span><span class="w"> </span><span class="na">initial=</span><span class="s">&quot;state_1&quot;</span><span class="nt">&gt;</span>
+<span class="w">        </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;state_1&quot;</span><span class="nt">&gt;</span>
+<span class="w">            </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;someevent&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;state_2&quot;</span><span class="nt">/&gt;</span>
+<span class="w">        </span><span class="nt">&lt;/state&gt;</span>
+<span class="w">        </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;state_2&quot;</span><span class="nt">&gt;</span>
+<span class="w">            </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;someevent&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;state_3&quot;</span><span class="nt">/&gt;</span>
+<span class="w">        </span><span class="nt">&lt;/state&gt;</span>
+<span class="w">        </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;state_3&quot;</span><span class="nt">&gt;</span>
+<span class="w">            </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;someevent&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;state_1&quot;</span><span class="nt">/&gt;</span>
+<span class="w">        </span><span class="nt">&lt;/state&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/state&gt;</span><span class="w"> </span><span class="cm">&lt;!-- end state master --&gt;</span>
 
-    <span class="cm">&lt;!-- &quot;slave&quot; state machine --&gt;</span>
-    <span class="cm">&lt;!-- this state machine acts on .entry events of our master state machine --&gt;</span>
-    <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;slave&quot;</span><span class="nt">&gt;</span>
-        <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">&quot;state_1.entry&quot;</span><span class="nt">&gt;</span>
-            <span class="nt">&lt;assign</span> <span class="na">name=</span><span class="s">&quot;current&quot;</span> <span class="na">expr=</span><span class="s">&quot;&#39;state_1&#39;&quot;</span><span class="nt">/&gt;</span>
-        <span class="nt">&lt;/transition&gt;</span>
-        <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">&quot;state_2.entry&quot;</span><span class="nt">&gt;</span>
-            <span class="nt">&lt;assign</span> <span class="na">name=</span><span class="s">&quot;current&quot;</span> <span class="na">expr=</span><span class="s">&quot;&#39;state_2&#39;&quot;</span><span class="nt">/&gt;</span>
-        <span class="nt">&lt;/transition&gt;</span>
-        <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">&quot;state_3.entry&quot;</span><span class="nt">&gt;</span>
-            <span class="nt">&lt;assign</span> <span class="na">name=</span><span class="s">&quot;current&quot;</span> <span class="na">expr=</span><span class="s">&quot;&#39;state_3&#39;&quot;</span><span class="nt">/&gt;</span>
-        <span class="nt">&lt;/transition&gt;</span>
-    <span class="nt">&lt;/state&gt;</span> <span class="cm">&lt;!-- end of slave --&gt;</span>
+<span class="w">    </span><span class="cm">&lt;!-- &quot;slave&quot; state machine --&gt;</span>
+<span class="w">    </span><span class="cm">&lt;!-- this state machine acts on .entry events of our master state machine --&gt;</span>
+<span class="w">    </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;slave&quot;</span><span class="nt">&gt;</span>
+<span class="w">        </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;state_1.entry&quot;</span><span class="nt">&gt;</span>
+<span class="w">            </span><span class="nt">&lt;assign</span><span class="w"> </span><span class="na">name=</span><span class="s">&quot;current&quot;</span><span class="w"> </span><span class="na">expr=</span><span class="s">&quot;&#39;state_1&#39;&quot;</span><span class="nt">/&gt;</span>
+<span class="w">        </span><span class="nt">&lt;/transition&gt;</span>
+<span class="w">        </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;state_2.entry&quot;</span><span class="nt">&gt;</span>
+<span class="w">            </span><span class="nt">&lt;assign</span><span class="w"> </span><span class="na">name=</span><span class="s">&quot;current&quot;</span><span class="w"> </span><span class="na">expr=</span><span class="s">&quot;&#39;state_2&#39;&quot;</span><span class="nt">/&gt;</span>
+<span class="w">        </span><span class="nt">&lt;/transition&gt;</span>
+<span class="w">        </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;state_3.entry&quot;</span><span class="nt">&gt;</span>
+<span class="w">            </span><span class="nt">&lt;assign</span><span class="w"> </span><span class="na">name=</span><span class="s">&quot;current&quot;</span><span class="w"> </span><span class="na">expr=</span><span class="s">&quot;&#39;state_3&#39;&quot;</span><span class="nt">/&gt;</span>
+<span class="w">        </span><span class="nt">&lt;/transition&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/state&gt;</span><span class="w"> </span><span class="cm">&lt;!-- end of slave --&gt;</span>
 
-    <span class="cm">&lt;!-- watch for data model changes --&gt;</span>
-    <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;watch_changes&quot;</span><span class="nt">&gt;</span>
-        <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">&quot;current.change&quot;</span><span class="nt">&gt;</span>
-            <span class="cm">&lt;!-- duh --&gt;</span>
-        <span class="nt">&lt;/transition&gt;</span>
-    <span class="nt">&lt;/state&gt;</span>
+<span class="w">    </span><span class="cm">&lt;!-- watch for data model changes --&gt;</span>
+<span class="w">    </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;watch_changes&quot;</span><span class="nt">&gt;</span>
+<span class="w">        </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;current.change&quot;</span><span class="nt">&gt;</span>
+<span class="w">            </span><span class="cm">&lt;!-- duh --&gt;</span>
+<span class="w">        </span><span class="nt">&lt;/transition&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/state&gt;</span>
 
 <span class="nt">&lt;/parallel&gt;</span>
 <span class="nt">&lt;/scxml&gt;</span>
@@ -374,13 +379,14 @@ Document b.xml:
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="../behavior.html" class="btn btn-neutral float-left" title="Bonsai - SCXML" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="config.html" class="btn btn-neutral float-right" title="SCXML Configuration" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>
 
   <div role="contentinfo">
     <p>&#169; Copyright 2023, Leroy Rügemer.
-      <span class="lastupdated">Last updated on Oct 31, 2023.
+      <span class="lastupdated">Last updated on Jun 09, 2024.
       </span></p>
   </div>
 

@@ -1,21 +1,24 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+<html class="writer-html5" lang="en" data-content_root="../">
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Changes &mdash; Bonsai Docs 0.7-SNAPSHOT documentation</title>
-      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=19f00094" />
+
+  
     <link rel="shortcut icon" href="../_static/favicon.ico"/>
   <!--[if lt IE 9]>
     <script src="../_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
-        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
-        <script src="../_static/jquery.js"></script>
-        <script src="../_static/underscore.js"></script>
-        <script src="../_static/doctools.js"></script>
+        <script src="../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../_static/documentation_options.js?v=b90832ea"></script>
+        <script src="../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" /> 
@@ -75,10 +78,10 @@
            <div itemprop="articleBody">
              
   <section id="changes">
-<h1>Changes<a class="headerlink" href="#changes" title="Permalink to this headline"></a></h1>
+<h1>Changes<a class="headerlink" href="#changes" title="Link to this heading"></a></h1>
 <p>Bonsai Legacy Changes</p>
 <section id="modules">
-<h2>Modules<a class="headerlink" href="#modules" title="Permalink to this headline"></a></h2>
+<h2>Modules<a class="headerlink" href="#modules" title="Link to this heading"></a></h2>
 <p>Bonsai uses a new module layout</p>
 <ul class="simple">
 <li><dl class="simple">
@@ -133,11 +136,11 @@
 </ul>
 </section>
 <section id="scxml">
-<h2>SCXML<a class="headerlink" href="#scxml" title="Permalink to this headline"></a></h2>
+<h2>SCXML<a class="headerlink" href="#scxml" title="Link to this heading"></a></h2>
 <section id="sourcing">
-<h3>Sourcing<a class="headerlink" href="#sourcing" title="Permalink to this headline"></a></h3>
+<h3>Sourcing<a class="headerlink" href="#sourcing" title="Link to this heading"></a></h3>
 <p>sourcing can now utilize defined mappings instead of relative paths</p>
-<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;consume&quot;</span> <span class="na">src=</span><span class="s">&quot;${TEST}/memorySlots.xml&quot;</span><span class="nt">/&gt;</span>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;consume&quot;</span><span class="w"> </span><span class="na">src=</span><span class="s">&quot;${TEST}/memorySlots.xml&quot;</span><span class="nt">/&gt;</span>
 </pre></div>
 </div>
 <p>the mappings can be set with the -m option example:</p>
@@ -147,9 +150,9 @@
 </section>
 </section>
 <section id="core">
-<h2>Core<a class="headerlink" href="#core" title="Permalink to this headline"></a></h2>
+<h2>Core<a class="headerlink" href="#core" title="Link to this heading"></a></h2>
 <section id="skills">
-<h3>Skills<a class="headerlink" href="#skills" title="Permalink to this headline"></a></h3>
+<h3>Skills<a class="headerlink" href="#skills" title="Link to this heading"></a></h3>
 <ul class="simple">
 <li><dl class="simple">
 <dt>Skills no longer have variables (getVariables/MapReader)</dt><dd><ul>
@@ -162,15 +165,15 @@
 </ul>
 </section>
 <section id="sensors">
-<h3>Sensors<a class="headerlink" href="#sensors" title="Permalink to this headline"></a></h3>
+<h3>Sensors<a class="headerlink" href="#sensors" title="Link to this heading"></a></h3>
 <ul class="simple">
 <li><p>Wire type is now a required attribute for Sensors</p></li>
 </ul>
-<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;Sensor</span> <span class="na">key=</span><span class="s">&quot;SpeechSensor&quot;</span>
-    <span class="na">dataTypeClass=</span><span class="s">&quot;de.unibi.citec.clf.btl.data.speechrec.Utterance&quot;</span>
-    <span class="na">factoryClass=</span><span class="s">&quot;de.unibi.citec.clf.bonsai.ros.RosFactory&quot;</span>
-    <span class="na">sensorClass=</span><span class="s">&quot;de.unibi.citec.clf.bonsai.ros.sensors.RosBtlMsgSensor&quot;</span>
-    <span class="na">wireTypeClass=</span><span class="s">&quot;std_msgs.String&quot;</span><span class="nt">&gt;</span>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;Sensor</span><span class="w"> </span><span class="na">key=</span><span class="s">&quot;SpeechSensor&quot;</span>
+<span class="w">    </span><span class="na">dataTypeClass=</span><span class="s">&quot;de.unibi.citec.clf.btl.data.speechrec.Utterance&quot;</span>
+<span class="w">    </span><span class="na">factoryClass=</span><span class="s">&quot;de.unibi.citec.clf.bonsai.ros.RosFactory&quot;</span>
+<span class="w">    </span><span class="na">sensorClass=</span><span class="s">&quot;de.unibi.citec.clf.bonsai.ros.sensors.RosBtlMsgSensor&quot;</span>
+<span class="w">    </span><span class="na">wireTypeClass=</span><span class="s">&quot;std_msgs.String&quot;</span><span class="nt">&gt;</span>
 </pre></div>
 </div>
 </section>
@@ -186,7 +189,7 @@
 
   <div role="contentinfo">
     <p>&#169; Copyright 2023, Leroy Rügemer.
-      <span class="lastupdated">Last updated on Oct 31, 2023.
+      <span class="lastupdated">Last updated on Jun 09, 2024.
       </span></p>
   </div>
 

@@ -1,21 +1,24 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+<html class="writer-html5" lang="en" data-content_root="./">
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Bonsai - SCXML &mdash; Bonsai Docs 0.7-SNAPSHOT documentation</title>
-      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
+
+  
     <link rel="shortcut icon" href="_static/favicon.ico"/>
   <!--[if lt IE 9]>
     <script src="_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
-        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
-        <script src="_static/jquery.js"></script>
-        <script src="_static/underscore.js"></script>
-        <script src="_static/doctools.js"></script>
+        <script src="_static/jquery.js?v=5d32c60e"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="_static/documentation_options.js?v=b90832ea"></script>
+        <script src="_static/doctools.js?v=9a2dae69"></script>
+        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -52,6 +55,7 @@
 <li class="toctree-l1"><a class="reference internal" href="general.html">Bonsai</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">SCXML Behavior Engine</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="behavior/scxml-intro.html">Intro</a></li>
+<li class="toctree-l2"><a class="reference internal" href="behavior/config.html">Statemachine Configuration</a></li>
 </ul>
 </li>
 </ul>
@@ -80,34 +84,24 @@
            <div itemprop="articleBody">
              
   <section id="bonsai-scxml">
-<h1>Bonsai - SCXML<a class="headerlink" href="#bonsai-scxml" title="Permalink to this headline"></a></h1>
+<h1>Bonsai - SCXML<a class="headerlink" href="#bonsai-scxml" title="Link to this heading"></a></h1>
 <p><a class="reference external" href="http://www.w3.org/TR/scxml/">SCXML</a>, or the “State Chart extensible Markup Language” provides a generic state-machine description including sophisticated constructs such as parallel states.</p>
 <p>The Bonsai SCXML utilises this to couple skills to rich behavior.</p>
 <div class="toctree-wrapper compound">
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="behavior/scxml-intro.html">Intro</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="behavior/scxml-intro.html#state">State</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="behavior/scxml-intro.html#parallel">Parallel</a></li>
-</ul>
-</li>
+<li class="toctree-l2"><a class="reference internal" href="behavior/scxml-intro.html#state">State</a></li>
 <li class="toctree-l2"><a class="reference internal" href="behavior/scxml-intro.html#datamodel">Datamodel</a></li>
-<li class="toctree-l2"><a class="reference internal" href="behavior/scxml-intro.html#event-transition">Event/Transition</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="behavior/scxml-intro.html#regex">Regex</a></li>
-<li class="toctree-l3"><a class="reference internal" href="behavior/scxml-intro.html#condition">Condition</a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="behavior/scxml-intro.html#actions">Actions</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="behavior/scxml-intro.html#id1">Send</a></li>
-<li class="toctree-l3"><a class="reference internal" href="behavior/scxml-intro.html#id2">Assign</a></li>
-</ul>
-</li>
+<li class="toctree-l2"><a class="reference internal" href="behavior/scxml-intro.html#event-transition">Event/Transition</a></li>
+<li class="toctree-l2"><a class="reference internal" href="behavior/scxml-intro.html#actions">Actions</a></li>
 <li class="toctree-l2"><a class="reference internal" href="behavior/scxml-intro.html#sourcing">Sourcing</a></li>
 <li class="toctree-l2"><a class="reference internal" href="behavior/scxml-intro.html#connect-skill-to-state">Connect Skill to State</a></li>
-<li class="toctree-l2"><a class="reference internal" href="behavior/scxml-intro.html#implicit-events">Implicit events</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="behavior/scxml-intro.html#entry-and-exit">.entry and .exit</a></li>
-<li class="toctree-l3"><a class="reference internal" href="behavior/scxml-intro.html#change">.change</a></li>
+<li class="toctree-l2"><a class="reference internal" href="behavior/scxml-intro.html#implicit-events">Implicit events</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="behavior/config.html">Statemachine Configuration</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="behavior/config.html#how-to-set-configuration">How to set Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="behavior/config.html#configurations">Configurations</a></li>
 </ul>
 </li>
 </ul>
@@ -126,7 +120,7 @@
 
   <div role="contentinfo">
     <p>&#169; Copyright 2023, Leroy Rügemer.
-      <span class="lastupdated">Last updated on Oct 31, 2023.
+      <span class="lastupdated">Last updated on Jun 09, 2024.
       </span></p>
   </div>
 

@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SCXML Configuration &mdash; Bonsai Docs 0.7-SNAPSHOT documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=19f00094" />
+
+  
+    <link rel="shortcut icon" href="../_static/favicon.ico"/>
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../_static/documentation_options.js?v=b90832ea"></script>
+        <script src="../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="prev" title="SCXML Definitions" href="scxml-intro.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Bonsai Docs
+              <img src="../_static/bonsai-l1s.png" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                0.7
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Table of Contents</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">QuickStart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../general.html">Bonsai</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../behavior.html">SCXML Behavior Engine</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="scxml-intro.html">Intro</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Statemachine Configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#how-to-set-configuration">How to set Configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#configurations">Configurations</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#state-prefix"><cite>#_STATE_PREFIX</cite></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#disable-default-slot-warnings"><cite>#_DISABLE_DEFAULT_SLOT_WARNINGS</cite></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#enable-skill-warnings"><cite>#_ENABLE_SKILL_WARNINGS</cite></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#generate-default-slots"><cite>#_GENERATE_DEFAULT_SLOTS</cite></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#configure-and-validate"><cite>#_CONFIGURE_AND_VALIDATE</cite></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#enable-config-cache"><cite>#_ENABLE_CONFIG_CACHE</cite></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#final-states"><cite>#_FINAL_STATES</cite></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Bonsai Docs</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../behavior.html">Bonsai - SCXML</a></li>
+      <li class="breadcrumb-item active">SCXML Configuration</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="scxml-configuration">
+<h1>SCXML Configuration<a class="headerlink" href="#scxml-configuration" title="Link to this heading"></a></h1>
+<section id="how-to-set-configuration">
+<h2>How to set Configuration<a class="headerlink" href="#how-to-set-configuration" title="Link to this heading"></a></h2>
+<p>Bonsai SCXML Statemachine Configuration is done in the datamodel of any scxm file.</p>
+<p>Example:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;scxml</span><span class="w"> </span><span class="na">xmlns=</span><span class="s">&quot;http://www.w3.org/2005/07/scxml&quot;</span><span class="w"> </span><span class="na">version=</span><span class="s">&quot;1.0&quot;</span><span class="w"> </span><span class="na">initial=</span><span class="s">&quot;A&quot;</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;datamodel&gt;</span>
+<span class="w">        </span><span class="nt">&lt;data</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;#_STATE_PREFIX&quot;</span><span class="w"> </span><span class="na">expr=</span><span class="s">&quot;&#39;de.unibi.citec.clf.bonsai.skills.&#39;&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/datamodel&gt;</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Remember <a class="reference internal" href="scxml-intro.html#scxml-sourcing"><span class="std std-ref">Sourced</span></a> files get copied into the main file.
+Set Configurations only in the topmost scxml to avoid suprises</p>
+</div>
+</section>
+<section id="configurations">
+<h2>Configurations<a class="headerlink" href="#configurations" title="Link to this heading"></a></h2>
+<section id="state-prefix">
+<h3><cite>#_STATE_PREFIX</cite><a class="headerlink" href="#state-prefix" title="Link to this heading"></a></h3>
+<p>defaults to: <cite>de.unibi.citec.clf.bonsai.skills.</cite></p>
+<p>Package prefix for skills:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;Fatal&quot;</span><span class="nt">/&gt;</span>
+</pre></div>
+</div>
+<p>Results in skill: <cite>de.unibi.citec.clf.bonsai.skills.Fatal</cite> being executed.</p>
+</section>
+<section id="disable-default-slot-warnings">
+<h3><cite>#_DISABLE_DEFAULT_SLOT_WARNINGS</cite><a class="headerlink" href="#disable-default-slot-warnings" title="Link to this heading"></a></h3>
+<p>defaults to <cite>false</cite></p>
+</section>
+<section id="enable-skill-warnings">
+<h3><cite>#_ENABLE_SKILL_WARNINGS</cite><a class="headerlink" href="#enable-skill-warnings" title="Link to this heading"></a></h3>
+<p>defaults to <cite>false</cite></p>
+</section>
+<section id="generate-default-slots">
+<h3><cite>#_GENERATE_DEFAULT_SLOTS</cite><a class="headerlink" href="#generate-default-slots" title="Link to this heading"></a></h3>
+<p>defaults to <cite>false</cite></p>
+</section>
+<section id="configure-and-validate">
+<h3><cite>#_CONFIGURE_AND_VALIDATE</cite><a class="headerlink" href="#configure-and-validate" title="Link to this heading"></a></h3>
+<p>defaults to <cite>true</cite></p>
+</section>
+<section id="enable-config-cache">
+<h3><cite>#_ENABLE_CONFIG_CACHE</cite><a class="headerlink" href="#enable-config-cache" title="Link to this heading"></a></h3>
+<p>defaults to <cite>false</cite></p>
+</section>
+<section id="final-states">
+<h3><cite>#_FINAL_STATES</cite><a class="headerlink" href="#final-states" title="Link to this heading"></a></h3>
+<p>defaults to <cite>true</cite></p>
+<p>Always assume <cite>End</cite> and <cite>Fatal</cite> as final states and stop the statemachine.</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="scxml-intro.html" class="btn btn-neutral float-left" title="SCXML Definitions" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Leroy Rügemer.
+      <span class="lastupdated">Last updated on Jun 09, 2024.
+      </span></p>
+  </div>
+
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

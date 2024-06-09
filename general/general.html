@@ -1,21 +1,24 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+<html class="writer-html5" lang="en" data-content_root="../">
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Bonsai Core Tutorial &mdash; Bonsai Docs 0.7-SNAPSHOT documentation</title>
-      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=19f00094" />
+
+  
     <link rel="shortcut icon" href="../_static/favicon.ico"/>
   <!--[if lt IE 9]>
     <script src="../_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
-        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
-        <script src="../_static/jquery.js"></script>
-        <script src="../_static/underscore.js"></script>
-        <script src="../_static/doctools.js"></script>
+        <script src="../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../_static/documentation_options.js?v=b90832ea"></script>
+        <script src="../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -93,20 +96,20 @@
            <div itemprop="articleBody">
              
   <section id="bonsai-core-tutorial">
-<h1>Bonsai Core Tutorial<a class="headerlink" href="#bonsai-core-tutorial" title="Permalink to this headline"></a></h1>
+<h1>Bonsai Core Tutorial<a class="headerlink" href="#bonsai-core-tutorial" title="Link to this heading"></a></h1>
 <p>Bonsai is a multi layered approach for behavior modelling of complex systems.</p>
 <p>Behavior Layer - Action Layer - Interface Layer - Funcional Component Layer - Hardware Layer</p>
 <p>The Bonsai framework uses <code class="docutils literal notranslate"><span class="pre">skills</span></code> as the <code class="docutils literal notranslate"><span class="pre">Action</span> <span class="pre">Layer</span></code> which represent reuseable actions for some type of hardware. These Skills use different In/Output interfaces (<code class="docutils literal notranslate"><span class="pre">Types</span></code>, <code class="docutils literal notranslate"><span class="pre">Sensors</span></code> and <code class="docutils literal notranslate"><span class="pre">Actuators</span></code> of the <code class="docutils literal notranslate"><span class="pre">Interface</span> <span class="pre">Layer</span></code>). To Create complex behavior Bonsai skills can be in different control layers such as <code class="docutils literal notranslate"><span class="pre">SCXML</span></code>
 Interfaces are implemented for different middlewares. They include serializer between middleware specific and bonsai <code class="docutils literal notranslate"><span class="pre">Types</span></code>.</p>
 <section id="configuration">
-<h2>Configuration<a class="headerlink" href="#configuration" title="Permalink to this headline"></a></h2>
+<h2>Configuration<a class="headerlink" href="#configuration" title="Link to this heading"></a></h2>
 <p>The BonSAI system must be configured. Usually you can use the <code class="docutils literal notranslate"><span class="pre">BasicActuators.xml</span></code> and the <code class="docutils literal notranslate"><span class="pre">BasicSensors.xml</span></code></p>
 <section id="scxml">
-<h3>SCXML<a class="headerlink" href="#scxml" title="Permalink to this headline"></a></h3>
+<h3>SCXML<a class="headerlink" href="#scxml" title="Link to this heading"></a></h3>
 <p>Combination of finite state machines and harel statecharts, described in an xml-like state machine language apache-scxml.</p>
 </section>
 <section id="structure">
-<h3>Structure<a class="headerlink" href="#structure" title="Permalink to this headline"></a></h3>
+<h3>Structure<a class="headerlink" href="#structure" title="Link to this heading"></a></h3>
 <p>The RoboCup [Exercise] project has the following structure:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">SCXML</span><span class="o">/</span><span class="n">src</span><span class="o">/</span><span class="n">main</span><span class="o">/</span>
            <span class="o">|---</span> <span class="n">config</span><span class="o">/</span>
@@ -121,7 +124,7 @@ Interfaces are implemented for different middlewares. They include serializer be
 </section>
 </section>
 <section id="test-statemachine-during-developement">
-<h2>Test Statemachine during developement<a class="headerlink" href="#test-statemachine-during-developement" title="Permalink to this headline"></a></h2>
+<h2>Test Statemachine during developement<a class="headerlink" href="#test-statemachine-during-developement" title="Link to this heading"></a></h2>
 <p>in the RobocupathomeDist <code class="docutils literal notranslate"><span class="pre">Robocup&#64;home</span> <span class="pre">[BIN]</span></code> module.</p>
 <p>Copy “resource/localMapping.default.properties” as “localMapping.properties” and enter the path to your local repositories</p>
 <ul class="simple">
@@ -142,7 +145,7 @@ Interfaces are implemented for different middlewares. They include serializer be
 
   <div role="contentinfo">
     <p>&#169; Copyright 2023, Leroy Rügemer.
-      <span class="lastupdated">Last updated on Oct 31, 2023.
+      <span class="lastupdated">Last updated on Jun 09, 2024.
       </span></p>
   </div>
 
