@@ -107,6 +107,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
      * Prefix of states (e.g. "de.unibi.citec.clf.bonsai.skills.").
      */
     private String statePrefix = "de.unibi.citec.clf.bonsai.skills.";
+    private boolean customFinalStates = true;
     private boolean showDefaultSlotWarnings = true;
     private boolean generateDefaultSlots = false;
     private boolean enableSkillWarnings = false;
@@ -437,6 +438,9 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
 
         hashSkillconfigurations = MapReader.readConfigBool("#_ENABLE_CONFIG_CACHE", hashSkillconfigurations, data);
         logger.debug("Enable configuration cache: " + hashSkillconfigurations);
+
+        customFinalStates = MapReader.readConfigBool("#_FINAL_STATES", customFinalStates, data);
+        logger.debug("Using End and Fatal as final states");
     }
 
     /**
@@ -871,6 +875,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     }
 
     private boolean isEndState(String s) {
+        if (!customFinalStates) return false;
         return s.equals("End") || s.equals("Fatal");
     }
 
