@@ -20,6 +20,8 @@ class NLU() : Type(), Iterable<NLUEntity?>, Cloneable {
         entities.addAll(es)
     }
 
+    constructor(o: NLU) : this(o.text, o.intent, o.confidence, o.entities.map { it.clone() })
+
     override fun iterator(): MutableIterator<NLUEntity> {
         return entities.iterator()
     }
@@ -51,7 +53,7 @@ class NLU() : Type(), Iterable<NLUEntity?>, Cloneable {
         return "NLU(intent=$intent, confidence=$confidence text:'$text', entities ${entities})"
     }
 
-    override fun clone(): NLU {
+    public override fun clone(): NLU {
         return NLU(text,intent, confidence, entities).also { it.frameId = frameId }
     }
 

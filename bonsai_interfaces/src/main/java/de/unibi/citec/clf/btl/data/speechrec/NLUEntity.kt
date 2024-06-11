@@ -41,7 +41,7 @@ class NLUEntity(val key: String, val value: String, val role: String?, val group
         return "NLUEntity($key, entity=$value, role=$role, entityScore=$entityScore, roleScore=$roleScore)"
     }
 
-    override fun clone(): NLUEntity {
+    public override fun clone(): NLUEntity {
         return NLUEntity(key,value, role, group).also { it.frameId = frameId }
     }
 
