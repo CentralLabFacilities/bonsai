@@ -20,7 +20,7 @@ public class RosSerializerRepository {
 
     private static Logger logger = Logger.getLogger(RosSerializerRepository.class);
 
-    private static Map<Class<? extends Type>, Map<String, RosSerializer<? extends Type, ? extends Message>>> serializers = new HashMap<>();
+    public static Map<Class<? extends Type>, Map<String, RosSerializer<? extends Type, ? extends Message>>> serializers = new HashMap<>();
 
 
     static {
