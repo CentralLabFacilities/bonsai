@@ -150,8 +150,8 @@ public class MsgTypeFactory {
         if (rosSerializer != null) {
             return rosSerializer.serialize(data, node.getTopicMessageFactory());
         } else {
-            String error = "No serializer for data type "
-                    + dataType.getSimpleName() + " found!";
+            String error = "No serializer for data type '"
+                    + dataType + "' and MsgType '" + msgType + "' found!";
             logger.error(error);
             throw new SerializationException(error);
         }

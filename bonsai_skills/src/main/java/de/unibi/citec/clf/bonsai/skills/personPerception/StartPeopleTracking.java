@@ -59,6 +59,7 @@ import java.util.concurrent.Future;
  *
  * @author pvonneumanncosel
  */
+@Deprecated
 public class StartPeopleTracking extends AbstractSkill {
 
     private ExitToken tokenSuccess;

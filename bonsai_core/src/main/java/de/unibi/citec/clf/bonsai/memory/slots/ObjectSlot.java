@@ -26,7 +26,7 @@ public class ObjectSlot<T extends Object> implements MemorySlot<T> {
     }
 
     @Override
-    public <S extends T> void memorize(S object) throws CommunicationException {
+    public <S extends T> void  memorize(S object) throws CommunicationException {
         logger.debug("memorized " + object.toString());
         savedObject = object;
     }

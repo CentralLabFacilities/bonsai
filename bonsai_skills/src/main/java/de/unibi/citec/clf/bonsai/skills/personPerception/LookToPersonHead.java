@@ -53,6 +53,7 @@ import java.io.IOException;
  *
  * @author dleins
  */
+@Deprecated
 public class LookToPersonHead extends AbstractSkill {
 
     private ExitToken tokenErrorNotFound;
