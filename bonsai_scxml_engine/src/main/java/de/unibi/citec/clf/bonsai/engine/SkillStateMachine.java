@@ -76,6 +76,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
 
     private boolean triggerEvents = true;
 
+
     public void setParams(Map<String, String> m) {
         logger.info("set params:" + m);
         datamodelParams = m;
@@ -114,6 +115,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     private boolean configureSkills = true;
     private boolean hashSkillconfigurations = false;
     public static boolean useFullIdForStateInformer = true;
+    private boolean sendAllPossibleTransitions = false;
 
     //private static SkillStateMachineConfig ssmConfig;
 
@@ -166,13 +168,17 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
 
             logger.trace("active states sent:" + states);
             stateMapInformers.forEach(it -> {
-                List<BonsaiTransition> ts = transitions;
+                List<BonsaiTransition> ts;
+                if (sendAllPossibleTransitions) {
+                    ts = getCurrentPossibleTransitions();
+                } else {
+                    ts = transitions;
+                }
                 if (!it.sendStatesWithTransitions()) {
                     ts = new LinkedList<>();
                 }
                 try {
-                    it.sendCurrentStatesAndTransitions(states, transitions);
-
+                    it.sendCurrentStatesAndTransitions(states, ts);
                 } catch (Exception e) {
                     logger.debug(e.getMessage(), e);
                     logger.warn(e.getMessage());
@@ -441,6 +447,9 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
 
         customFinalStates = MapReader.readConfigBool("#_FINAL_STATES", customFinalStates, data);
         logger.debug("Using End and Fatal as final states");
+
+        sendAllPossibleTransitions = MapReader.readConfigBool("#_SEND_ALL_TRANSITIONS", sendAllPossibleTransitions, data);
+        logger.debug("Send all Taransitions: " + sendAllPossibleTransitions);
     }
 
     /**
@@ -633,6 +642,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
                 scxmlExecutor.addListener(scxml, listener);
             }
             scxmlExecutor.go();
+            activeStates.sendCurrentStates();
         } catch (ModelException me) {
             logger.error("Error starting state machine", me);
             throw new StateMachineException("Error starting state machine", me);
@@ -961,6 +971,16 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
         }
 
         return list;
+    }
+
+    public List<BonsaiTransition> getCurrentPossibleTransitions() {
+        List<BonsaiTransition> transitions = new LinkedList<>();
+        List<Transition> rawTransitions = getPossibleTransitions();
+        for (Transition t : rawTransitions) {
+            BonsaiTransition trans = BonsaiTransition.of(t);
+            transitions.add(trans);
+        }
+        return transitions;
     }
 
     public List<BonsaiTransition> getTransitionsByState(String name) {
