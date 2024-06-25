@@ -64,6 +64,7 @@
 <li class="toctree-l4"><a class="reference internal" href="#configure-and-validate"><cite>#_CONFIGURE_AND_VALIDATE</cite></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#enable-config-cache"><cite>#_ENABLE_CONFIG_CACHE</cite></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#final-states"><cite>#_FINAL_STATES</cite></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#send-all-transitions"><cite>#_SEND_ALL_TRANSITIONS</cite></a></li>
 </ul>
 </li>
 </ul>
@@ -150,6 +151,11 @@ Set Configurations only in the topmost scxml to avoid suprises</p>
 <p>defaults to <cite>true</cite></p>
 <p>Always assume <cite>End</cite> and <cite>Fatal</cite> as final states and stop the statemachine.</p>
 </section>
+<section id="send-all-transitions">
+<h3><cite>#_SEND_ALL_TRANSITIONS</cite><a class="headerlink" href="#send-all-transitions" title="Link to this heading"></a></h3>
+<p>defaults to <cite>false</cite></p>
+<p>If disabled only informs Listeners of transitions from active Skills. (e.g. ROS UI will not display possible transitions defined in Parent States)</p>
+</section>
 </section>
 </section>
 
@@ -164,7 +170,7 @@ Set Configurations only in the topmost scxml to avoid suprises</p>
 
   <div role="contentinfo">
     <p>&#169; Copyright 2023, Leroy Rügemer.
-      <span class="lastupdated">Last updated on Jun 09, 2024.
+      <span class="lastupdated">Last updated on Jun 25, 2024.
       </span></p>
   </div>
 
