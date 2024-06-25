@@ -73,3 +73,11 @@ defaults to `false`
 defaults to `true`
 
 Always assume `End` and `Fatal` as final states and stop the statemachine. 
+
+
+`#_SEND_ALL_TRANSITIONS`
+........................
+
+defaults to `false`
+
+If disabled only informs Listeners of transitions from active Skills. (e.g. ROS UI will not display possible transitions defined in Parent States)
