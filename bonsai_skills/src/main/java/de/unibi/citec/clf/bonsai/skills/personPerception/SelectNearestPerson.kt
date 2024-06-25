@@ -78,12 +78,13 @@ class SelectNearestPerson : AbstractSkill() {
         bestPerson = null
         for (currentPerson in personDataList!!) {
             val distance: Double = positionData!!.getDistance(currentPerson.position, LengthUnit.MILLIMETER)
-            if (distance > bestDist) {
-                logger.debug("dropping person, because i already found closer person")
-                continue
+            logger.debug("person is $distance away")
+            if (distance < bestDist) {
+                bestDist = distance
+                bestPerson = currentPerson
+                logger.debug("person is closer!")
             }
-            bestDist = distance
-            bestPerson = currentPerson
+
         }
         return if (bestPerson == null) {
             tokenError!!
