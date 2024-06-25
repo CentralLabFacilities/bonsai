@@ -65,6 +65,7 @@ public class RemoteROSController extends ROSController implements FXGUISCXMLRemo
                 while (running) {
                     List<String> ids = r.getStateIds();
 
+
                     if (ids != null && changed(ids, old)) {
                         ObservableList o = FXCollections.observableArrayList();
                         o.addAll(ids);
@@ -89,9 +90,7 @@ public class RemoteROSController extends ROSController implements FXGUISCXMLRemo
 
     @Override
     public void addCurrentStateTrigger(ICurrentStateListener list) {
-
         listener = list;
-
     }
 
     @Override
