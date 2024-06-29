@@ -2,9 +2,8 @@ package de.unibi.citec.clf.bonsai.skills.personPerception.oneshot;
 
 import de.unibi.citec.clf.bonsai.actuators.DetectPeopleActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
-import de.unibi.citec.clf.bonsai.core.exception.TransformException;
-import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
+import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
 import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
@@ -12,9 +11,7 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.bonsai.util.CoordinateSystemConverter;
-import de.unibi.citec.clf.bonsai.util.CoordinateTransformer;
 import de.unibi.citec.clf.btl.data.geometry.Point2D;
-import de.unibi.citec.clf.btl.data.geometry.Point3D;
 import de.unibi.citec.clf.btl.data.navigation.PositionData;
 import de.unibi.citec.clf.btl.data.person.PersonData;
 import de.unibi.citec.clf.btl.data.person.PersonDataList;
@@ -113,9 +110,6 @@ public class SearchPeople extends AbstractSkill {
 
     private Sensor<PositionData> positionSensor;
 
-    private CoordinateTransformer coordTransformer;
-
-
     @Override
     public void configure(ISkillConfigurator configurator) {
         searchRadius = configurator.requestOptionalDouble(KEY_DISTANCE, searchRadius);
@@ -138,8 +132,6 @@ public class SearchPeople extends AbstractSkill {
         peopleActuator = configurator.getActuator("PeopleActuator", DetectPeopleActuator.class);
 
         positionSensor = configurator.getSensor("PositionSensor", PositionData.class);
-
-        coordTransformer = (CoordinateTransformer) configurator.getTransform();
     }
 
     @Override
@@ -203,40 +195,20 @@ public class SearchPeople extends AbstractSkill {
             return tokenError;
         }
 
-
         if (possiblePersons.isEmpty()) {
             logger.info("Seen no persons");
             return tokenSuccessNoPeople;
         }
 
-        logger.debug("Possible Persons: "+possiblePersons);
         for (PersonData currentPerson : possiblePersons) {
             PositionData localPersonPos = currentPerson.getPosition();
-
-            logger.debug(localPersonPos);
-
-            Point3D personPos = new Point3D();
-            personPos.setX(currentPerson.getPosition().getX(LengthUnit.METER), LengthUnit.METER);
-            personPos.setY(currentPerson.getPosition().getY(LengthUnit.METER), LengthUnit.METER);
-            personPos.setFrameId(currentPerson.getPosition().getFrameId());
-
-
-            Point3D personPosMap = null;
-            try {
-                personPosMap = coordTransformer.transform(personPos, "map");
-            } catch (TransformException e) {
-                logger.error("Could not transform: ", e);
-                return tokenError;
+            PositionData globalPersonPos = localPersonPos;
+            if(localPersonPos.isInBaseFrame()) {
+                globalPersonPos = CoordinateSystemConverter.localToGlobal(localPersonPos, robotPosition);
             }
 
-            logger.debug(personPosMap);
-
-            PositionData globalPersonPos = new PositionData();
-            globalPersonPos.setFrameId(personPosMap.getFrameId());
-            globalPersonPos.setX(personPosMap.getX(LengthUnit.METER), LengthUnit.METER);
-            globalPersonPos.setY(personPosMap.getY(LengthUnit.METER), LengthUnit.METER);
-
-
+            logger.info("I saw a person - checking angle now; searchangle= " + searchAngle + ". Local Person position "
+                    + localPersonPos.toString() + ". Global Person position " + globalPersonPos.toString());
             double angle = robotPosition.getRelativeAngle(globalPersonPos, AngleUnit.RADIAN);
 
             if (!(angle > searchAngle / -2 && angle <= 0) && !(angle < Math.PI * -2 + (searchAngle / 2) && angle >= Math.PI * -2)) {
@@ -246,9 +218,9 @@ public class SearchPeople extends AbstractSkill {
                 );
                 //continue;
             }
-            if (localPersonPos.getDistance(new Point2D(0.0, 0.0, LengthUnit.METER), LengthUnit.METER) > searchRadius) {
+            if (localPersonPos.getDistance(new Point2D(0.0, 0.0, LengthUnit.METER), LengthUnit.MILLIMETER) > searchRadius) {
                 logger.info("search distance is: " + searchRadius + ". person to far away: "
-                        + localPersonPos.getDistance(new Point2D(0.0, 0.0, LengthUnit.METER), LengthUnit.METER));
+                        + localPersonPos.getDistance(new Point2D(0.0, 0.0, LengthUnit.METER), LengthUnit.MILLIMETER));
                 continue;
             }
 
@@ -257,7 +229,7 @@ public class SearchPeople extends AbstractSkill {
             foundPersons.add(currentPerson);
         }
 
-        if (!foundPersons.elements.isEmpty()) {
+        if (foundPersons.elements.size() > 0) {
             return tokenSuccessPeople;
         }
         return tokenSuccessNoPeople;
@@ -266,9 +238,8 @@ public class SearchPeople extends AbstractSkill {
     @Override
     public ExitToken end(ExitToken curToken) {
         if (curToken.getExitStatus().isSuccess()) {
-            if (!foundPersons.elements.isEmpty()) {
+            if (foundPersons.elements.size() > 0) {
                 try {
-                    logger.error("Person: " + foundPersons);
                     personDataListSlot.memorize(foundPersons);
                 } catch (CommunicationException ex) {
                     logger.fatal("Unable to write to memory: " + ex.getMessage());
