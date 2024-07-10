@@ -30,7 +30,7 @@ import de.unibi.citec.clf.btl.data.speechrec.NLU
  * Options:
  *  #_INTENT:               [String] (optional)
  *                              -> check for matching intent
- *  'ENTITY[:ROLE][:GROUP]':
+ *  #'ENTITY[:ROLE][:GROUP]':
  *                              -> Entities to unpack (see example)
  * Slots:
  *  all defined Parameters as WriteSlot [String]
