@@ -36,7 +36,7 @@ public class HasPosture extends AbstractSkill {
     public void configure(ISkillConfigurator configurator) {
 
         tokenSuccessYes = configurator.requestExitToken(ExitStatus.SUCCESS().ps("yes"));
-        tokenSuccessYes = configurator.requestExitToken(ExitStatus.SUCCESS().ps("no"));
+        tokenSuccessNo = configurator.requestExitToken(ExitStatus.SUCCESS().ps("no"));
 
         poseActuator = configurator.getActuator("PostureActuator", PostureActuator.class);
 
