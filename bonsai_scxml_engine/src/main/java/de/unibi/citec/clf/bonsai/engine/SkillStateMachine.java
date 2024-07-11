@@ -76,6 +76,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
 
     private boolean triggerEvents = true;
 
+
     public void setParams(Map<String, String> m) {
         logger.info("set params:" + m);
         datamodelParams = m;
@@ -107,12 +108,14 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
      * Prefix of states (e.g. "de.unibi.citec.clf.bonsai.skills.").
      */
     private String statePrefix = "de.unibi.citec.clf.bonsai.skills.";
+    private boolean customFinalStates = true;
     private boolean showDefaultSlotWarnings = true;
     private boolean generateDefaultSlots = false;
     private boolean enableSkillWarnings = false;
     private boolean configureSkills = true;
     private boolean hashSkillconfigurations = false;
     public static boolean useFullIdForStateInformer = true;
+    private boolean sendAllPossibleTransitions = false;
 
     //private static SkillStateMachineConfig ssmConfig;
 
@@ -165,13 +168,17 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
 
             logger.trace("active states sent:" + states);
             stateMapInformers.forEach(it -> {
-                List<BonsaiTransition> ts = transitions;
+                List<BonsaiTransition> ts;
+                if (sendAllPossibleTransitions) {
+                    ts = getCurrentPossibleTransitions();
+                } else {
+                    ts = transitions;
+                }
                 if (!it.sendStatesWithTransitions()) {
                     ts = new LinkedList<>();
                 }
                 try {
-                    it.sendCurrentStatesAndTransitions(states, transitions);
-
+                    it.sendCurrentStatesAndTransitions(states, ts);
                 } catch (Exception e) {
                     logger.debug(e.getMessage(), e);
                     logger.warn(e.getMessage());
@@ -437,6 +444,12 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
 
         hashSkillconfigurations = MapReader.readConfigBool("#_ENABLE_CONFIG_CACHE", hashSkillconfigurations, data);
         logger.debug("Enable configuration cache: " + hashSkillconfigurations);
+
+        customFinalStates = MapReader.readConfigBool("#_FINAL_STATES", customFinalStates, data);
+        logger.debug("Using End and Fatal as final states");
+
+        sendAllPossibleTransitions = MapReader.readConfigBool("#_SEND_ALL_TRANSITIONS", sendAllPossibleTransitions, data);
+        logger.debug("Send all Taransitions: " + sendAllPossibleTransitions);
     }
 
     /**
@@ -471,9 +484,8 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
                 continue;
             }
             String expr = data.getExpr();
-            if (expr == null ) {
-                if(!data.getId().equalsIgnoreCase("#_SLOTS")) logger.error("expr from Data is null! data:" + data.getId());
-                continue;
+            if (expr == null) {
+                expr = "";
             }
 
             String name = expr.replaceAll("'", "");
@@ -519,6 +531,16 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
         TriggerEvent evts = new TriggerEvent(event, TriggerEvent.SIGNAL_EVENT);
         try {
             logger.debug("FIRE SKILL Event: " + event);
+            logger.trace("All Current states:");
+            if (logger.isTraceEnabled()) for(Object s : scxmlExecutor.getCurrentStatus().getAllStates()) {
+                if (s instanceof State) {
+                    State state = (State) s;
+                    logger.trace("- " + state.getId());
+                } else {
+                    logger.trace(s);
+                }
+
+            }
             //checkEventTransitions(event);
             scxmlExecutor.triggerEvent(evts);
         } catch (ModelException me) {
@@ -620,6 +642,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
                 scxmlExecutor.addListener(scxml, listener);
             }
             scxmlExecutor.go();
+            activeStates.sendCurrentStates();
         } catch (ModelException me) {
             logger.error("Error starting state machine", me);
             throw new StateMachineException("Error starting state machine", me);
@@ -701,6 +724,9 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
             if (a instanceof Send) {
                 logger.info("## SEND ## Event:"
                         + ((Send) a).getEvent());
+                //Somehow we dont always execute event actions and fire events?
+                //So we just fire manually
+                //fireEvent(((Send) a).getEvent());
                 //checkEventTransitions(((Send) a).getEvent());
             } else if (a instanceof Assign) {
                 Assign action = (Assign) a;
@@ -730,6 +756,17 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     public void onEntry(final TransitionTarget entered) {
 
         logger.debug("#OnEntry: " + entered.getId());
+        logger.trace("All Current states:");
+        if (logger.isTraceEnabled()) for(Object s : scxmlExecutor.getCurrentStatus().getAllStates()) {
+            if (s instanceof State) {
+                State state = (State) s;
+                logger.trace("- " + state.getId());
+            } else {
+                logger.trace(s);
+            }
+
+        }
+        logger.debug(this.scxmlExecutor.getCurrentStatus().toString());
         actionCheck(entered.getOnEntry().getActions());
 
         while (PAUSE && running) {
@@ -798,13 +835,21 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
             if (exited instanceof Parallel) {
                 Parallel parallel = (Parallel) exited;
                 logger.trace("exited is instance of parallel " + exited.getId());
+                this.pauseMachine();
                 for (Object s : parallel.getChildren()) {
                     if (s instanceof TransitionTarget) {
                         TransitionTarget t = (TransitionTarget) s;
+
                         StateID stateId = new StateID(statePrefix, t.getId());
                         stopAndRemoveState(stateId, true);
                     }
                 }
+                // Removing all active states to be sure
+                Set<StateID> keys = new HashSet<>(activeStates.keySet());
+                for (StateID key : keys) {
+                    stopAndRemoveState(key, true);
+                }
+                this.continueStateMachine();
             } else {
                 logger.trace("exited is not parallel " + exited.getId() + " "
                         + exited.getClass().getSimpleName());
@@ -840,6 +885,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     }
 
     private boolean isEndState(String s) {
+        if (!customFinalStates) return false;
         return s.equals("End") || s.equals("Fatal");
     }
 
@@ -925,6 +971,16 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
         }
 
         return list;
+    }
+
+    public List<BonsaiTransition> getCurrentPossibleTransitions() {
+        List<BonsaiTransition> transitions = new LinkedList<>();
+        List<Transition> rawTransitions = getPossibleTransitions();
+        for (Transition t : rawTransitions) {
+            BonsaiTransition trans = BonsaiTransition.of(t);
+            transitions.add(trans);
+        }
+        return transitions;
     }
 
     public List<BonsaiTransition> getTransitionsByState(String name) {

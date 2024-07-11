@@ -6,12 +6,15 @@ import de.unibi.citec.clf.btl.data.geometry.Pose3D;
 import de.unibi.citec.clf.btl.ros.MsgTypeFactory;
 import de.unibi.citec.clf.btl.ros.RosSerializer;
 import de.unibi.citec.clf.btl.units.LengthUnit;
+import org.apache.log4j.Logger;
 import org.ros.message.MessageFactory;
 
 /**
  * @author lruegeme
  */
 public class BoundingBox3DSerializer extends RosSerializer<BoundingBox3D, vision_msgs.BoundingBox3D> {
+
+    private Logger logger = Logger.getLogger(getClass());
 
     @Override
     public vision_msgs.BoundingBox3D serialize(BoundingBox3D data, MessageFactory fact) throws SerializationException {
@@ -29,8 +32,12 @@ public class BoundingBox3DSerializer extends RosSerializer<BoundingBox3D, vision
     public BoundingBox3D deserialize(vision_msgs.BoundingBox3D msg) throws DeserializationException {
         BoundingBox3D data = new BoundingBox3D();
 
+        logger.debug("deserialize BoundingBox3D center.pose.x=" + msg.getCenter().getPosition().getX());
+
         data.setPose(MsgTypeFactory.getInstance().createType(msg.getCenter(),Pose3D.class));
         data.setSize(new Point3D(msg.getSize().getX(),msg.getSize().getY(),msg.getSize().getZ(),LengthUnit.METER));
+
+        logger.debug("deserialized BoundingBox3D bb.pose.x=" + data.getPose().getTranslation().getX(LengthUnit.METER));
 
         return data;
     }

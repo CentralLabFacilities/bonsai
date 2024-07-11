@@ -2,6 +2,7 @@ package de.unibi.citec.clf.bonsai.test.actuators;
 
 import de.unibi.citec.clf.bonsai.core.configuration.IObjectConfigurator;
 import de.unibi.citec.clf.bonsai.core.exception.ConfigurationException;
+import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
@@ -43,6 +44,11 @@ public class SpeechActuatorStub implements de.unibi.citec.clf.bonsai.actuators.S
                 return null;
             }
         };
+    }
+
+    @Override
+    public Future<Boolean> enableASR(@NotNull Boolean b) throws IOException {
+        return null;
     }
 
     @Override

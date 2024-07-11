@@ -23,7 +23,7 @@
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <dir>target</dir>
-        <kotlin.version>1.7.21</kotlin.version>
+        <kotlin.version>1.9.0</kotlin.version>
     </properties>
 
     <dependencies>
@@ -46,8 +46,6 @@
             <artifactId>javafx-fxml</artifactId>
             <version>11.0.2</version>
         </dependency>
-
-
 
         <dependency>
             <groupId>commons-scxml</groupId>
@@ -167,7 +165,7 @@
                     </execution>
                 </executions>
                 <configuration>
-                    <jvmTarget>11</jvmTarget>
+                    <jvmTarget>${maven.compiler.target}</jvmTarget>
                 </configuration>
             </plugin>
             <plugin>

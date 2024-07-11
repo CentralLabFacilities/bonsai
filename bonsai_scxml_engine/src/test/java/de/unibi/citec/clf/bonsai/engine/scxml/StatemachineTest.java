@@ -61,6 +61,15 @@ public class StatemachineTest {
     }
 
     @Test
+    public void includeSendEventTransition() throws TransformerException, TimeoutException {
+        final String sm = "includeSend.xml";
+        final String conf = "TestConfig.xml";
+
+        LoadingResults res = TestTools.loadStatemachine(sm);
+        assertTrue(res.success());
+    }
+
+    @Test
     public void sendEventTransition() throws TransformerException, TimeoutException {
         final String sm = "sendEventTransition.xml";
         final String conf = "TestConfig.xml";
@@ -167,5 +176,29 @@ public class StatemachineTest {
         TestListener test = TestListener.newEndFatal();
         assertTrue(TestTools.testStatemachine(conf, sm, test));
     }
+
+//    @Test
+//    public void testParallelWorking() throws TransformerException, TimeoutException {
+//        final String sm = "parallelWorking.xml";
+//        final String conf = "TestConfig.xml";
+//
+//        LoadingResults res = TestTools.loadStatemachine(sm);
+//        assertTrue(res.success());
+//
+//        TestListener test = TestListener.newEndFatal();
+//        assertTrue(TestTools.testStatemachine(conf, sm, test));
+//    }
+//
+//    @Test
+//    public void testParallelBugged() throws TransformerException, TimeoutException {
+//        final String sm = "parallelBugged.xml";
+//        final String conf = "TestConfig.xml";
+//
+//        LoadingResults res = TestTools.loadStatemachine(sm);
+//        assertTrue(res.success());
+//
+//        TestListener test = TestListener.newEndFatal();
+//        assertTrue(TestTools.testStatemachine(conf, sm, test));
+//    }
 
 }

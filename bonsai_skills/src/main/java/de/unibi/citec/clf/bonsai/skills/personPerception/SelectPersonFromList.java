@@ -66,6 +66,7 @@ import java.io.IOException;
  *
  * @author dleins
  */
+@Deprecated
 public class SelectPersonFromList extends AbstractSkill {
 
     private final static String KEY_INDEX = "#_INDEX";

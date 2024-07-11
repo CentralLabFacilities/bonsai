@@ -27,6 +27,14 @@ public interface PostureActuator extends Actuator {
      */
     Future<Boolean> assumePose(@Nonnull String pose, @Nullable String group);
 
+    /**
+     * Checks if a defined Pose is reached
+     * @param pose
+     * @param group
+     * @return
+     */
+    Future<Boolean> isInPose(@Nonnull String pose, @Nullable String group);
+
 
     List<String> listMotions(@Nullable String group);
 

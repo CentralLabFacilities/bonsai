@@ -25,6 +25,7 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
  *
  * @author pvonneumanncosel
  */
+@Deprecated
 public class StopPeopleTracking extends AbstractSkill {
     private ExitToken tokenError;
     private ExitToken tokenSuccess;

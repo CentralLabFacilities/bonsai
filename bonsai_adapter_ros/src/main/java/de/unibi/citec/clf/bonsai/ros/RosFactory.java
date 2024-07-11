@@ -204,7 +204,8 @@ public class RosFactory implements CoreObjectFactory {
                         logger.debug("unused opt param: " + entry.getKey());
                     }
                     continue actuatorLoop;
-                } catch (IllegalAccessException | InstantiationException | NoSuchMethodException | SecurityException | InvocationTargetException ex) {
+                } catch (IllegalAccessException | InstantiationException | NoSuchMethodException | SecurityException |
+                         InvocationTargetException ex) {
                     throw new CoreObjectCreationException(ex);
                 }
 
@@ -307,7 +308,8 @@ public class RosFactory implements CoreObjectFactory {
                         logger.trace("unused opt param: " + entry.getKey());
                     }
                     continue sensorLoop;
-                } catch (IllegalAccessException | InstantiationException | NoSuchMethodException | SecurityException | InvocationTargetException ex) {
+                } catch (IllegalAccessException | InstantiationException | NoSuchMethodException | SecurityException |
+                         InvocationTargetException ex) {
                     logger.error(ex);
                     continue sensorLoop;
                 }
@@ -330,11 +332,13 @@ public class RosFactory implements CoreObjectFactory {
 
         if (transformer.getTransformerClass().equals(TFTransformer.class)) {
             coordinateTransformer = new TFTransformer(GraphName.of(RosNode.NODE_PREFIX + "tf"), GraphName.of(RosNode.NODE_PREFIX + "tf2"));
-        } else if (transformer.getTransformerClass().equals(TfRosjavaWrapper.class)){
+        } else if (transformer.getTransformerClass().equals(TfRosjavaWrapper.class)) {
             coordinateTransformer = new TfRosjavaWrapper(GraphName.of(RosNode.NODE_PREFIX + "Transformer"));
-            ((TfRosjavaWrapper)coordinateTransformer).getNode().setKey("Transformer");
-        }else {
-            throw new IllegalArgumentException("can only create " + TFTransformer.class +
+            ((TfRosjavaWrapper) coordinateTransformer).getNode().setKey("Transformer");
+        } else if (transformer.getTransformerClass().equals(TFTransformerTimestamps.class)) {
+            coordinateTransformer = new TFTransformerTimestamps(GraphName.of(RosNode.NODE_PREFIX + "tf"), GraphName.of(RosNode.NODE_PREFIX + "tf2"));
+        } else {
+            throw new IllegalArgumentException("can only create " + TFTransformer.class + " or " + TFTransformerTimestamps.class + " or " + TfRosjavaWrapper.class +
                     " but requested is: " + transformer.getTransformerClass());
         }
 
@@ -347,12 +351,12 @@ public class RosFactory implements CoreObjectFactory {
 
         if (isActuatorInitialized.get(key)) {
             //check if actuator is still connected
-            if (((RosNode) initializedActuatorsByKey.get(key)).connectionsAlive() ) {
+            if (((RosNode) initializedActuatorsByKey.get(key)).connectionsAlive()) {
                 return (T) initializedActuatorsByKey.get(key);
             } else {
                 // lost connection, shutdown
                 logger.error("Actuator: " + key + " class: " + actuatorClass + ", seems to has lost its connections, shutdown and restart");
-                isActuatorInitialized.put(key,false);
+                isActuatorInitialized.put(key, false);
                 ((RosNode) initializedActuatorsByKey.get(key)).destroyNode();
                 initializedActuatorsByKey.remove(key);
             }
@@ -368,7 +372,6 @@ public class RosFactory implements CoreObjectFactory {
         }
 
 
-
         ConfiguredObject obj = configuredObjectsByKey.get(key);
         Actuator actuator;
 
@@ -377,7 +380,8 @@ public class RosFactory implements CoreObjectFactory {
             actuator = (Actuator) cons.newInstance(GraphName.of(RosNode.NODE_PREFIX + key));
             ((RosNode) actuator).setKey(key);
             actuator.configure(obj.conf);
-        } catch (NoSuchMethodException | SecurityException | InstantiationException | IllegalAccessException | InvocationTargetException ex) {
+        } catch (NoSuchMethodException | SecurityException | InstantiationException | IllegalAccessException |
+                 InvocationTargetException ex) {
             logger.error("failed to create instance");
             throw new CoreObjectCreationException(ex);
         } catch (ConfigurationException e) {
@@ -388,7 +392,7 @@ public class RosFactory implements CoreObjectFactory {
             try {
                 spawnRosNode((RosNode) actuator, wait);
                 if (wait) {
-                   TimeUnit.MILLISECONDS.sleep(sleepTime);
+                    TimeUnit.MILLISECONDS.sleep(sleepTime);
                 }
             } catch (InterruptedException | ExecutionException | TimeoutException ex) {
                 logger.error(ex);
@@ -454,7 +458,8 @@ public class RosFactory implements CoreObjectFactory {
             sensor = (Sensor) declaredConstructors[0].newInstance(obj.data, obj.wire, GraphName.of(RosNode.NODE_PREFIX + key));
             ((RosNode) sensor).setKey(key);
             sensor.configure(obj.conf);
-        } catch (NoSuchMethodException | SecurityException | InstantiationException | IllegalAccessException | InvocationTargetException ex) {
+        } catch (NoSuchMethodException | SecurityException | InstantiationException | IllegalAccessException |
+                 InvocationTargetException ex) {
             logger.error("failed to create instance");
             throw new CoreObjectCreationException(ex);
         } catch (ConfigurationException ex) {
@@ -563,8 +568,18 @@ public class RosFactory implements CoreObjectFactory {
         if (coordinateTransformer == null)
             throw new CoreObjectCreationException("no ros transformer configured");
 
-        if(coordinateTransformer instanceof TFTransformer) {
+        if (coordinateTransformer instanceof TFTransformer) {
             TFTransformer c = (TFTransformer) coordinateTransformer;
+            if (!c.getNode().initialized) {
+                try {
+                    spawnRosNode(c.getNode(), true);
+                    spawnRosNode(c.getNode2(), true);
+                } catch (TimeoutException | ExecutionException | InterruptedException e) {
+                    throw new CoreObjectCreationException(e);
+                }
+            }
+        } else  if (coordinateTransformer instanceof TFTransformerTimestamps) {
+            TFTransformerTimestamps c = (TFTransformerTimestamps) coordinateTransformer;
             if (!c.getNode().initialized) {
                 try {
                     spawnRosNode(c.getNode(), true);
@@ -583,7 +598,6 @@ public class RosFactory implements CoreObjectFactory {
                 }
             }
         }
-
 
 
         return (T) coordinateTransformer;
@@ -607,7 +621,7 @@ public class RosFactory implements CoreObjectFactory {
         });
 
         if (coordinateTransformer != null) {
-            if(coordinateTransformer instanceof TFTransformer) {
+            if (coordinateTransformer instanceof TFTransformer) {
                 TFTransformer c = (TFTransformer) coordinateTransformer;
                 c.getNode().destroyNode();
                 c.getNode2().destroyNode();
@@ -629,8 +643,9 @@ public class RosFactory implements CoreObjectFactory {
         FactoryConfigurationResults res = new FactoryConfigurationResults();
         Queue<RosNode> nodesQuene = new ConcurrentLinkedQueue<>();
 
+
         if (coordinateTransformer != null) {
-            if(coordinateTransformer instanceof TFTransformer) {
+            if (coordinateTransformer instanceof TFTransformer) {
                 TFTransformer c = (TFTransformer) coordinateTransformer;
                 try {
                     spawnRosNode(c.getNode(), false);
@@ -640,7 +655,18 @@ public class RosFactory implements CoreObjectFactory {
                 }
                 nodesQuene.add(c.getNode());
                 nodesQuene.add(c.getNode2());
-            } else {
+            } else  if (coordinateTransformer instanceof TFTransformerTimestamps) {
+                TFTransformerTimestamps c = (TFTransformerTimestamps) coordinateTransformer;
+                try {
+                    spawnRosNode(c.getNode(), false);
+                    spawnRosNode(c.getNode2(), false);
+                } catch (TimeoutException | ExecutionException | InterruptedException e) {
+                    logger.error(e);
+                }
+                nodesQuene.add(c.getNode());
+                nodesQuene.add(c.getNode2());
+
+            }else {
                 TfRosjavaWrapper c = (TfRosjavaWrapper) coordinateTransformer;
                 try {
                     spawnRosNode(c.getNode(), false);

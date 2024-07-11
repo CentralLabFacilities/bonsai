@@ -21,10 +21,20 @@ public interface GazeActuator extends Actuator {
     /**
      *
      * @param point
-     * @param duration movement duration in ms
+     * @param duration minimal movement duration in ms
      * @return
      */
     Future<Void> lookAt(Point3D point, long duration);
+
+    /**
+     * Look at a point, moving at least minDuration milliseconds with below maxVelocity rad/s
+     *
+     * @param point the point to look at
+     * @param maxVelocity maximum velocity until we look at the point
+     * @param minDuration
+     * @return
+     */
+    Future<Void> lookAt(Point3D point, double maxVelocity, long minDuration);
 
     void manualStop() throws IOException;
 
