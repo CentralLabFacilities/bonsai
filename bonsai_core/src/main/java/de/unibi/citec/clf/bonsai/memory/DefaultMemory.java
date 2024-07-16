@@ -48,4 +48,8 @@ public class DefaultMemory implements WorkingMemory {
         //no cleanup
     }
 
+    public void clearAll() {
+        memorySlots.clear();
+    }
+
 }
