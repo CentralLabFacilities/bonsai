@@ -68,9 +68,27 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
             task = () -> {
                 try {
                     logger.info("starting drive");
+                    Twist3D org = MsgTypeFactory.getInstance().createType(driveMsg, Twist3D.class);
+                    Twist targetTwist = driveMsg;
+                    Twist3D cur = new Twist3D(org.getLinear() , org.getAngular());
+                    double x = org.getLinear().getX(SpeedUnit.METER_PER_SEC);
                     long timeout = Time.currentTimeMillis() + driveDuration;
+                    long start = Time.currentTimeMillis();
+                    double factor = 0;
                     while (Time.currentTimeMillis() < timeout) {
-                        moveRelativePublisher.publish(driveMsg);
+                        if(factor < 1.0) {
+                            factor = (Time.currentTimeMillis() - start) / 1000.0;
+                            if(factor > 1.0)
+                            {
+                                factor = 1.0;
+                                targetTwist = driveMsg;
+                            } else {
+                                cur.getLinear().setX(x * factor, SpeedUnit.METER_PER_SEC);
+                                targetTwist = MsgTypeFactory.getInstance().createMsg(cur, Twist.class);
+                            }
+                        }
+
+                        moveRelativePublisher.publish(targetTwist);
                         Thread.sleep(republishdelay);
                     }
                     //todo check target pose
@@ -82,6 +100,8 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
                     //todo check target pose
                 } catch (InterruptedException e) {
                     return;
+                } catch (RosSerializer.DeserializationException | RosSerializer.SerializationException e) {
+                    throw new RuntimeException(e);
                 } finally {
                     moveRelativePublisher.publish(zeroMsg);
                 }
