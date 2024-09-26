@@ -1,6 +1,7 @@
 package de.unibi.citec.clf.bonsai.engine;
 
 import de.unibi.citec.clf.bonsai.core.configuration.ConfigurationResults;
+import de.unibi.citec.clf.bonsai.engine.model.StateID;
 import de.unibi.citec.clf.bonsai.engine.scxml.config.StateMachineConfiguratorResults;
 import de.unibi.citec.clf.bonsai.engine.scxml.config.ValidationResult;
 import de.unibi.citec.clf.bonsai.engine.scxml.exception.LoadingException;
@@ -48,6 +49,13 @@ public class LoadingResults {
             out += "#### General Errors:\n";
             for (LoadingException l : loadingExceptions) {
                 out += "\n" + l.getMessage();
+            }
+        }
+        if (!validationResult.unreachedStates.isEmpty()) {
+            out += "#### Unreached States Warnings:\n";
+            for (StateID state : validationResult.unreachedStates) {
+                out += state.toString() + "\n";
+                // System.out.println(state.getFullSkill());
             }
         }
 
