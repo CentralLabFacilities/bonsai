@@ -39,7 +39,6 @@ public class IsAnySlotEmpty extends AbstractSkill {
     public void configure(ISkillConfigurator configurator) {
         tokenEmpty = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus("empty"));
         tokenNotEmpty = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus("notEmpty"));
-        tokenError = configurator.requestExitToken(ExitStatus.ERROR());
 
         slot = configurator.getReadSlot("slot", Object.class);
     }

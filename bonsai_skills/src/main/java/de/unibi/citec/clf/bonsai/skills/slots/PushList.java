@@ -2,6 +2,7 @@ package de.unibi.citec.clf.bonsai.skills.slots;
 
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
+import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
@@ -11,7 +12,7 @@ import de.unibi.citec.clf.btl.List;
 import de.unibi.citec.clf.btl.Type;
 
 /**
- * Removes (Pops) the last item from a List and writes the content to itemSlot.
+ * Pushes (Appends) an item to the back of a List.
  *
  * <pre>
  *
@@ -26,8 +27,8 @@ import de.unibi.citec.clf.btl.Type;
  * Slots:
  *  ListSlot: [L] [R/W]
  *      -> Memory slot of the List
- *  ItemSlot: [T] [Write]
- *      -> Memory slot the content will be written to
+ *  ItemSlot: [T] [Read]
+ *      -> Memory slot the content will be Read from
  *
  * ExitTokens:
  *  success:        Popped an Item
@@ -41,13 +42,13 @@ import de.unibi.citec.clf.btl.Type;
  *
  * @author lruegeme
  */
-public class PopList<T extends Type, L extends List<T>> extends AbstractSkill {
+public class PushList<T extends Type, L extends List<T>> extends AbstractSkill {
 
     private ExitToken tokenSuccess;
     private ExitToken tokenError;
 
     private MemorySlot<L> listSlot;
-    private MemorySlotWriter<T> itemSlot;
+    private MemorySlotReader<T> itemSlot;
 
     private final static String KEY_DATA_TYPE = "#_DATA_TYPE";
     private final static String KEY_LIST_TYPE = "#_LIST_TYPE";
@@ -56,11 +57,11 @@ public class PopList<T extends Type, L extends List<T>> extends AbstractSkill {
     private Class<T> type;
 
     L list;
+    T item;
 
     @Override
     public void configure(ISkillConfigurator configurator) {
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
-        tokenError = configurator.requestExitToken(ExitStatus.ERROR().ps("empty"));
 
         String typeString = configurator.requestValue(KEY_DATA_TYPE);
         String listTypeString = configurator.requestValue(KEY_LIST_TYPE);
@@ -72,8 +73,9 @@ public class PopList<T extends Type, L extends List<T>> extends AbstractSkill {
             logger.error(e);
             return;
         }
-        itemSlot = configurator.getWriteSlot("ItemSlot", type);
+        itemSlot = configurator.getReadSlot("ItemSlot", type);
         listSlot = configurator.getSlot("ListSlot", listType);
+
     }
 
 
@@ -81,9 +83,17 @@ public class PopList<T extends Type, L extends List<T>> extends AbstractSkill {
     public boolean init() {
         try {
             list = listSlot.recall();
+            item = itemSlot.recall();
 
             if (list == null) {
-                logger.warn("your ReadSlot was empty");
+                logger.warn("your List was null, creating");
+                try {
+                    list = listType.newInstance();
+                } catch (InstantiationException e) {
+                    throw new RuntimeException(e);
+                } catch (IllegalAccessException e) {
+                    throw new RuntimeException(e);
+                }
             }
 
         } catch (CommunicationException ex) {
@@ -95,16 +105,13 @@ public class PopList<T extends Type, L extends List<T>> extends AbstractSkill {
 
     @Override
     public ExitToken execute() {
-        int s = list.size();
-        logger.info("List currently has " + s + " items" );
-
-        if (list.isEmpty()) return tokenError;
-        T item = list.remove(s-1);
-        logger.info("popped: " + item);
+        logger.info("adding: " + item);
+        list.add(item);
+        logger.info("list now contains " + list.size() + " items");
 
         try {
             listSlot.memorize(list);
-            itemSlot.memorize(item);
+
         } catch (CommunicationException e) {
             throw new RuntimeException(e);
         }
