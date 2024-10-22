@@ -24,6 +24,8 @@ import java.util.concurrent.Future;
  * Options:
  *  #_BLOCKING:     [boolean] Optional (default: true)
  *                      -> If true skill ends after gaze was completed
+ *  #_HEIGHT        [double] Optional (default: 0.0)
+ *                      -> The height to look at
  *
  * Slots:
  *  NavigationGoalDataSlot: [NavigationGoalData] [Read]
@@ -47,8 +49,10 @@ import java.util.concurrent.Future;
 public class LookToGoal extends AbstractSkill {
 
     private static final String KEY_BLOCKING = "#_BLOCKING";
+    private static final String KEY_Z = "#_HEIGHT";
 
     private boolean blocking = true;
+    private double z = 0.0;
 
     private ExitToken tokenSuccess;
 
@@ -67,6 +71,7 @@ public class LookToGoal extends AbstractSkill {
     public void configure(ISkillConfigurator configurator) {
 
         blocking = configurator.requestOptionalBool(KEY_BLOCKING, blocking);
+        z = configurator.requestOptionalDouble(KEY_Z, z);
 
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
 
@@ -94,9 +99,9 @@ public class LookToGoal extends AbstractSkill {
             return false;
         }
 
-        Point3D targetPoint = new Point3D(navGoal.getX(LengthUnit.METER), navGoal.getY(LengthUnit.METER), 0.0, LengthUnit.METER, navGoal.getFrameId());
+        Point3D targetPoint = new Point3D(navGoal.getX(LengthUnit.METER), navGoal.getY(LengthUnit.METER), z, LengthUnit.METER, navGoal.getFrameId());
 
-        gazeDone = gazeActuator.lookAt(targetPoint);
+        gazeDone = gazeActuator.lookAt(targetPoint,1.0,250);
 
         return true;
     }
