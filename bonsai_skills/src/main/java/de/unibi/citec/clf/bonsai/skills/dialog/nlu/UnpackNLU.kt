@@ -29,7 +29,7 @@ import de.unibi.citec.clf.btl.data.speechrec.NLU
  *
  * Options:
  *  #_INTENT:               [String] (optional)
- *                              -> check for matching intent
+ *                              -> check for matching intent, use ';' for multiple ("intentA;intentB..")
  *  #'ENTITY[:ROLE][:GROUP]':
  *                              -> Entities to unpack (see example)
  * Slots:
@@ -88,8 +88,9 @@ class UnpackNLU : AbstractSkill() {
 
     override fun execute(): ExitToken {
         if (intent.isNotEmpty()) {
-            if (nlu.intent != intent) {
-                logger.error("wrong intent '${nlu.intent}' should be '$intent'")
+            val intents = intent.split(";")
+            if (!intents.contains(nlu.intent)) {
+                logger.error("wrong intent '${nlu.intent}' should be any of '$intent'")
                 return tokenErrorIntent!!
             }
         }

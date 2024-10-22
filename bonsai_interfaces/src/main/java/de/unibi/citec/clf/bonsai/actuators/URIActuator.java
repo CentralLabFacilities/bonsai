@@ -14,6 +14,21 @@ import java.util.concurrent.Future;
  */
 public interface URIActuator extends Actuator {
 
+    /**
+     *
+     * @param uri scheme + authority + path
+     * @param query from map to ?key=value
+     * @return the response
+     */
     Future<String> getRequest(URI uri, Map<String,String> query);
+
+    /**
+     * Request to configured scheme authority
+     * @param path the path
+     * @param query from map to ?key=value
+     * @return the response
+     */
+    Future<String> getRequest(String path, Map<String,String> query);
+    Future<String> getRequest(String path);
 
 }
