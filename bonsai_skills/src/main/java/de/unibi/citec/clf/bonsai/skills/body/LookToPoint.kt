@@ -97,8 +97,8 @@ class LookToPoint : AbstractSkill() {
     companion object {
         private const val KEY_ACTUATOR = "#_ACTUATOR"
         private const val KEY_TIMEOUT = "#_TIMEOUT"
-        private const val KEY_DURATION = "#_DURATION"
-        private const val KEY_VELOCITY = "#_VELOCITY"
+        private const val KEY_DURATION = "#_MIN_DURATION"
+        private const val KEY_VELOCITY = "#_MAX_VELOCITY"
         private const val KEY_BLOCKING = "#_BLOCKING"
 
         private const val KEY_FRAME = "#_FRAMEID"
