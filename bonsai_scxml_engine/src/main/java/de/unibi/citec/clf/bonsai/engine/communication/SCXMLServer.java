@@ -16,6 +16,6 @@ public interface SCXMLServer {
 
     public void sendCurrentStatesAndTransitions(List<String> states, List<BonsaiTransition> transitions);
 
-    public void sendStatus(String status);
+    public void sendStatus(StatemachineStatus status);
 
 }

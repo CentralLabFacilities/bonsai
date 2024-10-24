@@ -10,6 +10,7 @@ import de.unibi.citec.clf.bonsai.core.exception.StateIDException;
 import de.unibi.citec.clf.bonsai.core.object.Actuator;
 import de.unibi.citec.clf.bonsai.engine.communication.SCXMLServer;
 import de.unibi.citec.clf.bonsai.engine.communication.StateChangePublisher;
+import de.unibi.citec.clf.bonsai.engine.communication.StatemachineStatus;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.StateID;
@@ -31,6 +32,7 @@ import org.apache.commons.scxml.env.SimpleScheduler;
 import org.apache.commons.scxml.env.jexl.JexlEvaluator;
 import org.apache.commons.scxml.model.*;
 import org.apache.log4j.Logger;
+import org.jetbrains.annotations.NotNull;
 
 import javax.xml.transform.TransformerException;
 import java.io.File;
@@ -116,6 +118,9 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     private boolean hashSkillconfigurations = false;
     public static boolean useFullIdForStateInformer = true;
     private boolean sendAllPossibleTransitions = false;
+
+    public String lastPathToTask = "";
+    public String lastPathToConfig = "";
 
     //private static SkillStateMachineConfig ssmConfig;
 
@@ -241,19 +246,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
 
         if (sendAlive) {
             final Runnable alivePing = () -> {
-                String status = "unknown";
-                if (isInitialized) {
-                    status = "initialized";
-                }
-                if(isLoading) {
-                    status = "loading";
-                }
-                if (running) {
-                    status = "running";
-                }
-                if (PAUSE && running) {
-                    status = "pause";
-                }
+                StatemachineStatus status = getStatemachineStatus();
 
                 try {
                     server.sendStatus(status);
@@ -272,6 +265,24 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
 
     }
 
+    @NotNull
+    public StatemachineStatus getStatemachineStatus() {
+        StatemachineStatus status = StatemachineStatus.UNKNOWN;
+        if (isInitialized) {
+            status = StatemachineStatus.INITIALIZED;
+        }
+        if(isLoading) {
+            status = StatemachineStatus.LOADING;
+        }
+        if (running) {
+            status = StatemachineStatus.RUNNING;
+        }
+        if (PAUSE && running) {
+            status = StatemachineStatus.PAUSED;
+        }
+        return status;
+    }
+
     /**
      * Initialize the state machine. Decodes SCXML task file.
      *
@@ -286,6 +297,8 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     public LoadingResults initalize(String pathToTask, String pathToConfig)
             throws StateNotFoundException, StateIDException, LoadingException, TransformerException {
         isLoading = true;
+        lastPathToTask = pathToTask;
+        lastPathToConfig = pathToConfig;
         scxml = SCXMLDecoder.parseSCXML(new File(pathToTask), includeMapping);
         if (scxml == null) {
             LoadingException e = new LoadingException(
@@ -376,7 +389,6 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
             }
 
             isInitialized = true;
-            isLoading = false;
             results.statePrefix = statePrefix;
             results.configurationResults = confResults;
             results.showDefaultSlotWarnings = showDefaultSlotWarnings;
@@ -396,6 +408,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
             logger.info("\nHint: Missing the following Transitions:\n" + a);
         }
 
+        isLoading = false;
         return results;
 
     }
@@ -716,6 +729,10 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
             running = false;
             return false;
         }
+    }
+
+    public boolean isInitialized() {
+        return isInitialized;
     }
 
     private void actionCheck(List<Action> actions) {
