@@ -1,4 +1,6 @@
 ---
+string task
+string config
 string[] currentStates
 string[] transitions
 string[] ids
