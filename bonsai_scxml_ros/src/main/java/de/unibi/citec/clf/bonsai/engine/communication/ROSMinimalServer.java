@@ -74,9 +74,9 @@ public class ROSMinimalServer extends RosNode implements SCXMLServer {
     }
 
     @Override
-    public void sendStatus(String status) {
+    public void sendStatus(StatemachineStatus status) {
         std_msgs.String string = statusPublisher.newMessage();
-        string.setData(status);
+        string.setData(status.toString());
         statusPublisher.publish(string);
     }
 

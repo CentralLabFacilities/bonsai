@@ -3,6 +3,7 @@ package de.unibi.citec.clf.bonsai.engine.control;
 import de.unibi.citec.clf.bonsai.core.exception.ConfigurationException;
 import de.unibi.citec.clf.bonsai.engine.SkillStateMachine;
 import de.unibi.citec.clf.bonsai.engine.LoadingResults;
+import de.unibi.citec.clf.bonsai.engine.communication.StatemachineStatus;
 import de.unibi.citec.clf.bonsai.engine.scxml.SkillExceptionHandler;
 import org.apache.commons.scxml.model.SCXML;
 import org.apache.commons.scxml.model.Transition;
@@ -175,6 +176,22 @@ public class StateMachineController extends TimerTask implements SkillExceptionH
             skillStateMachine.fireEvent(string);
         }
     }
+
+    public boolean isInitialized() {
+        return skillStateMachine.isInitialized();
+    }
+
+    public String getLastTask() {
+        return skillStateMachine.lastPathToTask;
+    }
+    public String getLastConfig() {
+        return skillStateMachine.lastPathToConfig;
+    }
+
+    public StatemachineStatus getStatus(){
+        return skillStateMachine.getStatemachineStatus();
+    }
+
 
     public void setConfigPath(String path) {
         pathToConfig = path;

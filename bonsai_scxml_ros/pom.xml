@@ -43,7 +43,7 @@
         <dependency>
             <groupId>org.ros.rosjava_messages</groupId>
             <artifactId>bonsai_msgs</artifactId>
-            <version>0.4.1</version>
+            <version>0.4.3</version>
         </dependency>
         <dependency>
             <groupId>org.jetbrains.kotlin</groupId>
