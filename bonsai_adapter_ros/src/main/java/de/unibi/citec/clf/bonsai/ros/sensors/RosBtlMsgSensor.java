@@ -107,6 +107,8 @@ public class RosBtlMsgSensor<DataType extends Type, MsgType extends Message> ext
                     return MsgTypeFactory.getInstance().createType(tMsg, dataTypeClass);
                 } catch (RosSerializer.DeserializationException e) {
                     logger.warn(e);
+                } catch (NullPointerException e) {
+                    throw new IOException("sensor got no data");
                 }
             } else if (dataTypeClass.isAssignableFrom(List.class)) {
                 try {
