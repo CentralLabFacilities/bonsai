@@ -479,14 +479,8 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
         }
 
         Context ctx = scxmlExecutor.getRootContext();
-//        for (Object o : ctx.getVars().keySet()) {
-//            logger.fatal("key:" + o + " data:" + ctx.getVars().get(o));
-//        }
-        //State s = (State) tt;
-        //ctx.setLocal(tt.getParent()., payload);
-
         Evaluator eval = scxmlExecutor.getEvaluator();
-        String a = "@"; //$ does not work (seems to not replace the $ 
+        String atSymbol = "@";
 
         @SuppressWarnings("unchecked")
         List<Data> dataList = model.getData();
@@ -502,30 +496,29 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
             }
 
             String name = expr.replaceAll("'", "");
-            //logger.fatal(name);
-            if (name.startsWith(a)) {
-                name = name.replaceFirst(a, "");
+            String value = name;
+            if (name.startsWith(atSymbol)) {
+                name = name.replaceFirst(atSymbol, "");
 
                 if (datamodelParams.containsKey(name)) {
                     map.put(data.getId(), datamodelParams.get(name));
-                    logger.info("overwritten @" + name + " with external:" + datamodelParams.get(name));
+                    logger.warn("overwritten @" + name + " with external:" + datamodelParams.get(name));
                     continue;
                 }
 
                 Object varObj = null;
-                //logger.fatal("evaluating:" + name);
                 try {
                     varObj = eval.eval(ctx, name);
                 } catch (SCXMLExpressionException ex) {
                     java.util.logging.Logger.getLogger(SkillStateMachine.class.getName()).log(Level.SEVERE, null, ex);
                 }
-                logger.info("data id:" + data.getId() + " with expr=" + data.getExpr() + "changed to:" + varObj);
-                name = (varObj != null) ? varObj.toString() : "0";
-                map.put(data.getId(), name);
-
+                value = (varObj != null) ? varObj.toString() : "0";
+                logger.debug("\tdata id:" + data.getId() + " with expr=" + data.getExpr() + " changed to:" + varObj);
             } else {
-                map.put(data.getId(), expr.replaceAll("^'", "").replaceAll("'$", ""));
+                value = expr.replaceAll("^'", "").replaceAll("'$", "");
             }
+            logger.debug("\tparameter " + data.getId() + "='" + value + "'");
+            map.put(data.getId(), value);
         }
         return map;
     }
@@ -585,7 +578,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
      */
     protected boolean invoke(final StateID state, Map<String, String> data) {
         logger.trace("Invoking state: " + state.getFullID());
-        logger.info("##INVOKE   " + state.getCanonicalID());
+        logger.info("INVOKE ### " + state.getCanonicalID());
 
         String shortID = state.getCanonicalSkill();
         try {
@@ -701,7 +694,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
         setupEngine(scxml);
 
         PAUSE = false;
-        logger.info("#######################\nSTATE MACHINE STOPPED AND RESET\n#######################\n");
+        logger.info("\n#######################\nSTATE MACHINE STOPPED AND RESET\n#######################\n");
 
     }
 
@@ -739,7 +732,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
         //logger.trace("ACTIONCHECK");
         actions.stream().forEach((a) -> {
             if (a instanceof Send) {
-                logger.info("## SEND ## Event:"
+                logger.debug("\t\tSEND ## Event:"
                         + ((Send) a).getEvent());
                 //Somehow we dont always execute event actions and fire events?
                 //So we just fire manually
@@ -748,15 +741,9 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
             } else if (a instanceof Assign) {
                 Assign action = (Assign) a;
                 if(action.getExpr().startsWith("'")) {
-                    logger.info("## ASSIGN ## Name:" + action.getName() + " Expr:" + action.getExpr());
+                    logger.debug("\t\tASSIGN ## Name:" + action.getName() + " Expr:" + action.getExpr());
                 } else {
-                    Context ctx = scxmlExecutor.getRootContext();
-                    Evaluator eval = scxmlExecutor.getEvaluator();
-                    try {
-                        logger.warn("## ASSIGN ## Name:" + action.getName() + " VALUE OF:'" + action.getExpr()+ "' = " + eval.eval(ctx,action.getExpr()));
-                    } catch (SCXMLExpressionException e) {
-                        logger.warn("## ASSIGN ## Name:" + action.getName() + " VALUE OF:'" + action.getExpr()+ "' = NULL");
-                    }
+                    logger.warn("\t\tASSIGN ## Name:" + action.getName() + " VALUE OF:'" + action.getExpr()+ "'");
                 }
 
             }
@@ -772,7 +759,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     @Override
     public void onEntry(final TransitionTarget entered) {
 
-        logger.debug("#OnEntry: " + entered.getId());
+        logger.debug("\tOnEntry: " + entered.getId());
         logger.trace("All Current states:");
         if (logger.isTraceEnabled()) for(Object s : scxmlExecutor.getCurrentStatus().getAllStates()) {
             if (s instanceof State) {
@@ -806,7 +793,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
 
                 if (toEnter.isFinal() || isEndState(state.getCanonicalSkill())) {
                     running = false;
-                    logger.debug("#OnEntry: entered final State");
+                    logger.debug("\tOnEntry: entered final State");
                 }
 
                 // Is state a compound state (with substates)?
@@ -834,7 +821,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     public void onExit(final TransitionTarget exited) {
         //logger.trace("Called exit for: " + exited.getId());
 
-        logger.debug("#OnExit: " + exited.getId());
+        logger.debug("\tOnExit: " + exited.getId());
         actionCheck(exited.getOnExit().getActions());
 
         try {
@@ -894,7 +881,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
             logger.debug("Payload detected: " + payload.getClass().getSimpleName());
         }
 
-        logger.info("#onTransition: \"" + from.getId() + "\" --> \"" + to.getId()
+        logger.info("\tonTransition: \"" + from.getId() + "\" --> \"" + to.getId()
                 + " \"event: \"" + transition.getEvent() + "\"");
 
         actionCheck(transition.getActions());
