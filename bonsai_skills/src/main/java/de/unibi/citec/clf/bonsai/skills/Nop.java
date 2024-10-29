@@ -16,7 +16,6 @@ public class Nop extends AbstractSkill {
 
     @Override
     public void configure(ISkillConfigurator configurator) throws SkillConfigurationException {
-
     }
 
     @Override
