@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Usage Guide &mdash; Bonsai Docs 0.7-SNAPSHOT documentation</title>
+  <title>&lt;no title&gt; &mdash; Bonsai Docs 0.7-SNAPSHOT documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=19f00094" />
 
@@ -21,7 +21,9 @@
         <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
-    <link rel="search" title="Search" href="../search.html" /> 
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Integrate Bonsai Skills into the State Machine" href="example/scxml-skills.html" />
+    <link rel="prev" title="SCXML Configuration" href="config.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -68,7 +70,8 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">Usage Guide</li>
+          <li class="breadcrumb-item"><a href="../behavior.html">Bonsai - SCXML</a></li>
+      <li class="breadcrumb-item active">&lt;no title&gt;</li>
       <li class="wy-breadcrumbs-aside">
       </li>
   </ul>
@@ -77,43 +80,40 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="usage-guide">
-<h1>Usage Guide<a class="headerlink" href="#usage-guide" title="Link to this heading"></a></h1>
-<ol class="arabic simple">
-<li><dl class="simple">
-<dt>call <code class="docutils literal notranslate"><span class="pre">String</span> <span class="pre">listScenarios()</span></code></dt><dd><ul class="simple">
-<li><p>returns a “;” seperated string containing all scenarios</p></li>
+  <p>Here we provide some step by step examples how to use SCXML and Bonsai skills.</p>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="example/scxml-skills.html">Integrate Skills in the State Machine</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="example/scxml-skills.html#one-skill">One Skill</a></li>
+<li class="toctree-l2"><a class="reference internal" href="example/scxml-skills.html#using-the-same-skill-multiple-times">Using the same skill multiple times</a></li>
 </ul>
-</dd>
-</dl>
 </li>
-<li><p>call <code class="docutils literal notranslate"><span class="pre">boolean</span> <span class="pre">changeScenario(String)</span></code> to set the scenario</p></li>
-<li><dl class="simple">
-<dt>call <code class="docutils literal notranslate"><span class="pre">String</span> <span class="pre">listActions()</span></code></dt><dd><ul class="simple">
-<li><p>returns a “;” seperated string containing all actions of the currently loaded scenario</p></li>
+<li class="toctree-l1"><a class="reference internal" href="example/scxml-transition.html">Transitions</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="example/scxml-transition.html#exit-tokens">Exit Tokens</a></li>
+<li class="toctree-l2"><a class="reference internal" href="example/scxml-transition.html#verification">Verification</a></li>
 </ul>
-</dd>
-</dl>
 </li>
-<li><p>(optional) call <code class="docutils literal notranslate"><span class="pre">dict</span> <span class="pre">getActionParams(String</span> <span class="pre">action)</span></code> to get the dict used to start the action</p></li>
-</ol>
-<p>5a. (optional) change parameter of the dict</p>
-<ol class="arabic simple" start="6">
-<li><dl class="simple">
-<dt>call <code class="docutils literal notranslate"><span class="pre">boolean</span> <span class="pre">startAction(dict/string)</span></code> to start the action</dt><dd><ul class="simple">
-<li><p>parameter can be used with strings ex. <code class="docutils literal notranslate"><span class="pre">name=speakTobi,text=&quot;hello&quot;</span></code> where name is the name of the action</p></li>
+<li class="toctree-l1"><a class="reference internal" href="example/memory-slots.html">Memory Slots</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="example/memory-slots.html#skills">Skills</a></li>
+<li class="toctree-l2"><a class="reference internal" href="example/memory-slots.html#state-machine">State Machine</a></li>
 </ul>
-</dd>
-</dl>
 </li>
-<li><p>call (async) <code class="docutils literal notranslate"><span class="pre">boolean</span> <span class="pre">isDone()</span></code> wait until future.isDone, the returned value is true if the action completed without errors.</p></li>
-</ol>
-</section>
+<li class="toctree-l1"><a class="reference internal" href="example/parameter.html">Parameters and Variables</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="example/parameter.html#parameters">Parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="example/parameter.html#variables">Variables</a></li>
+<li class="toctree-l2"><a class="reference internal" href="example/parameter.html#on-entry-exit">On Entry/Exit</a></li>
+</ul>
+</li>
+</ul>
+</div>
 
 
            </div>
           </div>
-          <footer>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="config.html" class="btn btn-neutral float-left" title="SCXML Configuration" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="example/scxml-skills.html" class="btn btn-neutral float-right" title="Integrate Bonsai Skills into the State Machine" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
 
   <hr/>
 

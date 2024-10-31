@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Transitions &mdash; Bonsai Docs 0.7-SNAPSHOT documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
+
+  
+    <link rel="shortcut icon" href="../../_static/favicon.ico"/>
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../_static/documentation_options.js?v=b90832ea"></script>
+        <script src="../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Memory Slots" href="memory-slots.html" />
+    <link rel="prev" title="Integrate Bonsai Skills into the State Machine" href="scxml-skills.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Bonsai Docs
+              <img src="../../_static/bonsai-l1s.png" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                0.7
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Table of Contents</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">QuickStart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../general.html">Bonsai</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../behavior.html">SCXML Behavior Engine</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../scxml-intro.html">Intro</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../config.html">Statemachine Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="scxml-skills.html">Integrate Skills in the State Machine</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Transitions</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#exit-tokens">Exit Tokens</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#verification">Verification</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="memory-slots.html">Memory Slots</a></li>
+<li class="toctree-l2"><a class="reference internal" href="parameter.html">Parameters and Variables</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Bonsai Docs</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../behavior.html">Bonsai - SCXML</a></li>
+          <li class="breadcrumb-item"><a href="../scxml-examples.html">&lt;no title&gt;</a></li>
+      <li class="breadcrumb-item active">Transitions</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="transitions">
+<h1>Transitions<a class="headerlink" href="#transitions" title="Link to this heading"></a></h1>
+<section id="exit-tokens">
+<h2>Exit Tokens<a class="headerlink" href="#exit-tokens" title="Link to this heading"></a></h2>
+<p>A skill can return several statuses. The main ones are success, fatal and error.</p>
+<p>Take a look at the following example skill:</p>
+<div class="highlight-kotlin notranslate"><div class="highlight"><pre><span></span><span class="k">package</span><span class="w"> </span><span class="nn">de.unibi.citec.clf.bonsai.skills.example</span>
+
+<span class="k">import</span><span class="w"> </span><span class="nn">de.unibi.citec.clf.bonsai.engine.model.AbstractSkill</span>
+<span class="k">import</span><span class="w"> </span><span class="nn">de.unibi.citec.clf.bonsai.engine.model.ExitStatus</span>
+<span class="k">import</span><span class="w"> </span><span class="nn">de.unibi.citec.clf.bonsai.engine.model.ExitToken</span>
+<span class="k">import</span><span class="w"> </span><span class="nn">de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator</span>
+<span class="k">import</span><span class="w"> </span><span class="nn">de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException</span>
+
+<span class="cm">/**</span>
+<span class="cm">* This skill only succeeds</span>
+<span class="cm">*/</span>
+<span class="kd">class</span><span class="w"> </span><span class="nc">Succeeder</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">AbstractSkill</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">var</span><span class="w"> </span><span class="nv">tokenSuccess</span><span class="p">:</span><span class="w"> </span><span class="n">ExitToken? </span><span class="o">=</span><span class="w"> </span><span class="kc">null</span>
+
+<span class="w">    </span><span class="nd">@Throws</span><span class="p">(</span><span class="n">SkillConfigurationException</span><span class="o">::</span><span class="n">class</span><span class="p">)</span>
+<span class="w">    </span><span class="kd">override</span><span class="w"> </span><span class="kd">fun</span><span class="w"> </span><span class="nf">configure</span><span class="p">(</span><span class="n">configurator</span><span class="p">:</span><span class="w"> </span><span class="n">ISkillConfigurator</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">tokenSuccess</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">configurator</span><span class="p">.</span><span class="na">requestExitToken</span><span class="p">(</span><span class="n">ExitStatus</span><span class="p">.</span><span class="na">SUCCESS</span><span class="p">())</span>
+<span class="w">        </span><span class="n">configurator</span><span class="p">.</span><span class="na">requestExitToken</span><span class="p">(</span><span class="n">ExitStatus</span><span class="p">.</span><span class="na">ERROR</span><span class="p">().</span><span class="na">ps</span><span class="p">(</span><span class="s">&quot;never&quot;</span><span class="p">))</span>
+<span class="w">        </span><span class="n">configurator</span><span class="p">.</span><span class="na">requestExitToken</span><span class="p">(</span><span class="n">ExitStatus</span><span class="p">.</span><span class="na">ERROR</span><span class="p">().</span><span class="na">ps</span><span class="p">(</span><span class="s">&quot;neverEver&quot;</span><span class="p">))</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kd">override</span><span class="w"> </span><span class="kd">fun</span><span class="w"> </span><span class="nf">init</span><span class="p">():</span><span class="w"> </span><span class="kt">Boolean</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// returning false here makes the skill FATAL</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="kc">true</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kd">override</span><span class="w"> </span><span class="kd">fun</span><span class="w"> </span><span class="nf">execute</span><span class="p">():</span><span class="w"> </span><span class="n">ExitToken</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// we always return success</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">tokenSuccess</span><span class="o">!!</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kd">override</span><span class="w"> </span><span class="kd">fun</span><span class="w"> </span><span class="nf">end</span><span class="p">(</span><span class="n">curToken</span><span class="p">:</span><span class="w"> </span><span class="n">ExitToken</span><span class="p">):</span><span class="w"> </span><span class="n">ExitToken</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">curToken</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Each skill can only return Exit tokens The FATAL and LOOP tokens can be used directly.
+In order to use Success and Error tokens, they have to be requested first:</p>
+<div class="highlight-kotlin notranslate"><div class="highlight"><pre><span></span><span class="n">tokenSuccess</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">configurator</span><span class="p">.</span><span class="na">requestExitToken</span><span class="p">(</span><span class="n">ExitStatus</span><span class="p">.</span><span class="na">SUCCESS</span><span class="p">())</span>
+</pre></div>
+</div>
+<p>If you want several tokens or return more information, you can register Exit tokens with a processing status:</p>
+<div class="highlight-kotlin notranslate"><div class="highlight"><pre><span></span><span class="n">configurator</span><span class="p">.</span><span class="na">requestExitToken</span><span class="p">(</span><span class="n">ExitStatus</span><span class="p">.</span><span class="na">ERROR</span><span class="p">().</span><span class="na">ps</span><span class="p">(</span><span class="s">&quot;never&quot;</span><span class="p">))</span>
+<span class="n">configurator</span><span class="p">.</span><span class="na">requestExitToken</span><span class="p">(</span><span class="n">ExitStatus</span><span class="p">.</span><span class="na">ERROR</span><span class="p">().</span><span class="na">ps</span><span class="p">(</span><span class="s">&quot;neverEver&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>You should not use an exit token without a processing status when you already defined the token with a processing status.
+In this example, you should not use the ExitStatus.ERROR() token without a processing status, since we already defined the Error tokens with ps “never” and “neverEver”.</p>
+</div>
+<p>Depending on the skill, other process statuses can be returned which then need to be considered in the state machine.</p>
+<p>This can be easily done by adding the processing status in the event:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;example.Succeeder&quot;</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;Succeeder.success&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;End&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;Succeeder.fatal&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;Fatal&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;Succeeder.error.never&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;Fatal&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;Succeeder.error.*&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;Fatal&quot;</span><span class="nt">/&gt;</span>
+<span class="nt">&lt;/state&gt;</span>
+</pre></div>
+</div>
+<p>As can be seen above, the Error token with ps “never” is explicitly considered.
+The other error transitions are catched with the <code class="docutils literal notranslate"><span class="pre">&lt;transition</span> <span class="pre">event=&quot;Succeeder.error.*&quot;</span> <span class="pre">target=&quot;Fatal&quot;/&gt;</span></code></p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>It is important that the transition <code class="docutils literal notranslate"><span class="pre">&lt;transition</span> <span class="pre">event=&quot;Succeeder.error.*&quot;</span> <span class="pre">target=&quot;Fatal&quot;/&gt;</span></code> comes at last, as we do not want the “Succeeder.error.never” event to be catched by it as well.</p>
+</div>
+</section>
+<section id="verification">
+<h2>Verification<a class="headerlink" href="#verification" title="Link to this heading"></a></h2>
+<p>If we forget some events bonsai will remind us after loading.
+For example, if we would not include the error transitions above, you would then see errors looking something like this:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">State</span> <span class="k">with</span> <span class="nb">id</span> <span class="s2">&quot;de.unibi.citec.clf.bonsai.skills.example.Succeeder&quot;</span> <span class="n">misses</span> <span class="n">transition</span> <span class="k">for</span> <span class="n">event</span> <span class="s2">&quot;Succeeder.error.neverEver&quot;</span>
+<span class="n">State</span> <span class="k">with</span> <span class="nb">id</span> <span class="s2">&quot;de.unibi.citec.clf.bonsai.skills.example.Succeeder&quot;</span> <span class="n">misses</span> <span class="n">transition</span> <span class="k">for</span> <span class="n">event</span> <span class="s2">&quot;Succeeder.error.never&quot;</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="scxml-skills.html" class="btn btn-neutral float-left" title="Integrate Bonsai Skills into the State Machine" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="memory-slots.html" class="btn btn-neutral float-right" title="Memory Slots" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Leroy Rügemer.
+      <span class="lastupdated">Last updated on Oct 31, 2024.
+      </span></p>
+  </div>
+
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
