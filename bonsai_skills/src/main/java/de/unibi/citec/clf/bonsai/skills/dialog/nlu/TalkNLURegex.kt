@@ -33,13 +33,17 @@ import java.util.concurrent.Future
  *
  * Options:
  *  #_USE_DEFAULT   [Boolean] Optional (default true)
- *                          -> use the default mapping (otherwise send error.unlisted)
+ *                          -> use default if the intent is not mapped (otherwise send error.unlisted)
  *  #_MESSAGE:      [String] Optional (default: "#M?")
- *                          -> Text said by the robot before waiting for confirmation
+ *                          -> Text said by the robot
  *  #_INTENT_MAPPING:    [String[]] Optional (default: "")
  *                          -> List of intent mappings 'intent=mapping' separated by ';'
  *  #_DEFAULT:      [String] Optional (default: "#T")
  *                          -> Default mapping if no mapping for the intent is found
+ *  #_DO_REPLACEMENTS: [Boolean] Optional (default true)
+ *                          some additional regex replacements in the final message:
+ *                              '\bme\b' -> 'YOU'
+ *                              '\byou\b' -> 'ME'
  *
  * Slots:
  *
