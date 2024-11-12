@@ -22,11 +22,11 @@ import java.util.concurrent.TimeUnit
  *
  *  build the confirmation message using the given intent mappings
  *
- *  example: "pick_and_place=you want the #E:object from the #E:location:arrival;confirm_yes=#T what?"
+ *  example: "pick_and_place=you want the #E:object from the #E:location:arrival"
  *  the default message is "You want ME to: #M?"
  *  the default mapping is "#T"
  *
- *  some additional words in the final message are replaced:
+ *  some additional words in the final message may be replaced:
  *  'me' -> 'you'
  *
  *  usable variables:
@@ -88,7 +88,7 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
 
     private val finalReplacements = mapOf("""\bme\b""" to "YOU", """\byou\b""" to "ME")
     private var doFinalReplacements = true
-    private var confirmText = "You want Me to: #M?"
+    private var confirmText = "You want ME to: #M?"
     private var defaultMapping = "#T"
     private var timeout: Long = -1
     private var timeUntilRepeat: Long = 5000
