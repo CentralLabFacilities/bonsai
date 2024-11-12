@@ -26,7 +26,7 @@ import java.util.concurrent.Future;
  *  #_MESSAGE:             [String] Optional (default: "Was that correct?")
  *                          -> Text said by the robot before waiting for confirmation
  *  #_USESIMPLE:        [boolean] Optional (default: true)
- *                          -> If true robot only listens for confirmation, no talks
+ *                          -> If true: the robot only listens for confirmation (no talks)
  *  #_TIMEOUT           [long] Optional (default: -1)
  *                          -> Amount of time robot waits for confirmation in ms
  *  #_REPEAT_AFTER:     [long] Optional (default: 5000)
@@ -37,8 +37,8 @@ import java.util.concurrent.Future;
  *                          -> Name of intent that signals no
  *  #_INTENT_YES:  [String] Optional (default: "confirm_yes")
  *                          -> Name of intent that signals yes
- *  #_SPEECH_SENSOR:    [String] Optional (default: "SpeechSensorConfirm")
- *                          -> Which speech sensor to use for new understandings
+ *  #_SPEECH_SENSOR:    [String] Optional (default: "NLUSensor")
+ *                          -> Which sensor to use for new understandings
  *
  * Slots:
  *
