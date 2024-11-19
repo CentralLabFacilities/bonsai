@@ -2,6 +2,7 @@ package de.unibi.citec.clf.bonsai.engine.communication;
 
 
 import bonsai_msgs.*;
+import de.unibi.citec.clf.bonsai.core.exception.ConfigurationException;
 import de.unibi.citec.clf.bonsai.engine.control.StateMachineController;
 import org.apache.log4j.Logger;
 import org.ros.exception.ServiceException;
@@ -146,18 +147,23 @@ public class ROSServer extends ROSMinimalServer implements SCXMLServerWithContro
             if(t.getIsPath()){
                 smc.setConfigPath(t.getConfig());
                 smc.setTaskPath(t.getTask());
-                s.setResp(smc.load().toString());
+                try {
+                    s.setResp(smc.load().toString());
+                } catch (ConfigurationException ex) {
+                    logger.error(ex);
+                    throw new ServiceException(ex);
+                }
             }else{
                 String cfgPath = saveFile("/tmp/config", t.getConfig());
                 String taskPath = saveFile("/tmp/task", t.getTask());
                 smc.setConfigPath(cfgPath);
                 smc.setTaskPath(taskPath);
-                s.setResp(smc.load().toString());
                 try {
-                    Files.delete(Paths.get(cfgPath));
-                    Files.delete(Paths.get(taskPath));
-                } catch (IOException ex) {
-                    logger.debug(ex);
+                    s.setResp(smc.load().toString());
+                    //Files.delete(Paths.get(cfgPath));
+                    //Files.delete(Paths.get(taskPath));
+                } catch (ConfigurationException ex) {
+                    throw new ServiceException(ex);
                 }
             }
         }
