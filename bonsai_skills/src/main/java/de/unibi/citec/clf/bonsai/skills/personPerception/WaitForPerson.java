@@ -23,23 +23,33 @@ import java.io.IOException;
 
 /**
  * Use this state to wait until a person is recognized in front of the robot.
- *
+ * The person should stand in a cone in front of the robot defined by #_MAX_DIST and #_MAX_ANGLE
+ * This skill loops till the robot recognized a person in front.
  * <pre>
- * options:
- * (optional) #_TIMEOUT(in ms)    -> enable timeout after x ms
- * (optional) #_MAX_DIST(meter)   -> max Person Distance
- * (optional) #_MAX_ANGLE(rad)    -> max Person Angle (in both directions)
+ * 
+ * Options:
+ *  #_TIMEOUT:          [long] Optional (default: -1)
+ *                          -> enable timeout after x ms. -1 means not time out
+ * #_MAX_DIST:          [double] Optional (default: 2.0)
+ *                          -> max person distance in meter
+ * #_MAX_ANGLE:         [double] Optional (default: 0.4)
+*                            -> max Person Angle in radiant(in both directions)
  *
- * slots:
- * PersonDataSlot: [PersonData] [Write] -> saves the found person to this slot
+ * Slots:
+ * PersonDataSlot: [PersonData] [Write] 
+ *      -> saves the found person to this slot
  *
- * possible return states are:
- * success             -> person found
- * success.timeout     -> timeout
- * fatal               -> a hard error occurred e.g. Slot communication error
+ * ExitTokens:
+ *  success:             -> person found
+ *  success.timeout:     -> timeout
+ *  fatal:               -> a hard error occurred e.g. Slot communication error
  *
- * this skill loops till the robot recognized a person in front.
- * Default is no timeout.
+ * Sensors:
+ *  PersonSensor: [PersonDataList]
+ *      -> Used to detect people
+ *  PositionSensor: [PositionData]
+ *      -> Used to read the current robot position
+ * 
  * </pre>
  *
  * 
