@@ -56,8 +56,6 @@ import java.util.concurrent.Future;
  * Slots:
  *  PersonDataListSlot:             [PersonDataList] [Write]
  *      -> All found persons in a list
- *  PositionDataSlot:             [PositionData] [Read]
- *      -> the robot position to calculate relative angle, and setting the modified yaw in positional part of personData.
  *
  * ExitTokens:
  *  success.people:         There has been at least one person perceived in the given timeout interval satisfying the optional given angle and distance parameters.
@@ -66,8 +64,12 @@ import java.util.concurrent.Future;
  *  error:                  There has been an exception while writing to slot or calling the actuator.
  *
  * Sensors:
- *  PersonSensor:       [PersonDataList]
- *      -> Read in currently seen persons
+ *  PositionSensor: [PositionData]
+ *      -> Used to read the current robot position
+ *
+ * Actuators:
+ *  PeopleActuator: [DetectPeopleActuator]
+ *      -> Used to detect people
  *
  * </pre>
  *
@@ -120,9 +122,7 @@ public class SearchPeople extends AbstractSkill {
         search_timeout = configurator.requestOptionalInt(KEY_TIMEOUT, (int) search_timeout);
         actuator_timeout = configurator.requestOptionalInt(KEY_ACTUATOR_TIMEOUT, (int) actuator_timeout);
 
-        if (search_timeout > 0) {
-            tokenSuccessNoPeople = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus("noPeople"));
-        }
+        tokenSuccessNoPeople = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus("noPeople"));
         tokenSuccessPeople = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus("people"));
         tokenError = configurator.requestExitToken(ExitStatus.ERROR());
 
@@ -220,8 +220,8 @@ public class SearchPeople extends AbstractSkill {
                 //continue;
             }
             if (localPersonPos.getDistance(new Point2D(0.0, 0.0, LengthUnit.METER), LengthUnit.MILLIMETER) > searchRadius) {
-                logger.info("search distance is: " + searchRadius + ". person to far away: "
-                        + localPersonPos.getDistance(new Point2D(0.0, 0.0, LengthUnit.METER), LengthUnit.MILLIMETER));
+                logger.info("search distance is: " + searchRadius + "mm. person to far away: "
+                        + localPersonPos.getDistance(new Point2D(0.0, 0.0, LengthUnit.METER), LengthUnit.MILLIMETER) + " mm.");
                 continue;
             }
 
