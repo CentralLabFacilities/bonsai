@@ -221,7 +221,7 @@
     </xsd:group>
     <!-- scxml -->
     <xsd:attributeGroup name="scxml.scxml.attlist">
-        <xsd:attribute name="initial" type="xsd:IDREFS"/>
+        <xsd:attribute name="initial" type="bonsai.scxml.id"/>
         <xsd:attribute name="name" type="xsd:NMTOKEN"/>
         <xsd:attribute fixed="1.0" name="version" type="xsd:decimal" use="required"/>
         <xsd:attribute default="null" name="datamodel" type="xsd:NMTOKEN" use="optional"/>
@@ -231,7 +231,12 @@
     </xsd:attributeGroup>
     <xsd:group name="scxml.scxml.mix">
         <xsd:choice>
-            <xsd:element maxOccurs="unbounded" minOccurs="0" ref="state"/>
+            <xsd:element maxOccurs="unbounded" minOccurs="0" ref="state">
+                <xsd:unique name="unique_ids">
+                    <xsd:selector xpath="."/>
+                    <xsd:field xpath="@id"/>
+                </xsd:unique>
+            </xsd:element>
             <xsd:element maxOccurs="unbounded" minOccurs="0" ref="parallel"/>
             <xsd:element maxOccurs="unbounded" minOccurs="0" ref="final"/>
             <xsd:element maxOccurs="unbounded" minOccurs="0" ref="datamodel"/>
@@ -252,19 +257,28 @@
     <!-- state -->
     <xsd:attributeGroup name="scxml.state.attlist">
         <xsd:attribute name="id" type="bonsai.scxml.id"/>
-        <xsd:attribute name="initial" type="xsd:IDREFS"/>
+        <xsd:attribute name="initial" type="bonsai.scxml.id"/>
+        <xsd:attribute name="src" type="xsd:anyURI"/>
         <xsd:attributeGroup ref="scxml.extra.attribs"/>
     </xsd:attributeGroup>
 
 
     <xsd:simpleType name="bonsai.scxml.id" id="ID">
-        <xsd:restriction base="bonsai.scxml.NCNAME"/>
+        <xsd:restriction base="bonsai.scxml.NCNAME">
+            <xsd:pattern value="([a-zA-Z_$][a-zA-Z\d_$]*\.)*([a-zA-Z\d_$]*)*(#[a-zA-Z\d_$]*)*" id="NCName.id"/>
+        </xsd:restriction>
     </xsd:simpleType>
 
     <xsd:simpleType name="bonsai.scxml.NCNAME" id="NCName">
-        <xsd:restriction base="xsd:Name">
-            <xsd:pattern value="([a-zA-Z_$][a-zA-Z\d_$]*\.)*[a-zA-Z_$][a-zA-Z\d_$]*" id="NCName.pattern">
-            </xsd:pattern>
+        <xsd:restriction base="xsd:string">
+            <xsd:pattern value="([a-zA-Z_$][a-zA-Z\d_$]*\.)*([a-zA-Z\d_$]*)*(#[a-zA-Z\d_$]*)*" id="NCName.pattern"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+
+    <xsd:simpleType name="bonsai.scxml.id.nuq" id="ID.nuq">
+        <xsd:restriction base="xsd:string">
+            <xsd:whiteSpace value="collapse" id="token.whiteSpace"/>
+            <xsd:pattern value="([a-zA-Z_$][a-zA-Z\d_$]*\.)*([a-zA-Z\d_$]*)*(#[a-zA-Z\d_$]*)*" id="NCName.pattern.nuq"/>
         </xsd:restriction>
     </xsd:simpleType>
 
@@ -294,7 +308,12 @@
         </xsd:sequence>
         <xsd:attributeGroup ref="scxml.state.attlist"/>
     </xsd:complexType>
-    <xsd:element name="state" type="scxml.state.type"/>
+    <xsd:element name="state" type="scxml.state.type">
+        <xsd:unique name="unique_state_ids">
+            <xsd:selector xpath="./*"/>
+            <xsd:field xpath="@id"/>
+        </xsd:unique>
+    </xsd:element>
     <!-- initial -->
     <xsd:attributeGroup name="scxml.initial.attlist">
         <xsd:attributeGroup ref="scxml.extra.attribs"/>
@@ -318,6 +337,7 @@
     <xsd:group name="scxml.onentry.content">
         <xsd:sequence>
             <xsd:group maxOccurs="unbounded" minOccurs="0" ref="scxml.core.executablecontent"/>
+            <!--xsd:element name="assign" type="scxml.assign.type"/-->
         </xsd:sequence>
     </xsd:group>
     <xsd:complexType name="scxml.onentry.type">
@@ -343,7 +363,7 @@
     <xsd:attributeGroup name="scxml.transition.attlist">
         <xsd:attribute name="event" type="EventTypes.datatype"/>
         <xsd:attribute name="cond" type="CondLang.datatype"/>
-        <xsd:attribute name="target" type="xsd:IDREFS"/>
+        <xsd:attribute name="target" type="bonsai.scxml.id.nuq"/>
         <xsd:attribute name="type" type="TransitionType.datatype"/>
         <xsd:attributeGroup ref="scxml.extra.attribs"/>
     </xsd:attributeGroup>
@@ -603,7 +623,7 @@
     <xsd:element name="datamodel" type="scxml.datamodel.type"/>
     <!-- data -->
     <xsd:attributeGroup name="scxml.data.attlist">
-        <xsd:attribute name="id" type="xsd:ID" use="required"/>
+        <xsd:attribute name="id" type="bonsai.scxml.id.nuq" use="required"/>
         <xsd:attribute name="src" type="URI.datatype"/>
         <xsd:attribute name="expr" type="ValueLang.datatype"/>
         <xsd:attributeGroup ref="scxml.extra.attribs"/>
@@ -637,10 +657,11 @@
     <xsd:element name="param" type="scxml.param.type"/>
     <!--  assign  -->
     <xsd:attributeGroup name="scxml.assign.attlist">
-        <xsd:attribute name="location" type="LocLang.datatype" use="required"/>
-        <xsd:attribute name="expr" type="ValueLang.datatype"/>
+        <xsd:attribute name="location" type="LocLang.datatype"/>
+        <xsd:attribute name="expr" type="ValueLang.datatype" use="required"/>
         <xsd:attribute default="replacechildren" name="type" type="AssignType.datatype"/>
         <xsd:attribute name="attr" type="xsd:NMTOKEN"/>
+        <xsd:attribute name="name" type="xsd:NCName" use="required"/>
         <xsd:attributeGroup ref="scxml.extra.attribs"/>
     </xsd:attributeGroup>
     <xsd:group name="scxml.assign.content">
