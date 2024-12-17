@@ -19,6 +19,7 @@ import de.unibi.citec.clf.btl.data.object.ObjectShapeList;
  *
  * @author pvonneumanncosel
  */
+@Deprecated
 public class FilterObjectsByCategory extends AbstractSkill {
 
     // used tokens

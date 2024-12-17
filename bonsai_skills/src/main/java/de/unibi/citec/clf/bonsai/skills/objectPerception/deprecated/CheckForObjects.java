@@ -46,6 +46,7 @@ import java.util.ArrayList;
  *
  * @author dleins
  */
+@Deprecated
 public class CheckForObjects extends AbstractSkill {
 
     public enum Number

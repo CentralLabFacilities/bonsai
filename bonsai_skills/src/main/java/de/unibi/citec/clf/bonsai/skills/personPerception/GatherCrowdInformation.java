@@ -60,6 +60,7 @@ import java.util.logging.Logger;
  *
  * @author jsimmering
  */
+@Deprecated
 public class GatherCrowdInformation extends AbstractSkill {
 
     private final static String KEY_CHECK_IN_ARENA = "#_CHECK_IN_ARENA";

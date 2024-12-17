@@ -18,6 +18,7 @@ import de.unibi.citec.clf.btl.data.object.ObjectShapeList;
  *
  * @author ffriese, pvonneumanncosel
  */
+@Deprecated
 public class CheckForObject extends AbstractSkill {
 
     private ExitToken tokenSuccess;

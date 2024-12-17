@@ -36,7 +36,7 @@ import de.unibi.citec.clf.btl.units.LengthUnit;
  *
  * @author pvonneumancosel
  */
-
+@Deprecated
 public class GeneratePersonDescription extends AbstractSkill {
 
     private ExitToken tokenSuccess;

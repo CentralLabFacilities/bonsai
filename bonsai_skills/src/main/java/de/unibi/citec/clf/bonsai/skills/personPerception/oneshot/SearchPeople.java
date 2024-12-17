@@ -209,7 +209,9 @@ public class SearchPeople extends AbstractSkill {
 
             logger.info("I saw a person - checking angle now; searchangle= " + searchAngle + ". Local Person position "
                     + localPersonPos.toString() + ". Global Person position " + globalPersonPos.toString());
+
             logger.info("Persons gesture: " + currentPerson.getPersonAttribute().getGestures().toString());
+
             double angle = robotPosition.getRelativeAngle(globalPersonPos, AngleUnit.RADIAN);
 
             if (!(angle > searchAngle / -2 && angle <= 0) && !(angle < Math.PI * -2 + (searchAngle / 2) && angle >= Math.PI * -2)) {

@@ -20,6 +20,7 @@ import de.unibi.citec.clf.btl.data.person.PersonDataList;
  *
  * @author pvonneumanncosel
  */
+@Deprecated
 public class SortPeopleByGender extends AbstractSkill {
 
     private ExitToken tokenSuccess;
