@@ -48,6 +48,7 @@ import java.util.List;
  * @author jkummert
  * @author rfeldhans
  */
+@Deprecated
 public class WaitForNonterminals extends AbstractSkill {
 
     private static final String KEY_DEFAULT = "#_NONTERMINALS";

@@ -57,6 +57,7 @@ import java.util.concurrent.Future;
  * @author rfeldhans
  * @author jkummert
  */
+@Deprecated
 public class ConfirmYesOrNo extends AbstractSkill {
 
     private static final String KEY_TEXT = "#_MESSAGE";
