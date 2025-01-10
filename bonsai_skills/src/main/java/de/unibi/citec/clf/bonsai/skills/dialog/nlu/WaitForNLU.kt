@@ -47,6 +47,7 @@ class WaitForNLU : AbstractSkill() {
         private const val KEY_DEFAULT = "#_INTENTS"
         private const val KEY_TIMEOUT = "#_TIMEOUT"
         private const val KEY_ANY = "#_ANY"
+        private const val KEY_SENSOR = "#_SENSOR_KEY"
     }
 
     private var speechActuator: SpeechActuator? = null
@@ -54,6 +55,7 @@ class WaitForNLU : AbstractSkill() {
 
     private var timeout: Long = -1
     private var any = false
+    private var sensorkey = "NLUSensor"
 
     private var helper: SimpleNLUHelper? = null
 
@@ -64,6 +66,7 @@ class WaitForNLU : AbstractSkill() {
     private var nluSlot: MemorySlotWriter<NLU>? = null
 
     override fun configure(configurator: ISkillConfigurator) {
+        sensorkey = configurator.requestOptionalValue(KEY_SENSOR, sensorkey)
         any = configurator.requestOptionalBool(KEY_ANY, any)
         if (!any) {
             possible_intents = configurator.requestValue(KEY_DEFAULT).split(";")
@@ -79,7 +82,7 @@ class WaitForNLU : AbstractSkill() {
 
         timeout = configurator.requestOptionalInt(KEY_TIMEOUT, timeout.toInt()).toLong()
 
-        speechSensor = configurator.getSensor<NLU>("NLUSensor", NLU::class.java)
+        speechSensor = configurator.getSensor<NLU>(sensorkey, NLU::class.java)
         nluSlot = configurator.getWriteSlot<NLU>("NLUSlot", NLU::class.java)
 
         if (timeout > 0) {
