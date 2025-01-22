@@ -82,6 +82,7 @@ public abstract class DriveStrategyWithTryGoal implements DriveStrategy {
         maxDistanceSuccess = conf.requestOptionalDouble(MAX_DISTANCE_SUCCESS_KEY, DEFAULT_MAX_DISTANCE_SUCCESS);
         yawTolerance = conf.requestOptionalDouble(YAW_TOLERANCE_KEY, DEFAULT_YAW_TOLERANCE);
         replan = conf.requestOptionalInt(REPLAN, replan);
+        correctYaw = conf.requestOptionalBool(KET_CORRECT_YAW, correctYaw);
     }
 
     private void updateRobotPosition() {
