@@ -23,6 +23,7 @@ import org.apache.log4j.Logger;
  */
 public abstract class DriveStrategyWithTryGoal implements DriveStrategy {
 
+    private static final String KET_CORRECT_YAW = "#_CORRECT_YAW";
     private static final String MAX_DISTANCE_SUCCESS_KEY = "#_MAX_DISTANCE_SUCCESS";
     private static final String YAW_TOLERANCE_KEY = "#_MAX_YAW_TOLERANCE_SUCCESS";
     private static final String REPLAN = "#_REPLAN";
@@ -38,6 +39,7 @@ public abstract class DriveStrategyWithTryGoal implements DriveStrategy {
     private Future<CommandResult> lastCommandResult;
     private PositionData lastRobotPos;
 
+    protected boolean correctYaw = true;
     protected int takeGoal = 1;
     protected int replan = 3;
     protected int closerSteps = 1;
@@ -129,7 +131,7 @@ public abstract class DriveStrategyWithTryGoal implements DriveStrategy {
             if (actualBestGoal == null) {
                 if (checkSuccess()) {
                     logger.debug("i am in success distance, correcting yaw and returning success");
-                    correctYaw();
+                    if (correctYaw) correctYaw();
                     return StrategyState.SUCCESS;
                 } else {
                     logger.debug("not in success distance returning error");
@@ -137,7 +139,7 @@ public abstract class DriveStrategyWithTryGoal implements DriveStrategy {
                 }
             } else {
                 if (checkMinSuccess()) {
-                    correctYaw();
+                    if (correctYaw) correctYaw();
                     return StrategyState.SUCCESS;
                 }
                 driveTo(actualBestGoal);
