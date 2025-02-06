@@ -8,19 +8,25 @@ import de.unibi.citec.clf.btl.Type
  * @author lruegeme
  */
 class NLU() : Type(), Iterable<NLUEntity?>, Cloneable {
+    enum class Language {
+        DE, EN, OTHER, UNKNOWN
+    }
+
     private var entities : MutableList<NLUEntity> = ArrayList()
     var text: String = ""
     var intent: String = ""
     var confidence = 0.0f
+    var lang = Language.UNKNOWN
 
-    constructor(t: String, i: String, conf: Float, es: List<NLUEntity>) : this() {
+    constructor(t: String, i: String, conf: Float, es: List<NLUEntity>, l: Language = Language.UNKNOWN) : this() {
         text = t
         intent = i
         confidence = conf
         entities.addAll(es)
+        lang = l
     }
 
-    constructor(o: NLU) : this(o.text, o.intent, o.confidence, o.entities.map { it.clone() })
+    constructor(o: NLU) : this(o.text, o.intent, o.confidence, o.entities.map { it.clone() }, o.lang)
 
     override fun iterator(): MutableIterator<NLUEntity> {
         return entities.iterator()
@@ -43,8 +49,8 @@ class NLU() : Type(), Iterable<NLUEntity?>, Cloneable {
     override fun hashCode(): Int {
         var result = super.hashCode()
         result = 31 * result + entities.hashCode()
-        result = 31 * result + (text?.hashCode() ?: 0)
-        result = 31 * result + (intent?.hashCode() ?: 0)
+        result = 31 * result + (text.hashCode() ?: 0)
+        result = 31 * result + (intent.hashCode() ?: 0)
         result = 31 * result + confidence.hashCode()
         return result
     }
@@ -54,7 +60,7 @@ class NLU() : Type(), Iterable<NLUEntity?>, Cloneable {
     }
 
     public override fun clone(): NLU {
-        return NLU(text,intent, confidence, entities).also { it.frameId = frameId }
+        return NLU(text,intent, confidence, entities, lang).also { it.frameId = frameId }
     }
 
     fun hasEntity(key: String): Boolean {

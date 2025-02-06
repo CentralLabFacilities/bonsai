@@ -91,7 +91,7 @@ class RosJointPositionControl(private val nodeName: GraphName) : RosNode(), Join
             goal.goal.trajectory.jointNames.add(joint)
             goal.goal.trajectory.points.add(traj)
 
-            goal.goal.goalTimeTolerance = Duration.fromMillis(1000)
+            goal.goal.goalTimeTolerance = Duration.fromMillis(2000)
 
             val sendGoal = client.sendGoal(goal)
 
