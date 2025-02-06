@@ -957,6 +957,20 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
         return list;
     }
 
+    /**
+     * Get Set of current scxml States
+     * @return
+     */
+    public Set<String> getCurrentTransitionTargets() {
+        Set<String> list = new HashSet<>();
+        Set a = scxmlExecutor.getCurrentStatus().getAllStates();
+        a.stream().filter((so) -> so instanceof TransitionTarget).forEach((so) -> {
+            TransitionTarget s = (TransitionTarget) so;
+            list.add(s.getId());
+        });
+        return list;
+    }
+
     public List<Transition> getPossibleTransitions() {
         LinkedList<Transition> list = new LinkedList<>();
         try {
