@@ -70,7 +70,7 @@ public class WaitForPerson extends AbstractSkill {
 
     // used tokens
     private ExitToken tokenSuccess;
-    private ExitToken tokenSuccessTimeout;
+    private ExitToken tokenTimeout;
 
     private Sensor<PersonDataList> personSensor;
     private Sensor<PositionData> positionSensor;
@@ -99,7 +99,7 @@ public class WaitForPerson extends AbstractSkill {
         maxAngle = configurator.requestOptionalDouble(KEY_ANGLE, maxAngle);
 
         if (timeout > 0) {
-            tokenSuccessTimeout = configurator.requestExitToken(ExitStatus.SUCCESS().ps("timeout"));
+            tokenTimeout = configurator.requestExitToken(ExitStatus.ERROR().ps("timeout"));
         }
     }
 
@@ -124,7 +124,7 @@ public class WaitForPerson extends AbstractSkill {
         if (timeout > 0) {
             if (Time.currentTimeMillis() > timeout) {
                 logger.info("WaitForPerson timeout");
-                return tokenSuccessTimeout;
+                return tokenTimeout;
             }
         }
 
