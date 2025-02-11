@@ -8,17 +8,14 @@ import de.unibi.citec.clf.btl.Type
  * @author lruegeme
  */
 class NLU() : Type(), Iterable<NLUEntity?>, Cloneable {
-    enum class Language {
-        DE, EN, OTHER, UNKNOWN
-    }
 
     private var entities : MutableList<NLUEntity> = ArrayList()
     var text: String = ""
     var intent: String = ""
     var confidence = 0.0f
-    var lang = Language.UNKNOWN
+    var lang = Language.EN
 
-    constructor(t: String, i: String, conf: Float, es: List<NLUEntity>, l: Language = Language.UNKNOWN) : this() {
+    constructor(t: String, i: String, conf: Float, es: List<NLUEntity>, l: Language = Language.EN) : this() {
         text = t
         intent = i
         confidence = conf

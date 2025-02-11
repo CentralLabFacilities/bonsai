@@ -121,6 +121,7 @@ class WaitForNLU : AbstractSkill() {
 
             return ExitToken.loop(50)
         }
+        logger.debug("have new understanding...")
 
         val understood = helper!!.allNLUs
         if (any) {
