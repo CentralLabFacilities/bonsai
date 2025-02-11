@@ -2,7 +2,9 @@ package de.unibi.citec.clf.bonsai.test.actuators;
 
 import de.unibi.citec.clf.bonsai.core.configuration.IObjectConfigurator;
 import de.unibi.citec.clf.bonsai.core.exception.ConfigurationException;
+import de.unibi.citec.clf.btl.data.speechrec.Language;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
@@ -47,34 +49,10 @@ public class SpeechActuatorStub implements de.unibi.citec.clf.bonsai.actuators.S
     }
 
     @Override
-    public Future<Boolean> enableASR(@NotNull Boolean b) throws IOException {
-        return null;
-    }
-
-    @Override
     public void say(@Nonnull String text) throws IOException {
 
     }
 
-    @Override
-    public void sayAccentuated(String accented_text) throws IOException {
-
-    }
-
-    @Override
-    public void sayAccentuated(String accented_text, String prosodyConfig) throws IOException {
-
-    }
-
-    @Override
-    public void sayAccentuated(String accented_text, boolean async) throws IOException {
-
-    }
-
-    @Override
-    public void sayAccentuated(String accented_text, boolean async, String prosodyConfig) throws IOException {
-
-    }
 
     @Override
     public void configure(IObjectConfigurator conf) throws ConfigurationException {
@@ -84,5 +62,17 @@ public class SpeechActuatorStub implements de.unibi.citec.clf.bonsai.actuators.S
     @Override
     public void cleanUp() {
 
+    }
+
+    @Nullable
+    @Override
+    public Future<String> sayTranslated(@NotNull String text, @NotNull Language language) throws IOException {
+        return null;
+    }
+
+    @Nullable
+    @Override
+    public Future<Boolean> enableASR(boolean enable) throws IOException {
+        return null;
     }
 }
