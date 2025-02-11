@@ -10,6 +10,7 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitStatus
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
 import de.unibi.citec.clf.bonsai.util.helper.SimpleNLUHelper
+import de.unibi.citec.clf.btl.data.speechrec.LanguageType
 import de.unibi.citec.clf.btl.data.speechrec.NLU
 import java.util.*
 
@@ -53,6 +54,7 @@ class WaitForNLUWithEntities : AbstractSkill(){
 
     private var speechSensor: Sensor<NLU>? = null
     private var nluSlot: MemorySlotWriter<NLU>? = null
+    private var langSlot: MemorySlotWriter<LanguageType>? = null
 
     override fun configure(configurator: ISkillConfigurator) {
         intent = configurator.requestValue(KEY_DEFAULT)
@@ -67,6 +69,10 @@ class WaitForNLUWithEntities : AbstractSkill(){
 
         if (timeout > 0) {
             tokenErrorPsTimeout = configurator.requestExitToken(ExitStatus.ERROR().ps("timeout"))
+        }
+
+        if (configurator.requestOptionalBool(KEY_SET_LANGUAGE, false)) {
+            langSlot = configurator.getWriteSlot("Language", LanguageType::class.java)
         }
     }
 
@@ -99,6 +105,7 @@ class WaitForNLUWithEntities : AbstractSkill(){
                 logger.info("understood '$nt'")
                 if (nt.hasAllEntities(required_entities!!)) {
                     nluSlot?.memorize<NLU>(nt)
+                    langSlot?.memorize(LanguageType(nt.lang))
                     return tokenSuccess!!
                 } else {
                     logger.error("missing one of the required entities " + required_entities.toString())
@@ -116,6 +123,7 @@ class WaitForNLUWithEntities : AbstractSkill(){
     }
 
     companion object {
+        private const val KEY_SET_LANGUAGE = "#_SET_LANGUAGE"
         private const val KEY_DEFAULT = "INTENT"
         private const val KEY_ENTITY = "ENTITIES"
         private const val KEY_TIMEOUT = "TIMEOUT"
