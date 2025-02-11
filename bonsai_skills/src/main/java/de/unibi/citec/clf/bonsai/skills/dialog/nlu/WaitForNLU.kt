@@ -11,6 +11,7 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitToken
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
 import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException
 import de.unibi.citec.clf.bonsai.util.helper.SimpleNLUHelper
+import de.unibi.citec.clf.btl.data.speechrec.LanguageType
 import de.unibi.citec.clf.btl.data.speechrec.NLU
 import java.lang.Exception
 import java.util.concurrent.TimeUnit
@@ -44,6 +45,7 @@ import java.util.concurrent.TimeUnit
 class WaitForNLU : AbstractSkill() {
 
     companion object {
+        private const val KEY_SET_LANGUAGE = "#_SET_LANGUAGE"
         private const val KEY_DEFAULT = "#_INTENTS"
         private const val KEY_TIMEOUT = "#_TIMEOUT"
         private const val KEY_ANY = "#_ANY"
@@ -64,6 +66,7 @@ class WaitForNLU : AbstractSkill() {
 
     private var speechSensor: Sensor<NLU>? = null
     private var nluSlot: MemorySlotWriter<NLU>? = null
+    private var langSlot: MemorySlotWriter<LanguageType>? = null
 
     override fun configure(configurator: ISkillConfigurator) {
         sensorkey = configurator.requestOptionalValue(KEY_SENSOR, sensorkey)
@@ -87,6 +90,10 @@ class WaitForNLU : AbstractSkill() {
 
         if (timeout > 0) {
             tokenSuccessPsTimeout = configurator.requestExitToken(ExitStatus.ERROR().ps("timeout"))
+        }
+
+        if (configurator.requestOptionalBool(KEY_SET_LANGUAGE, false)) {
+            langSlot = configurator.getWriteSlot("Language", LanguageType::class.java)
         }
 
         speechActuator = configurator.getActuator("SpeechActuator", SpeechActuator::class.java)
@@ -137,6 +144,7 @@ class WaitForNLU : AbstractSkill() {
                 if (intent == nt.intent) {
                     try {
                         nluSlot?.memorize<NLU>(nt)
+                        langSlot?.memorize(LanguageType(nt.lang))
                     } catch (e: CommunicationException) {
                         logger.error("Can not write terminals $intent to memory.", e)
                         return ExitToken.fatal()
