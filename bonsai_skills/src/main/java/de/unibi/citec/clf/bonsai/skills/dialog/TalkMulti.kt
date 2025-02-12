@@ -6,20 +6,19 @@ import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
-import de.unibi.citec.clf.bonsai.skills.dialog.nlu.TalkNLURegex
 import de.unibi.citec.clf.btl.data.speechrec.Language
 import de.unibi.citec.clf.btl.data.speechrec.LanguageType
-import java.io.IOException
 import java.util.concurrent.Future
 
 /**
- * Use this state to let the robot talk.
+ * Use this state to let the robot talk multilingual.
+ * Reads the Language slot to determine what text to speak
  *
  * <pre>
  *
  * Options:
- * #_MESSAGE:      [String] Required
- * -> Text said by the robot
+ * #_MSG_<LANG>:      [String]
+ * -> Text said by the robot for the <LANG>
  * #_BLOCKING:     [boolean] Optional (default: true)
  * -> If true skill ends after talk was completed
  *
@@ -32,38 +31,47 @@ import java.util.concurrent.Future
  *
  * Actuators:
  * SpeechActuator: [SpeechActuator]
- * -> Used to say #_MESSAGE
+ * -> Used to say #_MSG
  *
 </pre> *
  *
- * @author lziegler, lruegeme
- * @author rfeldhans
- * @author jkummert
+ * @author lruegeme
  */
-class Talk : AbstractSkill() {
+class TalkMulti : AbstractSkill() {
     private var tokenSuccess: ExitToken? = null
     private var blocking = true
-    private var text = ""
+    private var text = HashMap<Language, String>()
     private var speechActuator: SpeechActuator? = null
-    private var sayingComplete: Future<String?>? = null
+    private var sayingComplete: Future<Void>? = null
     private var langSlot: MemorySlotReader<LanguageType>? = null
     override fun configure(configurator: ISkillConfigurator) {
-        text = configurator.requestValue(KEY_MESSAGE)
         blocking = configurator.requestOptionalBool(KEY_BLOCKING, blocking)
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
         speechActuator = configurator.getActuator("SpeechActuator", SpeechActuator::class.java)
-        text = text.trim().replace(" +".toRegex(), " ")
+        langSlot = configurator.getReadSlot("Language", LanguageType::class.java)
 
-        if (configurator.requestOptionalBool(KEY_USE_LANGUAGE, false)) {
-            langSlot = configurator.getReadSlot("Language", LanguageType::class.java)
+        for (key in configurator.configurationKeys) {
+            if (key.startsWith(KEY_MESSAGE_PREFIX)) {
+                val value = configurator.requestValue(key).trim().replace(" +".toRegex(), " ")
+                val lang = key.removePrefix(KEY_MESSAGE_PREFIX)
+                val language = Language.valueOf(lang)
+                logger.debug("found $key as ${language.name}: $value")
+                text[language] = value
+            }
         }
+
     }
 
     override fun init(): Boolean {
 
         val lang : Language = langSlot?.recall<LanguageType>()?.value ?: Language.EN
-        logger.debug("saying(${lang}): $text")
-        sayingComplete = speechActuator!!.sayTranslated(text,lang)
+        if(!text.containsKey(lang)) {
+            logger.error("unhandled language")
+            return false
+        }
+        val msg = text[lang]
+        logger.debug("saying(${lang}): $msg")
+        sayingComplete = speechActuator!!.sayAsync(msg!!, lang)
 
         return true
     }
@@ -75,16 +83,14 @@ class Talk : AbstractSkill() {
     }
 
     override fun end(curToken: ExitToken): ExitToken {
-        if(curToken.exitStatus.isFatal) {
-            logger.error("cancel speak")
+        if(curToken.exitStatus == ExitStatus.FATAL()) {
             sayingComplete?.cancel(true)
         }
         return curToken
     }
 
     companion object {
-        private const val KEY_MESSAGE = "#_MESSAGE"
+        private const val KEY_MESSAGE_PREFIX = "#_MSG"
         private const val KEY_BLOCKING = "#_BLOCKING"
-        private const val KEY_USE_LANGUAGE = "#_USE_LANGUAGE"
     }
 }

@@ -134,6 +134,7 @@ class WaitForNLU : AbstractSkill() {
         if (any) {
             try {
                 nluSlot?.memorize<NLU>(understood[0])
+                langSlot?.memorize(LanguageType(understood[0].lang))
                 logger.info("memorized: " + understood[0])
                 return tokenMap["any"]!!
             } catch (e: CommunicationException) {
