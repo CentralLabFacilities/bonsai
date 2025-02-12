@@ -24,14 +24,29 @@ interface SpeechActuator : Actuator {
      * communication error
      */
     @Throws(IOException::class)
-    fun sayAsync(text: String): Future<Void>?
+    fun sayAsync(text: String): Future<Void>
+
+    /**
+     * Multilingual say method with the ability to chose between synchronous and asynchronous
+     * speech synthesis.
+     *
+     * @param text
+     * text to say
+     * @param language
+     * language of the text
+     * @return
+     * @throws IOException
+     * communication error
+     */
+    @Throws(IOException::class)
+    fun sayAsync(text: String, language: Language): Future<Void>
 
     /**
      * Say method with the ability to choose the target language.
-     * This should translate the Text to the target language before speaking.
+     * This should translate the english Text to the target language before speaking.
      *
      * @param text english text to say
-     * @param language target language to say
+     * @param language target language to speak in
      * @throws IOException
      * communication error
      */
