@@ -75,4 +75,10 @@ public class SpeechActuatorStub implements de.unibi.citec.clf.bonsai.actuators.S
     public Future<Boolean> enableASR(boolean enable) throws IOException {
         return null;
     }
+
+    @NotNull
+    @Override
+    public Future<Void> sayAsync(@NotNull String text, @NotNull Language language) throws IOException {
+        return null;
+    }
 }
