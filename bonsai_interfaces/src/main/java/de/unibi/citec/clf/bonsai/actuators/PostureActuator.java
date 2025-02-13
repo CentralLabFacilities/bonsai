@@ -12,7 +12,7 @@ import java.util.concurrent.Future;
 public interface PostureActuator extends Actuator {
 
     /**
-     * Execute a defined Motion
+     * Execute a named Motion
      * @param motion
      * @param group
      * @return
@@ -20,12 +20,15 @@ public interface PostureActuator extends Actuator {
     Future<Boolean> executeMotion(@Nonnull String motion, @Nullable String group);
 
     /**
-     * Assume a predefined Pose
+     * Move to a named Pose
      * @param pose
      * @param group
+     * @param upright
      * @return
      */
-    Future<Boolean> assumePose(@Nonnull String pose, @Nullable String group);
+
+    Future<Boolean> moveTo(@Nonnull String pose, @Nullable String group, boolean upright);
+    Future<Boolean> moveTo(@Nonnull String pose, @Nullable String group);
 
     /**
      * Checks if a defined Pose is reached
