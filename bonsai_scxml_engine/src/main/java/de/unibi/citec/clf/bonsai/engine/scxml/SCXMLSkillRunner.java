@@ -88,6 +88,7 @@ public class SCXMLSkillRunner implements Runnable, SkillListener {
 
     @Override
     public void skillAborted(StateID id, Throwable e) {
+        logger.warn("  " + "skillAborted: " + id, e);
         statemachine.announceCorruptState(id, this);
         String event = id.getCanonicalSkill() + "." + ExitStatus.FATAL().getFullStatus();
         statemachine.fireEventFromSkill(event);
