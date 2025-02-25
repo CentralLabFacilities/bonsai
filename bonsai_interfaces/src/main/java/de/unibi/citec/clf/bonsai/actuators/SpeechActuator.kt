@@ -46,12 +46,15 @@ interface SpeechActuator : Actuator {
      * This should translate the english Text to the target language before speaking.
      *
      * @param text english text to say
-     * @param language target language to speak in
+     * @param speakLanguage target language to speak in
+     * @param textLanguage language of the given text
      * @throws IOException
+     * @return text that was spoken
      * communication error
      */
     @Throws(IOException::class)
-    fun sayTranslated(text: String, language: Language = Language.EN): Future<String?>
+    fun sayTranslated(text: String, speakLanguage: Language = Language.EN, textLanguage: Language = Language.EN): Future<String?>
+
 
     /**
      * Enable or disable ASR

@@ -11,6 +11,8 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitToken
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
 import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException
 import de.unibi.citec.clf.bonsai.util.helper.SimpleNLUHelper
+import de.unibi.citec.clf.btl.data.speechrec.Language
+import de.unibi.citec.clf.btl.data.speechrec.LanguageType
 import de.unibi.citec.clf.btl.data.speechrec.NLU
 import net.sf.saxon.functions.ConstantFunction.True
 import java.io.IOException
@@ -52,6 +54,8 @@ import java.util.concurrent.TimeUnit
  *                          -> List of intent mappings 'intent=mapping' separated by ';'
  *  #_DO_REPLACEMENTS:   [Boolean] Optional (default true)
  *                          -> replace some words like 'me' -> 'you'
+ *  #_USE_LANGUAGE: [Boolean] Optional (default: false)
+ *                          -> Read Language slot to determine speak language else it defaults to "EN"
  * Slots:
  *
  * ExitTokens:
@@ -67,6 +71,7 @@ import java.util.concurrent.TimeUnit
  */
 class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
     companion object {
+        private const val KEY_USE_LANGUAGE = "#_USE_LANGUAGE"
         private const val KEY_MAPPING = "#_INTENT_MAPPING"
         private const val KEY_TEXT = "#_MESSAGE"
         private const val KEY_TIMEOUT = "#_TIMEOUT"
@@ -106,16 +111,21 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
     private var speechActuator: SpeechActuator? = null
     private var nextRepeat: Long = 0
     private var timesAsked = 0
-    private var sayingComplete: Future<Void>? = null
+    private var sayingComplete: Future<String?>? = null
     private var nluSlot: MemorySlotReader<NLU>? = null
     private var intentMapping: MutableMap<String, String> = HashMap()
     private var computed = false
     private var useDefault = true
     private var foundMapping = true
+    private var langSlot: MemorySlotReader<LanguageType>? = null
 
     private lateinit var nlu: NLU
 
     override fun configure(configurator: ISkillConfigurator) {
+        if (configurator.requestOptionalBool(KEY_USE_LANGUAGE, false)) {
+            langSlot = configurator.getReadSlot("Language", LanguageType::class.java)
+        }
+
         useDefault = configurator.requestOptionalBool(KEY_USE_DEFAULT, useDefault)
         doFinalReplacements = configurator.requestOptionalBool(KEY_DO_FINAL_REPLACEMENTS, doFinalReplacements)
         if(!useDefault) tokenErrorUnlisted = configurator.requestExitToken(ExitStatus.ERROR().ps("unlisted"))
@@ -249,7 +259,8 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
         if (Time.currentTimeMillis() > nextRepeat) {
             if (timesAsked++ < maxRepeats) {
                 try {
-                    sayingComplete = speechActuator!!.sayAsync(confirmText)
+                    val lang : Language = langSlot?.recall<LanguageType>()?.value ?: Language.EN
+                    sayingComplete = speechActuator!!.sayTranslated(confirmText,lang)
                 } catch (ex: IOException) {
                     logger.error("IO Exception in speechActuator")
                 }
@@ -266,7 +277,8 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
                 return tokenSuccessPsNo
             }
             try {
-                sayingComplete = speechActuator!!.sayAsync("Please answer with yes or no!")
+                val lang : Language = langSlot?.recall<LanguageType>()?.value ?: Language.EN
+                sayingComplete = speechActuator!!.sayTranslated("Please answer with yes or no!",lang)
             } catch (ex: IOException) {
                 logger.error("IO Exception in speechActuator")
             }

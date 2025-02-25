@@ -46,6 +46,8 @@ import java.util.concurrent.Future
  *                          some additional regex replacements in the final message:
  *                              '\bme\b' -> 'YOU'
  *                              '\byou\b' -> 'ME'
+ *  #_USE_LANGUAGE: [Boolean] Optional (default: false)
+ *                          -> Read Language slot to determine speak language else it defaults to "EN"
  *
  * Slots:
  *

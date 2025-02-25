@@ -22,7 +22,8 @@ import java.util.concurrent.Future
  * -> Text said by the robot
  * #_BLOCKING:     [boolean] Optional (default: true)
  * -> If true skill ends after talk was completed
- *
+ * #_USE_LANGUAGE: [boolean] Optional (default: false)
+ * -> Read Language slot to determine speak language else it defaults to "EN"
  * Slots:
  *
  * ExitTokens:
