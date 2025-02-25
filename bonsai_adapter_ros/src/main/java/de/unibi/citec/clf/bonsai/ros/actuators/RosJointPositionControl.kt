@@ -1,12 +1,10 @@
 package de.unibi.citec.clf.bonsai.ros.actuators
 
-import actionlib_msgs.GoalID
 import com.github.rosjava_actionlib.ActionClient
 import de.unibi.citec.clf.bonsai.actuators.JointControllerActuator
 import de.unibi.citec.clf.bonsai.core.configuration.IObjectConfigurator
 import de.unibi.citec.clf.bonsai.core.exception.ConfigurationException
 import de.unibi.citec.clf.bonsai.ros.RosNode
-import de.unibi.citec.clf.btl.data.geometry.Pose3D
 import de.unibi.citec.clf.btl.ros.MsgTypeFactory
 import org.ros.message.Duration
 import org.ros.namespace.GraphName
@@ -14,12 +12,10 @@ import org.ros.node.ConnectedNode
 import java.io.IOException
 import java.util.concurrent.Future
 
-import control_msgs.FollowJointTrajectoryAction
 import control_msgs.FollowJointTrajectoryActionFeedback
 import control_msgs.FollowJointTrajectoryActionGoal
 import control_msgs.FollowJointTrajectoryActionResult
 import trajectory_msgs.JointTrajectoryPoint
-import kotlin.math.abs
 
 /**
  *
@@ -72,7 +68,7 @@ class RosJointPositionControl(private val nodeName: GraphName) : RosNode(), Join
 
 
     @Throws(IOException::class)
-    override fun moveTo(pose: Float, speed: Float?): Future<Boolean> {
+    override fun moveTo(pose: Float, duration: Float?): Future<Boolean> {
         //TODO clamp to min/max
 
 
@@ -84,7 +80,7 @@ class RosJointPositionControl(private val nodeName: GraphName) : RosNode(), Join
 
             //val delta = abs(getPosition() - pose)
             //val duration_sec = delta / (speed?:1f)
-            val duration_sec = 1f / (speed?:0.25f)
+            val duration_sec = 1f / (duration?:0.25f)
 
             traj.timeFromStart = Duration.fromMillis((duration_sec * 1000).toLong())
 

@@ -12,8 +12,12 @@ import java.util.concurrent.Future
  */
 interface JointControllerActuator : Actuator {
 
+    /**
+     * @param duration duration of the move in 1/duration sec
+     */
+
     @Throws(IOException::class)
-    fun moveTo(pose: Float, speed: Float?): Future<Boolean>
+    fun moveTo(pose: Float, duration: Float?): Future<Boolean>
 
     fun getMax(): Float
     fun getMin(): Float

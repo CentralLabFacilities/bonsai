@@ -21,7 +21,8 @@ import java.util.concurrent.Future
  * -> Text said by the robot for the <LANG>
  * #_BLOCKING:     [boolean] Optional (default: true)
  * -> If true skill ends after talk was completed
- *
+ * #_DEFAULT:      [String] Optional (default: EN)
+ * -> default msg if #_MSG_<LANG> is not defined
  * Slots:
  *
  * ExitTokens:
@@ -38,17 +39,25 @@ import java.util.concurrent.Future
  * @author lruegeme
  */
 class TalkMulti : AbstractSkill() {
+    companion object {
+        private const val KEY_MESSAGE_PREFIX = "#_MSG_"
+        private const val KEY_BLOCKING = "#_BLOCKING"
+        private const val KEY_DEFAULT = "#_DEFAULT"
+    }
+
+    private var default = Language.EN
     private var tokenSuccess: ExitToken? = null
     private var blocking = true
     private var text = HashMap<Language, String>()
     private var speechActuator: SpeechActuator? = null
-    private var sayingComplete: Future<Void>? = null
+    private var sayingComplete: Future<String?>? = null
     private var langSlot: MemorySlotReader<LanguageType>? = null
     override fun configure(configurator: ISkillConfigurator) {
         blocking = configurator.requestOptionalBool(KEY_BLOCKING, blocking)
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
         speechActuator = configurator.getActuator("SpeechActuator", SpeechActuator::class.java)
         langSlot = configurator.getReadSlot("Language", LanguageType::class.java)
+        default = Language.valueOf(configurator.requestOptionalValue(KEY_DEFAULT,"EN"))
 
         for (key in configurator.configurationKeys) {
             if (key.startsWith(KEY_MESSAGE_PREFIX)) {
@@ -60,18 +69,27 @@ class TalkMulti : AbstractSkill() {
             }
         }
 
+        if (!text.containsKey(default)) {
+            logger.warn("Default msg to use is $default, but no #_MSG_${default.name} is defined")
+        }
+
     }
 
     override fun init(): Boolean {
 
+        var textLanguage = Language.EN
         val lang : Language = langSlot?.recall<LanguageType>()?.value ?: Language.EN
-        if(!text.containsKey(lang)) {
-            logger.error("unhandled language")
-            return false
+        val msg = if(!text.containsKey(lang)) {
+            logger.warn("missing message for ${lang.name} default to ${default.name}")
+            textLanguage = default
+            text[default]
+        } else {
+            textLanguage = lang
+            text[lang]
         }
-        val msg = text[lang]
+
         logger.debug("saying(${lang}): $msg")
-        sayingComplete = speechActuator!!.sayAsync(msg!!, lang)
+        sayingComplete = speechActuator!!.sayTranslated(msg!!, speakLanguage = lang, textLanguage = textLanguage)
 
         return true
     }
@@ -79,7 +97,10 @@ class TalkMulti : AbstractSkill() {
     override fun execute(): ExitToken {
         return if (!sayingComplete!!.isDone && blocking) {
             ExitToken.loop(50)
-        } else tokenSuccess!!
+        } else {
+            logger.info("said: ${sayingComplete?.get()}")
+            tokenSuccess!!
+        }
     }
 
     override fun end(curToken: ExitToken): ExitToken {
@@ -89,8 +110,5 @@ class TalkMulti : AbstractSkill() {
         return curToken
     }
 
-    companion object {
-        private const val KEY_MESSAGE_PREFIX = "#_MSG"
-        private const val KEY_BLOCKING = "#_BLOCKING"
-    }
+
 }
