@@ -63,13 +63,7 @@ public class SpeechActuatorStub implements de.unibi.citec.clf.bonsai.actuators.S
     public void cleanUp() {
 
     }
-
-    @Nullable
-    @Override
-    public Future<String> sayTranslated(@NotNull String text, @NotNull Language language) throws IOException {
-        return null;
-    }
-
+    
     @Nullable
     @Override
     public Future<Boolean> enableASR(boolean enable) throws IOException {
@@ -79,6 +73,12 @@ public class SpeechActuatorStub implements de.unibi.citec.clf.bonsai.actuators.S
     @NotNull
     @Override
     public Future<Void> sayAsync(@NotNull String text, @NotNull Language language) throws IOException {
+        return null;
+    }
+
+    @NotNull
+    @Override
+    public Future<String> sayTranslated(@NotNull String text, @NotNull Language speakLanguage, @NotNull Language textLanguage) throws IOException {
         return null;
     }
 }
