@@ -24,6 +24,7 @@ import de.unibi.citec.clf.btl.data.navigation.PositionData;
 import de.unibi.citec.clf.btl.data.navigation.TurnData;
 import de.unibi.citec.clf.btl.data.person.PersonData;
 import de.unibi.citec.clf.btl.data.person.PersonDataList;
+import de.unibi.citec.clf.btl.data.speechrec.Language;
 import de.unibi.citec.clf.btl.tools.MathTools;
 import de.unibi.citec.clf.btl.units.AngleUnit;
 import de.unibi.citec.clf.btl.units.LengthUnit;
@@ -439,7 +440,7 @@ public class FollowPerson extends AbstractSkill {
 
     private void say(String txt){
         try {
-            speechActuator.sayAsync(slowDownMessage);
+            speechActuator.sayAsync(slowDownMessage, Language.EN);
         } catch (IOException ex) {
             logger.fatal(ex);
         }

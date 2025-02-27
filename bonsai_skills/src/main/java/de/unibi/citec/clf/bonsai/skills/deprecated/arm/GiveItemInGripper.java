@@ -11,6 +11,8 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.bonsai.util.arm.ArmController180;
 import de.unibi.citec.clf.btl.data.object.ObjectShapeData;
+import de.unibi.citec.clf.btl.data.speechrec.Language;
+
 import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -163,7 +165,7 @@ public class GiveItemInGripper extends AbstractSkill {
 
     private void say(String txt) {
         try {
-            speechActuator.sayAsync(txt);
+            speechActuator.sayAsync(txt, Language.EN);
 
         } catch (IOException ex) {
             Logger.getLogger(GiveItemInGripper.class.getName()).log(Level.SEVERE, null, ex);

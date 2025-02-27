@@ -89,7 +89,7 @@ class TalkNLURegex : AbstractSkill() {
         if(!useDefault) tokenErrorUnlisted = configurator.requestExitToken(ExitStatus.ERROR().ps("unlisted"))
         nluSlot = configurator.getReadSlot("NLUSlot", NLU::class.java)
 
-        if (configurator.requestOptionalBool(KEY_USE_LANGUAGE, false)) {
+        if (configurator.requestOptionalBool(KEY_USE_LANGUAGE, true)) {
             langSlot = configurator.getReadSlot("Language", LanguageType::class.java)
         }
 

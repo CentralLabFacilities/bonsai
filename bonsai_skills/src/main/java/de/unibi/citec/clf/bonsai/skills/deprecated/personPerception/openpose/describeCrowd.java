@@ -13,6 +13,7 @@ import de.unibi.citec.clf.btl.data.knowledgebase.Crowd;
 import de.unibi.citec.clf.btl.data.person.PersonData;
 import de.unibi.citec.clf.btl.data.navigation.PositionData;
 import de.unibi.citec.clf.btl.data.person.PersonAttribute;
+import de.unibi.citec.clf.btl.data.speechrec.Language;
 
 import java.io.IOException;
 import java.util.LinkedList;
@@ -183,8 +184,8 @@ public class describeCrowd extends AbstractSkill {
         int countFemale = crowd.getFemaleCount(persons);
         if (sayInfo) {
             try {
-                speechActuator.say("I see " + crowd.getPersons().size() + people + " " + countFemale + " female and " + countMale + " male.");
-            } catch (IOException ex) {
+                speechActuator.sayAsync("I see " + crowd.getPersons().size() + people + " " + countFemale + " female and " + countMale + " male.", Language.EN).get();
+            } catch (IOException | InterruptedException | ExecutionException ex) {
                 Logger.getLogger(describeCrowd.class.getName()).log(Level.SEVERE, null, ex);
             }
         }

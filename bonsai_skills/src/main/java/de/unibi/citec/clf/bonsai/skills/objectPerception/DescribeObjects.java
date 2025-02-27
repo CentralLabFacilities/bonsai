@@ -11,6 +11,7 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.btl.data.object.ObjectShapeData;
 import de.unibi.citec.clf.btl.data.object.ObjectData.Hypothesis;
 import de.unibi.citec.clf.btl.data.object.ObjectShapeList;
+import de.unibi.citec.clf.btl.data.speechrec.Language;
 
 /**
  * Describe Objects.
@@ -140,7 +141,7 @@ public class DescribeObjects extends AbstractSkill {
      */
     private void say(String text) {
         try {
-            speechActuator.say(text);
+            speechActuator.sayAsync(text, Language.EN).get();
         } catch (Exception ex) {
             logger.debug("Exception in say()");
             // Not so bad. The robot just says nothing.

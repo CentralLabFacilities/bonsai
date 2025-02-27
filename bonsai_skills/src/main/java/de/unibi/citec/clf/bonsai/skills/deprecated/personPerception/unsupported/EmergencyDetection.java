@@ -15,6 +15,7 @@ import de.unibi.citec.clf.btl.data.geometry.PolarCoordinate;
 import de.unibi.citec.clf.btl.data.navigation.NavigationGoalData;
 import de.unibi.citec.clf.btl.data.navigation.PositionData;
 import de.unibi.citec.clf.btl.data.person.PersonData;
+import de.unibi.citec.clf.btl.data.speechrec.Language;
 import de.unibi.citec.clf.btl.tools.MathTools;
 import de.unibi.citec.clf.btl.units.AngleUnit;
 import de.unibi.citec.clf.btl.units.LengthUnit;
@@ -278,7 +279,7 @@ public class EmergencyDetection extends AbstractSkill {
             //unsupported logger.info("Found person: " + currentPerson.getId() + "@" + currentPerson.getPosition());
             if (status == NO_PERSON_FOUND) {
                 try {
-                    speechActuator.sayAsync(PERSON_FOUND_MESSAGE);
+                    speechActuator.sayAsync(PERSON_FOUND_MESSAGE, Language.EN);
 
                 } catch (IOException ex) {
                     // Not so bad. The robot just says nothing.

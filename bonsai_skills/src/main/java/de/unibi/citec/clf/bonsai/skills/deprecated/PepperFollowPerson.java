@@ -14,6 +14,7 @@ import de.unibi.citec.clf.btl.List;
 import de.unibi.citec.clf.btl.data.navigation.NavigationGoalData;
 import de.unibi.citec.clf.btl.data.navigation.PositionData;
 import de.unibi.citec.clf.btl.data.person.PersonData;
+import de.unibi.citec.clf.btl.data.speechrec.Language;
 import de.unibi.citec.clf.btl.units.AngleUnit;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 
@@ -220,7 +221,7 @@ public class PepperFollowPerson extends AbstractSkill {
         if (currentPerson != null) {
             if (currentPersonDistance > talkdistance) {
                 try {
-                    speechActuator.sayAsync("Please move slower");
+                    speechActuator.sayAsync("Please move slower", Language.EN);
                 } catch (IOException ex) {
                     logger.fatal(ex);
                 }
