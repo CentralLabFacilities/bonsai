@@ -14,7 +14,6 @@ import de.unibi.citec.clf.bonsai.util.helper.SimpleNLUHelper
 import de.unibi.citec.clf.btl.data.speechrec.Language
 import de.unibi.citec.clf.btl.data.speechrec.LanguageType
 import de.unibi.citec.clf.btl.data.speechrec.NLU
-import net.sf.saxon.functions.ConstantFunction.True
 import java.io.IOException
 import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
@@ -91,6 +90,7 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
         private const val PS_YES = "confirmYes"
     }
 
+    private var spokenLanguage : Language = Language.EN
     private val finalReplacements = mapOf("""\bme\b""" to "YOU", """\byou\b""" to "ME")
     private var doFinalReplacements = true
     private var confirmText = "You want ME to: #M?"
@@ -190,6 +190,9 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
     }
 
     override fun init(): Boolean {
+        spokenLanguage = langSlot?.recall<LanguageType>()?.value ?: Language.EN
+        logger.info("talk language: ${spokenLanguage.name}")
+
         if (timeout > 0) {
             logger.debug("using timeout of $timeout ms")
             timeout += Time.currentTimeMillis()
@@ -259,8 +262,7 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
         if (Time.currentTimeMillis() > nextRepeat) {
             if (timesAsked++ < maxRepeats) {
                 try {
-                    val lang : Language = langSlot?.recall<LanguageType>()?.value ?: Language.EN
-                    sayingComplete = speechActuator!!.sayTranslated(confirmText,lang)
+                    sayingComplete = speechActuator!!.sayTranslated(confirmText,spokenLanguage, textLanguage = Language.EN)
                 } catch (ex: IOException) {
                     logger.error("IO Exception in speechActuator")
                 }
@@ -277,8 +279,7 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
                 return tokenSuccessPsNo
             }
             try {
-                val lang : Language = langSlot?.recall<LanguageType>()?.value ?: Language.EN
-                sayingComplete = speechActuator!!.sayTranslated("Please answer with yes or no!",lang)
+                sayingComplete = speechActuator!!.sayTranslated("Please answer with yes or no!",spokenLanguage, textLanguage = Language.EN)
             } catch (ex: IOException) {
                 logger.error("IO Exception in speechActuator")
             }
