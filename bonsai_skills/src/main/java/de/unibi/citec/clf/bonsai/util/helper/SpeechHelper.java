@@ -3,11 +3,8 @@ package de.unibi.citec.clf.bonsai.util.helper;
 import de.unibi.citec.clf.bonsai.actuators.SpeechActuator;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
 import de.unibi.citec.clf.bonsai.core.time.Time;
-import de.unibi.citec.clf.btl.data.speechrec.GrammarNonTerminal;
-import de.unibi.citec.clf.btl.data.speechrec.GrammarSymbol;
-import de.unibi.citec.clf.btl.data.speechrec.GrammarTree;
-import de.unibi.citec.clf.btl.data.speechrec.Utterance;
-import de.unibi.citec.clf.btl.data.speechrec.UtterancePart;
+import de.unibi.citec.clf.btl.data.speechrec.*;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -17,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import org.apache.log4j.Logger;
@@ -341,7 +339,7 @@ public class SpeechHelper {
                         }
                     }
                 }
-            } catch (IOException e) {
+            } catch (IOException | ExecutionException | InterruptedException e) {
                 logger.error("IOException in SpeechSensor");
             }
         }
@@ -359,7 +357,7 @@ public class SpeechHelper {
      * @see SpeechHelper#clear
      */
     public boolean waitForUnderstandingCleared(boolean usePhrase)
-            throws IOException {
+            throws IOException, ExecutionException, InterruptedException {
         return waitForUnderstanding(usePhrase, WAIT_PHRASE_SLEEP,
                 DEFAULT_TIMEOUT);
     }
@@ -368,7 +366,7 @@ public class SpeechHelper {
      *
      */
     public boolean waitForUnderstanding(boolean usePhrase)
-            throws IOException {
+            throws IOException, ExecutionException, InterruptedException {
         return waitForUnderstanding(usePhrase, WAIT_PHRASE_SLEEP,
                 DEFAULT_TIMEOUT);
     }
@@ -443,7 +441,7 @@ public class SpeechHelper {
      * @see SpeechHelper#clear
      */
     public boolean waitForUnderstanding(boolean usePhrase, long phraseTimeout,
-            long timeout) throws IOException {
+            long timeout) throws IOException, ExecutionException, InterruptedException {
         // Will be done by SaySrv automatically
 //        isrActuator.setThresholds(ISR_START_DB_LOW, ISR_UTT_DB_LOW);
         long startTime = Time.currentTimeMillis();
@@ -451,7 +449,7 @@ public class SpeechHelper {
         while (!understandSomething()) {
         	long currentTime = Time.currentTimeMillis();
             if (usePhrase && currentTime - lastPhraseTime > phraseTimeout) {
-                speechActuator.say(getWaitPhrase());
+                speechActuator.sayAsync(getWaitPhrase(), Language.EN).get();
                 lastPhraseTime = Time.currentTimeMillis();
             }
 

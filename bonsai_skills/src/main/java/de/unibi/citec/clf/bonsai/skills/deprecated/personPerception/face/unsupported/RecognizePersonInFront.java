@@ -2,6 +2,7 @@ package de.unibi.citec.clf.bonsai.skills.deprecated.personPerception.face.unsupp
 
 
 import de.unibi.citec.clf.bonsai.actuators.SpeechActuator;
+import de.unibi.citec.clf.bonsai.actuators.TranslationActuator;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
 
@@ -12,8 +13,11 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.btl.List;
 import de.unibi.citec.clf.btl.data.person.PersonData;
+import de.unibi.citec.clf.btl.data.speechrec.Language;
+
 import java.io.IOException;
 import java.util.Date;
+import java.util.concurrent.ExecutionException;
 
 /**
  * In this state the robot tries to recognize the person standing in front of
@@ -160,11 +164,15 @@ public class RecognizePersonInFront extends AbstractSkill {
      */
     private void say(String text) {
         try {
-            speechActuator.say(text);
+            speechActuator.sayAsync(text, Language.EN).get();
         } catch (IOException ex) {
             // Not so bad. The robot just says nothing.
             logger.warn(ex.getMessage());
 
+        } catch (ExecutionException e) {
+            throw new RuntimeException(e);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
         }
     }
 

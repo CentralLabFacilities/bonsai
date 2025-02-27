@@ -11,10 +11,13 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.btl.List;
 import de.unibi.citec.clf.btl.data.person.PersonData;
+import de.unibi.citec.clf.btl.data.speechrec.Language;
+
 import java.io.IOException;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -277,11 +280,10 @@ public class RecognizePerson extends AbstractSkill {
      */
     private void say(String text) {
         try {
-            speechActuator.say(text);
-        } catch (IOException ex) {
+            speechActuator.sayAsync(text, Language.EN).get();
+        } catch (IOException | ExecutionException | InterruptedException ex) {
             // Not so bad. The robot just says nothing.
             logger.warn(ex.getMessage());
-
         }
     }
 

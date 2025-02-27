@@ -19,7 +19,24 @@ public class SpeechActuatorStub implements de.unibi.citec.clf.bonsai.actuators.S
     }
 
     @Override
-    public Future<Void> sayAsync(@Nonnull String text) throws IOException {
+    public void configure(IObjectConfigurator conf) throws ConfigurationException {
+
+    }
+
+    @Override
+    public void cleanUp() {
+
+    }
+    
+    @Nullable
+    @Override
+    public Future<Boolean> enableASR(boolean enable) throws IOException {
+        return null;
+    }
+
+    @NotNull
+    @Override
+    public Future<Void> sayAsync(@NotNull String text, @NotNull Language language) throws IOException {
         return new Future<Void>() {
             @Override
             public boolean cancel(boolean b) {
@@ -46,34 +63,6 @@ public class SpeechActuatorStub implements de.unibi.citec.clf.bonsai.actuators.S
                 return null;
             }
         };
-    }
-
-    @Override
-    public void say(@Nonnull String text) throws IOException {
-
-    }
-
-
-    @Override
-    public void configure(IObjectConfigurator conf) throws ConfigurationException {
-
-    }
-
-    @Override
-    public void cleanUp() {
-
-    }
-    
-    @Nullable
-    @Override
-    public Future<Boolean> enableASR(boolean enable) throws IOException {
-        return null;
-    }
-
-    @NotNull
-    @Override
-    public Future<Void> sayAsync(@NotNull String text, @NotNull Language language) throws IOException {
-        return null;
     }
 
     @NotNull

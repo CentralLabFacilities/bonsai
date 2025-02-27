@@ -9,6 +9,9 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import java.io.IOException;
 import java.util.Date;
+import java.util.concurrent.ExecutionException;
+
+import de.unibi.citec.clf.btl.data.speechrec.Language;
 import org.apache.log4j.Logger;
 
 /**
@@ -155,13 +158,17 @@ public class StoreNewFace extends AbstractSkill {
     private void say(String text, boolean async) {
         try {
             if (async) {
-                speechActuator.sayAsync(text);
+                speechActuator.sayAsync(text, Language.EN);
             } else {
-                speechActuator.say(text);
+                speechActuator.sayAsync(text, Language.EN).get();
             }
         } catch (IOException ex) {
             // Not so bad. The robot just doesn't say anything.
             logger.warn(ex.getMessage());
+        } catch (ExecutionException e) {
+            throw new RuntimeException(e);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
         }
     }
 

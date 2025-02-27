@@ -82,7 +82,7 @@ class ConfirmYesOrNo : AbstractSkill() {
     private var langSlot: MemorySlotReader<LanguageType>? = null
 
     override fun configure(configurator: ISkillConfigurator) {
-        if (configurator.requestOptionalBool(KEY_USE_LANGUAGE, false)) {
+        if (configurator.requestOptionalBool(KEY_USE_LANGUAGE, true)) {
             langSlot = configurator.getReadSlot("Language", LanguageType::class.java)
         }
 

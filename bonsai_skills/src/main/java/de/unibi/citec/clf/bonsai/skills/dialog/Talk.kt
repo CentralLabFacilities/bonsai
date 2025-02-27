@@ -48,6 +48,7 @@ class Talk : AbstractSkill() {
     private var speechActuator: SpeechActuator? = null
     private var sayingComplete: Future<String?>? = null
     private var langSlot: MemorySlotReader<LanguageType>? = null
+    private var lang: Language = Language.EN
     override fun configure(configurator: ISkillConfigurator) {
         text = configurator.requestValue(KEY_MESSAGE)
         blocking = configurator.requestOptionalBool(KEY_BLOCKING, blocking)
@@ -55,14 +56,14 @@ class Talk : AbstractSkill() {
         speechActuator = configurator.getActuator("SpeechActuator", SpeechActuator::class.java)
         text = text.trim().replace(" +".toRegex(), " ")
 
-        if (configurator.requestOptionalBool(KEY_USE_LANGUAGE, false)) {
+        if (configurator.requestOptionalBool(KEY_USE_LANGUAGE, true)) {
             langSlot = configurator.getReadSlot("Language", LanguageType::class.java)
         }
     }
 
     override fun init(): Boolean {
 
-        val lang : Language = langSlot?.recall<LanguageType>()?.value ?: Language.EN
+        lang  = langSlot?.recall<LanguageType>()?.value ?: Language.EN
         logger.debug("saying(${lang}): $text")
         sayingComplete = speechActuator!!.sayTranslated(text,lang)
 

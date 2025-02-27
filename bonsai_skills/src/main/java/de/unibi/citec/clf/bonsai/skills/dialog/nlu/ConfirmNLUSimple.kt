@@ -10,6 +10,8 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitStatus
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
 import de.unibi.citec.clf.bonsai.util.helper.SimpleNLUHelper
+import de.unibi.citec.clf.btl.data.speechrec.Language
+import de.unibi.citec.clf.btl.data.speechrec.LanguageType
 import de.unibi.citec.clf.btl.data.speechrec.NLU
 import java.io.IOException
 import java.util.concurrent.Future
@@ -60,8 +62,10 @@ class ConfirmNLUSimple : AbstractSkill(), SensorListener<NLU?> {
     private var speechActuator: SpeechActuator? = null
     private var nextRepeat: Long = 0
     private var timesAsked = 0
-    private var sayingComplete: Future<Void>? = null
+    private var sayingComplete: Future<String?>? = null
     private var nluSlot: MemorySlotReader<NLU>? = null
+    private var langSlot: MemorySlotReader<LanguageType>? = null
+    private var lang: Language = Language.EN
 
     override fun configure(configurator: ISkillConfigurator) {
         nluSlot = configurator.getReadSlot<NLU>("NLUSlot", NLU::class.java)
@@ -78,9 +82,13 @@ class ConfirmNLUSimple : AbstractSkill(), SensorListener<NLU?> {
         }
         speechSensor = configurator.getSensor<NLU>(SENSOR_NLU, NLU::class.java)
         speechActuator = configurator.getActuator<SpeechActuator>(ACTUATOR_SPEECHACTUATOR, SpeechActuator::class.java)
+        if (configurator.requestOptionalBool(KEY_USE_LANGUAGE, true)) {
+            langSlot = configurator.getReadSlot("Language", LanguageType::class.java)
+        }
     }
 
     override fun init(): Boolean {
+        lang  = langSlot?.recall<LanguageType>()?.value ?: Language.EN
         if (timeout > 0) {
             logger.debug("using timeout of $timeout ms")
             timeout += Time.currentTimeMillis()
@@ -122,7 +130,7 @@ class ConfirmNLUSimple : AbstractSkill(), SensorListener<NLU?> {
         if (Time.currentTimeMillis() > nextRepeat) {
             if (timesAsked++ < maxRepeats) {
                 try {
-                    sayingComplete = speechActuator!!.sayAsync(confirmText)
+                    sayingComplete = speechActuator!!.sayTranslated(confirmText, lang)
                 } catch (ex: IOException) {
                     logger.error("IO Exception in speechActuator")
                 }
@@ -139,7 +147,7 @@ class ConfirmNLUSimple : AbstractSkill(), SensorListener<NLU?> {
                 return tokenSuccessPsNo
             }
             try {
-                sayingComplete = speechActuator!!.sayAsync("Please answer with yes or no!")
+                sayingComplete = speechActuator!!.sayTranslated("Please answer with yes or no!", lang)
             } catch (ex: IOException) {
                 logger.error("IO Exception in speechActuator")
             }
@@ -150,6 +158,7 @@ class ConfirmNLUSimple : AbstractSkill(), SensorListener<NLU?> {
     override fun newDataAvailable(nluEntities: NLU?) {}
 
     companion object {
+        private const val KEY_USE_LANGUAGE = "#_USE_LANGUAGE"
         private const val KEY_TEXT = "#_MESSAGE"
         private const val KEY_TIMEOUT = "#_TIMEOUT"
         private const val KEY_REPEAT = "#_REPEAT_AFTER"

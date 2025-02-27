@@ -13,20 +13,7 @@ import javax.annotation.Nonnull
  * @author arothert
  */
 interface SpeechActuator : Actuator {
-    /**
-     * Say method with the ability to chose between synchronous and asynchronous
-     * speech synthesis.
-     *
-     * @param text
-     * text to say
-     * @return
-     * @throws IOException
-     * communication error
-     */
-    @Throws(IOException::class)
-    fun sayAsync(text: String): Future<Void>
-
-    /**
+     /**
      * Multilingual say method with the ability to chose between synchronous and asynchronous
      * speech synthesis.
      *
@@ -39,7 +26,7 @@ interface SpeechActuator : Actuator {
      * communication error
      */
     @Throws(IOException::class)
-    fun sayAsync(text: String, language: Language): Future<Void>
+    fun sayAsync(text: String, textLanguage: Language = Language.EN): Future<Void>
 
     /**
      * Say method with the ability to choose the target language.
@@ -68,15 +55,4 @@ interface SpeechActuator : Actuator {
     @Throws(IOException::class)
     fun enableASR(enable: Boolean): Future<Boolean>?
 
-    /**
-     * Synchronous say method. Returns after the complete text was said.
-     *
-     * @param text
-     * text to say
-     * @throws IOException
-     * communication error
-     */
-    @Deprecated("")
-    @Throws(IOException::class)
-    fun say(text: String)
 }

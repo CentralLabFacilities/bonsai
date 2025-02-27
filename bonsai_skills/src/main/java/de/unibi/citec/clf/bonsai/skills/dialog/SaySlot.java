@@ -74,7 +74,7 @@ public class SaySlot extends AbstractSkill {
         speechActuator = configurator.getActuator("SpeechActuator", SpeechActuator.class);
         stringSlot = configurator.getReadSlot("StringSlot", String.class);
 
-        if (configurator.requestOptionalBool(KEY_USE_LANGUAGE, false)) {
+        if (configurator.requestOptionalBool(KEY_USE_LANGUAGE, true)) {
             langSlot = configurator.getReadSlot("Language", LanguageType.class);
         }
     }

@@ -122,7 +122,7 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
     private lateinit var nlu: NLU
 
     override fun configure(configurator: ISkillConfigurator) {
-        if (configurator.requestOptionalBool(KEY_USE_LANGUAGE, false)) {
+        if (configurator.requestOptionalBool(KEY_USE_LANGUAGE, true)) {
             langSlot = configurator.getReadSlot("Language", LanguageType::class.java)
         }
 

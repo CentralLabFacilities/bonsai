@@ -13,9 +13,11 @@ import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.btl.List;
 import de.unibi.citec.clf.btl.data.person.PersonData;
+import de.unibi.citec.clf.btl.data.speechrec.Language;
 import de.unibi.citec.clf.btl.data.vision2d.ImageData;
 import java.io.IOException;
 import java.util.Date;
+import java.util.concurrent.ExecutionException;
 
 /**
  * This state will learn a new face.
@@ -252,11 +254,11 @@ public class LearnFace extends AbstractSkill {
     private void say(String text, boolean async) {
         try {
             if (async) {
-                speechActuator.sayAsync(text);
+                speechActuator.sayAsync(text, Language.EN);
             } else {
-                speechActuator.say(text);
+                speechActuator.sayAsync(text, Language.EN).get();
             }
-        } catch (IOException ex) {
+        } catch (IOException | ExecutionException | InterruptedException ex) {
             // Not so bad. The robot just doesn't say anything.
             logger.warn(ex.getMessage());
         }

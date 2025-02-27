@@ -8,6 +8,7 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.bonsai.util.helper.SimpleSpeechHelper;
+import de.unibi.citec.clf.btl.data.speechrec.Language;
 import de.unibi.citec.clf.btl.data.speechrec.Utterance;
 
 import java.io.IOException;
@@ -68,6 +69,7 @@ public class ConfirmYesOrNo extends AbstractSkill {
     private static final String KEY_NONTERMINAL_NO = "#_NONTERMINAL_NO";
     private static final String KEY_NONTERMINAL_YES = "#_NONTERMINAL_YES";
     private static final String KEY_SPEECH_SENSOR = "#_SPEECH_SENSOR";
+
 
     private String confirmText = "Was that correct?";
     private boolean simpleYesOrNo = true;
@@ -187,7 +189,7 @@ public class ConfirmYesOrNo extends AbstractSkill {
         if (Time.currentTimeMillis() > nextRepeat) {
             if (timesAsked++ < maxRepeats) {
                 try {
-                    sayingComplete = speechActuator.sayAsync(confirmText);
+                    sayingComplete = speechActuator.sayAsync(confirmText, Language.EN);
                 } catch (IOException ex) {
                     logger.error("IO Exception in speechActuator");
                 }
@@ -208,7 +210,7 @@ public class ConfirmYesOrNo extends AbstractSkill {
         }
 
         try {
-            sayingComplete = speechActuator.sayAsync("Sorry, please repeat!");
+            sayingComplete = speechActuator.sayAsync("Sorry, please repeat!", Language.EN);
         } catch (IOException ex) {
             logger.error("IO Exception in speechActuator");
         }

@@ -10,7 +10,10 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.bonsai.util.arm.ArmController180;
 import de.unibi.citec.clf.btl.data.grasp.KatanaGripperData;
+import de.unibi.citec.clf.btl.data.speechrec.Language;
+
 import java.io.IOException;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 /**
@@ -79,12 +82,12 @@ public class HandOverItem extends AbstractSkill {
                 // Loops
                 if ((Time.currentTimeMillis() - timeOut) > askTimeout) {
                     timeOut = Time.currentTimeMillis();
-                    speechActuator.say("Please touch my gripper on both sides");
+                    speechActuator.sayAsync("Please touch my gripper on both sides", Language.EN).get();
                 }
                 return ExitToken.loop();
             }
 
-        } catch (IOException | InterruptedException ex) {
+        } catch (IOException | InterruptedException | RuntimeException | ExecutionException ex) {
             logger.fatal(ex);
             return ExitToken.fatal();
         }

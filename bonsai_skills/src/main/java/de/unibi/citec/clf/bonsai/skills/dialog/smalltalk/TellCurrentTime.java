@@ -5,6 +5,8 @@ import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
+import de.unibi.citec.clf.btl.data.speechrec.Language;
+
 import java.io.IOException;
 import java.util.Calendar;
 import java.util.concurrent.Future;
@@ -82,7 +84,7 @@ public class TellCurrentTime extends AbstractSkill {
         }
 
         try {
-            sayingComplete = speechActuator.sayAsync(sayingTime);
+            sayingComplete = speechActuator.sayAsync(sayingTime, Language.EN);
         } catch (IOException ex) {
             logger.error("Could not call speech actuator");
             return false;

@@ -13,7 +13,10 @@ import de.unibi.citec.clf.btl.List;
 import de.unibi.citec.clf.btl.data.navigation.NavigationGoalData;
 import de.unibi.citec.clf.btl.data.navigation.PositionData;
 import de.unibi.citec.clf.btl.data.person.PersonData;
+import de.unibi.citec.clf.btl.data.speechrec.Language;
+
 import java.io.IOException;
+import java.util.concurrent.ExecutionException;
 
 /**
  * In this skill, the robot turns towards the face of a person given Person or Face ID.
@@ -219,8 +222,8 @@ public class TurnTowardsFace extends AbstractSkill {
      */
     private void say(String text) {
         try {
-            speechActuator.say(text);
-        } catch (IOException ex) {
+            speechActuator.sayAsync(text, Language.EN).get();
+        } catch (IOException | InterruptedException | ExecutionException ex) {
             // Not so bad. The robot just says nothing.
             logger.warn(ex.getMessage());
 
