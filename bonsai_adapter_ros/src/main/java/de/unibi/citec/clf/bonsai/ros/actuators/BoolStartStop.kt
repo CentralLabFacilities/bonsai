@@ -63,6 +63,7 @@ class BoolStartStop(private val nodeName: GraphName) : RosNode(), StartStopActua
             val res = ResponseFuture<SetBoolResponse>()
             it.call(req, res)
             res.get()
+            return
         }
         throw RosException("service server failure ${this.topic}")
     }
@@ -74,6 +75,7 @@ class BoolStartStop(private val nodeName: GraphName) : RosNode(), StartStopActua
             val res = ResponseFuture<SetBoolResponse>()
             it.call(req, res)
             res.get()
+            return
         }
         throw RosException("service server failure ${this.topic}")
     }
