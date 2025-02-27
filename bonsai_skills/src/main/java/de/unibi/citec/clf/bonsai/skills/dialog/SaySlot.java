@@ -111,7 +111,7 @@ public class SaySlot extends AbstractSkill {
         logger.info("saying: " + sayStr);
 
         try {
-            sayingComplete = speechActuator.sayTranslated(sayStr, lang);
+            sayingComplete = speechActuator.sayTranslated(sayStr, lang, lang);
         } catch (IOException e) {
             logger.error("Could not call speech actuator");
             return false;
