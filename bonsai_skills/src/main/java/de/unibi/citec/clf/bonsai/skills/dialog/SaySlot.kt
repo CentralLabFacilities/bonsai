@@ -71,8 +71,8 @@ class SaySlot : AbstractSkill() {
             sayStr = ""
         }
 
-        sayStr = sayText.replace(Matcher.quoteReplacement(REPLACE_STRING).toRegex(), sayStr)
-        sayStr = sayStr.replace("_".toRegex(), " ")
+        sayStr = sayText.replace(REPLACE_STRING, sayStr)
+        sayStr = sayStr.replace("_", " ")
         logger.info("saying: $sayStr")
         sayingComplete = speechActuator?.sayTranslated(sayStr, lang, lang)
 
