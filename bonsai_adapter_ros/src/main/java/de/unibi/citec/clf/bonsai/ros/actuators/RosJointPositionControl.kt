@@ -15,28 +15,39 @@ import java.util.concurrent.Future
 import control_msgs.FollowJointTrajectoryActionFeedback
 import control_msgs.FollowJointTrajectoryActionGoal
 import control_msgs.FollowJointTrajectoryActionResult
+import control_msgs.JointTrajectoryControllerState
+import de.unibi.citec.clf.bonsai.util.BoundSynchronizedQueue
+import de.unibi.citec.clf.btl.units.TimeUnit
+import de.unibi.citec.clf.btl.units.UnitConverter
+import org.ros.message.MessageListener
+import org.ros.node.topic.Subscriber
 import trajectory_msgs.JointTrajectoryPoint
+import kotlin.math.abs
 
 /**
  *
  * @author lruegeme
  */
-class RosJointPositionControl(private val nodeName: GraphName) : RosNode(), JointControllerActuator {
+class RosJointPositionControl(private val nodeName: GraphName) : RosNode(), JointControllerActuator, MessageListener<JointTrajectoryControllerState> {
 
-
+    private val queue: BoundSynchronizedQueue<JointTrajectoryControllerState> = BoundSynchronizedQueue(2);
+    private var state: Subscriber<JointTrajectoryControllerState>? = null
     private var ac: ActionClient<FollowJointTrajectoryActionGoal, FollowJointTrajectoryActionFeedback, FollowJointTrajectoryActionResult>? = null
-    private lateinit var control_topic: String
-    private lateinit var joint: String
+    private lateinit var controllerTopic: String
+    private lateinit var jointName: String
     private val logger = org.apache.log4j.Logger.getLogger(javaClass)
+    private var joint = -1
 
     init {
         initialized = false
     }
 
     override fun onStart(connectedNode: ConnectedNode) {
+        state = connectedNode.newSubscriber("${this.controllerTopic}/state", JointTrajectoryControllerState._TYPE)
+        state?.addMessageListener(this)
         ac = ActionClient(
                 connectedNode,
-                this.control_topic,
+                "$controllerTopic/follow_joint_trajectory",
                 FollowJointTrajectoryActionGoal._TYPE,
                 FollowJointTrajectoryActionFeedback._TYPE,
                 FollowJointTrajectoryActionResult._TYPE
@@ -44,10 +55,10 @@ class RosJointPositionControl(private val nodeName: GraphName) : RosNode(), Join
 
 
         if (ac?.waitForActionServerToStart(Duration(20.0)) == true) {
-            logger.info("RosJointController connected to $control_topic")
+            logger.info("connected to $controllerTopic/follow_joint_trajectory")
             initialized = true
         } else {
-            logger.error("RosJointController not started to $control_topic")
+            logger.error("not started for $controllerTopic")
         }
 
     }
@@ -62,29 +73,27 @@ class RosJointPositionControl(private val nodeName: GraphName) : RosNode(), Join
 
     @Throws(ConfigurationException::class)
     override fun configure(ioc: IObjectConfigurator) {
-        this.control_topic = ioc.requestValue("topic")
-        this.joint = ioc.requestValue("joint")
+        this.controllerTopic = ioc.requestValue("controller")
+        this.jointName = ioc.requestValue("joint")
     }
 
 
     @Throws(IOException::class)
-    override fun moveTo(pose: Float, duration: Float?): Future<Boolean> {
-        //TODO clamp to min/max
-
-
+    override fun moveTo(pose: Float, speed: Double): Future<Boolean> {
         ac?.let { client ->
             val goal = client.newGoalMessage()
 
-            var traj = MsgTypeFactory.getInstance().newMessage<JointTrajectoryPoint>(JointTrajectoryPoint._TYPE)
+            val current = getPosition() ?: throw IOException("cant get current joint pose")
+
+            val delta = abs(pose - current)
+            val duration = (delta / speed) * 1000
+
+            val traj = MsgTypeFactory.getInstance().newMessage<JointTrajectoryPoint>(JointTrajectoryPoint._TYPE)
             traj.positions = doubleArrayOf(pose.toDouble())
 
-            //val delta = abs(getPosition() - pose)
-            //val duration_sec = delta / (speed?:1f)
-            val duration_sec = 1f / (duration?:0.25f)
+            traj.timeFromStart = Duration.fromMillis(duration.toLong())
 
-            traj.timeFromStart = Duration.fromMillis((duration_sec * 1000).toLong())
-
-            goal.goal.trajectory.jointNames.add(joint)
+            goal.goal.trajectory.jointNames.add(jointName)
             goal.goal.trajectory.points.add(traj)
 
             goal.goal.goalTimeTolerance = Duration.fromMillis(2000)
@@ -99,18 +108,50 @@ class RosJointPositionControl(private val nodeName: GraphName) : RosNode(), Join
         throw IOException()
     }
 
-    override fun getMax(): Float {
+    override fun moveTo(pose: Float, duration: Long, unit: TimeUnit): Future<Boolean> {
+        ac?.let { client ->
+            val goal = client.newGoalMessage()
+
+            val traj = MsgTypeFactory.getInstance().newMessage<JointTrajectoryPoint>(JointTrajectoryPoint._TYPE)
+            traj.positions = doubleArrayOf(pose.toDouble())
+            traj.timeFromStart = Duration.fromMillis(UnitConverter.convert(duration,unit,TimeUnit.MILLISECONDS))
+
+            goal.goal.trajectory.jointNames.add(jointName)
+            goal.goal.trajectory.points.add(traj)
+
+            goal.goal.goalTimeTolerance = Duration.fromMillis(2000)
+
+            val sendGoal = client.sendGoal(goal)
+
+            logger.info("Ros Joint Position Control: $goal")
+
+            return sendGoal.toBooleanFuture()
+        }
+
+        throw IOException()
+    }
+
+
+    override fun getMax(): Double? {
         throw NotImplementedError()
     }
 
-    override fun getMin(): Float {
+    override fun getMin(): Double? {
         throw NotImplementedError()
     }
 
-    override fun getPosition(): Float {
-        //TODO
-        //return 0.0f
-        throw NotImplementedError()
+    override fun getPosition(): Double? {
+        val current = queue.front()
+        return if (joint == -1) null
+        else current.actual.positions[joint]
+    }
+
+    override fun onNewMessage(p0: JointTrajectoryControllerState?) {
+        queue.push(p0)
+        if (joint == -1) {
+            joint = p0?.jointNames?.indexOf(jointName) ?: -1
+            logger.warn("found joint: '$jointName' at position $joint")
+        }
     }
 
 }
