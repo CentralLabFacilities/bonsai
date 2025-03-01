@@ -53,7 +53,7 @@ class MoveZlift: AbstractSkill() {
     private var tokenError: ExitToken? = null
 
     private var pos = 0f
-    private var move_duration = 4000
+    private var speed = 0.07
     private var timeout: Long = 7000
 
     private var b: Future<Boolean>? = null
@@ -68,7 +68,7 @@ class MoveZlift: AbstractSkill() {
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
         tokenError = configurator.requestExitToken(ExitStatus.ERROR())
 
-        move_duration = configurator.requestOptionalInt(KEY_MOVE_DURATION, move_duration)
+        speed = configurator.requestOptionalDouble(KEY_SPEED, speed)
         timeout = configurator.requestOptionalInt(KEY_TIMEOUT, timeout.toInt()).toLong()
 
         if (configurator.hasConfigurationKey(KEY_POSITION)) {
@@ -83,7 +83,7 @@ class MoveZlift: AbstractSkill() {
             pos
         }
 
-        b = jointcontroller!!.moveTo(pos, 1000.0f / move_duration)
+        b = jointcontroller!!.moveTo(pos, speed)
 
         if (timeout > 0) {
             timeout += Time.currentTimeMillis()
@@ -107,7 +107,7 @@ class MoveZlift: AbstractSkill() {
 
     companion object {
         private const val KEY_POSITION = "#_POSITION"
-        private const val KEY_MOVE_DURATION = "#_MOVE_DURATION"
+        private const val KEY_SPEED = "#_SPEED"
         private const val KEY_TIMEOUT = "#_TIMEOUT"
     }
 }
