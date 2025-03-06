@@ -8,6 +8,7 @@ import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
+import de.unibi.citec.clf.btl.data.geometry.Point3D
 import de.unibi.citec.clf.btl.data.person.PersonData
 import de.unibi.citec.clf.btl.units.LengthUnit
 import net.sf.saxon.functions.ConstantFunction.True
@@ -37,6 +38,8 @@ class TrackPerson : AbstractSkill() {
     private var personDataSlot: MemorySlotReader<PersonData>? = null
     private var trackingFut: Future<Boolean>? = null
 
+    private val lu: LengthUnit = LengthUnit.METER
+
     override fun configure(configurator: ISkillConfigurator) {
         tokenError = configurator.requestExitToken(ExitStatus.ERROR())
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
@@ -55,7 +58,9 @@ class TrackPerson : AbstractSkill() {
             return false
         }
 
-        trackingFut = trackingActuator?.startTracking(person.headPosition, 0.5)
+        val p = Point3D(person.headPosition.getX(lu).toFloat(), person.headPosition.getY(lu).toFloat(), person.headPosition.getZ(lu).toFloat())
+        p.frameId = person.frameId
+        trackingFut = trackingActuator?.startTracking(p, 0.5)
 
         return trackingFut != null
     }
@@ -65,7 +70,7 @@ class TrackPerson : AbstractSkill() {
             return ExitToken.loop(100)
         }
 
-        return if(trackingFut?.get() == true) tokenSuccess!! else tokenError!!;
+        return if (trackingFut?.get() == true) tokenSuccess!! else tokenError!!;
     }
 
     override fun end(curToken: ExitToken): ExitToken {
