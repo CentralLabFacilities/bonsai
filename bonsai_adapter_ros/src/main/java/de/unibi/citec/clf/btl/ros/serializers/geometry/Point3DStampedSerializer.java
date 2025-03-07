@@ -27,7 +27,7 @@ public class Point3DStampedSerializer extends RosSerializer<Point3D, PointStampe
     @Override
     public PointStamped serialize(Point3D data, MessageFactory fact) throws SerializationException {
         PointStamped ret = fact.newFromType(PointStamped._TYPE);
-        MsgTypeFactory.setHeader(data,ret.getHeader());
+        ret.setHeader(MsgTypeFactory.getInstance().makeHeader(data));
         ret.getPoint().setX(data.getX(LengthUnit.METER));
         ret.getPoint().setY(data.getY(LengthUnit.METER));
         ret.getPoint().setZ(data.getZ(LengthUnit.METER));
