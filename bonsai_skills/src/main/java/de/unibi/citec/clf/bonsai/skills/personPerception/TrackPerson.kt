@@ -53,24 +53,22 @@ class TrackPerson : AbstractSkill() {
             return false
         }
 
-        val p : Point3D = Point3D(person.position.getX(lu), person.position.getY(lu), 0.0, lu ).apply {
-            frameId = person.position.frameId
+        //val p : Point3D = Point3D(person.position.getX(lu), person.position.getY(lu), 1.0, lu ).apply {
+        //    frameId = person.position.frameId
+        //}
+
+       val p : Point3D = if (person.headPosition?.getZ(LengthUnit.METER)?.isNaN() != false) {
+            Point3D(person.position.getX(lu), person.position.getY(lu), 1.0, lu ).apply {
+                frameId = person.position.frameId
+            }
+        } else {
+            logger.info("using head pose")
+            Point3D(person.headPosition.getX(lu).toFloat(), person.headPosition.getY(lu).toFloat(), person.headPosition.getZ(lu).toFloat()).apply {
+                frameId = person.headPosition.frameId
+            }
         }
-
-
-
-//       val p : Point3D = if (person.headPosition?.getZ(LengthUnit.METER)?.isNaN() != false) {
-//            Point3D(person.position.getX(lu), person.position.getY(lu), 0.0, lu ).apply {
-//                frameId = person.position.frameId
-//            }
-//        } else {
-//            logger.info("using head pose")
-//            Point3D(person.headPosition.getX(lu).toFloat(), person.headPosition.getY(lu).toFloat(), person.headPosition.getZ(lu).toFloat()).apply {
-//                frameId = person.headPosition.frameId
-//            }
-//        }
         logger.info("tracking person near: $p")
-        trackingFut = trackingActuator?.startTracking(p, 0.5)
+        trackingFut = trackingActuator?.startTracking(p, 1.0)
 
         return trackingFut != null
     }
@@ -80,9 +78,10 @@ class TrackPerson : AbstractSkill() {
             return ExitToken.loop(100)
         }
 
-
-
-        return if (trackingFut?.get() == true) tokenSuccess!! else run {
+        return if (trackingFut?.get() == true) run {
+            logger.info("track person success")
+            tokenSuccess!!
+        } else run {
             logger.error("found no person close to point")
             tokenError!!
         };
