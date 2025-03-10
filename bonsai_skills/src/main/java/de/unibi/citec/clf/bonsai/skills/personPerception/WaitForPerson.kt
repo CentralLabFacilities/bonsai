@@ -135,14 +135,19 @@ class WaitForPerson : AbstractSkill() {
             return ExitToken.loop()
         }
         if (name != null) {
-            val filtered = persons?.filter { it.name == name }
+            val filtered = persons?.filter { it.name == name || it.uuid == name }
             if (filtered.isNullOrEmpty()) {
+                var personsDebug = ""
+                personsDebug = persons?.stream()?.map { person: PersonData -> "uuid '${person.uuid}' name: '${person.name}'" }?.reduce(personsDebug) { obj: String, str: String -> obj + str } ?: ""
+                logger.info("persons: $personsDebug")
                 logger.debug("requested persons name not found.")
                 return ExitToken.loop()
             }
             persons?.clear()
             persons?.addAll(filtered)
         }
+
+
 
         if (persons.isNullOrEmpty()) {
             logger.debug("No persons found.")
