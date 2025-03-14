@@ -29,7 +29,7 @@ class LookToPoint : AbstractSkill() {
     var x = 0.0
     var y = 0.0
     var z = 0.0
-    var timeout = -1L
+    var timeout = 4000L
 
     private var gazeActuator: GazeActuator? = null
     private var gazeDone: Future<Void>? = null
