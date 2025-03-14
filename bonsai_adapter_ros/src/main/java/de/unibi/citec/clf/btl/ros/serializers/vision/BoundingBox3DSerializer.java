@@ -32,12 +32,8 @@ public class BoundingBox3DSerializer extends RosSerializer<BoundingBox3D, vision
     public BoundingBox3D deserialize(vision_msgs.BoundingBox3D msg) throws DeserializationException {
         BoundingBox3D data = new BoundingBox3D();
 
-        logger.debug("deserialize BoundingBox3D center.pose.x=" + msg.getCenter().getPosition().getX());
-
         data.setPose(MsgTypeFactory.getInstance().createType(msg.getCenter(),Pose3D.class));
         data.setSize(new Point3D(msg.getSize().getX(),msg.getSize().getY(),msg.getSize().getZ(),LengthUnit.METER));
-
-        logger.debug("deserialized BoundingBox3D bb.pose.x=" + data.getPose().getTranslation().getX(LengthUnit.METER));
 
         return data;
     }

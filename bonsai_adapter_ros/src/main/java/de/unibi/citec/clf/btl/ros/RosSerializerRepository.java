@@ -46,7 +46,11 @@ public class RosSerializerRepository {
             Map<String, RosSerializer<? extends Type, ? extends Message>> submap = new HashMap<>();
             serializers.put(baseType, submap);
         }
+        if (serializers.get(baseType).containsKey(msgType.toString())) {
+            throw new RuntimeException("duplicate serializer for " + baseType + "->" + msgType);
+        }
         serializers.get(baseType).put(msgType.toString(), serializer);
+
     }
 
     public static <T extends Type, M extends Message> RosSerializer<T, M> getMsgSerializer(Class<T> baseType, String type) {

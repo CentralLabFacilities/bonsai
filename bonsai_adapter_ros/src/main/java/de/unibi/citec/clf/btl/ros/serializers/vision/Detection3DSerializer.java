@@ -1,11 +1,16 @@
 package de.unibi.citec.clf.btl.ros.serializers.vision;
 
 import de.unibi.citec.clf.btl.data.geometry.BoundingBox3D;
+import de.unibi.citec.clf.btl.data.geometry.Point3D;
+import de.unibi.citec.clf.btl.data.geometry.Pose3D;
+import de.unibi.citec.clf.btl.data.geometry.Rotation3D;
 import de.unibi.citec.clf.btl.data.object.ObjectData;
 import de.unibi.citec.clf.btl.data.object.ObjectShapeData;
 import de.unibi.citec.clf.btl.ros.MsgTypeFactory;
 import de.unibi.citec.clf.btl.ros.RosSerializer;
 import de.unibi.citec.clf.btl.units.LengthUnit;
+import geometry_msgs.Point;
+import geometry_msgs.Pose;
 import org.apache.log4j.Logger;
 import org.ros.message.MessageFactory;
 import vision_msgs.Detection3D;
@@ -50,13 +55,11 @@ public class Detection3DSerializer extends RosSerializer<ObjectShapeData, vision
         MsgTypeFactory.setHeader(data,msg.getHeader());
 
         // Bounding box
-        logger.debug("deserialize Detection3D bb.c.pose.x=" + msg.getBbox().getCenter().getPosition().getX());
         data.setBoundingBox(MsgTypeFactory.getInstance().createType(msg.getBbox(),BoundingBox3D.class));
         MsgTypeFactory.setHeader(data.getBoundingBox(),msg.getHeader());
         MsgTypeFactory.setHeader(data.getBoundingBox().getPose(),msg.getHeader());
-        logger.debug("deserialized Detection3D osd.bb.c.pose.x=" + data.getCenter().getX(lum));
 
-        // Hypotheses
+         // Hypotheses
         for(ObjectHypothesisWithPose hyp : msg.getResults()) {
             data.addHypothesis(MsgTypeFactory.getInstance().createType(hyp,ObjectData.Hypothesis.class));
         }
