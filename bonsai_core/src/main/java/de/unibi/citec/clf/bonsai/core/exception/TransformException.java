@@ -15,6 +15,10 @@ public class TransformException extends Exception {
         super("Cannot transform from \"" + from + "\" to \"" + to + "\" at time " + time);
     }
 
+    public TransformException(String from, String to) {
+        super("Cannot transform from \"" + from + "\" to \"" + to + "\"");
+    }
+
     public TransformException(String msg) {
         super(msg);
     }
