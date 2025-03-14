@@ -1,7 +1,6 @@
 package de.unibi.citec.clf.bonsai.ros
 
 import de.unibi.citec.clf.bonsai.core.exception.TransformException
-import de.unibi.citec.clf.bonsai.core.time.Time
 import de.unibi.citec.clf.bonsai.util.CoordinateTransformer
 import de.unibi.citec.clf.btl.Transform
 import geometry_msgs.TransformStamped
@@ -12,7 +11,6 @@ import org.ros.namespace.GraphName
 import org.ros.node.ConnectedNode
 import org.ros.node.topic.Subscriber
 import org.ros.rosjava_geometry.FrameTransform
-import org.ros.rosjava_geometry.FrameTransformTree
 import tf2_msgs.TFMessage
 import javax.media.j3d.Transform3D
 import javax.vecmath.Quat4d
@@ -23,7 +21,7 @@ import javax.vecmath.Vector3d
  */
 class TFTransformer(gn: GraphName, gn2: GraphName) : CoordinateTransformer(), MessageListener<List<TransformStamped>> {
     private val logger = Logger.getLogger(javaClass)
-    private val currentTree: FrameTransformTree = FrameTransformTree()
+    private val currentTree: TFQuene = TFQuene(64)
 
     private inner class TfOneNode(gn: GraphName, ml: MessageListener<List<TransformStamped>>) : RosNode(), MessageListener<tf.tfMessage> {
         private val nodeName: GraphName
@@ -123,7 +121,7 @@ class TFTransformer(gn: GraphName, gn2: GraphName) : CoordinateTransformer(), Me
     fun getTransform(source: String?, target: String?): FrameTransform {
         val transform = currentTree.transform(source, target)
         logger.trace("fetch tf: $transform")
-        return transform ?: throw TransformException(source, target, Time.currentTimeMillis())
+        return transform ?: throw TransformException(source, target)
     }
 
     override fun onNewMessage(transforms: List<TransformStamped>) {
