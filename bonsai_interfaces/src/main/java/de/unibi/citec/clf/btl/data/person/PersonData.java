@@ -125,7 +125,7 @@ public class PersonData extends BDO {
                 prefix = ", ";
                 strb.append(g.getGestureName());
             }
-            strb.append("]\"; ");
+            strb.append("\"]; ");
         }
         if (attributes.getPosture() != null) {
             strb.append("posture: \"" + attributes.getPosture().getPostureName()+"\"; ");
