@@ -80,7 +80,7 @@ public class ConfirmYesOrNo extends AbstractSkill {
     private String nonTerminalYes = "confirm_yes";
     private String speechSensorName = "SpeechSensorConfirm";
 
-    private ExitToken tokenSuccessPsTimeout;
+    private ExitToken tokenErrorPsTimeout;
     private ExitToken tokenSuccessPsYes;
     private ExitToken tokenSuccessPsNo;
 
@@ -114,7 +114,7 @@ public class ConfirmYesOrNo extends AbstractSkill {
         tokenSuccessPsYes = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus(PS_YES));
         tokenSuccessPsNo = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus(PS_NO));
         if (timeout > 0) {
-            tokenSuccessPsTimeout = configurator.requestExitToken(ExitStatus.SUCCESS().ps(PS_TIMEOUT));
+            tokenErrorPsTimeout = configurator.requestExitToken(ExitStatus.ERROR().ps(PS_TIMEOUT));
         }
 
         speechSensor = configurator.getSensor(speechSensorName, Utterance.class);
@@ -139,7 +139,7 @@ public class ConfirmYesOrNo extends AbstractSkill {
         if (timeout > 0) {
             if (Time.currentTimeMillis() > timeout) {
                 logger.info("ConfirmYesOrNo timeout");
-                return tokenSuccessPsTimeout;
+                return tokenErrorPsTimeout;
             }
         }
 
