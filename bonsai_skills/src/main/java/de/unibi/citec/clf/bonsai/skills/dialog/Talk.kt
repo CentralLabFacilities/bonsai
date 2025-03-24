@@ -6,10 +6,8 @@ import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
-import de.unibi.citec.clf.bonsai.skills.dialog.nlu.TalkNLURegex
 import de.unibi.citec.clf.btl.data.speechrec.Language
 import de.unibi.citec.clf.btl.data.speechrec.LanguageType
-import java.io.IOException
 import java.util.concurrent.Future
 
 /**
@@ -48,7 +46,8 @@ class Talk : AbstractSkill() {
     private var speechActuator: SpeechActuator? = null
     private var sayingComplete: Future<String?>? = null
     private var langSlot: MemorySlotReader<LanguageType>? = null
-    private var lang: Language = Language.EN
+    private var speakerlang: Language = Language.EN
+    private var textLang: Language = Language.EN
     override fun configure(configurator: ISkillConfigurator) {
         text = configurator.requestValue(KEY_MESSAGE)
         blocking = configurator.requestOptionalBool(KEY_BLOCKING, blocking)
@@ -56,17 +55,26 @@ class Talk : AbstractSkill() {
         speechActuator = configurator.getActuator("SpeechActuator", SpeechActuator::class.java)
         text = text.trim().replace(" +".toRegex(), " ")
 
-        if (configurator.requestOptionalBool(KEY_USE_LANGUAGE, true)) {
+        if(configurator.hasConfigurationKey(KEY_TEXT_LANGUAGE)) {
+            val input = configurator.requestValue(KEY_TEXT_LANGUAGE)
+            textLang = Language.valueOf(input)
+            speakerlang = textLang
+            if(!configurator.hasConfigurationKey(KEY_USE_LANGUAGE)) {
+                logger.warn("$KEY_TEXT_LANGUAGE is defined, $KEY_USE_LANGUAGE defaults to false")
+            }
+            if(configurator.requestOptionalBool(KEY_USE_LANGUAGE, false)) {
+                langSlot = configurator.getReadSlot("Language", LanguageType::class.java)
+            }
+        } else if (configurator.requestOptionalBool(KEY_USE_LANGUAGE, true)) {
             langSlot = configurator.getReadSlot("Language", LanguageType::class.java)
         }
+
     }
 
     override fun init(): Boolean {
-
-        lang  = langSlot?.recall<LanguageType>()?.value ?: Language.EN
-        logger.debug("saying(${lang}): $text")
-        sayingComplete = speechActuator!!.sayTranslated(text,lang)
-
+        speakerlang  = langSlot?.recall<LanguageType>()?.value ?: speakerlang
+        logger.debug("saying(in ${speakerlang}): $text [$textLang]")
+        sayingComplete = speechActuator!!.sayTranslated(text,speakerlang, textLang)
         return true
     }
 
@@ -88,5 +96,6 @@ class Talk : AbstractSkill() {
         private const val KEY_MESSAGE = "#_MESSAGE"
         private const val KEY_BLOCKING = "#_BLOCKING"
         private const val KEY_USE_LANGUAGE = "#_USE_LANGUAGE"
+        private const val KEY_TEXT_LANGUAGE = "#_LANG"
     }
 }
