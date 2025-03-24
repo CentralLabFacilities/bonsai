@@ -33,7 +33,7 @@ public class WaitForOpenDoor extends AbstractSkill implements
 
     // used tokens
     private ExitToken tokenSuccess;
-    private ExitToken tokenSuccessTimeout;
+    private ExitToken tokenTimeout;
 
     private Sensor<LaserData> laserSensor;
 
@@ -51,7 +51,7 @@ public class WaitForOpenDoor extends AbstractSkill implements
         distDiff = configurator.requestOptionalDouble(KEY_DIFF, distDiff);
 
         if (timeout > 0) {
-            tokenSuccessTimeout = configurator.requestExitToken(ExitStatus.SUCCESS().ps("timeout"));
+            tokenTimeout = configurator.requestExitToken(ExitStatus.ERROR().ps("timeout"));
         }
 
     }
@@ -75,7 +75,7 @@ public class WaitForOpenDoor extends AbstractSkill implements
         if (timeout > 0) {
             if (Time.currentTimeMillis() > timeout) {
                 logger.info("ConfirmYesOrNo timeout");
-                return tokenSuccessTimeout;
+                return tokenTimeout;
             }
         }
 

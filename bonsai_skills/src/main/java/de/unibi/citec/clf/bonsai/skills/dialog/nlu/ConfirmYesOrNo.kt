@@ -70,7 +70,7 @@ class ConfirmYesOrNo : AbstractSkill() {
     private var intentNo = "confirm_no"
     private var intentYes = "confirm_yes"
     private var speechSensorName = "NLUSensor"
-    private var tokenSuccessPsTimeout: ExitToken? = null
+    private var tokenErrorPsTimeout: ExitToken? = null
     private var tokenSuccessPsYes: ExitToken? = null
     private var tokenSuccessPsNo: ExitToken? = null
     private var helper: SimpleNLUHelper? = null
@@ -97,7 +97,7 @@ class ConfirmYesOrNo : AbstractSkill() {
         tokenSuccessPsYes = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus(PS_YES))
         tokenSuccessPsNo = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus(PS_NO))
         if (timeout > 0) {
-            tokenSuccessPsTimeout = configurator.requestExitToken(ExitStatus.SUCCESS().ps(PS_TIMEOUT))
+            tokenErrorPsTimeout = configurator.requestExitToken(ExitStatus.ERROR().ps(PS_TIMEOUT))
         }
         speechSensor = configurator.getSensor(speechSensorName, NLU::class.java)
         speechActuator = configurator.getActuator(ACTUATOR_SPEECHACTUATOR, SpeechActuator::class.java)
@@ -117,7 +117,7 @@ class ConfirmYesOrNo : AbstractSkill() {
         if (timeout > 0) {
             if (Time.currentTimeMillis() > timeout) {
                 logger.info("ConfirmYesOrNo timeout")
-                return tokenSuccessPsTimeout!!
+                return tokenErrorPsTimeout!!
             }
         }
         return if (simpleYesOrNo) {
