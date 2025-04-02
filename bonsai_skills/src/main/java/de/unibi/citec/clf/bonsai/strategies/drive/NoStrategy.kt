@@ -18,7 +18,7 @@ import java.util.concurrent.ExecutionException
 import java.util.concurrent.Future
 import kotlin.math.abs
 
-class NoStrategy(private val nav: NavigationActuator, private val robotPositionSensor: Sensor<PositionData>?) :
+class NoStrategy(private val nav: NavigationActuator?, private val robotPositionSensor: Sensor<PositionData>?) :
     DriveStrategy {
     private val logger: Logger = Logger.getLogger(this.javaClass)
     private var targetGoal: NavigationGoalData? = null
@@ -63,13 +63,13 @@ class NoStrategy(private val nav: NavigationActuator, private val robotPositionS
             logger.debug("Driving using NoStrategy")
             commandResult = when (ReferenceFrame.fromString(targetGoal!!.frameId)) {
                 ReferenceFrame.GLOBAL -> try {
-                    nav.navigateToCoordinate(targetGoal)
+                    nav?.navigateToCoordinate(targetGoal)
                 } catch (e: IOException) {
                     logger.error(e)
                     return StrategyState.ERROR
                 }
 
-                ReferenceFrame.LOCAL -> nav.navigateRelative(targetGoal)
+                ReferenceFrame.LOCAL -> nav?.navigateRelative(targetGoal)
                 else -> {
                     logger.error("GoalType not implemented")
                     return StrategyState.ERROR
