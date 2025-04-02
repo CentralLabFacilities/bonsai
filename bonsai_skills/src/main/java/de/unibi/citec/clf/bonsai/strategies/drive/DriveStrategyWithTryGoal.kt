@@ -25,7 +25,7 @@ import kotlin.math.abs
  * @author cklarhor
  */
 abstract class DriveStrategyWithTryGoal(
-    nav: NavigationActuator,
+    nav: NavigationActuator?,
     robotPositionSensor: Sensor<PositionData>?, conf: ISkillConfigurator
 ) : DriveStrategy {
     @JvmField
@@ -34,7 +34,7 @@ abstract class DriveStrategyWithTryGoal(
     @JvmField
     protected var targetGoal: NavigationGoalData? = null
     @JvmField
-    protected val nav: NavigationActuator
+    protected val nav: NavigationActuator?
     @JvmField
     protected var maxDistanceSuccess: Double = 0.0
     protected var yawTolerance: Double = 0.0
@@ -100,7 +100,7 @@ abstract class DriveStrategyWithTryGoal(
             targetGoal!!.setCoordinateTolerance(maxDistanceSuccess, LengthUnit.METER)
         }
         try {
-            nav.clearCostmap()
+            nav?.clearCostmap()
         } catch (e: IOException) {
             logger.error("Error while clearing costmap")
             return false
@@ -229,18 +229,18 @@ abstract class DriveStrategyWithTryGoal(
         t.setAngle(yawDiff, AngleUnit.RADIAN)
         var result: Future<CommandResult?>? = null
         try {
-            result = nav.moveRelative(DriveData(), t)
+            result = nav?.moveRelative(DriveData(), t)
         } catch (e: IOException) {
             throw ExecutionException(e)
         }
-        while (!result.isDone) {
+        while (result?.isDone != true) {
             Thread.sleep(50)
         }
     }
 
     override fun reset() {
         try {
-            nav.manualStop()
+            nav?.manualStop()
         } catch (ex: IOException) {
             logger.error("Could not stop navigation actuator", ex)
         }
@@ -254,7 +254,7 @@ abstract class DriveStrategyWithTryGoal(
                 logger.debug("strategy: GLOBAL")
                 val startTime = System.nanoTime()
                 try {
-                    lastCommandResult = nav.navigateToCoordinate(goal)
+                    lastCommandResult = nav?.navigateToCoordinate(goal)
                 } catch (e: IOException) {
                     throw ExecutionException(e)
                 }
@@ -263,7 +263,7 @@ abstract class DriveStrategyWithTryGoal(
 
             ReferenceFrame.LOCAL -> {
                 logger.debug("strategy: LOCAL")
-                lastCommandResult = nav.navigateRelative(goal)
+                lastCommandResult = nav?.navigateRelative(goal)
             }
 
             else -> {
