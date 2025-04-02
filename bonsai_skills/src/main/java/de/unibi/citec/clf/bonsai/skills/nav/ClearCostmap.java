@@ -35,7 +35,6 @@ import java.io.IOException;
 public class ClearCostmap extends AbstractSkill {
 
     private ExitToken tokenSuccess;
-    private ExitToken tokenError;
 
     private NavigationActuator navActuator;
 
@@ -43,7 +42,6 @@ public class ClearCostmap extends AbstractSkill {
     public void configure(ISkillConfigurator configurator) throws SkillConfigurationException {
 
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
-        tokenError = configurator.requestExitToken(ExitStatus.ERROR());
 
         navActuator = configurator.getActuator("NavigationActuator", NavigationActuator.class);
     }
@@ -60,7 +58,7 @@ public class ClearCostmap extends AbstractSkill {
             return tokenSuccess;
         } catch (IOException ex) {
             logger.fatal("Could not communicate with navserver to clear costmap. Error:" + ex.getMessage());
-            return tokenError;
+            return ExitToken.fatal();
         }
     }
 
