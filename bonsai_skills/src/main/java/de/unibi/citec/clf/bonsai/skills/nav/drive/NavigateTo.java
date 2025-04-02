@@ -59,8 +59,10 @@ public class NavigateTo extends AbstractSkill {
     private String strategy = "NoStrategy";
     private long timeout = -1L;
 
-    private ExitToken tokenError;
+    private ExitToken tokenErrorOther;
     private ExitToken tokenSuccess;
+    private ExitToken tokenErrorNotMoved;
+    private ExitToken tokenErrorTimeout;
 
     private NavigationActuator navActuator;
     private Sensor<PositionData> robotPositionSensor;
@@ -74,8 +76,12 @@ public class NavigateTo extends AbstractSkill {
 
         strategy = configurator.requestOptionalValue(KEY_STRATEGY, strategy);
         timeout = configurator.requestOptionalInt(KEY_TIMEOUT, (int) timeout);
+        if(timeout > 0) {
+            tokenErrorTimeout = configurator.requestExitToken(ExitStatus.ERROR().ps("timeout"));
+        }
 
-        tokenError = configurator.requestExitToken(ExitStatus.ERROR());
+        tokenErrorOther = configurator.requestExitToken(ExitStatus.ERROR().ps("other"));
+        tokenErrorNotMoved = configurator.requestExitToken(ExitStatus.ERROR().ps("not_moved"));
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
 
         navActuator = configurator.getActuator("NavigationActuator", NavigationActuator.class);
@@ -121,24 +127,26 @@ public class NavigateTo extends AbstractSkill {
         if (timeout > 0) {
             if (Time.currentTimeMillis() > timeout) {
                 logger.info("Navigate to reached timeout");
-                return tokenError;
+                return tokenErrorTimeout;
             }
         }
         
         if (robotPositionSensor == null) {
             logger.error("execute NavigateTo: Robot position sensor is null");
-            return tokenError;
+            return ExitToken.fatal();
         }
         DriveStrategy.StrategyState state = driveStrategy.execute();
         switch (state) {
             case SUCCESS:
                 return tokenSuccess;
             case ERROR:
-                return tokenError;
+                return tokenErrorOther;
             case NOT_FINISHED:
                 return ExitToken.loop(50);
             case PATH_BLOCKED:
-                return tokenError;
+                return tokenErrorOther;
+            case NOT_MOVED:
+                return tokenErrorNotMoved;
             default:
                 logger.fatal("Unimplemented state " + state);
                 return ExitToken.fatal();
