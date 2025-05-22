@@ -49,6 +49,8 @@ class SaySlot : AbstractSkill() {
     private var langSlot: MemorySlotReader<LanguageType>? = null
     private var speechActuator: SpeechActuator? = null
     private var sayingComplete: Future<String?>? = null
+    private var speakerlang: Language = Language.EN
+    private var textLang: Language = Language.EN
 
     override fun configure(configurator: ISkillConfigurator) {
         sayText = configurator.requestOptionalValue(SAY_TEXT, sayText)
@@ -56,13 +58,23 @@ class SaySlot : AbstractSkill() {
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
         speechActuator = configurator.getActuator("SpeechActuator", SpeechActuator::class.java)
         stringSlot = configurator.getReadSlot("StringSlot", String::class.java)
-        if (configurator.requestOptionalBool(KEY_USE_LANGUAGE, true)) {
+        if(configurator.hasConfigurationKey(KEY_TEXT_LANGUAGE)) {
+            val input = configurator.requestValue(KEY_TEXT_LANGUAGE)
+            textLang = Language.valueOf(input)
+            speakerlang = textLang
+            if(!configurator.hasConfigurationKey(KEY_USE_LANGUAGE)) {
+                logger.warn("$KEY_TEXT_LANGUAGE is defined, $KEY_USE_LANGUAGE defaults to false")
+            }
+            if(configurator.requestOptionalBool(KEY_USE_LANGUAGE, false)) {
+                langSlot = configurator.getReadSlot("Language", LanguageType::class.java)
+            }
+        } else if (configurator.requestOptionalBool(KEY_USE_LANGUAGE, true)) {
             langSlot = configurator.getReadSlot("Language", LanguageType::class.java)
         }
     }
 
     override fun init(): Boolean {
-        val lang = langSlot?.recall<LanguageType>()?.value ?: Language.EN
+        speakerlang = langSlot?.recall<LanguageType>()?.value ?: Language.EN
 
         var sayStr = stringSlot?.recall<String>()
 
@@ -73,8 +85,8 @@ class SaySlot : AbstractSkill() {
 
         sayStr = sayText.replace(REPLACE_STRING, sayStr)
         sayStr = sayStr.replace("_", " ")
-        logger.info("saying: $sayStr")
-        sayingComplete = speechActuator?.sayTranslated(sayStr, lang, lang)
+        logger.debug("saying(in ${speakerlang}): $sayStr [$textLang]")
+        sayingComplete = speechActuator?.sayTranslated(sayStr, speakerlang, textLang)
 
         return true
     }
@@ -93,6 +105,7 @@ class SaySlot : AbstractSkill() {
         private const val SAY_TEXT = "#_MESSAGE"
         private const val KEY_BLOCKING = "#_BLOCKING"
         private const val KEY_USE_LANGUAGE = "#_USE_LANGUAGE"
+        private const val KEY_TEXT_LANGUAGE = "#_LANG"
         private const val REPLACE_STRING = "\$S"
     }
 }
