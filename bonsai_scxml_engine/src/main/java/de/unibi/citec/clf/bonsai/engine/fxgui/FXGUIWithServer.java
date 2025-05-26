@@ -1,5 +1,6 @@
 package de.unibi.citec.clf.bonsai.engine.fxgui;
 
+
 import de.unibi.citec.clf.bonsai.engine.SkillStateMachine;
 import de.unibi.citec.clf.bonsai.engine.communication.SCXMLServer;
 import de.unibi.citec.clf.bonsai.engine.communication.SCXMLServerWithControl;
@@ -7,7 +8,6 @@ import de.unibi.citec.clf.bonsai.engine.communication.StateChangePublisher;
 import de.unibi.citec.clf.bonsai.engine.control.StateMachineController;
 import de.unibi.citec.clf.bonsai.engine.fxgui.communication.DirectControlRemote;
 import de.unibi.citec.clf.bonsai.engine.fxgui.communication.FXGUISCXMLRemote;
-
 
 /**
  * Created by lruegeme on 1/22/18.

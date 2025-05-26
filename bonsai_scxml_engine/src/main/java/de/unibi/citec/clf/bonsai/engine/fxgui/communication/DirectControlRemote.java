@@ -1,5 +1,6 @@
 package de.unibi.citec.clf.bonsai.engine.fxgui.communication;
 
+
 import de.unibi.citec.clf.bonsai.engine.control.StateMachineController;
 import de.unibi.citec.clf.bonsai.engine.fxgui.ExitListener;
 import javafx.beans.property.SimpleStringProperty;
@@ -7,7 +8,7 @@ import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
-import org.apache.commons.scxml.model.Transition;
+import org.apache.commons.scxml2.model.Transition;
 import org.apache.log4j.Logger;
 
 import java.util.LinkedList;
@@ -19,7 +20,7 @@ import java.util.Map;
  */
 public class DirectControlRemote implements FXGUISCXMLRemote {
 
-    static final Logger logger = org.apache.log4j.Logger.getLogger(DirectControlRemote.class);
+    static final Logger logger = Logger.getLogger(DirectControlRemote.class);
 
     StateMachineController smc;
     private SimpleStringProperty status;
@@ -29,7 +30,6 @@ public class DirectControlRemote implements FXGUISCXMLRemote {
 
     public DirectControlRemote(StateMachineController smc) {
         this.smc = smc;
-
         status = new SimpleStringProperty();
     }
 
@@ -103,6 +103,7 @@ public class DirectControlRemote implements FXGUISCXMLRemote {
 
     @Override
     public boolean stop() {
+        logger.fatal("STOP?");
         smc.stopStateMachine();
         return true;
     }

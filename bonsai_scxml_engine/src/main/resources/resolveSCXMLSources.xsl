@@ -90,9 +90,8 @@ the 'src' attribute of states. - Appends a suffix to all sourced 'id' and
         <xsl:attribute name="event">
             <xsl:choose>
                 <xsl:when test="starts-with(current(), 'success') or starts-with(current(), 'error') or starts-with(current(), 'fatal')">
-                    <xsl:variable name="vApos">'</xsl:variable>
                     <xsl:value-of
-                            select="concat($vApos, $prefix , translate(current(),$vApos,''), $vApos)"/>
+                            select="concat($prefix , current())"/>
                 </xsl:when>
                 <xsl:otherwise>
                     <xsl:value-of

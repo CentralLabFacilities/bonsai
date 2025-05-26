@@ -6,10 +6,9 @@ import de.unibi.citec.clf.bonsai.engine.SkillStateMachine;
 import de.unibi.citec.clf.bonsai.engine.control.StateMachineController;
 import de.unibi.citec.clf.bonsai.test.TestListener;
 
-import java.util.HashMap;
+
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
-
 public class TestTools {
 
     static final String PATH_TO_SM = TestTools.class.getResource("/state_machines").getPath();

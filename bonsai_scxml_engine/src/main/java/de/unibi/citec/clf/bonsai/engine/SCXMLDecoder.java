@@ -1,17 +1,19 @@
 package de.unibi.citec.clf.bonsai.engine;
 
-import de.unibi.citec.clf.bonsai.util.LoggingSAXErrorHandler;
+
 import net.sf.saxon.TransformerFactoryImpl;
 import nu.xom.*;
-import org.apache.commons.scxml.io.SCXMLParser;
-import org.apache.commons.scxml.model.ModelException;
-import org.apache.commons.scxml.model.SCXML;
+import org.apache.commons.scxml2.io.SCXMLReader;
+import org.apache.commons.scxml2.model.ModelException;
+import org.apache.commons.scxml2.model.SCXML;
 import org.apache.log4j.Logger;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.XMLReader;
-import org.xml.sax.helpers.XMLReaderFactory;
 
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.parsers.SAXParserFactory;
+import javax.xml.stream.XMLStreamException;
 import javax.xml.transform.ErrorListener;
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerConfigurationException;
@@ -56,7 +58,7 @@ public class SCXMLDecoder {
                 logger.error("scxml has duplicates");
                 throw new TransformerException("state machine has duplicates");
             }
-        } catch (ParsingException | IOException | SAXException ex) {
+        } catch (ParsingException | IOException | SAXException | ParserConfigurationException ex) {
             logger.error("TODO validator failed");
         }
         logger.debug(transformed);
@@ -76,12 +78,14 @@ public class SCXMLDecoder {
      * @throws TransformerException something went wrong
      */
     public static SCXML parseSCXML(InputSource in) throws TransformerException { try {
-            SCXML parsed = SCXMLParser.parse(in, new LoggingSAXErrorHandler(logger));
+            SCXML parsed = SCXMLReader.read(in.getCharacterStream());
             return parsed;
-        } catch (IOException | SAXException | ModelException ex) {
+        } catch (IOException | ModelException ex) {
             logger.error(ex.getMessage());
             throw new TransformerException(ex);
-        }
+    } catch (XMLStreamException e) {
+        throw new RuntimeException(e);
+    }
     }
 
     /**
@@ -149,7 +153,7 @@ public class SCXMLDecoder {
             pw.println(xml);
             pw.close();
             return xml;
-        } catch (IOException | SAXException | ParsingException ex) {
+        } catch (IOException | SAXException | ParsingException | ParserConfigurationException ex) {
             logger.error(ex);
             throw new TransformerException(ex);
         }
@@ -157,9 +161,9 @@ public class SCXMLDecoder {
     }
 
     private static ByteArrayOutputStream mergeDataModels(
-            ByteArrayInputStream bais) throws IOException, SAXException, ParsingException {
+            ByteArrayInputStream bais) throws IOException, SAXException, ParsingException, ParserConfigurationException {
 
-        XMLReader reader = XMLReaderFactory.createXMLReader();
+        XMLReader reader = SAXParserFactory.newInstance().newSAXParser().getXMLReader();
         Builder b = new Builder(reader);
         Document doc = b.build(bais);
 
@@ -199,7 +203,7 @@ public class SCXMLDecoder {
         }
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        nu.xom.Serializer s = new Serializer(out, "UTF-8");
+        Serializer s = new Serializer(out, "UTF-8");
         s.setIndent(4);
         s.setMaxLength(80);
         s.write(doc);

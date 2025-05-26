@@ -14,7 +14,7 @@
         </datamodel>
         <transition event="CheckDatamodel.*" target="CheckDatamodel#2">
             <!-- Change the SCXML data  -->
-            <assign name="val" expr="true"/>
+            <assign location="val" expr="true"/>
         </transition>
     </state>
 

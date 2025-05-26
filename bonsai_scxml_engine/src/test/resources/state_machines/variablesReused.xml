@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0"
+       initial="consume">
+    <datamodel>
+        <data id="#_SLOTS">
+            <slot key="Language" state="*" xpath="/null"/>
+        </data>
+        <data id="#_STATE_PREFIX" expr="'de.unibi.citec.clf.bonsai.skills.'" />
+    </datamodel>
+
+
+    <state id="consume" src="${TEST}/partialResuseableVariale.xml">
+        <onentry>
+            <assign location="hellosToSpeak" expr="1"></assign>
+        </onentry>
+        <transition event="consume.success" target="consume2"/>
+        <transition event="consume.error" target="Fatal"/>
+    </state>
+
+    <state id="consume2" src="${TEST}/partialResuseableVariale.xml">
+        <transition event="consume2.success" target="End"/>
+        <transition event="consume2.error" target="Fatal"/>
+    </state>
+   
+
+    <state id="End"/>
+    <state id="Fatal"/>
+</scxml>

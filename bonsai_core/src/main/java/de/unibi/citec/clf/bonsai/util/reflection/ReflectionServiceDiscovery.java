@@ -20,7 +20,7 @@ public class ReflectionServiceDiscovery implements ServiceDiscovery {
     public <T> Set<Class<? extends T>> discoverServicesByInterface(Class<T> iFace) {
 
         //TODO read package from config or something
-        logger.warn("discoverServicesByInterface is using '" + pkg + "' package");
+        logger.debug("discoverServicesByInterface is using '" + pkg + "' package");
         Reflections reflections = new Reflections(pkg);
 
         //de.unibi.citec.clf.bonsai.rsb.configuration
