@@ -1,6 +1,5 @@
 package de.unibi.citec.clf.bonsai.engine.fxgui;
 
-
 import de.unibi.citec.clf.bonsai.engine.fxgui.communication.FXGUISCXMLRemote;
 import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.PropertyConfigurator;

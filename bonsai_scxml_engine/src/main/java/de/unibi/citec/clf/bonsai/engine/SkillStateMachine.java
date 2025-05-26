@@ -8,13 +8,14 @@ import de.unibi.citec.clf.bonsai.core.configuration.XmlConfigurationParser;
 import de.unibi.citec.clf.bonsai.core.exception.ConfigurationException;
 import de.unibi.citec.clf.bonsai.core.exception.StateIDException;
 import de.unibi.citec.clf.bonsai.core.object.Actuator;
-import de.unibi.citec.clf.bonsai.engine.communication.SCXMLServer;
-import de.unibi.citec.clf.bonsai.engine.communication.StateChangePublisher;
-import de.unibi.citec.clf.bonsai.engine.communication.StatemachineStatus;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.StateID;
 import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException;
+import de.unibi.citec.clf.bonsai.engine.communication.SCXMLServer;
+import de.unibi.citec.clf.bonsai.engine.communication.StateChangePublisher;
+import de.unibi.citec.clf.bonsai.engine.communication.StatemachineStatus;
+import de.unibi.citec.clf.bonsai.engine.config.SkillStateMachineConfig;
 import de.unibi.citec.clf.bonsai.engine.scxml.BonsaiTransition;
 import de.unibi.citec.clf.bonsai.engine.scxml.SCXMLSkillRunner;
 import de.unibi.citec.clf.bonsai.engine.scxml.SkillExceptionHandler;
@@ -26,11 +27,10 @@ import de.unibi.citec.clf.bonsai.engine.scxml.exception.StateMachineException;
 import de.unibi.citec.clf.bonsai.engine.scxml.exception.StateNotFoundException;
 import de.unibi.citec.clf.bonsai.util.MapReader;
 import de.unibi.citec.clf.bonsai.util.helper.ListClass;
-import org.apache.commons.scxml.*;
-import org.apache.commons.scxml.env.SimpleErrorReporter;
-import org.apache.commons.scxml.env.SimpleScheduler;
-import org.apache.commons.scxml.env.jexl.JexlEvaluator;
-import org.apache.commons.scxml.model.*;
+import org.apache.commons.scxml2.*;
+import org.apache.commons.scxml2.env.SimpleErrorReporter;
+import org.apache.commons.scxml2.env.jexl.JexlEvaluator;
+import org.apache.commons.scxml2.model.*;
 import org.apache.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
 
@@ -40,34 +40,9 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.logging.Level;
+import java.util.stream.Collectors;
 
-/**
- * <p>
- * This class demonstrates one approach for providing the base functionality needed by classes representing stateful
- * entities, whose behaviors are defined via SCXML documents.
- * </p>
- * <p>
- * <p>
- * SCXML documents (more generically, UML state chart diagrams) can be used to define stateful behavior of objects, and
- * Commons SCXML enables developers to use this model directly into the corresponding code artifacts. The resulting
- * artifacts tend to be much simpler, embody a useful separation of concerns and are easier to understand and maintain.
- * As the size of the modeled entity grows, these benefits become more apparent.
- * </p>
- * <p>
- * <p>
- * This approach functions by registering an SCXMLListener that gets notified onentry, and calls the namesake method for
- * each state that has been entered.
- * </p>
- * <p>
- * <p>
- * This class swallows all exceptions only to log them. Developers of subclasses should think of themselves as
- * &quot;component developers&quot; catering to other end users, and therefore ensure that the subclasses are free of
- * <code>ModelException</code>s and the like. Most methods are <code>protected</code> for ease of subclassing.
- * </p>
- * <p>
- * TODO: Special class for sub-statemachine?
- */
+
 public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
 
     private final ScheduledExecutorService aliveScheduler = Executors
@@ -77,6 +52,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     private List<SCXMLServer> scxmlServers = new ArrayList<>();
 
     private boolean triggerEvents = true;
+    private SkillStateMachineConfig config = new SkillStateMachineConfig();
 
 
     public void setParams(Map<String, String> m) {
@@ -109,18 +85,12 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     /**
      * Prefix of states (e.g. "de.unibi.citec.clf.bonsai.skills.").
      */
-    private String statePrefix = "de.unibi.citec.clf.bonsai.skills.";
-    private boolean customFinalStates = true;
-    private boolean showDefaultSlotWarnings = true;
-    private boolean generateDefaultSlots = false;
-    private boolean enableSkillWarnings = false;
-    private boolean configureSkills = true;
-    private boolean hashSkillconfigurations = false;
-    public static boolean useFullIdForStateInformer = true;
-    private boolean sendAllPossibleTransitions = false;
+
+
 
     public String lastPathToTask = "";
     public String lastPathToConfig = "";
+
 
     //private static SkillStateMachineConfig ssmConfig;
 
@@ -163,18 +133,18 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
             List<String> states = new LinkedList<>();
             List<BonsaiTransition> transitions = new LinkedList<>();
             for (StateID id : this.keySet()) {
-                if (useFullIdForStateInformer) {
+                if (config.useFullIdForStateInformer) {
                     states.add(id.getFullID());
                 } else {
                     states.add(id.getCanonicalID());
                 }
-                transitions.addAll(getTransitionsByState(id.getFullID().replace(statePrefix, "")));
+                transitions.addAll(getTransitionsByState(id.getFullID().replace(config.statePrefix, "")));
             }
 
             logger.trace("active states sent:" + states);
             stateMapInformers.forEach(it -> {
                 List<BonsaiTransition> ts;
-                if (sendAllPossibleTransitions) {
+                if (config.sendAllPossibleTransitions) {
                     ts = getCurrentPossibleTransitions();
                 } else {
                     ts = transitions;
@@ -202,7 +172,6 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     /**
      * EventDispatcher implementation that can schedule delayed events.
      */
-    private SimpleScheduler simpleScheduler;
     private ExecutorService skillExecutor = Executors.newCachedThreadPool();
     /**
      * Is the state machine paused?
@@ -230,7 +199,6 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
 
 
     public SkillStateMachine(Map<String, String> includeMapping) {
-
         this.includeMapping = includeMapping;
     }
 
@@ -289,10 +257,10 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
      * @param pathToTask   Path to SCXML task file.
      * @param pathToConfig Path to BonSAI configuration file.
      * @return <code>true</code> on success, <code>false</code> otherwise.
-     * @throws de.unibi.citec.clf.bonsai.engine.scxml.exception.StateNotFoundException
+     * @throws StateNotFoundException
      * @throws StateIDException
      * @throws LoadingException
-     * @throws javax.xml.transform.TransformerException
+     * @throws TransformerException
      */
     public LoadingResults initalize(String pathToTask, String pathToConfig)
             throws StateNotFoundException, StateIDException, LoadingException, TransformerException {
@@ -311,7 +279,11 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
             stopMachine();
         }
 
-        setupEngine(scxml);
+        try {
+            setupEngine(scxml);
+        } catch (ModelException e) {
+            throw new RuntimeException(e);
+        }
         Exception cx = null;
         try {
             analyzeDatamodel();
@@ -323,19 +295,19 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
         LoadingResults results = new LoadingResults();
         ConfigurationParser parser = new XmlConfigurationParser();
         ConfigurationResults confResults = null;
-        configurator = new StateMachineConfigurator(statePrefix);
+        configurator = new StateMachineConfigurator(config.statePrefix);
 
 
         // Check if skills use existing sensors/actuators
-        if(configureSkills) {
+        if(config.configureSkills) {
             StateMachineConfiguratorResults smResults = configurator
-                    .configureSkills(scxml, generateDefaultSlots);
+                    .configureSkills(scxml, config.generateDefaultSlots);
 
             Map<StateID, Set<ExitToken>> registeredTokens
                     = configurator.getRegisteredExitTokens();
 
             // Check if classes and transitions exist
-            validator = new SCXMLValidator(this, statePrefix);
+            validator = new SCXMLValidator(this, config.statePrefix);
             ValidationResult scxmlValid = validator.validate(scxml, registeredTokens);
 
             Map<String, Class<?>> rs = configurator.getRequestedSensors();
@@ -370,11 +342,11 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
 
             isInitialized = true;
 
-            results.statePrefix = statePrefix;
+            results.statePrefix = config.statePrefix;
             results.configurationResults = confResults;
             results.stateMachineResults = smResults;
             results.validationResult = scxmlValid;
-            results.showDefaultSlotWarnings = showDefaultSlotWarnings;
+            results.showDefaultSlotWarnings = config.showDefaultSlotWarnings;
         } else {
 
             results.stateMachineResults = configurator.configureSlotsOnly(scxml);
@@ -389,17 +361,22 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
             }
 
             isInitialized = true;
-            results.statePrefix = statePrefix;
+            results.statePrefix = config.statePrefix;
             results.configurationResults = confResults;
-            results.showDefaultSlotWarnings = showDefaultSlotWarnings;
+            results.showDefaultSlotWarnings = config.showDefaultSlotWarnings;
         }
 
-        logger.info("\n#########RESULTS:#########\n" + results.toString());
-        if (enableSkillWarnings) {
-            logger.info(results.validationResult.getWarnings());
+        if (!results.success()) {
+            logger.warn("\n\n####### RESULTS: ########\n" + results.toString() + "\n####### /RESULTS ########\n");
+        } else {
+            logger.debug("\n####### SUCCESS: ########");
         }
 
-        String a = results.stateMachineResults.generateSlotHint(this.statePrefix, false);
+        if (config.enableSkillWarnings && !results.validationResult.getWarnings().isEmpty()) {
+            logger.warn(results.validationResult.getWarnings());
+        }
+
+        String a = results.stateMachineResults.generateSlotHint(config.statePrefix, false);
         if (!a.isEmpty()) {
             logger.info("\nHint: Missing the following Slots:\n" + a);
         }
@@ -418,13 +395,17 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
      *
      * @param stateMachine The state machine
      */
-    private void setupEngine(final SCXML stateMachine) {
+    private void setupEngine(final SCXML stateMachine) throws ModelException {
         scxmlExecutor = new SCXMLExecutor();
         // scxmlExecutor.sete
-        simpleScheduler = new SimpleScheduler(scxmlExecutor);
-        scxmlExecutor.setEventdispatcher(simpleScheduler);
+        //simpleScheduler = new SimpleScheduler(scxmlExecutor);
+        //scxmlExecutor.setEventdispatcher(simpleScheduler);
         scxmlExecutor.setErrorReporter(new SimpleErrorReporter());
-        scxmlExecutor.setEvaluator(new JexlEvaluator());
+        try {
+            scxmlExecutor.setEvaluator(new JexlEvaluator());
+        } catch (ModelException e) {
+            throw new RuntimeException(e);
+        }
         scxmlExecutor.setStateMachine(stateMachine);
         scxmlExecutor.addListener(stateMachine, this);
 
@@ -433,36 +414,13 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     /**
      * Analyze the data model and look for special variables like "#_STATE_PREFIX".
      *
-     * @see SkillStateMachine#statePrefix
+     * @see SkillStateMachineConfig#statePrefix
      */
     private void analyzeDatamodel() throws MapReader.KeyNotFound {
         Map<String, String> data = getVariables(scxmlExecutor.getStateMachine()
                 .getDatamodel());
 
-        statePrefix = MapReader.readConfigString("#_STATE_PREFIX", statePrefix, data);
-        logger.debug("Set state prefix to: " + statePrefix);
-
-        showDefaultSlotWarnings = !MapReader.readConfigBool("#_DISABLE_DEFAULT_SLOT_WARNINGS",
-                !showDefaultSlotWarnings, data);
-        logger.debug("Set disable_default_slot_warnings to: " + !showDefaultSlotWarnings);
-
-        enableSkillWarnings = MapReader.readConfigBool("#_ENABLE_SKILL_WARNINGS", enableSkillWarnings, data);
-        logger.debug("Enable Skill warnings: " + enableSkillWarnings);
-
-        generateDefaultSlots = MapReader.readConfigBool("#_GENERATE_DEFAULT_SLOTS", generateDefaultSlots, data);
-        logger.debug("Set generation of default slots to: " + generateDefaultSlots);
-
-        configureSkills = MapReader.readConfigBool("#_CONFIGURE_AND_VALIDATE", configureSkills, data);
-        logger.debug("Enable full configuration and validation: " + configureSkills);
-
-        hashSkillconfigurations = MapReader.readConfigBool("#_ENABLE_CONFIG_CACHE", hashSkillconfigurations, data);
-        logger.debug("Enable configuration cache: " + hashSkillconfigurations);
-
-        customFinalStates = MapReader.readConfigBool("#_FINAL_STATES", customFinalStates, data);
-        logger.debug("Using End and Fatal as final states");
-
-        sendAllPossibleTransitions = MapReader.readConfigBool("#_SEND_ALL_TRANSITIONS", sendAllPossibleTransitions, data);
-        logger.debug("Send all Taransitions: " + sendAllPossibleTransitions);
+        config.configure(data);
     }
 
     /**
@@ -478,7 +436,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
             return map;
         }
 
-        Context ctx = scxmlExecutor.getRootContext();
+        Context ctx = scxmlExecutor.getGlobalContext();
         Evaluator eval = scxmlExecutor.getEvaluator();
         String atSymbol = "@";
 
@@ -510,7 +468,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
                 try {
                     varObj = eval.eval(ctx, name);
                 } catch (SCXMLExpressionException ex) {
-                    java.util.logging.Logger.getLogger(SkillStateMachine.class.getName()).log(Level.SEVERE, null, ex);
+                    logger.fatal(ex);
                 }
                 value = (varObj != null) ? varObj.toString() : "0";
                 logger.debug("\tdata id:" + data.getId() + " with expr=" + data.getExpr() + " changed to:" + varObj);
@@ -529,7 +487,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
      * @param event The event name.
      * @return Whether the state machine has reached a &quot;final&quot; configuration.
      */
-    public boolean fireEventFromSkill(final String event) {
+    public synchronized boolean fireEventFromSkill(final String event) {
         if (!triggerEvents) {
             logger.warn("automatic transitions are disabled:" + event);
             return false;
@@ -537,13 +495,16 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
         TriggerEvent evts = new TriggerEvent(event, TriggerEvent.SIGNAL_EVENT);
         try {
             logger.debug("FIRE SKILL Event: " + event);
-            logger.trace("All Current states:");
-            if (logger.isTraceEnabled()) for(Object s : scxmlExecutor.getCurrentStatus().getAllStates()) {
+            logger.trace("All Current Active states:");
+            if (logger.isTraceEnabled()) for(EnterableState s : scxmlExecutor.getStatus().getActiveStates()) {
                 if (s instanceof State) {
                     State state = (State) s;
                     logger.trace("- " + state.getId());
+                } else if (s instanceof Parallel) {
+                    Parallel state = (Parallel) s;
+                    logger.trace("- (parallel) " + state.getId());
                 } else {
-                    logger.trace(s);
+                    logger.trace("- (?) s.getId()");
                 }
 
             }
@@ -553,7 +514,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
             logger.error("Error while fireing an event", me);
             logger.error(me.getMessage());
         }
-        return scxmlExecutor.getCurrentStatus().isFinal();
+        return scxmlExecutor.getStatus().isFinal();
     }
 
     public boolean fireEvent(final String event) {
@@ -566,7 +527,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
             logger.error("Error while fireing an event", me);
             logger.error(me.getMessage());
         }
-        return scxmlExecutor.getCurrentStatus().isFinal();
+        return scxmlExecutor.getStatus().isFinal();
     }
 
     /**
@@ -632,7 +593,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
         }
 
         try {
-            logger.info("\n#######################\nSTARTING STATE MACHINE\n#######################\n");
+            logger.info("\n#######################\nSTARTING STATE MACHINE\n#######################");
             running = true;
             // Set listeners
             for (SCXMLListener listener : listeners) {
@@ -640,7 +601,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
                 if (listener instanceof StateChangePublisher) {
                     StateChangePublisher scp = (StateChangePublisher) listener;
                     try {
-                        scp.publish("", scxml.getInitialTarget().getId(), "start");
+                        scp.publish("", scxml.getInitial(), "start");
                     } catch (NullPointerException e) {
                         scp.publish("", scxml.getInitial(), "start");
                     }
@@ -675,15 +636,18 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
         logger.info("STOP STATE MACHINE");
         running = false;
 
-        scxmlExecutor.removeListener(scxml, this);
-        for (SCXMLListener listener : listeners) {
+        if (scxmlExecutor!=null) {
+            scxmlExecutor.removeListener(scxml, this);
+            for (SCXMLListener listener : listeners) {
 
-            if (listener instanceof StateChangePublisher) {
-                StateChangePublisher scp = (StateChangePublisher) listener;
-                scp.publish("unknown", "", "cancel");
+                if (listener instanceof StateChangePublisher) {
+                    StateChangePublisher scp = (StateChangePublisher) listener;
+                    scp.publish("unknown", "", "cancel");
+                }
+                scxmlExecutor.removeListener(scxml, listener);
             }
-            scxmlExecutor.removeListener(scxml, listener);
         }
+
         Set<StateID> keys = new HashSet<>(activeStates.keySet());
         for (StateID key : keys) {
             stopAndRemoveState(key, false);
@@ -691,10 +655,15 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
 
         activeStates.clear();
 
-        setupEngine(scxml);
+        try {
+            setupEngine(scxml);
+        } catch (ModelException e) {
+            logger.fatal("Could not setup engine during stop");
+            throw new RuntimeException(e);
+        }
 
         PAUSE = false;
-        logger.info("\n#######################\nSTATE MACHINE STOPPED AND RESET\n#######################\n");
+        logger.info("\n#######################\nSTATE MACHINE STOPPED AND RESET\n#######################");
 
     }
 
@@ -741,9 +710,9 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
             } else if (a instanceof Assign) {
                 Assign action = (Assign) a;
                 if(action.getExpr().startsWith("'")) {
-                    logger.debug("\t\tASSIGN ## Name:" + action.getName() + " Expr:" + action.getExpr());
+                    logger.debug("\t\tASSIGN ## Name:" + action + " Expr:" + action.getExpr());
                 } else {
-                    logger.warn("\t\tASSIGN ## Name:" + action.getName() + " VALUE OF:'" + action.getExpr()+ "'");
+                    logger.warn("\t\tASSIGN ## Name:" + action + " VALUE OF:'" + action.getExpr()+ "'");
                 }
 
             }
@@ -757,21 +726,19 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
      */
     @SuppressWarnings("unchecked")
     @Override
-    public void onEntry(final TransitionTarget entered) {
+    public void onEntry(final EnterableState entered) {
 
         logger.debug("\tOnEntry: " + entered.getId());
         logger.trace("All Current states:");
-        if (logger.isTraceEnabled()) for(Object s : scxmlExecutor.getCurrentStatus().getAllStates()) {
-            if (s instanceof State) {
-                State state = (State) s;
-                logger.trace("- " + state.getId());
-            } else {
-                logger.trace(s);
+        if (logger.isTraceEnabled()) {
+            if (scxmlExecutor.getStatus().getStates().isEmpty()) {
+                logger.trace(" -- NONE --");
             }
-
+            for(EnterableState s : scxmlExecutor.getStatus().getStates()) {
+                logger.trace("- " + s.getId());
+            }
         }
-        logger.debug(this.scxmlExecutor.getCurrentStatus().toString());
-        actionCheck(entered.getOnEntry().getActions());
+        actionCheck(entered.getOnEntries().stream().map(it -> it.getActions()).flatMap(List::stream).collect(Collectors.toList()));
 
         while (PAUSE && running) {
             try {
@@ -789,9 +756,9 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
 
             try {
 
-                StateID state = new StateID(statePrefix, entered.getId());
+                StateID state = new StateID(config.statePrefix, entered.getId());
 
-                if (toEnter.isFinal() || isEndState(state.getCanonicalSkill())) {
+                if (entered instanceof Final | isEndState(state.getCanonicalSkill())) {
                     running = false;
                     logger.debug("\tOnEntry: entered final State");
                 }
@@ -818,11 +785,11 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
      */
     @SuppressWarnings("unchecked")
     @Override
-    public void onExit(final TransitionTarget exited) {
+    public void onExit(final EnterableState exited) {
         //logger.trace("Called exit for: " + exited.getId());
 
         logger.debug("\tOnExit: " + exited.getId());
-        actionCheck(exited.getOnExit().getActions());
+        actionCheck(exited.getOnExits().stream().map(it -> it.getActions()).flatMap(List::stream).collect(Collectors.toList()));
 
         try {
 
@@ -844,7 +811,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
                     if (s instanceof TransitionTarget) {
                         TransitionTarget t = (TransitionTarget) s;
 
-                        StateID stateId = new StateID(statePrefix, t.getId());
+                        StateID stateId = new StateID(config.statePrefix, t.getId());
                         stopAndRemoveState(stateId, true);
                     }
                 }
@@ -857,13 +824,14 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
             } else {
                 logger.trace("exited is not parallel " + exited.getId() + " "
                         + exited.getClass().getSimpleName());
-                StateID stateId = new StateID(statePrefix, exited.getId());
+                StateID stateId = new StateID(config.statePrefix, exited.getId());
                 stopAndRemoveState(stateId, false);
             }
         } catch (StateIDException e) {
             logger.error("Malformatted id: " + e.getMessage());
         }
     }
+
 
     /**
      * {@inheritDoc}
@@ -873,8 +841,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
      * @param transition
      */
     @Override
-    public void onTransition(final TransitionTarget from,
-                             final TransitionTarget to, final Transition transition) {
+    public void onTransition(TransitionTarget from, TransitionTarget to, Transition transition, String event) {
         // Lets have a look for payload (deprecated)
         payload = scxmlExecutor.getRootContext().get("_eventdata");
         if (payload != null) {
@@ -882,14 +849,14 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
         }
 
         logger.info("\tonTransition: \"" + from.getId() + "\" --> \"" + to.getId()
-                + " \"event: \"" + transition.getEvent() + "\"");
+                + " \"event: \"" + event + "\"");
 
         actionCheck(transition.getActions());
 
     }
 
     private boolean isEndState(String s) {
-        if (!customFinalStates) return false;
+        if (!config.customFinalStates) return false;
         return s.equals("End") || s.equals("Fatal");
     }
 
@@ -912,7 +879,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
             if (activeStates.containsKey(id)) {
                 SCXMLSkillRunner stateToEnd = activeStates.get(id);
                 if (!stateToEnd.hasRunnerBeenExecuted()) {
-                    logger.info("Waiting for state/class to end: " + id);
+                    logger.info("Waiting for state/class to end2: " + id);
 
                     // TODO: sending events should not be necessary here, but
                     // I am not completely sure what sideeffects this may have
@@ -945,10 +912,10 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
      */
     public LinkedList<String> getEventList() {
         LinkedList<String> list = new LinkedList<>();
-        if (scxmlExecutor.getCurrentStatus().getStates().iterator().hasNext()) {
+        if (scxmlExecutor.getStatus().getActiveStates().iterator().hasNext()) {
             @SuppressWarnings("unchecked")
-            List<Transition> a = ((State) scxmlExecutor.getCurrentStatus()
-                    .getStates().iterator().next()).getTransitionsList();
+            List<Transition> a = ((State) scxmlExecutor.getStatus()
+                    .getActiveStates().iterator().next()).getTransitionsList();
             for (Transition anA : a) {
                 String aString = anA.getEvent();
                 list.push(aString);
@@ -963,7 +930,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
      */
     public Set<String> getCurrentTransitionTargets() {
         Set<String> list = new HashSet<>();
-        Set a = scxmlExecutor.getCurrentStatus().getAllStates();
+        Set a = scxmlExecutor.getStatus().getStates();
         a.stream().filter((so) -> so instanceof TransitionTarget).forEach((so) -> {
             TransitionTarget s = (TransitionTarget) so;
             list.add(s.getId());
@@ -974,7 +941,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     public List<Transition> getPossibleTransitions() {
         LinkedList<Transition> list = new LinkedList<>();
         try {
-            Set a = scxmlExecutor.getCurrentStatus().getAllStates();
+            Set a = scxmlExecutor.getStatus().getStates();
             a.stream().filter((so) -> so instanceof State).forEach((so) -> {
                 State s = (State) so;
                 List b = s.getTransitionsList();
@@ -1004,23 +971,22 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     public List<BonsaiTransition> getTransitionsByState(String name) {
         List<BonsaiTransition> transitions = new LinkedList<>();
 
-        final Map<String, TransitionTarget> targets = scxmlExecutor.getStateMachine().getTargets();
-
-        TransitionTarget target = targets.get(name);
+        EnterableState target = scxmlExecutor.getStatus().getStates().stream().filter(it -> it.getId().equals(name)).findFirst().orElse(null);
 
         if (target != null) do {
-
-            final String targetId = target.getId();
-            target.getTransitionsList().forEach(it -> {
+            if (target instanceof TransitionalState) {
+                final TransitionalState ts = (TransitionalState) target;
+                final String targetId = target.getId();
+                ts.getTransitionsList().forEach(it -> {
                     BonsaiTransition t = BonsaiTransition.of((Transition) it);
                     t.setFrom(targetId);
                     transitions.add(t);
                 });
-
+            }
         } while ((target = target.getParent()) != null);
         else {
-            logger.fatal("State not found " + name + ", states:");
-            targets.keySet().forEach(it -> logger.info(it));
+            logger.fatal("State not found " + name);
+            scxmlExecutor.getStatus().getStates().stream().forEach(it -> logger.fatal(it.getId()));
         }
 
         return transitions;

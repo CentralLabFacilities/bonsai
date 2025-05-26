@@ -16,8 +16,8 @@ public class CheckOptionalDatamodel extends AbstractSkill {
     @Override
     public void configure(ISkillConfigurator configurator) throws SkillConfigurationException {
         conf = configurator.requestOptionalBool("SUCCESS", false);
-        if (((SkillConfigurator)configurator).getPhase() == SkillConfigurator.SkillConfigurationPhase.OBJECT)
-            System.out.println("configured " + conf);
+        //if (((SkillConfigurator)configurator).getPhase() == SkillConfigurator.SkillConfigurationPhase.OBJECT)
+            //System.out.println("configured " + conf);
         exitToken = configurator.requestExitToken(ExitStatus.SUCCESS());
     }
 

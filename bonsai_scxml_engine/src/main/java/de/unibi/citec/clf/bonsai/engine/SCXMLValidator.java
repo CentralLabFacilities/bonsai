@@ -5,20 +5,22 @@ import de.unibi.citec.clf.bonsai.core.exception.StateIDException;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.StateID;
-import de.unibi.citec.clf.bonsai.engine.scxml.config.TransitionError;
+import de.unibi.citec.clf.bonsai.engine.config.fault.TransitionFault;
 import de.unibi.citec.clf.bonsai.engine.scxml.config.ValidationResult;
 import de.unibi.citec.clf.bonsai.engine.scxml.exception.StateNotFoundException;
 import nu.xom.*;
-import org.apache.commons.scxml.model.*;
+import org.apache.commons.scxml2.model.*;
 import org.apache.log4j.Logger;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.XMLReader;
-import org.xml.sax.helpers.XMLReaderFactory;
 
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.parsers.SAXParserFactory;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /**
  * Class containing methods for SCXML validation.
@@ -64,8 +66,8 @@ public class SCXMLValidator {
 
     public static boolean hasDuplicates(InputSource is)
             throws ValidityException, ParsingException, IOException,
-            SAXException {
-        XMLReader reader = XMLReaderFactory.createXMLReader();
+            SAXException, ParserConfigurationException {
+        XMLReader reader = SAXParserFactory.newInstance().newSAXParser().getXMLReader();
         Builder b = new Builder(reader);
 
         Document doc = b.build(is.getCharacterStream());
@@ -130,9 +132,9 @@ public class SCXMLValidator {
                         isValid &= validateExistance(state);
                     }
                     if (vTransition) {
-                        List<TransitionError> e = validateTransitions(state, currentState, tokens.get(state));
-                        for (TransitionError t : e) {
-                            if (t.type == de.unibi.citec.clf.bonsai.engine.scxml.config.TransitionError.TransitionErrorType.MISSING) {
+                        List<TransitionFault> e = validateTransitions(state, currentState, tokens.get(state));
+                        for (TransitionFault t : e) {
+                            if (t.type == TransitionFault.TransitionErrorType.MISSING) {
                                 isValid = false;
                             }
                         }
@@ -159,81 +161,82 @@ public class SCXMLValidator {
      * @param aSCXML
      * @return
      */
-    private Collection<? extends TransitionError> findMissingSendTransitions(SCXML aSCXML) {
-        List<TransitionError> result = new ArrayList<>();
+    private Collection<? extends TransitionFault> findMissingSendTransitions(SCXML aSCXML) {
+        List<TransitionFault> result = new ArrayList<>();
 
         Map<String, TransitionTarget> map = aSCXML.getTargets();
-
         Map<String, Set<String>> eventsMap = new ConcurrentHashMap<>();
 
         for (Map.Entry<String, TransitionTarget> entry : map.entrySet()) {
             String stateID = entry.getKey();
-            TransitionTarget target = entry.getValue();
-
-
-            OnEntry onentry = target.getOnEntry();
-            if(onentry!=null) onentry.getActions().forEach(it ->{
-                Action action = (Action) it;
-                if(action instanceof Send) {
-                    Send send = (Send) action;
-                    String event = send.getEvent();
-                    logger.trace("Found send Action in State: " + stateID + " Event:" + event);
-                    Set<String> eventSet = eventsMap.getOrDefault(stateID, new HashSet<>());
-                    eventSet.add(event.replaceAll("'",""));
-                    eventsMap.put(stateID, eventSet);
-                }
-            });
-
-            OnExit onexit = target.getOnExit();
-            if(onexit!=null) onexit.getActions().forEach(it ->{
-                Action action = (Action) it;
-                if(action instanceof Send) {
-                    Send send = (Send) action;
-                    String event = send.getEvent();
-                    logger.trace("Found send Action in State: " + stateID + " Event:" + event);
-                    Set<String> eventSet = eventsMap.getOrDefault(stateID, new HashSet<>());
-                    eventSet.add(event.replaceAll("'",""));
-                    eventsMap.put(stateID, eventSet);
-                }
-            });
-
-            target.getTransitionsList().forEach( t -> {
-                Transition trans = (Transition) t;
-
-                for(Object a : trans.getActions()) {
-                    Action action = (Action) a;
-                    if(action instanceof Send) {
+            TransitionTarget ttarget = entry.getValue();
+            if (ttarget instanceof EnterableState) {
+                EnterableState target = (EnterableState) ttarget;
+                target.getOnEntries().stream().map(it -> it.getActions()).flatMap(List::stream).collect(Collectors.toList()).forEach(it -> {
+                    Action action = (Action) it;
+                    if (action instanceof Send) {
                         Send send = (Send) action;
                         String event = send.getEvent();
                         logger.trace("Found send Action in State: " + stateID + " Event:" + event);
                         Set<String> eventSet = eventsMap.getOrDefault(stateID, new HashSet<>());
-                        eventSet.add(event.replaceAll("'",""));
+                        eventSet.add(event.replaceAll("'", ""));
                         eventsMap.put(stateID, eventSet);
                     }
-                }
+                });
 
-            });
+                target.getOnExits().stream().map(it -> it.getActions()).flatMap(List::stream).collect(Collectors.toList()).forEach(it -> {
+                    Action action = (Action) it;
+                    if (action instanceof Send) {
+                        Send send = (Send) action;
+                        String event = send.getEvent();
+                        logger.trace("Found send Action in State: " + stateID + " Event:" + event);
+                        Set<String> eventSet = eventsMap.getOrDefault(stateID, new HashSet<>());
+                        eventSet.add(event.replaceAll("'", ""));
+                        eventsMap.put(stateID, eventSet);
+                    }
+                });
+            }
+
+            if (ttarget instanceof TransitionalState) {
+                TransitionalState target = (TransitionalState) ttarget;
+
+                target.getTransitionsList().forEach(t -> {
+                    for (Object a : t.getActions()) {
+                        Action action = (Action) a;
+                        if (action instanceof Send) {
+                            Send send = (Send) action;
+                            String event = send.getEvent();
+                            logger.trace("Found send Action in State: " + stateID + " Event:" + event);
+                            Set<String> eventSet = eventsMap.getOrDefault(stateID, new HashSet<>());
+                            eventSet.add(event.replaceAll("'", ""));
+                            eventsMap.put(stateID, eventSet);
+                        }
+                    }
+                });
+            }
         }
-
 
         for(Map.Entry<String, Set<String>> entry : eventsMap.entrySet()) {
             String stateID = entry.getKey();
-            TransitionTarget target = map.get(stateID);
+            TransitionTarget ttarget = map.get(stateID);
             Set<String> events = entry.getValue();
             Set<String> usedEvents = new HashSet<>();
-            logger.trace("Checking Sends of state " + target.getId());
-            while((target = target.getParent()) != null) {
-                logger.trace("  - checking transitions of state " + target.getId());
-                List<Transition> transitions = target.getTransitionsList();
-                for(Transition trans : transitions) {
-                    logger.trace("      - uses event " + trans.getEvent());
-                    usedEvents.add(trans.getEvent());
+            logger.trace("Checking Sends of state " + ttarget.getId());
+            while((ttarget = ttarget.getParent()) != null) {
+                logger.trace("  - checking transitions of state " + ttarget.getId());
+                if(ttarget instanceof TransitionalState){
+                    TransitionalState target = (TransitionalState)ttarget;
+                    List<Transition> transitions = target.getTransitionsList();
+                    for(Transition trans : transitions) {
+                        logger.trace("      - uses event " + trans.getEvent());
+                        usedEvents.add(trans.getEvent());
+                    }
                 }
             }
             events.removeAll(usedEvents);
             if(!events.isEmpty()) {
                 for(String event : events) {
-                    TransitionError error = new TransitionError(stateID, event);
+                    TransitionFault error = new TransitionFault(stateID, event);
                     result.add(error);
                     logger.error(error.getMessage());
                 }
@@ -243,8 +246,8 @@ public class SCXMLValidator {
         return result;
     }
 
-    private List<TransitionError> checkCompositeStateTransitions(String id, Map<String,TransitionTarget> map) {
-        List<TransitionError> result = new ArrayList<>();
+    private List<TransitionFault> checkCompositeStateTransitions(String id, Map<String,TransitionTarget> map) {
+        List<TransitionFault> result = new ArrayList<>();
 
         return result;
     }
@@ -276,9 +279,9 @@ public class SCXMLValidator {
         return isValid;
     }
 
-    private List<TransitionError> validateTransitions(StateID state, State currentState, Set<ExitToken> tokens) {
+    private List<TransitionFault> validateTransitions(StateID state, State currentState, Set<ExitToken> tokens) {
 
-        List<TransitionError> errors = new ArrayList<>();
+        List<TransitionFault> errors = new ArrayList<>();
 
         boolean error = false;
         boolean errorPS = false;
@@ -320,50 +323,49 @@ public class SCXMLValidator {
             if (statusForToken.looping()) {
                 logger.fatal("VerifyError while checking class "
                         + state.getCanonicalID() + ": Registered a Loop event ");
-                errors.add(new TransitionError(state, statusForToken));
+                errors.add(new TransitionFault(state, statusForToken));
             }
 
             //String eventForToken = statusForToken.getFullStatus();
-            @SuppressWarnings("rawtypes")
-            List transitions = new LinkedList<>();
-
-            TransitionTarget curTarget = (TransitionTarget) currentState;
-            List tmp;
-            do {
-                logger.trace("  ##for:" + curTarget.getId() + " event:" + eventForToken);
-                tmp = curTarget.getTransitionsList(eventForToken);
-                if (tmp != null) {
-                    transitions.addAll(tmp);
-                    logger.trace("   found some");
-                }
-
-                String regex = eventForToken;
-                while (regex.contains(".")) {
-                    regex = regex.substring(0, regex.lastIndexOf('.'));
-                    tmp = curTarget.getTransitionsList(regex + ".*");
-                    logger.trace("   #for:" + regex + ".*");
+            List<Transition> transitions = new LinkedList<Transition>();
+            if(currentState instanceof TransitionalState) {
+                TransitionalState curTarget = (TransitionalState) currentState;
+                List tmp;
+                do {
+                    logger.trace("  ##for:" + curTarget.getId() + " event:" + eventForToken);
+                    tmp = curTarget.getTransitionsList(eventForToken);
                     if (tmp != null) {
                         transitions.addAll(tmp);
                         logger.trace("   found some");
                     }
 
-                }
-                curTarget = curTarget.getParent();
+                    String regex = eventForToken;
+                    while (regex.contains(".")) {
+                        regex = regex.substring(0, regex.lastIndexOf('.'));
+                        tmp = curTarget.getTransitionsList(regex + ".*");
+                        logger.trace("   #for:" + regex + ".*");
+                        if (tmp != null) {
+                            transitions.addAll(tmp);
+                            logger.trace("   found some");
+                        }
 
-            } while (curTarget != null);
+                    }
+                    curTarget = curTarget.getParent();
+
+                } while (curTarget != null);
+            }
 
             if (transitions.isEmpty()) {
 
                 logger.fatal("VerifyError while checking state "
                         + state.getFullSkill() + ": Transition missing for event \"" + eventForToken + "\"");
-                errors.add(new TransitionError(state, statusForToken));
+                errors.add(new TransitionFault(state, statusForToken));
 
             } else {
                 //logger.debug("found");
                 //check if one of the
                 boolean cond = true;
-                for (Object o : transitions) {
-                    Transition transition = (Transition) o;
+                for (Transition transition : transitions) {
                     if (transition.getCond() == null || transition.getCond().isEmpty()) {
                         cond = false;
                     }
@@ -373,17 +375,17 @@ public class SCXMLValidator {
                             + state.getFullSkill() + ": Event has only conditional Transitions \""
                             + state.getCanonicalSkill() + '.' + statusForToken.getFullStatus() + "\""
                     );
-                    errors.add(new TransitionError(state, statusForToken, true));
+                    errors.add(new TransitionFault(state, statusForToken, true));
                 }
             }
 
         }
 
         if (error && errorPS) {
-            errors.add(new TransitionError(state, ExitStatus.Status.ERROR));
+            errors.add(new TransitionFault(state, ExitStatus.Status.ERROR));
         }
         if (success && successPS) {
-            errors.add(new TransitionError(state, ExitStatus.Status.SUCCESS));
+            errors.add(new TransitionFault(state, ExitStatus.Status.SUCCESS));
         }
 
         return errors;

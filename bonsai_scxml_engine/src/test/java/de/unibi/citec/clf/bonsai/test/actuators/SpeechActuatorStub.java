@@ -6,7 +6,6 @@ import de.unibi.citec.clf.btl.data.speechrec.Language;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -68,6 +67,31 @@ public class SpeechActuatorStub implements de.unibi.citec.clf.bonsai.actuators.S
     @NotNull
     @Override
     public Future<String> sayTranslated(@NotNull String text, @NotNull Language speakLanguage, @NotNull Language textLanguage) throws IOException {
-        return null;
+        return new Future<String>() {
+            @Override
+            public boolean cancel(boolean b) {
+                return false;
+            }
+
+            @Override
+            public boolean isCancelled() {
+                return false;
+            }
+
+            @Override
+            public boolean isDone() {
+                return true;
+            }
+
+            @Override
+            public String get() throws InterruptedException, ExecutionException {
+                return null;
+            }
+
+            @Override
+            public String get(long l, TimeUnit timeUnit) throws InterruptedException, ExecutionException, TimeoutException {
+                return null;
+            }
+        };
     }
 }

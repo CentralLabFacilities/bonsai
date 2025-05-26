@@ -1,7 +1,7 @@
 package de.unibi.citec.clf.bonsai.engine.scxml.config;
 
 import de.unibi.citec.clf.bonsai.core.exception.StateIDException;
-import de.unibi.citec.clf.bonsai.engine.scxml.SkillConfigFaults;
+import de.unibi.citec.clf.bonsai.engine.config.SkillConfigFaults;
 
 import java.util.HashSet;
 import java.util.Set;

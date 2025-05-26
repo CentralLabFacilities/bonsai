@@ -30,27 +30,30 @@ public class LoadingResults {
             return "";
         }
 
-        String out = "";
+        StringBuilder out = new StringBuilder();
 
         if (!validationResult.success()) {
-            out += "#### State machine validation errors:";
-            out += validationResult + "\n\n";
+            out.append("#### State machine validation errors:");
+            out.append(validationResult);
         }
         if (!stateMachineResults.success(showDefaultSlotWarnings)) {
-            out += "#### State machine configuration errors:";
-            out += stateMachineResults.toString(showDefaultSlotWarnings) + "\n\n";
+            if(!out.isEmpty()) out.append("\n\n");
+            out.append("#### State machine configuration errors:");
+            out.append(stateMachineResults.toString(showDefaultSlotWarnings));
         }
         if (!configurationResults.success()) {
-            out += "#### Configuration errors:";
-            out += configurationResults + "\n\n";
+            if(!out.isEmpty()) out.append("\n\n");
+            out.append("#### Configuration errors:");
+            out.append(configurationResults);
         }
         if (!loadingExceptions.isEmpty()) {
-            out += "#### General Errors:\n";
+            if(!out.isEmpty()) out.append("\n\n");
+            out.append("#### General Errors:\n");
             for (LoadingException l : loadingExceptions) {
-                out += "\n" + l.getMessage();
+                out.append("\n" + l.getMessage());
             }
         }
 
-        return out;
+        return out.toString();
     }
 }

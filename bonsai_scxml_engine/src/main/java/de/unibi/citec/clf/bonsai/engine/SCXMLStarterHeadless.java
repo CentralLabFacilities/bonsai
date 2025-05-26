@@ -25,7 +25,6 @@ public class SCXMLStarterHeadless extends SCXMLStarter {
      * Starts the application.
      *
      * @param args Arguments
-     * @throws RSBException
      */
     public static void main(String[] args) {
         List<String> strings = Arrays.asList(args);
