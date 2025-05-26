@@ -2,11 +2,11 @@ package de.unibi.citec.clf.bonsai.engine.control;
 
 import de.unibi.citec.clf.bonsai.core.exception.ConfigurationException;
 import de.unibi.citec.clf.bonsai.engine.LoadingResults;
+import de.unibi.citec.clf.bonsai.engine.LoadingResults;
 import de.unibi.citec.clf.bonsai.engine.SkillStateMachine;
 import de.unibi.citec.clf.bonsai.engine.communication.StatemachineStatus;
 import de.unibi.citec.clf.bonsai.engine.scxml.SkillExceptionHandler;
 import org.apache.commons.scxml2.model.SCXML;
-import org.apache.commons.scxml2.model.SimpleTransition;
 import org.apache.commons.scxml2.model.Transition;
 import org.apache.commons.scxml2.model.TransitionTarget;
 import org.apache.log4j.Logger;
@@ -100,32 +100,27 @@ public class StateMachineController extends TimerTask implements SkillExceptionH
     }
 
     public void executeStateMachine() {
-        executeStateMachine("");
+        skillStateMachine.startMachine();
+    }
+
+    public void executeStateMachine(TransitionTarget initial) {
+        SCXML scxml = skillStateMachine.getSCXML();
+        scxml.setInitial(initial.getId());
+        skillStateMachine.setScxml(scxml);
+        skillStateMachine.startMachine();
     }
 
     public void executeStateMachine(String initial) {
-        logger.debug("executeStateMachine: " + initial);
-
-        SCXML scxml = skillStateMachine.getSCXML();
-        scxml.getInitialTransition().getTargets().clear();
-
-        if (initial.isEmpty()) {
-            initial = originalTarget.getId();
+        if (!initial.isEmpty()) {
+            SCXML scxml = skillStateMachine.getSCXML();
+            scxml.setInitial(initial);
+            skillStateMachine.setScxml(scxml);
         }
-
-        scxml.setInitial(initial);
-
-        SimpleTransition t = scxml.getInitialTransition();
-        t.setNext(initial);
-        scxml.setInitialTransition(t);
-
-        scxml.getInitialTransition().getTargets().add(scxml.getTargets().get(initial));
-        skillStateMachine.setScxml(scxml);
-
         skillStateMachine.startMachine();
     }
 
     public void stopStateMachine() {
+        logger.debug("STOP SM");
         logger.debug("STOP SM");
         // Stop state machine
         if (skillStateMachine != null) {
@@ -134,6 +129,7 @@ public class StateMachineController extends TimerTask implements SkillExceptionH
     }
 
     public void resetStateMachine() {
+        logger.debug("RESET SM");
         logger.debug("RESET SM");
         // Stop state machine
         if (skillStateMachine != null) {
