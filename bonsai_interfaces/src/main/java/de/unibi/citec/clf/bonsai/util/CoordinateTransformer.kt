@@ -1,8 +1,8 @@
 package de.unibi.citec.clf.bonsai.util
 
 
-import de.unibi.citec.clf.bonsai.core.`object`.TransformLookup
 import de.unibi.citec.clf.bonsai.core.exception.TransformException
+import de.unibi.citec.clf.bonsai.core.`object`.TransformLookup
 import de.unibi.citec.clf.bonsai.core.time.Time
 import de.unibi.citec.clf.btl.data.common.Timestamp
 import de.unibi.citec.clf.btl.data.geometry.Point3D
@@ -21,6 +21,8 @@ abstract class CoordinateTransformer : TransformLookup {
     @Throws(TransformException::class)
     @JvmOverloads
     fun transform(data: Point3D, csTo: String, timestamp: Long? = null): Point3D {
+        if(data.frameId == csTo) return data
+
         val m = LengthUnit.METER
         val time = timestamp ?: data.timestamp?.created?.time ?: (Time.currentTimeMillis() - 300)
         val t = lookup(data.frameId, csTo, time).transform
@@ -40,6 +42,8 @@ abstract class CoordinateTransformer : TransformLookup {
     @Throws(TransformException::class)
     @JvmOverloads
     fun transform(data: Rotation3D, csTo: String, timestamp: Long? = null): Rotation3D {
+        if(data.frameId == csTo) return data
+
         val time = timestamp ?: data.timestamp?.created?.time ?: (Time.currentTimeMillis() - 300)
         val t = lookup(data.frameId, csTo, time).transform
 
@@ -60,6 +64,7 @@ abstract class CoordinateTransformer : TransformLookup {
     @Throws(TransformException::class)
     @JvmOverloads
     fun transform(data: Pose3D, csTo: String, timestamp: Long? = null): Pose3D {
+        if(data.frameId == csTo) return data
 
         val time = timestamp ?: data.timestamp?.created?.time ?: (Time.currentTimeMillis() - 300)
 

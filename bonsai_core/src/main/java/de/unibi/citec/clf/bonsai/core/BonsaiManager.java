@@ -39,7 +39,6 @@ import java.util.Map.Entry;
  */
 public class BonsaiManager {
 
-
     private Logger logger = Logger.getLogger(getClass());
     /**
      * The parser instance used for initial configuration.
@@ -265,9 +264,9 @@ public class BonsaiManager {
     public ConfigurationResults configureByString(String configuration, ConfigurationParser parser,
                                                   Set<String> aSensorKeySet, Set<String> aListSensorKeySet, Set<String> aActuatorKeySet,
                                                   Set<String> aMemoryKeySet) throws ConfigurationException {
-        logger.info("Parsing configuration file");
+        logger.trace("Parsing configuration file");
         try {
-            logger.info("Parsing configuration file");
+            logger.trace("Parsing configuration file");
             parser.parse(configuration);
             return configure(parser, aSensorKeySet, aListSensorKeySet, aActuatorKeySet, aMemoryKeySet);
         } catch (ParseException e) {
@@ -299,7 +298,7 @@ public class BonsaiManager {
                                           Set<String> aListSensorKeySet, Set<String> aActuatorKeySet, Set<String> aMemoryKeySet)
             throws ConfigurationException {
         try {
-            logger.info("Parsing configuration file");
+            logger.trace("Parsing configuration file");
             parser.parse(configurationFile);
             return configure(parser, aSensorKeySet, aListSensorKeySet, aActuatorKeySet,
                     aMemoryKeySet);
@@ -335,7 +334,7 @@ public class BonsaiManager {
                                           ConfigurationParser parser, Set<String> aSensorKeySet, Set<String> aListSensorKeySet,
                                           Set<String> aActuatorKeySet, Set<String> aMemoryKeySet) throws ConfigurationException {
         try {
-            logger.info("Parsing configuration file");
+            logger.trace("Parsing configuration file");
             parser.parse(configurationStream);
             return configure(parser, aSensorKeySet, aListSensorKeySet, aActuatorKeySet,
                     aMemoryKeySet);
@@ -365,10 +364,10 @@ public class BonsaiManager {
         Set<String> actuatorKeySet = aActuatorKeySet == null ? null : new HashSet<>(aActuatorKeySet);
         Set<String> memoryKeySet = aMemoryKeySet == null ? null : new HashSet<>(aMemoryKeySet);
 
-        logger.info("Creating factories");
+        logger.trace("Creating factories");
         createFactories(config.factories.values());
 
-        logger.info("Initializing coordinate transformer");
+        logger.trace("Initializing coordinate transformer");
         results.merge(initializeCoordinateTransformer(config.transformer));
 
         // load only bonsais from the given key sets
@@ -421,16 +420,16 @@ public class BonsaiManager {
         }
 
 
-        logger.info("Initializing working memories");
+        logger.debug("Initializing working memories");
         results.merge(initializeWorkingMemories(requiredMemory.values()));
 
-        logger.info("Initializing sensors per factory");
+        logger.debug("Initializing sensors per factory");
         results.merge(initializeSensors(requiredSensors.values()));
 
-        logger.info("Initializing actuators per factory");
+        logger.debug("Initializing actuators per factory");
         results.merge(initializeActuators(requiredActuator.values()));
 
-        logger.info("trigger object creation");
+        logger.debug("trigger object creation");
         configuredFactoriesByClass.entrySet().stream().map((entry) -> entry.getValue()).forEachOrdered((factory) -> {
             results.otherExceptions.addAll(factory.createAndCacheAllConfiguredObjects().exceptions);
         });
@@ -664,7 +663,7 @@ public class BonsaiManager {
     public <T> Sensor<T> createSensor(String key, Class<T> dataType) throws IllegalArgumentException,
             CoreObjectCreationException {
 
-        logger.info("Creating a sensor instance with key '" + key + "' and dataType '" + dataType + "'");
+        logger.debug("Creating a sensor instance with key '" + key + "' and dataType '" + dataType + "'");
 
         if (!sensorKeysToFactories.containsKey(key)) {
             throw new IllegalArgumentException("No sensor with key '" + key + "'");
@@ -698,7 +697,7 @@ public class BonsaiManager {
     public <S extends List<T>, T> Sensor<S> createSensor(String key, Class<S> listType, Class<T> dataType)
             throws IllegalArgumentException, CoreObjectCreationException {
 
-        logger.info("Creating a sensor instance with key '" + key + "', listType '" + listType + "' and dataType '"
+        logger.debug("Creating a sensor instance with key '" + key + "', listType '" + listType + "' and dataType '"
                 + dataType + "'");
 
         if (!sensorKeysToFactories.containsKey(key)) {
@@ -729,7 +728,7 @@ public class BonsaiManager {
     public <T extends Actuator> T createActuator(String key, Class<T> actuatorClass) throws IllegalArgumentException,
             CoreObjectCreationException {
 
-        logger.info("Creating an actuator instance with key '" + key + "' and type '" + actuatorClass + "'");
+        logger.debug("Creating an actuator instance with key '" + key + "' and type '" + actuatorClass + "'");
 
         if (!actuatorKeysToFactories.containsKey(key)) {
             throw new IllegalArgumentException("No actuator with key '" + key + "'");
@@ -757,7 +756,7 @@ public class BonsaiManager {
     public <T extends WorkingMemory> T createWorkingMemory(String key) throws IllegalArgumentException,
             CoreObjectCreationException {
 
-        logger.info("Creating an working memory instance with key '" + key + "'");
+        logger.debug("Creating an working memory instance with key '" + key + "'");
 
         if (!memoryKeysToFactories.containsKey(key)) {
             throw new IllegalArgumentException("No working memory with key '" + key + "'");
@@ -780,7 +779,7 @@ public class BonsaiManager {
      * @return coordinate transformer
      */
     public TransformLookup createCoordinateTransformer() {
-        logger.info("Creating a coordinte transformer instance");
+        logger.debug("Creating a coordinte transformer instance");
 
         assert coordinateFactory != null;
         if (!coordinateFactory.canCreateCoordinateTransformer()) {
@@ -843,7 +842,7 @@ public class BonsaiManager {
 
         // if the initialization was successful, populate the map of sensor
         // keys to factory objects
-        logger.info("Building map of initialized sensors");
+        logger.debug("Building map of initialized sensors");
         for (Entry<CoreObjectFactory, Set<SensorToConfigure>> factoryEntry : sensorToConfigureByFactory.entrySet()) {
 
             CoreObjectFactory factory = factoryEntry.getKey();
@@ -903,7 +902,7 @@ public class BonsaiManager {
         }
 
         // build a mapping of actuator keys to creating factories
-        logger.info("Building map of initialized actuators");
+        logger.debug("Building map of initialized actuators");
         for (Entry<CoreObjectFactory, Set<ActuatorToConfigure>> factoryEntry : actuatorsToConfigureByFactory.entrySet()) {
 
             CoreObjectFactory factory = factoryEntry.getKey();
@@ -975,7 +974,7 @@ public class BonsaiManager {
         }
 
         // build a mapping of actuator keys to creating factories
-        logger.info("Building map of initialized coordinate transformers");
+        logger.debug("Building map of initialized coordinate transformers");
         for (Entry<CoreObjectFactory, Set<CoordinateTransformerToConfigure>> factoryEntry : transformersToConfigureByFactory.entrySet()) {
 
             CoreObjectFactory factory = factoryEntry.getKey();
@@ -1024,7 +1023,7 @@ public class BonsaiManager {
         }
 
         // build a mapping of slot keys to creating factories
-        logger.info("Building map of initialized working memorys");
+        logger.debug("Building map of initialized working memorys");
         for (Entry<CoreObjectFactory, Set<WorkingMemoryToConfigure>> factoryEntry : memoriesToConfigureByFactory
                 .entrySet()) {
 

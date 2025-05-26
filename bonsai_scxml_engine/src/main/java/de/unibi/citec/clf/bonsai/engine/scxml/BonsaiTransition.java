@@ -1,7 +1,9 @@
 package de.unibi.citec.clf.bonsai.engine.scxml;
 
 
-import org.apache.commons.scxml.model.Transition;
+import org.apache.commons.scxml2.model.Transition;
+
+import java.util.stream.Collectors;
 
 public class BonsaiTransition {
 
@@ -29,8 +31,7 @@ public class BonsaiTransition {
     static public BonsaiTransition of(Transition t) {
         final BonsaiTransition ret = new BonsaiTransition();
         ret.event = (t.getEvent() != null) ? t.getEvent() : "";
-        ret.to = (t.getTarget() != null) ? t.getTarget().getId() : "";
-
+        ret.to = (t.getTargets().isEmpty()) ? t.getTargets().stream().map(it -> it.getId()).collect(Collectors.joining(", ")) : "";
         return ret;
     }
 }

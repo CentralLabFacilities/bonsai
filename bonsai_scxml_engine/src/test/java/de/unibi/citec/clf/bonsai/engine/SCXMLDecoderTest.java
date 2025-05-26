@@ -5,7 +5,7 @@
  */
 package de.unibi.citec.clf.bonsai.engine;
 
-import org.apache.commons.scxml.model.SCXML;
+import org.apache.commons.scxml2.model.SCXML;
 import org.apache.log4j.Logger;
 import org.apache.log4j.PropertyConfigurator;
 import org.junit.Before;

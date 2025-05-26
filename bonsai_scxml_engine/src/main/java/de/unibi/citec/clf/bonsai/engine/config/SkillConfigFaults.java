@@ -1,4 +1,4 @@
-package de.unibi.citec.clf.bonsai.engine.scxml;
+package de.unibi.citec.clf.bonsai.engine.config;
 
 
 import de.unibi.citec.clf.bonsai.engine.model.StateID;

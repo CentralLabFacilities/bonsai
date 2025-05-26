@@ -1,5 +1,6 @@
 package de.unibi.citec.clf.bonsai.engine.scxml.config;
 
+import de.unibi.citec.clf.bonsai.engine.config.fault.TransitionFault;
 import de.unibi.citec.clf.bonsai.engine.scxml.exception.StateNotFoundException;
 
 import java.util.ArrayList;
@@ -13,13 +14,13 @@ import java.util.Set;
 public class ValidationResult {
 
     public Set<StateNotFoundException> stateNotFoundException = new HashSet<>();
-    public Set<TransitionError> transitionNotFoundException = new HashSet<>();
+    public Set<TransitionFault> transitionNotFoundException = new HashSet<>();
 
     public boolean success() {
         boolean valid = stateNotFoundException.isEmpty();
-        for (TransitionError t : transitionNotFoundException) {
-            if (t.type == TransitionError.TransitionErrorType.MISSING ||
-                    t.type == TransitionError.TransitionErrorType.SEND) {
+        for (TransitionFault t : transitionNotFoundException) {
+            if (t.type == TransitionFault.TransitionErrorType.MISSING ||
+                    t.type == TransitionFault.TransitionErrorType.SEND) {
                 valid = false;
                 break;
             }
@@ -30,9 +31,9 @@ public class ValidationResult {
     public String getWarnings() {
         StringBuilder out = new StringBuilder();
         List<String> errors = new ArrayList<>();
-        for (TransitionError l : transitionNotFoundException) {
-            if (l.type == TransitionError.TransitionErrorType.MISSING ||
-                    l.type == TransitionError.TransitionErrorType.SEND) {
+        for (TransitionFault l : transitionNotFoundException) {
+            if (l.type == TransitionFault.TransitionErrorType.MISSING ||
+                    l.type == TransitionFault.TransitionErrorType.SEND) {
                 continue;
             }
             if (!errors.contains(l.getMessage())) {
@@ -48,10 +49,10 @@ public class ValidationResult {
 
     public String generateTransitionHints() {
         StringBuilder out = new StringBuilder();
-        for (TransitionError l : transitionNotFoundException) {
-            if (l.type == TransitionError.TransitionErrorType.MISSING) {
+        for (TransitionFault l : transitionNotFoundException) {
+            if (l.type == TransitionFault.TransitionErrorType.MISSING) {
                 out.append("<transition event=\"").append(l.id.getCanonicalSkill()).append(".").append(l.status.getFullStatus()).append("\" target=\"\"/> \n");
-            } else if (l.type == TransitionError.TransitionErrorType.SEND) {
+            } else if (l.type == TransitionFault.TransitionErrorType.SEND) {
                 out.append("<transition event=\"").append(l.event).append("\" target=\"\"/> \n");
             } else {
                 //TODO
@@ -69,10 +70,10 @@ public class ValidationResult {
         for (StateNotFoundException l : stateNotFoundException) {
             out += "\n" + l.getMessage();
         }
-        for (TransitionError l : transitionNotFoundException) {
-            if (l.type == TransitionError.TransitionErrorType.MISSING) {
+        for (TransitionFault l : transitionNotFoundException) {
+            if (l.type == TransitionFault.TransitionErrorType.MISSING) {
                 out += "\n" + l.getMessage();
-            } else if(l.type == TransitionError.TransitionErrorType.SEND) {
+            } else if(l.type == TransitionFault.TransitionErrorType.SEND) {
                 out += "\n " + l.getMessage();
             }
         }

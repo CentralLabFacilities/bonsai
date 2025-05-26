@@ -4,9 +4,7 @@
     <datamodel>
         <data id="#_STATE_PREFIX" expr="'de.unibi.citec.clf.bonsai.skills.'"/>
         <data id="#_SLOTS">
-            <slots>
-                <slot key="StringSlot" state="slots.SlotIO" xpath="/null"/>
-            </slots>
+            <slot key="StringSlot" state="slots.SlotIO" xpath="/null"/>
         </data>
     </datamodel>
 
@@ -19,45 +17,29 @@
                 <transition event="Wait.success" target="End">
                     <!--<send event="blub"/>-->
                 </transition>
-
-
+                <transition event="blub" target="End"/>
 
                 <state id="compound" initial="Nop">
-
-
                     <state id="Nop">
                         <transition event="Nop.fatal" target="slots.SlotIO"/>
                     </state>
-
                     <state id="slots.SlotIO">
                         <transition event="SlotIO.fatal" target="Nop"/>
                         <transition event="SlotIO.success" target="Nop"/>
                     </state>
-
                 </state>
-
-
 
                 <state id="Wait">
                     <datamodel>
                         <data id="#_TIMEOUT" expr="100"/>
                     </datamodel>
-
                     <transition event="Wait.fatal" target="Fatal"/>
                 </state>
 
-                <transition event="blub" target="End"/>
-
             </parallel>
-
-
         </state>
-
-
     </state>
 
-
     <state id="Fatal" final="true"/>
-
     <state id="End" final="true"/>
 </scxml>

@@ -4,7 +4,7 @@
 
     <!-- The Basics -->
     <groupId>de.unibi.citec.clf</groupId>
-    <version>0.7-SNAPSHOT</version>
+    <version>0.8-SNAPSHOT</version>
     <artifactId>bonsai_scxml_ros</artifactId>
     <packaging>jar</packaging>
 
@@ -37,7 +37,7 @@
         <dependency>
             <groupId>de.unibi.citec.clf</groupId>
             <artifactId>bonsai_scxml_engine</artifactId>
-            <version>0.7-SNAPSHOT</version>
+            <version>0.8-SNAPSHOT</version>
         </dependency>
 
         <dependency>
@@ -52,9 +52,15 @@
         </dependency>
         <dependency>
             <groupId>org.jetbrains.kotlin</groupId>
-            <artifactId>kotlin-test</artifactId>
+            <artifactId>kotlin-test-junit</artifactId>
             <version>${kotlin.version}</version>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>de.unibi.citec.clf</groupId>
+            <artifactId>bonsai_scxml_engine</artifactId>
+            <version>0.8-SNAPSHOT</version>
+            <scope>compile</scope>
         </dependency>
 
     </dependencies>

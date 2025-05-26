@@ -1,13 +1,13 @@
 package de.unibi.citec.clf.bonsai.engine.control;
 
 import de.unibi.citec.clf.bonsai.core.exception.ConfigurationException;
-import de.unibi.citec.clf.bonsai.engine.SkillStateMachine;
 import de.unibi.citec.clf.bonsai.engine.LoadingResults;
+import de.unibi.citec.clf.bonsai.engine.SkillStateMachine;
 import de.unibi.citec.clf.bonsai.engine.communication.StatemachineStatus;
 import de.unibi.citec.clf.bonsai.engine.scxml.SkillExceptionHandler;
-import org.apache.commons.scxml.model.SCXML;
-import org.apache.commons.scxml.model.Transition;
-import org.apache.commons.scxml.model.TransitionTarget;
+import org.apache.commons.scxml2.model.SCXML;
+import org.apache.commons.scxml2.model.Transition;
+import org.apache.commons.scxml2.model.TransitionTarget;
 import org.apache.log4j.Logger;
 
 import java.util.*;
@@ -102,7 +102,7 @@ public class StateMachineController extends TimerTask implements SkillExceptionH
 
     public void executeStateMachine(TransitionTarget initial) {
         SCXML scxml = skillStateMachine.getSCXML();
-        scxml.setInitialTarget(initial);
+        scxml.setInitial(initial.getId());
         skillStateMachine.setScxml(scxml);
         skillStateMachine.startMachine();
     }
@@ -110,14 +110,14 @@ public class StateMachineController extends TimerTask implements SkillExceptionH
     public void executeStateMachine(String initial) {
         if (!initial.isEmpty()) {
             SCXML scxml = skillStateMachine.getSCXML();
-            Map a = scxml.getTargets();
-            scxml.setInitialTarget((TransitionTarget) a.get(initial));
+            scxml.setInitial(initial);
             skillStateMachine.setScxml(scxml);
         }
         skillStateMachine.startMachine();
     }
 
     public void stopStateMachine() {
+        logger.debug("STOP SM");
         // Stop state machine
         if (skillStateMachine != null) {
             skillStateMachine.stopMachine();
@@ -125,6 +125,7 @@ public class StateMachineController extends TimerTask implements SkillExceptionH
     }
 
     public void resetStateMachine() {
+        logger.debug("RESET SM");
         // Stop state machine
         if (skillStateMachine != null) {
             skillStateMachine.stopMachine();
