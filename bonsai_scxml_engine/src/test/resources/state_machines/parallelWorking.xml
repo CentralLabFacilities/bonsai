@@ -15,9 +15,9 @@
 
     <parallel id="Parallel">
         <onentry>
-            <assign name="condition1" expr="false"/>
-            <assign name="condition2" expr="false"/>
-            <assign name="condition3" expr="false"/>
+            <assign location="condition1" expr="false"/>
+            <assign location="condition2" expr="false"/>
+            <assign location="condition3" expr="false"/>
         </onentry>
 
         <!-- Transitions that leave parallel have to be defined on the parallel state -->
@@ -25,7 +25,7 @@
 
         <state id="Nop">
             <transition event="Nop.fatal">
-                <assign name="condition1" expr="true"/>
+                <assign location="condition1" expr="true"/>
                 <send event="strand.done" delay="1000"/>
             </transition>
 
@@ -36,7 +36,7 @@
                 <data id="#_TIMEOUT" expr="'1000'"/>
             </datamodel>
             <transition event="Wait.success">
-                <assign name="condition2" expr="true"/>
+                <assign location="condition2" expr="true"/>
                 <send event="strand.done" delay="1000"/>
             </transition>
             <transition event="Wait.fatal"/>
@@ -47,7 +47,7 @@
                 <data id="#_TIMEOUT" expr="'10000'"/>
             </datamodel>
             <transition event="Wait2.success">
-                <assign name="condition3" expr="true"/>
+                <assign location="condition3" expr="true"/>
                 <send event="strand.done" delay="1000"/>
             </transition>
             <transition event="Wait2.fatal"/>

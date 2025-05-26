@@ -1,6 +1,5 @@
 package de.unibi.citec.clf.bonsai.engine.fxgui;
 
-
 import de.unibi.citec.clf.bonsai.engine.fxgui.communication.FXGUISCXMLRemote;
 import de.unibi.citec.clf.bonsai.engine.fxgui.controller.CurrentStateViewController;
 import de.unibi.citec.clf.bonsai.engine.fxgui.controller.SCXMLOverviewController;

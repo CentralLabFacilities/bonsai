@@ -166,9 +166,7 @@ public class SkillRunner implements Runnable {
         return configurator.getSlotRequests();
     }
 
-    public Map<String, Class> inspectionGetRequiredParams() {
-        return configurator.getRequiredParams();
-    }
+    public Map<String, Class> inspectionGetRequiredParams() { return configurator.getRequiredParams(); }
 
     public Map<String, Class> inspectionGetAllOptionalParams() {
         return configurator.getOptionalParams();
@@ -353,15 +351,15 @@ public class SkillRunner implements Runnable {
      * <code>true</code> if the reason is a timeout.
      */
     public synchronized void forceEnd() {
-        logger.debug("Forcing skill to end: " + id.getCanonicalSkill());
+        logger.error("Forcing skill to end: " + id.getCanonicalSkill());
         forceEnd = true;
         try {
-            logger.debug("notify loop to stop");
+            logger.error("notify loop to stop");
             synchronized (loopCondition) {
                 loopCondition.notifyAll();
             }
 
-            logger.debug("waiting for skill to quit");
+            logger.error("waiting for skill to quit");
             wait(1000);
 
         } catch (InterruptedException ex) {

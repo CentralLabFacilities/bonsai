@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0"
+       initial="dialog.Talk">
+    <datamodel>
+        <data id="#_SLOTS">
+            <slot key="Language" state="dialog.Talk" xpath="/null"/>
+        </data>
+        <data id="#_STATE_PREFIX" expr="'de.unibi.citec.clf.bonsai.skills.'" />
+        <!-- Counter -->
+        <data id="hellosToSpeak" expr="3"/>
+    </datamodel>
+
+    <state id="dialog.Talk">
+        <datamodel>
+            <data id="#_MESSAGE" expr="'Hello'" />
+        </datamodel>
+        <!-- Onentry runs before skill execution (there is also <onexit>)  -->
+        <onentry>
+            <!-- Change the SCXML variable.  -->
+            <assign location="hellosToSpeak" expr="hellosToSpeak - 1"/>
+        </onentry>
+        <!-- Repeat state if not all hellos have been said by now ...  -->
+        <transition event="Talk.*" cond="hellosToSpeak > 1" target="dialog.Talk" />
+        <!-- ... otherwise go to next state. -->
+        <transition event="Talk.*" target="End" />
+    </state>
+
+    <final id="End" />
+</scxml>

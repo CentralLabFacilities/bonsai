@@ -5,10 +5,10 @@ import de.unibi.citec.clf.bonsai.core.exception.ConfigurationException;
 import de.unibi.citec.clf.bonsai.engine.SkillConfigurator;
 import de.unibi.citec.clf.bonsai.engine.SkillListener;
 import de.unibi.citec.clf.bonsai.engine.SkillRunner;
-import de.unibi.citec.clf.bonsai.engine.SkillStateMachine;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.StateID;
+import de.unibi.citec.clf.bonsai.engine.SkillStateMachine;
 import org.apache.log4j.Logger;
 
 import java.util.Map;
@@ -60,8 +60,9 @@ public class SCXMLSkillRunner implements Runnable, SkillListener {
      *                  <code>true</code> if the reason is a timeout.
      */
     public synchronized void forceEnd(boolean fireEvent) {
+        logger.warn("Force SkillRunner To end " + runner.toString());
         this.fireEvent = fireEvent;
-        runner.forceEnd();
+        if(!runner.hasBeenExecuted()) runner.forceEnd();
     }
 
     /**

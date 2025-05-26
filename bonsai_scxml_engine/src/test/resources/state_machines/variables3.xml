@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0"
+       initial="dialog.Talk">
+    <datamodel>
+        <data id="#_SLOTS">
+            <slot key="Language" state="*" xpath="/null"/>
+        </data>
+        <data id="#_STATE_PREFIX" expr="'de.unibi.citec.clf.bonsai.skills.'" />
+        <!-- Utterance to speak -->
+        <data id="text" expr="'Hello'"/>
+    </datamodel>
+
+    <state id="dialog.Talk">
+        <datamodel>
+            <!-- Reference data with @id -->
+            <data id="#_MESSAGE" expr="'@text'" />
+        </datamodel>
+        <transition event="Talk.*" target="dialog.Talk#2" >
+            <!-- Change the SCXML variable.  -->
+            <assign location="text" expr="'how are you?'"/>
+        </transition>
+
+    </state>
+
+    <state id="dialog.Talk#2">
+        <datamodel>
+            <data id="#_MESSAGE" expr="'@text'" />
+        </datamodel>
+        <transition event="Talk.*" target="End" />
+    </state>
+
+    <final id="End" />
+</scxml>

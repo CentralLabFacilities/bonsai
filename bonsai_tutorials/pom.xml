@@ -31,7 +31,7 @@
         <dependency>
           <groupId>de.unibi.citec.clf</groupId>
           <artifactId>bonsai_scxml_ros</artifactId>
-          <version>0.7-SNAPSHOT</version>
+          <version>0.8-SNAPSHOT</version>
         </dependency>
 
         <!-- Skill Modules -->
@@ -52,6 +52,12 @@
             <groupId>de.unibi.citec.clf</groupId>
             <artifactId>bonsai_adapter_ros2</artifactId>
             <version>0.7-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>de.unibi.citec.clf</groupId>
+            <artifactId>bonsai_scxml_ros</artifactId>
+            <version>0.8-SNAPSHOT</version>
+            <scope>compile</scope>
         </dependency>
 
 

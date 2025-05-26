@@ -5,14 +5,16 @@ import de.unibi.citec.clf.bonsai.core.exception.ConfigurationException;
 import de.unibi.citec.clf.bonsai.core.exception.StateIDException;
 import de.unibi.citec.clf.bonsai.core.object.Actuator;
 import de.unibi.citec.clf.bonsai.engine.SkillConfigurator;
+import de.unibi.citec.clf.bonsai.engine.config.fault.MissingSlotFault;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.StateID;
-import de.unibi.citec.clf.bonsai.engine.scxml.SkillConfigFaults;
+import de.unibi.citec.clf.bonsai.engine.config.SkillConfigFaults;
 import de.unibi.citec.clf.bonsai.util.helper.ListClass;
-import org.apache.commons.scxml.model.*;
+import org.apache.commons.scxml2.model.*;
 import org.apache.log4j.Logger;
 import org.w3c.dom.NamedNodeMap;
+import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
 import java.lang.reflect.Constructor;
@@ -65,7 +67,7 @@ public class StateMachineConfigurator {
 
     public StateMachineConfigurator(String prefix) {
         this.prefix = prefix;
-        logger.info("CREATING NEW STATE MACHINE CONFIGURATOR");
+        logger.debug("CREATING NEW STATE MACHINE CONFIGURATOR");
     }
 
     /**
@@ -80,54 +82,50 @@ public class StateMachineConfigurator {
         Map<String, TransitionTarget> targets = scxml.getTargets();
         @SuppressWarnings("unchecked")
         List<Data> dataList = (scxml.getDatamodel() != null) ? scxml.getDatamodel().getData() : new LinkedList<>();
-        for (Data d : dataList) {
-            // Look for slots
-            if (d.getId().equals("#_SLOTS")) {
-                NodeList children = d.getNode().getChildNodes();
-                NodeList slotNodes = children.item(0).getChildNodes();
-                for (int i = 0; i < slotNodes.getLength(); ++i) {
-                    NamedNodeMap attr = slotNodes.item(i).getAttributes();
-                    String slotKey = attr.getNamedItem("key").getNodeValue();
-                    String state = attr.getNamedItem("state").getNodeValue();
-                    String fullstate = prefix;
-                    if (prefix.endsWith(".")) {
-                        fullstate += state;
-                    } else {
-                        fullstate += "." + state;
-                    }
-                    String slotXpath = attr.getNamedItem("xpath").getNodeValue();
+        List<Node> slotNodes = getSlotNodes(dataList);
 
-                    boolean foundTraget = false;
-                    if(state.contains("*")) {
-                        String idRegex = state.replace(".", "\\.");
-                        idRegex = idRegex.replace("*", ".*");
-                        for (String target : targets.keySet()) {
-                            if (target.matches(idRegex)) {
-                                foundTraget = true;
-                                break;
-                            }
-                        }
-                    } else {
-                        foundTraget = targets.containsKey(state);
-                    }
-
-
-                    if (!foundTraget) {
-                        String msg = "Slot definition '" + slotKey + "' for unknown state '" + state + "'.";
-                        logger.error(msg);
-                        results.add(new SkillConfigFaults(StateID.getUnknownState(), msg));
-                        continue;
-                    }
-
-                    logger.trace("Set XPath '" + slotXpath + "' for slot '" + slotKey + "' in state '" + state + "'.");
-                    if (!stateSlotXPathMapping.containsKey(fullstate)) {
-                        stateSlotXPathMapping.put(fullstate, new HashMap<>());
-                    }
-                    stateSlotXPathMapping.get(fullstate).put(slotKey, slotXpath);
-
-                }
+        for (Node n : slotNodes) {
+            logger.trace("SLOT " + n.toString());
+            NamedNodeMap attr = n.getAttributes();
+            String slotKey = attr.getNamedItem("key").getNodeValue();
+            String state = attr.getNamedItem("state").getNodeValue();
+            String fullstate = prefix;
+            if (prefix.endsWith(".")) {
+                fullstate += state;
+            } else {
+                fullstate += "." + state;
             }
+            String slotXpath = attr.getNamedItem("xpath").getNodeValue();
+
+            boolean foundTraget = false;
+            if(state.contains("*")) {
+                String idRegex = state.replace(".", "\\.");
+                idRegex = idRegex.replace("*", ".*");
+                for (String target : targets.keySet()) {
+                    if (target.matches(idRegex)) {
+                        foundTraget = true;
+                        break;
+                    }
+                }
+            } else {
+                foundTraget = targets.containsKey(state);
+            }
+
+            if (!foundTraget) {
+                String msg = "Slot definition '" + slotKey + "' for unknown state '" + state + "'.";
+                logger.error(msg);
+                results.add(new SkillConfigFaults(StateID.getUnknownState(), msg));
+                continue;
+            }
+
+            logger.trace("Set XPath '" + slotXpath + "' for slot '" + slotKey + "' in state '" + state + "'.");
+            if (!stateSlotXPathMapping.containsKey(fullstate)) {
+                stateSlotXPathMapping.put(fullstate, new HashMap<>());
+            }
+            stateSlotXPathMapping.get(fullstate).put(slotKey, slotXpath);
+
         }
+
         // print slot-XPath mapping
         logger.debug("### STATE-SLOT-XPATH MAPPING ###");
         for (String stateID : stateSlotXPathMapping.keySet()) {
@@ -140,37 +138,75 @@ public class StateMachineConfigurator {
         return results;
     }
 
+    private List<Node> getSlotNodes(List<Data> data) {
+        List<Node> slotNodes = new LinkedList<>();
+
+        for (Data d : data) {
+            // Look for slots
+            if (d.getId().equals("#_SLOTS")) {
+                logger.trace("FOUND #_SLOTS");
+                ParsedValue value = d.getParsedValue();
+                if (value.getType() == ParsedValue.ValueType.NODE) {
+                    logger.trace("FOUND #_SLOTS NODE");
+                    NodeValue nv = (NodeValue) value;
+                    Node node = nv.getValue();
+
+                    logger.trace("  String:" + node.toString());
+                    String ln = node.getLocalName();
+                    if (ln.equals("slot")) {
+                        slotNodes.add(node);
+                    } else {
+                        logger.trace("local name: '" + ln + "'");
+                        NodeList shitlist = node.getChildNodes();
+                        for (int i = 0; i < shitlist.getLength(); ++i) {
+                            Node maybeSlotNode = shitlist.item(i);
+                            ln = maybeSlotNode.getLocalName();
+                            if (ln != null && ln.equals("slot")) {
+                                slotNodes.add(maybeSlotNode);
+                            }
+                        }
+                    }
+
+                } else if (value.getType() == ParsedValue.ValueType.NODE_LIST) {
+                    logger.trace("FOUND SLOTS NODE_LIST");
+                    NodeListValue node = (NodeListValue) value;
+                    logger.trace(node.toString());
+                    node.getValue().forEach(it -> logger.trace(it.toString()));
+                    slotNodes.addAll(node.getValue());
+                } else {
+                    throw new RuntimeException("something slots");
+                }
+            }
+        }
+        return slotNodes;
+    }
+
     public synchronized StateMachineConfiguratorResults configureSlotsOnly(SCXML scxml) {
         StateMachineConfiguratorResults results = new StateMachineConfiguratorResults();
 
         List<Data> dataList = (scxml.getDatamodel() != null) ? scxml.getDatamodel().getData() : new LinkedList<>();
-        for (Data d : dataList) {
-            // Look for slots
-            if (d.getId().equals("#_SLOTS")) {
+        List<Node> slotNodes = getSlotNodes(dataList);
 
-                NodeList children = d.getNode().getChildNodes();
-                NodeList slotNodes = children.item(0).getChildNodes();
-
-                for (int i = 0; i < slotNodes.getLength(); ++i) {
-                    NamedNodeMap attr = slotNodes.item(i).getAttributes();
-                    String slotKey = attr.getNamedItem("key").getNodeValue();
-                    String state = attr.getNamedItem("state").getNodeValue();
-                    String fullstate = prefix;
-                    if (prefix.endsWith(".")) {
-                        fullstate += state;
-                    } else {
-                        fullstate += "." + state;
-                    }
-                    String slotXpath = attr.getNamedItem("xpath").getNodeValue();
-
-                    logger.trace("Set XPath '" + slotXpath + "' for slot '" + slotKey + "' in state '" + state + "'.");
-                    if (!stateSlotXPathMapping.containsKey(fullstate)) {
-                        stateSlotXPathMapping.put(fullstate, new HashMap<>());
-                    }
-                    stateSlotXPathMapping.get(fullstate).put(slotKey, slotXpath);
+        for (Node n : slotNodes) {
+            logger.trace("SLOT " + n.toString());
+            NamedNodeMap attr = n.getAttributes();
+            String slotKey = attr.getNamedItem("key").getNodeValue();
+            String state = attr.getNamedItem("state").getNodeValue();
+                String fullstate = prefix;
+                if (prefix.endsWith(".")) {
+                    fullstate += state;
+                } else {
+                    fullstate += "." + state;
                 }
+                String slotXpath = attr.getNamedItem("xpath").getNodeValue();
+
+                logger.trace("Set XPath '" + slotXpath + "' for slot '" + slotKey + "' in state '" + state + "'.");
+                if (!stateSlotXPathMapping.containsKey(fullstate)) {
+                    stateSlotXPathMapping.put(fullstate, new HashMap<>());
+                }
+                stateSlotXPathMapping.get(fullstate).put(slotKey, slotXpath);
             }
-        }
+
         for(String state : stateSlotXPathMapping.keySet()) {
             try {
                 stateIDXPathMapping.put(new StateID(state), stateSlotXPathMapping.get(state));
@@ -178,7 +214,6 @@ public class StateMachineConfigurator {
                 logger.fatal(e);
             }
         }
-
 
         // print slot-XPath mapping
         logger.debug("### STATE-SLOT-XPATH MAPPING ###");
@@ -259,22 +294,22 @@ public class StateMachineConfigurator {
     }
 
     // TODO: change Exception
-    public synchronized List<MissingSlotFault> testOrAddSlotXPathMapping(StateID state, Set<String> slotKey, boolean addDefaults) {
+    public synchronized List<MissingSlotFault> testOrAddSlotXPathMapping(StateID state, Map<String, Class<?>> slotKey, boolean addDefaults) {
         List<MissingSlotFault> errors = new ArrayList<>();
         if (stateIDXPathMapping.containsKey(state)) {
             return errors;// stateIDXPathMapping.get(state);
         }
         Map<String, String> result = new HashMap<>();
-        for (String key : slotKey) {
+        for (Map.Entry<String,Class<?>> kv : slotKey.entrySet()) {
             String matching = null;
             String fid = state.getFullID();
             // fetch match
-            if(stateSlotXPathMapping.containsKey(fid) && stateSlotXPathMapping.get(fid).containsKey(key)) {
+            if(stateSlotXPathMapping.containsKey(fid) && stateSlotXPathMapping.get(fid).containsKey(kv.getKey())) {
                 matching = fid;
             }
 
             if (matching != null) {
-                result.put(key, stateSlotXPathMapping.get(matching).get(key));
+                result.put(kv.getKey(), stateSlotXPathMapping.get(matching).get(kv.getKey()));
                 continue;
             }
             // Search with regex
@@ -283,20 +318,20 @@ public class StateMachineConfigurator {
                     String fullIdRegEx = candidate.replace(".", "\\.");
                     fullIdRegEx = fullIdRegEx.replace("*", ".*");
                     if ((state.getFullID().matches(fullIdRegEx))
-                            && (stateSlotXPathMapping.get(candidate).containsKey(key))) {
+                            && (stateSlotXPathMapping.get(candidate).containsKey(kv.getKey()))) {
                         matching = candidate;
                         break;
                     }
                 }
             }
             if (matching != null) {
-                result.put(key, stateSlotXPathMapping.get(matching).get(key));
+                result.put(kv.getKey(), stateSlotXPathMapping.get(matching).get(kv.getKey()));
             } else {
                 if (addDefaults) {
-                    result.put(key, "/" + key);
-                    errors.add(new MissingSlotFault(key, state, false));
+                    result.put(kv.getKey(), "/" + kv.getKey());
+                    errors.add(new MissingSlotFault(kv.getKey(), state, kv.getValue(), false));
                 } else {
-                    errors.add(new MissingSlotFault(key, state));
+                    errors.add(new MissingSlotFault(kv.getKey(), state, kv.getValue()));
                 }
             }
         }
@@ -430,7 +465,7 @@ public class StateMachineConfigurator {
     private StateMachineConfiguratorResults fetchRequestedSlots(Map<String, Class<?>> requests, StateID stateID, boolean generateDefaults) {
         StateMachineConfiguratorResults results = new StateMachineConfiguratorResults();
 
-        List<MissingSlotFault> errors = testOrAddSlotXPathMapping(stateID, requests.keySet(), generateDefaults);
+        List<MissingSlotFault> errors = testOrAddSlotXPathMapping(stateID, requests, generateDefaults);
         if (!errors.isEmpty()) {
             for (MissingSlotFault e : errors) {
                 SkillConfigFaults smerror = new SkillConfigFaults(stateID, e.getMessage());
@@ -512,10 +547,9 @@ public class StateMachineConfigurator {
 
         String symbol = "@";
 
-        @SuppressWarnings("unchecked")
         List<Data> dataList = model.getData();
         for (Data data : dataList) {
-            logger.info("reading variable: " + data.getId());
+            logger.debug("reading variable: " + data.getId());
             String exp = data.getExpr();
             if (exp == null) exp = "";
             String name = exp.replaceAll("'", "");
@@ -524,10 +558,9 @@ public class StateMachineConfigurator {
 
                 if (vars.containsKey(name)) {
                     map.put(data.getId(), vars.get(name));
-                    logger.info("overwritten @" + name + " with external:" + vars.get(name));
-                    continue;
+                    logger.debug("overwritten @" + name + " with external:" + vars.get(name));
                 } else {
-                    logger.info("variable " + name + " not found in root datamodel");
+                    logger.debug("variable " + name + " not found in root datamodel");
                 }
             } else {
                 map.put(data.getId(), exp.replaceAll("^'", "").replaceAll("'$", ""));

@@ -1,6 +1,7 @@
 package de.unibi.citec.clf.bonsai.engine.fxgui.controller;
 
 
+
 import de.unibi.citec.clf.bonsai.engine.fxgui.FXGUI;
 import de.unibi.citec.clf.bonsai.engine.fxgui.communication.FXGUISCXMLRemote;
 import de.unibi.citec.clf.bonsai.engine.fxgui.communication.IStateListener;
@@ -71,7 +72,7 @@ public class SCXMLOverviewController implements IStateListener {
         System.out.println("got states ");
         if (stateIds != null) {
             System.out.println("got states " + stateIds.size());
-            java.util.Collections.sort(stateIds);
+            Collections.sort(stateIds);
             data.addAll(stateIds);
             this.setNewStateList(data, null);
         }

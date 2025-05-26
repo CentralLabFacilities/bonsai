@@ -1,9 +1,10 @@
 package de.unibi.citec.clf.bonsai.engine.communication;
 
 
-import org.apache.commons.scxml.SCXMLListener;
-import org.apache.commons.scxml.model.Transition;
-import org.apache.commons.scxml.model.TransitionTarget;
+import org.apache.commons.scxml2.SCXMLListener;
+import org.apache.commons.scxml2.model.EnterableState;
+import org.apache.commons.scxml2.model.Transition;
+import org.apache.commons.scxml2.model.TransitionTarget;
 
 /**
  * @author semeyerz
@@ -11,7 +12,7 @@ import org.apache.commons.scxml.model.TransitionTarget;
 public abstract class StateChangePublisher implements SCXMLListener {
 
     @Override
-    public void onEntry(TransitionTarget tt) {
+    public void onEntry(EnterableState tt) {
 
         if (tt.getId().equals("End") || tt.getId().equals("Error")
                 || tt.getId().equals("Fatal")) {
@@ -20,12 +21,12 @@ public abstract class StateChangePublisher implements SCXMLListener {
     }
 
     @Override
-    public void onExit(TransitionTarget tt) {
+    public void onExit(EnterableState tt) {
     }
 
     @Override
-    public void onTransition(final TransitionTarget from,
-                             final TransitionTarget to, final Transition transition) {
+    public void onTransition(TransitionTarget from, TransitionTarget to,
+                             Transition transition, String event) {
         if (transition.getEvent() != null) {
             this.publish(from.getId(), to.getId(), transition.getEvent());
         }

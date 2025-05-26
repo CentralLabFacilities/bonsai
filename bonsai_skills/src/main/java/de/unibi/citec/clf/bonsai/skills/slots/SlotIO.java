@@ -36,7 +36,7 @@ public class SlotIO extends AbstractSkill {
     private static final String KEY_WRITE = "#_WRITE";
 
     // Defaults
-    private String write = "";
+    private String write = null;
     private String content = "";
 
     MemorySlot<String> stringSlot;
@@ -46,7 +46,10 @@ public class SlotIO extends AbstractSkill {
 
         // request all tokens that you plan to return from other methods
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
-        write = configurator.requestValue(KEY_WRITE);
+        if (configurator.hasConfigurationKey(KEY_WRITE)) {
+            write = configurator.requestValue(KEY_WRITE);
+        }
+
         stringSlot = configurator.getReadWriteSlot("StringSlot", String.class);
 
     }
@@ -65,14 +68,13 @@ public class SlotIO extends AbstractSkill {
 
     @Override
     public ExitToken execute() {
-        logger.debug("current data:"+content);
+        logger.info("current data: '" + content + "'");
         return tokenSuccess;
     }
 
     @Override
     public ExitToken end(ExitToken curToken) {
-        if (write.isEmpty()) {
-            logger.warn("Write is empty, slot will not be affected"); //Old hack, may be unintended behaviour
+        if (write == null || write.isEmpty()) {
             return curToken;
         }
         try {
