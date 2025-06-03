@@ -11,10 +11,13 @@ import javafx.scene.shape.Path
 import javafx.scene.shape.Rectangle
 
 
-class BonsaiEdge(val graph: BonsaiGraph, val source: BonsaiNode, val destination: BonsaiNode) {
+class BonsaiEdge(val graph: BonsaiGraph, val source: BonsaiNode, val destination: BonsaiNode, val wayPoints: MutableList<BonsaiEdgeWayPoint> = mutableListOf()) {
     var displayShape: Node? = null
-    val wayPoints: ArrayList<BonsaiEdgeWayPoint> = ArrayList()
     val wayPointHandles: HashMap<BonsaiEdgeWayPoint, Node> = HashMap()
+
+    init {
+        graph.addEdge(this)
+    }
 
     fun addWayPoint(wayPoint: BonsaiEdgeWayPoint) {
         wayPoints.add(wayPoint)
@@ -27,14 +30,16 @@ class BonsaiEdge(val graph: BonsaiGraph, val source: BonsaiNode, val destination
     }
 
     private fun compileDisplayShapeFor(wayPoint: BonsaiEdgeWayPoint, zoomLevel: Double): Node {
-        val node = Rectangle(4.0, 4.0, Color.RED)
-        node.stroke = Color.RED
+        val node = Rectangle(4.0, 4.0, Color.RED).apply {
+            stroke = Color.RED
+            scaleX = zoomLevel
+            scaleY = zoomLevel
+            layoutX = (wayPoint.positionX - 2) * zoomLevel
+            layoutY = (wayPoint.positionY - 2) * zoomLevel
+            userData = wayPoint
+        }
 
-        node.scaleX = zoomLevel
-        node.scaleY = zoomLevel
-        node.layoutX = (wayPoint.positionX - 2) * zoomLevel
-        node.layoutY = (wayPoint.positionY - 2) * zoomLevel
-        node.userData = wayPoint
+
 
         return node
     }
@@ -56,9 +61,11 @@ class BonsaiEdge(val graph: BonsaiGraph, val source: BonsaiNode, val destination
 
         val destinationBounds = destination.wrappedNode.boundsInParent
         val lineTo = LineTo(destinationBounds.minX + destinationBounds.width / 2, destinationBounds.minY + destinationBounds.height / 2)
-        path.elements.add(lineTo)
-        path.stroke = Color.RED
-        path.strokeWidth = 2.0
+        path.apply {
+            elements.add(lineTo)
+            stroke = Color.RED
+            strokeWidth = 2.0
+        }
 
         displayShape = path
     }

@@ -1,10 +1,8 @@
 package de.unibi.citec.clf.bonsai.gui
 
 import de.unibi.citec.clf.bonsai.gui.view.graph.core.BonsaiGraph
-import de.unibi.citec.clf.bonsai.gui.view.graph.core.BonsaiGraphBuilder
-import de.unibi.citec.clf.bonsai.gui.view.graph.edge.BonsaiEdgeBuilder
+import de.unibi.citec.clf.bonsai.gui.view.graph.edge.BonsaiEdge
 import de.unibi.citec.clf.bonsai.gui.view.graph.node.BonsaiNode
-import de.unibi.citec.clf.bonsai.gui.view.graph.node.BonsaiNodeBuilder
 import javafx.application.Application
 import javafx.event.EventHandler
 import javafx.scene.Scene
@@ -19,10 +17,10 @@ class BonsaiGraphDemoApplication : Application() {
         stage.minHeight = 600.0
         stage.title = this::class.java.simpleName
 
-        val graphBuilder: BonsaiGraphBuilder = BonsaiGraphBuilder.create()
-        val graph: BonsaiGraph = graphBuilder.build()
+        val graph = BonsaiGraph()
 
         val nodes: MutableList<BonsaiNode> = mutableListOf()
+        val edges: MutableList<BonsaiEdge> = mutableListOf()
         val centerX: Int = 400
         val centerY: Int = 300
         val numNodes: Int = 20
@@ -37,12 +35,10 @@ class BonsaiGraphDemoApplication : Application() {
             val positionX: Double = centerX + cos(Math.toRadians(360.0 / numNodes * num)) * radius
             val positionY: Double = centerY + sin(Math.toRadians(360.0 / numNodes * num)) * radius
 
-            val nodeBuilder: BonsaiNodeBuilder = BonsaiNodeBuilder(graph)
-            nodes.add(nodeBuilder.node(button1).x(positionX).y(positionY).build())
+            nodes.add(BonsaiNode(button1, graph, positionX, positionY))
         }
         for (num in 0..< nodes.size - 1) {
-            val edgeBuilder: BonsaiEdgeBuilder = BonsaiEdgeBuilder(graph)
-            edgeBuilder.source(nodes[num]).destination(nodes[num+1]).build()
+            edges.add(BonsaiEdge(graph, nodes[num], nodes[num+1]))
         }
 
         stage.setScene(Scene(graph))

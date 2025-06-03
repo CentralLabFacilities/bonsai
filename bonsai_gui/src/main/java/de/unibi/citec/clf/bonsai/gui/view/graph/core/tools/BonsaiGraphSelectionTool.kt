@@ -62,13 +62,15 @@ class BonsaiGraphSelectionTool(private val owningControl: Pane, private val mode
             val width: Double = maxX - minX + 40.0
             val height: Double = maxY - minY + 40.0
 
-            currentSelectionRectangle = Rectangle(startX, startY, width, height)
-            currentSelectionRectangle!!.strokeWidth = 1.0
-            currentSelectionRectangle!!.stroke = Color.BLACK
-            currentSelectionRectangle!!.strokeDashArray.addAll(3.0, 7.0, 3.0, 7.0)
-            currentSelectionRectangle!!.fill = Color.TRANSPARENT
-            currentSelectionRectangle!!.isMouseTransparent = true
-            currentSelectionRectangle!!.translateZ = SELECTION_Z_OFFSET
+            currentSelectionRectangle = Rectangle(startX, startY, width, height).apply {
+                strokeWidth = 1.0
+                stroke = Color.BLACK
+                strokeDashArray.addAll(3.0, 7.0, 3.0, 7.0)
+                fill = Color.TRANSPARENT
+                isMouseTransparent = true
+                translateZ = SELECTION_Z_OFFSET
+            }
+
 
             owningControl.children.add(currentSelectionRectangle)
 
@@ -77,9 +79,10 @@ class BonsaiGraphSelectionTool(private val owningControl: Pane, private val mode
                 currentSelectionRectangle!!.strokeDashOffset += 1
             })
 
-            currentSelectionTimeline = Timeline(keyFrame)
-            currentSelectionTimeline!!.cycleCount = Animation.INDEFINITE
-            currentSelectionTimeline!!.play()
+            currentSelectionTimeline = Timeline(keyFrame).apply {
+                cycleCount = Animation.INDEFINITE
+                play()
+            }
         }
     }
 
@@ -96,13 +99,15 @@ class BonsaiGraphSelectionTool(private val owningControl: Pane, private val mode
     }
 
     private fun startSelectionAt(sceneX: Double, sceneY: Double) {
-        interactiveSelectionRectangle = Rectangle(sceneX, sceneY, 1.0, 1.0)
-        interactiveSelectionRectangle!!.strokeWidth = 1.0
-        interactiveSelectionRectangle!!.stroke = Color.BLACK
-        interactiveSelectionRectangle!!.strokeDashArray.addAll(3.0, 7.0, 3.0, 7.0)
-        interactiveSelectionRectangle!!.fill = Color.TRANSPARENT
-        interactiveSelectionRectangle!!.isMouseTransparent = true
-        interactiveSelectionRectangle!!.translateZ = SELECTION_Z_OFFSET
+        interactiveSelectionRectangle = Rectangle(sceneX, sceneY, 1.0, 1.0).apply {
+            strokeWidth = 1.0
+            stroke = Color.BLACK
+            strokeDashArray.addAll(3.0, 7.0, 3.0, 7.0)
+            fill = Color.TRANSPARENT
+            isMouseTransparent = true
+            translateZ = SELECTION_Z_OFFSET
+        }
+
 
         owningControl.children.add(interactiveSelectionRectangle)
 
@@ -111,17 +116,20 @@ class BonsaiGraphSelectionTool(private val owningControl: Pane, private val mode
             interactiveSelectionRectangle!!.strokeDashOffset += 1
         })
 
-        interactiveSelectionTimeline = Timeline(keyFrame)
-        interactiveSelectionTimeline!!.cycleCount = Animation.INDEFINITE
-        interactiveSelectionTimeline!!.play()
+        interactiveSelectionTimeline = Timeline(keyFrame).apply {
+            cycleCount = Animation.INDEFINITE
+            play()
+        }
     }
 
     private fun enhanceSelectionTo(sceneX: Double, sceneY: Double) {
         val width: Double = sceneX - interactiveSelectionRectangle!!.x
         val height: Double = sceneY - interactiveSelectionRectangle!!.y
 
-        interactiveSelectionRectangle!!.width = width
-        interactiveSelectionRectangle!!.height = height
+        interactiveSelectionRectangle!!.apply {
+            this.width = width
+            this.height = height
+        }
     }
 
     private fun endSelection() {

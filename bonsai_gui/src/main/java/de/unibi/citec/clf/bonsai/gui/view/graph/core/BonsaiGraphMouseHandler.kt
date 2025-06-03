@@ -60,10 +60,13 @@ class BonsaiGraphMouseHandler(val graph: BonsaiGraph) {
     }
 
     fun registerHandlerFor(node: Node) {
-        node.onMouseDragged = mouseDraggedEventHandler
-        node.onMousePressed = mousePressedEventHandler
-        node.onMouseReleased = mouseReleasedEventHandler
-        node.onScroll = scrollEventHandler
+        node.apply {
+            onMouseDragged = mouseDraggedEventHandler
+            onMousePressed = mousePressedEventHandler
+            onMouseReleased = mouseReleasedEventHandler
+            onScroll = scrollEventHandler
+        }
+
     }
 
     fun registerNewNode(node: BonsaiNode) {

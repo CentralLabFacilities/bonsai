@@ -18,9 +18,10 @@ class BonsaiGraphZoomHandler(val graph: BonsaiGraph) {
             updateNodePositionAndScale()
         })
 
-        zoomTimeline = Timeline(keyFrame)
-        zoomTimeline.cycleCount = Animation.INDEFINITE
-        zoomTimeline.play()
+        zoomTimeline = Timeline(keyFrame).apply {
+            cycleCount = Animation.INDEFINITE
+            play()
+        }
     }
 
     private fun updateNodePositionAndScale() {

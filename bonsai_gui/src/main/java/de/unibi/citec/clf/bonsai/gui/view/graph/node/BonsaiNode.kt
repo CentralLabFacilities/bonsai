@@ -1,23 +1,21 @@
 package de.unibi.citec.clf.bonsai.gui.view.graph.node
 
 import de.unibi.citec.clf.bonsai.gui.view.graph.core.BonsaiGraph
-import javafx.scene.Node;
+import javafx.scene.Node
 
-class BonsaiNode(var wrappedNode: Node, var graph: BonsaiGraph) {
-    private var posX: Double = 0.0;
-    private var posY: Double = 0.0;
+class BonsaiNode(var wrappedNode: Node, var graph: BonsaiGraph, private var posX: Double, private var posY: Double) {
 
-    fun setPos(posX: Double, posY: Double) {
-        wrappedNode.relocate(posX, posY);
-        this.posX = posX;
-        this.posY = posY;
-
+    init {
+        graph.addNode(this)
+        wrappedNode.relocate(posX, posY)
         graph.updateEdgeNodesFor(this)
     }
 
     fun translatePosition(movementX: Double, movementY: Double, zoomLevel: Double) {
-        wrappedNode.layoutX += movementX
-        wrappedNode.layoutY += movementY
+        wrappedNode.apply {
+            layoutX += movementX
+            layoutY += movementY
+        }
         posX += movementX / zoomLevel
         posY += movementY / zoomLevel
 
@@ -25,11 +23,13 @@ class BonsaiNode(var wrappedNode: Node, var graph: BonsaiGraph) {
     }
 
     fun setZoomLevel(zoomLevel: Double) {
-        wrappedNode.layoutX = posX * zoomLevel
-        wrappedNode.layoutY = posY * zoomLevel
-        wrappedNode.scaleX = zoomLevel
-        wrappedNode.scaleY = zoomLevel
+        wrappedNode.apply {
+            layoutX = posX * zoomLevel
+            layoutY = posY * zoomLevel
+            scaleX = zoomLevel
+            scaleY = zoomLevel
 
+        }
         graph.updateEdgeNodesFor(this, zoomLevel)
     }
 }
