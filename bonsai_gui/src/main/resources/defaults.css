@@ -1,0 +1,233 @@
+.graph-editor {
+    -fx-background-color: white;
+}
+
+.graph-editor-node-layer, .graph-editor-connection-layer {
+    -fx-padding: 15;
+}
+
+.graph-editor-selection-box {
+    -fx-stroke: deepskyblue;
+    -fx-stroke-type: inside;
+    -fx-fill: rgba(135, 206, 250, 0.2);
+}
+
+.minimap {
+    -fx-border-color: rgb(180, 180, 180);
+    -fx-background-color: white;
+    -fx-effect: dropshadow(gaussian, rgb(180, 180, 180), 5, 0, 0, 0);
+}
+
+.minimap-node {
+    -fx-stroke: grey;
+    -fx-stroke-type: inside;
+    -fx-stroke-width: 1;
+    -fx-fill: rgb(249, 247, 250);
+}
+
+.minimap-node:selected {
+    -fx-fill: derive(rgb(249,247,250), -5%);
+}
+
+.minimap-locator {
+    -fx-border-color: rgba(135, 206, 250, 0.65);
+    -fx-border-style: solid inside;
+    -fx-border-width: 1;
+    -fx-background-color: rgba(255, 255, 255, 0);
+}
+
+.hyperlink.zoom-in,
+.hyperlink.zoom-out {
+    -fx-font-size: 120%;
+}
+.hyperlink.zoom {
+    -fx-font-weight: bold;
+}
+
+
+.graph-editor-scroll-bar:vertical .thumb {
+    -fx-background-insets: 0 2 0 0;
+}
+.graph-editor-scroll-bar:horizontal .thumb {
+    -fx-background-insets: 0 0 2 0;
+}
+.graph-editor-scroll-bar .decrement-arrow,
+.graph-editor-scroll-bar .decrement-button,
+.graph-editor-scroll-bar .increment-button,
+.graph-editor-scroll-bar .increment-arrow {
+    -fx-pref-width: 0;
+    -fx-pref-height: 0;
+    -fx-background-color: transparent;
+}
+.graph-editor-scroll-bar:horizontal,
+.graph-editor-scroll-bar:vertical {
+    -fx-background-color: transparent;
+    -fx-pref-width: 12;
+    -fx-pref-height: 12;
+    -fx-padding: 2;
+}
+.graph-editor-scroll-bar:horizontal .thumb,
+.graph-editor-scroll-bar:vertical .thumb {
+    -fx-background-color: black;
+    -fx-background-radius: 1000;
+    -fx-opacity: 0.2;
+    -fx-pref-width: 12;
+    -fx-pref-height: 12;
+}
+.graph-editor-scroll-bar .thumb:hover {
+    -fx-opacity: 0.5;
+}
+
+.default-node-border {
+    -fx-stroke: darkslategrey;
+    -fx-stroke-type: inside;
+    -fx-stroke-width: 1;
+    -fx-arc-width: 6;
+    -fx-arc-height: 6;
+    -fx-fill: null;
+    -fx-effect: dropshadow(one-pass-box, rgba(180, 180, 180), 5, 0, 1, 1);
+}
+
+.default-node-background {
+    -fx-fill: rgb(249,247,250);
+    -fx-opacity: 0.9;
+    -fx-stroke: null;
+    -fx-stroke-type: inside;
+    -fx-stroke-width: 1;
+    -fx-arc-width: 6;
+    -fx-arc-height: 6;
+}
+
+.default-node-background:selected {
+    -fx-fill: derive(rgb(249,247,250), -5%);
+}
+
+.default-node-selection-halo {
+    -fx-stroke: deepskyblue;
+    -fx-stroke-type: inside;
+    -fx-stroke-line-cap: butt;
+    -fx-fill: null;
+}
+
+.default-connector {
+    -fx-stroke: darkslategrey;
+    -fx-stroke-type: inside;
+    -fx-stroke-width: 1;
+    -fx-effect: dropshadow(one-pass-box, rgba(180, 180, 180, 0.5), 5, 0, 1, 1);
+    -inside-fill: derive(rgb(249,247,250), -20%);
+    -outside-fill: white;
+    /* The following are overridden by animated colors and are only here to prevent CSS-resolution warnings. */
+    -animated-color-allowed: white;
+    -animated-color-forbidden: white;
+}
+
+.default-connector:hover, .default-connector:pressed, .default-connector:allowed, .default-connector:forbidden {
+    -fx-stroke-width: 2;
+}
+
+.default-connector:allowed {
+    -outside-fill: -animated-color-allowed;
+}
+
+.default-connector:forbidden {
+    -outside-fill: -animated-color-forbidden;
+}
+
+.left-input {
+    -fx-fill: linear-gradient(from 0px 0px to 25px 0px, -outside-fill, -outside-fill 40%, -fx-stroke 40%, -fx-stroke 44%, -inside-fill 44%, -inside-fill);
+}
+
+.left-output {
+    -fx-fill: linear-gradient(from 0px 0px to 25px 0px, -outside-fill, -outside-fill 60%, -fx-stroke 60%, -fx-stroke 64%, -inside-fill 64%, -inside-fill);
+}
+
+.right-input {
+    -fx-fill: linear-gradient(from 0px 0px to 25px 0px, -inside-fill, -inside-fill 56%, -fx-stroke 56%, -fx-stroke 60%, -outside-fill 60%, -outside-fill);
+}
+
+.right-output {
+    -fx-fill: linear-gradient(from 0px 0px to 25px 0px, -inside-fill, -inside-fill 36%, -fx-stroke 36%, -fx-stroke 40%, -outside-fill 40%, -outside-fill);
+}
+
+.top-input {
+    -fx-fill: linear-gradient(from 0px 0px to 0px 25px, -outside-fill, -outside-fill 40%, -fx-stroke 40%, -fx-stroke 44%, -inside-fill 44%, -inside-fill);
+}
+
+.top-output {
+    -fx-fill: linear-gradient(from 0px 0px to 0px 25px, -outside-fill, -outside-fill 60%, -fx-stroke 60%, -fx-stroke 64%, -inside-fill 64%, -inside-fill);
+}
+
+.bottom-input {
+    -fx-fill: linear-gradient(from 0px 0px to 0px 25px, -inside-fill, -inside-fill 56%, -fx-stroke 56%, -fx-stroke 60%, -outside-fill 60%, -outside-fill);
+}
+
+.bottom-output {
+    -fx-fill: linear-gradient(from 0px 0px to 0px 25px, -inside-fill, -inside-fill 36%, -fx-stroke 36%, -fx-stroke 40%, -outside-fill 40%, -outside-fill);
+}
+
+.default-connection {
+    -fx-stroke-width: 1;
+    -fx-stroke: darkslategrey;
+    -fx-effect: dropshadow(one-pass-box, rgba(180, 180, 180), 5, 0, 1, 1);
+}
+
+.default-connection-background {
+    -fx-stroke-width: 7;
+    -fx-stroke: transparent;
+}
+
+.default-connection-hover-effect {
+    -fx-stroke-width: 1;
+    -fx-stroke: darkslategrey;
+    -fx-stroke-dash-array: 8 4;
+    -fx-stroke-dash-offset: 4;
+    -fx-stroke-type: inside;
+    -fx-stroke-line-cap: butt;
+    -fx-fill: transparent;
+    -fx-opacity: 0.5;
+}
+
+.default-connection-hover-effect:pressed {
+    -fx-stroke-width: 1;
+    -fx-stroke: null;
+    -fx-stroke-type: inside;
+    -fx-fill: null;
+}
+
+.default-tail  {
+    -fx-stroke: derive(darkslategrey, 130%);
+    -fx-effect: dropshadow(one-pass-box, derive(lightgrey, 50%), 5, 0, 1, 1);
+}
+
+.default-tail-endpoint  {
+    -fx-stroke: derive(darkslategrey, 130%);
+    -fx-stroke-type: inside;
+    -fx-stroke-width: 1;
+    -fx-effect: dropshadow(one-pass-box,  derive(lightgrey, 50%), 5, 0, 1, 1);
+    -inside-fill: rgb(249,247,250);
+    -outside-fill: white;
+}
+
+.default-joint {
+    /* Invisible by default but make sure it has the exact same dimensions as for hover and pressed effects. */
+    -fx-border-width: 1;
+    -fx-border-color: transparent;
+    -fx-border-style: solid inside;
+    -fx-background-color: transparent;
+    -fx-border-radius: 2;
+    -fx-background-radius: 2;
+}
+
+.default-joint:hover, .default-joint:selected:hover {
+    -fx-border-color: derive(darkslategrey, 30%);
+    -fx-background-color: white;
+    -fx-opacity: 0.7;
+    -fx-effect: dropshadow(one-pass-box, rgba(180, 180, 180), 5, 0, 1, 1);
+}
+
+.default-joint:pressed, .default-joint:selected, .default-joint:selected:pressed {
+    -fx-border-color: derive(darkslategrey, 30%);
+    -fx-background-color: derive(white, -5%);
+    -fx-opacity: 0.7;
+    -fx-effect: dropshadow(one-pass-box, rgba(180, 180, 180), 5, 0, 1, 1);
+}
