@@ -1,8 +1,9 @@
-package de.unibi.citec.clf.bonsai.gui.view.graph.core
+package de.unibi.citec.clf.bonsai.gui.controller.graph
 
-import de.unibi.citec.clf.bonsai.gui.view.graph.edge.BonsaiEdge
-import de.unibi.citec.clf.bonsai.gui.view.graph.edge.BonsaiEdgeWayPoint
-import de.unibi.citec.clf.bonsai.gui.view.graph.node.BonsaiNode
+import de.unibi.citec.clf.bonsai.gui.view.graph.BonsaiGraph
+import de.unibi.citec.clf.bonsai.gui.view.graph.BonsaiEdge
+import de.unibi.citec.clf.bonsai.gui.view.graph.BonsaiEdgeWayPoint
+import de.unibi.citec.clf.bonsai.gui.view.graph.BonsaiNode
 import javafx.event.EventHandler
 import javafx.scene.Node
 import javafx.scene.input.MouseEvent
@@ -50,7 +51,7 @@ class BonsaiGraphMouseHandler(val graph: BonsaiGraph) {
         println("Scrolled!")
         if (it.deltaY > 0) {
             graph.zoomHandler.zoomOneStepOut()
-        } else {
+        } else if (it.deltaY < 0) {
             graph.zoomHandler.zoomOneStepIn()
         }
     }

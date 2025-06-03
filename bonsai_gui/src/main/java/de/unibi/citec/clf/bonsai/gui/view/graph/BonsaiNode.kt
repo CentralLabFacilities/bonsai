@@ -1,6 +1,5 @@
-package de.unibi.citec.clf.bonsai.gui.view.graph.node
+package de.unibi.citec.clf.bonsai.gui.view.graph
 
-import de.unibi.citec.clf.bonsai.gui.view.graph.core.BonsaiGraph
 import javafx.scene.Node
 
 class BonsaiNode(var wrappedNode: Node, var graph: BonsaiGraph, private var posX: Double, private var posY: Double) {

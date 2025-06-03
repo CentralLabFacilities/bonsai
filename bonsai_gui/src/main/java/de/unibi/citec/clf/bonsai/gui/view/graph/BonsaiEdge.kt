@@ -1,7 +1,7 @@
-package de.unibi.citec.clf.bonsai.gui.view.graph.edge
+package de.unibi.citec.clf.bonsai.gui.view.graph
 
-import de.unibi.citec.clf.bonsai.gui.view.graph.core.BonsaiGraph
-import de.unibi.citec.clf.bonsai.gui.view.graph.node.BonsaiNode
+import de.unibi.citec.clf.bonsai.gui.view.graph.BonsaiGraph
+import de.unibi.citec.clf.bonsai.gui.view.graph.BonsaiNode
 import javafx.scene.Node
 import javafx.scene.layout.Pane
 import javafx.scene.paint.Color

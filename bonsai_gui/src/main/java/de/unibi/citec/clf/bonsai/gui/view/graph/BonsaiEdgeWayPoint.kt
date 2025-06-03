@@ -1,4 +1,4 @@
-package de.unibi.citec.clf.bonsai.gui.view.graph.edge
+package de.unibi.citec.clf.bonsai.gui.view.graph
 
 class BonsaiEdgeWayPoint(private val edge: BonsaiEdge, var positionX: Double, var positionY: Double) {
 

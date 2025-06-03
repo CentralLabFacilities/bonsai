@@ -1,8 +1,8 @@
-package de.unibi.citec.clf.bonsai.gui.view.graph.core.tools
+package de.unibi.citec.clf.bonsai.gui.controller.graph.tools
 
-import de.unibi.citec.clf.bonsai.gui.view.graph.edge.BonsaiEdge
-import de.unibi.citec.clf.bonsai.gui.view.graph.edge.BonsaiEdgeWayPoint
-import de.unibi.citec.clf.bonsai.gui.view.graph.node.BonsaiNode
+import de.unibi.citec.clf.bonsai.gui.view.graph.BonsaiEdge
+import de.unibi.citec.clf.bonsai.gui.view.graph.BonsaiEdgeWayPoint
+import de.unibi.citec.clf.bonsai.gui.view.graph.BonsaiNode
 import javafx.scene.input.MouseEvent
 
 abstract class BonsaiGraphTool {

@@ -1,10 +1,10 @@
-package de.unibi.citec.clf.bonsai.gui.view.graph.core.tools
+package de.unibi.citec.clf.bonsai.gui.controller.graph.tools
 
-import de.unibi.citec.clf.bonsai.gui.view.graph.core.BonsaiGraphModel
-import de.unibi.citec.clf.bonsai.gui.view.graph.core.BonsaiGraphZoomHandler
-import de.unibi.citec.clf.bonsai.gui.view.graph.edge.BonsaiEdge
-import de.unibi.citec.clf.bonsai.gui.view.graph.edge.BonsaiEdgeWayPoint
-import de.unibi.citec.clf.bonsai.gui.view.graph.node.BonsaiNode
+import de.unibi.citec.clf.bonsai.gui.model.graph.BonsaiGraphModel
+import de.unibi.citec.clf.bonsai.gui.controller.graph.BonsaiGraphZoomHandler
+import de.unibi.citec.clf.bonsai.gui.view.graph.BonsaiEdge
+import de.unibi.citec.clf.bonsai.gui.view.graph.BonsaiEdgeWayPoint
+import de.unibi.citec.clf.bonsai.gui.view.graph.BonsaiNode
 import javafx.animation.Animation
 import javafx.animation.KeyFrame
 import javafx.animation.Timeline
@@ -14,6 +14,7 @@ import javafx.scene.layout.Pane
 import javafx.scene.paint.Color
 import javafx.scene.shape.Rectangle
 import javafx.util.Duration
+import kotlin.collections.iterator
 
 class BonsaiGraphSelectionTool(private val owningControl: Pane, private val model: BonsaiGraphModel, private val zoomHandler: BonsaiGraphZoomHandler) : BonsaiGraphTool() {
 
@@ -43,11 +44,11 @@ class BonsaiGraphSelectionTool(private val owningControl: Pane, private val mode
             owningControl.children.remove(currentSelectionRectangle)
             currentSelectionTimeline!!.stop()
         }
-        if (currentSelection.size > 0) {
-            var minX: Double = Double.MIN_VALUE
-            var maxX: Double = Double.MAX_VALUE
-            var minY: Double = Double.MIN_VALUE
-            var maxY: Double = Double.MAX_VALUE
+        if (currentSelection.isNotEmpty()) {
+            var minX: Double = Double.MAX_VALUE
+            var maxX: Double = Double.MIN_VALUE
+            var minY: Double = Double.MAX_VALUE
+            var maxY: Double = Double.MIN_VALUE
 
             for (node in currentSelection) {
                 val bounds: Bounds = node.wrappedNode.boundsInParent
@@ -190,6 +191,7 @@ class BonsaiGraphSelectionTool(private val owningControl: Pane, private val mode
                 mousePressedOnNodeOrSelection = true
             }
         }
+
     }
 
     override fun mouseDragged(event: MouseEvent) {

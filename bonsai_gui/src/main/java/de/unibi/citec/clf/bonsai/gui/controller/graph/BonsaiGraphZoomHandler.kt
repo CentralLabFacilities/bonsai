@@ -1,5 +1,6 @@
-package de.unibi.citec.clf.bonsai.gui.view.graph.core
+package de.unibi.citec.clf.bonsai.gui.controller.graph
 
+import de.unibi.citec.clf.bonsai.gui.view.graph.BonsaiGraph
 import javafx.animation.Animation
 import javafx.animation.KeyFrame
 import javafx.animation.Timeline
@@ -13,7 +14,7 @@ class BonsaiGraphZoomHandler(val graph: BonsaiGraph) {
     private var zoomTimeline: Timeline
 
     init {
-        val duration: Duration = Duration.millis(1000.0 / 25.0)
+        val duration: Duration = Duration.millis(1000.0 / 100.0)
         val keyFrame = KeyFrame(duration, {
             updateNodePositionAndScale()
         })
@@ -29,12 +30,12 @@ class BonsaiGraphZoomHandler(val graph: BonsaiGraph) {
         var evolvePosition = false
 
         if (currentZoomLevel > targetZoomLevel) {
-            currentZoomLevel -= (currentZoomLevel - targetZoomLevel) * 0.06
+            currentZoomLevel -= (currentZoomLevel - targetZoomLevel) * 0.2
             evolvePosition = true
         }
 
         if (currentZoomLevel < targetZoomLevel) {
-            currentZoomLevel += (targetZoomLevel - currentZoomLevel) * 0.06
+            currentZoomLevel += (targetZoomLevel - currentZoomLevel) * 0.2
             evolvePosition = true
         }
 

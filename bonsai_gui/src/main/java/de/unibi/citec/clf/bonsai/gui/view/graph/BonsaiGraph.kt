@@ -1,9 +1,11 @@
-package de.unibi.citec.clf.bonsai.gui.view.graph.core
+package de.unibi.citec.clf.bonsai.gui.view.graph
 
-import de.unibi.citec.clf.bonsai.gui.view.graph.core.tools.BonsaiGraphSelectionTool
-import de.unibi.citec.clf.bonsai.gui.view.graph.core.tools.BonsaiGraphTool
-import de.unibi.citec.clf.bonsai.gui.view.graph.edge.BonsaiEdge
-import de.unibi.citec.clf.bonsai.gui.view.graph.node.BonsaiNode
+import de.unibi.citec.clf.bonsai.gui.controller.graph.BonsaiGraphMouseHandler
+import de.unibi.citec.clf.bonsai.gui.controller.graph.BonsaiGraphZoomHandler
+import de.unibi.citec.clf.bonsai.gui.controller.graph.tools.BonsaiGraphSelectionTool
+import de.unibi.citec.clf.bonsai.gui.controller.graph.tools.BonsaiGraphTool
+import de.unibi.citec.clf.bonsai.gui.model.graph.BonsaiGraphModel
+import de.unibi.citec.clf.bonsai.gui.view.graph.BonsaiNode
 import javafx.scene.control.ScrollPane
 import javafx.scene.layout.Pane
 
@@ -20,6 +22,8 @@ class BonsaiGraph : ScrollPane() {
     init {
         vbarPolicy = ScrollBarPolicy.AS_NEEDED
         hbarPolicy = ScrollBarPolicy.AS_NEEDED
+        isFitToWidth = true
+        //contentPane.prefWidth = this.width
         content = contentPane
         mouseHandler.registerHandlerFor(contentPane)
         currentTool = selectionTool
