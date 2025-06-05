@@ -29,7 +29,7 @@ class BonsaiEdge(val graph: BonsaiGraph, val source: BonsaiNode, val destination
         graph.updateEdge(this, graph.zoomHandler.currentZoomLevel)
     }
 
-    private fun compileDisplayShapeFor(wayPoint: BonsaiEdgeWayPoint, zoomLevel: Double): Node {
+    private fun compileDisplayShapeFor(wayPoint: BonsaiEdgeWayPoint, zoomLevel: Double, color: Color = Color.RED): Node {
         val node = Rectangle(4.0, 4.0, Color.RED).apply {
             stroke = Color.RED
             scaleX = zoomLevel
@@ -38,9 +38,6 @@ class BonsaiEdge(val graph: BonsaiGraph, val source: BonsaiNode, val destination
             layoutY = (wayPoint.positionY - 2) * zoomLevel
             userData = wayPoint
         }
-
-
-
         return node
     }
 

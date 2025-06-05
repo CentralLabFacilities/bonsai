@@ -2,10 +2,10 @@ package de.unibi.citec.clf.bonsai.gui.view.graph
 
 import de.unibi.citec.clf.bonsai.gui.controller.graph.BonsaiGraphMouseHandler
 import de.unibi.citec.clf.bonsai.gui.controller.graph.BonsaiGraphZoomHandler
-import de.unibi.citec.clf.bonsai.gui.controller.graph.tools.BonsaiGraphSelectionTool
+import de.unibi.citec.clf.bonsai.gui.controller.graph.tools.BonsaiGraphAreaSelectionTool
+import de.unibi.citec.clf.bonsai.gui.controller.graph.tools.BonsaiGraphMovePaneTool
 import de.unibi.citec.clf.bonsai.gui.controller.graph.tools.BonsaiGraphTool
 import de.unibi.citec.clf.bonsai.gui.model.graph.BonsaiGraphModel
-import de.unibi.citec.clf.bonsai.gui.view.graph.BonsaiNode
 import javafx.scene.control.ScrollPane
 import javafx.scene.layout.Pane
 
@@ -14,7 +14,8 @@ class BonsaiGraph : ScrollPane() {
     private var contentPane: Pane = Pane()
     var model: BonsaiGraphModel = BonsaiGraphModel()
     var zoomHandler: BonsaiGraphZoomHandler = BonsaiGraphZoomHandler(this)
-    private var selectionTool: BonsaiGraphSelectionTool = BonsaiGraphSelectionTool(contentPane, model, zoomHandler)
+    private var selectionTool: BonsaiGraphAreaSelectionTool = BonsaiGraphAreaSelectionTool(contentPane, model, zoomHandler)
+    var paneMoveTool: BonsaiGraphMovePaneTool = BonsaiGraphMovePaneTool(contentPane)
     private var mouseHandler: BonsaiGraphMouseHandler = BonsaiGraphMouseHandler(this)
 
     var currentTool: BonsaiGraphTool

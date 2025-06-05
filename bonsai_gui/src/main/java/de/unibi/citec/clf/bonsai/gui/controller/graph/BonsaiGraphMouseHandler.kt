@@ -11,7 +11,14 @@ import javafx.scene.input.ScrollEvent
 
 class BonsaiGraphMouseHandler(val graph: BonsaiGraph) {
     private val mousePressedEventHandler: EventHandler<MouseEvent> = EventHandler<MouseEvent> {
-        println("Click!")
+        if (it.isPrimaryButtonDown) {
+            println("Left click")
+        } else if (it.isSecondaryButtonDown) {
+            println("Right click")
+        } else if (it.isMiddleButtonDown) {
+            println("Mouse Wheel click")
+            graph.paneMoveTool.mousePressed(it)
+        }
         val source = it.source
         if (source is Node) {
             val node: Node = source
@@ -38,9 +45,14 @@ class BonsaiGraphMouseHandler(val graph: BonsaiGraph) {
         it.consume()
     }
     private val mouseDraggedEventHandler: EventHandler<MouseEvent> = EventHandler<MouseEvent> {
-        println("Dragged!")
-        graph.currentTool.mouseDragged(it)
-        it.consume()
+        if (it.isMiddleButtonDown) {
+            graph.paneMoveTool.mouseDragged(it)
+            it.consume()
+        } else {
+            println("Dragged!")
+            graph.currentTool.mouseDragged(it)
+            it.consume()
+        }
     }
     private val mouseReleasedEventHandler: EventHandler<MouseEvent> = EventHandler<MouseEvent> {
         println("Released!")

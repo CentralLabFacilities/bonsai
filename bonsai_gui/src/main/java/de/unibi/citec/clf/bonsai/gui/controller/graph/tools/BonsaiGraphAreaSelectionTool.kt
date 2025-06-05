@@ -16,7 +16,7 @@ import javafx.scene.shape.Rectangle
 import javafx.util.Duration
 import kotlin.collections.iterator
 
-class BonsaiGraphSelectionTool(private val owningControl: Pane, private val model: BonsaiGraphModel, private val zoomHandler: BonsaiGraphZoomHandler) : BonsaiGraphTool() {
+class BonsaiGraphAreaSelectionTool(private val owningControl: Pane, private val model: BonsaiGraphModel, private val zoomHandler: BonsaiGraphZoomHandler) : BonsaiGraphTool() {
 
     private val currentSelection: HashSet<BonsaiNode> = HashSet()
 
@@ -185,13 +185,12 @@ class BonsaiGraphSelectionTool(private val owningControl: Pane, private val mode
     override fun mousePressed(event: MouseEvent) {
         mousePressedOnNodeOrSelection = false
         pressedWaypoint = null
-
         currentSelectionRectangle?.let {
-            if (it.contains(event.sceneX, event.sceneY)) {
-                mousePressedOnNodeOrSelection = true
-            }
+            mousePressedOnNodeOrSelection = it.contains(event.sceneX, event.sceneY)
         }
-
+        if (!mousePressedOnNodeOrSelection) {
+            resetSelection()
+        }
     }
 
     override fun mouseDragged(event: MouseEvent) {
