@@ -1,6 +1,6 @@
-============
+===============
 Compound States
-============
+===============
 
 States can consist of multiple other states. These states are grouped:
 
