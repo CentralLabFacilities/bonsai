@@ -5,7 +5,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Compound States &mdash; Bonsai Docs 0.7-SNAPSHOT documentation</title>
-      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b76e3c8a" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
 
   
@@ -80,25 +80,25 @@
   <section id="compound-states">
 <h1>Compound States<a class="headerlink" href="#compound-states" title="Link to this heading"></a></h1>
 <p>States can consist of multiple other states. These states are grouped:</p>
-<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;DoCoolStuff&quot;</span><span class="w"> </span><span class="na">initial=</span><span class="s">&quot;example.Succeeder&quot;</span><span class="nt">&gt;</span>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;DoCoolStuff&quot;</span> <span class="na">initial=</span><span class="s">&quot;example.Succeeder&quot;</span><span class="nt">&gt;</span>
 
-<span class="w">    </span><span class="cm">&lt;!-- we can also define transitions here --&gt;</span>
-<span class="w">    </span><span class="cm">&lt;!-- The parent states transition gets checked if none of the childs matches --&gt;</span>
-<span class="w">    </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;Succeeder.*&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;Fatal&quot;</span><span class="nt">/&gt;</span>
+    <span class="cm">&lt;!-- we can also define transitions here --&gt;</span>
+    <span class="cm">&lt;!-- The parent states transition gets checked if none of the childs matches --&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">&quot;Succeeder.*&quot;</span> <span class="na">target=</span><span class="s">&quot;Fatal&quot;</span><span class="nt">/&gt;</span>
 
-<span class="w">    </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;example.Succeeder&quot;</span><span class="nt">&gt;</span>
-<span class="w">        </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;Succeeder.success&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;example.Succeeder#again&quot;</span><span class="nt">/&gt;</span>
-<span class="w">    </span><span class="nt">&lt;/state&gt;</span>
+    <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;example.Succeeder&quot;</span><span class="nt">&gt;</span>
+        <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">&quot;Succeeder.success&quot;</span> <span class="na">target=</span><span class="s">&quot;example.Succeeder#again&quot;</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;/state&gt;</span>
 
-<span class="w">    </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;example.Succeeder#again&quot;</span><span class="nt">&gt;</span>
-<span class="w">        </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;Succeeder.success&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;example.Nothing&quot;</span><span class="nt">/&gt;</span>
-<span class="w">    </span><span class="nt">&lt;/state&gt;</span>
+    <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;example.Succeeder#again&quot;</span><span class="nt">&gt;</span>
+        <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">&quot;Succeeder.success&quot;</span> <span class="na">target=</span><span class="s">&quot;example.Nothing&quot;</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;/state&gt;</span>
 
 <span class="nt">&lt;/state&gt;</span>
 
-<span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;example.Nothing&quot;</span><span class="nt">&gt;</span>
-<span class="w">    </span><span class="cm">&lt;!-- this is a easy reference to transition too --&gt;</span>
-<span class="w">    </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;Nothing.fatal&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;DoCoolStuff&quot;</span><span class="nt">/&gt;</span>
+<span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;example.Nothing&quot;</span><span class="nt">&gt;</span>
+    <span class="cm">&lt;!-- this is a easy reference to transition too --&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">&quot;Nothing.fatal&quot;</span> <span class="na">target=</span><span class="s">&quot;DoCoolStuff&quot;</span><span class="nt">/&gt;</span>
 <span class="nt">&lt;/state&gt;</span>
 </pre></div>
 </div>
@@ -113,7 +113,7 @@
 
   <div role="contentinfo">
     <p>&#169; Copyright 2023, Leroy Rügemer.
-      <span class="lastupdated">Last updated on Oct 31, 2024.
+      <span class="lastupdated">Last updated on Jun 10, 2025.
       </span></p>
   </div>
 
