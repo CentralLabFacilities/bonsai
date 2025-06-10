@@ -156,10 +156,10 @@ Above the statemachine there should always be a short paragraph to describe the 
     A state declaration, ready to be copy-pasted and slightly adjusted. Example:
     <state id="navigateToPerson" src="${ROBOCUP}/behavior/nav/navigateToPerson.xml">
             <onentry>
-                    <assign name="personLostTimeout"    expr="100"/>
-                    <assign name="stopDistance"         expr="800"/>
-                    <assign name="strategy"             expr="NearestToTarget"/>
-                    <assign name="refindDistance"       expr="800"/>
+                    <assign location="personLostTimeout"    expr="100"/>
+                    <assign location="stopDistance"         expr="800"/>
+                    <assign location="strategy"             expr="NearestToTarget"/>
+                    <assign location="refindDistance"       expr="800"/>
             </onentry>
             <transition event="navigateToPerson.success"    target="TOFILL"/>
             <transition event="navigateToPerson.personLost" target="TOFILL"/>

@@ -31,7 +31,8 @@ Each Parameters needs to be requested by the configurator.
 The "optional" parameter here is an optional bool value. 
 
 When we are using this skill in the state machine, we can provide the skill with these parameters. 
-The parameter "value" *must* be provided in the state machine. The parameters have to be set in a datamodel **within** the state:
+The parameter "value" *must* be provided in the state machine. The parameters have to be set in a ``datamodel/data`` **within** the state:
+The ``expr`` value is *read as string* by the skill. Remember to use additional singlequotes. 
 
 .. code-block:: xml
 
@@ -56,10 +57,11 @@ The parameter "value" *must* be provided in the state machine. The parameters ha
     Booleans and numbers do not need the extra quotes.
 
 
-Variables
----------
+SCXML Variables
+---------------
 
-Variables are not specific for each state but rather for the whole state machine. As such, they are defined in the datamodel of the state machine:
+SCXML Variables should not be specific for each state but rather for the whole state machine. As such, they are defined in the datamodel of the state machine:
+To use SCXML Variables as parameters we need to mark them with ``@``. 
 
 .. code-block:: xml
 
@@ -79,11 +81,11 @@ Variables are not specific for each state but rather for the whole state machine
 The ParameterHaver skill gets the "hellosToSpeak" variable assigned as parameter.
 
 .. warning:: 
-    Since the "value" parameter needs to be a string, we need to add quotes and a @ to get the variable as string:
+    Since the "expression" is read as a string, we need to add singlequotes and ``@`` or scxml may try to evaluate the expression as jexl:
     ``<data id="value" expr="'@hellosToSpeak'"/>``
 
 During transitions we can execute SCXML actions. 
-The variables can be changed by assigning them a new value using the "assign" action: 
+The scxml variables can be changed by assigning them a new value using the "assign" action: 
 
 .. code-block:: xml
 
@@ -97,7 +99,7 @@ The variables can be changed by assigning them a new value using the "assign" ac
                 <data id="value" expr="'Hello'"/>
             </datamodel>
             <transition event="ParameterHaver.*" target="example.ParameterHaver" >
-                <assign name="hellosToSpeak" expr="hellosToSpeak - 1"/>
+                <assign location="hellosToSpeak" expr="hellosToSpeak - 1"/>
             </transition>
         </state>
     </scxml>    
@@ -113,7 +115,7 @@ This can be done by adding ``cond="hellosToSpeak > 1"`` in the transition. Anoth
         </datamodel>
         
         <transition event="ParameterHaver.*" cond="hellosToSpeak > 1" target="example.ParameterHaver">
-            <assign name="hellosToSpeak" expr="hellosToSpeak - 1"/>
+            <assign location="hellosToSpeak" expr="hellosToSpeak - 1"/>
         </transition>
         <transition event="ParameterHaver.*" target="End" />
     </state>
@@ -132,7 +134,7 @@ The on_entry action here decrements the "hellosToSpeak" variable each time the s
         </datamodel>
 
         <onentry>
-            <assign name="hellosToSpeak" expr="hellosToSpeak - 1"/>
+            <assign location="hellosToSpeak" expr="hellosToSpeak - 1"/>
         </onentry>
 
         <transition event="ParameterHaver.*" cond="hellosToSpeak > 0" target="example.ParameterHaver" />
