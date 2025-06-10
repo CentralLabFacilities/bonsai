@@ -1,6 +1,6 @@
-============
+========================
 Parameters and Variables
-============
+========================
 
 Parameters
 ----------
@@ -121,7 +121,7 @@ This can be done by adding ``cond="hellosToSpeak > 1"`` in the transition. Anoth
     </state>
 
 On Entry/Exit
---------
+-------------
 
 We can also use the on_entry/on_exit actions of the state to assign some values to a variable. 
 The on_entry action here decrements the "hellosToSpeak" variable each time the state machine transitions back to the state:
