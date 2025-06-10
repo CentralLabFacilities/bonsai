@@ -160,7 +160,7 @@ Assign is used to update data entrys
 
 .. code-block:: xml
 
-    <assign name="number" expr="2"/>
+    <assign location="number" expr="2"/>
 
 
 
@@ -284,13 +284,13 @@ Similarly to the ``.entry`` and ``.exit`` event the Commons SCXML implementation
         <!-- this state machine acts on .entry events of our master state machine -->
         <state id="slave">
             <transition event="state_1.entry">
-                <assign name="current" expr="'state_1'"/>
+                <assign location="current" expr="'state_1'"/>
             </transition>
             <transition event="state_2.entry">
-                <assign name="current" expr="'state_2'"/>
+                <assign location="current" expr="'state_2'"/>
             </transition>
             <transition event="state_3.entry">
-                <assign name="current" expr="'state_3'"/>
+                <assign location="current" expr="'state_3'"/>
             </transition>
         </state> <!-- end of slave -->
                             
