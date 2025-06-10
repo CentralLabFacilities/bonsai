@@ -5,7 +5,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Changes &mdash; Bonsai Docs 0.7-SNAPSHOT documentation</title>
-      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b76e3c8a" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=19f00094" />
 
   
@@ -140,7 +140,7 @@
 <section id="sourcing">
 <h3>Sourcing<a class="headerlink" href="#sourcing" title="Link to this heading"></a></h3>
 <p>sourcing can now utilize defined mappings instead of relative paths</p>
-<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;consume&quot;</span><span class="w"> </span><span class="na">src=</span><span class="s">&quot;${TEST}/memorySlots.xml&quot;</span><span class="nt">/&gt;</span>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;consume&quot;</span> <span class="na">src=</span><span class="s">&quot;${TEST}/memorySlots.xml&quot;</span><span class="nt">/&gt;</span>
 </pre></div>
 </div>
 <p>the mappings can be set with the -m option example:</p>
@@ -169,11 +169,11 @@
 <ul class="simple">
 <li><p>Wire type is now a required attribute for Sensors</p></li>
 </ul>
-<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;Sensor</span><span class="w"> </span><span class="na">key=</span><span class="s">&quot;SpeechSensor&quot;</span>
-<span class="w">    </span><span class="na">dataTypeClass=</span><span class="s">&quot;de.unibi.citec.clf.btl.data.speechrec.Utterance&quot;</span>
-<span class="w">    </span><span class="na">factoryClass=</span><span class="s">&quot;de.unibi.citec.clf.bonsai.ros.RosFactory&quot;</span>
-<span class="w">    </span><span class="na">sensorClass=</span><span class="s">&quot;de.unibi.citec.clf.bonsai.ros.sensors.RosBtlMsgSensor&quot;</span>
-<span class="w">    </span><span class="na">wireTypeClass=</span><span class="s">&quot;std_msgs.String&quot;</span><span class="nt">&gt;</span>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;Sensor</span> <span class="na">key=</span><span class="s">&quot;SpeechSensor&quot;</span>
+    <span class="na">dataTypeClass=</span><span class="s">&quot;de.unibi.citec.clf.btl.data.speechrec.Utterance&quot;</span>
+    <span class="na">factoryClass=</span><span class="s">&quot;de.unibi.citec.clf.bonsai.ros.RosFactory&quot;</span>
+    <span class="na">sensorClass=</span><span class="s">&quot;de.unibi.citec.clf.bonsai.ros.sensors.RosBtlMsgSensor&quot;</span>
+    <span class="na">wireTypeClass=</span><span class="s">&quot;std_msgs.String&quot;</span><span class="nt">&gt;</span>
 </pre></div>
 </div>
 </section>
@@ -189,7 +189,7 @@
 
   <div role="contentinfo">
     <p>&#169; Copyright 2023, Leroy Rügemer.
-      <span class="lastupdated">Last updated on Oct 31, 2024.
+      <span class="lastupdated">Last updated on Jun 10, 2025.
       </span></p>
   </div>
 

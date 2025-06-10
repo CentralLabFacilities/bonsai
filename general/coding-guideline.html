@@ -5,7 +5,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Coding Guidelines &mdash; Bonsai Docs 0.7-SNAPSHOT documentation</title>
-      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b76e3c8a" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=19f00094" />
 
   
@@ -211,8 +211,8 @@ Analogous to  Actuators.
 <li><p>Skills should <em>NOT</em> be given scxml data parameter <code class="docutils literal notranslate"><span class="pre">&#64;DATA</span></code> if this changes the configure requests.</p></li>
 </ul>
 <p><em>ExampleSkill</em> <code class="docutils literal notranslate"><span class="pre">Configure()</span></code>:</p>
-<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">useAct</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">configurator</span><span class="p">.</span><span class="na">requestOptionalBool</span><span class="p">(</span><span class="s">&quot;#_USE&quot;</span><span class="p">,</span><span class="w"> </span><span class="kc">false</span><span class="p">);</span>
-<span class="k">if</span><span class="p">(</span><span class="n">useAct</span><span class="p">)</span><span class="w"> </span><span class="n">act</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">configurator</span><span class="p">.</span><span class="na">getActuator</span><span class="p">(</span><span class="s">&quot;Foo&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">Bar</span><span class="p">.</span><span class="na">class</span><span class="p">);</span>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">useAct</span> <span class="o">=</span> <span class="n">configurator</span><span class="p">.</span><span class="na">requestOptionalBool</span><span class="p">(</span><span class="s">&quot;#_USE&quot;</span><span class="p">,</span> <span class="kc">false</span><span class="p">);</span>
+<span class="k">if</span><span class="p">(</span><span class="n">useAct</span><span class="p">)</span> <span class="n">act</span> <span class="o">=</span> <span class="n">configurator</span><span class="p">.</span><span class="na">getActuator</span><span class="p">(</span><span class="s">&quot;Foo&quot;</span><span class="p">,</span> <span class="n">Bar</span><span class="p">.</span><span class="na">class</span><span class="p">);</span>
 </pre></div>
 </div>
 <p>If <code class="docutils literal notranslate"><span class="pre">#_USE</span></code> is set to <code class="docutils literal notranslate"><span class="pre">&#64;DATA</span></code> with expression <code class="docutils literal notranslate"><span class="pre">false</span></code> during LOAD but gets changed to <code class="docutils literal notranslate"><span class="pre">true</span></code> with <code class="docutils literal notranslate"><span class="pre">&lt;assign&gt;</span></code> the State will not function properly</p>
@@ -242,10 +242,10 @@ Analogous to  Actuators.
 <span class="cm">A state declaration, ready to be copy-pasted and slightly adjusted. Example:</span>
 <span class="cm">&lt;state id=&quot;navigateToPerson&quot; src=&quot;${ROBOCUP}/behavior/nav/navigateToPerson.xml&quot;&gt;</span>
 <span class="cm">        &lt;onentry&gt;</span>
-<span class="cm">                &lt;assign name=&quot;personLostTimeout&quot;    expr=&quot;100&quot;/&gt;</span>
-<span class="cm">                &lt;assign name=&quot;stopDistance&quot;         expr=&quot;800&quot;/&gt;</span>
-<span class="cm">                &lt;assign name=&quot;strategy&quot;             expr=&quot;NearestToTarget&quot;/&gt;</span>
-<span class="cm">                &lt;assign name=&quot;refindDistance&quot;       expr=&quot;800&quot;/&gt;</span>
+<span class="cm">                &lt;assign location=&quot;personLostTimeout&quot;    expr=&quot;100&quot;/&gt;</span>
+<span class="cm">                &lt;assign location=&quot;stopDistance&quot;         expr=&quot;800&quot;/&gt;</span>
+<span class="cm">                &lt;assign location=&quot;strategy&quot;             expr=&quot;NearestToTarget&quot;/&gt;</span>
+<span class="cm">                &lt;assign location=&quot;refindDistance&quot;       expr=&quot;800&quot;/&gt;</span>
 <span class="cm">        &lt;/onentry&gt;</span>
 <span class="cm">        &lt;transition event=&quot;navigateToPerson.success&quot;    target=&quot;TOFILL&quot;/&gt;</span>
 <span class="cm">        &lt;transition event=&quot;navigateToPerson.personLost&quot; target=&quot;TOFILL&quot;/&gt;</span>
@@ -274,7 +274,7 @@ Analogous to  Actuators.
 
   <div role="contentinfo">
     <p>&#169; Copyright 2023, Leroy Rügemer.
-      <span class="lastupdated">Last updated on Oct 31, 2024.
+      <span class="lastupdated">Last updated on Jun 10, 2025.
       </span></p>
   </div>
 
