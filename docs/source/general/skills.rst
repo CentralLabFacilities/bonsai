@@ -80,6 +80,7 @@ Skills are able to read parameter in the configure method
         blocking = configurator.requestOptionalBool(KEY_BLOCKING, blocking);
     }
     
+    
 
 - there are different requestTYPE methods for different types ``requestValue()`` reads the value as String.
 - Requested parameter have to be given
