@@ -8,6 +8,7 @@ import javafx.util.Duration
 import kotlin.math.abs
 
 class BonsaiGraphZoomHandler(val graph: BonsaiGraph) {
+    //TODO: https://stackoverflow.com/questions/27356577/scale-at-pivot-point-in-an-already-scaled-node
     var currentZoomLevel: Double = 1.0
     private var targetZoomLevel: Double = 1.0
 

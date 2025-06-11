@@ -7,6 +7,7 @@ import de.unibi.citec.clf.bonsai.gui.controller.graph.tools.BonsaiGraphMovePaneT
 import de.unibi.citec.clf.bonsai.gui.controller.graph.tools.BonsaiGraphTool
 import de.unibi.citec.clf.bonsai.gui.model.graph.BonsaiGraphModel
 import javafx.scene.control.ScrollPane
+import javafx.scene.layout.Border
 import javafx.scene.layout.Pane
 
 class BonsaiGraph : ScrollPane() {
@@ -15,7 +16,7 @@ class BonsaiGraph : ScrollPane() {
     var model: BonsaiGraphModel = BonsaiGraphModel()
     var zoomHandler: BonsaiGraphZoomHandler = BonsaiGraphZoomHandler(this)
     private var selectionTool: BonsaiGraphAreaSelectionTool = BonsaiGraphAreaSelectionTool(contentPane, model, zoomHandler)
-    var paneMoveTool: BonsaiGraphMovePaneTool = BonsaiGraphMovePaneTool(contentPane)
+    var paneMoveTool: BonsaiGraphMovePaneTool = BonsaiGraphMovePaneTool(this)
     private var mouseHandler: BonsaiGraphMouseHandler = BonsaiGraphMouseHandler(this)
 
     var currentTool: BonsaiGraphTool
@@ -24,6 +25,9 @@ class BonsaiGraph : ScrollPane() {
         vbarPolicy = ScrollBarPolicy.AS_NEEDED
         hbarPolicy = ScrollBarPolicy.AS_NEEDED
         isFitToWidth = true
+        contentPane.style = "-fx-border-color: green"
+        contentPane.minWidthProperty().bind(this.widthProperty())
+        contentPane.minHeightProperty().bind(this.heightProperty())
         //contentPane.prefWidth = this.width
         content = contentPane
         mouseHandler.registerHandlerFor(contentPane)
