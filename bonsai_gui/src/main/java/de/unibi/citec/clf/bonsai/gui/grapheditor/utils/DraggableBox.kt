@@ -10,6 +10,7 @@ import javafx.scene.layout.StackPane
 import javafx.scene.input.MouseEvent
 import javafx.scene.layout.Region
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 open class DraggableBox(private val type: BonsaiEditorElement): StackPane() {
 
@@ -17,10 +18,10 @@ open class DraggableBox(private val type: BonsaiEditorElement): StackPane() {
         const val DEFAULT_ALIGNMENT_THRESHOLD = 5.0
     }
 
-    private var lastLayoutX: Double = 0.0
-    private var lastLayoutY: Double = 0.0
-    private var lastMouseX: Double = 0.0
-    private var lastMouseY: Double = 0.0
+    var lastLayoutX: Double = 0.0
+    var lastLayoutY: Double = 0.0
+    var lastMouseX: Double = 0.0
+    var lastMouseY: Double = 0.0
 
     private var editorProperties: BonsaiGraphEditorProperties? = null
 
@@ -41,7 +42,7 @@ open class DraggableBox(private val type: BonsaiEditorElement): StackPane() {
         addEventHandler(MouseEvent.MOUSE_RELEASED, this::handleMouseReleased)
     }
 
-    fun dispose() {
+    open fun dispose() {
         finishGesture(BonsaiGraphInputGesture.MOVE)
         dependencyX = null
         dependencyY = null
@@ -51,37 +52,37 @@ open class DraggableBox(private val type: BonsaiEditorElement): StackPane() {
         return false
     }
 
-    fun isMouseInPositionForResize(): Boolean {
+    open fun isMouseInPositionForResize(): Boolean {
         return false
     }
 
-    private fun isEditable(): Boolean {
-        return editorProperties != null && !editorProperties.isReadOnly(type)
+    fun isEditable(): Boolean {
+        return editorProperties?.isReadOnly(type) ?: false
     }
 
     fun activateGesture(gesture: BonsaiGraphInputGesture, event: Event): Boolean {
-        return editorProperties.activateGesture(gesture, event, this) ?: true
+        return editorProperties?.activateGesture(gesture, event, this) ?: true
     }
 
     fun finishGesture(gesture: BonsaiGraphInputGesture): Boolean {
-        return editorProperties.finishGesture(gesture, this) ?: true
+        return editorProperties?.finishGesture(gesture, this) ?: true
     }
 
-    private fun handleMousePressed(event: MouseEvent) {
+    open fun handleMousePressed(event: MouseEvent) {
         if (event.button != MouseButton.PRIMARY || !isEditable()) return
         val cursorPosition: Point2D = BonsaiGeometryUtils.getCursorPosition(event, getContainer(this))
         storeClickValuesForDrag(cursorPosition.x, cursorPosition.y)
         event.consume()
     }
 
-    private fun handleMouseDragged(event: MouseEvent) {
+    open fun handleMouseDragged(event: MouseEvent) {
         if (event.button != MouseButton.PRIMARY || !isEditable() || !activateGesture(BonsaiGraphInputGesture.MOVE, event)) return
         val cursorPosition: Point2D = BonsaiGeometryUtils.getCursorPosition(event, getContainer(this))
         handleDrag(cursorPosition.x, cursorPosition.y)
         event.consume()
     }
 
-    private fun handleMouseReleased(event: MouseEvent) {
+    open fun handleMouseReleased(event: MouseEvent) {
         if (finishGesture(BonsaiGraphInputGesture.MOVE)) event.consume()
     }
 
@@ -92,11 +93,11 @@ open class DraggableBox(private val type: BonsaiEditorElement): StackPane() {
         lastMouseY = y
     }
 
-    private fun roundToGridSpacing(valueToRound: Double): Double {
+    fun roundToGridSpacing(valueToRound: Double): Double {
         return BonsaiGeometryUtils.roundToGridSpacing(editorProperties, valueToRound)
     }
 
-    fun positionMoved() {
+    open fun positionMoved() {
     }
 
     private fun handleDrag(x: Double, y: Double) {
@@ -105,24 +106,24 @@ open class DraggableBox(private val type: BonsaiEditorElement): StackPane() {
         positionMoved()
     }
 
-    private fun isSnapToGrid(): Boolean {
-        return editorProperties.isSnapToGridOn() ?: false
+    fun isSnapToGrid(): Boolean {
+        return editorProperties?.snapToGrid ?: false
     }
 
-    private fun getWestBoundValue(): Double {
-        return editorProperties.westBoundValue ?: BonsaiGraphEditorProperties.DEFAULT_BOUND_VALUE
+    fun getWestBoundValue(): Double {
+        return editorProperties?.westBoundValue ?: BonsaiGraphEditorProperties.DEFAULT_BOUND_VALUE
     }
 
-    private fun getNorthBoundValue(): Double {
-        return editorProperties.northBoundValue ?: BonsaiGraphEditorProperties.DEFAULT_BOUND_VALUE
+    fun getNorthBoundValue(): Double {
+        return editorProperties?.northBoundValue ?: BonsaiGraphEditorProperties.DEFAULT_BOUND_VALUE
     }
 
-    private fun getSouthBoundValue(): Double {
-        return editorProperties.southBoundValue ?: BonsaiGraphEditorProperties.DEFAULT_BOUND_VALUE
+    fun getSouthBoundValue(): Double {
+        return editorProperties?.southBoundValue ?: BonsaiGraphEditorProperties.DEFAULT_BOUND_VALUE
     }
 
-    private fun getEastBoundValue(): Double {
-        return editorProperties.eastBoundValue ?: BonsaiGraphEditorProperties.DEFAULT_BOUND_VALUE
+    fun getEastBoundValue(): Double {
+        return editorProperties?.eastBoundValue ?: BonsaiGraphEditorProperties.DEFAULT_BOUND_VALUE
     }
 
     private fun handleDragX(x: Double) {
@@ -136,7 +137,7 @@ open class DraggableBox(private val type: BonsaiEditorElement): StackPane() {
         if (isSnapToGrid()) {
             newLayoutX = roundToGridSpacing(newLayoutX - snapToGridOffset.x) + snapToGridOffset.x
         } else {
-            newLayoutX = Math.round(newLayoutX).toDouble()
+            newLayoutX = newLayoutX.roundToInt().toDouble()
             if (alignmentTargetsX.isNotEmpty()) {
                 newLayoutX = align(newLayoutX, alignmentTargetsX)
             }
@@ -162,7 +163,7 @@ open class DraggableBox(private val type: BonsaiEditorElement): StackPane() {
         if (isSnapToGrid()) {
             newLayoutY = roundToGridSpacing(newLayoutY - snapToGridOffset.y) + snapToGridOffset.y
         } else {
-            newLayoutY = Math.round(newLayoutY).toDouble()
+            newLayoutY = newLayoutY.roundToInt().toDouble()
             if(alignmentTargetsY.isNotEmpty()) {
                 newLayoutY = align(newLayoutY, alignmentTargetsY)
             }

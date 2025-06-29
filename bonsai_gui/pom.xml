@@ -22,6 +22,10 @@
         <maven.compiler.target>17</maven.compiler.target>
         <dir>target</dir>
         <kotlin.version>1.9.0</kotlin.version>
+        <org.eclipse.emf.ecore.version>2.38.0</org.eclipse.emf.ecore.version>
+        <org.eclipse.emf.common.version>2.40.0</org.eclipse.emf.common.version>
+        <org.eclipse.emf.ecore.xmi.version>2.38.0</org.eclipse.emf.ecore.xmi.version>
+        <org.eclipse.emf.edit.version>2.22.0</org.eclipse.emf.edit.version>
     </properties>
 
     <dependencies>
@@ -56,6 +60,18 @@
             <groupId>org.kordamp.ikonli</groupId>
             <artifactId>ikonli-materialdesign2-pack</artifactId>
             <version>12.4.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.emf</groupId>
+            <artifactId>org.eclipse.emf.edit</artifactId>
+            <version>${org.eclipse.emf.edit.version}</version>
+            <!-- EMF Edit brings a bunch of transitive junk that we don't need right now. -->
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
     </dependencies>
 
