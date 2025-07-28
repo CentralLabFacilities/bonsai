@@ -12,7 +12,7 @@ import java.util.concurrent.TimeoutException
 /**
  * @param <M>
  * @author lruegeme
-</M> */
+ */
 class ResponseFuture<M : Message> : Future<M?>, ServiceResponseListener<M> {
     var response: M? = null
     var finished = false
@@ -45,8 +45,8 @@ class ResponseFuture<M : Message> : Future<M?>, ServiceResponseListener<M> {
     }
 
     @Throws(InterruptedException::class, ExecutionException::class, TimeoutException::class)
-    override fun get(l: Long, tu: TimeUnit?): M? {
-        val timeout = Time.currentTimeMillis() + (tu?.toMillis(l) ?: l)
+    override fun get(l: Long, tu: TimeUnit): M? {
+        val timeout = Time.currentTimeMillis() + (tu.toMillis(l))
         while (!finished) {
             if (Time.currentTimeMillis() > timeout) {
                 throw TimeoutException()
@@ -80,7 +80,7 @@ class ResponseFuture<M : Message> : Future<M?>, ServiceResponseListener<M> {
             override fun get(): T? = get(1, TimeUnit.DAYS)
 
             @Throws(InterruptedException::class, ExecutionException::class)
-            override fun get(p0: Long, p1: TimeUnit?): T? {
+            override fun get(p0: Long, p1: TimeUnit): T? {
                 val msg = res.get(p0, p1)
                 return if (msg != null) converter(msg) else null
             }
