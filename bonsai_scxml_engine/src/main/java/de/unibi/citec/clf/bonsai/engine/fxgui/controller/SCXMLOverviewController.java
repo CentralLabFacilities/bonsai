@@ -179,7 +179,6 @@ public class SCXMLOverviewController implements IStateListener {
     @FXML
     protected void buttonStart() {
 
-        logger.fatal("start");
         if (remote == null) {
             logger.fatal("remote not set");
             return;
@@ -193,6 +192,7 @@ public class SCXMLOverviewController implements IStateListener {
         } catch (Exception e) {
 
         }
+        logger.debug("button start with initial: " + s);
         if (s != null) {
             remote.start(s);
         } else {

@@ -6,6 +6,7 @@ import de.unibi.citec.clf.bonsai.engine.SkillStateMachine;
 import de.unibi.citec.clf.bonsai.engine.communication.StatemachineStatus;
 import de.unibi.citec.clf.bonsai.engine.scxml.SkillExceptionHandler;
 import org.apache.commons.scxml2.model.SCXML;
+import org.apache.commons.scxml2.model.SimpleTransition;
 import org.apache.commons.scxml2.model.Transition;
 import org.apache.commons.scxml2.model.TransitionTarget;
 import org.apache.log4j.Logger;
@@ -19,6 +20,7 @@ import java.util.*;
  */
 public class StateMachineController extends TimerTask implements SkillExceptionHandler {
 
+    private TransitionTarget originalTarget = null;
     private String pathToConfig = null;
     private String pathToTask = null;
     private SkillStateMachine skillStateMachine = null;
@@ -93,26 +95,33 @@ public class StateMachineController extends TimerTask implements SkillExceptionH
         }
 
         skillStateMachine.addExceptionHandler(this);
+        originalTarget = (TransitionTarget) skillStateMachine.getSCXML().getInitialTransition().getTargets().toArray()[0];
         return results;
     }
 
     public void executeStateMachine() {
-        skillStateMachine.startMachine();
-    }
-
-    public void executeStateMachine(TransitionTarget initial) {
-        SCXML scxml = skillStateMachine.getSCXML();
-        scxml.setInitial(initial.getId());
-        skillStateMachine.setScxml(scxml);
-        skillStateMachine.startMachine();
+        executeStateMachine("");
     }
 
     public void executeStateMachine(String initial) {
-        if (!initial.isEmpty()) {
-            SCXML scxml = skillStateMachine.getSCXML();
-            scxml.setInitial(initial);
-            skillStateMachine.setScxml(scxml);
+        logger.debug("executeStateMachine: " + initial);
+
+        SCXML scxml = skillStateMachine.getSCXML();
+        scxml.getInitialTransition().getTargets().clear();
+
+        if (initial.isEmpty()) {
+            initial = originalTarget.getId();
         }
+
+        scxml.setInitial(initial);
+
+        SimpleTransition t = scxml.getInitialTransition();
+        t.setNext(initial);
+        scxml.setInitialTransition(t);
+
+        scxml.getInitialTransition().getTargets().add(scxml.getTargets().get(initial));
+        skillStateMachine.setScxml(scxml);
+
         skillStateMachine.startMachine();
     }
 
