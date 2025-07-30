@@ -1027,6 +1027,11 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
      */
     public void setScxml(SCXML scxml) {
         this.scxml = scxml;
+        try {
+            scxmlExecutor.setStateMachine(scxml);
+        } catch (ModelException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public Set<String> getRequestedSensorNames() {
