@@ -39,7 +39,7 @@ open class PanningWindow : Region() {
 
         fun constrainZoom(pZoom: Double): Double {
             val zoom: Double = round(pZoom * 100.0) / 100.0
-            if (zoom <= 1.02 && zoom >= 0.98) return 1.0
+            if (zoom in 0.98..1.02) return 1.0
             return min(max(zoom, SCALE_MIN), SCALE_MAX)
         }
     }
@@ -48,12 +48,12 @@ open class PanningWindow : Region() {
         set(value) {
             val prevContent: Region? = field
             prevContent?.let {
-                removeMouseHandlersFromContent(prevContent)
-                children?.remove(prevContent)
-                prevContent.transforms.remove(scale)
+                removeMouseHandlersFromContent(it)
+                children?.remove(it)
+                it.transforms.remove(scale)
             }
             field = value
-            field?.let {
+            value?.let {
                 it.isManaged = false
                 children?.add(value)
                 addMouseHandlersToContent(it)
@@ -74,6 +74,7 @@ open class PanningWindow : Region() {
     var contentX: Double
         get() = _contentX.get()
         set(value) = _contentX.set(value)
+    fun contentXProperty() = _contentX
 
     private val _contentY = object : SimpleDoubleProperty() {
         override fun invalidated() {
@@ -83,6 +84,7 @@ open class PanningWindow : Region() {
     var contentY: Double
         get() = _contentY.get()
         set(value) = _contentY.set(value)
+    fun contentYProperty() = _contentY
 
     private val scrollX: ScrollBar = ScrollBar()
     private val scrollY: ScrollBar = ScrollBar()
@@ -172,6 +174,8 @@ open class PanningWindow : Region() {
     var zoom: Double
         get() = _zoom.get()
         set(value) = _zoom.set(value)
+    fun zoomProperty() = _zoom
+
     private val scale: Scale = Scale()
 
     lateinit var properties: GraphEditorProperties
@@ -182,16 +186,18 @@ open class PanningWindow : Region() {
         tmpClip.heightProperty().bind(heightProperty())
         clip = tmpClip
 
-        scale.xProperty().bind(_zoom)
-        scale.yProperty().bind(_zoom)
+        scale.xProperty().bind(zoomProperty())
+        scale.yProperty().bind(zoomProperty())
 
         children?.addAll(scrollX, scrollY)
 
         scrollX.orientation = Orientation.HORIZONTAL
         scrollX.valueProperty().bindBidirectional(_contentX)
+        scrollX.styleClass.add("graph-editor-scroll-bar")
 
         scrollY.orientation = Orientation.VERTICAL
         scrollY.valueProperty().bindBidirectional(_contentY)
+        scrollY.styleClass.add("graph-editor-scroll-bar")
     }
 
     /**
@@ -293,6 +299,10 @@ open class PanningWindow : Region() {
             VPos.BOTTOM -> content!!.height - height
         }
         checkWindowBounds()
+    }
+
+    fun setNewZoomLevel(zoom: Double) {
+        setZoomAt(zoom, contentX, contentY)
     }
 
     /**

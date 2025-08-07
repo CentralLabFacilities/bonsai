@@ -7,7 +7,7 @@ import javafx.collections.FXCollections
 import javafx.collections.ListChangeListener
 import javafx.collections.ObservableList
 
-class GNode() : SelectableType() {
+open class GNode() : SelectableType() {
 
     private val _id = SimpleStringProperty(this, "id")
     fun idProperty() = _id
