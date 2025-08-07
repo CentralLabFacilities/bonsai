@@ -47,7 +47,7 @@ class GraphEditorMinimap(): PanningWindowMinimap() {
     private val modelChangeListener = CommandStackListener { minimapNodeGroup.draw() }
 
     init {
-        setContentRepresentation(minimapNodeGroup)
+        contentRepresentation = minimapNodeGroup
     }
 
     override fun getContentBias(): Orientation {

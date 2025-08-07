@@ -11,11 +11,11 @@ abstract class GSkin<T: Selectable>(val item: T?) {
     abstract val root: Node?
 
     private val _selectedProperty = object : BooleanPropertyBase(false) {
-        override fun getBean(): Any? {
+        override fun getBean(): Any {
             return this
         }
 
-        override fun getName(): String? {
+        override fun getName(): String {
             return "selected"
         }
 

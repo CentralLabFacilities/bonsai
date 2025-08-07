@@ -27,12 +27,19 @@ import kotlin.math.round
 open class PanningWindowMinimap : Pane() {
 
     companion object {
-        val MINIMAP_PADDING: Double = 5.0
+        const val MINIMAP_PADDING: Double = 5.0
         private const val STYLE_CLASS = "minimap"
     }
 
     private val locator: MinimapLocator = MinimapLocator(MINIMAP_PADDING)
-    private var contentRepresentation: MinimapNodeGroup? = null
+
+    var contentRepresentation: MinimapNodeGroup? = null
+        set(value) {
+            field?.let { children.remove(it) }
+            field = value
+            field?.let { children.add(0, it) }
+        }
+
     var window: PanningWindow? = null
         set(value) {
             field?.widthProperty()?.removeListener(drawListener)
@@ -42,9 +49,10 @@ open class PanningWindowMinimap : Pane() {
             field?.heightProperty()?.addListener(drawListener)
             requestLayout()
         }
+
     var content: Region? = null
         set(value) {
-            field.let {
+            field?.let {
                 layoutXProperty().removeListener(drawListener)
                 layoutYProperty().removeListener(drawListener)
                 widthProperty().removeListener(drawListener)
@@ -52,7 +60,7 @@ open class PanningWindowMinimap : Pane() {
                 localToSceneTransformProperty().removeListener(drawListener)
             }
             field = value
-            field.let {
+            field?.let {
                 layoutXProperty().addListener(drawListener)
                 layoutYProperty().addListener(drawListener)
                 widthProperty().addListener(drawListener)
@@ -75,6 +83,7 @@ open class PanningWindowMinimap : Pane() {
         isPickOnBounds = false
 
         createLocatorPositionListeners()
+        println("Adding minimap click handlers")
         createMinimapClickHandlers()
 
         children.add(locator)
@@ -99,35 +108,19 @@ open class PanningWindowMinimap : Pane() {
         ), CornerRadii(0.0), BorderWidths(2.0)))
     }
 
-    protected fun zoomIn(event: ActionEvent) {
-        window?.let { it.zoom += 0.06 }
+    private fun zoomIn(event: ActionEvent) {
+        window?.let { it.setNewZoomLevel(it.zoom + 0.06) }
         event.consume()
     }
 
-    protected fun zoomExact(event: ActionEvent) {
-        window?.zoom = 1.0
+    private fun zoomExact(event: ActionEvent) {
+        window?.setNewZoomLevel(1.0)
         event.consume()
     }
 
-    protected fun zoomOut(event: ActionEvent) {
-        window?.let { it.zoom -= 0.06 }
+    private fun zoomOut(event: ActionEvent) {
+        window?.let { it.setNewZoomLevel(it.zoom - 0.06) }
         event.consume()
-    }
-
-    /**
-     * Sets the content representation to be displayed in this minimap.
-     *
-     * @param pContentRepresentation
-     *            a {@link MinimapNodeGroup} to be displayed
-     */
-    open fun setContentRepresentation(pContentRepresentation: MinimapNodeGroup) {
-        contentRepresentation?.let {
-            children.remove(contentRepresentation)
-        }
-        contentRepresentation = pContentRepresentation
-        contentRepresentation.let {
-            children.add(0, pContentRepresentation)
-        }
     }
 
     /**
@@ -140,7 +133,7 @@ open class PanningWindowMinimap : Pane() {
      *
      * @return the ratio of the minimap size to the content size
      */
-    protected fun calculateScaleFactor(): Double {
+    private fun calculateScaleFactor(): Double {
         return content?.let {
             val scaleFactorX: Double = (width - 2 * MINIMAP_PADDING) / it.width
             val scaleFactorY: Double = (height - 2 * MINIMAP_PADDING) / it.height
@@ -153,10 +146,12 @@ open class PanningWindowMinimap : Pane() {
 
         val scaleFactor: Double = calculateScaleFactor()
 
-        if (checkContentExists() && checkWindowExists() && contentRepresentation != null) {
-            contentRepresentation!!.relocate(MINIMAP_PADDING, MINIMAP_PADDING)
-            contentRepresentation!!.scaleFactor = scaleFactor
-            contentRepresentation!!.resize(width - MINIMAP_PADDING * 2, height - MINIMAP_PADDING * 2)
+        contentRepresentation?.let {
+            if (checkContentExists() && checkWindowExists()) {
+                it.relocate(MINIMAP_PADDING, MINIMAP_PADDING)
+                it.scaleFactor = scaleFactor
+                it.resize(width - MINIMAP_PADDING * 2, height - MINIMAP_PADDING * 2)
+            }
         }
 
         val maxLocWidth: Double = width - MINIMAP_PADDING * 2
@@ -165,7 +160,7 @@ open class PanningWindowMinimap : Pane() {
         if (!drawLocatorListenerMuted) {
             locatorPositionListenersMuted = true
 
-            val zoomFactor: Double = calculateScaleFactor()
+            val zoomFactor: Double = calculateZoomFactor()
             val x: Double = max(0.0, content?.let { round(-it.layoutX * scaleFactor / zoomFactor) } ?: 0.0)
             val y: Double = max(0.0, content?.let { round(-it.layoutY * scaleFactor / zoomFactor) } ?: 0.0)
             val locWidth: Double = min(maxLocWidth, round(window!!.width * scaleFactor / zoomFactor))
@@ -179,7 +174,7 @@ open class PanningWindowMinimap : Pane() {
         zoomExact.relocate(maxLocWidth / 2 - zoomExact.width / 2, height - zoomOut.height)
     }
 
-    protected fun createLocatorPositionListeners() {
+    private fun createLocatorPositionListeners() {
         locator.layoutXProperty().addListener { _, _, newValue ->
             if (!locatorPositionListenersMuted && checkContentExists() && checkWindowExists()) {
                 drawLocatorListenerMuted = true
@@ -200,9 +195,10 @@ open class PanningWindowMinimap : Pane() {
         }
     }
 
-    protected fun createMinimapClickHandlers() {
-        onMousePressed = EventHandler { event ->
-            if (!checkReadyForClickEvent(event)) return@EventHandler
+    private fun createMinimapClickHandlers() {
+        setOnMousePressed { event ->
+            println("Minimap clicked")
+            if (!checkReadyForClickEvent(event)) return@setOnMousePressed
 
             val x = event.x - MINIMAP_PADDING - locator.width / 2
             val y = event.y - MINIMAP_PADDING - locator.height / 2
@@ -213,21 +209,21 @@ open class PanningWindowMinimap : Pane() {
         }
     }
 
-    protected fun calculateZoomFactor(): Double {
+    private fun calculateZoomFactor(): Double {
         return content?.localToSceneTransform?.mxx ?: 1.0
     }
 
-    protected fun checkReadyForClickEvent(event: MouseEvent): Boolean {
+    private fun checkReadyForClickEvent(event: MouseEvent): Boolean {
         return event.button == MouseButton.PRIMARY && checkContentExists() && checkWindowExists()
     }
 
-    protected fun checkContentExists(): Boolean {
+    private fun checkContentExists(): Boolean {
         return content?.let {
             it.height > 0 && it.height > 0
         } ?: false
     }
 
-    protected fun checkWindowExists(): Boolean {
+    private fun checkWindowExists(): Boolean {
         return window?.let {
             it.height > 0 && it.width > 0
         } ?: false

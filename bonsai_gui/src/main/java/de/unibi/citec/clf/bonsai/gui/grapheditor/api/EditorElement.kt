@@ -6,5 +6,6 @@ package de.unibi.citec.clf.bonsai.gui.grapheditor.api
 enum class EditorElement {
     CONNECTOR,
     NODE,
+    NESTED_NODE,
     JOINT
 }

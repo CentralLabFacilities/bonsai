@@ -32,9 +32,9 @@ open class AutoScrollingWindow: PanningWindow() {
 
     private var timeline: Timeline = Timeline()
     private var isScrolling: Boolean = false
-    private var jumpDistance: Point2D? = null
+    private var jumpDistance: Point2D = Point2D.ZERO
 
-    private var autoScrollingEnabled: Boolean = false
+    private var autoScrollingEnabled: Boolean = true
     private var jumpsTaken: Int = 0
 
     init {
@@ -51,10 +51,10 @@ open class AutoScrollingWindow: PanningWindow() {
      *
      * @param event the mouse-dragged event object
      */
-    protected fun handleMouseDragged(event: MouseEvent) {
+    private fun handleMouseDragged(event: MouseEvent) {
         if (event.isPrimaryButtonDown && event.target is Node && !isScrollBar(event)) {
             jumpDistance = getDistanceToJump(event.x, event.y)
-            if (jumpDistance == null) {
+            if (jumpDistance == Point2D.ZERO) {
                 jumpsTaken = 0
             } else if (!isScrolling && autoScrollingEnabled) {
                 startScrolling()
@@ -62,7 +62,7 @@ open class AutoScrollingWindow: PanningWindow() {
         }
     }
 
-    protected fun isScrollBar(event: MouseEvent): Boolean {
+    private fun isScrollBar(event: MouseEvent): Boolean {
         if (event.target is Node) {
             var node: Node? = event.target as Node
             while (node != null) {
@@ -79,14 +79,14 @@ open class AutoScrollingWindow: PanningWindow() {
      * Gets the distance to jump based on the current cursor position.
      *
      * <p>
-     * Returns null if the cursor is inside the window and no auto-scrolling should occur.
+     * Returns a zero 2D-Point if the cursor is inside the window and no auto-scrolling should occur.
      * </p>
      *
      * @param cursorX the cursor-x position in this {@link PanningWindow}
      * @param cursorY the cursor-y position in this {@link PanningWindow}
-     * @return the distance to jump, or null if no jump should occur
+     * @return the distance to jump, or zero if no jump should occur
      */
-    protected fun getDistanceToJump(cursorX: Double, cursorY: Double): Point2D? {
+    private fun getDistanceToJump(cursorX: Double, cursorY: Double): Point2D {
         var jumpX = 0.0
         var jumpY = 0.0
 
@@ -107,7 +107,7 @@ open class AutoScrollingWindow: PanningWindow() {
         }
 
         if (jumpX.equals(0.0) && jumpY.equals(0.0)) {
-            return null
+            return Point2D.ZERO
         }
 
         return Point2D(round(jumpX), round(jumpY))
@@ -126,7 +126,7 @@ open class AutoScrollingWindow: PanningWindow() {
      * @param y
      *            the vertical distance to move the window by
      */
-    protected fun panBy(x: Double, y: Double) {
+    private fun panBy(x: Double, y: Double) {
         if (x != 0.0 && y != 0.0) {
             panTo(contentX + x, contentY + y)
         } else if (x != 0.0) {
@@ -139,25 +139,26 @@ open class AutoScrollingWindow: PanningWindow() {
     /**
      * Starts the auto-scrolling.
      */
-    protected fun startScrolling() {
+    private fun startScrolling() {
         isScrolling = true
         jumpsTaken = 0
         val frame = KeyFrame(JUMP_PERIOD, {
-            if (isScrolling && jumpDistance != null) {
-                panBy(jumpDistance!!.x, jumpDistance!!.y)
+            if (isScrolling && jumpDistance != Point2D.ZERO) {
+                panBy(jumpDistance.x, jumpDistance.y)
                 jumpsTaken++
             }
         })
-        timeline = Timeline()
-        timeline.cycleCount = Animation.INDEFINITE
-        timeline.keyFrames.add(frame)
-        timeline.play()
+        timeline = Timeline().apply {
+            this.cycleCount = Animation.INDEFINITE
+            this.keyFrames.add(frame)
+            this.play()
+        }
     }
 
     /**
      * Stops the auto-scrolling.
      */
-    protected fun endScrolling() {
+    private fun endScrolling() {
         isScrolling = false
         timeline.stop()
     }

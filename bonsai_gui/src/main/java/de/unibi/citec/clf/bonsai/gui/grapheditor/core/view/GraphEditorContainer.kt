@@ -13,7 +13,8 @@ class GraphEditorContainer(): AutoScrollingWindow() {
 
         private val STYLE_SHEET_VIEW: String? = GraphEditorContainer::class.java.getResource("default.css")?.toExternalForm()
 
-        private const val MINIMAP_INDENT = 10.0
+        private const val MINIMAP_INDENT_HORIZONTAL = 18.0
+        private const val MINIMAP_INDENT_VERTICAL = 6.0
 
     }
 
@@ -22,23 +23,23 @@ class GraphEditorContainer(): AutoScrollingWindow() {
     var graphEditor: GraphEditor? = null
         set(value) {
             val previous = field
-            previous?._modelProperty?.removeListener(modelChangeListener)
+            previous?.modelProperty()?.removeListener(modelChangeListener)
             field = value
-            value?.let {
-                value._modelProperty.addListener(modelChangeListener)
+            field?.let {
+                field!!.modelProperty().addListener(modelChangeListener)
 
-                val view: Region = value.view
-                val model: GModel = value.model
+                val view: Region = field!!.view
+                val model: GModel = field!!.model
                 model.let { view.resize(model.contentWidth, model.contentHeight) }
 
                 content = view
                 minimap.content = view
                 minimap.model = model
-                minimap.setSelectionManager(value.selectionManager)
+                minimap.setSelectionManager(field!!.selectionManager)
 
                 view.toBack()
 
-                properties = value.editorProperties
+                properties = field!!.editorProperties
             }
         }
 
@@ -64,7 +65,7 @@ class GraphEditorContainer(): AutoScrollingWindow() {
     override fun layoutChildren() {
         super.layoutChildren()
         if (children?.contains(minimap) == true) {
-            minimap.relocate(width - (minimap.width + MINIMAP_INDENT), MINIMAP_INDENT)
+            minimap.relocate(width - (minimap.width + MINIMAP_INDENT_HORIZONTAL), MINIMAP_INDENT_VERTICAL)
         }
     }
 }
