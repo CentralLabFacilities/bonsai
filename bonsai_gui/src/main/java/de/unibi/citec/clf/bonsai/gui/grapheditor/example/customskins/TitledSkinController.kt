@@ -13,6 +13,7 @@ import de.unibi.citec.clf.bonsai.gui.grapheditor.model.GConnection
 import de.unibi.citec.clf.bonsai.gui.grapheditor.model.GConnector
 import de.unibi.citec.clf.bonsai.gui.grapheditor.model.GJoint
 import de.unibi.citec.clf.bonsai.gui.grapheditor.model.GNode
+import de.unibi.citec.clf.bonsai.gui.grapheditor.model.bonsai.State
 import de.unibi.citec.clf.bonsai.gui.grapheditor.model.command.Command
 import de.unibi.citec.clf.bonsai.gui.grapheditor.model.command.CompoundCommand
 import de.unibi.citec.clf.bonsai.gui.grapheditor.model.command.SetPropertyCommand
@@ -60,7 +61,7 @@ class TitledSkinController
         return if (TitledSkinConstants.TITLED_INPUT_CONNECTOR.equals(connector.type) || TitledSkinConstants.TITLED_INPUT_CONNECTOR.equals(connector.type)) TitledTailSkin(connector) else DefaultTailSkin(connector)
     }
 
-    override fun addNode(currentZoomFactor: Double) {
+    override fun addNode(currentZoomFactor: Double, state: State) {
         val windowXOffset: Double
         val windowYOffset: Double
         if (currentZoomFactor != 0.0) {
@@ -82,6 +83,7 @@ class TitledSkinController
         node.connectors.add(output)
         output.type = TitledSkinConstants.TITLED_OUTPUT_CONNECTOR
         addNode(graphEditor.model, node)
+        println("Added titled node")
     }
 
     override fun addConnector(position: Side?, input: Boolean) {

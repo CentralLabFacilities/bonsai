@@ -9,6 +9,7 @@ import de.unibi.citec.clf.bonsai.gui.grapheditor.core.view.GraphEditorContainer
 import de.unibi.citec.clf.bonsai.gui.grapheditor.example.selections.SelectionCopier
 import de.unibi.citec.clf.bonsai.gui.grapheditor.model.GConnector
 import de.unibi.citec.clf.bonsai.gui.grapheditor.model.GNode
+import de.unibi.citec.clf.bonsai.gui.grapheditor.model.bonsai.State
 import de.unibi.citec.clf.bonsai.gui.grapheditor.model.command.AddCommand
 import de.unibi.citec.clf.bonsai.gui.grapheditor.model.command.CommandStack
 import de.unibi.citec.clf.bonsai.gui.grapheditor.model.command.CompoundCommand
@@ -30,7 +31,7 @@ open class DefaultSkinController
         graphEditorContainer.minimap.connectionFilter = Predicate{c -> true}
     }
 
-    override fun addNode(currentZoomFactor: Double) {
+    override fun addNode(currentZoomFactor: Double, state: State) {
         val windowXOffset: Double
         val windowYOffset: Double
         if (currentZoomFactor != 0.0) {
@@ -51,6 +52,7 @@ open class DefaultSkinController
         rightOutput.type = DefaultConnectorTypes.RIGHT_OUTPUT
         leftInput.type = DefaultConnectorTypes.LEFT_INPUT
         addNode(graphEditor.model, node)
+        println("Added default node")
     }
 
     /**

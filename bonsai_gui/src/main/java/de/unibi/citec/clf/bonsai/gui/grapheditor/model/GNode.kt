@@ -1,13 +1,16 @@
 package de.unibi.citec.clf.bonsai.gui.grapheditor.model
 
+import de.unibi.citec.clf.bonsai.gui.grapheditor.model.bonsai.Skill
+import de.unibi.citec.clf.bonsai.gui.grapheditor.model.bonsai.State
 import javafx.beans.property.SimpleDoubleProperty
+import javafx.beans.property.SimpleObjectProperty
 import javafx.beans.property.SimpleStringProperty
 import javafx.beans.value.ChangeListener
 import javafx.collections.FXCollections
 import javafx.collections.ListChangeListener
 import javafx.collections.ObservableList
 
-open class GNode() : SelectableType() {
+open class GNode(val state: State? = State()) : SelectableType() {
 
     private val _id = SimpleStringProperty(this, "id")
     fun idProperty() = _id

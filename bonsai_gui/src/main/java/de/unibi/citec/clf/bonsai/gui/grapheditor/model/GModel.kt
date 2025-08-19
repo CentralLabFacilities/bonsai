@@ -1,5 +1,6 @@
 package de.unibi.citec.clf.bonsai.gui.grapheditor.model
 
+import de.unibi.citec.clf.bonsai.gui.grapheditor.model.bonsai.Skill
 import javafx.beans.property.SimpleDoubleProperty
 import javafx.beans.property.SimpleStringProperty
 import javafx.collections.FXCollections
@@ -8,6 +9,7 @@ import javafx.collections.ObservableList
 class GModel {
     val nodes: ObservableList<GNode> = FXCollections.observableArrayList()
     val connections: ObservableList<GConnection?> = FXCollections.observableArrayList()
+    val availableSkills: ObservableList<Skill> = FXCollections.observableArrayList()
 
     private val _type = SimpleStringProperty(this, "type")
     fun typeProperty() = _type
