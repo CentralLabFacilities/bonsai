@@ -28,7 +28,7 @@ class Skill(val name: String) {
      * Contains transitions of skill as key-value pair <transition, GeneralTransitionType>. Each Skill should have an
      * 'inbound' transition.
      */
-    private val transitions = mutableMapOf<String,TransitionType>("inbound" to TransitionType.INBOUND)
+    val transitions = mutableMapOf<String,TransitionType>("inbound" to TransitionType.INBOUND)
 
     /**
      * Adds transition and gets matching general transition type.
