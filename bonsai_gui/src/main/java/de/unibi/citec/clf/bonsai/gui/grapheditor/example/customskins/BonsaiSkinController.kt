@@ -4,10 +4,7 @@ import de.unibi.citec.clf.bonsai.gui.grapheditor.api.*
 import de.unibi.citec.clf.bonsai.gui.grapheditor.core.skins.defaults.*
 import de.unibi.citec.clf.bonsai.gui.grapheditor.core.view.GraphEditorContainer
 import de.unibi.citec.clf.bonsai.gui.grapheditor.example.customskins.bonsai.BonsaiNodeSkin
-import de.unibi.citec.clf.bonsai.gui.grapheditor.example.customskins.titled.TitledConnectorSkin
-import de.unibi.citec.clf.bonsai.gui.grapheditor.example.customskins.titled.TitledNodeSkin
 import de.unibi.citec.clf.bonsai.gui.grapheditor.example.customskins.titled.TitledSkinConstants
-import de.unibi.citec.clf.bonsai.gui.grapheditor.example.customskins.titled.TitledTailSkin
 import de.unibi.citec.clf.bonsai.gui.grapheditor.example.selections.SelectionCopier
 import de.unibi.citec.clf.bonsai.gui.grapheditor.model.GConnection
 import de.unibi.citec.clf.bonsai.gui.grapheditor.model.GConnector

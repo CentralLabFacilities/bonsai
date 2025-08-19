@@ -43,36 +43,6 @@ class GraphEditorDemoController {
     private lateinit var menuBar: MenuBar
 
     @FXML
-    private lateinit var addConnectorButton: MenuItem
-
-    @FXML
-    private lateinit var clearConnectorsButton: MenuItem
-
-    @FXML
-    private lateinit var connectorTypeMenu: Menu
-
-    @FXML
-    private lateinit var connectorPositionMenu: Menu
-
-    @FXML
-    private lateinit var inputConnectorTypeButton: RadioMenuItem
-
-    @FXML
-    private lateinit var outputConnectorTypeButton: RadioMenuItem
-
-    @FXML
-    private lateinit var leftConnectorPositionButton: RadioMenuItem
-
-    @FXML
-    private lateinit var rightConnectorPositionButton: RadioMenuItem
-
-    @FXML
-    private lateinit var topConnectorPositionButton: RadioMenuItem
-
-    @FXML
-    private lateinit var bottomConnectorPositionButton: RadioMenuItem
-
-    @FXML
     private lateinit var showGridButton: RadioMenuItem
 
     @FXML
@@ -80,12 +50,6 @@ class GraphEditorDemoController {
 
     @FXML
     private lateinit var readOnlyMenu: Menu
-
-    @FXML
-    private lateinit var defaultSkinButton: RadioMenuItem
-
-    @FXML
-    private lateinit var treeSkinButton: RadioMenuItem
 
     @FXML
     private lateinit var titledSkinButton: RadioMenuItem
@@ -113,8 +77,6 @@ class GraphEditorDemoController {
             graphEditor.selectionManager)
     private val graphEditorPersistence: GraphEditorPersistence = GraphEditorPersistence()
     private val graphEditorSkillHandler = GraphEditorSkillHandler()
-    private var defaultSkinController: DefaultSkinController? = null
-    private var treeSkinController: TreeSkinController? = null
     private var titledSkinController: TitledSkinController? = null
     private var bonsaiSkinController: BonsaiSkinController? = null
     private val activeSkinController: ObjectProperty<SkinController?> = object : SimpleObjectProperty<SkinController?>() {
@@ -136,8 +98,6 @@ class GraphEditorDemoController {
         graphEditorContainer.graphEditor = graphEditor
         setDetouredStyle()
         graphEditorContainer.let {
-            defaultSkinController = DefaultSkinController(graphEditor, it)
-            treeSkinController = TreeSkinController(graphEditor, it)
             titledSkinController = TitledSkinController(graphEditor, it)
             bonsaiSkinController = BonsaiSkinController(graphEditor, it)
         }
@@ -177,34 +137,6 @@ class GraphEditorDemoController {
     fun load() {
         graphEditorPersistence.loadFromFile(graphEditor)
         checkSkinType()
-    }
-
-    @FXML
-    fun loadSample() {
-        defaultSkinButton.isSelected = true
-        setDefaultSkin()
-        graphEditorPersistence.loadSample(graphEditor)
-    }
-
-    @FXML
-    fun loadSampleLarge() {
-        defaultSkinButton.isSelected = true
-        setDefaultSkin()
-        graphEditorPersistence.loadSampleLarge(graphEditor)
-    }
-
-    @FXML
-    fun loadTree() {
-        treeSkinButton.isSelected = true
-        setTreeSkin()
-        graphEditorPersistence.loadTree(graphEditor)
-    }
-
-    @FXML
-    fun loadTitled() {
-        titledSkinButton.isSelected = true
-        setTitledSkin()
-        graphEditorPersistence.loadTitled(graphEditor)
     }
 
     @FXML
@@ -274,26 +206,6 @@ class GraphEditorDemoController {
     }
 
     @FXML
-    fun addConnector() {
-        inputConnectorTypeButton.let { activeSkinController.get()?.addConnector(selectedConnectorPosition, it.isSelected) }
-    }
-
-    @FXML
-    fun clearConnectors() {
-        activeSkinController.get()?.clearConnectors()
-    }
-
-    @FXML
-    fun setDefaultSkin() {
-        activeSkinController.set(defaultSkinController)
-    }
-
-    @FXML
-    fun setTreeSkin() {
-        activeSkinController.set(treeSkinController)
-    }
-
-    @FXML
     fun setTitledSkin() {
         activeSkinController.set(titledSkinController)
     }
@@ -311,14 +223,14 @@ class GraphEditorDemoController {
 
     @FXML
     fun setDetouredStyle() {
-        val customProperties: MutableMap<String, String> = graphEditor.editorProperties.customProperties ?: mutableMapOf()
+        val customProperties: MutableMap<String, String> = graphEditor.editorProperties.customProperties
         customProperties[SimpleConnectionSkin.SHOW_DETOURS_KEY] = true.toString()
         graphEditor.reload()
     }
 
     @FXML
     fun toggleMinimap() {
-        minimapButton.let{graphEditorContainer.minimap.visibleProperty()?.bind(it.selectedProperty())}
+        minimapButton.let { graphEditorContainer.minimap.visibleProperty()?.bind(it.selectedProperty()) }
     }
 
     /**
@@ -327,19 +239,11 @@ class GraphEditorDemoController {
     private fun initializeMenuBar() {
 
         val skinGroup = ToggleGroup()
-        skinGroup.toggles.addAll(defaultSkinButton, treeSkinButton, titledSkinButton)
+        skinGroup.toggles.addAll(titledSkinButton, bonsaiSkinButton)
 
         val connectionStyleGroup = ToggleGroup()
         connectionStyleGroup.toggles.addAll(gappedStyleButton, detouredStyleButton)
 
-        val connectorTypeGroup = ToggleGroup()
-        //connectorTypeGroup.toggles += inputConnectorTypeButton
-        // connectorTypeGroup.toggles += outputConnectorTypeButton
-        connectorTypeGroup.toggles.addAll(inputConnectorTypeButton, outputConnectorTypeButton)
-
-        val positionGroup = ToggleGroup()
-        positionGroup.toggles.addAll(leftConnectorPositionButton, rightConnectorPositionButton, topConnectorPositionButton, bottomConnectorPositionButton)
-        //positionGroup.toggles.addAll(topConnectorPositionButton, bottomConnectorPositionButton)
         showGridButton.let {
             graphEditor.editorProperties.gridVisibleProperty().bind(it.selectedProperty())
         }
@@ -369,17 +273,13 @@ class GraphEditorDemoController {
      * Enables & disables certain menu options and sets CSS classes based on the new skin type that was set active.
      */
     private fun handleActiveSkinControllerChange() {
-        if (treeSkinController?.equals(activeSkinController.get()) == true) {
-            graphEditor.connectorValidator = TreeConnectorValidator()
-            graphEditor.view.styleClass.remove(STYLE_CLASS_TITLED_SKINS)
-            treeSkinButton?.isSelected = true
-        } else if (titledSkinController?.equals(activeSkinController.get()) == true) {
+        if (titledSkinController?.equals(activeSkinController.get()) == true) {
             graphEditor.connectorValidator = null
             if (!graphEditor.view.styleClass.contains(STYLE_CLASS_TITLED_SKINS)) {
                 graphEditor.view.styleClass.add(STYLE_CLASS_TITLED_SKINS)
             }
-            titledSkinButton?.isSelected = true
-        } else if (bonsaiSkinController?.equals(activeSkinController.get()) == true)  {
+            titledSkinButton.isSelected = true
+        } else if (bonsaiSkinController?.equals(activeSkinController.get()) == true) {
             graphEditor.connectorValidator = null
             if (!graphEditor.view.styleClass.contains(STYLE_CLASS_TITLED_SKINS)) {
                 graphEditor.view.styleClass.add(STYLE_CLASS_TITLED_SKINS)
@@ -388,7 +288,7 @@ class GraphEditorDemoController {
         } else {
             graphEditor.connectorValidator = null
             graphEditor.view.styleClass.remove(STYLE_CLASS_TITLED_SKINS)
-            defaultSkinButton?.isSelected = true
+            bonsaiSkinButton.isSelected = true
         }
 
         // Demo does not currently support mixing of skin types. Skins don't know how to cope with it.
@@ -402,17 +302,7 @@ class GraphEditorDemoController {
      * Crudely inspects the model's first node and sets the new skin type accordingly.
      */
     private fun checkSkinType() {
-        if (!graphEditor.model.nodes.isEmpty()) {
-            val firstNode = graphEditor.model.nodes[0]
-            val type = firstNode.type
-            if (TreeSkinConstants.TREE_NODE == type) {
-                activeSkinController.set(treeSkinController)
-            } else if (TitledSkinConstants.TITLED_NODE == type) {
-                activeSkinController.set(titledSkinController)
-            } else {
-                activeSkinController.set(defaultSkinController)
-            }
-        }
+        activeSkinController.set(bonsaiSkinController)
     }
 
     /**
@@ -421,25 +311,8 @@ class GraphEditorDemoController {
     private fun checkConnectorButtonsToDisable() {
         val nothingSelected = graphEditor.selectionManager.selectedItems.stream()
                 .noneMatch { e: Selectable? -> e is GNode }
-        val treeSkinActive: Boolean = treeSkinController?.equals(activeSkinController.get()) ?: false
         val titledSkinActive: Boolean = titledSkinController?.equals(activeSkinController.get()) ?: false
-        if (titledSkinActive || treeSkinActive) {
-            //addConnectorButton.isDisable = true
-            //clearConnectorsButton.isDisable = true
-            connectorTypeMenu.isDisable = true
-            connectorPositionMenu.isDisable = true
-        } else if (nothingSelected) {
-            //addConnectorButton.isDisable = true
-            //clearConnectorsButton.isDisable = true
-            connectorTypeMenu.isDisable = false
-            connectorPositionMenu.isDisable = false
-        } else {
-            //addConnectorButton.isDisable = false
-            //clearConnectorsButton.isDisable = false
-            connectorTypeMenu.isDisable = false
-            connectorPositionMenu.isDisable = false
-        }
-        intersectionStyle.isDisable = treeSkinActive
+        intersectionStyle.isDisable = false
     }
 
     /**
@@ -448,22 +321,6 @@ class GraphEditorDemoController {
     private fun flushCommandStack() {
         CommandStack.getCommandStack(graphEditor.model).flush()
     }
-
-    private val selectedConnectorPosition: Side
-        /**
-         * Gets the side corresponding to the currently selected connector position in the menu.
-         *
-         * @return the [Side] corresponding to the currently selected connector position
-         */
-        get() = if (leftConnectorPositionButton.isSelected) {
-            Side.LEFT
-        } else if (rightConnectorPositionButton.isSelected) {
-            Side.RIGHT
-        } else if (topConnectorPositionButton.isSelected) {
-            Side.TOP
-        } else {
-            Side.BOTTOM
-        }
 
     companion object {
         private const val STYLE_CLASS_TITLED_SKINS = "titled-skins" //$NON-NLS-1$

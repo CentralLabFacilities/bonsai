@@ -30,13 +30,13 @@ open class GNode(val state: State? = State()) : SelectableType() {
         get() = _y.get()
         set(value) = _y.set(value)
 
-    private val _width = SimpleDoubleProperty(this, "width", 151.0)
+    private val _width = SimpleDoubleProperty(this, "width", 300.0)
     fun widthProperty() = _width
     var width: Double
         get() = _width.get()
         set(value) = _width.set(value)
 
-    private val _height = SimpleDoubleProperty(this, "height", 101.0)
+    private val _height = SimpleDoubleProperty(this, "height", 200.0)
     fun heightProperty() = _height
     var height: Double
         get() = _height.get()

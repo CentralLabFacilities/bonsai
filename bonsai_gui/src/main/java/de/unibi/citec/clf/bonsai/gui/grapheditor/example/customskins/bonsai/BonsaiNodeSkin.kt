@@ -4,12 +4,11 @@ import de.unibi.citec.clf.bonsai.gui.grapheditor.api.Commands
 import de.unibi.citec.clf.bonsai.gui.grapheditor.api.GConnectorSkin
 import de.unibi.citec.clf.bonsai.gui.grapheditor.api.GNodeSkin
 import de.unibi.citec.clf.bonsai.gui.grapheditor.example.customskins.titled.TitledConnectorSkin
-import de.unibi.citec.clf.bonsai.gui.grapheditor.example.customskins.titled.TitledNodeSkin
 import de.unibi.citec.clf.bonsai.gui.grapheditor.example.utils.AwesomeIcon
 import de.unibi.citec.clf.bonsai.gui.grapheditor.model.GNode
 import de.unibi.citec.clf.bonsai.gui.grapheditor.model.Selectable
+import de.unibi.citec.clf.bonsai.gui.grapheditor.model.bonsai.TransitionType
 import javafx.css.PseudoClass
-import javafx.event.ActionEvent
 import javafx.event.EventHandler
 import javafx.geometry.Point2D
 import javafx.geometry.Pos
@@ -23,9 +22,8 @@ import javafx.scene.layout.Priority
 import javafx.scene.layout.Region
 import javafx.scene.layout.VBox
 import javafx.scene.shape.Rectangle
-import java.lang.IllegalArgumentException
 
-class BonsaiNodeSkin(node: GNode): GNodeSkin(node) {
+class BonsaiNodeSkin(node: GNode) : GNodeSkin(node) {
 
     companion object {
 
@@ -35,7 +33,6 @@ class BonsaiNodeSkin(node: GNode): GNodeSkin(node) {
         private const val STYLE_CLASS_HEADER = "titled-node-header"
         private const val STYLE_CLASS_TITLE = "titled-node-title"
         private const val STYLE_CLASS_BUTTON = "titled-node-close-button"
-
 
 
         private val PSEUDO_CLASS_SELECTED = PseudoClass.getPseudoClass("selected")
@@ -82,6 +79,16 @@ class BonsaiNodeSkin(node: GNode): GNodeSkin(node) {
     }
 
     override fun setConnectorSkins(connectorSkins: List<GConnectorSkin>) {
+        removeAllConnectors()
+        inputConnectorSkins.clear()
+        outputConnectorSkins.clear()
+        for (connectorSkin in connectorSkins) {
+
+        }
+    }
+
+    private fun removeAllConnectors() {
+
     }
 
     override fun layoutConnectors() {
@@ -101,9 +108,12 @@ class BonsaiNodeSkin(node: GNode): GNodeSkin(node) {
             selectionHalo.isVisible = false
             contentRoot.pseudoClassStateChanged(PSEUDO_CLASS_SELECTED, false)
         }
-        //setConnectorsSelected()
+        setConnectorsSelected()
     }
 
+    /**
+     * Adds or removes the 'selected' pseudo-class from all connectors belonging to this node.
+     */
     private fun setConnectorsSelected() {
         val editor = graphEditor ?: return
         for (skin in inputConnectorSkins) {
@@ -157,9 +167,12 @@ class BonsaiNodeSkin(node: GNode): GNodeSkin(node) {
                 val slotLabel = Label().apply { text = "Slots:" }
                 val reqVarsLabel = Label().apply { text = "Required Vars:" }
                 val optVarsLabel = Label().apply { text = "Optional Vars:" }
+                val transitionLabel = Label().apply { text = "Transitions:" }
 
                 item.state?.let { state ->
+
                     state.skill?.let { skill ->
+                        /*
                         skill.readSlots.forEach { (xpath, name) ->
                             val hBox = HBox().apply {
                                 val label = Label().apply { text = name }
@@ -168,6 +181,7 @@ class BonsaiNodeSkin(node: GNode): GNodeSkin(node) {
                                 children.forEach { HBox.setHgrow(it, Priority.ALWAYS) }
                             }
                             VBox.setVgrow(hBox, Priority.ALWAYS)
+
                             slots.children.add(hBox)
                         }
                         skill.writeSlots.forEach { (xpath, name) ->
@@ -181,6 +195,7 @@ class BonsaiNodeSkin(node: GNode): GNodeSkin(node) {
                             VBox.setVgrow(hBox, Priority.ALWAYS)
                             slots.children.add(hBox)
                         }
+                        */
                         skill.requiredVars.forEach { (id, expression) ->
                             val hBox = HBox().apply {
                                 val label = Label().apply { text = id }
@@ -201,44 +216,58 @@ class BonsaiNodeSkin(node: GNode): GNodeSkin(node) {
                             VBox.setVgrow(hBox, Priority.ALWAYS)
                             optVars.children.add(hBox)
                         }
+                        skill.transitions.forEach { (name, transitionType) ->
+                            if (transitionType == TransitionType.INBOUND) return@forEach
+                            val hBox = HBox().apply {
+                                val transitionFiller = Region()
+                                HBox.setHgrow(transitionFiller, Priority.ALWAYS)
+                                val label = Label().apply { text = name }
+                                children.addAll(transitionFiller, label)
+                                id = "#" + state.id + name
+                            }
+                            transitions.children.add(hBox)
+                        }
                     }
                 }
 
-                contentRoot.children.addAll(header, slotLabel, slots, reqVarsLabel, reqVars, optVarsLabel, optVars)
+                contentRoot.children.addAll(header, slotLabel, slots, reqVarsLabel, reqVars, optVarsLabel, optVars, transitionLabel, transitions)
                 contentRoot.children.forEach { VBox.setVgrow(it, Priority.ALWAYS) }
                 root!!.children.add(contentRoot)
-                root!!.isManaged = false
-                root!!.resize(MIN_WIDTH, MIN_HEIGHT)
-                println("Root size is ${root!!.width} x ${root!!.height}")
-                root!!.setMinSize(MIN_WIDTH, MIN_HEIGHT)
                 closeButton.graphic = AwesomeIcon.TIMES.node()
                 closeButton.cursor = Cursor.DEFAULT
                 closeButton.onAction = EventHandler { Commands.removeNode(graphEditor!!.model, item) }
-                println("Width root: ${root!!.widthProperty().get()}, min width root: ${root!!.minWidthProperty().get()}")
                 contentRoot.minWidthProperty().bind(root!!.widthProperty())
-                //contentRoot.prefWidthProperty().bind(root!!.widthProperty())
-                contentRoot.prefWidth = MIN_WIDTH
+                contentRoot.prefWidthProperty().bind(root!!.widthProperty())
                 contentRoot.maxWidthProperty().bind(root!!.widthProperty())
                 contentRoot.minHeightProperty().bind(root!!.heightProperty())
-                //contentRoot.prefHeightProperty().bind(root!!.heightProperty())
-                contentRoot.prefHeight = MIN_HEIGHT
+                contentRoot.prefHeightProperty().bind(root!!.heightProperty())
                 contentRoot.maxHeightProperty().bind(root!!.heightProperty())
-                println("Width contentRoot: ${contentRoot.widthProperty().get()}, min width contentRoot: ${contentRoot.minWidthProperty().get()}")
                 contentRoot.layoutX = BORDER_WIDTH
                 contentRoot.layoutY = BORDER_WIDTH
                 contentRoot.styleClass.setAll(STYLE_CLASS_BACKGROUND)
-                println("Added BonsaiNode")
             }
+
             else -> throw IllegalArgumentException("Cannot build BonsaiNodeSkin from non-GNode object!")
         }
 
     }
 
+    /**
+     * Stops the node being dragged if it isn't selected.
+     *
+     * @param event a mouse-dragged event on the node
+     */
     private fun filterMouseDragged(event: MouseEvent) {
         if (event.isPrimaryButtonDown && !selected) {
             event.consume()
         }
     }
+
+    private fun layoutLeftAndRightConnectors() {
+
+    }
+
+
 
 
 }
