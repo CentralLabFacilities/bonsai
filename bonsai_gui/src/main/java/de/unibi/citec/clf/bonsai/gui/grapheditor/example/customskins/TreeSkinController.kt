@@ -12,6 +12,7 @@ import de.unibi.citec.clf.bonsai.gui.grapheditor.example.selections.SelectionCop
 import de.unibi.citec.clf.bonsai.gui.grapheditor.model.GConnection
 import de.unibi.citec.clf.bonsai.gui.grapheditor.model.GConnector
 import de.unibi.citec.clf.bonsai.gui.grapheditor.model.GNode
+import de.unibi.citec.clf.bonsai.gui.grapheditor.model.bonsai.State
 import de.unibi.citec.clf.bonsai.gui.grapheditor.model.command.CompoundCommand
 import javafx.geometry.Side
 import javafx.util.Callback
@@ -53,7 +54,7 @@ class TreeSkinController
         return if (TreeSkinConstants.TREE_INPUT_CONNECTOR == connector.type || TreeSkinConstants.TREE_OUTPUT_CONNECTOR == connector.type) TreeTailSkin(connector) else DefaultTailSkin(connector)
     }
 
-    override fun addNode(currentZoomFactor: Double) {
+    override fun addNode(currentZoomFactor: Double, state: State) {
         val windowXOffset = graphEditorContainer.contentX / currentZoomFactor
         val windowYOffset = graphEditorContainer.contentY / currentZoomFactor
         val node = GNode()

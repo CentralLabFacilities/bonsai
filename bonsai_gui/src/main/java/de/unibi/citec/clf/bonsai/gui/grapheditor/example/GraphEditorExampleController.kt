@@ -8,9 +8,7 @@ import de.unibi.citec.clf.bonsai.gui.grapheditor.api.GraphEditor
 import de.unibi.citec.clf.bonsai.gui.grapheditor.core.DefaultGraphEditor
 import de.unibi.citec.clf.bonsai.gui.grapheditor.core.skins.defaults.connection.SimpleConnectionSkin
 import de.unibi.citec.clf.bonsai.gui.grapheditor.core.view.GraphEditorContainer
-import de.unibi.citec.clf.bonsai.gui.grapheditor.example.customskins.DefaultSkinController
-import de.unibi.citec.clf.bonsai.gui.grapheditor.example.customskins.SkinController
-import de.unibi.citec.clf.bonsai.gui.grapheditor.example.customskins.TreeSkinController
+import de.unibi.citec.clf.bonsai.gui.grapheditor.example.customskins.*
 import de.unibi.citec.clf.bonsai.gui.grapheditor.example.customskins.titled.TitledSkinConstants
 import de.unibi.citec.clf.bonsai.gui.grapheditor.example.customskins.tree.TreeConnectorValidator
 import de.unibi.citec.clf.bonsai.gui.grapheditor.example.customskins.tree.TreeSkinConstants
@@ -20,7 +18,8 @@ import de.unibi.citec.clf.bonsai.gui.grapheditor.model.GModel
 import de.unibi.citec.clf.bonsai.gui.grapheditor.model.GNode
 import de.unibi.citec.clf.bonsai.gui.grapheditor.model.Selectable
 import de.unibi.citec.clf.bonsai.gui.grapheditor.model.command.CommandStack
-import de.unibi.citec.clf.bonsai.gui.grapheditor.example.customskins.TitledSkinController
+import de.unibi.citec.clf.bonsai.gui.grapheditor.model.bonsai.Skill
+import de.unibi.citec.clf.bonsai.gui.grapheditor.model.bonsai.State
 import javafx.application.Platform
 import javafx.beans.property.ObjectProperty
 import javafx.beans.property.SimpleObjectProperty
@@ -92,6 +91,9 @@ class GraphEditorDemoController {
     private lateinit var titledSkinButton: RadioMenuItem
 
     @FXML
+    private lateinit var bonsaiSkinButton: RadioMenuItem
+
+    @FXML
     private lateinit var intersectionStyle: Menu
 
     @FXML
@@ -110,9 +112,11 @@ class GraphEditorDemoController {
     private val selectionCopier: SelectionCopier = SelectionCopier(graphEditor.skinLookup,
             graphEditor.selectionManager)
     private val graphEditorPersistence: GraphEditorPersistence = GraphEditorPersistence()
+    private val graphEditorSkillHandler = GraphEditorSkillHandler()
     private var defaultSkinController: DefaultSkinController? = null
     private var treeSkinController: TreeSkinController? = null
     private var titledSkinController: TitledSkinController? = null
+    private var bonsaiSkinController: BonsaiSkinController? = null
     private val activeSkinController: ObjectProperty<SkinController?> = object : SimpleObjectProperty<SkinController?>() {
         override fun invalidated() {
             super.invalidated()
@@ -128,19 +132,31 @@ class GraphEditorDemoController {
     fun initialize() {
         val model = GModel()
         graphEditor.model = model
+        addExampleSkills()
         graphEditorContainer.graphEditor = graphEditor
         setDetouredStyle()
         graphEditorContainer.let {
             defaultSkinController = DefaultSkinController(graphEditor, it)
             treeSkinController = TreeSkinController(graphEditor, it)
             titledSkinController = TitledSkinController(graphEditor, it)
+            bonsaiSkinController = BonsaiSkinController(graphEditor, it)
         }
 
-        activeSkinController.set(titledSkinController)
+        activeSkinController.set(bonsaiSkinController)
         graphEditor.modelProperty().addListener { _, _, n: GModel -> selectionCopier.initialize(n) }
         selectionCopier.initialize(model)
         initializeMenuBar()
         addActiveSkinControllerListener()
+    }
+
+    private fun addExampleSkills() {
+        val saySkill = Skill("dialog.Talk").apply {
+            requiredVars["#_MESSAGE"] = "Hello, i am tiago"
+            optionalVars["#_BLOCKING"] = "true"
+            addTransition("success")
+            addTransition("fatal")
+        }
+        graphEditor.model.availableSkills.addAll(saySkill)
     }
 
     /**
@@ -239,7 +255,22 @@ class GraphEditorDemoController {
 
     @FXML
     fun addNode() {
-        activeSkinController.get()?.addNode(graphEditor.view.localToSceneTransform.mxx)
+        activeSkinController.get()?.addNode(graphEditor.view.localToSceneTransform.mxx, State().apply {
+            skill = graphEditor.model.availableSkills[0]
+        })
+    }
+
+    @FXML
+    fun addSimpleState() {
+        activeSkinController.get()?.addNode(graphEditor.view.localToSceneTransform.mxx, State().apply {
+            skill = graphEditor.model.availableSkills[0]
+        })
+        //graphEditorSkillHandler.showSelectionPopUp(graphEditor.view.scene.window)
+    }
+
+    @FXML
+    fun addCustomState() {
+
     }
 
     @FXML
@@ -265,6 +296,11 @@ class GraphEditorDemoController {
     @FXML
     fun setTitledSkin() {
         activeSkinController.set(titledSkinController)
+    }
+
+    @FXML
+    fun setBonsaiSkin() {
+        activeSkinController.set(bonsaiSkinController)
     }
 
     @FXML
@@ -343,6 +379,12 @@ class GraphEditorDemoController {
                 graphEditor.view.styleClass.add(STYLE_CLASS_TITLED_SKINS)
             }
             titledSkinButton?.isSelected = true
+        } else if (bonsaiSkinController?.equals(activeSkinController.get()) == true)  {
+            graphEditor.connectorValidator = null
+            if (!graphEditor.view.styleClass.contains(STYLE_CLASS_TITLED_SKINS)) {
+                graphEditor.view.styleClass.add(STYLE_CLASS_TITLED_SKINS)
+            }
+            bonsaiSkinButton.isSelected = true
         } else {
             graphEditor.connectorValidator = null
             graphEditor.view.styleClass.remove(STYLE_CLASS_TITLED_SKINS)
@@ -382,18 +424,18 @@ class GraphEditorDemoController {
         val treeSkinActive: Boolean = treeSkinController?.equals(activeSkinController.get()) ?: false
         val titledSkinActive: Boolean = titledSkinController?.equals(activeSkinController.get()) ?: false
         if (titledSkinActive || treeSkinActive) {
-            addConnectorButton.isDisable = true
-            clearConnectorsButton.isDisable = true
+            //addConnectorButton.isDisable = true
+            //clearConnectorsButton.isDisable = true
             connectorTypeMenu.isDisable = true
             connectorPositionMenu.isDisable = true
         } else if (nothingSelected) {
-            addConnectorButton.isDisable = true
-            clearConnectorsButton.isDisable = true
+            //addConnectorButton.isDisable = true
+            //clearConnectorsButton.isDisable = true
             connectorTypeMenu.isDisable = false
             connectorPositionMenu.isDisable = false
         } else {
-            addConnectorButton.isDisable = false
-            clearConnectorsButton.isDisable = false
+            //addConnectorButton.isDisable = false
+            //clearConnectorsButton.isDisable = false
             connectorTypeMenu.isDisable = false
             connectorPositionMenu.isDisable = false
         }

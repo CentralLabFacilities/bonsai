@@ -1,6 +1,7 @@
 package de.unibi.citec.clf.bonsai.gui.grapheditor.example.customskins
 
 import de.unibi.citec.clf.bonsai.gui.grapheditor.example.selections.SelectionCopier
+import de.unibi.citec.clf.bonsai.gui.grapheditor.model.bonsai.State
 import javafx.geometry.Side
 
 /**
@@ -12,7 +13,7 @@ interface SkinController {
      *
      * @param currentZoomFactor the current zoom factor (1 for 100%)
      */
-    fun addNode(currentZoomFactor: Double)
+    fun addNode(currentZoomFactor: Double, state: State)
 
     /**
      * activates this skin

@@ -40,9 +40,9 @@
                 </Menu>
                 <Menu text="Actions">
                     <items>
-                        <MenuItem text="Add Node" onAction="#addNode" accelerator="Shortcut+N"/>
-                        <MenuItem text="Add Connector" fx:id="addConnectorButton" onAction="#addConnector" accelerator="Shortcut+E"/>
-                        <MenuItem text="Clear Connectors" fx:id="clearConnectorsButton" onAction="#clearConnectors" accelerator="Shortcut+W"/>
+                        <MenuItem text="Add SimpleState" onAction="#addSimpleState" accelerator="Shortcut+N"/>
+                        <MenuItem text="Add CustomState" onAction="#addCustomState" accelerator="Shortcut+M"/>
+
                         <Menu fx:id="connectorTypeMenu" text="Connector Type">
                             <items>
                                 <RadioMenuItem fx:id="inputConnectorTypeButton" text="Input" selected="true"/>
@@ -69,6 +69,7 @@
                                 <RadioMenuItem fx:id="defaultSkinButton" text="Default" onAction="#setDefaultSkin" selected="true"/>
                                 <RadioMenuItem fx:id="treeSkinButton" text="Tree" onAction="#setTreeSkin"/>
                                 <RadioMenuItem fx:id="titledSkinButton" text="Titled" onAction="#setTitledSkin"/>
+                                <RadioMenuItem fx:id="bonsaiSkinButton" text="Bonsai" onAction="#setBonsaiSkin"/>
                             </items>
                         </Menu>
                         <!-- Added blank spaces to force menu to be wider. -->

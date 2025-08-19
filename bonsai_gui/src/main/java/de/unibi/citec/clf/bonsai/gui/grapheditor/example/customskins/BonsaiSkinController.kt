@@ -1,9 +1,9 @@
 package de.unibi.citec.clf.bonsai.gui.grapheditor.example.customskins
 
 import de.unibi.citec.clf.bonsai.gui.grapheditor.api.*
-import de.unibi.citec.clf.bonsai.gui.grapheditor.api.Commands.addNode
 import de.unibi.citec.clf.bonsai.gui.grapheditor.core.skins.defaults.*
 import de.unibi.citec.clf.bonsai.gui.grapheditor.core.view.GraphEditorContainer
+import de.unibi.citec.clf.bonsai.gui.grapheditor.example.customskins.bonsai.BonsaiNodeSkin
 import de.unibi.citec.clf.bonsai.gui.grapheditor.example.customskins.titled.TitledConnectorSkin
 import de.unibi.citec.clf.bonsai.gui.grapheditor.example.customskins.titled.TitledNodeSkin
 import de.unibi.citec.clf.bonsai.gui.grapheditor.example.customskins.titled.TitledSkinConstants
@@ -17,21 +17,23 @@ import de.unibi.citec.clf.bonsai.gui.grapheditor.model.bonsai.State
 import de.unibi.citec.clf.bonsai.gui.grapheditor.model.command.Command
 import de.unibi.citec.clf.bonsai.gui.grapheditor.model.command.CompoundCommand
 import de.unibi.citec.clf.bonsai.gui.grapheditor.model.command.SetPropertyCommand
-import javafx.geometry.Side
 import javafx.util.Callback
-import java.util.*
+import java.util.ArrayList
 
 /**
- * Responsible for grey-skin specific logic in the graph editor demo.
+ * Responsible for bonsai-skin specific logic in the graph editor.
  */
-class TitledSkinController
+class BonsaiSkinController
 /**
- * Creates a new [TitledSkinController] instance.
+ * Creates a new [BonsaiSkinController] instance.
  *
- * @param graphEditor the graph editor on display in this demo
- * @param graphEditorContainer the graph editor container on display in this demo
+ * @param graphEditor the graph editor on display
+ * @param graphEditorContainer the graph editor container on display
  */
-(graphEditor: GraphEditor?, graphEditorContainer: GraphEditorContainer?) : DefaultSkinController(graphEditor!!, graphEditorContainer!!) {
+(graphEditor: GraphEditor, graphEditorContainer: GraphEditorContainer) : DefaultSkinController(graphEditor, graphEditorContainer) {
+    /**
+     * Should be called to activate the skin controller. It sets skin factories in graph editor to bonsai specific ones.
+     */
     override fun activate() {
         super.activate()
         graphEditor.nodeSkinFactory = Callback { node: GNode -> this.createSkin(node) }
@@ -42,11 +44,11 @@ class TitledSkinController
     }
 
     private fun createSkin(node: GNode): GNodeSkin {
-        return if (TitledSkinConstants.TITLED_NODE.equals(node.type)) TitledNodeSkin(node) else DefaultNodeSkin(node)
+        return BonsaiNodeSkin(node)
     }
 
     private fun createSkin(connector: GConnector): GConnectorSkin {
-        return if (TitledSkinConstants.TITLED_INPUT_CONNECTOR.equals(connector.type) || TitledSkinConstants.TITLED_OUTPUT_CONNECTOR.equals(connector.type)) TitledConnectorSkin(connector) else DefaultConnectorSkin(connector)
+        return DefaultConnectorSkin(connector)
     }
 
     private fun createSkin(connection: GConnection): GConnectionSkin {
@@ -58,9 +60,12 @@ class TitledSkinController
     }
 
     private fun createTailSkin(connector: GConnector): GTailSkin {
-        return if (TitledSkinConstants.TITLED_INPUT_CONNECTOR.equals(connector.type) || TitledSkinConstants.TITLED_INPUT_CONNECTOR.equals(connector.type)) TitledTailSkin(connector) else DefaultTailSkin(connector)
+        return DefaultTailSkin(connector)
     }
 
+    /**
+     * Handles addition of new node to graph editor
+     */
     override fun addNode(currentZoomFactor: Double, state: State) {
         val windowXOffset: Double
         val windowYOffset: Double
@@ -71,27 +76,35 @@ class TitledSkinController
             windowYOffset = graphEditorContainer.contentY
             windowXOffset = graphEditorContainer.contentX
         }
-        val node = GNode()
-        node.y = NODE_INITIAL_Y // + windowYOffset
+        val node = GNode(state)
+        node.y = NODE_INITIAL_Y + windowYOffset
         node.type = TitledSkinConstants.TITLED_NODE
-        node.x = NODE_INITIAL_X // + windowXOffset
+        node.x = NODE_INITIAL_X + windowXOffset
         node.id = allocateNewId()
+        /*
         val input = GConnector()
         node.connectors.add(input)
         input.type = TitledSkinConstants.TITLED_INPUT_CONNECTOR
         val output = GConnector()
         node.connectors.add(output)
         output.type = TitledSkinConstants.TITLED_OUTPUT_CONNECTOR
-        addNode(graphEditor.model, node)
-        println("Added titled node")
+         */
+        Commands.addNode(graphEditor.model, node)
     }
 
-    override fun addConnector(position: Side?, input: Boolean) {
-        TODO("Not yet implemented")
-    }
-
+    /**
+     * Handles paste action in graph editor, e.g. gets new id for pasted node(s).
+     * @param selectionCopier the selectionCopier instance used in graph editor
+     */
     override fun handlePaste(selectionCopier: SelectionCopier?) {
         selectionCopier?.paste { nodes: List<GNode?>, command: CompoundCommand -> allocateIds(nodes, command) }
+    }
+
+    /**
+     * Handles select all action in graph editor.
+     */
+    override fun handleSelectAll() {
+        graphEditor.selectionManager.selectAll()
     }
 
     /**
@@ -135,16 +148,15 @@ class TitledSkinController
     private fun allocateNewId(): String {
         val nodes: List<GNode> = graphEditor.model.nodes
         val max = nodes.mapNotNull { it.id?.toIntOrNull() }.maxOrNull()
-        return if (max != null) {
-            (max + 1).toString()
-        } else "1"
-        // ELSE:
-        //$NON-NLS-1$
+        return max?.let {
+            (it + 1).toString()
+        } ?: "1"
     }
 
-    companion object {
-        protected const val NODE_INITIAL_X = 19.0
 
-        protected const val NODE_INITIAL_Y = 19.0
+
+    companion object {
+        private const val NODE_INITIAL_X = 19.0
+        private const val NODE_INITIAL_Y = 19.0
     }
 }
