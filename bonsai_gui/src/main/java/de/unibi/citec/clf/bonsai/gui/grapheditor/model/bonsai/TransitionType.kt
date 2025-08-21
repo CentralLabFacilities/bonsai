@@ -7,7 +7,7 @@ enum class TransitionType {
     FATAL;
 
     companion object {
-        fun getGeneralTransitionType(transition: String): TransitionType {
+        fun getGeneralTransitionTypeFromString(transition: String): TransitionType {
             return when {
                 transition.contains("success") -> SUCCESS
                 transition.contains("error") -> ERROR
