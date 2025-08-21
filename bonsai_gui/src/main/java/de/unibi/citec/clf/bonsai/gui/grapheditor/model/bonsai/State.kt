@@ -1,6 +1,7 @@
 package de.unibi.citec.clf.bonsai.gui.grapheditor.model.bonsai
 
 import org.apache.log4j.Logger
+import java.util.Locale.getDefault
 
 /**
  * Simple representation of scxml-State used in graph model.
@@ -20,11 +21,21 @@ class State() {
             if (subStates.isEmpty()) {
                 field = value
                 id = value?.name ?: ""
+                value?.let {
+                    for (status in it.status) {
+                        transitions.add(status.status.name.lowercase(getDefault()) + "." + status.statusSuffix)
+                    }
+                }
             } else {
                 logger.error("State is not simple, can't add skill")
                 throw Exception("State configuration error")
             }
         }
+
+    /**
+     * List containing all available transitions
+     */
+    val transitions = mutableListOf<String>()
 
     private val subStates = mutableListOf<State>()
 

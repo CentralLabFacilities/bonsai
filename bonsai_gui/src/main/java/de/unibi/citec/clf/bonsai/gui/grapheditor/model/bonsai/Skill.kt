@@ -1,60 +1,44 @@
 package de.unibi.citec.clf.bonsai.gui.grapheditor.model.bonsai
 
+import kotlin.reflect.KClass
+
 /**
  * Simple representation of Bonsai-Skill used in graph model.
  */
 class Skill(val name: String) {
-    /**
-     * Contains read-slots of skill as key-value pair <xpath, simple name>.
-     */
-    val readSlots = mutableMapOf<String, String>()
 
     /**
-     * Contains write-slots of skill as key-value pair <xpath, simple name>.
+     * Represents slots of skill.
      */
-    val writeSlots = mutableMapOf<String, String>()
+    class Slot(val dataType: KClass<*>, var xpath: String = "")
 
     /**
-     * Contains required variables of skill as key-value pair <id, expression>.
+     * Represents variables of skill.
      */
-    val requiredVars = mutableMapOf<String, String>()
+    class Variable(val dataType: KClass<*>, var expression: Any)
 
     /**
-     * Contains optional variables of skill as key-value pair <id, expression>.
+     * Contains read-slots of skill as key-value pair <simple name, slot>.
      */
-    val optionalVars = mutableMapOf<String, String>()
+    val readSlots = mutableMapOf<String, Slot>()
 
     /**
-     * Contains transitions of skill as key-value pair <transition, GeneralTransitionType>. Each Skill should have an
-     * 'inbound' transition.
+     * Contains write-slots of skill as key-value pair <simple name, slot>.
      */
-    val transitions = mutableMapOf<String,TransitionType>("inbound" to TransitionType.INBOUND)
+    val writeSlots = mutableMapOf<String, Slot>()
 
     /**
-     * Adds transition and gets matching general transition type.
-     * @param transition Transition to be added
+     * Contains required variables of skill as key-value pair <id, variables>.
      */
-    fun addTransition(transition: String) {
-        transitions[transition] = TransitionType.getGeneralTransitionType(transition)
-    }
+    val requiredVars = mutableMapOf<String, Variable>()
 
     /**
-     * Adds bunch of transitions and gets matching general transition types.
-     * @param transitions List of transitions to be added
+     * Contains optional variables of skill as key-value pair <id, variables>.
      */
-    fun addTransitions(transitions: List<String>) {
-        for (transition in transitions) {
-            addTransition(transition)
-        }
-    }
+    val optionalVars = mutableMapOf<String, Variable>()
 
     /**
-     * Removes given transition.
-     * @param transition Transition to be removed
+     * Contains all available exit-stati of skill as List of ExitStatus.
      */
-    fun removeTransition(transition: String) {
-        transitions.remove(transition)
-    }
-
-
+    val status = mutableListOf<ExitStatus>()
 }
