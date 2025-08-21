@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="pal.IsSomethingInGripper">
+    <datamodel>
+        <data id="recognition_attempts" expr="'0'"/>
+        <data id="initial" expr="'1'" />
+        <data id="#_STATE_PREFIX" expr="'de.unibi.citec.clf.bonsai.skills.'"/>
+        <data id="#_SLOTS">
+            <slots>
+                <slot key="Language" state="*" xpath="/language"/>
+
+                <slot key="Name" state="ecwm.EntityFromGivenName" xpath="/requestHandover/ItemName"/>
+                <slot key="Entity" state="ecwm.EntityFromGivenName" xpath="/askforobject/entity"/>
+                <slot key="Entity" state="ecwm.grasping.AttachEntity" xpath="/askforobject/entity"/>
+
+                <slot key="Entity" state="tasks.cleanup.AttachEntityWithOffset" xpath="/askforobject/entity"/>
+
+                <slot key="ReadSlot" state="slots.CopyAnySlot#prepare_say" xpath="/requestHandover/ItemName"/>
+                <slot key="WriteSlot" state="slots.CopyAnySlot#prepare_say" xpath="/entityNameInGripper"/>
+
+                <slot key="ReadSlot" state="slots.CopyAnySlot#prepare_placement" xpath="/askforobject/entity"/>
+                <slot key="WriteSlot" state="slots.CopyAnySlot#prepare_placement" xpath="/graspEntity"/>
+
+                <slot key="ReadSlot" state="slots.CompareSlot" xpath="/requestHandover/ItemName"/>
+            </slots>
+        </data>
+    </datamodel>
+
+    <state id="pal.IsSomethingInGripper">
+        <transition event="IsSomethingInGripper.success.yes" target="dialog.Talk#wrong_error"/>  <!-- Gripper filled -->
+        <transition event="IsSomethingInGripper.success.no" target="dialogRequestItem">  <!-- Expected case -->
+            <assign location="set_back" expr="'0'"/>
+            <assign location="initial" expr="'1'"/>
+        </transition>
+        <transition event="IsSomethingInGripper.fatal" target="takeDefaultPoseFatal"/>
+    </state>
+
+    <state id="dialog.Talk#wrong_error">
+        <datamodel>
+            <data id="#_MESSAGE" expr="'My gripper is already filled. I am continuing with the task.'"/>
+            <data id="#_BLOCKING" expr="false"/>
+        </datamodel>
+        <transition event="Talk.*" target="ecwm.EntityFromGivenName"/>
+    </state>
+
+
+    <state id="dialogRequestItem" src="${ROBOCUP}/tasks/cleanup/dialogRequestItem.xml">
+        <transition event="dialogRequestItem.success" target="body.ExecutePosture#OpenGripper"/>
+        <transition event="dialogRequestItem.error" target="body.ExecutePosture#OpenGripper"/>
+        <transition event="dialogRequestItem.fatal" target="body.ExecutePosture#OpenGripper"/>
+    </state>
+
+    <state id="body.ExecutePosture#OpenGripper">
+        <datamodel>
+            <data id="#_POSE" expr="'open_gripper'" />
+            <data id="#_BLOCKING" expr="'true'" />
+            <data id="#_GROUP" expr="''" />
+            <data id="#_TIMEOUT" expr="10000" />
+        </datamodel>
+        <transition event="ExecutePosture.fatal" target="takeDefaultPoseFatal"/>
+        <transition event="ExecutePosture.success" target="dialog.Talk#TouchGripper"/>
+    </state>
+
+    <state id="dialog.Talk#TouchGripper">
+        <datamodel>
+            <data id="#_MESSAGE" expr="'Please press the item against my gripper'"/>
+            <data id="#_BLOCKING" expr="false"/>
+        </datamodel>
+        <transition event="Talk.*" target="arm.WaitForForce"/>
+    </state>
+
+    <state id="arm.WaitForForce">
+        <datamodel>
+            <data id="#_TIMEOUT" expr="5000" />
+        </datamodel>
+        <transition event="WaitForForce.fatal" target="takeDefaultPoseFatal"/>
+        <transition event="WaitForForce.error.timeout" target="dialog.Talk#TouchGripper"/>
+        <transition event="WaitForForce.success" target="dialog.Talk#Thanks"/>
+        <transition event="WaitForForce.error" target="Nop#error"/>
+    </state>
+
+    <state id="dialog.Talk#Thanks">
+        <datamodel>
+            <data id="#_MESSAGE" expr="'Thank you. I will close the gripper now.'"/>
+            <data id="#_BLOCKING" expr="false"/>
+        </datamodel>
+        <transition event="Talk.*" target="body.ExecutePosture#CloseGripper"/>
+    </state>
+
+    <state id="body.ExecutePosture#CloseGripper">
+        <datamodel>
+            <data id="#_POSE" expr="'close_gripper'" />
+            <data id="#_BLOCKING" expr="'true'" />
+            <data id="#_GROUP" expr="''" />
+        </datamodel>
+        <transition event="ExecutePosture.fatal" target="takeDefaultPoseFatal"/>
+        <transition event="ExecutePosture.success" target="Wait#close"/>
+    </state>
+
+    <state id="Wait#close">
+        <datamodel>
+            <data id="#_TIMEOUT" expr="1000"/>
+        </datamodel>
+        <transition event="Wait.*" target="ecwm.EntityFromGivenName"/>
+    </state>
+
+    <state id="ecwm.EntityFromGivenName">
+        <transition event="EntityFromGivenName.success" target="slots.CompareSlot"/>
+        <transition event="EntityFromGivenName.*" target="slots.CompareSlot"/>
+    </state>
+
+    <!--Check if we ask for a plate   -->
+    <state id="slots.CompareSlot">
+        <datamodel>
+            <data id="#_COMPARE_STRING" expr="'plate'"/>
+        </datamodel>
+        <transition event="CompareSlot.success.match" target="tasks.cleanup.AttachEntityWithOffset"/>
+        <transition event="CompareSlot.success.misMatch" target="ecwm.grasping.AttachEntity"/>
+        <transition event="CompareSlot.error" target="ecwm.grasping.AttachEntity"/>
+        <transition event="CompareSlot.fatal" target="ecwm.grasping.AttachEntity"/>
+    </state>
+
+    <!-- for plate  -->
+    <state id="tasks.cleanup.AttachEntityWithOffset">
+        <datamodel>
+            <data id="use_slot" expr="'true'"/>
+            <data id="offset_X" expr="'0.08'"/>
+            <data id="rotation_X" expr="'0.707'"/>
+            <data id="rotation_W" expr="'0.707'"/>
+        </datamodel>
+        <transition event="AttachEntityWithOffset.success" target="slots.CopyAnySlot#prepare_say"/>
+        <transition event="AttachEntityWithOffset.fatal" target="slots.CopyAnySlot#prepare_say"/>
+    </state>
+
+    <state id="ecwm.grasping.AttachEntity">
+        <datamodel>
+            <data id="use_slot" expr="'true'"/>
+        </datamodel>
+        <transition event="AttachEntity.success" target="slots.CopyAnySlot#prepare_say"/>
+        <transition event="AttachEntity.fatal" target="slots.CopyAnySlot#prepare_say"/>
+    </state>
+
+    <state id="slots.CopyAnySlot#prepare_say">
+        <datamodel>
+            <!--            <data id="#_DATA_TYPE" expr="'de.unibi.citec.clf.btl.data.ecwm.Entity'"/>-->
+            <data id="#_DATA_TYPE" expr="'java.lang.String'"/>
+        </datamodel>
+        <transition event="CopyAnySlot.success" target="slots.CopyAnySlot#prepare_placement"/>
+        <transition event="CopyAnySlot.*" target="slots.CopyAnySlot#prepare_placement"/>
+    </state>
+
+    <state id="slots.CopyAnySlot#prepare_placement">
+        <datamodel>
+            <data id="#_DATA_TYPE" expr="'de.unibi.citec.clf.btl.data.ecwm.Entity'"/>
+            <!--            <data id="#_DATA_TYPE" expr="'java.lang.String'"/>-->
+        </datamodel>
+        <transition event="CopyAnySlot.success" target="takeTransportPose"/>
+        <transition event="CopyAnySlot.*" target="takeTransportPose"/>
+    </state>
+
+    <state id="takeTransportPose" src="${ROBOCUP}/tasks/cleanup/takeTransportPose.xml">
+        <transition event="takeTransportPose.success" target="Nop#success"/>
+        <transition event="takeTransportPose.error" target="Nop#error"/>
+        <transition event="takeTransportPose.fatal" target="Nop#error"/>
+    </state>
+
+    <state id="takeDefaultPoseFatal" src="${ROBOCUP}/tasks/cleanup/takeDefaultPose.xml">
+        <transition event="takeDefaultPoseFatal.success" target="Nop#fatal"/>
+        <transition event="takeDefaultPoseFatal.error" target="Nop#fatal"/>
+        <transition event="takeDefaultPoseFatal.fatal" target="Nop#fatal"/>
+    </state>
+
+    <state id="Nop#success">
+        <transition event="Nop.fatal">
+            <send event="success"/>
+        </transition>
+    </state>
+
+    <state id="Nop#error">
+        <transition event="Nop.fatal">
+            <send event="error"/>
+        </transition>
+    </state>
+
+    <state id="Nop#fatal">
+        <transition event="Nop.fatal">
+            <send event="fatal"/>
+        </transition>
+    </state>
+
+
+</scxml>

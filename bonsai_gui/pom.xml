@@ -21,10 +21,38 @@
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <dir>target</dir>
-        <kotlin.version>1.9.0</kotlin.version>
+        <kotlin.version>2.2.0</kotlin.version>
+        <serialization.version>1.8.1</serialization.version>
     </properties>
 
     <dependencies>
+        <dependency>
+            <groupId>org.jetbrains.kotlinx</groupId>
+            <artifactId>kotlinx-serialization-json</artifactId>
+            <version>${serialization.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>io.github.pdvrieze.xmlutil</groupId>
+            <artifactId>core</artifactId>
+            <version>0.91.2</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.pdvrieze.xmlutil</groupId>
+            <artifactId>serialization</artifactId>
+            <version>0.91.2</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.pdvrieze.xmlutil</groupId>
+            <artifactId>core-jdk</artifactId>
+            <version>0.91.2</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.pdvrieze.xmlutil</groupId>
+            <artifactId>serialization-jvm</artifactId>
+            <version>0.91.2</version>
+        </dependency>
+
         <dependency>
             <groupId>de.unibi.citec.clf</groupId>
             <artifactId>bonsai_scxml_engine</artifactId>
@@ -74,7 +102,13 @@
             <version>0.7-SNAPSHOT</version>
             <scope>compile</scope>
         </dependency>
+        <dependency>
+            <groupId>org.jetbrains.kotlinx</groupId>
+            <artifactId>kotlinx-serialization-core-jvm</artifactId>
+            <version>${serialization.version}</version>
+        </dependency>
     </dependencies>
+    
 
     <build>
         <directory>${dir}</directory>
@@ -129,7 +163,17 @@
                 </executions>
                 <configuration>
                     <jvmTarget>${maven.compiler.target}</jvmTarget>
+                    <compilerPlugins>
+                        <plugin>kotlinx-serialization</plugin>
+                    </compilerPlugins>
                 </configuration>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.jetbrains.kotlin</groupId>
+                        <artifactId>kotlin-maven-serialization</artifactId>
+                        <version>${kotlin.version}</version>
+                    </dependency>
+                </dependencies>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
