@@ -21,6 +21,7 @@ class GraphEditorDemo : Application() {
         scene.stylesheets.add(javaClass.getResource(DEMO_STYLESHEET).toExternalForm())
         scene.stylesheets.add(javaClass.getResource(TREE_SKIN_STYLESHEET).toExternalForm())
         scene.stylesheets.add(javaClass.getResource(TITLED_SKIN_STYLESHEET).toExternalForm())
+        scene.stylesheets.add(javaClass.getResource(BONSAI_SKIN_STYLESHEET).toExternalForm())
         Font.loadFont(javaClass.getResource(FONT_AWESOME).toExternalForm(), 12.0)
         stage.scene = scene
         stage.title = APPLICATION_TITLE
@@ -34,6 +35,7 @@ class GraphEditorDemo : Application() {
         private const val DEMO_STYLESHEET = "/demo.css" //$NON-NLS-1$
         private const val TREE_SKIN_STYLESHEET = "/treeskins.css" //$NON-NLS-1$
         private const val TITLED_SKIN_STYLESHEET = "/titledskins.css" //$NON-NLS-1$
+        private const val BONSAI_SKIN_STYLESHEET = "/bonsaiskins.css"
         private const val FONT_AWESOME = "/fontawesome.ttf" //$NON-NLS-1$
         private const val DEFAULT_STYLESHEET = "/defaults.css"
     }
