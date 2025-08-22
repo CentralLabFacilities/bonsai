@@ -77,6 +77,7 @@ open class GraphEditorSkillHandler {
         runner.inspectionGetOutSlots().forEach {
             skill.writeSlots[it.key] = Skill.Slot(it.value, "/")
         }
+        println("Skill ${skill.name} has ${skill.readSlots.size} read-slots and ${skill.writeSlots.size} write-slots.")
         //Vars
         runner.inspectionGetRequiredParams().forEach {
             skill.requiredVars[it.key] = Skill.Variable(it.value, null)

@@ -3,25 +3,28 @@ package de.unibi.citec.clf.bonsai.gui.grapheditor.example.customskins.bonsai
 import de.unibi.citec.clf.bonsai.gui.grapheditor.api.Commands
 import de.unibi.citec.clf.bonsai.gui.grapheditor.api.GConnectorSkin
 import de.unibi.citec.clf.bonsai.gui.grapheditor.api.GNodeSkin
-import de.unibi.citec.clf.bonsai.gui.grapheditor.example.customskins.titled.TitledConnectorSkin
+import de.unibi.citec.clf.bonsai.gui.grapheditor.api.utils.GeometryUtils.moveOnPixel
+import de.unibi.citec.clf.bonsai.gui.grapheditor.core.adapters.SlotAdapter
 import de.unibi.citec.clf.bonsai.gui.grapheditor.example.utils.AwesomeIcon
 import de.unibi.citec.clf.bonsai.gui.grapheditor.model.GNode
 import de.unibi.citec.clf.bonsai.gui.grapheditor.model.Selectable
-import de.unibi.citec.clf.bonsai.gui.grapheditor.model.bonsai.TransitionType
+import de.unibi.citec.clf.bonsai.gui.grapheditor.model.bonsai.Skill
+import javafx.beans.binding.Bindings
 import javafx.css.PseudoClass
 import javafx.event.EventHandler
 import javafx.geometry.Point2D
 import javafx.geometry.Pos
 import javafx.scene.Cursor
-import javafx.scene.control.Button
-import javafx.scene.control.Label
-import javafx.scene.control.TextField
+import javafx.scene.control.*
+import javafx.scene.control.cell.TextFieldTableCell
 import javafx.scene.input.MouseEvent
 import javafx.scene.layout.HBox
 import javafx.scene.layout.Priority
 import javafx.scene.layout.Region
 import javafx.scene.layout.VBox
 import javafx.scene.shape.Rectangle
+import javafx.util.Callback
+import java.util.Locale.getDefault
 
 class BonsaiNodeSkin(node: GNode) : GNodeSkin(node) {
 
@@ -48,18 +51,32 @@ class BonsaiNodeSkin(node: GNode) : GNodeSkin(node) {
         private const val HALO_CORNER_SIZE = 10.0
     }
 
+    private fun TableView<*>.shrinkToContent(rowHeight: Double = 30.0, headerHeight: Double = 30.0) {
+        fixedCellSize = rowHeight
+        prefHeightProperty().bind(Bindings.size(items).multiply(rowHeight).subtract(rowHeight).add(headerHeight))
+    }
+
     private val selectionHalo = Rectangle()
 
     private val contentRoot = VBox()
     private val header = HBox()
     private val transitions = VBox()
     private val slots = VBox()
+    private val tableReadSlots = TableView<SlotAdapter>().apply {
+        shrinkToContent()
+    }
+    private val readSlotsAdapted = mutableListOf<SlotAdapter>()
+    private val writeSlotsAdapted = mutableListOf<SlotAdapter>()
+    private val optVarsAdapted = mutableListOf<Any>()
+    private val reqVarsAdapted = mutableListOf<Any>()
     private val optVars = VBox()
     private val reqVars = VBox()
     private val title = Label()
 
-    private val inputConnectorSkins = mutableListOf<GConnectorSkin>()
-    private val outputConnectorSkins = mutableListOf<GConnectorSkin>()
+    private var inputConnectorSkin: GConnectorSkin? = null
+    private var successOutputConnectorSkin: GConnectorSkin? = null
+    private var errorOutputConnectorSkin: GConnectorSkin? = null
+    private var fatalOutputConnectorSkin: GConnectorSkin? = null
 
     private val border = Rectangle()
 
@@ -80,18 +97,45 @@ class BonsaiNodeSkin(node: GNode) : GNodeSkin(node) {
 
     override fun setConnectorSkins(connectorSkins: List<GConnectorSkin>) {
         removeAllConnectors()
-        inputConnectorSkins.clear()
-        outputConnectorSkins.clear()
-        for (connectorSkin in connectorSkins) {
+        for (skin in connectorSkins) {
+            when (skin.item?.type) {
+                BonsaiSkinConstants.BONSAI_INBOUND_CONNECTOR -> {
+                    inputConnectorSkin = skin
+                    root?.children?.add(skin.root)
+                }
 
+                BonsaiSkinConstants.BONSAI_OUTBOUND_SUCCESS_CONNECTOR -> {
+                    successOutputConnectorSkin = skin
+                    root?.children?.add(skin.root)
+                }
+
+                BonsaiSkinConstants.BONSAI_OUTBOUND_ERROR_CONNECTOR -> {
+                    errorOutputConnectorSkin = skin
+                    root?.children?.add(skin.root)
+                }
+
+                BonsaiSkinConstants.BONSAI_OUTBOUND_FATAL_CONNECTOR -> {
+                    fatalOutputConnectorSkin = skin
+                    root?.children?.add(skin.root)
+                }
+
+                else -> {}
+            }
         }
     }
 
     private fun removeAllConnectors() {
-
+        root?.children?.apply {
+            remove(inputConnectorSkin?.root)
+            remove(successOutputConnectorSkin?.root)
+            remove(errorOutputConnectorSkin?.root)
+            remove(fatalOutputConnectorSkin?.root)
+        }
     }
 
     override fun layoutConnectors() {
+        layoutLeftAndRightConnectors()
+        layoutSelectionHalo()
     }
 
     override fun getConnectorPosition(connectorSkin: GConnectorSkin): Point2D {
@@ -116,16 +160,10 @@ class BonsaiNodeSkin(node: GNode) : GNodeSkin(node) {
      */
     private fun setConnectorsSelected() {
         val editor = graphEditor ?: return
-        for (skin in inputConnectorSkins) {
-            if (skin is TitledConnectorSkin) {
-                editor.selectionManager.select(skin.item as Selectable)
-            }
-        }
-        for (skin in outputConnectorSkins) {
-            if (skin is TitledConnectorSkin) {
-                editor.selectionManager.select(skin.item as Selectable)
-            }
-        }
+        inputConnectorSkin?.let { editor.selectionManager.select(it.item as Selectable) }
+        successOutputConnectorSkin?.let { editor.selectionManager.select(it.item as Selectable) }
+        errorOutputConnectorSkin?.let { editor.selectionManager.select(it.item as Selectable) }
+        fatalOutputConnectorSkin?.let { editor.selectionManager.select(it.item as Selectable) }
     }
 
     private fun addSelectionHalo() {
@@ -150,6 +188,26 @@ class BonsaiNodeSkin(node: GNode) : GNodeSkin(node) {
         }
     }
 
+    private fun processSlot(slot: Map.Entry<String, Skill.Slot>): HBox {
+        return HBox().apply {
+            children += Label().apply { text = slot.key }
+            children += Label().apply { text = slot.value.dataType.simpleName }
+            children += TextField().apply { text = slot.value.xpath }
+        }
+    }
+
+    private fun processVar(variable: Map.Entry<String, Skill.Variable>): HBox {
+        return HBox().apply {
+            children += Label().apply { text = variable.key }
+            children += Label().apply { text = variable.value.dataType.simpleName }
+            children += TextField().apply { text = variable.value.expression.toString() }
+        }
+    }
+
+    private fun slotToSlotAdapter(slot: Map.Entry<String, Skill.Slot>): SlotAdapter {
+        return SlotAdapter(slot.key, slot.value)
+    }
+
     private fun createContent() {
         when (item) {
             is GNode -> {
@@ -172,65 +230,91 @@ class BonsaiNodeSkin(node: GNode) : GNodeSkin(node) {
                 item.state?.let { state ->
 
                     state.skill?.let { skill ->
-                        /*
-                        skill.readSlots.forEach { (xpath, name) ->
-                            val hBox = HBox().apply {
-                                val label = Label().apply { text = name }
-                                val textField = TextField().apply { text = xpath }
-                                children.addAll(label, textField)
-                                children.forEach { HBox.setHgrow(it, Priority.ALWAYS) }
-                            }
-                            VBox.setVgrow(hBox, Priority.ALWAYS)
 
-                            slots.children.add(hBox)
+                        skill.writeSlots.forEach {
+                            readSlotsAdapted += slotToSlotAdapter(it)
                         }
-                        skill.writeSlots.forEach { (xpath, name) ->
-                            if (xpath in skill.readSlots) return@forEach
-                            val hBox = HBox().apply {
-                                val label = Label().apply { text = name }
-                                val textField = TextField().apply { text = xpath }
-                                children.addAll(label, textField)
-                                children.forEach { HBox.setHgrow(it, Priority.ALWAYS) }
+
+                        tableReadSlots.apply {
+                            columns += TableColumn<SlotAdapter, String>("Name").apply {
+                                cellValueFactory = Callback { it.value.nameProperty() }
+                                cellFactory = TextFieldTableCell.forTableColumn()
                             }
-                            VBox.setVgrow(hBox, Priority.ALWAYS)
-                            slots.children.add(hBox)
-                        }
-                        */
-                        skill.requiredVars.forEach { (id, expression) ->
-                            val hBox = HBox().apply {
-                                val label = Label().apply { text = id }
-                                val textField = TextField().apply { text = expression }
-                                children.addAll(label, textField)
-                                children.forEach { HBox.setHgrow(it, Priority.ALWAYS) }
+                            columns += TableColumn<SlotAdapter, String>("DataType").apply {
+                                cellValueFactory = Callback { it.value.dataTypeProperty() }
+                                cellFactory = TextFieldTableCell.forTableColumn()
                             }
-                            VBox.setVgrow(hBox, Priority.ALWAYS)
-                            reqVars.children.add(hBox)
                         }
-                        skill.optionalVars.forEach { (id, expression) ->
-                            val hBox = HBox().apply {
-                                val label = Label().apply { text = id }
-                                val textField = TextField().apply { text = expression }
-                                children.addAll(label, textField)
-                                children.forEach { HBox.setHgrow(it, Priority.ALWAYS) }
+                        val xpathColumn = TableColumn<SlotAdapter, String>("xPath").apply {
+                            cellValueFactory = Callback { it.value.xpathProperty() }
+                            cellFactory = Callback {
+                                object : TableCell<SlotAdapter, String>() {
+                                    private val textField = TextField()
+
+                                    init {
+                                        textField.textProperty().addListener { _, _, newValue ->
+                                            if (index >= 0 && index < tableReadSlots.items.size) {
+                                                tableReadSlots.items[index].xpathProperty().set(newValue)
+                                            }
+                                        }
+                                        graphic = textField
+                                    }
+
+                                    override fun updateItem(item: String?, empty: Boolean) {
+                                        super.updateItem(item, empty)
+                                        if (empty || item == null) {
+                                            graphic = null
+                                        } else {
+                                            textField.text = item
+                                            graphic = textField
+                                        }
+                                    }
+                                }
                             }
-                            VBox.setVgrow(hBox, Priority.ALWAYS)
-                            optVars.children.add(hBox)
                         }
-                        skill.transitions.forEach { (name, transitionType) ->
-                            if (transitionType == TransitionType.INBOUND) return@forEach
-                            val hBox = HBox().apply {
+
+                        tableReadSlots.columns += xpathColumn
+                        tableReadSlots.items.addAll(readSlotsAdapted)
+                        skill.writeSlots.forEach {
+                            writeSlotsAdapted += slotToSlotAdapter(it)
+                        }
+
+
+                        skill.requiredVars.forEach { requiredVars ->
+                            reqVars.children += processVar(requiredVars)
+                        }
+                        skill.optionalVars.forEach { optionalVars ->
+                            optVars.children += processVar(optionalVars)
+                        }
+                        skill.status.forEach { status ->
+                            transitions.children += HBox().apply {
                                 val transitionFiller = Region()
-                                HBox.setHgrow(transitionFiller, Priority.ALWAYS)
-                                val label = Label().apply { text = name }
-                                children.addAll(transitionFiller, label)
-                                id = "#" + state.id + name
+                                HBox.setHgrow(filler, Priority.ALWAYS)
+                                children += transitionFiller
+                                children += Label().apply {
+                                    if (status.statusSuffix == "") {
+                                        text = status.status.toString().lowercase(getDefault())
+                                    } else {
+                                        text = status.status.toString().lowercase(getDefault()).plus(".")
+                                            .plus(status.statusSuffix)
+                                    }
+                                }
                             }
-                            transitions.children.add(hBox)
                         }
                     }
                 }
 
-                contentRoot.children.addAll(header, slotLabel, slots, reqVarsLabel, reqVars, optVarsLabel, optVars, transitionLabel, transitions)
+                contentRoot.children.addAll(
+                    header,
+                    slotLabel,
+                    tableReadSlots,
+                    reqVarsLabel,
+                    reqVars,
+                    optVarsLabel,
+                    optVars,
+                    transitionLabel,
+                    transitions
+                )
                 contentRoot.children.forEach { VBox.setVgrow(it, Priority.ALWAYS) }
                 root!!.children.add(contentRoot)
                 closeButton.graphic = AwesomeIcon.TIMES.node()
@@ -264,10 +348,10 @@ class BonsaiNodeSkin(node: GNode) : GNodeSkin(node) {
     }
 
     private fun layoutLeftAndRightConnectors() {
-
+        inputConnectorSkin?.let { skin ->
+            skin.root?.layoutX = moveOnPixel(0 - skin.width / 2)
+        }
     }
-
-
 
 
 }

@@ -90,13 +90,11 @@ class DefaultConnectorSkin(connector: GConnector) : GConnectorSkin(connector) {
         root.children.add(polygon)
     }
 
-    override fun getWidth(): Double {
-        return SIZE
-    }
+    override val width = SIZE
 
-    override fun getHeight(): Double {
-        return SIZE
-    }
+
+    override val height = SIZE
+
 
     override fun applyStyle(style: GConnectorStyle) {
         when(style) {
@@ -119,6 +117,7 @@ class DefaultConnectorSkin(connector: GConnector) : GConnectorSkin(connector) {
     }
 
     private fun performChecks() {
+        return
         item?.type?.let {
             if (!DefaultConnectorTypes.isValid(it)) {
                 LOGGER.error("Connector type '${it}' not recognized, setting to 'left-input'.")

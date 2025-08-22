@@ -1,6 +1,7 @@
 package de.unibi.citec.clf.bonsai.gui.grapheditor.model
 
 import de.unibi.citec.clf.bonsai.gui.grapheditor.model.bonsai.Skill
+import de.unibi.citec.clf.bonsai.gui.grapheditor.model.bonsai.State
 import javafx.beans.property.SimpleDoubleProperty
 import javafx.beans.property.SimpleStringProperty
 import javafx.collections.FXCollections
@@ -10,6 +11,10 @@ class GModel {
     val nodes: ObservableList<GNode> = FXCollections.observableArrayList()
     val connections: ObservableList<GConnection?> = FXCollections.observableArrayList()
     val availableSkills: ObservableList<Skill> = FXCollections.observableArrayList()
+
+    fun addNewRootState(state: State) {
+        //TODO("Add graph generation out of states")
+    }
 
     private val _type = SimpleStringProperty(this, "type")
     fun typeProperty() = _type

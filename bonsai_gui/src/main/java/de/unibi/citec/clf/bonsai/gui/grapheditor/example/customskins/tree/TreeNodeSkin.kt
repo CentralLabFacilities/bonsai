@@ -75,8 +75,8 @@ class TreeNodeSkin(node: GNode?) : GNodeSkin(node!!) {
 
     override fun getConnectorPosition(connectorSkin: GConnectorSkin): Point2D {
         val connectorRoot = connectorSkin.root
-        val x = connectorRoot!!.layoutX + connectorSkin.getWidth() / 2
-        val y = connectorRoot.layoutY + connectorSkin.getHeight() / 2
+        val x = connectorRoot!!.layoutX + connectorSkin.width / 2
+        val y = connectorRoot.layoutY + connectorSkin.height / 2
         return Point2D(x, y)
     }
 
@@ -85,14 +85,14 @@ class TreeNodeSkin(node: GNode?) : GNodeSkin(node!!) {
      */
     private fun layoutTopAndBottomConnectors() {
         if (inputConnectorSkin != null) {
-            val inputX = (root!!.width - inputConnectorSkin!!.getWidth()) / 2
-            val inputY = -inputConnectorSkin!!.getHeight() / 2
+            val inputX = (root!!.width - inputConnectorSkin!!.width) / 2
+            val inputY = -inputConnectorSkin!!.height / 2
             inputConnectorSkin!!.root!!.layoutX = inputX
             inputConnectorSkin!!.root!!.layoutY = inputY
         }
         if (outputConnectorSkin != null) {
-            val outputX = (root!!.width - outputConnectorSkin!!.getWidth()) / 2
-            val outputY = root!!.height - outputConnectorSkin!!.getHeight() / 2
+            val outputX = (root!!.width - outputConnectorSkin!!.width) / 2
+            val outputY = root!!.height - outputConnectorSkin!!.height / 2
             outputConnectorSkin!!.root!!.layoutX = outputX
             outputConnectorSkin!!.root!!.layoutY = outputY
         }

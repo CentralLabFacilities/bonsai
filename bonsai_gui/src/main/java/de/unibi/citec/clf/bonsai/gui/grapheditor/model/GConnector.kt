@@ -9,6 +9,15 @@ import javafx.collections.ObservableList
 
 class GConnector(): SelectableType() {
 
+    constructor(type: String) : this() {
+        this.type = type
+    }
+
+    constructor(type: String, parent: GNode) : this() {
+        this.type = type
+        this.parent = parent
+    }
+
     private val _id = SimpleStringProperty(this, "id")
     fun idProperty() = _id
     var id: String?

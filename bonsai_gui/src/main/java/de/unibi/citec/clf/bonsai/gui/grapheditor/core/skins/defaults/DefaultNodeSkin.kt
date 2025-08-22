@@ -97,15 +97,15 @@ class DefaultNodeSkin(node: GNode) : GNodeSkin(node) {
         var y = 0.0
         connectorSkin.root?.let {
             when (side) {
-                Side.LEFT -> y = it.layoutY + connectorSkin.getHeight() / 2
+                Side.LEFT -> y = it.layoutY + connectorSkin.height / 2
                 Side.RIGHT -> {
                     x = root?.width ?: 0.0
-                    y = it.layoutY + connectorSkin.getHeight() / 2
+                    y = it.layoutY + connectorSkin.height / 2
                 }
 
-                Side.TOP -> x = it.layoutX + connectorSkin.getWidth() / 2
+                Side.TOP -> x = it.layoutX + connectorSkin.width / 2
                 else -> {
-                    x = it.layoutX + connectorSkin.getWidth() / 2
+                    x = it.layoutX + connectorSkin.width / 2
                     y = root?.height ?: 0.0
                 }
             }
@@ -139,13 +139,13 @@ class DefaultNodeSkin(node: GNode) : GNodeSkin(node) {
             if (vertical) {
                 val offsetY = (root?.height ?: 0.0) / (connectorSkins.size + 1)
                 val offsetX = connectorSkin.value.item?.let { getMinorOffsetX(it) } ?: 0.0
-                connectorSkin.value.root?.layoutX = GeometryUtils.moveOnPixel(offset - connectorSkin.value.getWidth() / 2 + offsetX)
-                connectorSkin.value.root?.layoutY = GeometryUtils.moveOnPixel((connectorSkin.index + 1) * offsetY - connectorSkin.value.getHeight() / 2)
+                connectorSkin.value.root?.layoutX = GeometryUtils.moveOnPixel(offset - connectorSkin.value.width / 2 + offsetX)
+                connectorSkin.value.root?.layoutY = GeometryUtils.moveOnPixel((connectorSkin.index + 1) * offsetY - connectorSkin.value.height / 2)
             } else {
                 val offsetX = (root?.width ?: 0.0) / (connectorSkins.size + 1)
                 val offsetY = connectorSkin.value.item?.let { getMinorOffsetY(it) } ?: 0.0
-                connectorSkin.value.root?.layoutX = GeometryUtils.moveOnPixel((connectorSkin.index + 1) * offsetX - connectorSkin.value.getWidth() / 2)
-                connectorSkin.value.root?.layoutY = GeometryUtils.moveOnPixel(offset - connectorSkin.value.getHeight() / 2 + offsetY)
+                connectorSkin.value.root?.layoutX = GeometryUtils.moveOnPixel((connectorSkin.index + 1) * offsetX - connectorSkin.value.width / 2)
+                connectorSkin.value.root?.layoutY = GeometryUtils.moveOnPixel(offset - connectorSkin.value.height / 2 + offsetY)
             }
         }
     }
