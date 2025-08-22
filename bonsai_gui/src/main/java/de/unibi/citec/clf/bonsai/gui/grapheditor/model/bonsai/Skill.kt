@@ -1,7 +1,5 @@
 package de.unibi.citec.clf.bonsai.gui.grapheditor.model.bonsai
 
-import kotlin.reflect.KClass
-
 /**
  * Simple representation of Bonsai-Skill used in graph model.
  */
@@ -10,12 +8,12 @@ class Skill(val name: String) {
     /**
      * Represents slots of skill.
      */
-    class Slot(val dataType: KClass<*>, var xpath: String = "")
+    data class Slot(val dataType: Class<*>, var xpath: String = "")
 
     /**
      * Represents variables of skill.
      */
-    class Variable(val dataType: KClass<*>, var expression: Any)
+    data class Variable(val dataType: Class<*>, var expression: Any?)
 
     /**
      * Contains read-slots of skill as key-value pair <simple name, slot>.
@@ -41,4 +39,8 @@ class Skill(val name: String) {
      * Contains all available exit-stati of skill as List of ExitStatus.
      */
     val status = mutableListOf<ExitStatus>()
+
+    override fun toString(): String {
+        return "Skill [name=$name, read_slots=$readSlots, write_slots=$writeSlots, required_vars=$requiredVars, optional_vars=$optionalVars, exit_status=$status]"
+    }
 }
