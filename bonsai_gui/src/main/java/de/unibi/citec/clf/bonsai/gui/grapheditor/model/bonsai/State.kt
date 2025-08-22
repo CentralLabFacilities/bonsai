@@ -6,7 +6,7 @@ import java.util.Locale.getDefault
 /**
  * Simple representation of scxml-State used in graph model.
  */
-class State() {
+class State(id: String = "") {
 
     companion object {
         private val logger = Logger.getLogger(State::class.java)
@@ -81,5 +81,9 @@ class State() {
      */
     fun removeSubState(subState: State) {
         subStates.remove(subState)
+    }
+
+    init {
+        this.id = id
     }
 }
