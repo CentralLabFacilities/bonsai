@@ -31,13 +31,9 @@ class TitledConnectorSkin(connector: GConnector?) : GConnectorSkin(connector!!) 
         root.children.addAll(forbiddenGraphic)
     }
 
-    override fun getWidth(): Double {
-        return SIZE
-    }
+    override val width = SIZE
 
-    override fun getHeight(): Double {
-        return SIZE
-    }
+    override val height = SIZE
 
     override fun applyStyle(style: GConnectorStyle) {
         when (style) {

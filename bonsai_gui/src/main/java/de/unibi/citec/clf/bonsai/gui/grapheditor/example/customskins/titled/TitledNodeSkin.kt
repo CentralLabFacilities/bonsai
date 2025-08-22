@@ -81,8 +81,8 @@ class TitledNodeSkin(node: GNode?) : GNodeSkin(node!!) {
 
     override fun getConnectorPosition(connectorSkin: GConnectorSkin): Point2D {
         val connectorRoot = connectorSkin.root
-        val x = connectorRoot!!.layoutX + connectorSkin.getWidth() / 2
-        val y = connectorRoot.layoutY + connectorSkin.getHeight() / 2
+        val x = connectorRoot!!.layoutX + connectorSkin.width / 2
+        val y = connectorRoot.layoutY + connectorSkin.height / 2
         return if (inputConnectorSkins.contains(connectorSkin)) {
             Point2D(x, y)
         } else Point2D(x - 1, y)
@@ -127,8 +127,8 @@ class TitledNodeSkin(node: GNode?) : GNodeSkin(node!!) {
         for (i in 0 until inputCount) {
             val inputSkin = inputConnectorSkins[i]
             val connectorRoot = inputSkin.root
-            val layoutX = moveOnPixel(0 - inputSkin.getWidth() / 2)
-            val layoutY = moveOnPixel((i + 1) * inputOffsetY - inputSkin.getHeight() / 2)
+            val layoutX = moveOnPixel(0 - inputSkin.width / 2)
+            val layoutY = moveOnPixel((i + 1) * inputOffsetY - inputSkin.height / 2)
             connectorRoot!!.layoutX = layoutX
             connectorRoot.layoutY = layoutY + HEADER_HEIGHT
         }
@@ -137,8 +137,8 @@ class TitledNodeSkin(node: GNode?) : GNodeSkin(node!!) {
         for (i in 0 until outputCount) {
             val outputSkin = outputConnectorSkins[i]
             val connectorRoot = outputSkin.root
-            val layoutX = moveOnPixel(root!!.width - outputSkin.getWidth() / 2)
-            val layoutY = moveOnPixel((i + 1) * outputOffsetY - outputSkin.getHeight() / 2)
+            val layoutX = moveOnPixel(root!!.width - outputSkin.width / 2)
+            val layoutY = moveOnPixel((i + 1) * outputOffsetY - outputSkin.height / 2)
             connectorRoot!!.layoutX = layoutX
             connectorRoot.layoutY = layoutY + HEADER_HEIGHT
         }

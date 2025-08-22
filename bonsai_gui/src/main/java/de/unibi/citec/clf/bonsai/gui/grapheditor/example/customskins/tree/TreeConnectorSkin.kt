@@ -39,13 +39,9 @@ class TreeConnectorSkin(connector: GConnector) : GConnectorSkin(connector) {
         // Not implemented
     }
 
-    override fun getWidth(): Double {
-        return 2 * RADIUS
-    }
+    override val width = 2 * RADIUS
 
-    override fun getHeight(): Double {
-        return 2 * RADIUS
-    }
+    override val height = 2 * RADIUS
 
     override fun applyStyle(style: GConnectorStyle) {
         when (style) {

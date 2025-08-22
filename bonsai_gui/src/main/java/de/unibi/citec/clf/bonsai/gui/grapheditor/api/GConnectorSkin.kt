@@ -15,8 +15,9 @@ import de.unibi.citec.clf.bonsai.gui.grapheditor.model.GConnector
  * </p>
  */
 abstract class GConnectorSkin(connector: GConnector): GSkin<GConnector>(connector) {
-    abstract fun getWidth(): Double
-    abstract fun getHeight(): Double
+
+    abstract val width: Double
+    abstract val height: Double
 
     /**
      * Applys the specified style to the connector.
