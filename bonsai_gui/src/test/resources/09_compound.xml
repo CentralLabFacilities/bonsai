@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This Example shows how to group multiple states together -->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="DoCoolStuff">
+    <datamodel>
+        <data id="#_STATE_PREFIX" expr="'de.unibi.citec.clf.bonsai.skills.'"/>
+    </datamodel>
+
+    <!-- we can use compound states to group different states together -->
+    <state id="DoCoolStuff" initial="example.Succeeder">
+
+        <!-- we can also define transitions here -->
+        <!-- The parent states transition gets checked if none of the childs matches -->
+        <transition event="Succeeder.*" target="Fatal"/>
+
+        <state id="example.Succeeder">
+            <transition event="Succeeder.success" target="example.Succeeder#again"/>
+        </state>
+
+        <state id="example.Succeeder#again">
+            <transition event="Succeeder.success" target="example.Nothing"/>
+        </state>
+
+    </state>
+
+    <state id="example.Nothing">
+        <!-- this is an easy reference to transition too -->
+        <transition event="Nothing.fatal" target="DoCoolStuff"/>
+    </state>
+
+    <state id="Fatal" final="true"/>
+    <state id="End" final="true"/>
+</scxml>

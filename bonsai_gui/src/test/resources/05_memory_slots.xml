@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This Example shows how to use slots -->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="example.SlotWriter">
+    <datamodel>
+        <data id="#_STATE_PREFIX" expr="'de.unibi.citec.clf.bonsai.skills.'"/>
+        <!-- slots are used to store data for other skills/states to use -->
+        <!-- we have to define the path for each used slot -->
+        <data id="#_SLOTS">
+            <slots>
+                <!-- we want to read and write data that gets written to "/path" -->
+                <!-- The slot 'StringToWriteTo' gets written to /path -->
+                <slot key="StringToWriteTo" state="example.SlotWriter" xpath="/path"/>
+                <!-- The slot 'StringIAmReading' reads from /path -->
+                <slot key="StringIAmReading" state="example.SlotReader" xpath="/path"/>
+            </slots>
+        </data>
+    </datamodel>
+
+    <!-- Use ctrl+n and search for `SlotWriter` to jump to the skill definition -->
+    <!-- The skills will request slots with predefined keys. -->
+    <!-- The keys in the skill must correspond to the slot keys defined in this state machine -->
+    <!-- You will see how slots are registered during configure -->
+    <state id="example.SlotWriter">
+        <transition event="SlotWriter.*" target="example.SlotReader"/>
+    </state>
+
+    <state id="example.SlotReader">
+        <transition event="SlotReader.*" target="End"/>
+    </state>
+
+    <state id="End" final="true"/>
+</scxml>

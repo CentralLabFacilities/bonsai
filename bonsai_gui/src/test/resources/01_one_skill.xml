@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This Example shows a minimal Statemachine using a bonsai skill-->
+<!-- This state machine begins with the state with the id "Nothing"-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="Nothing">
+    <datamodel>
+        <!-- this prefix is used to find the skill (Mind the full stop/period at the end of the prefix) -->
+        <data id="#_STATE_PREFIX" expr="'de.unibi.citec.clf.bonsai.skills.example.'"/>
+    </datamodel>
+
+    <!-- The Statemachine tries to find a skill with the name #_STATE_PREFIX.id -->
+    <!-- The id here is set to 'Nothing'. Thus, this state uses the de.unibi.citec.clf.bonsai.skills.example.Nothing class -->
+    <!-- Use ctrl+n and search for `Nothing` to jump to the skill definition -->
+    <state id="Nothing">
+        <!-- After the skill finishes its exit status gets send as event `id.event` -->
+        <!-- target is the id of the state we got to -->
+        <transition event="Nothing.fatal" target=""/>
+    </state>
+
+</scxml>

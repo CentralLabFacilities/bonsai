@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This Example shows misses a transition -->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="example.Succeeder">
+    <datamodel>
+        <data id="#_STATE_PREFIX" expr="'de.unibi.citec.clf.bonsai.skills.'"/>
+    </datamodel>
+
+    <state id="example.Succeeder">
+        <transition event="Succeeder.success" target="End"/>
+        <transition event="Succeeder.fatal" target="Fatal"/>
+        <!-- if we forget some events bonsai will remind us after loading -->
+        <!--transition event="Succeeder.error.*" target=""/-->
+        <!-- You will see the following errors after loading:
+
+#### State machine validation errors:
+State with id "de.unibi.citec.clf.bonsai.skills.example.Succeeder" misses transition for event "Succeeder.error.neverEver"
+State with id "de.unibi.citec.clf.bonsai.skills.example.Succeeder" misses transition for event "Succeeder.error.never"
+
+        -->
+        <!-- You can (but should not) ignore them and still run the statemachine -->
+    </state>
+
+    <state id="Fatal" final="true"/>
+    <state id="End" final="true"/>
+</scxml>

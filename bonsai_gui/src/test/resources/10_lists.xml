@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This Example shows how to use Lists -->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="example.CreatePositionList">
+    <datamodel>
+        <data id="#_STATE_PREFIX" expr="'de.unibi.citec.clf.bonsai.skills.'"/>
+        <data id="#_SLOTS">
+            <slots>
+                <slot key="List" state="example.CreatePositionList" xpath="/list"/>
+
+                <slot key="ListSlot" state="slots.PopList" xpath="/list"/>
+                <slot key="ItemSlot" state="slots.PopList" xpath="/item"/>
+            </slots>
+        </data>
+    </datamodel>
+
+    <!-- This skill creates a [btl.List] Type: PositionDataList with two PositionData-->
+    <state id="example.CreatePositionList">
+        <transition event="CreatePositionList.*" target="slots.PopList"/>
+    </state>
+
+    <!-- This Generic skill Pops the first item of the list-->
+    <state id="slots.PopList">
+        <datamodel>
+            <data id="#_DATA_TYPE" expr="de.unibi.citec.clf.btl.data.navigation.PositionData"/>
+            <data id="#_LIST_TYPE" expr="de.unibi.citec.clf.btl.data.navigation.PositionDataList"/>
+        </datamodel>
+        <!-- We Repeat this -->
+        <transition event="PopList.success" target="slots.PopList"/>
+        <transition event="PopList.fatal" />
+        <!-- If the list is empty, we get error.empty Status-->
+        <transition event="PopList.error.empty" target="End"/>
+    </state>
+
+
+
+    <state id="End" final="true"/>
+</scxml>

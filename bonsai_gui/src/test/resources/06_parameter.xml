@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This Example shows how to use parameter -->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="example.ParameterHaver">
+    <datamodel>
+        <data id="#_STATE_PREFIX" expr="'de.unibi.citec.clf.bonsai.skills.'"/>
+    </datamodel>
+
+    <!-- Use ctrl+n and search for `ParameterHaver` to jump to the skill definition -->
+    <!-- You will see how parameters are defined during configure -->
+    <state id="example.ParameterHaver">
+        <!-- skill parameter are read from the state datamodel -->
+        <datamodel>
+            <!-- make sure to use extra quotes for strings -->
+            <data id="value" expr="'Hello'"/>
+        </datamodel>
+        <transition event="ParameterHaver.*" target="example.ParameterHaver#option"/>
+    </state>
+
+    <state id="example.ParameterHaver#option">
+        <datamodel>
+            <data id="value" expr="'World'"/>
+            <!-- dont use extra quotes for booleans or numbers -->
+            <data id="option" expr="true"/>
+        </datamodel>
+        <transition event="ParameterHaver.*" target="End"/>
+    </state>
+
+    <state id="End" final="true"/>
+</scxml>
