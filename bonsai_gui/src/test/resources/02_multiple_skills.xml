@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This Example shows how to use a skill multiple times -->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="example.Nothing">
+    <datamodel>
+        <!-- We change the prefix to not include the example directory anymore -->
+        <!-- Thus our state has to be named example.Nothing to match the class name -->
+        <data id="#_STATE_PREFIX" expr="'de.unibi.citec.clf.bonsai.skills.'"/>
+    </datamodel>
+
+    <!-- State ids have to be unique which means you cant use Nothing twice -->
+    <state id="example.Nothing">
+        <!-- The transition only uses the skill name -->
+        <transition event="Nothing.fatal" target="example.Nothing#2"/>
+    </state>
+
+    <!-- We can add hashtag #tag which gets ignored in the search for the class -->
+    <!-- This results in unique state ids we can refer to -->
+    <state id="example.Nothing#2">
+        <transition event="Nothing.fatal" target=""/>
+    </state>
+
+</scxml>

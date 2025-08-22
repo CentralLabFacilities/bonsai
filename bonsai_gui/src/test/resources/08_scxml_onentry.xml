@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This Example shows how to scxml data for transition conditions -->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0"
+       initial="example.ParameterHaver">
+    <datamodel>
+        <data id="#_STATE_PREFIX" expr="'de.unibi.citec.clf.bonsai.skills.'" />
+        <!-- Define a scxml variable in the datamodel -->
+        <data id="hellosToSpeak" expr="3"/>
+    </datamodel>
+
+    <state id="example.ParameterHaver">
+        <datamodel>
+            <data id="value" expr="'Hello'"/>
+        </datamodel>
+        <!-- We can also use actions onentry/exit of the state -->
+        <onentry>
+            <!-- Change the SCXML variable.  -->
+            <assign location="hellosToSpeak" expr="hellosToSpeak - 1"/>
+        </onentry>
+
+        <!-- Change the condition as we decrement onentry -->
+        <transition event="ParameterHaver.*" cond="hellosToSpeak > 0" target="example.ParameterHaver" />
+        <transition event="ParameterHaver.*" target="End" />
+    </state>
+
+    <final id="End" />
+</scxml>

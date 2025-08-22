@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="assigner">
+    <datamodel>
+        <data id="data" expr="'1'" />
+        <data id="#_STATE_PREFIX" expr="'de.unibi.citec.clf.bonsai.skills.'"/>
+        <data id="#_SLOTS">
+            <slots>
+                <slot key="Language" state="*" xpath="/language"/>
+            </slots>
+        </data>
+    </datamodel>
+
+    <state id="assigner">
+        <onentry>
+            <assign location="data" expr="'0'"/>
+        </onentry>
+    </state>
+
+    <state id="sourcer" src="${ROBOCUP}/filepath.xml">
+        <transition event="sourcer.success" target="compound"/>
+    </state>
+
+    <state id="compound" initial="A">
+        <state id="A">
+            <transition event="A.*" target="B"/>
+        </state>
+
+        <state id="B">
+            <transition event="B" target="End"/>
+        </state>
+    </state>
+
+    <state id="End">
+        <transition event="End.fatal">
+            <send event="fatal"/>
+        </transition>
+    </state>
+
+
+</scxml>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This Example introduces the Exit Status of a skill -->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="example.Succeeder">
+    <datamodel>
+        <data id="#_STATE_PREFIX" expr="'de.unibi.citec.clf.bonsai.skills.'"/>
+    </datamodel>
+
+    <!-- Use ctrl+n and search for `Succeeder` to jump to the skill definition -->
+    <!-- You will see how a possible status has to be registered during configure -->
+    <state id="example.Succeeder">
+        <transition event="Succeeder.success" target="End"/>
+        <transition event="Succeeder.error.never" target=""/>
+        <!-- we always have to react to the fatal transition -->
+        <transition event="Succeeder.fatal" target="Fatal"/>
+        <!-- if we are not interested in the status we can catch all like this -->
+        <!-- this would also transition on `Succeeder.error.never` but transitions are checked in order -->
+        <!-- (the reason you don't want to have `error` and `error.foo` in the same skill) -->
+        <transition event="Succeeder.error.*" target=""/>
+    </state>
+
+    <!-- End and Fatal can be used as final states -->
+    <state id="Fatal" final="true"/>
+    <state id="End" final="true"/>
+</scxml>

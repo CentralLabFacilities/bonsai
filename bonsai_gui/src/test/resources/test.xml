@@ -7,19 +7,14 @@
         <data id="#_SLOTS">
             <slots>
                 <slot key="Language" state="*" xpath="/language"/>
-
                 <slot key="Name" state="ecwm.EntityFromGivenName" xpath="/requestHandover/ItemName"/>
                 <slot key="Entity" state="ecwm.EntityFromGivenName" xpath="/askforobject/entity"/>
                 <slot key="Entity" state="ecwm.grasping.AttachEntity" xpath="/askforobject/entity"/>
-
                 <slot key="Entity" state="tasks.cleanup.AttachEntityWithOffset" xpath="/askforobject/entity"/>
-
                 <slot key="ReadSlot" state="slots.CopyAnySlot#prepare_say" xpath="/requestHandover/ItemName"/>
                 <slot key="WriteSlot" state="slots.CopyAnySlot#prepare_say" xpath="/entityNameInGripper"/>
-
                 <slot key="ReadSlot" state="slots.CopyAnySlot#prepare_placement" xpath="/askforobject/entity"/>
                 <slot key="WriteSlot" state="slots.CopyAnySlot#prepare_placement" xpath="/graspEntity"/>
-
                 <slot key="ReadSlot" state="slots.CompareSlot" xpath="/requestHandover/ItemName"/>
             </slots>
         </data>
