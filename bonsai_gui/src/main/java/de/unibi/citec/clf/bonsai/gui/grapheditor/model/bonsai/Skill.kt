@@ -1,9 +1,17 @@
 package de.unibi.citec.clf.bonsai.gui.grapheditor.model.bonsai
 
+import javafx.beans.property.SimpleStringProperty
+
 /**
  * Simple representation of Bonsai-Skill used in graph model.
  */
-class Skill(val name: String) {
+class Skill(name: String) {
+
+    val _name = SimpleStringProperty()
+    var name: String
+        get() = _name.get()
+        set(value) = _name.set(value)
+    fun nameProperty() = _name
 
     /**
      * Represents slots of skill.
@@ -39,6 +47,10 @@ class Skill(val name: String) {
      * Contains all available exit-stati of skill as List of ExitStatus.
      */
     val status = mutableListOf<ExitStatus>()
+
+    init {
+        this.name = name
+    }
 
     override fun toString(): String {
         return "Skill [name=$name, read_slots=$readSlots, write_slots=$writeSlots, required_vars=$requiredVars, optional_vars=$optionalVars, exit_status=$status]"

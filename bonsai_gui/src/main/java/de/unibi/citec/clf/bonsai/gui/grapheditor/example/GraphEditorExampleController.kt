@@ -110,12 +110,7 @@ class GraphEditorDemoController {
     }
 
     private fun addExampleSkills() {
-        val saySkill = Skill("dialog.Talk").apply {
-            requiredVars["#_MESSAGE"] = "Hello, i am tiago"
-            optionalVars["#_BLOCKING"] = "true"
-            addTransition("success")
-            addTransition("fatal")
-        }
+        val saySkill = Skill("dialog.Talk")
         graphEditor.model.availableSkills.addAll(saySkill)
     }
 
@@ -195,7 +190,7 @@ class GraphEditorDemoController {
     @FXML
     fun addSimpleState() {
         activeSkinController.get()?.addNode(graphEditor.view.localToSceneTransform.mxx, State().apply {
-            skill = graphEditor.model.availableSkills[0]
+            skill = graphEditorSkillHandler.selectNewSkill(graphEditor)
         })
         //graphEditorSkillHandler.showSelectionPopUp(graphEditor.view.scene.window)
     }
