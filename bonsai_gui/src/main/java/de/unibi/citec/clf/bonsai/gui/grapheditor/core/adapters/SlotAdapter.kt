@@ -1,6 +1,7 @@
 package de.unibi.citec.clf.bonsai.gui.grapheditor.core.adapters
 
 import de.unibi.citec.clf.bonsai.gui.grapheditor.model.bonsai.Skill
+import javafx.beans.property.SimpleBooleanProperty
 import javafx.beans.property.SimpleStringProperty
 
 /**
@@ -26,10 +27,24 @@ class SlotAdapter(slotName: String, slot: Skill.Slot) {
         get() = _xpath.get()
         set(value) = _xpath.set(value)
 
+    val _read = SimpleBooleanProperty()
+    fun readProperty() = _read
+    var read: Boolean
+        get() = _read.get()
+        set(value) = _read.set(value)
+
+    val _write = SimpleBooleanProperty()
+    fun writeProperty() = _write
+    var write: Boolean
+        get() = _write.get()
+        set(value) = _write.set(value)
+
     init {
         name = slotName
         dataType = slot.dataType.simpleName
         xpath = slot.xpath
+        read = slot.read
+        write = slot.write
     }
 
 

@@ -5,25 +5,27 @@ import de.unibi.citec.clf.bonsai.gui.grapheditor.api.GConnectorSkin
 import de.unibi.citec.clf.bonsai.gui.grapheditor.api.GNodeSkin
 import de.unibi.citec.clf.bonsai.gui.grapheditor.api.utils.GeometryUtils.moveOnPixel
 import de.unibi.citec.clf.bonsai.gui.grapheditor.core.adapters.SlotAdapter
+import de.unibi.citec.clf.bonsai.gui.grapheditor.core.adapters.VariableAdapter
+import de.unibi.citec.clf.bonsai.gui.grapheditor.example.customskins.bonsai.utils.SkillParamsTableGenerator
 import de.unibi.citec.clf.bonsai.gui.grapheditor.example.utils.AwesomeIcon
 import de.unibi.citec.clf.bonsai.gui.grapheditor.model.GNode
 import de.unibi.citec.clf.bonsai.gui.grapheditor.model.Selectable
 import de.unibi.citec.clf.bonsai.gui.grapheditor.model.bonsai.Skill
-import javafx.beans.binding.Bindings
 import javafx.css.PseudoClass
 import javafx.event.EventHandler
 import javafx.geometry.Point2D
 import javafx.geometry.Pos
 import javafx.scene.Cursor
-import javafx.scene.control.*
-import javafx.scene.control.cell.TextFieldTableCell
+import javafx.scene.control.Button
+import javafx.scene.control.Label
+import javafx.scene.control.TableView
+import javafx.scene.control.TextField
 import javafx.scene.input.MouseEvent
 import javafx.scene.layout.HBox
 import javafx.scene.layout.Priority
 import javafx.scene.layout.Region
 import javafx.scene.layout.VBox
 import javafx.scene.shape.Rectangle
-import javafx.util.Callback
 import java.util.Locale.getDefault
 
 class BonsaiNodeSkin(node: GNode) : GNodeSkin(node) {
@@ -41,7 +43,7 @@ class BonsaiNodeSkin(node: GNode) : GNodeSkin(node) {
         private val PSEUDO_CLASS_SELECTED = PseudoClass.getPseudoClass("selected")
 
         private const val MIN_WIDTH = 300.0
-        private const val MIN_HEIGHT = 800.0
+        private const val MIN_HEIGHT = 1000.0
         private const val BORDER_WIDTH = 1.0
         private const val HEADER_HEIGHT = 20.0
         private const val TRANSITIONS_HEIGHT = 40.0
@@ -51,10 +53,6 @@ class BonsaiNodeSkin(node: GNode) : GNodeSkin(node) {
         private const val HALO_CORNER_SIZE = 10.0
     }
 
-    private fun TableView<*>.shrinkToContent(rowHeight: Double = 30.0, headerHeight: Double = 30.0) {
-        fixedCellSize = rowHeight
-        prefHeightProperty().bind(Bindings.size(items).multiply(rowHeight).subtract(rowHeight).add(headerHeight))
-    }
 
     private val selectionHalo = Rectangle()
 
@@ -62,15 +60,12 @@ class BonsaiNodeSkin(node: GNode) : GNodeSkin(node) {
     private val header = HBox()
     private val transitions = VBox()
     private val slots = VBox()
-    private val tableReadSlots = TableView<SlotAdapter>().apply {
-        shrinkToContent()
-    }
-    private val readSlotsAdapted = mutableListOf<SlotAdapter>()
-    private val writeSlotsAdapted = mutableListOf<SlotAdapter>()
-    private val optVarsAdapted = mutableListOf<Any>()
-    private val reqVarsAdapted = mutableListOf<Any>()
-    private val optVars = VBox()
-    private val reqVars = VBox()
+    private var tableSlots = TableView<SlotAdapter>()
+    private var tableReqVars = TableView<VariableAdapter>()
+    private var tableOptVars = TableView<VariableAdapter>()
+    private val slotsAdapted = mutableListOf<SlotAdapter>()
+    private val optVarsAdapted = mutableListOf<VariableAdapter>()
+    private val reqVarsAdapted = mutableListOf<VariableAdapter>()
     private val title = Label()
 
     private var inputConnectorSkin: GConnectorSkin? = null
@@ -208,6 +203,10 @@ class BonsaiNodeSkin(node: GNode) : GNodeSkin(node) {
         return SlotAdapter(slot.key, slot.value)
     }
 
+    private fun varToVarAdapter(variable: Map.Entry<String, Skill.Variable>): VariableAdapter {
+        return VariableAdapter(variable.key, variable.value)
+    }
+
     private fun createContent() {
         when (item) {
             is GNode -> {
@@ -223,99 +222,75 @@ class BonsaiNodeSkin(node: GNode) : GNodeSkin(node) {
                 header.children.addAll(title, filler, closeButton)
 
                 val slotLabel = Label().apply { text = "Slots:" }
+                val noSlotLabel = Label().apply { text = "No Slots found" }
                 val reqVarsLabel = Label().apply { text = "Required Vars:" }
+                val noReqVarsLabel = Label().apply { text = "No required Vars found" }
                 val optVarsLabel = Label().apply { text = "Optional Vars:" }
+                val noOptVarsLabel = Label().apply { text = "No optional Vars found" }
                 val transitionLabel = Label().apply { text = "Transitions:" }
 
                 item.state?.let { state ->
 
                     state.skill?.let { skill ->
 
-                        skill.writeSlots.forEach {
-                            readSlotsAdapted += slotToSlotAdapter(it)
-                        }
-
-                        tableReadSlots.apply {
-                            columns += TableColumn<SlotAdapter, String>("Name").apply {
-                                cellValueFactory = Callback { it.value.nameProperty() }
-                                cellFactory = TextFieldTableCell.forTableColumn()
-                            }
-                            columns += TableColumn<SlotAdapter, String>("DataType").apply {
-                                cellValueFactory = Callback { it.value.dataTypeProperty() }
-                                cellFactory = TextFieldTableCell.forTableColumn()
-                            }
-                        }
-                        val xpathColumn = TableColumn<SlotAdapter, String>("xPath").apply {
-                            cellValueFactory = Callback { it.value.xpathProperty() }
-                            cellFactory = Callback {
-                                object : TableCell<SlotAdapter, String>() {
-                                    private val textField = TextField()
-
-                                    init {
-                                        textField.textProperty().addListener { _, _, newValue ->
-                                            if (index >= 0 && index < tableReadSlots.items.size) {
-                                                tableReadSlots.items[index].xpathProperty().set(newValue)
-                                            }
-                                        }
-                                        graphic = textField
-                                    }
-
-                                    override fun updateItem(item: String?, empty: Boolean) {
-                                        super.updateItem(item, empty)
-                                        if (empty || item == null) {
-                                            graphic = null
-                                        } else {
-                                            textField.text = item
-                                            graphic = textField
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        tableReadSlots.columns += xpathColumn
-                        tableReadSlots.items.addAll(readSlotsAdapted)
-                        skill.writeSlots.forEach {
-                            writeSlotsAdapted += slotToSlotAdapter(it)
-                        }
-
-
-                        skill.requiredVars.forEach { requiredVars ->
-                            reqVars.children += processVar(requiredVars)
-                        }
-                        skill.optionalVars.forEach { optionalVars ->
-                            optVars.children += processVar(optionalVars)
-                        }
                         skill.status.forEach { status ->
                             transitions.children += HBox().apply {
                                 val transitionFiller = Region()
                                 HBox.setHgrow(filler, Priority.ALWAYS)
                                 children += transitionFiller
                                 children += Label().apply {
-                                    if (status.statusSuffix == "") {
-                                        text = status.status.toString().lowercase(getDefault())
+                                    text = if (status.statusSuffix == "") {
+                                        status.status.toString().lowercase(getDefault())
                                     } else {
-                                        text = status.status.toString().lowercase(getDefault()).plus(".")
+                                        status.status.toString().lowercase(getDefault()).plus(".")
                                             .plus(status.statusSuffix)
                                     }
                                 }
                             }
                         }
+                        contentRoot.children.addAll(
+                            header,
+                            transitionLabel,
+                            transitions
+                        )
+
+                        skill.slots.forEach {
+                            slotsAdapted += slotToSlotAdapter(it)
+                        }
+                        if (slotsAdapted.isNotEmpty()) {
+                            contentRoot.children.addAll(
+                                slotLabel,
+                                SkillParamsTableGenerator.generateSlotTable(slotsAdapted)
+                            )
+                        } else {
+                            contentRoot.children += noSlotLabel
+                        }
+                        skill.requiredVars.forEach {
+                            reqVarsAdapted += varToVarAdapter(it)
+                        }
+                        if (reqVarsAdapted.isNotEmpty()) {
+                            contentRoot.children.addAll(
+                                reqVarsLabel,
+                                SkillParamsTableGenerator.generateVarsTable(reqVarsAdapted)
+                            )
+                        } else {
+                            contentRoot.children += noReqVarsLabel
+                        }
+                        skill.optionalVars.forEach {
+                            optVarsAdapted += varToVarAdapter(it)
+                        }
+                        if (optVarsAdapted.isNotEmpty()) {
+                            contentRoot.children.addAll(
+                                optVarsLabel,
+                                SkillParamsTableGenerator.generateVarsTable(optVarsAdapted)
+                            )
+                        } else {
+                            contentRoot.children += noOptVarsLabel
+                        }
+
+
                     }
                 }
-
-                contentRoot.children.addAll(
-                    header,
-                    slotLabel,
-                    tableReadSlots,
-                    reqVarsLabel,
-                    reqVars,
-                    optVarsLabel,
-                    optVars,
-                    transitionLabel,
-                    transitions
-                )
-                contentRoot.children.forEach { VBox.setVgrow(it, Priority.ALWAYS) }
                 root!!.children.add(contentRoot)
                 closeButton.graphic = AwesomeIcon.TIMES.node()
                 closeButton.cursor = Cursor.DEFAULT

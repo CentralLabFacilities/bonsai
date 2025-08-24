@@ -31,6 +31,7 @@ import javafx.geometry.Pos
 import javafx.geometry.Side
 import javafx.scene.control.*
 import javafx.scene.layout.AnchorPane
+import org.apache.log4j.Logger
 
 /**
  * Controller for the [GraphEditorDemo] application.
@@ -189,10 +190,12 @@ class GraphEditorDemoController {
 
     @FXML
     fun addSimpleState() {
-        activeSkinController.get()?.addNode(graphEditor.view.localToSceneTransform.mxx, State().apply {
-            skill = graphEditorSkillHandler.selectNewSkill(graphEditor)
-        })
-        //graphEditorSkillHandler.showSelectionPopUp(graphEditor.view.scene.window)
+        graphEditorSkillHandler.selectNewSkill(graphEditor)?.let {
+            activeSkinController.get()?.addNode(graphEditor.view.localToSceneTransform.mxx, State().apply {
+                skill = it
+            })
+            LOGGER.trace("Generated node for skill '${it.name}'")
+        } ?: LOGGER.trace("Can't generate node for skill 'null', skipping")
     }
 
     @FXML
@@ -318,6 +321,7 @@ class GraphEditorDemoController {
     }
 
     companion object {
-        private const val STYLE_CLASS_TITLED_SKINS = "titled-skins" //$NON-NLS-1$
+        private const val STYLE_CLASS_TITLED_SKINS = "titled-skins"
+        private val LOGGER = Logger.getLogger(GraphEditorDemoController::class.java)
     }
 }
