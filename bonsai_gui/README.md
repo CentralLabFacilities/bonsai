@@ -1,7 +1,5 @@
-Adapted from the javafxgraph project by mirkosertic.
+## Known issues
 
-Github: https://github.com/mirkosertic/javafxgraph/tree/master
-
-TODOS:
-
-- Make classes compliant to MVC-pattern
+----
+  - Skills with variable number of slots can't be displayed correctly
+    - e.g. MergeStringSlots,... 

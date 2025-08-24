@@ -16,7 +16,11 @@ class Skill(name: String) {
     /**
      * Represents slots of skill.
      */
-    data class Slot(val dataType: Class<*>, var xpath: String = "")
+    data class Slot(val dataType: Class<*>, var xpath: String = "", var read: Boolean = false, var write: Boolean = false) {
+        override fun toString(): String {
+            return "Slot [dataType=${dataType.simpleName}, xpath=$xpath, read=$read, write=$write]"
+        }
+    }
 
     /**
      * Represents variables of skill.
@@ -24,14 +28,10 @@ class Skill(name: String) {
     data class Variable(val dataType: Class<*>, var expression: Any?)
 
     /**
-     * Contains read-slots of skill as key-value pair <simple name, slot>.
+     * Contains slots of skill as key-value pair <simple name, slot>.
      */
-    val readSlots = mutableMapOf<String, Slot>()
+    val slots = mutableMapOf<String, Slot>()
 
-    /**
-     * Contains write-slots of skill as key-value pair <simple name, slot>.
-     */
-    val writeSlots = mutableMapOf<String, Slot>()
 
     /**
      * Contains required variables of skill as key-value pair <id, variables>.
@@ -53,6 +53,6 @@ class Skill(name: String) {
     }
 
     override fun toString(): String {
-        return "Skill [name=$name, read_slots=$readSlots, write_slots=$writeSlots, required_vars=$requiredVars, optional_vars=$optionalVars, exit_status=$status]"
+        return "Skill [name=$name, slots=$slots, required_vars=$requiredVars, optional_vars=$optionalVars, exit_status=$status]"
     }
 }
