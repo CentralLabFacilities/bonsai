@@ -109,13 +109,13 @@ data class SCXML private constructor(
 ) {
 
     constructor(initial: String, states: List<State>, data: List<Data>?, slots: List<Slot>?) : this(
-        datamodel = DataModel(mutableListOf<Data>().also { if (data != null) it.addAll(data) }),
+        datamodel = DataModel(mutableListOf<Data>().also {
+            if (data != null) it.addAll(data)
+            if (slots!=null) it.add(Data("#_SLOTS", null, Slots(slots)))
+        }),
         initial = initial,
         states = states
-    ) {
-        val slots = Data("#_SLOTS", null, Slots(slots))
-        datamodel.data
-    }
+    )
 
     val data: List<Data> get() = datamodel.data.filter { it.slots == null}
     val slots: List<Slot> get() = datamodel.data.find { it.slots != null }?.slots?.data ?: listOf()
