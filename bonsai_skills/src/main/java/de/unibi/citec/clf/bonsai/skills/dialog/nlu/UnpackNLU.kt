@@ -67,10 +67,10 @@ class UnpackNLU : AbstractSkill() {
 
         nluSlot = configurator.getReadSlot("NLUSlot", NLU::class.java)
         for (item in configurator.configurationKeys) {
-            if(item.startsWith("#_")) continue
-            if(item.startsWith("#")) {
+            if (item.startsWith("#_")) continue
+            if (item.startsWith("#")) {
                 entitySet.add(item.substring(1))
-                val a = configurator.requestValue(item)
+                configurator.requestValue(item)
             }
         }
 
@@ -101,9 +101,14 @@ class UnpackNLU : AbstractSkill() {
             if (match.isEmpty() || match.size > 3) return ExitToken.fatal()
 
             val key = match.first()
-            val role = if (match.size >= 2 ) match[1] else ""
-            val group = if (match.size == 3) match[2].toInt() else -1
-            val filtered = nlu.getEntities().filter { it.key == key && it.role == role && it.group == group }
+            val role = if (match.size >= 2) match[1] else ""
+            val group = if (match.size == 3) match[2].toInt() else null
+            val filtered = nlu.getEntities()
+                .filter {
+                    (it.key == key) &&
+                    (it.role == role || (role.isEmpty() && it.role.isNullOrEmpty())) &&
+                    (it.group == group)
+                }
 
             if (filtered.size != 1) {
                 logger.error("${if (filtered.isEmpty()) "missing" else "multiple"} entity with key:$key role:$role group:$group")
