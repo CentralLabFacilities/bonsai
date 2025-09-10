@@ -112,6 +112,10 @@ class WaitForNLU : AbstractSkill() {
             logger.warn(ex)
         }
 
+        if (langSlot != null) {
+            logger.debug("Will set LANGUAGE from NLU")
+        }
+
         helper = SimpleNLUHelper(speechSensor, true)
         helper!!.startListening()
         return true
@@ -134,7 +138,10 @@ class WaitForNLU : AbstractSkill() {
         if (any) {
             try {
                 nluSlot?.memorize<NLU>(understood[0])
-                langSlot?.memorize(LanguageType(understood[0].lang))
+                langSlot?.apply {
+                    logger.debug("write LanguageType: '${understood[0].lang}' to slot")
+                    memorize(LanguageType(understood[0].lang))
+                }
                 logger.info("memorized: " + understood[0])
                 return tokenMap["any"]!!
             } catch (e: CommunicationException) {
