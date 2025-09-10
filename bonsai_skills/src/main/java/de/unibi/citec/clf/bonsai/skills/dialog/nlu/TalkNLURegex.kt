@@ -123,7 +123,8 @@ class TalkNLURegex : AbstractSkill() {
                 3 -> {
                     val key = match.groupValues[1]
                     val role = match.groupValues[2]
-                    val filtered = nlu.getEntities().filter { it.key == key && it.role == role }
+                    val filtered = nlu.getEntities()
+                        .filter { it.key == key && (it.role == role || (role.isEmpty() && it.role.isNullOrEmpty())) }
                     if (filtered.size != 1)
                         throw RuntimeException("${if (filtered.isEmpty()) "missing" else "multiple"} entity with key:$key role:$role")
                     filtered.first().value
