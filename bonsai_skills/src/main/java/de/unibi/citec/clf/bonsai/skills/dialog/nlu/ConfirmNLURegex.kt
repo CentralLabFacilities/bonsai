@@ -90,7 +90,7 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
         private const val PS_YES = "confirmYes"
     }
 
-    private var spokenLanguage : Language = Language.EN
+    private var spokenLanguage: Language = Language.EN
     private val finalReplacements = mapOf("""\b([mM]e)|([uU][sS][eE][rR])\b""" to "YOU", """\b[yY]ou\b""" to "ME")
     private var doFinalReplacements = true
     private var confirmText = "You want ME to: #M?"
@@ -128,7 +128,7 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
 
         useDefault = configurator.requestOptionalBool(KEY_USE_DEFAULT, useDefault)
         doFinalReplacements = configurator.requestOptionalBool(KEY_DO_FINAL_REPLACEMENTS, doFinalReplacements)
-        if(!useDefault) tokenErrorUnlisted = configurator.requestExitToken(ExitStatus.ERROR().ps("unlisted"))
+        if (!useDefault) tokenErrorUnlisted = configurator.requestExitToken(ExitStatus.ERROR().ps("unlisted"))
         nluSlot = configurator.getReadSlot("NLUSlot", NLU::class.java)
         timeout = configurator.requestOptionalInt(KEY_TIMEOUT, timeout.toInt()).toLong()
         timeUntilRepeat = configurator.requestOptionalInt(KEY_REPEAT, timeUntilRepeat.toInt()).toLong()
@@ -147,8 +147,8 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
         speechActuator = configurator.getActuator<SpeechActuator>(ACTUATOR_SPEECHACTUATOR, SpeechActuator::class.java)
 
         val mappings = configurator.requestOptionalValue(KEY_MAPPING, "")
-                .replace("""\n""".toRegex(), "")
-                .replace("""\s+""".toRegex(), " ")
+            .replace("""\n""".toRegex(), "")
+            .replace("""\s+""".toRegex(), " ")
 
         for (m in mappings.split(";")) {
             if (m.isBlank()) continue // last string after ;
@@ -169,11 +169,13 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
                 3 -> {
                     val key = match.groupValues[1]
                     val role = match.groupValues[2]
-                    val filtered = nlu.getEntities().filter { it.key == key && it.role == role }
+                    val filtered = nlu.getEntities()
+                        .filter { it.key == key && (it.role == role || (role.isEmpty() && it.role.isNullOrEmpty())) }
                     if (filtered.size != 1)
-                        throw RuntimeException("${if (filtered.isEmpty()) "missing" else "multiple"} entity with key:$key role:$role")
+                        throw RuntimeException("${if (filtered.isEmpty()) "missing" else "multiple"} entity with key:'$key' role:'$role'")
                     filtered.first().value
                 }
+
                 else -> {
                     throw RuntimeException("unhandled match group size: ${match.groupValues.size}")
                 }
@@ -217,7 +219,7 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
     }
 
     override fun execute(): ExitToken {
-        if(!foundMapping) return tokenErrorUnlisted!!
+        if (!foundMapping) return tokenErrorUnlisted!!
 
         if (!computed) {
             try {
@@ -262,7 +264,8 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
         if (Time.currentTimeMillis() > nextRepeat) {
             if (timesAsked++ < maxRepeats) {
                 try {
-                    sayingComplete = speechActuator!!.sayTranslated(confirmText,spokenLanguage, textLanguage = Language.EN)
+                    sayingComplete =
+                        speechActuator!!.sayTranslated(confirmText, spokenLanguage, textLanguage = Language.EN)
                 } catch (ex: IOException) {
                     logger.error("IO Exception in speechActuator")
                 }
@@ -279,7 +282,11 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
                 return tokenSuccessPsNo
             }
             try {
-                sayingComplete = speechActuator!!.sayTranslated("Please answer with yes or no!",spokenLanguage, textLanguage = Language.EN)
+                sayingComplete = speechActuator!!.sayTranslated(
+                    "Please answer with yes or no!",
+                    spokenLanguage,
+                    textLanguage = Language.EN
+                )
             } catch (ex: IOException) {
                 logger.error("IO Exception in speechActuator")
             }
