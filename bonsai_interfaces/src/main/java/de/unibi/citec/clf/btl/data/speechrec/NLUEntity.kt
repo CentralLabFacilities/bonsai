@@ -38,7 +38,7 @@ class NLUEntity(val key: String, val value: String, val role: String?, val group
     }
 
     override fun toString(): String {
-        return "NLUEntity($key, entity=$value, role=$role, entityScore=$entityScore, roleScore=$roleScore)"
+        return "NLUEntity(key=$key, value=$value, role=$role, entityScore=$entityScore, roleScore=$roleScore)"
     }
 
     public override fun clone(): NLUEntity {
