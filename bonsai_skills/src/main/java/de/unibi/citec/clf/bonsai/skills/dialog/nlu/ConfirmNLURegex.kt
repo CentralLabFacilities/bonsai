@@ -91,7 +91,7 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
     }
 
     private var spokenLanguage : Language = Language.EN
-    private val finalReplacements = mapOf("""\bme\b""" to "YOU", """\byou\b""" to "ME")
+    private val finalReplacements = mapOf("""\b([mM]e)|([uU][sS][eE][rR])\b""" to "YOU", """\b[yY]ou\b""" to "ME")
     private var doFinalReplacements = true
     private var confirmText = "You want ME to: #M?"
     private var defaultMapping = "#T"
