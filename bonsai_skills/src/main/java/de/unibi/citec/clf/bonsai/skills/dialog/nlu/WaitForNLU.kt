@@ -2,6 +2,7 @@ package de.unibi.citec.clf.bonsai.skills.dialog.nlu
 
 import de.unibi.citec.clf.bonsai.actuators.SpeechActuator
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException
+import de.unibi.citec.clf.bonsai.core.exception.ConfigurationException
 import de.unibi.citec.clf.bonsai.core.`object`.MemorySlotWriter
 import de.unibi.citec.clf.bonsai.core.`object`.Sensor
 import de.unibi.citec.clf.bonsai.core.time.Time
@@ -11,6 +12,7 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitToken
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
 import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException
 import de.unibi.citec.clf.bonsai.util.helper.SimpleNLUHelper
+import de.unibi.citec.clf.btl.data.speechrec.Language
 import de.unibi.citec.clf.btl.data.speechrec.LanguageType
 import de.unibi.citec.clf.btl.data.speechrec.NLU
 import java.lang.Exception
@@ -50,7 +52,10 @@ class WaitForNLU : AbstractSkill() {
         private const val KEY_TIMEOUT = "#_TIMEOUT"
         private const val KEY_ANY = "#_ANY"
         private const val KEY_SENSOR = "#_SENSOR_KEY"
+        private const val KEY_ALLOWED_LANGUAGES = "#_ALLOWED_LANGUAGES"
     }
+
+    private var allowedLanguages : MutableList<Language>? = null
 
     private var speechActuator: SpeechActuator? = null
     private var possible_intents: List<String> = mutableListOf()
@@ -61,6 +66,7 @@ class WaitForNLU : AbstractSkill() {
 
     private var helper: SimpleNLUHelper? = null
 
+    private var tokenErrorLanguage: ExitToken? = null
     private var tokenSuccessPsTimeout: ExitToken? = null
     private val tokenMap = HashMap<String, ExitToken>()
 
@@ -97,6 +103,18 @@ class WaitForNLU : AbstractSkill() {
         }
 
         speechActuator = configurator.getActuator("SpeechActuator", SpeechActuator::class.java)
+
+        if (configurator.hasConfigurationKey(KEY_ALLOWED_LANGUAGES)) {
+            //TODO
+            if(!any) throw ConfigurationException("!any has no allowed_language support")
+
+            allowedLanguages = mutableListOf()
+            val langs = configurator.requestValue(KEY_ALLOWED_LANGUAGES)
+            for (l in langs.split(";")) {
+                allowedLanguages?.add(Language.valueOf(l))
+            }
+            tokenErrorLanguage = configurator.requestExitToken(ExitStatus.ERROR().ps("language"))
+        }
     }
 
     override fun init(): Boolean {
@@ -129,20 +147,26 @@ class WaitForNLU : AbstractSkill() {
                     return tokenSuccessPsTimeout!!
                 }
             }
-
             return ExitToken.loop(50)
         }
         logger.debug("have new understanding...")
 
         val understood = helper!!.allNLUs
         if (any) {
+            val nlu = understood[0]
+            langSlot?.apply {
+                logger.debug("write LanguageType: '${nlu.lang}' to slot")
+                memorize(LanguageType(nlu.lang))
+            }
+
+            if (!allowedLanguages.isNullOrEmpty() && !allowedLanguages?.contains(nlu.lang)!!) {
+                logger.error("Input has wrong Language: ${nlu.lang} (allowed $allowedLanguages)")
+                return tokenErrorLanguage!!
+            }
+
             try {
-                nluSlot?.memorize<NLU>(understood[0])
-                langSlot?.apply {
-                    logger.debug("write LanguageType: '${understood[0].lang}' to slot")
-                    memorize(LanguageType(understood[0].lang))
-                }
-                logger.info("memorized: " + understood[0])
+                nluSlot?.memorize<NLU>(nlu)
+                logger.info("memorized: " + nlu)
                 return tokenMap["any"]!!
             } catch (e: CommunicationException) {
                 return ExitToken.fatal()
