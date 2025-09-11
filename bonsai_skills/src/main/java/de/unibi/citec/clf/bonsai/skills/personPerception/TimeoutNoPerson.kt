@@ -176,7 +176,7 @@ class TimeoutNoPerson : AbstractSkill() {
             }
         }
         if (personInFront != null) {
-            logger.trace("reset timeout")
+            logger.debug("reset timeout")
             timeout = Time.currentTimeMillis() + maxTimeout
         }
         return ExitToken.loop()
