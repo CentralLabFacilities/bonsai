@@ -98,7 +98,10 @@ class UnpackNLU : AbstractSkill() {
         for (item in entitySet) {
             val match = item.split(":")
             logger.trace("splitting '$item' on ':' has ${match.size} values")
-            if (match.isEmpty() || match.size > 3) return ExitToken.fatal()
+            if (match.isEmpty() || match.size > 3) {
+                logger.error("spltting into: ${match.size} (>3 or 0)" )
+                return ExitToken.fatal()
+            }
 
             val key = match.first()
             val role = if (match.size >= 2) match[1] else ""
@@ -107,11 +110,12 @@ class UnpackNLU : AbstractSkill() {
                 .filter {
                     (it.key == key) &&
                     (it.role == role || (role.isEmpty() && it.role.isNullOrEmpty())) &&
-                    (it.group == group)
+                    (it.group == group || (group == null && it.group == -1))
                 }
 
             if (filtered.size != 1) {
-                logger.error("${if (filtered.isEmpty()) "missing" else "multiple"} entity with key:$key role:$role group:$group")
+                logger.error("${if (filtered.isEmpty()) "missing" else "multiple"} entity with key:'$key' role:'$role' group:'$group'")
+                nlu.getEntities().forEach { logger.warn("- have: key:'${it.key}' role:'${it.role}' group:'${it.group}'") }
                 return tokenMap[item]!!
             }
 
