@@ -110,7 +110,7 @@ class UnpackNLU : AbstractSkill() {
                 .filter {
                     (it.key == key) &&
                     (it.role == role || (role.isEmpty() && it.role.isNullOrEmpty())) &&
-                    (it.group == group || (group == null && it.group == -1))
+                    (it.group == group || (group == null && (it.group == -1 || it.group == 0) ) )
                 }
 
             if (filtered.size != 1) {
