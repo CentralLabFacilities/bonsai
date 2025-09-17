@@ -71,6 +71,7 @@ public class TalkRandom extends AbstractSkill {
         String[] texts = text.split(";");
 
         try {
+            //TODO("Add multi language support")
             sayingComplete = speechActuator.sayAsync(texts[new Random().nextInt(texts.length)], Language.EN);
         } catch (IOException ex) {
             logger.error("Could not call speech actuator");
