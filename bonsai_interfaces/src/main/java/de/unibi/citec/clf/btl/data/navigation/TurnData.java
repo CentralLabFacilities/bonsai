@@ -2,6 +2,7 @@ package de.unibi.citec.clf.btl.data.navigation;
 
 
 
+import de.unibi.citec.clf.btl.StampedType;
 import org.apache.log4j.Logger;
 
 import de.unibi.citec.clf.btl.Type;
@@ -16,7 +17,7 @@ import de.unibi.citec.clf.btl.units.UnitConverter;
  * @author lziegler
  * @author unknown
  */
-public class TurnData extends Type  {
+public class TurnData extends StampedType {
 
 	private static Logger logger = Logger.getLogger(TurnData.class);
 

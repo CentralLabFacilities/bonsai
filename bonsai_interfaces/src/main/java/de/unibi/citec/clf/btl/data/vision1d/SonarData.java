@@ -2,6 +2,7 @@ package de.unibi.citec.clf.btl.data.vision1d;
 
 
 
+import de.unibi.citec.clf.btl.StampedType;
 import de.unibi.citec.clf.btl.Type;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 import de.unibi.citec.clf.btl.units.UnitConverter;
@@ -12,7 +13,7 @@ import de.unibi.citec.clf.btl.units.UnitConverter;
  * 
  * @author sebschne
  */
-public class SonarData extends Type {
+public class SonarData extends StampedType {
 
 	private double distanceRight;
 	private double distanceLeft;

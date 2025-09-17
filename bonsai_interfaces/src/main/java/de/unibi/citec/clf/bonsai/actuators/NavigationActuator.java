@@ -3,12 +3,8 @@ package de.unibi.citec.clf.bonsai.actuators;
 
 
 import de.unibi.citec.clf.bonsai.core.object.Actuator;
-import de.unibi.citec.clf.btl.data.navigation.CommandResult;
-import de.unibi.citec.clf.btl.data.navigation.DriveData;
-import de.unibi.citec.clf.btl.data.navigation.GlobalPlan;
-import de.unibi.citec.clf.btl.data.navigation.NavigationGoalData;
-import de.unibi.citec.clf.btl.data.navigation.PositionData;
-import de.unibi.citec.clf.btl.data.navigation.TurnData;
+import de.unibi.citec.clf.btl.data.navigation.*;
+import de.unibi.citec.clf.btl.data.geometry.Pose2D;
 import de.unibi.citec.clf.btl.units.AngleUnit;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 import de.unibi.citec.clf.btl.units.RotationalSpeedUnit;
@@ -59,7 +55,7 @@ public interface NavigationActuator extends Actuator {
      * @throws IOException
      *             communication error
      */
-    Future<GlobalPlan> getPlan(NavigationGoalData data, PositionData startPos) throws IOException;
+    Future<GlobalPlan> getPlan(NavigationGoalData data, Pose2D startPos) throws IOException;
 
     /**
      * Drives the robot forward or behind.

@@ -2,12 +2,13 @@ package de.unibi.citec.clf.btl.data.geometry;
 
 
 
+import de.unibi.citec.clf.btl.StampedType;
 import de.unibi.citec.clf.btl.Type;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 
 import java.util.Objects;
 
-public class BoundingBox3D extends Type {
+public class BoundingBox3D extends StampedType {
 
 	protected Pose3D pose = new Pose3D();
 	protected Point3D size = new Point3D();

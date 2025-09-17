@@ -8,7 +8,7 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.btl.data.navigation.NavigationGoalData;
-import de.unibi.citec.clf.btl.data.navigation.PositionData;
+import de.unibi.citec.clf.btl.data.geometry.Pose2D;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 import java.io.IOException;
 
@@ -51,7 +51,7 @@ public class CheckGoalDistance extends AbstractSkill {
     private static final String POSITIVE_RESPONSE = "WithinDistance";
     private static final String NEGATIVE_RESPONSE = "OutOfDistance";
 
-    private Sensor<PositionData> positionSensor;
+    private Sensor<Pose2D> positionSensor;
     private MemorySlotReader<NavigationGoalData> navigationGoalDataSlot;
 
     @Override
@@ -60,7 +60,7 @@ public class CheckGoalDistance extends AbstractSkill {
         tokenSuccessPositiveResponse = configurator.requestExitToken(ExitStatus.SUCCESS().ps(POSITIVE_RESPONSE));
         tokenSuccessNegativeResponse = configurator.requestExitToken(ExitStatus.SUCCESS().ps(NEGATIVE_RESPONSE));
 
-        positionSensor = configurator.getSensor("PositionSensor", PositionData.class);
+        positionSensor = configurator.getSensor("PositionSensor", Pose2D.class);
         navigationGoalDataSlot = configurator.getReadSlot("NavigationGoalDataSlot", NavigationGoalData.class);
 
         minGoalDistance = configurator.requestOptionalDouble(KEY_DISTANCE, minGoalDistance);
@@ -74,7 +74,7 @@ public class CheckGoalDistance extends AbstractSkill {
     @Override
     public ExitToken execute() {
         NavigationGoalData navigationGoalData;
-        PositionData currentRobotPosition;
+        Pose2D currentRobotPosition;
         try {
             navigationGoalData = navigationGoalDataSlot.recall();
             currentRobotPosition = positionSensor.readLast(1000);

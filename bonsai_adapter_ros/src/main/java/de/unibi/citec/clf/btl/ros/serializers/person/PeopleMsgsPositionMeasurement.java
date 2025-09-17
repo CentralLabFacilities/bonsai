@@ -1,9 +1,7 @@
 package de.unibi.citec.clf.btl.ros.serializers.person;
 
 import de.unibi.citec.clf.btl.data.geometry.Point3D;
-import de.unibi.citec.clf.btl.data.geometry.Pose3D;
-import de.unibi.citec.clf.btl.data.geometry.Rotation3D;
-import de.unibi.citec.clf.btl.data.navigation.PositionData;
+import de.unibi.citec.clf.btl.data.geometry.Pose2D;
 import de.unibi.citec.clf.btl.data.person.PersonData;
 import de.unibi.citec.clf.btl.ros.MsgTypeFactory;
 import de.unibi.citec.clf.btl.ros.RosSerializer;
@@ -22,7 +20,7 @@ public class PeopleMsgsPositionMeasurement extends RosSerializer<PersonData, Pos
         MsgTypeFactory.setHeader(person,msg.getHeader());
 
         Point3D point = MsgTypeFactory.getInstance().createType(msg.getPos(), Point3D.class);
-        PositionData pose = new PositionData();
+        Pose2D pose = new Pose2D();
 
         MsgTypeFactory.setHeader(pose,msg.getHeader());
         pose.setX(point.getX(LengthUnit.METER),LengthUnit.METER);

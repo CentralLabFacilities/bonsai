@@ -1,6 +1,7 @@
 package de.unibi.citec.clf.btl.data.vision1d;
 
 
+import de.unibi.citec.clf.btl.StampedType;
 import org.apache.log4j.Logger;
 import de.unibi.citec.clf.btl.Type;
 import de.unibi.citec.clf.btl.data.hardwareinfo.LaserInfo;
@@ -21,7 +22,7 @@ import de.unibi.citec.clf.btl.units.UnitConverter;
  * @author jwienke
  * @author lziegler
  */
-public class LaserData extends Type {
+public class LaserData extends StampedType {
 
     private final static Logger logger = Logger.getLogger(LaserData.class);
 

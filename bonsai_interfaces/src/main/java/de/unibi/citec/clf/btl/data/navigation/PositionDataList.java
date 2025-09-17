@@ -2,6 +2,7 @@ package de.unibi.citec.clf.btl.data.navigation;
 
 
 
+import de.unibi.citec.clf.btl.data.geometry.Pose2D;
 import org.apache.log4j.Logger;
 
 import de.unibi.citec.clf.btl.List;
@@ -11,13 +12,13 @@ import de.unibi.citec.clf.btl.List;
  * 
  * @author: Denis Schulze <dschulze@techfak.uni-bielefeld.de>
  */
-public class PositionDataList extends List<PositionData> {
+public class PositionDataList extends List<Pose2D> {
 
     private static final Logger logger = Logger.getLogger(PositionDataList.class);
 
     /** Constructor. */
     public PositionDataList() {
-        super(PositionData.class);
+        super(Pose2D.class);
     }
 
     /** Constructor. */
@@ -26,17 +27,17 @@ public class PositionDataList extends List<PositionData> {
     }
 
     /** Constructor. */
-    public PositionDataList(List<PositionData> other) {
+    public PositionDataList(List<Pose2D> other) {
         super(other);
     }
 
     /** Adds new person data to this list. */
-    public void addPositionData(PositionData data) {
+    public void addPositionData(Pose2D data) {
         add(data);
     }
 
     /** Returns the person data from the list. */
-    public PositionData getPositionData(int index) {
+    public Pose2D getPositionData(int index) {
         if (index > size())
             return null;
 
@@ -44,7 +45,7 @@ public class PositionDataList extends List<PositionData> {
     }
 
     /** Update an existing PositionData by index. */
-    public void updatePositionData(int index, PositionData data) {
+    public void updatePositionData(int index, Pose2D data) {
         set(index, data);
     }
 

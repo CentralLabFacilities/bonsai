@@ -13,7 +13,7 @@ import org.apache.log4j.Logger;
 public class Point3D extends Point2D {
     
     private final Logger logger = Logger.getLogger(Point3D.class);
-    
+
     protected double z;
     
     @Override
@@ -50,23 +50,21 @@ public class Point3D extends Point2D {
             return false;
         }
         
-        return Objects.equals(other.frameId, frameId);
+        return true;
     }
     
     @Override
     public int hashCode() {
         int hash = 7;
-        hash = 97 * hash + (int) (Double.doubleToLongBits(this.x) ^ (Double.doubleToLongBits(this.x) >>> 32));
-        hash = 97 * hash + (int) (Double.doubleToLongBits(this.y) ^ (Double.doubleToLongBits(this.y) >>> 32));
-        hash = 97 * hash + (int) (Double.doubleToLongBits(this.z) ^ (Double.doubleToLongBits(this.z) >>> 32));
-        hash = 97 * hash + Objects.hashCode(this.frameId);
+        hash = 97 * hash + Long.hashCode(Double.doubleToLongBits(this.x));
+        hash = 97 * hash + Long.hashCode(Double.doubleToLongBits(this.y));
+        hash = 97 * hash + Long.hashCode(Double.doubleToLongBits(this.z));
         return hash;
     }
     
     @Override
     public String toString() {
-        return "[" + getClass().getSimpleName() + " x=" + x + " y=" + y + " z=" + z
-                + " frame=" + getFrameId() + "]";
+        return "[" + getClass().getSimpleName() + " x=" + x + " y=" + y + " z=" + z;
     }
 
     /**
@@ -79,9 +77,7 @@ public class Point3D extends Point2D {
         this.x = p.x;
         this.y = p.y;
         this.z = p.z;
-        this.frameId = p.frameId;
         this.iLU = p.iLU;
-        this.timestamp = p.timestamp;
     }
 
     /**
@@ -103,20 +99,6 @@ public class Point3D extends Point2D {
         this.x = x;
         this.y = y;
         this.z = z;
-    }
-
-    /**
-     * Creates instance.
-     *
-     * @param x first value
-     * @param y second value
-     * @param z third value
-     * @param unit unit of the values
-     * @param frame coordinate frame
-     */
-    public Point3D(double x, double y, double z, LengthUnit unit, String frame) {
-        this(x, y, z, unit);
-        frameId = frame;
     }
 
     /**
@@ -166,9 +148,6 @@ public class Point3D extends Point2D {
     }
     
     public double distance(Point3D center) {
-        if (!this.frameId.equals(center.frameId)) {
-            logger.warn("distance in different frames: " + this.frameId + " and " + center.frameId);
-        }
         if (!this.iLU.equals(center.getOriginalLU())) {
             return Math.sqrt(Math.pow(this.x - center.getX(iLU), 2) + Math.pow(this.y - center.getY(iLU), 2) 
                     + Math.pow(this.z - center.getZ(iLU), 2));            

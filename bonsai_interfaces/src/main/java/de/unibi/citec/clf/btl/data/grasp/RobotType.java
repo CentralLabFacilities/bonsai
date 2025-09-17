@@ -15,7 +15,6 @@ public class RobotType extends Type {
     }
     
     public enum Robot {
-
         BIRON, MEKA, PEPPER
     }
 

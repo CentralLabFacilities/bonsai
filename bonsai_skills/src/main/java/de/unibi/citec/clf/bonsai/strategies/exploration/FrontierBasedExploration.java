@@ -8,12 +8,12 @@ import de.unibi.citec.clf.bonsai.util.Pair;
 import de.unibi.citec.clf.bonsai.util.slam.SlamTools;
 import de.unibi.citec.clf.bonsai.util.slam.SlamTools.Edge;
 import de.unibi.citec.clf.bonsai.util.slam.SlamTools.Node;
-import de.unibi.citec.clf.btl.data.geometry.Point2D;
+import de.unibi.citec.clf.btl.data.geometry.Point2DStamped;
 import de.unibi.citec.clf.btl.data.map.Annotation;
 import de.unibi.citec.clf.btl.data.map.BinarySlamMap;
 import de.unibi.citec.clf.btl.data.map.DynamicGridMap;
 import de.unibi.citec.clf.btl.data.navigation.NavigationGoalData;
-import de.unibi.citec.clf.btl.data.navigation.PositionData;
+import de.unibi.citec.clf.btl.data.geometry.Pose2D;
 import de.unibi.citec.clf.btl.units.AngleUnit;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 import de.unibi.citec.clf.btl.units.UnitConverter;
@@ -173,7 +173,7 @@ public class FrontierBasedExploration implements ExplorationStrategy {
 	 */
 	@Override
 	public synchronized NavigationGoalData getNextGoal(
-			PositionData currentPosition) throws NoGoalFoundException {
+			Pose2D currentPosition) throws NoGoalFoundException {
 
 		// do calculation
 		long start = Time.currentTimeMillis();
@@ -212,7 +212,7 @@ public class FrontierBasedExploration implements ExplorationStrategy {
 	 */
 	@Override
 	public synchronized NavigationGoalData getNextGoal(
-			PositionData currentPosition, Annotation region)
+            Pose2D currentPosition, Annotation region)
 			throws NoGoalFoundException {
 
 		// do calculation
@@ -226,7 +226,7 @@ public class FrontierBasedExploration implements ExplorationStrategy {
 				if (currentSlamMap != null) {
 					int i = frontier.getFirst().intValue();
 					int j = frontier.getSecond().intValue();
-					Point2D pos = currentSlamMap.getPositionFromBin(i, j);
+					Point2DStamped pos = currentSlamMap.getPositionFromBin(i, j);
 
 					if (region.getPolygon().contains(pos.getX(LengthUnit.METER),
 							pos.getY(LengthUnit.METER), LengthUnit.METER)) {
@@ -246,7 +246,7 @@ public class FrontierBasedExploration implements ExplorationStrategy {
 	}
 
 	private NavigationGoalData chooseGoal(List<Pair<Integer>> frontiers,
-			PositionData currentPosition) throws NoGoalFoundException {
+			Pose2D currentPosition) throws NoGoalFoundException {
 
 		Pair<Integer> chosen = null;
 
@@ -333,7 +333,7 @@ public class FrontierBasedExploration implements ExplorationStrategy {
 							+ currentSlamMap.getOriginX();
 					int j = frontier.getSecond().intValue()
 							+ currentSlamMap.getOriginY();
-					Point2D pos = currentSlamMap.getPositionFromBin(i, j);
+					Point2DStamped pos = currentSlamMap.getPositionFromBin(i, j);
 					double distance = currentPosition.getDistance(pos,
 							LengthUnit.METER);
 					if (distance < minDistance) {
@@ -355,10 +355,10 @@ public class FrontierBasedExploration implements ExplorationStrategy {
 						+ currentSlamMap.getOriginX();
 				int j = chosen.getSecond().intValue()
 						+ currentSlamMap.getOriginY();
-				Point2D pos = currentSlamMap.getPositionFromBin(i, j);
+				Point2DStamped pos = currentSlamMap.getPositionFromBin(i, j);
 				chosenGoal = new NavigationGoalData("FrontierBasedExploration",
 						pos.getX(LengthUnit.METER), pos.getY(LengthUnit.METER),
-						0, PositionData.ReferenceFrame.GLOBAL, LengthUnit.METER, AngleUnit.RADIAN);
+						0, Pose2D.ReferenceFrame.GLOBAL, LengthUnit.METER, AngleUnit.RADIAN);
 			}
 		}
 
@@ -369,7 +369,7 @@ public class FrontierBasedExploration implements ExplorationStrategy {
 			chosenGoal.setYawTolerance(YAW_TOLERANCE, AngleUnit.RADIAN);
 		} else {
 			chosenGoal.setYawTolerance(2 * Math.PI, AngleUnit.RADIAN);
-			chosenGoal.setFrameId(PositionData.ReferenceFrame.GLOBAL);
+			chosenGoal.setFrameId(Pose2D.ReferenceFrame.GLOBAL);
 		}
 		return chosenGoal;
 	}
@@ -657,8 +657,8 @@ public class FrontierBasedExploration implements ExplorationStrategy {
 		}
 	}
 
-	private void debug(List<Pair<Integer>> frontiers, PositionData chosen,
-			PositionData currentPosition) {
+	private void debug(List<Pair<Integer>> frontiers, Pose2D chosen,
+			Pose2D currentPosition) {
 		if (debugMode) {
 
 			String windowTitle = "Frontier based exploration Debugging";
@@ -709,8 +709,8 @@ public class FrontierBasedExploration implements ExplorationStrategy {
 		private static final long serialVersionUID = 1L;
 		private DynamicGridMap map;
 		private List<Pair<Integer>> frontiers;
-		private PositionData chosen;
-		private PositionData position;
+		private Pose2D chosen;
+		private Pose2D position;
 		private static final int RADIUS = 5;
 
 		public void updateMap(DynamicGridMap map) {
@@ -721,11 +721,11 @@ public class FrontierBasedExploration implements ExplorationStrategy {
 			this.frontiers = frontiers;
 		}
 
-		public void updateChosen(PositionData chosen) {
+		public void updateChosen(Pose2D chosen) {
 			this.chosen = chosen;
 		}
 
-		public void updatePosition(PositionData position) {
+		public void updatePosition(Pose2D position) {
 			this.position = position;
 		}
 

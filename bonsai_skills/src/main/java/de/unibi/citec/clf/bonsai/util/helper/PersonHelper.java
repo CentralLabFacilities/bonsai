@@ -4,7 +4,7 @@ package de.unibi.citec.clf.bonsai.util.helper;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
 import de.unibi.citec.clf.btl.List;
 import de.unibi.citec.clf.btl.data.geometry.PolarCoordinate;
-import de.unibi.citec.clf.btl.data.navigation.PositionData;
+import de.unibi.citec.clf.btl.data.geometry.Pose2D;
 import de.unibi.citec.clf.btl.data.person.PersonData;
 import de.unibi.citec.clf.btl.data.person.PersonDataList;
 import de.unibi.citec.clf.btl.tools.MathTools;
@@ -62,13 +62,12 @@ public final class PersonHelper {
      * @return <code>true</code> if person is standing in front of the robot facing it within a small distance, else
      * <code>false</code>
      */
-    public static boolean isStandingInFront(PersonData p, PositionData robotPosition) {
+    public static boolean isStandingInFront(PersonData p, Pose2D robotPosition) {
 
         PolarCoordinate polar = new PolarCoordinate(MathTools.globalToLocal(
                 p.getPosition(), robotPosition));
 
         logger.debug("Person " + p.getUuid() + " frame person:" + p.getFrameId()
-                + " frame polar: " + polar.getFrameId()
                 + "\n dist:" + polar.getDistance(LengthUnit.METER)
                 + "\n angle:" + polar.getAngle(AngleUnit.RADIAN));
 
@@ -96,10 +95,10 @@ public final class PersonHelper {
      * @return Person in front of robot or <code>null</code> if no person is standing in front.
      */
     public static PersonData getNextPersonInFront(
-            Sensor<PersonDataList> personSensor, Sensor<PositionData> positionSensor) {
+            Sensor<PersonDataList> personSensor, Sensor<Pose2D> positionSensor) {
 
         List<PersonData> persons = null;
-        PositionData robot = null;
+        Pose2D robot = null;
 
         try {
             robot = positionSensor.readLast(500);
@@ -142,7 +141,7 @@ public final class PersonHelper {
      *
      * @param persons List of persons to sort.
      */
-    public static void sortPersonsByDistance(java.util.List<PersonData> persons, final PositionData robPos) {
+    public static void sortPersonsByDistance(java.util.List<PersonData> persons, final Pose2D robPos) {
         Collections.sort(persons, (o1, o2) -> {
             PolarCoordinate polar1 = new PolarCoordinate(MathTools.localToOther(o1.getPosition(), robPos));
             PolarCoordinate polar2 = new PolarCoordinate(MathTools.localToOther(o2.getPosition(), robPos));
