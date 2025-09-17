@@ -44,7 +44,6 @@ public class ObjectSlot<T extends Object> implements MemorySlot<T> {
         }
 
         //try different copy methods
-
         Class<T> clazz = (Class<T>) savedObject.getClass();
         try {
             Constructor<?> copyConstructor = clazz.getConstructor(clazz);
@@ -55,9 +54,7 @@ public class ObjectSlot<T extends Object> implements MemorySlot<T> {
             logger.trace(ex);
         }
 
-
         if (savedObject instanceof Serializable) {
-
             ObjectOutputStream oos = null;
             ObjectInputStream ois = null;
             try {

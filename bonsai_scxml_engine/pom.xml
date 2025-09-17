@@ -23,7 +23,7 @@
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <dir>target</dir>
-        <kotlin.version>1.9.0</kotlin.version>
+        <kotlin.version>2.2.0</kotlin.version>
     </properties>
 
     <dependencies>
@@ -31,7 +31,7 @@
         <dependency>
             <groupId>de.unibi.citec.clf</groupId>
             <artifactId>bonsai_interfaces</artifactId>
-            <version>0.7-SNAPSHOT</version>
+            <version>0.8-SNAPSHOT</version>
         </dependency>
 
         <dependency>
@@ -91,7 +91,7 @@
         <dependency>
             <groupId>de.unibi.citec.clf</groupId>
             <artifactId>bonsai_skills</artifactId>
-            <version>0.7-SNAPSHOT</version>
+            <version>0.8-SNAPSHOT</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -108,7 +108,7 @@
         <dependency>
             <groupId>de.unibi.citec.clf</groupId>
             <artifactId>bonsai_core</artifactId>
-            <version>0.7-SNAPSHOT</version>
+            <version>0.8-SNAPSHOT</version>
             <scope>compile</scope>
         </dependency>
 

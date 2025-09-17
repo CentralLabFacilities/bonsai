@@ -4,7 +4,7 @@ package de.unibi.citec.clf.bonsai.strategies.exploration;
 
 import de.unibi.citec.clf.btl.data.map.Annotation;
 import de.unibi.citec.clf.btl.data.navigation.NavigationGoalData;
-import de.unibi.citec.clf.btl.data.navigation.PositionData;
+import de.unibi.citec.clf.btl.data.geometry.Pose2D;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 import java.util.ArrayList;
 import org.apache.log4j.Logger;
@@ -18,22 +18,22 @@ public class ViewPointBasedSearchStrategy implements ExplorationStrategy {
 
     private Logger logger = Logger.getLogger(this.getClass());
     static final double COORDINATE_TOLERANCE = 0.5; // meters
-    ArrayList<PositionData> allViewPoints = new ArrayList<>();
-    ArrayList<PositionData> remainingViewPoints = new ArrayList<>();
-    ArrayList<PositionData> missmatch = new ArrayList<>();
+    ArrayList<Pose2D> allViewPoints = new ArrayList<>();
+    ArrayList<Pose2D> remainingViewPoints = new ArrayList<>();
+    ArrayList<Pose2D> missmatch = new ArrayList<>();
 
-    void addViewPoint(PositionData point) {
+    void addViewPoint(Pose2D point) {
         logger.debug("addPoint " + point);
         System.out.println("addPoint " + point);
         allViewPoints.add(point);
         remainingViewPoints.add(point);
     }
 
-    void addMissMatchPoint(PositionData point) {
+    void addMissMatchPoint(Pose2D point) {
         missmatch.add(point);
     }
 
-    void removeViewPoint(PositionData point) {
+    void removeViewPoint(Pose2D point) {
         allViewPoints.remove(point);
         remainingViewPoints.remove(point);
     }
@@ -43,7 +43,7 @@ public class ViewPointBasedSearchStrategy implements ExplorationStrategy {
     }
 
     @Override
-    public NavigationGoalData getNextGoal(PositionData currentPosition) {
+    public NavigationGoalData getNextGoal(Pose2D currentPosition) {
         logger.info("getNextGoal");
 
         if (remainingViewPoints.isEmpty()) {
@@ -60,8 +60,8 @@ public class ViewPointBasedSearchStrategy implements ExplorationStrategy {
         logger.debug("currentPosition " + currentPosition);
 
         double minDist = Double.MAX_VALUE;
-        PositionData minDistPos = null;
-        for (PositionData p : remainingViewPoints) {
+        Pose2D minDistPos = null;
+        for (Pose2D p : remainingViewPoints) {
             logger.debug("PositionData " + p);
             double d = Math.sqrt(Math.pow(
                     p.getX(LengthUnit.METER)
@@ -81,14 +81,14 @@ public class ViewPointBasedSearchStrategy implements ExplorationStrategy {
         if (minDistPos != null) {
             goal = new NavigationGoalData(minDistPos);
             goal.setCoordinateTolerance(COORDINATE_TOLERANCE, LengthUnit.METER);
-            goal.setFrameId(PositionData.ReferenceFrame.LOCAL);
+            goal.setFrameId(Pose2D.ReferenceFrame.LOCAL);
         }
         return goal;
     }
 
     @Override
-    public NavigationGoalData getNextGoal(PositionData currentPosition,
-            Annotation roomPosition) {
+    public NavigationGoalData getNextGoal(Pose2D currentPosition,
+                                          Annotation roomPosition) {
         logger.info("getNextGoal");
 
         if (remainingViewPoints.isEmpty()) {
@@ -104,8 +104,8 @@ public class ViewPointBasedSearchStrategy implements ExplorationStrategy {
         logger.debug("currentPosition " + currentPosition);
 
         double minDist = Double.MAX_VALUE;
-        PositionData minDistPos = null;
-        for (PositionData p : remainingViewPoints) {
+        Pose2D minDistPos = null;
+        for (Pose2D p : remainingViewPoints) {
             logger.debug("PositionData " + p);
             logger.debug("roomPosition " + roomPosition);
             double d = Math.sqrt(Math.pow(

@@ -1,13 +1,12 @@
 package de.unibi.citec.clf.bonsai.skills.personPerception
 
-import de.unibi.citec.clf.bonsai.core.exception.CommunicationException
 import de.unibi.citec.clf.bonsai.core.`object`.MemorySlotReader
 import de.unibi.citec.clf.bonsai.core.`object`.MemorySlotWriter
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
-import de.unibi.citec.clf.btl.data.navigation.PositionData
+import de.unibi.citec.clf.btl.data.geometry.Pose2D
 import de.unibi.citec.clf.btl.data.person.PersonData
 import de.unibi.citec.clf.btl.data.person.PersonDataList
 import de.unibi.citec.clf.btl.units.LengthUnit
@@ -38,10 +37,10 @@ class SelectNearestPerson : AbstractSkill() {
     private var tokenError: ExitToken? = null
 
     private var personDataListSlot: MemorySlotReader<PersonDataList>? = null
-    private var positionDataSlot: MemorySlotReader<PositionData>? = null
+    private var pose2DSlot: MemorySlotReader<Pose2D>? = null
     private var personDataSlot: MemorySlotWriter<PersonData>? = null
     private var personDataList: PersonDataList? = null
-    private var positionData: PositionData? = null
+    private var pose2D: Pose2D? = null
     private var bestPerson: PersonData? = null
 
     private var maxDist = Double.MAX_VALUE
@@ -50,7 +49,7 @@ class SelectNearestPerson : AbstractSkill() {
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
         tokenError = configurator.requestExitToken(ExitStatus.ERROR())
         personDataListSlot = configurator.getReadSlot("PersonDataListSlot", PersonDataList::class.java)
-        positionDataSlot = configurator.getReadSlot("PositionDataSlot", PositionData::class.java)
+        pose2DSlot = configurator.getReadSlot("PositionDataSlot", Pose2D::class.java)
         personDataSlot = configurator.getWriteSlot("PersonDataSlot", PersonData::class.java)
 
         maxDist = configurator.requestOptionalDouble(KEY_MAX_DIST, maxDist)
@@ -63,9 +62,9 @@ class SelectNearestPerson : AbstractSkill() {
                 return false
             }
 
-            positionData = positionDataSlot?.recall<PositionData>() ?: return false
+            pose2D = pose2DSlot?.recall<Pose2D>() ?: return false
 
-            if (java.lang.Double.isNaN(positionData!!.getX(LengthUnit.METER)) || java.lang.Double.isNaN(positionData!!.getY(LengthUnit.METER))) {
+            if (java.lang.Double.isNaN(pose2D!!.getX(LengthUnit.METER)) || java.lang.Double.isNaN(pose2D!!.getY(LengthUnit.METER))) {
                 logger.error("your PositionDataSlot was NaN")
                 return false
             }
@@ -77,7 +76,7 @@ class SelectNearestPerson : AbstractSkill() {
         var bestDist = maxDist
         bestPerson = null
         for (currentPerson in personDataList!!) {
-            val distance: Double = positionData!!.getDistance(currentPerson.position, LengthUnit.MILLIMETER)
+            val distance: Double = pose2D!!.getDistance(currentPerson.position, LengthUnit.MILLIMETER)
             logger.debug("person is $distance away")
             if (distance < bestDist) {
                 bestDist = distance

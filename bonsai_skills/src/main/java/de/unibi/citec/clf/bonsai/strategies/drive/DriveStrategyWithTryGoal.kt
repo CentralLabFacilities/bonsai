@@ -7,8 +7,9 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
 import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException
 import de.unibi.citec.clf.bonsai.strategies.drive.DriveStrategy.StrategyState
 import de.unibi.citec.clf.bonsai.util.CoordinateSystemConverter
+import de.unibi.citec.clf.btl.data.geometry.Pose2D
 import de.unibi.citec.clf.btl.data.navigation.*
-import de.unibi.citec.clf.btl.data.navigation.PositionData.ReferenceFrame
+import de.unibi.citec.clf.btl.data.geometry.Pose2D.ReferenceFrame
 import de.unibi.citec.clf.btl.units.AngleUnit
 import de.unibi.citec.clf.btl.units.LengthUnit
 import org.apache.log4j.Logger
@@ -26,11 +27,11 @@ import kotlin.math.abs
  */
 abstract class DriveStrategyWithTryGoal(
     nav: NavigationActuator?,
-    robotPositionSensor: Sensor<PositionData>?, conf: ISkillConfigurator
+    robotPositionSensor: Sensor<Pose2D>?, conf: ISkillConfigurator
 ) : DriveStrategy {
     @JvmField
     protected val logger: Logger = Logger.getLogger(this.javaClass)
-    private val robotPositionSensor: Sensor<PositionData>?
+    private val robotPositionSensor: Sensor<Pose2D>?
     @JvmField
     protected var targetGoal: NavigationGoalData? = null
     @JvmField
@@ -39,9 +40,9 @@ abstract class DriveStrategyWithTryGoal(
     protected var maxDistanceSuccess: Double = 0.0
     protected var yawTolerance: Double = 0.0
     @JvmField
-    protected var robotPos: PositionData? = null
+    protected var robotPos: Pose2D? = null
     private var lastCommandResult: Future<CommandResult>? = null
-    private var lastRobotPos: PositionData? = null
+    private var lastRobotPos: Pose2D? = null
 
     protected var correctYaw: Boolean = true
     @JvmField
@@ -56,13 +57,13 @@ abstract class DriveStrategyWithTryGoal(
     protected var closerMaxSteps: Double = 4.0
     protected var minDistanceSuccess: Double = 0.1
 
-    private var progressLastPose: PositionData? = null
+    private var progressLastPose: Pose2D? = null
     private var progressLastTime: Long = 0L
     private var progressMinDist = 0.05
     private var progressMinYaw = 0.2
     private var progressMaxTime = 3000L
 
-    fun checkProgress(current: PositionData) : Boolean  {
+    fun checkProgress(current: Pose2D) : Boolean  {
         if(progressLastPose == null) {
             progressLastPose = current
             progressLastTime = Time.currentTimeMillis()

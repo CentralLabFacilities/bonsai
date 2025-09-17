@@ -3,7 +3,6 @@ package de.unibi.citec.clf.btl.data.geometry;
 
 
 import de.unibi.citec.clf.btl.Type;
-import de.unibi.citec.clf.btl.data.navigation.PositionData;
 import de.unibi.citec.clf.btl.tools.MathTools;
 import de.unibi.citec.clf.btl.units.AngleUnit;
 import de.unibi.citec.clf.btl.units.LengthUnit;
@@ -29,13 +28,13 @@ public class PolarCoordinate extends Type {
         angle = p.angle;
     }
     
-    public PolarCoordinate(Point2D point) {
+    public PolarCoordinate(Point2DStamped point) {
         super(point);
         distance = MathTools.cartesianToPolarDistance(point.getX(iLU), point.getY(iLU));
         angle = MathTools.cartesianToPolarAngle(point.getX(iLU), point.getY(iLU), iAU);
     }
 
-    public PolarCoordinate(PositionData pos) {
+    public PolarCoordinate(Pose2D pos) {
         distance = MathTools.cartesianToPolarDistance(pos.getX(iLU), pos.getY(iLU));
         angle = MathTools.cartesianToPolarAngle(pos.getX(iLU), pos.getY(iLU), iAU);
     }

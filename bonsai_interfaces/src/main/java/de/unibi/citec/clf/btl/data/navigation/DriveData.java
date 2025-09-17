@@ -1,14 +1,14 @@
 package de.unibi.citec.clf.btl.data.navigation;
 
 
+import de.unibi.citec.clf.btl.StampedType;
 import org.apache.log4j.Logger;
 
-import de.unibi.citec.clf.btl.Type;
 import de.unibi.citec.clf.btl.data.common.MicroTimestamp;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 import de.unibi.citec.clf.btl.units.SpeedUnit;
 import de.unibi.citec.clf.btl.units.UnitConverter;
-import de.unibi.citec.clf.btl.data.geometry.Point2D;
+import de.unibi.citec.clf.btl.data.geometry.Point2DStamped;
 
 /**
  * This class is used to send direct linear drive commands (distance and speed).
@@ -16,7 +16,7 @@ import de.unibi.citec.clf.btl.data.geometry.Point2D;
  *
  * @author lziegler, cklarhor
  */
-public class DriveData extends Type {
+public class DriveData extends StampedType {
 
     private static Logger logger = Logger.getLogger(DriveData.class);
 
@@ -29,7 +29,7 @@ public class DriveData extends Type {
      */
     private double maxAcceleration = Double.NaN;
 
-    private Point2D direction = new Point2D(1, 0, LengthUnit.METER); //todo: dirty hack
+    private Point2DStamped direction = new Point2DStamped(1, 0, LengthUnit.METER); //todo: dirty hack
 
     private double distance;
     private MicroTimestamp readTime = new MicroTimestamp();
@@ -47,18 +47,18 @@ public class DriveData extends Type {
         setSpeed(speed, speedUnit);
     }
 
-    public DriveData(double distance, LengthUnit lengthUnit, double speed, SpeedUnit speedUnit, Point2D direction) {
+    public DriveData(double distance, LengthUnit lengthUnit, double speed, SpeedUnit speedUnit, Point2DStamped direction) {
         super();
         setDirection(direction);
         setDistance(distance, lengthUnit);
         setSpeed(speed, speedUnit);
     }
 
-    public Point2D getDirection() {
+    public Point2DStamped getDirection() {
         return direction;
     }
 
-    public void setDirection(Point2D direction) {
+    public void setDirection(Point2DStamped direction) {
         this.direction = direction;
     }
 

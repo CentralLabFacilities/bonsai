@@ -9,8 +9,9 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.btl.data.geometry.Point3D;
+import de.unibi.citec.clf.btl.data.geometry.Point3DStamped;
 import de.unibi.citec.clf.btl.data.navigation.NavigationGoalData;
-import de.unibi.citec.clf.btl.data.navigation.PositionData;
+import de.unibi.citec.clf.btl.data.geometry.Pose2D;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 
 import java.io.IOException;
@@ -60,9 +61,9 @@ public class LookToGoal extends AbstractSkill {
 
     private GazeActuator gazeActuator;
 
-    private Sensor<PositionData> positionSensor;
+    private Sensor<Pose2D> positionSensor;
 
-    private PositionData robotPos;
+    private Pose2D robotPos;
     private NavigationGoalData navGoal;
 
     private Future<Void> gazeDone;
@@ -79,7 +80,7 @@ public class LookToGoal extends AbstractSkill {
 
         gazeActuator = configurator.getActuator("GazeActuator", GazeActuator.class);
 
-        positionSensor = configurator.getSensor("PositionSensor", PositionData.class);
+        positionSensor = configurator.getSensor("PositionSensor", Pose2D.class);
     }
 
     @Override
@@ -99,7 +100,7 @@ public class LookToGoal extends AbstractSkill {
             return false;
         }
 
-        Point3D targetPoint = new Point3D(navGoal.getX(LengthUnit.METER), navGoal.getY(LengthUnit.METER), z, LengthUnit.METER, navGoal.getFrameId());
+        Point3DStamped targetPoint = new Point3DStamped(navGoal.getX(LengthUnit.METER), navGoal.getY(LengthUnit.METER), z, LengthUnit.METER, navGoal.getFrameId());
 
         gazeDone = gazeActuator.lookAt(targetPoint,1.0,250);
 

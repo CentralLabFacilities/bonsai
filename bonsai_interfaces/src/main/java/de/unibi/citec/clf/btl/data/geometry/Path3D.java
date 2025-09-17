@@ -2,9 +2,10 @@ package de.unibi.citec.clf.btl.data.geometry;
 
 
 
+import de.unibi.citec.clf.btl.StampedType;
 import de.unibi.citec.clf.btl.Type;
 
-public class Path3D extends Type {
+public class Path3D extends StampedType {
 
 	public static final String SCOPE_TAG_NAME = "SCOPE";
 

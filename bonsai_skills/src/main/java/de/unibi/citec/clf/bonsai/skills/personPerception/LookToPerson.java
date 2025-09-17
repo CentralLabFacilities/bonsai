@@ -12,7 +12,8 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.bonsai.util.CoordinateSystemConverter;
 import de.unibi.citec.clf.btl.List;
 import de.unibi.citec.clf.btl.data.geometry.Point3D;
-import de.unibi.citec.clf.btl.data.navigation.PositionData;
+import de.unibi.citec.clf.btl.data.geometry.Point3DStamped;
+import de.unibi.citec.clf.btl.data.geometry.Pose2D;
 import de.unibi.citec.clf.btl.data.person.PersonData;
 import de.unibi.citec.clf.btl.data.person.PersonDataList;
 import de.unibi.citec.clf.btl.units.LengthUnit;
@@ -73,11 +74,11 @@ public class LookToPerson extends AbstractSkill {
     private GazeActuator gazeActuator;
 
     private Sensor<PersonDataList> personSensor;
-    private Sensor<PositionData> positionSensor;
+    private Sensor<Pose2D> positionSensor;
 
     private List<PersonData> currentPersons;
     private String targetID;
-    private PositionData robotPos;
+    private Pose2D robotPos;
     private double maxAngle = 0.78;
     private double minAngle = -0.78;
     private double minTurningAngle = 0.04;
@@ -107,7 +108,7 @@ public class LookToPerson extends AbstractSkill {
         gazeActuator = configurator.getActuator("GazeActuator", GazeActuator.class);
 
         personSensor = configurator.getSensor("PersonSensor", PersonDataList.class);
-        positionSensor = configurator.getSensor("PositionSensor", PositionData.class);
+        positionSensor = configurator.getSensor("PositionSensor", Pose2D.class);
 
         targetID = configurator.requestOptionalValue(KEY_UUID, null);
     }
@@ -183,7 +184,7 @@ public class LookToPerson extends AbstractSkill {
         for (int i = 0; i < currentPersons.size(); ++i) {
             if (currentPersons.get(i).getUuid().equals(targetID)) {
                 logger.info("person position: " + currentPersons.get(i).getPosition().toString() + "robot position: " + robotPos.toString());
-                PositionData posDataLocal = getLocalPosition(currentPersons.get(i).getPosition(), robotPos);
+                Pose2D posDataLocal = getLocalPosition(currentPersons.get(i).getPosition(), robotPos);
 
                 if (posDataLocal == null) {
                     return tokenLoopDiLoop;
@@ -211,7 +212,7 @@ public class LookToPerson extends AbstractSkill {
                 float y_rel = (float)Math.sin(horizontal) * scaling_factor;
                 float z_rel = (float)Math.sin(vertical) * scaling_factor;
 
-                Point3D target = new Point3D(x_rel, y_rel, z_rel, LengthUnit.METER, "torso_lift_link");
+                Point3DStamped target = new Point3DStamped(x_rel, y_rel, z_rel, LengthUnit.METER, "torso_lift_link");
 
                 logger.info("Looking at point: (x: " + x_rel+ " / y: " +y_rel+ " / z:  "+ z_rel +" / frame: torso_lift_link) with duration: " + gazeSpeed);
 
@@ -228,7 +229,7 @@ public class LookToPerson extends AbstractSkill {
         logger.warn("No found person matched the UUID I am looking for");
         if(lastPersonTime + noPersonTimeout > Time.currentTimeMillis()) {
             //look straight
-            Point3D target = new Point3D(10, 0, 0, LengthUnit.METER, "torso_lift_link");
+            Point3DStamped target = new Point3DStamped(10, 0, 0, LengthUnit.METER, "torso_lift_link");
             gazeFuture = gazeActuator.lookAt(target, gazeSpeed);
         }
 
@@ -236,8 +237,8 @@ public class LookToPerson extends AbstractSkill {
 
     }
 
-    private PositionData getLocalPosition(PositionData position, PositionData reference) {
-        if(position.getFrameId().equals(PositionData.ReferenceFrame.LOCAL.getFrameName())) {
+    private Pose2D getLocalPosition(Pose2D position, Pose2D reference) {
+        if(position.getFrameId().equals(Pose2D.ReferenceFrame.LOCAL.getFrameName())) {
             return position;
         } else {
             return CoordinateSystemConverter.globalToLocal(position, reference);

@@ -13,6 +13,7 @@ import java.util.Objects;
  * @author lschilli
  * 
  */
+@Deprecated
 public class GrammarTree extends GrammarNonTerminal {
 
 	private boolean cancel;

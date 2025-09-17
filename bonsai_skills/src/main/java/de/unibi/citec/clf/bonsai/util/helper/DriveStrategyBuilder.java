@@ -7,7 +7,7 @@ import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException
 import de.unibi.citec.clf.bonsai.strategies.drive.DriveStrategy;
 import de.unibi.citec.clf.bonsai.strategies.drive.NearestToTarget;
 import de.unibi.citec.clf.bonsai.strategies.drive.NoStrategy;
-import de.unibi.citec.clf.btl.data.navigation.PositionData;
+import de.unibi.citec.clf.btl.data.geometry.Pose2D;
 import org.apache.log4j.Logger;
 
 /**
@@ -19,7 +19,7 @@ public class DriveStrategyBuilder {
     private static Logger logger = Logger.getLogger(DriveStrategyBuilder.class);
 
     static public DriveStrategy createStrategy(String strategy, ISkillConfigurator conf, NavigationActuator navActuator,
-            Sensor<PositionData> robotPositionSensor) throws SkillConfigurationException {
+            Sensor<Pose2D> robotPositionSensor) throws SkillConfigurationException {
         switch (strategy) {
             case "NoStrategy":
                 return new NoStrategy(navActuator, robotPositionSensor);

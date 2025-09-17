@@ -1,6 +1,7 @@
 package de.unibi.citec.clf.btl.data.navigation;
 
 import de.unibi.citec.clf.btl.List;
+import de.unibi.citec.clf.btl.data.geometry.Pose2D;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 
 import org.apache.log4j.Logger;
@@ -37,7 +38,7 @@ public class GlobalPlan extends List<NavigationGoalData>  {
 		StringBuilder stringBuilder = new StringBuilder();
 
 		stringBuilder.append("Waypoints:\n");
-		for (PositionData wp : this) {
+		for (Pose2D wp : this) {
 			stringBuilder.append("(" + wp.getX(LengthUnit.METER) + ", " + wp.getY(LengthUnit.METER) + ")\n");
 		}
 

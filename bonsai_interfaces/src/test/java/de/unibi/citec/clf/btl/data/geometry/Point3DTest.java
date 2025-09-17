@@ -13,8 +13,8 @@ public class Point3DTest {
     @Test
     public void equals() {
         
-        Point3D instance = new Point3D(1, 2, 3, LengthUnit.METER, "map");
-        Point3D instance2 = new Point3D(1, 2, 3, LengthUnit.METER, "map");
+        Point3D instance = new Point3D(1, 2, 3, LengthUnit.METER);
+        Point3D instance2 = new Point3D(1, 2, 3, LengthUnit.METER);
         
         boolean result = instance.equals(instance2);
         assertTrue(result);
@@ -23,7 +23,7 @@ public class Point3DTest {
     @Test
     public void copy() {
         
-        Point3D instance = new Point3D(1, 2, 3, LengthUnit.METER, "map");
+        Point3D instance = new Point3D(1, 2, 3, LengthUnit.METER);
         Point3D instance2 = new Point3D(instance);
         
         boolean result = instance.equals(instance2);

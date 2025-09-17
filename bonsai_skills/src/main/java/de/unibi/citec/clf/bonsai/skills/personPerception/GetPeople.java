@@ -3,21 +3,16 @@ package de.unibi.citec.clf.bonsai.skills.personPerception;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
-import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.bonsai.util.CoordinateSystemConverter;
 import de.unibi.citec.clf.bonsai.util.CoordinateTransformer;
-import de.unibi.citec.clf.bonsai.util.helper.PersonHelper;
 import de.unibi.citec.clf.btl.List;
-import de.unibi.citec.clf.btl.data.geometry.PolarCoordinate;
-import de.unibi.citec.clf.btl.data.navigation.PositionData;
+import de.unibi.citec.clf.btl.data.geometry.Pose2D;
 import de.unibi.citec.clf.btl.data.person.PersonData;
 import de.unibi.citec.clf.btl.data.person.PersonDataList;
-import de.unibi.citec.clf.btl.units.AngleUnit;
-import de.unibi.citec.clf.btl.units.LengthUnit;
 
 import java.io.IOException;
 
@@ -52,8 +47,8 @@ public class GetPeople extends AbstractSkill {
 
     List<PersonData> persons;
     CoordinateTransformer tf;
-    private Sensor<PositionData> positionSensor;
-    private PositionData robotPosition;
+    private Sensor<Pose2D> positionSensor;
+    private Pose2D robotPosition;
 
     @Override
     public void configure(ISkillConfigurator configurator) {
@@ -62,7 +57,7 @@ public class GetPeople extends AbstractSkill {
 
         // request all tokens that you plan to return from other methods
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
-        positionSensor = configurator.getSensor("PositionSensor", PositionData.class);
+        positionSensor = configurator.getSensor("PositionSensor", Pose2D.class);
 
         personSensor = configurator.getSensor("PersonSensor", PersonDataList.class);
         currentPersonSlot = configurator.getWriteSlot("PersonDataListSlot", PersonDataList.class);
@@ -106,8 +101,8 @@ public class GetPeople extends AbstractSkill {
 
     }
 
-    private PositionData getLocalPosition(PositionData position) {
-        if(position.getFrameId().equals(PositionData.ReferenceFrame.LOCAL.getFrameName())) {
+    private Pose2D getLocalPosition(Pose2D position) {
+        if(position.getFrameId().equals(Pose2D.ReferenceFrame.LOCAL.getFrameName())) {
             return position;
         } else {
             return CoordinateSystemConverter.globalToLocal(position, robotPosition);

@@ -1,18 +1,19 @@
 package de.unibi.citec.clf.btl.data.person;
 
 
+import de.unibi.citec.clf.btl.StampedType;
 import de.unibi.citec.clf.btl.data.geometry.Point3D;
-import de.unibi.citec.clf.btl.data.knowledgebase.BDO;
+import de.unibi.citec.clf.btl.data.geometry.Point3DStamped;
 import org.apache.log4j.Logger;
 
-import de.unibi.citec.clf.btl.data.navigation.PositionData;
+import de.unibi.citec.clf.btl.data.geometry.Pose2D;
 
 /**
  *
  * @author rfeldhans
  *
  */
-public class PersonData extends BDO {
+public class PersonData extends StampedType {
 
     private double reliability = 0.0;
     private String uuid;
@@ -23,7 +24,7 @@ public class PersonData extends BDO {
     private Double estimate_angle;
     protected PersonAttribute attributes = new PersonAttribute();
 
-    private PositionData position = new PositionData();
+    private Pose2D position = new Pose2D();
 
     private static Logger logger = Logger.getLogger(PersonData.class);
 
@@ -60,22 +61,22 @@ public class PersonData extends BDO {
         this.name = name;
     }
 
-    public Point3D getHeadPosition(){
-        return headPosition;
+    public Point3DStamped getHeadPosition(){
+        return new Point3DStamped(headPosition, frameId);
     }
     public void setHeadPosition(Point3D headPosition){
         this.headPosition = headPosition;
     }
 
-    public Point3D getRightHandPosition(){
-        return rightHandPosition;
+    public Point3DStamped getRightHandPosition(){
+        return new Point3DStamped(rightHandPosition, frameId);
     }
     public void setRightHandPosition(Point3D rightHandPosition){
         this.rightHandPosition = rightHandPosition;
     }
 
-    public Point3D getLeftHandPosition(){
-        return leftHandPosition;
+    public Point3DStamped getLeftHandPosition(){
+        return new Point3DStamped(leftHandPosition, frameId);
     }
     public void setLeftHandPosition(Point3D leftHandPosition){
         this.leftHandPosition = leftHandPosition;
@@ -94,12 +95,12 @@ public class PersonData extends BDO {
     /**
      * A setter for the global position of a person. This is the position where
      * the robot has seen this person last
-     * @param positionData global position of a person
+     * @param pose2D global position of a person
      */
-    public void setPosition(PositionData positionData) {
-        position = positionData;
+    public void setPosition(Pose2D pose2D) {
+        position = pose2D;
     }
-    public PositionData getPosition() {
+    public Pose2D getPosition() {
         return position;
     }
 

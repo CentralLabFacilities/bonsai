@@ -2,6 +2,7 @@ package de.unibi.citec.clf.btl.data.vision3d;
 
 
 
+import de.unibi.citec.clf.btl.StampedType;
 import de.unibi.citec.clf.btl.Type;
 import de.unibi.citec.clf.btl.data.geometry.Point3D;
 import de.unibi.citec.clf.btl.units.LengthUnit;
@@ -13,7 +14,8 @@ import de.unibi.citec.clf.btl.units.UnitConverter;
  * @author plueckin
  */
 
-public class PointCloudGrasping extends Type {
+@Deprecated
+public class PointCloudGrasping extends StampedType {
 
 	public static final String LABEL_TAG = "LABEL";
 	public static final String GRASPPNT_TAG = "GRASPING_POINT";

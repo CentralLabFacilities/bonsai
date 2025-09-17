@@ -11,7 +11,7 @@ import java.util.Set;
 
 
 import de.unibi.citec.clf.btl.data.geometry.PrecisePolygon;
-import de.unibi.citec.clf.btl.data.navigation.PositionData;
+import de.unibi.citec.clf.btl.data.geometry.Pose2D;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 
 /**
@@ -109,26 +109,26 @@ public class ObjectPositionData extends ObjectData {
 		return super.getHypotheses();
 	}
 
-	public static ObjectPositionData fromPosition(PositionData position,
-			String label) {
+	public static ObjectPositionData fromPosition(Pose2D position,
+                                                  String label) {
 		return fromPosition(position, label, DEFAULT_EDGE_LENGTH,
 				LengthUnit.METER, DEFAULT_RELIABILITY);
 	}
 
-	public static ObjectPositionData fromPosition(PositionData position,
-			String label, double reliability) {
+	public static ObjectPositionData fromPosition(Pose2D position,
+                                                  String label, double reliability) {
 		return fromPosition(position, label, DEFAULT_EDGE_LENGTH,
 				LengthUnit.METER, reliability);
 	}
 
-	public static ObjectPositionData fromPosition(PositionData position,
-			String label, double edgeLength, LengthUnit unit) {
+	public static ObjectPositionData fromPosition(Pose2D position,
+                                                  String label, double edgeLength, LengthUnit unit) {
 		return fromPosition(position, label, edgeLength, unit,
 				DEFAULT_RELIABILITY);
 	}
 
-	public static ObjectPositionData fromPosition(PositionData position,
-			String label, double edgeLength, LengthUnit unit, double reliability) {
+	public static ObjectPositionData fromPosition(Pose2D position,
+                                                  String label, double edgeLength, LengthUnit unit, double reliability) {
 		double half = edgeLength / 2.0;
 		PrecisePolygon poly = new PrecisePolygon();
 		poly.addPoint(position.getX(LengthUnit.METER) - half,

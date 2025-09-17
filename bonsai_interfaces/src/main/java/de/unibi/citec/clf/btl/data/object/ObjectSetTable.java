@@ -4,7 +4,7 @@ package de.unibi.citec.clf.btl.data.object;
 
 
 import de.unibi.citec.clf.btl.Type;
-import de.unibi.citec.clf.btl.data.navigation.PositionData;
+import de.unibi.citec.clf.btl.data.geometry.Pose2D;
 
 
 /**
@@ -19,18 +19,18 @@ public class ObjectSetTable extends Type{
     //private String current_location_annotation= "";
     private boolean moved = false;
     //private Viewpoint current_location = null;
-    private PositionData originalLocation = null;
-    private PositionData currentLocation = null;
+    private Pose2D originalLocation = null;
+    private Pose2D currentLocation = null;
 
     public ObjectSetTable(){
         this.name = "default";
-        this.originalLocation = new PositionData();
-        this.currentLocation = new PositionData();
+        this.originalLocation = new Pose2D();
+        this.currentLocation = new Pose2D();
         this.graspDifficulty = -1;
         this.moved = false;
     }
     
-    public ObjectSetTable(String name, PositionData originalLocation, int graspability){
+    public ObjectSetTable(String name, Pose2D originalLocation, int graspability){
         this.name = name;
         this.originalLocation = originalLocation;
         this.currentLocation = originalLocation;
@@ -61,20 +61,20 @@ public class ObjectSetTable extends Type{
         this.moved = moved;
     }
 
-    public PositionData getOriginalLocation() {
+    public Pose2D getOriginalLocation() {
         return originalLocation;
     }
 
-    public void setOriginalLocation(PositionData original_location) {
+    public void setOriginalLocation(Pose2D original_location) {
         if(original_location != null){
         this.originalLocation = original_location;
             return;
         }
     }
-    public PositionData getCurrentLocation(){
+    public Pose2D getCurrentLocation(){
         return currentLocation;
     }
-    public void setCurrentLocation(PositionData newLocation){
+    public void setCurrentLocation(Pose2D newLocation){
         if(newLocation != null){
         this.currentLocation = newLocation;
             return;

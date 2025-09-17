@@ -12,7 +12,7 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.bonsai.util.CoordinateSystemConverter;
 import de.unibi.citec.clf.btl.data.geometry.PolarCoordinate;
 import de.unibi.citec.clf.btl.data.navigation.NavigationGoalData;
-import de.unibi.citec.clf.btl.data.navigation.PositionData;
+import de.unibi.citec.clf.btl.data.geometry.Pose2D;
 import de.unibi.citec.clf.btl.tools.MathTools;
 import de.unibi.citec.clf.btl.units.AngleUnit;
 import de.unibi.citec.clf.btl.units.LengthUnit;
@@ -53,7 +53,7 @@ public class SetGoalNearerToRobot extends AbstractSkill {
     private ExitToken tokenError;
     private ExitToken tokenSuccess;
 
-    private Sensor<PositionData> robotPositionSensor;
+    private Sensor<Pose2D> robotPositionSensor;
 
     private MemorySlotWriter<NavigationGoalData> navigationGoalDataSlotWrite;
     private MemorySlotReader<NavigationGoalData> navigationGoalDataSlotRead;
@@ -61,7 +61,7 @@ public class SetGoalNearerToRobot extends AbstractSkill {
     private NavigationGoalData goal;
     private NavigationGoalData newGoal;
     private double closer = 500;
-    PositionData robotPos;
+    Pose2D robotPos;
 
     @Override
     public void configure(ISkillConfigurator configurator) throws SkillConfigurationException {
@@ -72,7 +72,7 @@ public class SetGoalNearerToRobot extends AbstractSkill {
         navigationGoalDataSlotWrite = configurator.getWriteSlot("NavigationGoalDataSlot", NavigationGoalData.class);
         navigationGoalDataSlotRead = configurator.getReadSlot("NavigationGoalDataSlot", NavigationGoalData.class);
 
-        robotPositionSensor = configurator.getSensor("PositionSensor", PositionData.class);
+        robotPositionSensor = configurator.getSensor("PositionSensor", Pose2D.class);
 
         closer = configurator.requestOptionalDouble(KEY_CLOSER, closer);
     }

@@ -7,7 +7,7 @@ import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
-import de.unibi.citec.clf.btl.data.geometry.Point3D
+import de.unibi.citec.clf.btl.data.geometry.Point3DStamped
 import de.unibi.citec.clf.btl.units.LengthUnit
 import java.util.concurrent.Future
 
@@ -34,7 +34,7 @@ class LookToPoint : AbstractSkill() {
     private var gazeActuator: GazeActuator? = null
     private var gazeDone: Future<Void>? = null
 
-    private var slot: MemorySlotReader<Point3D>? = null
+    private var slot: MemorySlotReader<Point3DStamped>? = null
 
     override fun configure(configurator: ISkillConfigurator) {
         timeout = configurator.requestOptionalInt(KEY_TIMEOUT, timeout.toInt()).toLong()
@@ -53,7 +53,7 @@ class LookToPoint : AbstractSkill() {
             y = configurator.requestOptionalDouble(KEY_Y, y)
             z = configurator.requestOptionalDouble(KEY_Z, z)
         } else {
-            slot = configurator.getReadSlot("Point", Point3D::class.java)
+            slot = configurator.getReadSlot("Point", Point3DStamped::class.java)
         }
 
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
@@ -67,9 +67,9 @@ class LookToPoint : AbstractSkill() {
             timeout += Time.currentTimeMillis()
         }
 
-        val pointToLookAt : Point3D = slot?.recall<Point3D>() ?: run {
+        val pointToLookAt : Point3DStamped = slot?.recall<Point3DStamped>() ?: run {
             logger.debug("slot null, building point from $x, $y, $z in $frame")
-            Point3D(x, y, z, LengthUnit.METER, this.frame)
+            Point3DStamped(x, y, z, LengthUnit.METER, this.frame)
         }
         logger.info("looking at point${pointToLookAt}")
         gazeDone = gazeActuator?.lookAt(pointToLookAt, velocity, duration.toLong())

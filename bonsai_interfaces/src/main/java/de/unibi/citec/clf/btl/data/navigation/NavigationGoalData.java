@@ -3,6 +3,7 @@ package de.unibi.citec.clf.btl.data.navigation;
 
 
 import de.unibi.citec.clf.bonsai.core.time.Time;
+import de.unibi.citec.clf.btl.data.geometry.Pose2D;
 import de.unibi.citec.clf.btl.units.AngleUnit;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 import de.unibi.citec.clf.btl.units.TimeUnit;
@@ -10,7 +11,7 @@ import de.unibi.citec.clf.btl.units.UnitConverter;
 
 import java.util.Objects;
 
-public class NavigationGoalData extends PositionData {
+public class NavigationGoalData extends Pose2D {
 
 	private double coordinateTolerance = 7.0;
 	private double yawTolerance = 0.15;
@@ -43,7 +44,7 @@ public class NavigationGoalData extends PositionData {
 	 * 			  Angle unit of yaw and yawTolerance input
 	 * @param lU
 	 * 			  Length unit of x,y and coordinateTolerance input
-	 * @see de.unibi.citec.clf.btl.data.navigation.PositionData.ReferenceFrame
+	 * @see Pose2D.ReferenceFrame
 	 */
 	public NavigationGoalData(String generator, double x, double y, double yaw,
 			double coordinateTolerance, double yawTolerance, ReferenceFrame frame, LengthUnit lU, AngleUnit aU) {
@@ -79,10 +80,10 @@ public class NavigationGoalData extends PositionData {
 	 * how you should use it:
 	 * PositionData posi = ...;
 	 * NavigationGoalData goal = (NavagationGoalData) posi;
-	 * @param positionData
+	 * @param pose2D
 	 */
-	public NavigationGoalData(PositionData positionData) {
-		super(positionData);
+	public NavigationGoalData(Pose2D pose2D) {
+		super(pose2D);
 	}
 
 	/**
@@ -105,7 +106,7 @@ public class NavigationGoalData extends PositionData {
 	 * 			  Angle unit of yaw input
 	 * @param lU
 	 * 			  Length unit of x,y input
-	 * @see de.unibi.citec.clf.btl.data.navigation.PositionData.ReferenceFrame
+	 * @see Pose2D.ReferenceFrame
 	 */
 	public NavigationGoalData(String generator, double x, double y, double yaw,
 			ReferenceFrame frame, LengthUnit lU,AngleUnit aU) {

@@ -11,7 +11,7 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.bonsai.util.CoordinateSystemConverter;
 import de.unibi.citec.clf.btl.data.geometry.PolarCoordinate;
 import de.unibi.citec.clf.btl.data.navigation.NavigationGoalData;
-import de.unibi.citec.clf.btl.data.navigation.PositionData;
+import de.unibi.citec.clf.btl.data.geometry.Pose2D;
 import de.unibi.citec.clf.btl.data.person.PersonData;
 import de.unibi.citec.clf.btl.units.AngleUnit;
 import de.unibi.citec.clf.btl.units.LengthUnit;
@@ -31,11 +31,11 @@ public class SetPersonAsNavigationGoal extends AbstractSkill {
     private MemorySlotReader<PersonData> personDataSlot;
     private MemorySlotWriter<NavigationGoalData> navigationGoalDataSlot;
 
-    private Sensor<PositionData> posSensor;
+    private Sensor<Pose2D> posSensor;
 
     private PersonData person;
     private double currentPersonDistance = 0;
-    private PositionData robotPosition;
+    private Pose2D robotPosition;
     private NavigationGoalData goal;
 
     @Override
@@ -45,7 +45,7 @@ public class SetPersonAsNavigationGoal extends AbstractSkill {
 
         personDataSlot = configurator.getReadSlot("PersonDataSlot", PersonData.class);
         navigationGoalDataSlot = configurator.getWriteSlot("NavigationGoalDataSlot", NavigationGoalData.class);
-        posSensor = configurator.getSensor("PositionSensor", PositionData.class);
+        posSensor = configurator.getSensor("PositionSensor", Pose2D.class);
 
         stopDistance = configurator.requestOptionalDouble(KEY_STOP_DISTANCE, stopDistance);
     }
@@ -94,8 +94,8 @@ public class SetPersonAsNavigationGoal extends AbstractSkill {
         return distance;
     }
 
-    private PositionData getLocalPosition(PositionData position) {
-        if (position.getFrameId().equals(PositionData.ReferenceFrame.LOCAL.getFrameName())) {
+    private Pose2D getLocalPosition(Pose2D position) {
+        if (position.getFrameId().equals(Pose2D.ReferenceFrame.LOCAL.getFrameName())) {
             return position;
         } else {
             return CoordinateSystemConverter.globalToLocal(position, robotPosition);

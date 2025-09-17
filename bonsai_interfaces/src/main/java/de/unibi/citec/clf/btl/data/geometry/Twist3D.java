@@ -1,10 +1,11 @@
 package de.unibi.citec.clf.btl.data.geometry;
 
 
+import de.unibi.citec.clf.btl.StampedType;
 import de.unibi.citec.clf.btl.Type;
 import java.util.Objects;
 
-public class Twist3D extends Type {
+public class Twist3D extends StampedType {
 
     private Velocity3D linear;
     private AngularVelocity3D angular;

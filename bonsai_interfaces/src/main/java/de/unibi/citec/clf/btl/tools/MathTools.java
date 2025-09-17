@@ -8,8 +8,8 @@ import javax.vecmath.Vector2d;
 import javax.vecmath.Vector3d;
 
 import de.unibi.citec.clf.btl.data.geometry.*;
-import de.unibi.citec.clf.btl.data.navigation.PositionData;
-import de.unibi.citec.clf.btl.data.navigation.PositionData.ReferenceFrame;
+import de.unibi.citec.clf.btl.data.geometry.Pose2D;
+import de.unibi.citec.clf.btl.data.geometry.Pose2D.ReferenceFrame;
 import de.unibi.citec.clf.btl.units.AngleUnit;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 import de.unibi.citec.clf.btl.units.UnitConverter;
@@ -29,7 +29,7 @@ public class MathTools {
      * Normalize angle to be "-PI < angle <= PI" or "-180° < angle <= 180°"
      * respectively.
      * 
-     * @param arbitrary
+     * @param angle
      *            angle
      * @return normalized angle
      */
@@ -55,7 +55,7 @@ public class MathTools {
         }
     }
 
-    public static PositionData localToOther(PositionData global, PositionData other) {
+    public static Pose2D localToOther(Pose2D global, Pose2D other) {
         LengthUnit iLU = LengthUnit.MILLIMETER;
         AngleUnit iAU = AngleUnit.RADIAN;
 
@@ -67,7 +67,7 @@ public class MathTools {
         double dx1 = MathTools.rotatePointX(dx, dy, -other.getYaw(iAU), iAU);
         double dy1 = MathTools.rotatePointY(dx, dy, -other.getYaw(iAU), iAU);
 
-        PositionData out = new PositionData(global);
+        Pose2D out = new Pose2D(global);
         out.setFrameId(ReferenceFrame.LOCAL);
         out.setX(dx1, iLU);
         out.setY(dy1, iLU);
@@ -75,7 +75,7 @@ public class MathTools {
         return out;
     }
 
-    public static PositionData globalToLocal(PositionData global, PositionData robot) {
+    public static Pose2D globalToLocal(Pose2D global, Pose2D robot) {
         if (!global.getFrameId().equals(ReferenceFrame.GLOBAL.getFrameName())) {
             throw new MathException("given point does not have a global reference frame");
         }
@@ -90,7 +90,7 @@ public class MathTools {
         double dx1 = MathTools.rotatePointX(dx, dy, -robot.getYaw(iAU), iAU);
         double dy1 = MathTools.rotatePointY(dx, dy, -robot.getYaw(iAU), iAU);
 
-        PositionData out = new PositionData(global);
+        Pose2D out = new Pose2D(global);
         out.setFrameId(ReferenceFrame.LOCAL);
         out.setX(dx1, iLU);
         out.setY(dy1, iLU);
@@ -98,7 +98,7 @@ public class MathTools {
         return out;
     }
 
-    public static PositionData localToGlobal(PositionData local, PositionData robot) {
+    public static Pose2D localToGlobal(Pose2D local, Pose2D robot) {
         if (!local.getFrameId().equals(ReferenceFrame.LOCAL.toString())) {
             throw new MathException("given point does not have a local reference frame");
         }
@@ -110,7 +110,7 @@ public class MathTools {
         double angle = local.getYaw(iAU) + robot.getYaw(iAU);
         angle = MathTools.normalizeAngle(angle, iAU);
 
-        PositionData out = new PositionData(local);
+        Pose2D out = new Pose2D(local);
         out.setFrameId(ReferenceFrame.GLOBAL);
         out.setX(dx, iLU);
         out.setY(dy, iLU);
@@ -132,16 +132,16 @@ public class MathTools {
         return xIn * sn + yIn * cs;
     }
 
-    public static Point2D rotatePoint(final Point2D in, final double angle, final AngleUnit unit) {
+    public static Point2DStamped rotatePoint(final Point2DStamped in, final double angle, final AngleUnit unit) {
         double x0 = MathTools.rotatePointX(in.getX(in.getOriginalLU()), in.getY(in.getOriginalLU()), angle, unit);
         double y0 = MathTools.rotatePointY(in.getX(in.getOriginalLU()), in.getY(in.getOriginalLU()), angle, unit);
-        Point2D p = new Point2D(in);
+        Point2DStamped p = new Point2DStamped(in);
         p.setX(x0, in.getOriginalLU());
         p.setY(y0, in.getOriginalLU());
         return p;
     }
 
-    public static PolarCoordinate cartesianToPolar(Point2D cartesian) {
+    public static PolarCoordinate cartesianToPolar(Point2DStamped cartesian) {
         return new PolarCoordinate(cartesian);
     }
 
@@ -319,15 +319,15 @@ public class MathTools {
     	LengthUnit m = LengthUnit.METER;
     	Vector3d vec = new Vector3d(point.getX(m), point.getY(m), point.getZ(m));
     	rot.getMatrix().transform(vec);
-    	return new Point3D(vec.x, vec.y, vec.z, m, point.getFrameId());
+    	return new Point3D(vec.x, vec.y, vec.z, m);
     }
     
     public static Point3D applyAddition(Point3D p0, Point3D p1) {
     	LengthUnit m = LengthUnit.METER;
-    	return new Point3D(p0.getX(m) + p1.getX(m), p0.getY(m) + p1.getY(m), p0.getZ(m) + p1.getZ(m), m, p0.getFrameId());
+    	return new Point3D(p0.getX(m) + p1.getX(m), p0.getY(m) + p1.getY(m), p0.getZ(m) + p1.getZ(m), m);
     }
 
-    public static Pose3D positionToPose (PositionData position) {
+    public static Pose3D positionToPose (Pose2D position) {
         Point3D point = new Point3D(position.getX(LengthUnit.METER), position.getY(LengthUnit.METER), 0, LengthUnit.METER);
         Rotation3D rotation = new Rotation3D(new Vector3d(0,0,1), position.getYaw(AngleUnit.RADIAN), AngleUnit.RADIAN);
         return new Pose3D(point, rotation, position.getFrameId());
