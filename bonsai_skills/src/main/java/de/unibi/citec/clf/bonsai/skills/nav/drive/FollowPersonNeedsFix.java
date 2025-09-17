@@ -66,7 +66,7 @@ import java.util.concurrent.Future;
  *
  * @author jkummert
  */
-public class NavigateToPerson extends AbstractSkill {
+public class FollowPersonNeedsFix extends AbstractSkill {
 
     private static final String KEY_PERSON_LOST_TIMEOUT = "#_PERSON_LOST_TIMEOUT";
     private static final String KEY_STOP_DISTANCE = "#_STOP_DISTANCE";

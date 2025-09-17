@@ -15,7 +15,8 @@ import java.util.concurrent.Future;
  * @author lruegeme
  */
 public interface GazeActuator extends Actuator {
-    
+
+    @Deprecated
     Future<Void> lookAt(Point3D point);
 
     /**
@@ -24,6 +25,7 @@ public interface GazeActuator extends Actuator {
      * @param duration minimal movement duration in ms
      * @return
      */
+    @Deprecated
     Future<Void> lookAt(Point3D point, long duration);
 
     /**
@@ -36,6 +38,7 @@ public interface GazeActuator extends Actuator {
      */
     Future<Void> lookAt(Point3D point, double maxVelocity, long minDuration);
 
+    @Deprecated
     void manualStop() throws IOException;
 
     @Deprecated

@@ -14,6 +14,7 @@ import de.unibi.citec.clf.btl.Type;
  * @author sjebbara
  * @author lkettenb
  */
+@Deprecated
 public class GrammarNonTerminal extends Type implements GrammarSymbol {
 
     private GrammarSymbol parent = null;

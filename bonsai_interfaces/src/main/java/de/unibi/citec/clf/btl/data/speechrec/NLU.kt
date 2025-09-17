@@ -3,7 +3,7 @@ package de.unibi.citec.clf.btl.data.speechrec
 import de.unibi.citec.clf.btl.Type
 
 /**
- * Domain class representing an natural language understanding
+ * Domain class representing a natural language understanding
  *
  * @author lruegeme
  */

@@ -1,8 +1,8 @@
 package de.unibi.citec.clf.btl.data.person;
 
 
+import de.unibi.citec.clf.btl.Type;
 import de.unibi.citec.clf.btl.data.geometry.Point3D;
-import de.unibi.citec.clf.btl.data.knowledgebase.BDO;
 import org.apache.log4j.Logger;
 
 import de.unibi.citec.clf.btl.data.navigation.PositionData;
@@ -12,7 +12,7 @@ import de.unibi.citec.clf.btl.data.navigation.PositionData;
  * @author rfeldhans
  *
  */
-public class PersonData extends BDO {
+public class PersonData extends Type {
 
     private double reliability = 0.0;
     private String uuid;
