@@ -4,6 +4,8 @@ package de.unibi.citec.clf.bonsai.actuators;
 
 import de.unibi.citec.clf.bonsai.core.object.Actuator;
 import de.unibi.citec.clf.btl.data.geometry.Point3D;
+import de.unibi.citec.clf.btl.data.geometry.Point3DStamped;
+import de.unibi.citec.clf.btl.data.geometry.Pose3D;
 
 import java.io.IOException;
 
@@ -15,8 +17,9 @@ import java.util.concurrent.Future;
  * @author lruegeme
  */
 public interface GazeActuator extends Actuator {
-    
-    Future<Void> lookAt(Point3D point);
+
+    @Deprecated
+    Future<Void> lookAt(Point3DStamped point);
 
     /**
      *
@@ -24,7 +27,8 @@ public interface GazeActuator extends Actuator {
      * @param duration minimal movement duration in ms
      * @return
      */
-    Future<Void> lookAt(Point3D point, long duration);
+    @Deprecated
+    Future<Void> lookAt(Point3DStamped point, long duration);
 
     /**
      * Look at a point, moving at least minDuration milliseconds with below maxVelocity rad/s
@@ -34,8 +38,9 @@ public interface GazeActuator extends Actuator {
      * @param minDuration
      * @return
      */
-    Future<Void> lookAt(Point3D point, double maxVelocity, long minDuration);
+    Future<Void> lookAt(Point3DStamped point, double maxVelocity, long minDuration);
 
+    @Deprecated
     void manualStop() throws IOException;
 
     @Deprecated

@@ -5,6 +5,7 @@ import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
 
+import de.unibi.citec.clf.btl.StampedType;
 import de.unibi.citec.clf.btl.Type;
 
 /**
@@ -13,7 +14,7 @@ import de.unibi.citec.clf.btl.Type;
  * @author sebschne
  * @author jwienke
  */
-public class ObjectData extends Type {
+public class ObjectData extends StampedType {
 
     public static class Hypothesis extends Type {
 
@@ -51,8 +52,7 @@ public class ObjectData extends Type {
 
         @Override
         public String toString() {
-            return "[HYPOTHESIS " + "label: " + getClassLabel() + "timestamp: " + getTimestamp()
-                    + " reliability:  " + getReliability() + "]";
+            return "[HYPOTHESIS " + "label: " + getClassLabel() + " reliability:  " + getReliability() + "]";
 
         }
 
@@ -62,7 +62,7 @@ public class ObjectData extends Type {
                 return true;
             } else if (o != null && this.getClass() == o.getClass()) {
                 Hypothesis hyp = (Hypothesis) o;
-                return (Objects.equals(this.getClassLabel(),hyp.getClassLabel()) && Objects.equals(this.getTimestamp(),hyp.getTimestamp()));
+                return (Objects.equals(this.getClassLabel(),hyp.getClassLabel()));
             } else {
                 return false;
             }

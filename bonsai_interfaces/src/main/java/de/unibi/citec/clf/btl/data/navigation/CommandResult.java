@@ -2,13 +2,14 @@ package de.unibi.citec.clf.btl.data.navigation;
 
 
 
+import de.unibi.citec.clf.btl.StampedType;
 import de.unibi.citec.clf.btl.Type;
 
 /**
  *
  * @author cklarhor
  */
-public class CommandResult extends Type {
+public class CommandResult extends StampedType {
     
     /**
      * possible CommandResults see rst.navigation.CommandResult.Result

@@ -8,7 +8,7 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException;
-import de.unibi.citec.clf.btl.data.navigation.PositionData;
+import de.unibi.citec.clf.btl.data.geometry.Pose2D;
 import de.unibi.citec.clf.btl.data.person.PersonData;
 
 /**
@@ -42,10 +42,10 @@ public class GetPersonPosition extends AbstractSkill{
     private ExitToken tokenError;
 
     private MemorySlotReader<PersonData> personDataSlot;
-    private MemorySlotWriter<PositionData> positionDataSlot;
+    private MemorySlotWriter<Pose2D> positionDataSlot;
 
     private PersonData personData;
-    private PositionData positionData;
+    private Pose2D pose2D;
 
 
     @Override
@@ -54,7 +54,7 @@ public class GetPersonPosition extends AbstractSkill{
         tokenError = configurator.requestExitToken(ExitStatus.ERROR());
 
         personDataSlot = configurator.getReadSlot("PersonDataSlot", PersonData.class);
-        positionDataSlot = configurator.getWriteSlot("PositionDataSlot", PositionData.class);
+        positionDataSlot = configurator.getWriteSlot("PositionDataSlot", Pose2D.class);
     }
 
     @Override
@@ -77,7 +77,7 @@ public class GetPersonPosition extends AbstractSkill{
 
     @Override
     public ExitToken execute() {
-        positionData = personData.getPosition();
+        pose2D = personData.getPosition();
         return tokenSuccess;
     }
 
@@ -85,7 +85,7 @@ public class GetPersonPosition extends AbstractSkill{
     public ExitToken end(ExitToken curToken) {
         if (curToken.getExitStatus().isSuccess()) {
             try {
-                positionDataSlot.memorize(positionData);
+                positionDataSlot.memorize(pose2D);
             } catch (CommunicationException ex) {
                 logger.error("Could not memorize positionData");
                 return tokenError;

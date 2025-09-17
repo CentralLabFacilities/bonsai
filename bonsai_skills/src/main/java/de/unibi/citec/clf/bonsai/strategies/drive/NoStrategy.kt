@@ -7,8 +7,8 @@ import de.unibi.citec.clf.bonsai.strategies.drive.DriveStrategy.StrategyState
 import de.unibi.citec.clf.bonsai.util.CoordinateSystemConverter
 import de.unibi.citec.clf.btl.data.navigation.CommandResult
 import de.unibi.citec.clf.btl.data.navigation.NavigationGoalData
-import de.unibi.citec.clf.btl.data.navigation.PositionData
-import de.unibi.citec.clf.btl.data.navigation.PositionData.ReferenceFrame
+import de.unibi.citec.clf.btl.data.geometry.Pose2D
+import de.unibi.citec.clf.btl.data.geometry.Pose2D.ReferenceFrame
 import de.unibi.citec.clf.btl.units.AngleUnit
 import de.unibi.citec.clf.btl.units.LengthUnit
 import org.apache.log4j.Logger
@@ -18,14 +18,14 @@ import java.util.concurrent.ExecutionException
 import java.util.concurrent.Future
 import kotlin.math.abs
 
-class NoStrategy(private val nav: NavigationActuator?, private val robotPositionSensor: Sensor<PositionData>?) :
+class NoStrategy(private val nav: NavigationActuator?, private val robotPositionSensor: Sensor<Pose2D>?) :
     DriveStrategy {
     private val logger: Logger = Logger.getLogger(this.javaClass)
     private var targetGoal: NavigationGoalData? = null
     private var commandResult: Future<CommandResult>? = null
-    private var robotPos: PositionData? = null
+    private var robotPos: Pose2D? = null
 
-    private var progressLastPose: PositionData? = null
+    private var progressLastPose: Pose2D? = null
     private var progressLastTime: Long = 0L
     private var progressMinDist = 0.05
     private var progressMinYaw = 0.2
@@ -34,7 +34,7 @@ class NoStrategy(private val nav: NavigationActuator?, private val robotPosition
     override fun reset() {
     }
 
-    fun checkProgress(current: PositionData) : Boolean  {
+    fun checkProgress(current: Pose2D) : Boolean  {
         if(progressLastPose == null) {
             progressLastPose = current
             progressLastTime = Time.currentTimeMillis()

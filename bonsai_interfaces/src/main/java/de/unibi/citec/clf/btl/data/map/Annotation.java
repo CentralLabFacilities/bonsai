@@ -4,7 +4,7 @@ package de.unibi.citec.clf.btl.data.map;
 
 import de.unibi.citec.clf.btl.Type;
 import de.unibi.citec.clf.btl.data.geometry.PrecisePolygon;
-import de.unibi.citec.clf.btl.data.navigation.PositionData;
+import de.unibi.citec.clf.btl.data.geometry.Pose2D;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 
 import java.util.Arrays;
@@ -137,7 +137,7 @@ public class Annotation extends Type {
      * @param position given position
      * @return nearest viewpoint
      */
-    public Viewpoint getNearestViewPoint(PositionData position) {
+    public Viewpoint getNearestViewPoint(Pose2D position) {
         double minDist = Double.MAX_VALUE;
         Viewpoint result = null;
         for (Viewpoint vp : viewpoints) {

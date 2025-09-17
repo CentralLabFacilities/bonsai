@@ -4,7 +4,7 @@ package de.unibi.citec.clf.bonsai.strategies.exploration;
 
 import de.unibi.citec.clf.btl.data.map.Annotation;
 import de.unibi.citec.clf.btl.data.navigation.NavigationGoalData;
-import de.unibi.citec.clf.btl.data.navigation.PositionData;
+import de.unibi.citec.clf.btl.data.geometry.Pose2D;
 
 /**
  * This interface defines strategies, that produce navigation goals in order to
@@ -24,7 +24,7 @@ public interface ExplorationStrategy {
      *             Is thrown if no further goal could be generated.
      * @return A reasonable new goal.
      */
-    NavigationGoalData getNextGoal(PositionData currentPosition)
+    NavigationGoalData getNextGoal(Pose2D currentPosition)
             throws NoGoalFoundException;
 
     /**
@@ -39,8 +39,8 @@ public interface ExplorationStrategy {
      *             Is thrown if no further goal could be generated.
      * @return A reasonable new goal.
      */
-    NavigationGoalData getNextGoal(PositionData currentPosition,
-            Annotation region) throws NoGoalFoundException;
+    NavigationGoalData getNextGoal(Pose2D currentPosition,
+                                   Annotation region) throws NoGoalFoundException;
 
     /**
      * This exception should be thrown, if no further navigation goal could be

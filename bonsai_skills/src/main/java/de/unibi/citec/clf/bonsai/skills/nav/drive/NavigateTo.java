@@ -13,7 +13,7 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.bonsai.strategies.drive.DriveStrategy;
 import de.unibi.citec.clf.bonsai.util.helper.DriveStrategyBuilder;
 import de.unibi.citec.clf.btl.data.navigation.NavigationGoalData;
-import de.unibi.citec.clf.btl.data.navigation.PositionData;
+import de.unibi.citec.clf.btl.data.geometry.Pose2D;
 import java.io.IOException;
 
 /**
@@ -65,7 +65,7 @@ public class NavigateTo extends AbstractSkill {
     private ExitToken tokenErrorTimeout;
 
     private NavigationActuator navActuator;
-    private Sensor<PositionData> robotPositionSensor;
+    private Sensor<Pose2D> robotPositionSensor;
     private MemorySlotReader<NavigationGoalData> navigationGoalDataSlot;
 
     private DriveStrategy driveStrategy;
@@ -85,7 +85,7 @@ public class NavigateTo extends AbstractSkill {
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
 
         navActuator = configurator.getActuator("NavigationActuator", NavigationActuator.class);
-        robotPositionSensor = configurator.getSensor("PositionSensor", PositionData.class);
+        robotPositionSensor = configurator.getSensor("PositionSensor", Pose2D.class);
 
         navigationGoalDataSlot = configurator.getReadSlot("NavigationGoalDataSlot", NavigationGoalData.class);
         driveStrategy = DriveStrategyBuilder.createStrategy(strategy, configurator, navActuator, robotPositionSensor);

@@ -5,6 +5,7 @@ import de.unibi.citec.clf.btl.data.common.Timestamp;
 import de.unibi.citec.clf.btl.units.TimeUnit;
 import org.apache.log4j.Logger;
 
+import java.io.Serial;
 import java.util.Objects;
 
 /**
@@ -15,21 +16,18 @@ import java.util.Objects;
  */
 public abstract class Type {
 
-    public static final String BASE_FRAME = "base_link";
-    protected Timestamp timestamp = new Timestamp();
     protected String generator = "unknown";
-    protected String frameId = "";
 
-    private static Logger logger = Logger.getLogger(Type.class);
+    protected static Logger logger = Logger.getLogger(Type.class);
 
-    private int id = -1;
+    protected int id = -1;
 
     /**
      * This is the source element, from which the current btl object was
      * parsed. If the object was not parsed from a wire document but created
      * manually, this field is null.
      */
-    private String sourceDocument = null;
+    protected String sourceDocument = null;
 
     /**
      * Returns true if this instance has a memory ID.
@@ -96,48 +94,7 @@ public abstract class Type {
      * Copy type.
      */
     public Type(Type other) {
-        timestamp = new Timestamp(other.timestamp);
         generator = other.generator;
-        frameId = other.frameId;
-    }
-
-    /**
-     * Sets the timestamp using a single millisecond value.
-     *
-     * @param timestamp The timestamp as a long value unix time.
-     */
-    public final void setTimestamp(long timestamp, TimeUnit unit) {
-        this.timestamp = new Timestamp(timestamp, unit);
-    }
-
-    /**
-     * Sets the timestamps associated with this type.
-     *
-     * @param timestamp timstamps to set
-     */
-    public final void setTimestamp(Timestamp timestamp) {
-        if (timestamp == null) {
-            logger.error("Inserted timestamp was null");
-            throw new IllegalArgumentException("Timestamp must not be null.");
-        }
-        this.timestamp = timestamp;
-    }
-
-    /**
-     * Uses the current system time as new timestamp for this class.
-     */
-    public final void setTimestampNow() {
-        this.timestamp = new Timestamp();
-    }
-
-    /**
-     * Returns the timestamps associated with this type.
-     *
-     * @return timestamp timstamps
-     */
-    public final Timestamp getTimestamp() {
-        assert (timestamp != null) : "Parsing must have set the timestamp.";
-        return timestamp;
     }
 
     /**
@@ -162,32 +119,9 @@ public abstract class Type {
         return generator;
     }
 
-    /**
-     * Returns the coordinate frame id of this type.
-     *
-     * @return the coordinate frame id of this type.
-     */
-    public String getFrameId() {
-        return frameId;
-    }
-
-    public boolean isInBaseFrame() {
-        return frameId.equals(BASE_FRAME);
-    }
-
-    /**
-     * Sets the coordinate frame id of this type.
-     *
-     * @param frameId the new coordinate frame id
-     */
-    public void setFrameId(String frameId) {
-        this.frameId = frameId;
-    }
-
     @Override
     public int hashCode() {
-
-        return Objects.hash(timestamp, frameId, id);
+        return Objects.hash(id);
     }
 
     @Override
@@ -195,7 +129,7 @@ public abstract class Type {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Type type = (Type) o;
-        return Objects.equals(frameId, type.frameId);
+        return true;
     }
 
     /**
@@ -206,6 +140,7 @@ public abstract class Type {
      */
     public static class NoSourceDocumentException extends Exception {
 
+        @Serial
         private static final long serialVersionUID = 3558849451905177392L;
 
         /**

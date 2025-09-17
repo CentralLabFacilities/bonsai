@@ -6,6 +6,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Objects;
 
+import de.unibi.citec.clf.btl.StampedType;
 import de.unibi.citec.clf.btl.Type;
 import de.unibi.citec.clf.btl.data.common.Timestamp;
 import de.unibi.citec.clf.btl.units.TimeUnit;
@@ -19,7 +20,7 @@ import de.unibi.citec.clf.btl.units.TimeUnit;
  * @author lschilli
  * @author lkettenb
  */
-public class Utterance extends Type implements Iterable<UtterancePart> {
+public class Utterance extends StampedType implements Iterable<UtterancePart> {
 
 	private LinkedHashMap<Integer, UtterancePart> utterancePartMap = new LinkedHashMap<>();
 	private boolean stable;

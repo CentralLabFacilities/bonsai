@@ -11,7 +11,7 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.btl.List;
-import de.unibi.citec.clf.btl.data.navigation.PositionData;
+import de.unibi.citec.clf.btl.data.geometry.Pose2D;
 import de.unibi.citec.clf.btl.data.person.PersonData;
 import de.unibi.citec.clf.btl.data.person.PersonDataList;
 import de.unibi.citec.clf.btl.units.LengthUnit;
@@ -63,11 +63,11 @@ public class GetNewFollowId extends AbstractSkill {
 
     private Sensor<PersonDataList> personSensor;
 
-    private MemorySlotReader<PositionData> positionSlotRead;
+    private MemorySlotReader<Pose2D> positionSlotRead;
     private MemorySlotReader<PersonData> followPersonRead = null;
     private MemorySlotWriter<PersonData> followPersonSlotWrite;
 
-    private PositionData personPos;
+    private Pose2D personPos;
     private PersonData target;
 
     @Override
@@ -79,7 +79,7 @@ public class GetNewFollowId extends AbstractSkill {
         if (configurator.requestOptionalBool(KEY_USE_PERSON_SLOT, false)) {
             followPersonRead = configurator.getReadSlot("PersonInput", PersonData.class);
         } else {
-            positionSlotRead = configurator.getReadSlot("LastPersonPositionSlot", PositionData.class);
+            positionSlotRead = configurator.getReadSlot("LastPersonPositionSlot", Pose2D.class);
         }
 
         personSensor = configurator.getSensor("PersonSensor", PersonDataList.class);
@@ -131,13 +131,13 @@ public class GetNewFollowId extends AbstractSkill {
 
     }
 
-    public PersonData findClosestToPosition(PositionData old, double maxDist) {
+    public PersonData findClosestToPosition(Pose2D old, double maxDist) {
         double cur = maxDist;
         PersonData best = null;
         List<PersonData> personList = getPersons();
         if (personList != null) {
             for (PersonData p : personList) {
-                PositionData pos = p.getPosition();
+                Pose2D pos = p.getPosition();
                 double dist = pos.getDistance(old, LU);
                 logger.debug("Person: " + p);
                 logger.debug("Person dist: " + dist);

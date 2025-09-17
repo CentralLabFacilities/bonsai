@@ -367,11 +367,11 @@ public class PrecisePolygon extends Type implements Iterable<Point2D> {
             Point2D newRobo = robo;
             intersectionsLeft.sort(new Comparator<Point2D>() {
                 @Override
-                public int compare(Point2D point2D, Point2D t1) {
-                    if(point2D.distance(newRobo) < t1.distance(newRobo)){
+                public int compare(Point2D point2DStamped, Point2D t1) {
+                    if(point2DStamped.distance(newRobo) < t1.distance(newRobo)){
                         return -1;
                     }
-                    else if(point2D.distance(newRobo) > t1.distance(newRobo)){
+                    else if(point2DStamped.distance(newRobo) > t1.distance(newRobo)){
                         return 1;
                     }
                     return 0;
@@ -401,11 +401,11 @@ public class PrecisePolygon extends Type implements Iterable<Point2D> {
             Point2D newRobo = robo;
             intersectionsRight.sort(new Comparator<Point2D>() {
                 @Override
-                public int compare(Point2D point2D, Point2D t1) {
-                    if(point2D.distance(newRobo) < t1.distance(newRobo)){
+                public int compare(Point2D point2DStamped, Point2D t1) {
+                    if(point2DStamped.distance(newRobo) < t1.distance(newRobo)){
                         return -1;
                     }
-                    else if(point2D.distance(newRobo) > t1.distance(newRobo)){
+                    else if(point2DStamped.distance(newRobo) > t1.distance(newRobo)){
                         return 1;
                     }
                     return 0;
@@ -514,7 +514,7 @@ public class PrecisePolygon extends Type implements Iterable<Point2D> {
      * @return
      */
     public List<Point2D> getAllIntersections(Point2D inside, Point2D outside) {
-        List<Point2D> point2DS = new List<>(Point2D.class);
+        List<Point2D> point2DStampeds = new List<>(Point2D.class);
         if (list.size() < 3 || !this.contains(inside) || this.contains(outside)) {
             return null;
         }
@@ -559,10 +559,10 @@ public class PrecisePolygon extends Type implements Iterable<Point2D> {
             Point2D ret = new Point2D(0.0, 0.0, meter);
             ret.setX(xi, meter);
             ret.setY(yi, meter);
-            point2DS.add(ret);
+            point2DStampeds.add(ret);
 
         }
-        return point2DS;
+        return point2DStampeds;
     }
 
     /**

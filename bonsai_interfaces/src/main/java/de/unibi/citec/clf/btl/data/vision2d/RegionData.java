@@ -2,10 +2,11 @@ package de.unibi.citec.clf.btl.data.vision2d;
 
 
 
+import de.unibi.citec.clf.btl.StampedType;
 import de.unibi.citec.clf.btl.Type;
 import de.unibi.citec.clf.btl.data.geometry.PrecisePolygon;
 
-public class RegionData extends Type {
+public class RegionData extends StampedType {
 
 	public static final String SCOPE_TAG_NAME = "SCOPE";
 

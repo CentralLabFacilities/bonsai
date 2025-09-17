@@ -2,10 +2,9 @@ package de.unibi.citec.clf.bonsai.util;
 
 
 
-import de.unibi.citec.clf.btl.data.geometry.Point2D;
-import de.unibi.citec.clf.btl.data.geometry.Point3D;
+import de.unibi.citec.clf.btl.data.geometry.Point2DStamped;
 import de.unibi.citec.clf.btl.data.navigation.NavigationGoalData;
-import de.unibi.citec.clf.btl.data.navigation.PositionData;
+import de.unibi.citec.clf.btl.data.geometry.Pose2D;
 import de.unibi.citec.clf.btl.tools.MathTools;
 import de.unibi.citec.clf.btl.units.AngleUnit;
 import de.unibi.citec.clf.btl.units.LengthUnit;
@@ -40,8 +39,8 @@ public class CoordinateSystemConverter {
      *         orientation of the robot as NavigationGoalData, which can
      *         directly by used for the NavigationActuator.
      */
-    public static NavigationGoalData polar2NavigationGoalData(PositionData origin, double angle, double dist,
-            AngleUnit angleUnit, LengthUnit lengthUnit) {
+    public static NavigationGoalData polar2NavigationGoalData(Pose2D origin, double angle, double dist,
+                                                              AngleUnit angleUnit, LengthUnit lengthUnit) {
         NavigationGoalData cart = new NavigationGoalData();
         double localAngle = UnitConverter.convert(angle, angleUnit, AngleUnit.RADIAN)
                 + origin.getYaw(AngleUnit.RADIAN);
@@ -56,7 +55,7 @@ public class CoordinateSystemConverter {
                 origin.getY(LengthUnit.METER) + Math.sin(localAngle)
                         * UnitConverter.convert(dist, lengthUnit, LengthUnit.METER), LengthUnit.METER);
         cart.setYaw(localAngle, AngleUnit.RADIAN);
-        cart.setFrameId(PositionData.ReferenceFrame.GLOBAL);
+        cart.setFrameId(Pose2D.ReferenceFrame.GLOBAL);
         return cart;
     }
 
@@ -84,24 +83,24 @@ public class CoordinateSystemConverter {
     public static NavigationGoalData polar2LocalNavigationGoalData(double angle, double dist, AngleUnit angleUnit,
             LengthUnit lengthUnit) {
 
-        PositionData localPosition = new PositionData();
+        Pose2D localPosition = new Pose2D();
         localPosition.setX(0.0, lengthUnit);
         localPosition.setY(0.0, lengthUnit);
         localPosition.setYaw(0.0, angleUnit);
 
         NavigationGoalData cart = polar2NavigationGoalData(localPosition, angle, dist, angleUnit, lengthUnit);
-        cart.setFrameId(PositionData.ReferenceFrame.LOCAL);
+        cart.setFrameId(Pose2D.ReferenceFrame.LOCAL);
 
         return cart;
     }
 
-    public static double positionData2Angle(PositionData ownPosition, PositionData oP, AngleUnit angleUnit) {
+    public static double positionData2Angle(Pose2D ownPosition, Pose2D oP, AngleUnit angleUnit) {
 
-        return positionData2Angle(ownPosition, new Point2D(oP.getX(LengthUnit.METER), oP.getY(LengthUnit.METER),
+        return positionData2Angle(ownPosition, new Point2DStamped(oP.getX(LengthUnit.METER), oP.getY(LengthUnit.METER),
                 LengthUnit.METER), angleUnit);
     }
 
-    public static double positionData2Angle(PositionData ownPosition, Point2D objectPosition, AngleUnit angleUnit) {
+    public static double positionData2Angle(Pose2D ownPosition, Point2DStamped objectPosition, AngleUnit angleUnit) {
 
         double angle = Math.atan2(objectPosition.getY(LengthUnit.METER) - ownPosition.getY(LengthUnit.METER),
                 objectPosition.getX(LengthUnit.METER) - ownPosition.getX(LengthUnit.METER));
@@ -112,12 +111,12 @@ public class CoordinateSystemConverter {
         return UnitConverter.convert(angle, AngleUnit.RADIAN, angleUnit);
     }
 
-    public static double positionDistance(PositionData ownPosition, PositionData oP, LengthUnit lUnit) {
+    public static double positionDistance(Pose2D ownPosition, Pose2D oP, LengthUnit lUnit) {
 
-        return positionDistance(ownPosition, new Point2D(oP.getX(lUnit), oP.getY(lUnit), lUnit), lUnit);
+        return positionDistance(ownPosition, new Point2DStamped(oP.getX(lUnit), oP.getY(lUnit), lUnit), lUnit);
     }
 
-    public static double positionDistance(PositionData ownPosition, Point2D objectPosition, LengthUnit lUnit) {
+    public static double positionDistance(Pose2D ownPosition, Point2DStamped objectPosition, LengthUnit lUnit) {
 
         double x = ownPosition.getX(lUnit) - objectPosition.getX(lUnit);
 
@@ -129,34 +128,21 @@ public class CoordinateSystemConverter {
     }
 
     @Deprecated
-    public static PositionData localToGlobal(PositionData src, PositionData currentPosition) {
+    public static Pose2D localToGlobal(Pose2D src, Pose2D currentPosition) {
 
         LengthUnit meter = LengthUnit.METER;
         AngleUnit rad = AngleUnit.RADIAN;
 
-        Point2D pGlobal = localToGlobal((Point2D) src, currentPosition);
+        Point2DStamped pGlobal = localToGlobal((Point2DStamped) src, currentPosition);
 
         double gyaw = currentPosition.getYaw(rad) + src.getYaw(rad);
 
-        PositionData tgt = new PositionData(pGlobal.getX(meter), pGlobal.getY(meter), gyaw, src.getTimestamp(), meter,
+        Pose2D tgt = new Pose2D(pGlobal.getX(meter), pGlobal.getY(meter), gyaw, src.getTimestamp(), meter,
                 rad);
         return tgt;
     }
 
-    
-      public static PositionData armToRobotLocal(Point3D src) {
-
-        LengthUnit meter = LengthUnit.METER;
-        AngleUnit rad = AngleUnit.RADIAN;
-                
-        PositionData tgt = new PositionData(
-                src.getZ(meter)+0.20, -src.getY(meter), 0, src.getTimestamp(), meter,
-                rad);
-        
-        return tgt;
-    }
-
-    public static Point2D localToGlobal(Point2D src, PositionData currentPosition) {
+    public static Point2DStamped localToGlobal(Point2DStamped src, Pose2D currentPosition) {
 
         LengthUnit meter = LengthUnit.METER;
         AngleUnit rad = AngleUnit.RADIAN;
@@ -174,26 +160,26 @@ public class CoordinateSystemConverter {
         double gx = currentPosition.getX(meter) + px;
         double gy = currentPosition.getY(meter) + py;
 
-        Point2D tgt = new Point2D(gx, gy, meter);
+        Point2DStamped tgt = new Point2DStamped(gx, gy, meter);
         tgt.setTimestamp(src.getTimestamp());
         return tgt;
     }
 
-    public static PositionData globalToLocal(PositionData src, PositionData referencePosition) {
+    public static Pose2D globalToLocal(Pose2D src, Pose2D referencePosition) {
 
-        Point2D pointLocal = globalToLocal((Point2D) src, referencePosition);
+        Point2DStamped pointLocal = globalToLocal((Point2DStamped) src, referencePosition);
 
         LengthUnit meter = LengthUnit.METER;
         AngleUnit rad = AngleUnit.RADIAN;
 
         double yawLocal = src.getYaw(rad) - referencePosition.getYaw(rad);
 
-        PositionData tgt = new PositionData(pointLocal.getX(meter), pointLocal.getY(meter), yawLocal,
+        Pose2D tgt = new Pose2D(pointLocal.getX(meter), pointLocal.getY(meter), yawLocal,
                 src.getTimestamp(), meter, rad);
         return tgt;
     }
 
-    public static Point2D globalToLocal(Point2D src, PositionData referencePosition) {
+    public static Point2DStamped globalToLocal(Point2DStamped src, Pose2D referencePosition) {
 
         LengthUnit meter = LengthUnit.METER;
         AngleUnit rad = AngleUnit.RADIAN;
@@ -211,7 +197,7 @@ public class CoordinateSystemConverter {
         double xLocal = xTmp * cs - yTmp * sn;
         double yLocal = xTmp * sn + yTmp * cs;
 
-        Point2D p = new Point2D(xLocal, yLocal, meter);
+        Point2DStamped p = new Point2DStamped(xLocal, yLocal, meter);
         p.setTimestamp(src.getTimestamp());
         return p;
     }

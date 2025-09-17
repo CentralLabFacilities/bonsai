@@ -8,7 +8,7 @@ import de.unibi.citec.clf.bonsai.util.CoordinateSystemConverter;
 import de.unibi.citec.clf.btl.data.geometry.PolarCoordinate;
 import de.unibi.citec.clf.btl.data.navigation.GlobalPlan;
 import de.unibi.citec.clf.btl.data.navigation.NavigationGoalData;
-import de.unibi.citec.clf.btl.data.navigation.PositionData;
+import de.unibi.citec.clf.btl.data.geometry.Pose2D;
 import de.unibi.citec.clf.btl.tools.MathTools;
 import de.unibi.citec.clf.btl.units.AngleUnit;
 import de.unibi.citec.clf.btl.units.LengthUnit;
@@ -26,7 +26,7 @@ public class NearestToTarget extends DriveStrategyWithTryGoal {
     GlobalPlan oldPlan = null;
 
     public NearestToTarget(NavigationActuator nav,
-            Sensor<PositionData> robotPositionSensor, ISkillConfigurator conf) throws SkillConfigurationException {
+                           Sensor<Pose2D> robotPositionSensor, ISkillConfigurator conf) throws SkillConfigurationException {
         super(nav, robotPositionSensor, conf);
     }
 
@@ -55,7 +55,7 @@ public class NearestToTarget extends DriveStrategyWithTryGoal {
 
                     PolarCoordinate targetPolar;
                     //If targetGoal is already a LOCAL target, the conversion globalToLocal is not necessary
-                    if(targetGoal.getFrameId().equals(PositionData.ReferenceFrame.LOCAL.getFrameName())) {
+                    if(targetGoal.getFrameId().equals(Pose2D.ReferenceFrame.LOCAL.getFrameName())) {
                         targetPolar = new PolarCoordinate(targetGoal);
                     } else {
                         targetPolar = new PolarCoordinate(MathTools.globalToLocal(

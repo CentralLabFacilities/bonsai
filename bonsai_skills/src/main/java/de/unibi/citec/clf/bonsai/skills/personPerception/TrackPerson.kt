@@ -1,9 +1,7 @@
 package de.unibi.citec.clf.bonsai.skills.personPerception
 
 import de.unibi.citec.clf.bonsai.actuators.TrackingActuator
-import de.unibi.citec.clf.bonsai.core.exception.CommunicationException
 import de.unibi.citec.clf.bonsai.core.`object`.MemorySlotReader
-import de.unibi.citec.clf.bonsai.core.time.Time
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken
@@ -11,7 +9,6 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
 import de.unibi.citec.clf.btl.data.geometry.Point3D
 import de.unibi.citec.clf.btl.data.person.PersonData
 import de.unibi.citec.clf.btl.units.LengthUnit
-import net.sf.saxon.functions.ConstantFunction.True
 import java.util.concurrent.Future
 
 /**
@@ -58,14 +55,10 @@ class TrackPerson : AbstractSkill() {
         //}
 
        val p : Point3D = if (person.headPosition?.getZ(LengthUnit.METER)?.isNaN() != false) {
-            Point3D(person.position.getX(lu), person.position.getY(lu), 1.0, lu ).apply {
-                frameId = person.position.frameId
-            }
+            Point3D(person.position.getX(lu), person.position.getY(lu), 1.0, lu )
         } else {
             logger.info("using head pose")
-            Point3D(person.headPosition.getX(lu).toFloat(), person.headPosition.getY(lu).toFloat(), person.headPosition.getZ(lu).toFloat()).apply {
-                frameId = person.headPosition.frameId
-            }
+            Point3D(person.headPosition.getX(lu).toFloat(), person.headPosition.getY(lu).toFloat(), person.headPosition.getZ(lu).toFloat())
         }
         logger.info("tracking person near: $p")
         trackingFut = trackingActuator?.startTracking(p, 1.0)

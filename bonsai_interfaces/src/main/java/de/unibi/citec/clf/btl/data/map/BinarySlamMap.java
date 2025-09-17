@@ -3,8 +3,8 @@ package de.unibi.citec.clf.btl.data.map;
 
 
 import de.unibi.citec.clf.btl.data.common.Timestamp;
-import de.unibi.citec.clf.btl.data.geometry.Point2D;
-import de.unibi.citec.clf.btl.data.navigation.PositionData;
+import de.unibi.citec.clf.btl.data.geometry.Point2DStamped;
+import de.unibi.citec.clf.btl.data.geometry.Pose2D;
 import de.unibi.citec.clf.btl.units.AngleUnit;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 
@@ -24,7 +24,7 @@ import de.unibi.citec.clf.btl.units.LengthUnit;
  * @author jwienke
  * @author lziegler
  */
-public class BinarySlamMap extends PositionData {
+public class BinarySlamMap extends Pose2D {
 
     private DynamicGridMap slamMap = new DynamicGridMap();
 
@@ -263,7 +263,7 @@ public class BinarySlamMap extends PositionData {
      *            the y index of the map
      * @return The corresponding position in meters.
      */
-    public Point2D getPositionFromBin(int i, int j) {
+    public Point2DStamped getPositionFromBin(int i, int j) {
         return slamMap.getPositionFromBin(i, j);
     }
 
@@ -274,7 +274,7 @@ public class BinarySlamMap extends PositionData {
      *            the position that is queried (in meters)
      * @return the x index of the map
      */
-    public int getBinXFromPosition(PositionData pos) {
+    public int getBinXFromPosition(Pose2D pos) {
         return slamMap.getBinXFromPosition(pos);
     }
 
@@ -285,7 +285,7 @@ public class BinarySlamMap extends PositionData {
      *            the position that is queried (in meters)
      * @return the y index of the map
      */
-    public int getBinYFromPosition(Point2D pos) {
+    public int getBinYFromPosition(Point2DStamped pos) {
         return slamMap.getBinYFromPosition(pos);
     }
 
@@ -296,7 +296,7 @@ public class BinarySlamMap extends PositionData {
      *            the position that is queried (in meters)
      * @return the x index of the map
      */
-    public int getBinXFromPosition(Point2D pos) {
+    public int getBinXFromPosition(Point2DStamped pos) {
         return slamMap.getBinXFromPosition(pos);
     }
 
@@ -307,7 +307,7 @@ public class BinarySlamMap extends PositionData {
      *            the position that is queried (in meters)
      * @return the y index of the map
      */
-    public int getBinYFromPosition(PositionData pos) {
+    public int getBinYFromPosition(Pose2D pos) {
         return slamMap.getBinYFromPosition(pos);
     }
 

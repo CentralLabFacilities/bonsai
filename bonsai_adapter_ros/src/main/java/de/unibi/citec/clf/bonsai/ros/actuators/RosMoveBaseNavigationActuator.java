@@ -9,7 +9,6 @@ import de.unibi.citec.clf.bonsai.core.exception.InitializationException;
 import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.ros.RosNode;
 import de.unibi.citec.clf.bonsai.ros.helper.NavigationFuture;
-import de.unibi.citec.clf.bonsai.util.CoordinateSystemConverter;
 import de.unibi.citec.clf.btl.data.geometry.*;
 import de.unibi.citec.clf.btl.data.navigation.*;
 import de.unibi.citec.clf.btl.ros.MsgTypeFactory;
@@ -39,7 +38,6 @@ import javax.annotation.Nullable;
 import javax.vecmath.Quat4d;
 import java.io.IOException;
 import java.util.concurrent.*;
-import java.util.concurrent.locks.Lock;
 
 
 /**
@@ -316,7 +314,7 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
     }
 
     @Override
-    public Future<GlobalPlan> getPlan(NavigationGoalData data, PositionData startPos) throws IOException {
+    public Future<GlobalPlan> getPlan(NavigationGoalData data, Pose2D startPos) throws IOException {
         throw new UnsupportedOperationException();
     }
 
@@ -336,7 +334,7 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
             ac.sendCancel(lastAcGoalId);
         } else {
             final NavigationGoalData goal = new NavigationGoalData();
-            goal.setFrameId(PositionData.ReferenceFrame.LOCAL);
+            goal.setFrameId(Pose2D.ReferenceFrame.LOCAL);
             final Future<CommandResult> commandResultFuture = navigateToCoordinate(goal);
             commandResultFuture.cancel(true);
             ac.sendCancel(lastAcGoalId);
@@ -360,7 +358,7 @@ public class RosMoveBaseNavigationActuator extends RosNode implements Navigation
 
         MoveBaseGoal goal = msg.getGoal();
         try {
-            PositionData p = new PositionData(data);
+            Pose2D p = new Pose2D(data);
             final Pose pose = MsgTypeFactory.getInstance().createMsg(p, Pose.class);
             goal.getTargetPose().setPose(pose);
             goal.getTargetPose().getHeader().setFrameId(data.getFrameId());

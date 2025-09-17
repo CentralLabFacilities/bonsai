@@ -7,7 +7,7 @@ import de.unibi.citec.clf.bonsai.core.SensorListener;
 import de.unibi.citec.clf.bonsai.util.CoordinateSystemConverter;
 import de.unibi.citec.clf.btl.data.map.Annotation;
 import de.unibi.citec.clf.btl.data.navigation.NavigationGoalData;
-import de.unibi.citec.clf.btl.data.navigation.PositionData;
+import de.unibi.citec.clf.btl.data.geometry.Pose2D;
 import de.unibi.citec.clf.btl.data.vision1d.LaserData;
 import de.unibi.citec.clf.btl.units.AngleUnit;
 import de.unibi.citec.clf.btl.units.LengthUnit;
@@ -57,7 +57,7 @@ public class OpenSpaceExploration implements ExplorationStrategy,
     }
 
     @Override
-    public NavigationGoalData getNextGoal(PositionData currentPosition) {
+    public NavigationGoalData getNextGoal(Pose2D currentPosition) {
 
         LaserData laserData = null;
         synchronized (laserLock) {
@@ -125,8 +125,8 @@ public class OpenSpaceExploration implements ExplorationStrategy,
     }
 
     @Override
-    public NavigationGoalData getNextGoal(PositionData currentPosition,
-            Annotation region) {
+    public NavigationGoalData getNextGoal(Pose2D currentPosition,
+                                          Annotation region) {
 
         // TODO implement this!!
         return getNextGoal(currentPosition);

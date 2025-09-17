@@ -1,18 +1,20 @@
 package de.unibi.citec.clf.btl.ros.serializers.geometry;
 
 
+import de.unibi.citec.clf.btl.data.geometry.Point2DStamped;
 import de.unibi.citec.clf.btl.data.geometry.Point3D;
+import de.unibi.citec.clf.btl.data.geometry.Point3DStamped;
+import de.unibi.citec.clf.btl.data.geometry.Pose3D;
 import de.unibi.citec.clf.btl.ros.MsgTypeFactory;
 import de.unibi.citec.clf.btl.ros.RosSerializer;
 import de.unibi.citec.clf.btl.units.LengthUnit;
-import geometry_msgs.Point;
 import geometry_msgs.PointStamped;
 import org.ros.message.MessageFactory;
 
 /**
  * @author
  */
-public class Point3DStampedSerializer extends RosSerializer<Point3D, PointStamped> {
+public class Point3DStampedSerializer extends RosSerializer<Point3DStamped, PointStamped> {
 
     @Override
     public Class<PointStamped> getMessageType() {
@@ -20,12 +22,12 @@ public class Point3DStampedSerializer extends RosSerializer<Point3D, PointStampe
     }
 
     @Override
-    public Class<Point3D> getDataType() {
-        return Point3D.class;
+    public Class<Point3DStamped> getDataType() {
+        return Point3DStamped.class;
     }
 
     @Override
-    public PointStamped serialize(Point3D data, MessageFactory fact) throws SerializationException {
+    public PointStamped serialize(Point3DStamped data, MessageFactory fact) throws SerializationException {
         PointStamped ret = fact.newFromType(PointStamped._TYPE);
         ret.setHeader(MsgTypeFactory.getInstance().makeHeader(data));
         ret.getPoint().setX(data.getX(LengthUnit.METER));
@@ -35,11 +37,8 @@ public class Point3DStampedSerializer extends RosSerializer<Point3D, PointStampe
     }
 
     @Override
-    public Point3D deserialize(PointStamped msg) throws DeserializationException {
-        Point3D ret = new Point3D();
-        ret.setX(msg.getPoint().getX(), LengthUnit.METER);
-        ret.setY(msg.getPoint().getY(), LengthUnit.METER);
-        ret.setZ(msg.getPoint().getZ(), LengthUnit.METER);
+    public Point3DStamped deserialize(PointStamped msg) throws DeserializationException {
+        Point3DStamped ret = new Point3DStamped((float) msg.getPoint().getX(), (float) msg.getPoint().getY(), (float) msg.getPoint().getZ(), LengthUnit.METER, msg.getHeader().getFrameId());
         ret.setFrameId(msg.getHeader().getFrameId());
         return ret;
     }

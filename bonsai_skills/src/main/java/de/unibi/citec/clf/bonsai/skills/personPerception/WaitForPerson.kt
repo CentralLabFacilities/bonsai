@@ -13,13 +13,12 @@ import de.unibi.citec.clf.bonsai.util.CoordinateTransformer
 import de.unibi.citec.clf.bonsai.util.helper.PersonHelper
 import de.unibi.citec.clf.btl.List
 import de.unibi.citec.clf.btl.data.geometry.PolarCoordinate
-import de.unibi.citec.clf.btl.data.navigation.PositionData
+import de.unibi.citec.clf.btl.data.geometry.Pose2D
 import de.unibi.citec.clf.btl.data.person.PersonData
 import de.unibi.citec.clf.btl.data.person.PersonDataList
 import de.unibi.citec.clf.btl.units.AngleUnit
 import de.unibi.citec.clf.btl.units.LengthUnit
 import java.io.IOException
-import java.util.function.Function
 import kotlin.math.abs
 
 /**
@@ -50,7 +49,7 @@ import kotlin.math.abs
  * Sensors:
  *  PersonSensor: [PersonDataList]
  *      -> Used to detect people
- *  PositionSensor: [PositionData]
+ *  PositionSensor: [Pose2D]
  *      -> Used to read the current robot position
  *
  * </pre>
@@ -72,9 +71,9 @@ class WaitForPerson : AbstractSkill() {
     private var tokenName: ExitToken? = null
 
     private var personSensor: Sensor<PersonDataList>? = null
-    private var positionSensor: Sensor<PositionData>? = null
+    private var positionSensor: Sensor<Pose2D>? = null
     private var currentPersonSlot: MemorySlotWriter<PersonData>? = null
-    var robotPosition: PositionData? = null
+    var robotPosition: Pose2D? = null
     var personInFront: PersonData? = null
     var persons: List<PersonData>? = null
     var tf: CoordinateTransformer? = null
@@ -85,7 +84,7 @@ class WaitForPerson : AbstractSkill() {
         // request all tokens that you plan to return from other methods
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
         personSensor = configurator.getSensor("PersonSensor", PersonDataList::class.java)
-        positionSensor = configurator.getSensor("PositionSensor", PositionData::class.java)
+        positionSensor = configurator.getSensor("PositionSensor", Pose2D::class.java)
         currentPersonSlot = configurator.getWriteSlot("PersonDataSlot", PersonData::class.java)
 
         timeout = configurator.requestOptionalInt(KEY_TIMEOUT, timeout.toInt()).toLong()
@@ -173,7 +172,7 @@ class WaitForPerson : AbstractSkill() {
         for (p in persons!!) {
             polar = PolarCoordinate(p.position)
             logger.debug("""
-                Person ${p.uuid}(${p.name}) frame person:${p.frameId} frame polar: ${polar.frameId}
+                Person ${p.uuid}(${p.name}) frame person:${p.frameId}
                 dist:${polar.getDistance(LengthUnit.METER)}
                 angle:${polar.getAngle(AngleUnit.RADIAN)}""")
             // if person too far away
@@ -191,8 +190,8 @@ class WaitForPerson : AbstractSkill() {
         }
     }
 
-    private fun getLocalPosition(position: PositionData): PositionData {
-        return if (position.frameId == PositionData.ReferenceFrame.LOCAL.frameName) {
+    private fun getLocalPosition(position: Pose2D): Pose2D {
+        return if (position.frameId == Pose2D.ReferenceFrame.LOCAL.frameName) {
             position
         } else {
             CoordinateSystemConverter.globalToLocal(position, robotPosition)

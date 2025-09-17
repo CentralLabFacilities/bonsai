@@ -3,7 +3,7 @@ package de.unibi.citec.clf.btl.data.map;
 
 
 import de.unibi.citec.clf.btl.Type;
-import de.unibi.citec.clf.btl.data.navigation.PositionData;
+import de.unibi.citec.clf.btl.data.geometry.Pose2D;
 
 import java.util.UUID;
 
@@ -12,7 +12,7 @@ import java.util.UUID;
  * prescribed category and a unique label.
  * @author lkettenb
  */
-public class Viewpoint extends PositionData {
+public class Viewpoint extends Pose2D {
 
     /**
      * The label of this viewpoint. This label should be unique. Please note
@@ -26,12 +26,12 @@ public class Viewpoint extends PositionData {
     public Viewpoint() {
 
     }
-    public Viewpoint(PositionData positionData){
-        super(positionData);
+    public Viewpoint(Pose2D pose2D){
+        super(pose2D);
     }
 
-    public Viewpoint(PositionData positionData, String label){
-        super(positionData);
+    public Viewpoint(Pose2D pose2D, String label){
+        super(pose2D);
         this.label = label;
     }
 

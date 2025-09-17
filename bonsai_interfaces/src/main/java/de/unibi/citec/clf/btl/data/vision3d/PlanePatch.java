@@ -10,6 +10,7 @@ import de.unibi.citec.clf.btl.data.geometry.PrecisePolygon;
  * @author lziegler
  *
  */
+@Deprecated
 public class PlanePatch extends PolygonalPatch3D {
 
     String surfaceName;

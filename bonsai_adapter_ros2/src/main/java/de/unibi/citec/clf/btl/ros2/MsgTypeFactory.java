@@ -1,5 +1,6 @@
 package de.unibi.citec.clf.btl.ros2;
 
+import de.unibi.citec.clf.btl.StampedType;
 import de.unibi.citec.clf.btl.Type;
 import de.unibi.citec.clf.btl.data.common.Timestamp;
 import de.unibi.citec.clf.btl.ros2.Ros2Serializer.DeserializationException;
@@ -130,7 +131,7 @@ public class MsgTypeFactory {
      * @param t the btl Type with Timestamp and FrameId
      * @return msg with Timestamp and FrameID
      */
-    public HeaderMessage makeHeader(Type t) {
+    public HeaderMessage makeHeader(StampedType t) {
         HeaderMessage header = new HeaderMessage();
         header.frame_id = t.getFrameId();
         header.stamp = new Time((int)t.getTimestamp().getCreated(TimeUnit.SECONDS), 0);
@@ -144,7 +145,7 @@ public class MsgTypeFactory {
      * @param header header which fields are used
      * @return the type
      */
-    public static Type setHeader(Type type, HeaderMessage header) {
+    public static Type setHeader(StampedType type, HeaderMessage header) {
         type.setFrameId(header.frame_id);
         type.setTimestamp(new Timestamp(header.stamp.sec,TimeUnit.SECONDS));
         return type;

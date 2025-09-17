@@ -42,13 +42,11 @@ class NLUEntity(val key: String, val value: String, val role: String?, val group
     }
 
     public override fun clone(): NLUEntity {
-        return NLUEntity(key,value, role, group).also { it.frameId = frameId }
+        return NLUEntity(key,value, role, group)
     }
 
     constructor(e: NLUEntity) : this(e.key, e.value, e.role, e.group) {
         entityScore = e.entityScore
         roleScore = e.roleScore
-        frameId = e.frameId
-        timestamp = e.timestamp
     }
 }

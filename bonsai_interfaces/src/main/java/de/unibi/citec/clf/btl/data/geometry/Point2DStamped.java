@@ -1,12 +1,10 @@
 package de.unibi.citec.clf.btl.data.geometry;
 
 import de.unibi.citec.clf.btl.StampedType;
-import de.unibi.citec.clf.btl.Type;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 import de.unibi.citec.clf.btl.units.UnitConverter;
-import org.apache.log4j.Logger;
-
 import java.util.Objects;
+import org.apache.log4j.Logger;
 
 /**
  * This class represents a point in 2 dimensions.
@@ -14,9 +12,9 @@ import java.util.Objects;
  * @author lziegler
  * @author rfeldhans
  */
-public class Point2D extends Type {
+public class Point2DStamped extends StampedType {
 
-    private final Logger logger = Logger.getLogger(Point2D.class);
+    private final Logger logger = Logger.getLogger(Point2DStamped.class);
 
     protected double x;
     protected double y;
@@ -30,36 +28,51 @@ public class Point2D extends Type {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof Point2D)) return false;
+        if (!(o instanceof Point2DStamped)) return false;
         if (!super.equals(o)) return false;
-        Point2D pose2D = (Point2D) o;
-        return Double.compare(pose2D.x, x) == 0 &&
-                Double.compare(pose2D.y, y) == 0 &&
-                iLU == pose2D.iLU;
+        Point2DStamped point2DStamped = (Point2DStamped) o;
+        return Double.compare(point2DStamped.x, x) == 0 &&
+                Double.compare(point2DStamped.y, y) == 0 &&
+                iLU == point2DStamped.iLU;
     }
 
     @Override
     public int hashCode() {
         int hash = 7;
-        hash = 97 * hash + Long.hashCode(Double.doubleToLongBits(this.x));
-        hash = 97 * hash + Long.hashCode(Double.doubleToLongBits(this.y));
+        hash = 97 * hash + (int) (Double.doubleToLongBits(this.x) ^ (Double.doubleToLongBits(this.x) >>> 32));
+        hash = 97 * hash + (int) (Double.doubleToLongBits(this.y) ^ (Double.doubleToLongBits(this.y) >>> 32));
+        hash = 97 * hash + Objects.hashCode(this.frameId);
         return hash;
     }
 
     @Override
     public String toString() {
-        return "[" + getClass().getSimpleName() + " x=" + this.getX(LengthUnit.METER) + " y=" + this.getY(LengthUnit.METER);
+        return "[" + getClass().getSimpleName() + " x=" + this.getX(LengthUnit.METER) + " y=" + this.getY(LengthUnit.METER)
+                + " frame=" + getFrameId() + "]";
+    }
+
+    public Point2D toUnstamped() {
+        return new Point2D(x,y,iLU);
     }
 
     /**
      * Creates instance.
      */
-    public Point2D() {
+    public Point2DStamped() {
     }
 
-    public Point2D(Point2D p) {
+    public Point2DStamped(Point2DStamped p) {
         this.x = p.x;
         this.y = p.y;
+        this.frameId = p.frameId;
+        this.iLU = p.iLU;
+        this.timestamp = p.timestamp;
+    }
+
+    public Point2DStamped(Point2D p, String frame) {
+        this.x = p.x;
+        this.y = p.y;
+        this.frameId = frame;
         this.iLU = p.iLU;
     }
 
@@ -69,7 +82,7 @@ public class Point2D extends Type {
      * @param x first value
      * @param y second value
      */
-    public Point2D(double x, double y) {
+    public Point2DStamped(double x, double y) {
         this.x = x;
         this.y = y;
     }
@@ -81,12 +94,31 @@ public class Point2D extends Type {
      * @param y second value
      * @param unit unit of the values
      */
-    public Point2D(double x, double y, LengthUnit unit) {
+    public Point2DStamped(double x, double y, LengthUnit unit) {
         this.x = x;
         this.y = y;
         iLU = unit;
     }
 
+    /**
+     * Creates instance.
+     *
+     * @param x first value
+     * @param y second value
+     * @param unit unit of the values
+     * @param frame coordinate frame
+     */
+    public Point2DStamped(double x, double y, LengthUnit unit, String frame) {
+        this(x, y, unit);
+        frameId = frame;
+    }
+
+    public double distance(Point2DStamped center) {
+        if (!this.frameId.equals(center.frameId)) {
+            logger.warn("distance in different frames: " + this.frameId + " and " + center.frameId);
+        }
+        return distance(center.toUnstamped());
+    }
 
     public double distance(Point2D center) {
         if (!this.iLU.equals(center.getOriginalLU())) {
@@ -95,9 +127,14 @@ public class Point2D extends Type {
         return Math.sqrt(Math.pow(this.x - center.x, 2) + Math.pow(this.y - center.y, 2));
     }
 
+    public double getDistance(Point2DStamped center, LengthUnit lu) {
+        return UnitConverter.convert(distance(center), iLU, lu);
+    }
+
     public double getDistance(Point2D center, LengthUnit lu) {
         return UnitConverter.convert(distance(center), iLU, lu);
     }
+
 
     public double getX(LengthUnit unit) {
         return UnitConverter.convert(x, iLU, unit);
@@ -121,8 +158,8 @@ public class Point2D extends Type {
      * @param p the other point
      * @return a new Point2D
      */
-    public Point2D add(Point2D p) {
-        Point2D point = new Point2D(getX(iLU) + p.getX(iLU), getY(iLU) + p.getY(iLU), iLU);
+    public Point2DStamped add(Point2DStamped p) {
+        Point2DStamped point = new Point2DStamped(getX(iLU) + p.getX(iLU), getY(iLU) + p.getY(iLU), iLU);
         return point;
     }
 
@@ -132,8 +169,8 @@ public class Point2D extends Type {
      * @param p the other point
      * @return a new Point2D
      */
-    public Point2D mul(Point2D p) {
-        Point2D point = new Point2D(getX(iLU) * p.getX(iLU), getY(iLU) * p.getY(iLU), iLU);
+    public Point2DStamped mul(Point2DStamped p) {
+        Point2DStamped point = new Point2DStamped(getX(iLU) * p.getX(iLU), getY(iLU) * p.getY(iLU), iLU);
         return point;
     }
 
@@ -144,8 +181,8 @@ public class Point2D extends Type {
      * @param p the other point
      * @return a new Point2D
      */
-    public Point2D sub(Point2D p) {
-        Point2D point = new Point2D(getX(iLU) - p.getX(iLU), getY(iLU) - p.getY(iLU), iLU);
+    public Point2DStamped sub(Point2DStamped p) {
+        Point2DStamped point = new Point2DStamped(getX(iLU) - p.getX(iLU), getY(iLU) - p.getY(iLU), iLU);
         return point;
     }
 
@@ -156,8 +193,8 @@ public class Point2D extends Type {
      * @param p the other point
      * @return a new Point2D
      */
-    public Point2D div(Point2D p) {
-        Point2D point = new Point2D(getX(iLU) / p.getX(iLU), getY(iLU) / p.getY(iLU), iLU);
+    public Point2DStamped div(Point2DStamped p) {
+        Point2DStamped point = new Point2DStamped(getX(iLU) / p.getX(iLU), getY(iLU) / p.getY(iLU), iLU);
         return point;
     }
 
@@ -168,7 +205,7 @@ public class Point2D extends Type {
      * @return The length of the vector this Point2D describes.
      */
     public double getLength(LengthUnit Lu) {
-        return getDistance(new Point2D(0, 0, Lu), Lu);
+        return getDistance(new Point2DStamped(0, 0, Lu), Lu);
     }
 
     /**
@@ -177,7 +214,7 @@ public class Point2D extends Type {
      * @param p the point with which the dot product shall be calculated
      * @return The dot product, in this points Length unit
      */
-    public double dotProduct(Point2D p) {
+    public double dotProduct(Point2DStamped p) {
         return this.getX(iLU) * p.getX(iLU) + this.getY(iLU) * p.getY(iLU);
     }
 
@@ -187,6 +224,10 @@ public class Point2D extends Type {
      * @param other the other Point
      * @return the angle to the other Point
      */
+    public double getAngle(Point2DStamped other) {
+        return Math.atan2(other.getY(iLU) - getY(iLU), other.getX(iLU) - getX(iLU));
+    }
+
     public double getAngle(Point2D other) {
         return Math.atan2(other.getY(iLU) - getY(iLU), other.getX(iLU) - getX(iLU));
     }
