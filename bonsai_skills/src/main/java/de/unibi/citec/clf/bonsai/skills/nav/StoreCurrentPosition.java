@@ -7,7 +7,7 @@ import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
-import de.unibi.citec.clf.btl.data.navigation.PositionData;
+import de.unibi.citec.clf.btl.data.geometry.Pose2D;
 
 import java.io.IOException;
 
@@ -39,18 +39,18 @@ public class StoreCurrentPosition extends AbstractSkill {
 
     private ExitToken tokenSuccess;
 
-    private MemorySlotWriter<PositionData> positionSlot;
-    private Sensor<PositionData> positionSensor;
+    private MemorySlotWriter<Pose2D> positionSlot;
+    private Sensor<Pose2D> positionSensor;
 
-    private PositionData posData;
+    private Pose2D posData;
 
     @Override
     public void configure(ISkillConfigurator configurator) {
 
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
 
-        positionSlot = configurator.getWriteSlot("PositionDataSlot", PositionData.class);
-        positionSensor = configurator.getSensor("PositionSensor", PositionData.class);
+        positionSlot = configurator.getWriteSlot("PositionDataSlot", Pose2D.class);
+        positionSensor = configurator.getSensor("PositionSensor", Pose2D.class);
     }
 
     @Override

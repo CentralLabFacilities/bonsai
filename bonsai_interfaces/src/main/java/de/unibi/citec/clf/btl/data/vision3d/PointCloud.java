@@ -3,6 +3,7 @@ package de.unibi.citec.clf.btl.data.vision3d;
 
 
 import de.unibi.citec.clf.btl.List;
+import de.unibi.citec.clf.btl.StampedType;
 import de.unibi.citec.clf.btl.Type;
 import de.unibi.citec.clf.btl.data.geometry.Point3D;
 import de.unibi.citec.clf.btl.data.geometry.Rotation3D;
@@ -13,7 +14,8 @@ import de.unibi.citec.clf.btl.units.LengthUnit;
  * 
  * @author plueckin
  */
-public class PointCloud extends Type {
+@Deprecated
+public class PointCloud extends StampedType {
 
 	public static LengthUnit iLU = LengthUnit.MILLIMETER;
 

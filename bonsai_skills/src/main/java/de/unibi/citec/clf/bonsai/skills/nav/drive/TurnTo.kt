@@ -1,7 +1,6 @@
 package de.unibi.citec.clf.bonsai.skills.nav.drive
 
 import de.unibi.citec.clf.bonsai.actuators.NavigationActuator
-import de.unibi.citec.clf.bonsai.core.exception.CommunicationException
 import de.unibi.citec.clf.bonsai.core.`object`.MemorySlotReader
 import de.unibi.citec.clf.bonsai.core.`object`.Sensor
 import de.unibi.citec.clf.bonsai.core.time.Time
@@ -14,8 +13,7 @@ import de.unibi.citec.clf.bonsai.util.CoordinateSystemConverter
 import de.unibi.citec.clf.btl.data.geometry.PolarCoordinate
 import de.unibi.citec.clf.btl.data.navigation.CommandResult
 import de.unibi.citec.clf.btl.data.navigation.NavigationGoalData
-import de.unibi.citec.clf.btl.data.navigation.PositionData
-import de.unibi.citec.clf.btl.tools.MathTools
+import de.unibi.citec.clf.btl.data.geometry.Pose2D
 import de.unibi.citec.clf.btl.units.AngleUnit
 import de.unibi.citec.clf.btl.units.LengthUnit
 import java.util.concurrent.Future
@@ -39,7 +37,7 @@ import java.util.concurrent.Future
  * error:              Turn failed or cancelled
  *
  * Sensors:
- * PositionSensor: [PositionData]
+ * PositionSensor: [Pose2D]
  * -> Get current robot position
  *
  * Actuators:
@@ -59,10 +57,10 @@ class TurnTo<IOException> : AbstractSkill() {
 
     private var navigationGoalDataSlot: MemorySlotReader<NavigationGoalData>? = null
     private var navActuator: NavigationActuator? = null
-    private var robotPositionSensor: Sensor<PositionData>? = null
+    private var robotPositionSensor: Sensor<Pose2D>? = null
 
     private var navResult: Future<CommandResult>? = null
-    private var pos: PositionData? = null
+    private var pos: Pose2D? = null
     private var targetGoal: NavigationGoalData? = null
 
 
@@ -73,7 +71,7 @@ class TurnTo<IOException> : AbstractSkill() {
         tokenError = configurator.requestExitToken(ExitStatus.ERROR())
         navActuator = configurator.getActuator("NavigationActuator", NavigationActuator::class.java)
         navigationGoalDataSlot = configurator.getReadSlot("NavigationGoalDataSlot", NavigationGoalData::class.java)
-        robotPositionSensor = configurator.getSensor("PositionSensor", PositionData::class.java)
+        robotPositionSensor = configurator.getSensor("PositionSensor", Pose2D::class.java)
         if (timeout > 0) {
             tokenSuccessPsTimeout = configurator.requestExitToken(ExitStatus.SUCCESS().ps("timeout"))
         }

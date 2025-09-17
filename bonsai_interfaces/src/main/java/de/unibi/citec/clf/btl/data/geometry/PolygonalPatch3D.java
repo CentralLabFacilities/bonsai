@@ -1,10 +1,9 @@
 package de.unibi.citec.clf.btl.data.geometry;
 
+import de.unibi.citec.clf.btl.StampedType;
 import org.apache.log4j.Logger;
 
 
-
-import de.unibi.citec.clf.btl.Type;
 import de.unibi.citec.clf.btl.data.vision3d.PointCloud;
 import de.unibi.citec.clf.btl.tools.MathTools;
 import de.unibi.citec.clf.btl.units.LengthUnit;
@@ -15,7 +14,7 @@ import java.util.Objects;
  * @author lziegler
  *
  */
-public class PolygonalPatch3D extends Type {
+public class PolygonalPatch3D extends StampedType {
 	
 	private Pose3D base = new Pose3D();
 	private PrecisePolygon border = new PrecisePolygon();
@@ -75,7 +74,7 @@ public class PolygonalPatch3D extends Type {
 		
 		logger.debug("2d centroid: " + centroid2D);
 		
-		Point3D center = new Point3D(centroid2D.getX(m), centroid2D.getY(m), 0, m, getFrameId());
+		Point3D center = new Point3D(centroid2D.getX(m), centroid2D.getY(m), 0, m);
 		
 		center = MathTools.applyAddition(center, base.getTranslation());
 		center = MathTools.applyRotation(center, base.getRotation());
@@ -88,7 +87,7 @@ public class PolygonalPatch3D extends Type {
 		PointCloud cloud = new PointCloud();
 		for (Point2D p2d : border.getList()) {
 			
-			Point3D p3d = new Point3D(p2d.getX(m), p2d.getY(m), 0, m, getFrameId());
+			Point3D p3d = new Point3D(p2d.getX(m), p2d.getY(m), 0, m);
 			
 			p3d = MathTools.applyAddition(p3d, base.getTranslation());
 			p3d = MathTools.applyRotation(p3d, base.getRotation());

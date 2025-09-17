@@ -3,7 +3,7 @@ package de.unibi.citec.clf.btl.data.speechrec
 import de.unibi.citec.clf.btl.Type
 
 /**
- * Domain class representing an natural language understanding
+ * Domain class representing a natural language understanding
  *
  * @author lruegeme
  */
@@ -57,7 +57,7 @@ class NLU() : Type(), Iterable<NLUEntity?>, Cloneable {
     }
 
     public override fun clone(): NLU {
-        return NLU(text,intent, confidence, entities, lang).also { it.frameId = frameId }
+        return NLU(text,intent, confidence, entities, lang)
     }
 
     fun hasEntity(key: String): Boolean {

@@ -5,11 +5,12 @@ package de.unibi.citec.clf.btl.data.geometry;
 
 
 
+import de.unibi.citec.clf.btl.StampedType;
 import de.unibi.citec.clf.btl.Type;
 
 import java.util.Objects;
 
-public class Pose3D extends Type {
+public class Pose3D extends StampedType {
 	
 	private Point3D translation = new Point3D();
 	private Rotation3D rotation = new Rotation3D();

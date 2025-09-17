@@ -8,6 +8,7 @@ package de.unibi.citec.clf.btl.data.speechrec;
  * @author lschilli
  *
  */
+@Deprecated
 public interface GrammarSymbol {
 
     /**

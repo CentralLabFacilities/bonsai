@@ -1,6 +1,7 @@
 package de.unibi.citec.clf.btl.ros.serializers.vision;
 
 import de.unibi.citec.clf.btl.data.geometry.Point2D;
+import de.unibi.citec.clf.btl.data.geometry.Point2DStamped;
 import de.unibi.citec.clf.btl.data.geometry.PrecisePolygon;
 import de.unibi.citec.clf.btl.ros.MsgTypeFactory;
 import de.unibi.citec.clf.btl.ros.RosSerializer;

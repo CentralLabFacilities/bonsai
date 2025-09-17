@@ -1,10 +1,12 @@
 package de.unibi.citec.clf.btl.data.geometry;
 
+import de.unibi.citec.clf.btl.StampedType;
 import de.unibi.citec.clf.btl.Type;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 import de.unibi.citec.clf.btl.units.UnitConverter;
-import java.util.Objects;
 import org.apache.log4j.Logger;
+
+import java.util.Objects;
 
 /**
  * This class represents a point in 2 dimensions.
@@ -30,25 +32,23 @@ public class Point2D extends Type {
         if (this == o) return true;
         if (!(o instanceof Point2D)) return false;
         if (!super.equals(o)) return false;
-        Point2D point2D = (Point2D) o;
-        return Double.compare(point2D.x, x) == 0 &&
-                Double.compare(point2D.y, y) == 0 &&
-                iLU == point2D.iLU;
+        Point2D pose2D = (Point2D) o;
+        return Double.compare(pose2D.x, x) == 0 &&
+                Double.compare(pose2D.y, y) == 0 &&
+                iLU == pose2D.iLU;
     }
 
     @Override
     public int hashCode() {
         int hash = 7;
-        hash = 97 * hash + (int) (Double.doubleToLongBits(this.x) ^ (Double.doubleToLongBits(this.x) >>> 32));
-        hash = 97 * hash + (int) (Double.doubleToLongBits(this.y) ^ (Double.doubleToLongBits(this.y) >>> 32));
-        hash = 97 * hash + Objects.hashCode(this.frameId);
+        hash = 97 * hash + Long.hashCode(Double.doubleToLongBits(this.x));
+        hash = 97 * hash + Long.hashCode(Double.doubleToLongBits(this.y));
         return hash;
     }
 
     @Override
     public String toString() {
-        return "[" + getClass().getSimpleName() + " x=" + this.getX(LengthUnit.METER) + " y=" + this.getY(LengthUnit.METER)
-                + " frame=" + getFrameId() + "]";
+        return "[" + getClass().getSimpleName() + " x=" + this.getX(LengthUnit.METER) + " y=" + this.getY(LengthUnit.METER);
     }
 
     /**
@@ -60,9 +60,7 @@ public class Point2D extends Type {
     public Point2D(Point2D p) {
         this.x = p.x;
         this.y = p.y;
-        this.frameId = p.frameId;
         this.iLU = p.iLU;
-        this.timestamp = p.timestamp;
     }
 
     /**
@@ -89,23 +87,8 @@ public class Point2D extends Type {
         iLU = unit;
     }
 
-    /**
-     * Creates instance.
-     *
-     * @param x first value
-     * @param y second value
-     * @param unit unit of the values
-     * @param frame coordinate frame
-     */
-    public Point2D(double x, double y, LengthUnit unit, String frame) {
-        this(x, y, unit);
-        frameId = frame;
-    }
 
     public double distance(Point2D center) {
-        if (!this.frameId.equals(center.frameId)) {
-            logger.warn("distance in different frames: " + this.frameId + " and " + center.frameId);
-        }
         if (!this.iLU.equals(center.getOriginalLU())) {
             return Math.sqrt(Math.pow(getX(iLU) - center.getX(iLU), 2) + Math.pow(getY(iLU) - center.getY(iLU), 2));
         }

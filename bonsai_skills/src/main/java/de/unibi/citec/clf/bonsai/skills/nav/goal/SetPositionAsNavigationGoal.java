@@ -8,7 +8,7 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.btl.data.navigation.NavigationGoalData;
-import de.unibi.citec.clf.btl.data.navigation.PositionData;
+import de.unibi.citec.clf.btl.data.geometry.Pose2D;
 import de.unibi.citec.clf.btl.units.AngleUnit;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 
@@ -59,10 +59,10 @@ public class SetPositionAsNavigationGoal extends AbstractSkill {
     private ExitToken tokenSuccess;
     private ExitToken tokenError;
 
-    private MemorySlotReader<PositionData> positionSlot;
+    private MemorySlotReader<Pose2D> positionSlot;
     private MemorySlotWriter<NavigationGoalData> navigationMemorySlot;
 
-    private PositionData posData;
+    private Pose2D posData;
     private NavigationGoalData navData;
 
     @Override
@@ -79,7 +79,7 @@ public class SetPositionAsNavigationGoal extends AbstractSkill {
 
         if (Double.isNaN(x) || Double.isNaN(y) || Double.isNaN(yaw)) {
             logger.debug("At least on of x,y and yaw is missing. using slot");
-            positionSlot = configurator.getReadSlot("PositionDataSlot", PositionData.class);
+            positionSlot = configurator.getReadSlot("PositionDataSlot", Pose2D.class);
         }
     }
 
@@ -95,7 +95,7 @@ public class SetPositionAsNavigationGoal extends AbstractSkill {
                 return false;
             }
         } else {
-            posData = new PositionData(x, y, yaw, LengthUnit.METER, AngleUnit.RADIAN);
+            posData = new Pose2D(x, y, yaw, LengthUnit.METER, AngleUnit.RADIAN);
             return true;
         }
     }
@@ -109,7 +109,7 @@ public class SetPositionAsNavigationGoal extends AbstractSkill {
 
         logger.debug("position to navgoal: " + (posData.toString()));
         navData = new NavigationGoalData(posData);
-        if (relative) navData.setFrameId(PositionData.ReferenceFrame.LOCAL); else navData.setFrameId(PositionData.ReferenceFrame.GLOBAL);
+        if (relative) navData.setFrameId(Pose2D.ReferenceFrame.LOCAL); else navData.setFrameId(Pose2D.ReferenceFrame.GLOBAL);
         logger.info("navgoal: " + navData.toString());
         return tokenSuccess;
     }

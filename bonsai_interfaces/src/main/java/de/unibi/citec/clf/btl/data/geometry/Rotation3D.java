@@ -7,6 +7,7 @@ import javax.vecmath.Matrix3d;
 import javax.vecmath.Quat4d;
 import javax.vecmath.Vector3d;
 
+import de.unibi.citec.clf.btl.StampedType;
 import de.unibi.citec.clf.btl.Type;
 import de.unibi.citec.clf.btl.tools.MathTools;
 import de.unibi.citec.clf.btl.units.AngleUnit;
@@ -142,7 +143,6 @@ public class Rotation3D extends Type {
 
 	public Rotation3D(Vector3d vector3d, double yaw, AngleUnit radian, String frameId) {
 		this(vector3d,yaw,radian);
-		setFrameId(frameId);
 	}
 
 	/**
@@ -294,7 +294,7 @@ public class Rotation3D extends Type {
 	/**
 	 * Set rotation from quaternion representation.
 	 * 
-	 * @param rotation
+	 * @param x,y,z,w
 	 *            The rotation as vecmath object.
 	 */
 	public void setQuaternion(double x, double y, double z, double w) {
@@ -378,7 +378,6 @@ public class Rotation3D extends Type {
 		info += " matrix=" + mat.m00 + ", " + mat.m01 + ", " + mat.m02;
 		info += ", " + mat.m10 + ", " + mat.m11 + ", " + mat.m12;
 		info += ", " + mat.m20 + ", " + mat.m21 + ", " + mat.m22;
-		info += " frame=" + getFrameId();
 		info += "]";
 		return info;
 	}
