@@ -6,6 +6,7 @@ import de.unibi.citec.clf.btl.StampedType;
 import de.unibi.citec.clf.btl.Type;
 import de.unibi.citec.clf.btl.data.geometry.PrecisePolygon;
 
+@Deprecated
 public class RegionData extends StampedType {
 
 	public static final String SCOPE_TAG_NAME = "SCOPE";

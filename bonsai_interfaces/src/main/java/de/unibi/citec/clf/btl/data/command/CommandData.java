@@ -2,13 +2,14 @@ package de.unibi.citec.clf.btl.data.command;
 
 
 import de.unibi.citec.clf.btl.Type;
-import de.unibi.citec.clf.btl.data.speechrec.GrammarNonTerminal;
+import de.unibi.citec.clf.btl.data.speech.GrammarNonTerminal;
 import java.util.Objects;
 
 /**
  *
  * @author gminareci, ikillman
  */
+@Deprecated
 public class CommandData extends Type {
 
     private GrammarNonTerminal tree = new GrammarNonTerminal();

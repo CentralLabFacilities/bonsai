@@ -26,6 +26,7 @@ import de.unibi.citec.clf.btl.data.object.ObjectShapeList;
  *
  * @author lruegeme
  */
+@Deprecated
 public class SelectObjectsForGrasping extends AbstractSkill {
 
     private static final String UNKNOWN_LABEL = "unknown";

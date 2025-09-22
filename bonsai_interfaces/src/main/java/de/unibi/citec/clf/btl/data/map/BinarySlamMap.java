@@ -24,6 +24,7 @@ import de.unibi.citec.clf.btl.units.LengthUnit;
  * @author jwienke
  * @author lziegler
  */
+@Deprecated
 public class BinarySlamMap extends Pose2D {
 
     private DynamicGridMap slamMap = new DynamicGridMap();

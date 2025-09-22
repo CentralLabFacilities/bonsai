@@ -9,6 +9,7 @@ import de.unibi.citec.clf.btl.Type;
  *
  * @author johannes
  */
+@Deprecated
 public class GraspConfig extends Type {
     private String groupName;
     private String configName;
