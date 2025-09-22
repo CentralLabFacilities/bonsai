@@ -1,14 +1,12 @@
 package de.unibi.citec.clf.bonsai.skills.dialog.nlu
 
-import de.unibi.citec.clf.bonsai.core.`object`.MemorySlotReader
 import de.unibi.citec.clf.bonsai.core.`object`.MemorySlotWriter
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
-import de.unibi.citec.clf.btl.List
-import de.unibi.citec.clf.btl.data.speechrec.NLU
-import de.unibi.citec.clf.btl.data.speechrec.NLUEntity
+import de.unibi.citec.clf.btl.data.speech.NLU
+import de.unibi.citec.clf.btl.data.speech.NLUEntity
 
 /**
  *  Load an NLU with the given #_INTENT into a slot.

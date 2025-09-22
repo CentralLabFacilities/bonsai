@@ -9,6 +9,7 @@ import de.unibi.citec.clf.btl.List;
  *
  * @author semueller
  */
+@Deprecated
 public class ObjectSetTableList extends List<ObjectSetTable>{
     
     public ObjectSetTableList(){

@@ -1,5 +1,6 @@
 package de.unibi.citec.clf.btl.data.geometry;
 
+import de.unibi.citec.clf.btl.data.common.Timestamp;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 import de.unibi.citec.clf.btl.units.UnitConverter;
 import java.util.Objects;
@@ -65,6 +66,11 @@ public class Point3D extends Point2D {
     @Override
     public String toString() {
         return "[" + getClass().getSimpleName() + " x=" + x + " y=" + y + " z=" + z;
+    }
+
+    public Point3DStamped toStamped(String frame)
+    {
+        return new Point3DStamped(this, frame);
     }
 
     /**

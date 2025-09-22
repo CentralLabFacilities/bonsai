@@ -12,6 +12,7 @@ import java.util.UUID;
  * prescribed category and a unique label.
  * @author lkettenb
  */
+@Deprecated
 public class Viewpoint extends Pose2D {
 
     /**

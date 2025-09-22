@@ -1,7 +1,5 @@
 package de.unibi.citec.clf.bonsai.skills.dialog.nlu
 
-import de.unibi.citec.clf.bonsai.core.SensorListener
-import de.unibi.citec.clf.bonsai.core.exception.CommunicationException
 import de.unibi.citec.clf.bonsai.core.`object`.MemorySlotWriter
 import de.unibi.citec.clf.bonsai.core.`object`.Sensor
 import de.unibi.citec.clf.bonsai.core.time.Time
@@ -10,9 +8,8 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitStatus
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
 import de.unibi.citec.clf.bonsai.util.helper.SimpleNLUHelper
-import de.unibi.citec.clf.btl.data.speechrec.LanguageType
-import de.unibi.citec.clf.btl.data.speechrec.NLU
-import java.util.*
+import de.unibi.citec.clf.btl.data.speech.LanguageType
+import de.unibi.citec.clf.btl.data.speech.NLU
 
 /**
  * Wait for the robot to understand something containing certain intents.
