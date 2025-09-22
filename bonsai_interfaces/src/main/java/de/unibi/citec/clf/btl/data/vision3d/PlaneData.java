@@ -15,6 +15,7 @@ import de.unibi.citec.clf.btl.data.vision2d.RegionData.Scope;
  * 
  * @author lziegler
  */
+@Deprecated
 public class PlaneData extends RegionData {
 
 	public static final String ORIGIN_TAG_NAME = "ORIGIN";

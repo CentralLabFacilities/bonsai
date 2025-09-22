@@ -11,6 +11,7 @@ import de.unibi.citec.clf.btl.List;
  *
  * @author lkettenb
  */
+@Deprecated
 public class AnnotationList extends List<Annotation> {
 
     /**

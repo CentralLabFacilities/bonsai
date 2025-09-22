@@ -12,6 +12,7 @@ import de.unibi.citec.clf.btl.List;
  * 
  * @author lziegler
  */
+@Deprecated
 public class ObjectLocationList extends List<ObjectLocationData> {
 
     /**

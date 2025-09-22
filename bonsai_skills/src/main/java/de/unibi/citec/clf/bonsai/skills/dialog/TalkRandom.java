@@ -6,7 +6,7 @@ import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
-import de.unibi.citec.clf.btl.data.speechrec.Language;
+import de.unibi.citec.clf.btl.data.speech.Language;
 
 import java.io.IOException;
 import java.util.concurrent.Future;

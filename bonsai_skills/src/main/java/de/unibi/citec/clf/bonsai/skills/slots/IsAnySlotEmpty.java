@@ -29,7 +29,6 @@ public class IsAnySlotEmpty extends AbstractSkill {
 
     private ExitToken tokenEmpty;
     private ExitToken tokenNotEmpty;
-    private ExitToken tokenError;
 
     MemorySlotReader<Object> slot;
 

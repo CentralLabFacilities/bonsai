@@ -9,6 +9,7 @@ import java.util.List;
  *
  * @author skoester
  */
+@Deprecated
 public class VerbPhraseData extends Type {
 
     private String verbPhraseType;

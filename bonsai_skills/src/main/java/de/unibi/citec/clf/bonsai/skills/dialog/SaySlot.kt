@@ -6,10 +6,9 @@ import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
-import de.unibi.citec.clf.btl.data.speechrec.Language
-import de.unibi.citec.clf.btl.data.speechrec.LanguageType
+import de.unibi.citec.clf.btl.data.speech.Language
+import de.unibi.citec.clf.btl.data.speech.LanguageType
 import java.util.concurrent.Future
-import java.util.regex.Matcher
 
 /**
  * This class is used to say something with some or all content read in from the
@@ -22,6 +21,11 @@ import java.util.regex.Matcher
  *                      -> Text said by the robot. $S will be replaced by memory slot content
  *  #_BLOCKING:     [boolean] Optional (default: true)
  *                      -> If true skill ends after talk was completed
+ * #_USE_LANGUAGE:  [boolean] Optional (default: true)
+ *                      -> Read Language slot to determine speak language
+ * #_LANG:          [Language] text language (default: EN)
+ *                      -> Use the given language to speak the (same language) #_MESSAGE.
+ *                         This Defaults #_USE_LANGUAGE to false, set it to enable translation to current language
  *
  * Slots:
  *  StringSlot: [String] [Read]

@@ -2,16 +2,14 @@ package de.unibi.citec.clf.bonsai.skills.dialog.nlu
 
 import de.unibi.citec.clf.bonsai.actuators.SpeechActuator
 import de.unibi.citec.clf.bonsai.core.`object`.MemorySlotReader
-import de.unibi.citec.clf.bonsai.core.time.Time
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
 import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException
-import de.unibi.citec.clf.btl.data.speechrec.Language
-import de.unibi.citec.clf.btl.data.speechrec.LanguageType
-import de.unibi.citec.clf.btl.data.speechrec.NLU
-import java.io.IOException
+import de.unibi.citec.clf.btl.data.speech.Language
+import de.unibi.citec.clf.btl.data.speech.LanguageType
+import de.unibi.citec.clf.btl.data.speech.NLU
 import java.util.concurrent.Future
 
 /**

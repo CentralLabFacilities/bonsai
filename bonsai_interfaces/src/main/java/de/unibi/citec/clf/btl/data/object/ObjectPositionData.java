@@ -22,6 +22,7 @@ import de.unibi.citec.clf.btl.units.LengthUnit;
  * 
  * @author lziegler
  */
+@Deprecated
 public class ObjectPositionData extends ObjectData {
 
 	private static final double DEFAULT_EDGE_LENGTH = 0.1;

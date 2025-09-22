@@ -54,6 +54,7 @@ import java.util.UUID;
  *
  * @author lkettenb
  */
+@Deprecated
 public class Annotation extends Type {
 
     /**

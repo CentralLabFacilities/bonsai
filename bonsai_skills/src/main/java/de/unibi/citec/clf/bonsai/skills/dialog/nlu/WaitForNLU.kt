@@ -12,9 +12,9 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitToken
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
 import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException
 import de.unibi.citec.clf.bonsai.util.helper.SimpleNLUHelper
-import de.unibi.citec.clf.btl.data.speechrec.Language
-import de.unibi.citec.clf.btl.data.speechrec.LanguageType
-import de.unibi.citec.clf.btl.data.speechrec.NLU
+import de.unibi.citec.clf.btl.data.speech.Language
+import de.unibi.citec.clf.btl.data.speech.LanguageType
+import de.unibi.citec.clf.btl.data.speech.NLU
 import java.lang.Exception
 import java.util.concurrent.TimeUnit
 

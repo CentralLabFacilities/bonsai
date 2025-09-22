@@ -10,6 +10,7 @@ import de.unibi.citec.clf.btl.data.map.Viewpoint;
  *
  * @author vlosing, alangfeld, lziegler
  */
+@Deprecated
 public class ObjectOrder extends Type {
 
     private int ordererFaceClassId = -1;

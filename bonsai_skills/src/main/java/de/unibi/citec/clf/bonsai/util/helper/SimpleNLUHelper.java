@@ -5,7 +5,8 @@ import de.unibi.citec.clf.bonsai.core.SensorListener;
 import de.unibi.citec.clf.bonsai.core.object.Sensor;
 import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.btl.Type.NoSourceDocumentException;
-import de.unibi.citec.clf.btl.data.speechrec.*;
+import de.unibi.citec.clf.btl.data.speech.NLU;
+import de.unibi.citec.clf.btl.data.speech.*;
 import org.apache.log4j.Logger;
 
 import java.io.IOException;

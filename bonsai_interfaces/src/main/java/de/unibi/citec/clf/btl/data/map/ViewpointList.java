@@ -8,6 +8,7 @@ import de.unibi.citec.clf.btl.List;
  *
  * @author kharmening
  */
+@Deprecated
 public class ViewpointList extends List<Viewpoint> {
 
     /**

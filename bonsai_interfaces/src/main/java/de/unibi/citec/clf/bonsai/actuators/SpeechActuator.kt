@@ -1,10 +1,9 @@
 package de.unibi.citec.clf.bonsai.actuators
 
 import de.unibi.citec.clf.bonsai.core.`object`.Actuator
-import de.unibi.citec.clf.btl.data.speechrec.Language
+import de.unibi.citec.clf.btl.data.speech.Language
 import java.io.IOException
 import java.util.concurrent.Future
-import javax.annotation.Nonnull
 
 /**
  * Interface for actuators controlling a speech synthesizer.

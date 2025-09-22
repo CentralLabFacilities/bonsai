@@ -8,6 +8,7 @@ import java.util.Objects;
  *
  * @author skoester
  */
+@Deprecated
 public class TaskData extends Type {
     
     private String task = "task";

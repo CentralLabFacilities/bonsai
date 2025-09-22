@@ -11,6 +11,7 @@ import de.unibi.citec.clf.btl.data.geometry.PrecisePolygon;
  *
  * @author lziegler
  */
+@Deprecated
 public class ObjectLocationData extends ObjectData {
 
     /**

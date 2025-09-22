@@ -36,6 +36,7 @@ import java.util.concurrent.Future;
  *
  * @author lruegeme
  */
+@Deprecated
 public class DetectSurface extends AbstractSkill {
 
     private ExitToken tokenSuccess;

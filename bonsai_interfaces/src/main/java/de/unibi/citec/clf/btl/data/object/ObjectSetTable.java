@@ -11,6 +11,7 @@ import de.unibi.citec.clf.btl.data.geometry.Pose2D;
  *
  * @author semueller
  */
+@Deprecated
 public class ObjectSetTable extends Type{
     
     

@@ -57,6 +57,7 @@ import java.util.concurrent.Future;
  *
  * @author jkummert
  */
+@Deprecated
 public class LookToPerson extends AbstractSkill {
 
     private String KEY_MAX_ANGLE = "#_MAX_ANGLE";
