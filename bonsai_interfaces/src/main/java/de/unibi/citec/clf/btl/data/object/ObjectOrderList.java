@@ -10,6 +10,7 @@ import de.unibi.citec.clf.btl.List;
  *
  * @author cwitte
  */
+@Deprecated
 public class ObjectOrderList extends List<ObjectOrder> {
     
     public ObjectOrderList() {

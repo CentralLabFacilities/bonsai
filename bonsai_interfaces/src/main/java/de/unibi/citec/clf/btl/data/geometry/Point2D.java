@@ -51,6 +51,11 @@ public class Point2D extends Type {
         return "[" + getClass().getSimpleName() + " x=" + this.getX(LengthUnit.METER) + " y=" + this.getY(LengthUnit.METER);
     }
 
+    public Point2DStamped toStamped(String frame)
+    {
+        return new Point2DStamped(this, frame);
+    }
+
     /**
      * Creates instance.
      */

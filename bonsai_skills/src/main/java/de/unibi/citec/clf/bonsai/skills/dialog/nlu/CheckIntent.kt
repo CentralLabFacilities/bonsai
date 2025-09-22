@@ -5,7 +5,7 @@ import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
-import de.unibi.citec.clf.btl.data.speechrec.NLU
+import de.unibi.citec.clf.btl.data.speech.NLU
 
 /**
  * Check if NLU has one of the given intents

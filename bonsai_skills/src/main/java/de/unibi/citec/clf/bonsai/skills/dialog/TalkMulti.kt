@@ -6,8 +6,8 @@ import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
-import de.unibi.citec.clf.btl.data.speechrec.Language
-import de.unibi.citec.clf.btl.data.speechrec.LanguageType
+import de.unibi.citec.clf.btl.data.speech.Language
+import de.unibi.citec.clf.btl.data.speech.LanguageType
 import java.util.concurrent.Future
 
 /**
@@ -18,11 +18,11 @@ import java.util.concurrent.Future
  *
  * Options:
  * #_MSG_<LANG>:      [String]
- * -> Text said by the robot for the <LANG>
+ *      -> Text said by the robot for the <LANG>
  * #_BLOCKING:     [boolean] Optional (default: true)
- * -> If true skill ends after talk was completed
+ *      -> If true skill ends after talk was completed
  * #_DEFAULT:      [String] Optional (default: EN)
- * -> default msg if #_MSG_<LANG> is not defined
+ *      -> default msg if #_MSG_<LANG> is not defined
  * Slots:
  *
  * ExitTokens:

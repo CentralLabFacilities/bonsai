@@ -38,6 +38,7 @@ import java.util.concurrent.Future;
  *
  * @author lruegeme
  */
+@Deprecated(since="use wm based skills")
 public class DetectObjects extends AbstractSkill {
 
     private static final String KEY_MINREL = "#_MIN_REL";

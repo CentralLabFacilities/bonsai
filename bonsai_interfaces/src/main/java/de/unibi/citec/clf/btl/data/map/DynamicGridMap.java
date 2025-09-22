@@ -29,6 +29,7 @@ import de.unibi.citec.clf.btl.units.UnitConverter;
  * @author jwienke
  * @author lziegler
  */
+@Deprecated
 public class DynamicGridMap extends StampedType {
 
 	private static final String ATTACHMENT_URI_ATTRIBUTE_NAME = "uri";
