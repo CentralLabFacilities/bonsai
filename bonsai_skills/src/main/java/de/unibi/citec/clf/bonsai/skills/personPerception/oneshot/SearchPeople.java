@@ -10,6 +10,7 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.bonsai.util.CoordinateSystemConverter;
+import de.unibi.citec.clf.btl.StampedType;
 import de.unibi.citec.clf.btl.data.geometry.Point2DStamped;
 import de.unibi.citec.clf.btl.data.geometry.Pose2D;
 import de.unibi.citec.clf.btl.data.person.PersonData;
@@ -220,9 +221,9 @@ public class SearchPeople extends AbstractSkill {
                 );
                 //continue;
             }
-            if (localPersonPos.getDistance(new Point2DStamped(0.0, 0.0, LengthUnit.METER), LengthUnit.MILLIMETER) > searchRadius) {
+            if (localPersonPos.getDistance(new Point2DStamped(0.0, 0.0, LengthUnit.METER, StampedType.LOCAL_FRAME), LengthUnit.MILLIMETER) > searchRadius) {
                 logger.info("search distance is: " + searchRadius + "mm. person to far away: "
-                        + localPersonPos.getDistance(new Point2DStamped(0.0, 0.0, LengthUnit.METER), LengthUnit.MILLIMETER) + " mm.");
+                        + localPersonPos.getDistance(new Point2DStamped(0.0, 0.0, LengthUnit.METER, StampedType.LOCAL_FRAME), LengthUnit.MILLIMETER) + " mm.");
                 continue;
             }
 
