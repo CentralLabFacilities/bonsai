@@ -29,6 +29,10 @@ class EntityWithAttributes(id: String, modelName: String = "", pose :Pose3D? = n
         return attributes.getOrDefault(key, listOf()).firstOrNull()
     }
 
+    fun getAttribute(key: String): List<String>? {
+        return attributes[key]
+    }
+
     fun addAttribute(attribute: String, value: String) {
         if(!attributes.containsKey(attribute)) {
             attributes[attribute] = mutableListOf()
