@@ -8,6 +8,7 @@ import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
+import de.unibi.citec.clf.btl.StampedType;
 import de.unibi.citec.clf.btl.data.geometry.Point2DStamped;
 import de.unibi.citec.clf.btl.data.navigation.CommandResult;
 import de.unibi.citec.clf.btl.data.navigation.DriveData;
@@ -141,7 +142,7 @@ public class DriveDirect extends AbstractSkill {
         }
 
         if (!Double.isNaN(dist) && dist != 0) {
-            Point2DStamped direction = new Point2DStamped(dir_x, dir_y, LengthUnit.METER);
+            Point2DStamped direction = new Point2DStamped(dir_x, dir_y, LengthUnit.METER, StampedType.LOCAL_FRAME);
             driveData = new DriveData(dist, LengthUnit.METER, moveSpeed, SpeedUnit.METER_PER_SEC, direction);
         }
         if (!Double.isNaN(angle) && angle != 0) {

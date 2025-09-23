@@ -29,7 +29,7 @@ public class DriveData extends StampedType {
      */
     private double maxAcceleration = Double.NaN;
 
-    private Point2DStamped direction = new Point2DStamped(1, 0, LengthUnit.METER); //todo: dirty hack
+    private Point2DStamped direction = new Point2DStamped(1, 0, LengthUnit.METER, "base_link"); //todo: dirty hack
 
     private double distance;
     private MicroTimestamp readTime = new MicroTimestamp();

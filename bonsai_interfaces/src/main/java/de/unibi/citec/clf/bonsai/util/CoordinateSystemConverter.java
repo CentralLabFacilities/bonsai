@@ -2,6 +2,7 @@ package de.unibi.citec.clf.bonsai.util;
 
 
 
+import de.unibi.citec.clf.btl.data.geometry.Point2D;
 import de.unibi.citec.clf.btl.data.geometry.Point2DStamped;
 import de.unibi.citec.clf.btl.data.navigation.NavigationGoalData;
 import de.unibi.citec.clf.btl.data.geometry.Pose2D;
@@ -9,6 +10,9 @@ import de.unibi.citec.clf.btl.tools.MathTools;
 import de.unibi.citec.clf.btl.units.AngleUnit;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 import de.unibi.citec.clf.btl.units.UnitConverter;
+
+import static de.unibi.citec.clf.btl.StampedType.LOCAL_FRAME;
+import static de.unibi.citec.clf.btl.StampedType.GLOBAL_FRAME;
 
 /**
  * Utility class with methods to convert between several coordinate systems.
@@ -96,11 +100,11 @@ public class CoordinateSystemConverter {
 
     public static double positionData2Angle(Pose2D ownPosition, Pose2D oP, AngleUnit angleUnit) {
 
-        return positionData2Angle(ownPosition, new Point2DStamped(oP.getX(LengthUnit.METER), oP.getY(LengthUnit.METER),
+        return positionData2Angle(ownPosition, new Point2D(oP.getX(LengthUnit.METER), oP.getY(LengthUnit.METER),
                 LengthUnit.METER), angleUnit);
     }
 
-    public static double positionData2Angle(Pose2D ownPosition, Point2DStamped objectPosition, AngleUnit angleUnit) {
+    public static double positionData2Angle(Pose2D ownPosition, Point2D objectPosition, AngleUnit angleUnit) {
 
         double angle = Math.atan2(objectPosition.getY(LengthUnit.METER) - ownPosition.getY(LengthUnit.METER),
                 objectPosition.getX(LengthUnit.METER) - ownPosition.getX(LengthUnit.METER));
@@ -113,10 +117,10 @@ public class CoordinateSystemConverter {
 
     public static double positionDistance(Pose2D ownPosition, Pose2D oP, LengthUnit lUnit) {
 
-        return positionDistance(ownPosition, new Point2DStamped(oP.getX(lUnit), oP.getY(lUnit), lUnit), lUnit);
+        return positionDistance(ownPosition, new Point2D(oP.getX(lUnit), oP.getY(lUnit), lUnit), lUnit);
     }
 
-    public static double positionDistance(Pose2D ownPosition, Point2DStamped objectPosition, LengthUnit lUnit) {
+    public static double positionDistance(Pose2D ownPosition, Point2D objectPosition, LengthUnit lUnit) {
 
         double x = ownPosition.getX(lUnit) - objectPosition.getX(lUnit);
 
@@ -160,7 +164,7 @@ public class CoordinateSystemConverter {
         double gx = currentPosition.getX(meter) + px;
         double gy = currentPosition.getY(meter) + py;
 
-        Point2DStamped tgt = new Point2DStamped(gx, gy, meter);
+        Point2DStamped tgt = new Point2DStamped(gx, gy, meter, GLOBAL_FRAME);
         tgt.setTimestamp(src.getTimestamp());
         return tgt;
     }
@@ -176,6 +180,7 @@ public class CoordinateSystemConverter {
 
         Pose2D tgt = new Pose2D(pointLocal.getX(meter), pointLocal.getY(meter), yawLocal,
                 src.getTimestamp(), meter, rad);
+        tgt.setFrameId(LOCAL_FRAME);
         return tgt;
     }
 
@@ -197,7 +202,7 @@ public class CoordinateSystemConverter {
         double xLocal = xTmp * cs - yTmp * sn;
         double yLocal = xTmp * sn + yTmp * cs;
 
-        Point2DStamped p = new Point2DStamped(xLocal, yLocal, meter);
+        Point2DStamped p = new Point2DStamped(xLocal, yLocal, meter, GLOBAL_FRAME);
         p.setTimestamp(src.getTimestamp());
         return p;
     }

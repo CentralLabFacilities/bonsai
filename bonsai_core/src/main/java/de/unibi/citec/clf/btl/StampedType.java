@@ -3,7 +3,6 @@ package de.unibi.citec.clf.btl;
 
 import de.unibi.citec.clf.btl.data.common.Timestamp;
 import de.unibi.citec.clf.btl.units.TimeUnit;
-import org.apache.log4j.Logger;
 
 import java.util.Objects;
 
@@ -15,7 +14,9 @@ import java.util.Objects;
  */
 public abstract class StampedType extends Type {
 
-    public static final String BASE_FRAME = "base_link";
+    public static final String LOCAL_FRAME = "base_link";
+    public static final String GLOBAL_FRAME = "map";
+
     protected Timestamp timestamp = new Timestamp();
     protected String frameId = "";
 
@@ -84,7 +85,7 @@ public abstract class StampedType extends Type {
     }
 
     public boolean isInBaseFrame() {
-        return frameId.equals(BASE_FRAME);
+        return frameId.equals(LOCAL_FRAME);
     }
 
     /**

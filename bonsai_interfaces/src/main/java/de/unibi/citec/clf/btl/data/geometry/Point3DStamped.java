@@ -83,6 +83,8 @@ public class Point3DStamped extends Point2DStamped {
         this.y = p.y;
         this.z = p.z;
         this.iLU = p.iLU;
+        this.frameId = p.frameId;
+        this.timestamp = p.timestamp;
     }
 
     public Point3DStamped(Point3D point, String frameId) {
@@ -105,12 +107,14 @@ public class Point3DStamped extends Point2DStamped {
         this.y = y;
         this.z = z;
         iLU = unit;
+        frameId = frame;
     }
 
     public Point3DStamped(float x, float y, float z, String frame) {
         this.x = x;
         this.y = y;
         this.z = z;
+        frameId = frame;
     }
 
     /**
@@ -132,6 +136,7 @@ public class Point3DStamped extends Point2DStamped {
      * @return a new Point3D
      */
     public Point3DStamped mul(Point3DStamped p) {
+        if(frameId != p.frameId) logger.warn("points in differrent frames");
         Point3DStamped point = new Point3DStamped(getX(iLU) * p.getX(iLU), getY(iLU) * p.getY(iLU), getZ(iLU) * p.getZ(iLU), iLU, frameId);
         return point;
     }
@@ -144,6 +149,7 @@ public class Point3DStamped extends Point2DStamped {
      * @return a new Point3D
      */
     public Point3DStamped sub(Point3DStamped p) {
+        if(frameId != p.frameId) logger.warn("points in differrent frames");
         Point3DStamped point = new Point3DStamped(getX(iLU) - p.getX(iLU), getY(iLU) - p.getY(iLU), getZ(iLU) - p.getZ(iLU), iLU, frameId);
         return point;
     }
@@ -156,11 +162,13 @@ public class Point3DStamped extends Point2DStamped {
      * @return a new Point3D
      */
     public Point3DStamped div(Point3DStamped p) {
+        if(frameId != p.frameId) logger.warn("points in differrent frames");
         Point3DStamped point = new Point3DStamped(getX(iLU) / p.getX(iLU), getY(iLU) / p.getY(iLU), getZ(iLU) / p.getZ(iLU), iLU, frameId);
         return point;
     }
     
     public double distance(Point3DStamped center) {
+        if(frameId != center.frameId) logger.warn("points in differrent frames");
         if (!this.iLU.equals(center.getOriginalLU())) {
             return Math.sqrt(Math.pow(this.x - center.getX(iLU), 2) + Math.pow(this.y - center.getY(iLU), 2) 
                     + Math.pow(this.z - center.getZ(iLU), 2));            
