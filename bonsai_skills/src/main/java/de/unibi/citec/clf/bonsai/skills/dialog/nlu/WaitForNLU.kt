@@ -53,9 +53,12 @@ class WaitForNLU : AbstractSkill() {
         private const val KEY_ANY = "#_ANY"
         private const val KEY_SENSOR = "#_SENSOR_KEY"
         private const val KEY_ALLOWED_LANGUAGES = "#_ALLOWED_LANGUAGES"
+        private const val KEY_ENTITY = "#_ENTITIES"
     }
 
     private var allowedLanguages : MutableList<Language>? = null
+
+    private var required_entities: List<String> = listOf()
 
     private var speechActuator: SpeechActuator? = null
     private var possible_intents: List<String> = mutableListOf()
@@ -78,6 +81,7 @@ class WaitForNLU : AbstractSkill() {
         sensorkey = configurator.requestOptionalValue(KEY_SENSOR, sensorkey)
         any = configurator.requestOptionalBool(KEY_ANY, any)
         if (!any) {
+            required_entities = configurator.requestOptionalValue(KEY_ENTITY, "").split(";")
             possible_intents = configurator.requestValue(KEY_DEFAULT).split(";")
             for (nt in possible_intents) {
                 if (nt.isBlank()) continue
@@ -85,9 +89,12 @@ class WaitForNLU : AbstractSkill() {
             }
         } else if (configurator.hasConfigurationKey(KEY_DEFAULT)) {
             throw SkillConfigurationException("cant use $KEY_ANY and $KEY_DEFAULT together")
+        }  else if (configurator.hasConfigurationKey(KEY_ENTITY)) {
+            throw SkillConfigurationException("cant use $KEY_ANY and $KEY_ENTITY together")
         } else {
             tokenMap["any"] = configurator.requestExitToken(ExitStatus.SUCCESS())
         }
+
 
         timeout = configurator.requestOptionalInt(KEY_TIMEOUT, timeout.toInt()).toLong()
 
@@ -173,7 +180,7 @@ class WaitForNLU : AbstractSkill() {
             }
         } else for (intent in possible_intents) {
             for (nt in understood) {
-                if (intent == nt.intent) {
+                if (intent == nt.intent &&  nt.getEntities().map { it.key }.containsAll(required_entities)) {
                     try {
                         nluSlot?.memorize<NLU>(nt)
                         langSlot?.memorize(LanguageType(nt.lang))
