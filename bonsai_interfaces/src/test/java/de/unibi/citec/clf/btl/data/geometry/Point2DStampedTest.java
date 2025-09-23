@@ -1,5 +1,6 @@
 package de.unibi.citec.clf.btl.data.geometry;
 
+import de.unibi.citec.clf.btl.StampedType;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 import org.junit.Test;
 
@@ -17,7 +18,7 @@ public class Point2DStampedTest {
 
         Point2DStamped instance2 = new Point2DStamped(1, 2, LengthUnit.METER, "map");
 
-        Point2DStamped instance3 = new Point2DStamped(1,2);
+        Point2DStamped instance3 = new Point2DStamped(1,2, "base");
         instance3.setFrameId("base");
 
         assertTrue(instance.equals(instance2));
@@ -38,8 +39,8 @@ public class Point2DStampedTest {
 
     @Test
     public void distance() {
-        Point2DStamped instance = new Point2DStamped(1000, 1000,LengthUnit.MILLIMETER);
-        Point2DStamped instance2 = new Point2DStamped(1, 2);
+        Point2DStamped instance = new Point2DStamped(1000, 1000,LengthUnit.MILLIMETER, StampedType.LOCAL_FRAME);
+        Point2DStamped instance2 = new Point2DStamped(1, 2, StampedType.LOCAL_FRAME);
         assertEquals(1000,instance.distance(instance2),0.0);
         assertEquals(1,instance.getDistance(instance2,LengthUnit.METER),0.0);
 
@@ -50,59 +51,59 @@ public class Point2DStampedTest {
 
     @Test
     public void add() {
-        Point2DStamped instance = new Point2DStamped(1, 1);
-        Point2DStamped instance2 = new Point2DStamped(1, 2);
+        Point2DStamped instance = new Point2DStamped(1, 1, StampedType.LOCAL_FRAME);
+        Point2DStamped instance2 = new Point2DStamped(1, 2, StampedType.LOCAL_FRAME);
 
-        Point2DStamped sum = new Point2DStamped(2,3);
+        Point2DStamped sum = new Point2DStamped(2,3, StampedType.LOCAL_FRAME);
         assertEquals(sum,instance.add(instance2));
     }
 
     @Test
     public void mul() {
-        Point2DStamped instance = new Point2DStamped(1, 1);
-        Point2DStamped instance2 = new Point2DStamped(1, 2);
+        Point2DStamped instance = new Point2DStamped(1, 1, StampedType.LOCAL_FRAME);
+        Point2DStamped instance2 = new Point2DStamped(1, 2, StampedType.LOCAL_FRAME);
 
-        Point2DStamped mul = new Point2DStamped(1,2);
+        Point2DStamped mul = new Point2DStamped(1,2, StampedType.LOCAL_FRAME);
         assertEquals(mul,instance.mul(instance2));
     }
 
     @Test
     public void sub() {
-        Point2DStamped instance = new Point2DStamped(1, 1);
-        Point2DStamped instance2 = new Point2DStamped(1, 2);
+        Point2DStamped instance = new Point2DStamped(1, 1, StampedType.LOCAL_FRAME);
+        Point2DStamped instance2 = new Point2DStamped(1, 2, StampedType.LOCAL_FRAME);
 
-        Point2DStamped sub = new Point2DStamped(0,-1);
+        Point2DStamped sub = new Point2DStamped(0,-1, StampedType.LOCAL_FRAME);
         assertEquals(sub, instance.sub(instance2));
     }
 
     @Test
     public void div() {
-        Point2DStamped instance = new Point2DStamped(1, 1);
-        Point2DStamped instance2 = new Point2DStamped(1, 2);
+        Point2DStamped instance = new Point2DStamped(1, 1, StampedType.LOCAL_FRAME);
+        Point2DStamped instance2 = new Point2DStamped(1, 2, StampedType.LOCAL_FRAME);
 
-        Point2DStamped div = new Point2DStamped(1,0.5);
+        Point2DStamped div = new Point2DStamped(1,0.5, StampedType.LOCAL_FRAME);
         assertEquals(div,instance.div(instance2));
     }
 
     @Test
     public void getLength() {
-        Point2DStamped instance = new Point2DStamped(2, 0);
+        Point2DStamped instance = new Point2DStamped(2, 0, StampedType.LOCAL_FRAME);
 
         assertEquals(2,instance.getLength(LengthUnit.METER),0.0);
     }
 
     @Test
     public void dotProduct() {
-        Point2DStamped instance = new Point2DStamped(1, 1);
-        Point2DStamped instance2 = new Point2DStamped(1, 2);
+        Point2DStamped instance = new Point2DStamped(1, 1, StampedType.LOCAL_FRAME);
+        Point2DStamped instance2 = new Point2DStamped(1, 2, StampedType.LOCAL_FRAME);
 
         assertEquals(3,instance.dotProduct(instance2), 0.0);
     }
 
     @Test
     public void getAngle() {
-        Point2DStamped instance = new Point2DStamped(1, 1);
-        Point2DStamped instance2 = new Point2DStamped(10, 1);
+        Point2DStamped instance = new Point2DStamped(1, 1, StampedType.LOCAL_FRAME);
+        Point2DStamped instance2 = new Point2DStamped(10, 1, StampedType.LOCAL_FRAME);
 
         assertEquals(0, instance.getAngle(instance2),0.0);
     }

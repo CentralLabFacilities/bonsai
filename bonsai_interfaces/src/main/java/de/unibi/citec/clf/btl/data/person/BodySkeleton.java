@@ -3,7 +3,7 @@ package de.unibi.citec.clf.btl.data.person;
 
 import de.unibi.citec.clf.btl.List;
 import de.unibi.citec.clf.btl.Type;
-import de.unibi.citec.clf.btl.data.geometry.Point2DStamped;
+import de.unibi.citec.clf.btl.data.geometry.Point2D;
 import java.util.Set;
 
 import de.unibi.citec.clf.btl.data.geometry.Point3D;
@@ -21,8 +21,7 @@ import org.apache.log4j.Logger;
  * @author rfeldhans
  */
 public class BodySkeleton extends Type {
-
-    public static final String FRAME = "base_footprint";
+    
     protected Logger logger = Logger.getLogger(this.getClass());
 
     public static class SkeletonJoint extends Type {
@@ -153,16 +152,16 @@ public class BodySkeleton extends Type {
      * @return
      */
     public PersonAttribute.Posture getPoseRelativPictureCoordinates() {
-        Point2DStamped head = getHeadCenterPictureCoordinates();
-        Point2DStamped torso = getTorsoCenterPictureCoordinates();
-        Point2DStamped hips = getHipCenterPictureCoordinates();
-        Point2DStamped legs = getLegCenterPictureCoordinates();
-        Point2DStamped knees = getKneeCenterPictureCoordinates();
-        Point2DStamped ankles = getAnkleCenterPictureCoordinates();
+        Point2D head = getHeadCenterPictureCoordinates();
+        Point2D torso = getTorsoCenterPictureCoordinates();
+        Point2D hips = getHipCenterPictureCoordinates();
+        Point2D legs = getLegCenterPictureCoordinates();
+        Point2D knees = getKneeCenterPictureCoordinates();
+        Point2D ankles = getAnkleCenterPictureCoordinates();
         //System.out.println("Head: " + head + "; torso: " + torso + "; hips: " + hips + "; legs: " +legs + "; knees: " + knees + "; ankles: " +ankles);
         //System.out.println("torso to hips" + hips.sub(torso) + "hips to knees" + knees.sub(hips));
 
-        Point2DStamped orientationDiff = legs.sub(head);
+        Point2D orientationDiff = legs.sub(head);
         Double orientation = orientationDiff.getX(LengthUnit.METER) / orientationDiff.getY(LengthUnit.METER);
         if (orientation > 0.6 || orientation < -0.6) { //more difference in width than in height
             return PersonAttribute.Posture.LYING;
@@ -172,9 +171,9 @@ public class BodySkeleton extends Type {
             return PersonAttribute.Posture.STANDING;
         }
 
-        Point2DStamped head_torso = torso.sub(head);
-        Point2DStamped torso_hips = hips.sub(torso);
-        Point2DStamped hips_legs = legs.sub(hips);
+        Point2D head_torso = torso.sub(head);
+        Point2D torso_hips = hips.sub(torso);
+        Point2D hips_legs = legs.sub(hips);
 
         if (hips_legs.getX(LengthUnit.MILLIMETER) >= hips_legs.getY(LengthUnit.MILLIMETER) || -1 * hips_legs.getX(LengthUnit.MILLIMETER) >= hips_legs.getY(LengthUnit.MILLIMETER)) {//Person sitting in relief (person seen from the side)
             return PersonAttribute.Posture.SITTING;
@@ -303,21 +302,21 @@ public class BodySkeleton extends Type {
      */
     public boolean getWaving() {
 
-        Point2DStamped shoulderCenter = getShoulderCenterPictureCoordinates();
-        Point2DStamped headCenter = getHeadCenterPictureCoordinates();
-        Point2DStamped rightWrist = null;
-        Point2DStamped leftWrist = null;
+        Point2D shoulderCenter = getShoulderCenterPictureCoordinates();
+        Point2D headCenter = getHeadCenterPictureCoordinates();
+        Point2D rightWrist = null;
+        Point2D leftWrist = null;
         //System.out.println("head/shoulder/2: " + shoulderCenter.sub(headCenter).getY(LengthUnit.MILLIMETER)/2);
 
         if (hasJoint(SkeletonJoint.JointType.RWRIST)) {
-            rightWrist = new Point2DStamped(getJoint(SkeletonJoint.JointType.RWRIST).getU(), getJoint(SkeletonJoint.JointType.RWRIST).getV(), LengthUnit.MILLIMETER);
+            rightWrist = new Point2D(getJoint(SkeletonJoint.JointType.RWRIST).getU(), getJoint(SkeletonJoint.JointType.RWRIST).getV(), LengthUnit.MILLIMETER);
             //System.out.println("right: " + shoulderCenter.sub(rightWrist).getY(LengthUnit.MILLIMETER));
             if (shoulderCenter.sub(rightWrist).getY(LengthUnit.MILLIMETER) > 0) {//right wrist lies above the head
                 return true;
             }
         }
         if (hasJoint(SkeletonJoint.JointType.LWRIST)) {
-            leftWrist = new Point2DStamped(getJoint(SkeletonJoint.JointType.LWRIST).getU(), getJoint(SkeletonJoint.JointType.LWRIST).getV(), LengthUnit.MILLIMETER);
+            leftWrist = new Point2D(getJoint(SkeletonJoint.JointType.LWRIST).getU(), getJoint(SkeletonJoint.JointType.LWRIST).getV(), LengthUnit.MILLIMETER);
             //System.out.println("left: " + shoulderCenter.sub(leftWrist).getY(LengthUnit.MILLIMETER));
             if (shoulderCenter.sub(leftWrist).getY(LengthUnit.MILLIMETER) > 0) {//left wrist lies above the head
                 return true;
@@ -333,28 +332,28 @@ public class BodySkeleton extends Type {
     public PersonAttribute.Gesture getGestureRelativePictureCoordinates() {
         //---------------setup variables and basic vectors
 
-        Point2DStamped headCenter = getHeadCenterPictureCoordinates();
-        Point2DStamped shoulderCenter = getShoulderCenterPictureCoordinates();
-        Point2DStamped hips = getHipCenterPictureCoordinates();
+        Point2D headCenter = getHeadCenterPictureCoordinates();
+        Point2D shoulderCenter = getShoulderCenterPictureCoordinates();
+        Point2D hips = getHipCenterPictureCoordinates();
 
-        Point2DStamped rightElbow = null;
-        Point2DStamped rightWrist = null;
+        Point2D rightElbow = null;
+        Point2D rightWrist = null;
 
-        Point2DStamped leftElbow = null;
-        Point2DStamped leftWrist = null;
+        Point2D leftElbow = null;
+        Point2D leftWrist = null;
 
 
         if (hasJoint(SkeletonJoint.JointType.RSHOULDER) && hasJoint(SkeletonJoint.JointType.RELBOW) && hasJoint(SkeletonJoint.JointType.RWRIST)) {
-            rightElbow = new Point2DStamped(getJoint(SkeletonJoint.JointType.RELBOW).getU(), getJoint(SkeletonJoint.JointType.RELBOW).getV(), LengthUnit.MILLIMETER);
-            rightWrist = new Point2DStamped(getJoint(SkeletonJoint.JointType.RWRIST).getU(), getJoint(SkeletonJoint.JointType.RWRIST).getV(), LengthUnit.MILLIMETER);
+            rightElbow = new Point2D(getJoint(SkeletonJoint.JointType.RELBOW).getU(), getJoint(SkeletonJoint.JointType.RELBOW).getV(), LengthUnit.MILLIMETER);
+            rightWrist = new Point2D(getJoint(SkeletonJoint.JointType.RWRIST).getU(), getJoint(SkeletonJoint.JointType.RWRIST).getV(), LengthUnit.MILLIMETER);
         } else {
             //System.out.println("right arm not completely visible");
             return PersonAttribute.Gesture.NEUTRAL;
         }
 
         if (hasJoint(SkeletonJoint.JointType.LSHOULDER) && hasJoint(SkeletonJoint.JointType.LELBOW) && hasJoint(SkeletonJoint.JointType.LWRIST)) {
-            leftElbow = new Point2DStamped(getJoint(SkeletonJoint.JointType.LELBOW).getU(), getJoint(SkeletonJoint.JointType.LELBOW).getV(), LengthUnit.MILLIMETER);
-            leftWrist = new Point2DStamped(getJoint(SkeletonJoint.JointType.LWRIST).getU(), getJoint(SkeletonJoint.JointType.LWRIST).getV(), LengthUnit.MILLIMETER);
+            leftElbow = new Point2D(getJoint(SkeletonJoint.JointType.LELBOW).getU(), getJoint(SkeletonJoint.JointType.LELBOW).getV(), LengthUnit.MILLIMETER);
+            leftWrist = new Point2D(getJoint(SkeletonJoint.JointType.LWRIST).getU(), getJoint(SkeletonJoint.JointType.LWRIST).getV(), LengthUnit.MILLIMETER);
         } else {
             //System.out.println("left arm not completely visible");
             return PersonAttribute.Gesture.NEUTRAL;
@@ -496,9 +495,9 @@ public class BodySkeleton extends Type {
      * @return a Point2D where x and y are the lower bounds of the head in
      * picture coordinates
      */
-    public Point2DStamped getHeadLowerBound() {
-        Point2DStamped ret = new Point2DStamped(0, 0, LengthUnit.MILLIMETER);
-        Point2DStamped center = getHeadCenterPictureCoordinates();
+    public Point2D getHeadLowerBound() {
+        Point2D ret = new Point2D(0, 0, LengthUnit.MILLIMETER);
+        Point2D center = getHeadCenterPictureCoordinates();
         Double dist = Double.MAX_VALUE;
 
         for (SkeletonJoint joint : jointList) {
@@ -531,9 +530,9 @@ public class BodySkeleton extends Type {
      * @return a Point2D where x and y are the upper bounds of the head in
      * picture coordinates
      */
-    public Point2DStamped getHeadUpperBound() {
-        Point2DStamped ret = new Point2DStamped(0, 0, LengthUnit.MILLIMETER);
-        Point2DStamped center = getHeadCenterPictureCoordinates();
+    public Point2D getHeadUpperBound() {
+        Point2D ret = new Point2D(0, 0, LengthUnit.MILLIMETER);
+        Point2D center = getHeadCenterPictureCoordinates();
         Double dist = Double.MAX_VALUE;
 
         for (SkeletonJoint joint : jointList) {
@@ -563,8 +562,8 @@ public class BodySkeleton extends Type {
      *
      * @return
      */
-    public Point2DStamped getHeadCenterPictureCoordinates() {
-        Point2DStamped ret = new Point2DStamped(0, 0, LengthUnit.MILLIMETER);
+    public Point2D getHeadCenterPictureCoordinates() {
+        Point2D ret = new Point2D(0, 0, LengthUnit.MILLIMETER);
 
         int counter = 0;
         for (SkeletonJoint joint : jointList) {
@@ -578,13 +577,13 @@ public class BodySkeleton extends Type {
                     && joint.jointType != SkeletonJoint.JointType.NOSE) {
                 continue;
             }
-            ret = ret.add(new Point2DStamped(joint.u, joint.v, LengthUnit.MILLIMETER));
+            ret = ret.add(new Point2D(joint.u, joint.v, LengthUnit.MILLIMETER));
             counter++;
         }
         if (counter == 0) {
-            return new Point2DStamped(counter, counter, LengthUnit.MILLIMETER, FRAME);
+            return new Point2D(counter, counter, LengthUnit.MILLIMETER);
         }
-        Point2DStamped div = new Point2DStamped(counter, counter, LengthUnit.MILLIMETER);
+        Point2D div = new Point2D(counter, counter, LengthUnit.MILLIMETER);
         ret = ret.div(div);
         ret.setX((int) (ret.getX(LengthUnit.MILLIMETER)), LengthUnit.MILLIMETER);
         ret.setY((int) (ret.getY(LengthUnit.MILLIMETER)), LengthUnit.MILLIMETER);
@@ -596,8 +595,8 @@ public class BodySkeleton extends Type {
      *
      * @return
      */
-    public Point2DStamped getShoulderCenterPictureCoordinates() {
-        Point2DStamped ret = new Point2DStamped(0, 0, LengthUnit.MILLIMETER);
+    public Point2D getShoulderCenterPictureCoordinates() {
+        Point2D ret = new Point2D(0, 0, LengthUnit.MILLIMETER);
 
         int counter = 0;
         for (SkeletonJoint joint : jointList) {
@@ -608,13 +607,13 @@ public class BodySkeleton extends Type {
                     && joint.jointType != SkeletonJoint.JointType.RSHOULDER) {
                 continue;
             }
-            ret = ret.add(new Point2DStamped(joint.u, joint.v, LengthUnit.MILLIMETER));
+            ret = ret.add(new Point2D(joint.u, joint.v, LengthUnit.MILLIMETER));
             counter++;
         }
         if (counter == 0) {
-            return new Point2DStamped(counter, counter, LengthUnit.MILLIMETER, FRAME);
+            return new Point2D(counter, counter, LengthUnit.MILLIMETER);
         }
-        Point2DStamped div = new Point2DStamped(counter, counter, LengthUnit.MILLIMETER);
+        Point2D div = new Point2D(counter, counter, LengthUnit.MILLIMETER);
         ret = ret.div(div);
         ret.setX((int) (ret.getX(LengthUnit.MILLIMETER)), LengthUnit.MILLIMETER);
         ret.setY((int) (ret.getY(LengthUnit.MILLIMETER)), LengthUnit.MILLIMETER);
@@ -626,8 +625,8 @@ public class BodySkeleton extends Type {
      *
      * @return
      */
-    public Point2DStamped getTorsoCenterPictureCoordinates() {
-        Point2DStamped ret = new Point2DStamped(0, 0, LengthUnit.MILLIMETER);
+    public Point2D getTorsoCenterPictureCoordinates() {
+        Point2D ret = new Point2D(0, 0, LengthUnit.MILLIMETER);
 
         int counter = 0;
         for (SkeletonJoint joint : jointList) {
@@ -641,13 +640,13 @@ public class BodySkeleton extends Type {
                     && joint.jointType != SkeletonJoint.JointType.RSHOULDER) {
                 continue;
             }
-            ret = ret.add(new Point2DStamped(joint.u, joint.v, LengthUnit.MILLIMETER));
+            ret = ret.add(new Point2D(joint.u, joint.v, LengthUnit.MILLIMETER));
             counter++;
         }
         if (counter == 0) {
-            return new Point2DStamped(counter, counter, LengthUnit.MILLIMETER, FRAME);
+            return new Point2D(counter, counter, LengthUnit.MILLIMETER);
         }
-        Point2DStamped div = new Point2DStamped(counter, counter, LengthUnit.MILLIMETER);
+        Point2D div = new Point2D(counter, counter, LengthUnit.MILLIMETER);
         ret = ret.div(div);
         ret.setX((int) (ret.getX(LengthUnit.MILLIMETER)), LengthUnit.MILLIMETER);
         ret.setY((int) (ret.getY(LengthUnit.MILLIMETER)), LengthUnit.MILLIMETER);
@@ -659,8 +658,8 @@ public class BodySkeleton extends Type {
      *
      * @return
      */
-    public Point2DStamped getHipCenterPictureCoordinates() {
-        Point2DStamped ret = new Point2DStamped(0, 0, LengthUnit.MILLIMETER);
+    public Point2D getHipCenterPictureCoordinates() {
+        Point2D ret = new Point2D(0, 0, LengthUnit.MILLIMETER);
 
         int counter = 0;
         for (SkeletonJoint joint : jointList) {
@@ -671,13 +670,13 @@ public class BodySkeleton extends Type {
                     && joint.jointType != SkeletonJoint.JointType.LHIP) {
                 continue;
             }
-            ret = ret.add(new Point2DStamped(joint.u, joint.v, LengthUnit.MILLIMETER));
+            ret = ret.add(new Point2D(joint.u, joint.v, LengthUnit.MILLIMETER));
             counter++;
         }
         if (counter == 0) {
-            return new Point2DStamped(counter, counter, LengthUnit.MILLIMETER, FRAME);
+            return new Point2D(counter, counter, LengthUnit.MILLIMETER);
         }
-        Point2DStamped div = new Point2DStamped(counter, counter, LengthUnit.MILLIMETER);
+        Point2D div = new Point2D(counter, counter, LengthUnit.MILLIMETER);
         ret = ret.div(div);
         ret.setX((int) (ret.getX(LengthUnit.MILLIMETER)), LengthUnit.MILLIMETER);
         ret.setY((int) (ret.getY(LengthUnit.MILLIMETER)), LengthUnit.MILLIMETER);
@@ -689,8 +688,8 @@ public class BodySkeleton extends Type {
      *
      * @return
      */
-    public Point2DStamped getLegCenterPictureCoordinates() {
-        Point2DStamped ret = new Point2DStamped(0, 0, LengthUnit.MILLIMETER);
+    public Point2D getLegCenterPictureCoordinates() {
+        Point2D ret = new Point2D(0, 0, LengthUnit.MILLIMETER);
 
         int counter = 0;
         for (SkeletonJoint joint : jointList) {
@@ -705,13 +704,13 @@ public class BodySkeleton extends Type {
                     && joint.jointType != SkeletonJoint.JointType.RKNEE) {
                 continue;
             }
-            ret = ret.add(new Point2DStamped(joint.u, joint.v, LengthUnit.MILLIMETER));
+            ret = ret.add(new Point2D(joint.u, joint.v, LengthUnit.MILLIMETER));
             counter++;
         }
         if (counter == 0) {
-            return new Point2DStamped(counter, counter, LengthUnit.MILLIMETER, FRAME);
+            return new Point2D(counter, counter, LengthUnit.MILLIMETER);
         }
-        Point2DStamped div = new Point2DStamped(counter, counter, LengthUnit.MILLIMETER);
+        Point2D div = new Point2D(counter, counter, LengthUnit.MILLIMETER);
         ret = ret.div(div);
         ret.setX((int) (ret.getX(LengthUnit.MILLIMETER)), LengthUnit.MILLIMETER);
         ret.setY((int) (ret.getY(LengthUnit.MILLIMETER)), LengthUnit.MILLIMETER);
@@ -723,8 +722,8 @@ public class BodySkeleton extends Type {
      *
      * @return
      */
-    public Point2DStamped getKneeCenterPictureCoordinates() {
-        Point2DStamped ret = new Point2DStamped(0, 0, LengthUnit.MILLIMETER);
+    public Point2D getKneeCenterPictureCoordinates() {
+        Point2D ret = new Point2D(0, 0, LengthUnit.MILLIMETER);
 
         int counter = 0;
         for (SkeletonJoint joint : jointList) {
@@ -735,13 +734,13 @@ public class BodySkeleton extends Type {
                     && joint.jointType != SkeletonJoint.JointType.RKNEE) {
                 continue;
             }
-            ret = ret.add(new Point2DStamped(joint.u, joint.v, LengthUnit.MILLIMETER));
+            ret = ret.add(new Point2D(joint.u, joint.v, LengthUnit.MILLIMETER));
             counter++;
         }
         if (counter == 0) {
-            return new Point2DStamped(counter, counter, LengthUnit.MILLIMETER, FRAME);
+            return new Point2D(counter, counter, LengthUnit.MILLIMETER);
         }
-        Point2DStamped div = new Point2DStamped(counter, counter, LengthUnit.MILLIMETER);
+        Point2D div = new Point2D(counter, counter, LengthUnit.MILLIMETER);
         ret = ret.div(div);
         ret.setX((int) (ret.getX(LengthUnit.MILLIMETER)), LengthUnit.MILLIMETER);
         ret.setY((int) (ret.getY(LengthUnit.MILLIMETER)), LengthUnit.MILLIMETER);
@@ -753,8 +752,8 @@ public class BodySkeleton extends Type {
      *
      * @return
      */
-    public Point2DStamped getAnkleCenterPictureCoordinates() {
-        Point2DStamped ret = new Point2DStamped(0, 0, LengthUnit.MILLIMETER);
+    public Point2D getAnkleCenterPictureCoordinates() {
+        Point2D ret = new Point2D(0, 0, LengthUnit.MILLIMETER);
 
         int counter = 0;
         for (SkeletonJoint joint : jointList) {
@@ -765,13 +764,13 @@ public class BodySkeleton extends Type {
                     && joint.jointType != SkeletonJoint.JointType.RANKLE) {
                 continue;
             }
-            ret = ret.add(new Point2DStamped(joint.u, joint.v, LengthUnit.MILLIMETER));
+            ret = ret.add(new Point2D(joint.u, joint.v, LengthUnit.MILLIMETER));
             counter++;
         }
         if (counter == 0) {
-            return new Point2DStamped(counter, counter, LengthUnit.MILLIMETER, FRAME);
+            return new Point2D(counter, counter, LengthUnit.MILLIMETER);
         }
-        Point2DStamped div = new Point2DStamped(counter, counter, LengthUnit.MILLIMETER);
+        Point2D div = new Point2D(counter, counter, LengthUnit.MILLIMETER);
         ret = ret.div(div);
         ret.setX((int) (ret.getX(LengthUnit.MILLIMETER)), LengthUnit.MILLIMETER);
         ret.setY((int) (ret.getY(LengthUnit.MILLIMETER)), LengthUnit.MILLIMETER);

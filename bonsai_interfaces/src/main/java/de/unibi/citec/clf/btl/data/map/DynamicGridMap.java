@@ -359,7 +359,7 @@ public class DynamicGridMap extends StampedType {
 	public Point2DStamped getPositionFromBin(int i, int j) {
 		double x = idx2x(i, iLU);
 		double y = idx2y(j,iLU);
-		Point2DStamped p = new Point2DStamped(x, y, iLU);
+		Point2DStamped p = new Point2DStamped(x, y, iLU, frameId);
 		p.setTimestamp(getTimestamp());
 		return p;
 	}
