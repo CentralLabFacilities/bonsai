@@ -82,9 +82,10 @@ public class Point2DStamped extends StampedType {
      * @param x first value
      * @param y second value
      */
-    public Point2DStamped(double x, double y) {
+    public Point2DStamped(double x, double y, String frame) {
         this.x = x;
         this.y = y;
+        this.frameId = frame;
     }
 
     /**
@@ -94,23 +95,11 @@ public class Point2DStamped extends StampedType {
      * @param y second value
      * @param unit unit of the values
      */
-    public Point2DStamped(double x, double y, LengthUnit unit) {
+    public Point2DStamped(double x, double y, LengthUnit unit, String frame) {
         this.x = x;
         this.y = y;
         iLU = unit;
-    }
-
-    /**
-     * Creates instance.
-     *
-     * @param x first value
-     * @param y second value
-     * @param unit unit of the values
-     * @param frame coordinate frame
-     */
-    public Point2DStamped(double x, double y, LengthUnit unit, String frame) {
-        this(x, y, unit);
-        frameId = frame;
+        this.frameId = frame;
     }
 
     public double distance(Point2DStamped center) {
@@ -159,7 +148,7 @@ public class Point2DStamped extends StampedType {
      * @return a new Point2D
      */
     public Point2DStamped add(Point2DStamped p) {
-        Point2DStamped point = new Point2DStamped(getX(iLU) + p.getX(iLU), getY(iLU) + p.getY(iLU), iLU);
+        Point2DStamped point = new Point2DStamped(getX(iLU) + p.getX(iLU), getY(iLU) + p.getY(iLU), iLU, frameId);
         return point;
     }
 
@@ -170,7 +159,7 @@ public class Point2DStamped extends StampedType {
      * @return a new Point2D
      */
     public Point2DStamped mul(Point2DStamped p) {
-        Point2DStamped point = new Point2DStamped(getX(iLU) * p.getX(iLU), getY(iLU) * p.getY(iLU), iLU);
+        Point2DStamped point = new Point2DStamped(getX(iLU) * p.getX(iLU), getY(iLU) * p.getY(iLU), iLU, frameId);
         return point;
     }
 
@@ -182,7 +171,7 @@ public class Point2DStamped extends StampedType {
      * @return a new Point2D
      */
     public Point2DStamped sub(Point2DStamped p) {
-        Point2DStamped point = new Point2DStamped(getX(iLU) - p.getX(iLU), getY(iLU) - p.getY(iLU), iLU);
+        Point2DStamped point = new Point2DStamped(getX(iLU) - p.getX(iLU), getY(iLU) - p.getY(iLU), iLU, frameId);
         return point;
     }
 
@@ -194,7 +183,7 @@ public class Point2DStamped extends StampedType {
      * @return a new Point2D
      */
     public Point2DStamped div(Point2DStamped p) {
-        Point2DStamped point = new Point2DStamped(getX(iLU) / p.getX(iLU), getY(iLU) / p.getY(iLU), iLU);
+        Point2DStamped point = new Point2DStamped(getX(iLU) / p.getX(iLU), getY(iLU) / p.getY(iLU), iLU, frameId);
         return point;
     }
 
@@ -205,7 +194,7 @@ public class Point2DStamped extends StampedType {
      * @return The length of the vector this Point2D describes.
      */
     public double getLength(LengthUnit Lu) {
-        return getDistance(new Point2DStamped(0, 0, Lu), Lu);
+        return getDistance(new Point2DStamped(0, 0, Lu, frameId), Lu);
     }
 
     /**
