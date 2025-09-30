@@ -90,7 +90,7 @@ class FilterEntityListByAttribute : AbstractSkill() {
         val filtered = entitylist!!.filter { e ->
             val attributeValues = ecwm?.getEntityAttributes(e)?.get()?.getAttribute(key) ?: listOf()
             logger.debug("entity ${e.id} has $key: $attributeValues")
-            val match = if (useRegex) attributeValues.map { attr -> value!!.toRegex().matches(attr) }.any() else attributeValues.contains(value)
+            val match = if (useRegex) attributeValues.map { attr -> value!!.toRegex().matches(attr.lowercase()) }.any { it } else attributeValues.contains(value)
             if (invert) !match else match
         }
 
