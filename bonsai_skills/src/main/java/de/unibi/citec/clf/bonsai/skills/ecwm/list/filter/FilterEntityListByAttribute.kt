@@ -21,6 +21,8 @@ import de.unibi.citec.clf.btl.data.world.EntityList
  *                          -> the value the attribute needs to contain
  *  #_INVERT:           [Boolean] Optional Default: false
  *                          -> remove entities of this category from the list
+ *  #_REGEX             [Boolean] (default True):
+ *                          -> use Regex to match
  * Slots:
  *  EntityList: [EntityList] [Read] [Write]
  *      -> the list to be filtered
@@ -46,7 +48,13 @@ class FilterEntityListByAttribute : AbstractSkill() {
     private var valueSlot: MemorySlotReader<String>? = null
     private var value: String? = ""
 
+    private val KEY_ATTRIBUTE = "#_ATTRIBUTE"
+    private val KEY_VALUE = "#_VALUE"
+    private val KEY_INVERT = "#_INVERT"
+    private val KEY_REGEX = "#_REGEX"
+
     private var invert = false
+    private var useRegex = true
 
     private var ecwm: ECWMRobocup? = null
 
@@ -55,13 +63,14 @@ class FilterEntityListByAttribute : AbstractSkill() {
         tokenSuccessEmpty = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus("empty"))
 
         listSlot = configurator.getReadWriteSlot("EntityList", EntityList::class.java)
-        key = configurator.requestValue("#_ATTRIBUTE")
-        if (configurator.hasConfigurationKey("#_VALUE")) {
-            value = configurator.requestValue("#_VALUE")
+        key = configurator.requestValue(KEY_ATTRIBUTE)
+        if (configurator.hasConfigurationKey(KEY_VALUE)) {
+            value = configurator.requestValue(KEY_VALUE)
         } else {
             valueSlot = configurator.getReadSlot("Value", String::class.java)
         }
-        invert = configurator.requestOptionalBool("#_INVERT", invert)
+        invert = configurator.requestOptionalBool(KEY_INVERT, invert)
+        useRegex = configurator.requestOptionalBool(KEY_REGEX, useRegex)
         ecwm = configurator.getActuator("ECWMRobocup", ECWMRobocup::class.java)
     }
 
@@ -81,7 +90,7 @@ class FilterEntityListByAttribute : AbstractSkill() {
         val filtered = entitylist!!.filter { e ->
             val attributeValues = ecwm?.getEntityAttributes(e)?.get()?.getAttribute(key) ?: listOf()
             logger.debug("entity ${e.id} has $key: $attributeValues")
-            val match = attributeValues.contains(value)
+            val match = if (useRegex) attributeValues.map { attr -> value!!.toRegex().matches(attr) }.any() else attributeValues.contains(value)
             if (invert) !match else match
         }
 
