@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(bonsai_skills)
 
-find_package(catkin REQUIRED rosjava_build_tools bonsai_core)
+find_package(catkin REQUIRED rosjava_build_tools)
 
 # catkin_rosjava_env_setup()
 
