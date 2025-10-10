@@ -22,6 +22,8 @@ import javax.xml.transform.stream.StreamResult;
 import javax.xml.transform.stream.StreamSource;
 import java.io.*;
 import java.net.URL;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -149,15 +151,25 @@ public class SCXMLDecoder {
             out = mergeDataModels(new ByteArrayInputStream(out.toByteArray()));
             String xml = out.toString();
             logger.trace("transformed: \n" + xml);
-            PrintWriter pw = new PrintWriter("/tmp/lastscxml.xml");
-            pw.println(xml);
-            pw.close();
+            WriteXmlTmp(xml);
             return xml;
         } catch (IOException | SAXException | ParsingException | ParserConfigurationException ex) {
             logger.error(ex);
             throw new TransformerException(ex);
         }
 
+    }
+
+    private static void WriteXmlTmp(String xml) throws FileNotFoundException {
+        PrintWriter pw;
+        try {
+            pw = new PrintWriter("/tmp/lastscxml.xml");
+        } catch (Exception e) {
+            String filename = "/tmp/lastscml_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd-HH-mm-ss")) + ".xml";
+            pw = new PrintWriter(filename);
+        }
+        pw.println(xml);
+        pw.close();
     }
 
     private static ByteArrayOutputStream mergeDataModels(
