@@ -5,6 +5,7 @@ import de.unibi.citec.clf.btl.data.ecwm.robocup.EntityStorage
 import de.unibi.citec.clf.btl.data.ecwm.robocup.EntityWithAttributes
 import de.unibi.citec.clf.btl.data.ecwm.robocup.ModelWithAttributes
 import de.unibi.citec.clf.btl.data.ecwm.robocup.ModelWithAttributesList
+import de.unibi.citec.clf.btl.data.knowledge.Attributes
 import de.unibi.citec.clf.btl.data.world.Entity
 import de.unibi.citec.clf.btl.data.world.EntityList
 import de.unibi.citec.clf.btl.data.world.ModelList
@@ -17,9 +18,10 @@ interface ECWMRobocup : Actuator {
      * Get Attributes for the given entity type
      */
     @Throws(IOException::class)
-    fun getModelAttributes(type: String): Future<Map<String, List<String>>?>
+    fun getModelAttributes(type: String): Future<Attributes?>
 
-    fun getModelAttributes(entity: Entity): Future<Map<String, List<String>>?> {
+    @Throws(IOException::class)
+    fun getModelAttributes(entity: Entity): Future<Attributes?> {
         return getModelAttributes(entity.modelName)
     }
 
@@ -27,7 +29,10 @@ interface ECWMRobocup : Actuator {
     fun getModelAttributes(type: ModelWithAttributes): Future<ModelWithAttributes?>
 
     @Throws(IOException::class)
-    fun getEntityAttributes(entity: Entity): Future<EntityWithAttributes?>
+    fun getEntityAttributes(entity: Entity): Future<Attributes?>
+
+    @Throws(IOException::class)
+    fun getEntityAttributes(entity: EntityWithAttributes): Future<EntityWithAttributes?>
 
     /**
      * Get All Known Models With Attributes
