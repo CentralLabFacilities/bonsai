@@ -1,6 +1,7 @@
 package de.unibi.citec.clf.bonsai.skills.slots;
 
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
+import de.unibi.citec.clf.bonsai.core.exception.ConfigurationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
@@ -70,7 +71,7 @@ public class PopList<T extends Type, L extends List<T>> extends AbstractSkill {
             listType = (Class<L>) Class.forName(listTypeString);
         } catch (ClassNotFoundException e) {
             logger.error(e);
-            return;
+            throw new ConfigurationException(e);
         }
         itemSlot = configurator.getWriteSlot("ItemSlot", type);
         listSlot = configurator.getSlot("ListSlot", listType);
