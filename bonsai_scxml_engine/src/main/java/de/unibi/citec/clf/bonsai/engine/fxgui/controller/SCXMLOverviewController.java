@@ -265,7 +265,8 @@ public class SCXMLOverviewController implements IStateListener {
         File file = null;
         FileChooser fileChooser = new FileChooser();
         try {
-            file = new File(f.getText());
+            String fileName = f.getText().replaceFirst("^~/", System.getProperty("user.home"));
+            file = new File(fileName);
             if (file.exists()) {
                 fileChooser.setInitialDirectory(file.getParentFile());
             }

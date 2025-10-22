@@ -265,6 +265,8 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     public LoadingResults initalize(String pathToTask, String pathToConfig)
             throws StateNotFoundException, StateIDException, LoadingException, TransformerException {
         isLoading = true;
+        pathToTask = pathToTask.replaceFirst("^~/", System.getProperty("user.home"));
+        pathToConfig = pathToConfig.replaceFirst("^~/", System.getProperty("user.home"));
         lastPathToTask = pathToTask;
         lastPathToConfig = pathToConfig;
         scxml = SCXMLDecoder.parseSCXML(new File(pathToTask), includeMapping);
