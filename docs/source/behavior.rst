@@ -1,5 +1,7 @@
 .. _SCXML: http://www.w3.org/TR/scxml/
 
+.. _section_scxml:
+
 ==============
 Bonsai - SCXML
 ==============
