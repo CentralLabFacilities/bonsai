@@ -5,6 +5,10 @@ Skills
 
 .. highlight:: java
 
+.. quote:: 
+
+  "A skill describes a combinable and reusable stateful building block of a robot behavior that covers one desired outcome (minimal) by only facilitating the frameworks sensors and actuators."
+
 Skill execute code using :ref:`sensors <section_sensor>` and :ref:`actuators <section_actuator>` and finish with one defined :ref:`ExitStatus <section_exit_token>`. 
 They can use aditional input/output with :ref:`slots <section_memory>`.
 Furthermore, :ref:`parameters <section_parameter>` can be directly provided via the SCXML state machine.
