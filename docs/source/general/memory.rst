@@ -4,14 +4,14 @@
 Memory Slots
 ============
 
-The slots is used to memorize data for different skills.
+The slots are used to memorize data for different skills.
 A slot has a ``key`` which uniquely identifies the slot within the skill in use.
 
 :ref:`Skills <section_skills>` define the data type of the slot and can read and write data into it.
 
 .. note:: 
 
-    Data already stored in a slot will be overwriten once another skill writes data into it.
+    Data already stored in a slot will be overwritten once another skill writes data into it.
 
 
 A skill can request slots from the :ref:`Skill Configurator <section_skill_configurator>`. 
@@ -47,7 +47,7 @@ Usage
 Memory slots are created using the :ref:`MemoryFactory class <section_factory_class>`.
 This will create instances of ``ObjectSlots`` which inherit from the ``MemorySlot`` interface (both implemented in the ``bonsai_core`` repository).
 
-Slot have several functions that you can use:
+Slots have several functions that you can use:
 
 .. list-table:: Slot Functions
    :widths: 15 15
@@ -63,7 +63,7 @@ Slot have several functions that you can use:
      - Removes the data from the slot
 
 Within a skill, using the :ref:`SkillConfigurator <section_skill_configurator>` the skill can request slots from which it can read or write from.
-The skill can define the key used to reference the slot. The slot location for the skill is defined within in the :ref:`SCXML <section_scxml>`.
+The skill can define the key used to reference the slot. The slot location for the skill is defined within the :ref:`SCXML <section_scxml>`.
 
 Example
 .......
@@ -79,13 +79,13 @@ In this example we want to:
     public class ExampleSkill implements AbstractSkill {
 
          // define here the keys of everything we want to get from the configurator
-         private KEY_CLASS_SLOT = "ClassSlot";
-         private KEY_INT_SLOT = "IntSlot";
-         private KEY_STRING_SLOT = "StringSlot";
+         private static final String KEY_CLASS_SLOT = "ClassSlot";
+         private static final String KEY_INT_SLOT = "IntSlot";
+         private static final String KEY_STRING_SLOT = "StringSlot";
 
          // Declare the Actuators, Sensors, Slots and parameters
          private Slot<String> stringSlot;
-         private Slot<int> intSlot;
+         private Slot<Integer> intSlot;
          private Slot<Type> classSlot;
 
          private String stringData = "example";
@@ -121,10 +121,10 @@ In this example we want to:
         @Override
         public ExitToken execute() {
             // write to the WriteSlot
-            this.stringSlot.write(this.stringData);
+            this.stringSlot.memorize(this.stringData);
             // write to the ReadWriteSlot
             this.classData.doSomeChanges();
-            this.classSlot.write(this.classData);
+            this.classSlot.memorize(this.classData);
         }
 
         ...

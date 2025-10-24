@@ -65,11 +65,11 @@ The configuration file can look like the following:
 
 
 The first line defines the XML version and encoding of the configuration file.
-The **BonsaiConfiguration** contains all the configurations Bonsai needs. the XML schema is implemented in the *BonsaiConfiguration.xsd* file.
+The **BonsaiConfiguration** element contains all configurations Bonsai requires. The XML schema is defined in the BonsaiConfiguration.xsd file.
 
 .. note:: 
     
-    When you started Bonsai and you want to load your robotic behavior, you also need to provide your Bonsai config file
+    When you start Bonsai and want to load your robotic behavior, you also need to provide your Bonsai config file
 
 .. code-block:: xml
 
@@ -81,8 +81,8 @@ The **BonsaiConfiguration** contains all the configurations Bonsai needs. the XM
 
 .. _section_config_factory:
     
-Factory Class Config
---------------------
+Factory Class Configuration
+---------------------------
 
 :ref:`Factory classes <section_factory_class>` can be used to configure Sensors, Actuators, and the internal memory.
 The factory class checks if the sensor and actuator configuration is correct and configures the sensors and actuators. 
@@ -205,7 +205,7 @@ The actual implementation of the actuator is `ClfMoveBaseNavigationActuator`.
    * - ``actuatorClass``
      - | The actual implementation of the actuator
 
-The NavigationActuator required several topics in order move the robot around.
+The NavigationActuator requires several topics in order move the robot around.
 The topics can be configured under the ``Options`` tag. 
 
 In the actual implementation of the Actuator (here it is `ClfMoveBaseNavigationActuator`) the options can be gathered from the configurations using the keys,
@@ -220,10 +220,10 @@ A skill in Bonsai can access the Actuator and Sensors defined in the configurati
     </Actuator>
 
 
-Bonsai configurator
+Bonsai Configurator
 -------------------
 
-The configuration from the Bonsai config are passed to the Actuators, Sensors, and Skills via their configure() method.
+The configuration from the Bonsai configuration are passed to the Actuators, Sensors, and Skills via their configure() method.
 
 .. code-block:: java
 

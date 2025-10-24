@@ -7,16 +7,16 @@ Skills
 
 .. quote:: 
 
-  "A skill describes a combinable and reusable stateful building block of a robot behavior that covers one desired outcome (minimal) by only facilitating the frameworks sensors and actuators."
+   "A skill describes a combinable and reusable stateful building block of a robot behavior that covers one desired outcome (minimal) by only facilitating the frameworks sensors and actuators."
 
-Skill execute code using :ref:`sensors <section_sensor>` and :ref:`actuators <section_actuator>` and finish with one defined :ref:`ExitStatus <section_exit_token>`. 
-They can use aditional input/output with :ref:`slots <section_memory>`.
+Skills execute code using :ref:`sensors <section_sensor>` and :ref:`actuators <section_actuator>` and finish with one defined :ref:`ExitStatus <section_exit_token>`. 
+They can use additional input/output with :ref:`slots <section_memory>`.
 Furthermore, :ref:`parameters <section_parameter>` can be directly provided via the SCXML state machine.
 
 .. note:: 
 
     - Sensors, Actuators, Slots, and parameters all can be requested through the :ref:`SkillConfigurator <section_skill_configurator>`.
-    - Sensors and Actuators are defined in the :ref:`bonsai config <section_config>`.
+    - Sensors and Actuators are defined in the :ref:`Bonsai config <section_config>`.
     - Slot definitions and Parameters are configured inside the :ref:`behavior modelling <section_scxml>`.
 
 Functions
@@ -25,7 +25,7 @@ Functions
 Each skill *must* contain the following functions:
 
 .. list-table:: Skill Functions
-   :widths: 15 30 15
+   :widths: 20 60 20
    :header-rows: 1
 
    * - Function
@@ -40,7 +40,7 @@ Each skill *must* contain the following functions:
        | The skill stops if configure throws and 
        | exception
    * - init()
-     - | Init initalizes the skill and should be used as 
+     - | init() initalizes the skill and should be used as 
        | a place to define your pre nonlogic structures  
      - | If init returns false, the execute method is
        | skipped, ``end(Token.Fatal())`` is then called
@@ -82,7 +82,7 @@ The actuator and sensor, however, get their configurations from the **Bonsai con
 
 .. note:: 
 
-    For more infos on how and where the SkillConfigurator gets the configuration, look up the section :ref:`SkillConfigurator <section_skill_configurator>`.
+    For more information on how and where the SkillConfigurator gets the configuration, look up the section :ref:`SkillConfigurator <section_skill_configurator>`.
 
 Configure is already called before during load, therefore errors can be handled before execution.
 
@@ -119,7 +119,7 @@ Configure is already called before during load, therefore errors can be handled 
      - | Request :ref:`memory slot <section_memory>` with specified key.
        | The :ref:`robotic behavior code <section_memory_scxml>` has to provide the other configurations needed.
    * - getSensor(String key, DataType T)
-     - | This will provide the :ref:`Sensor <section_sensor>` with the specified key 
+     - | Provides the :ref:`Sensor <section_sensor>` with the specified key 
        | from the **Bonsai config**. The sensor will return
        | data of the specified type T.
    * - getActuator(String key, InterfaceClass T)
@@ -136,7 +136,7 @@ Configure is already called before during load, therefore errors can be handled 
     when requesting values, int, doubles, or booleans, the ``SkillConfigurator`` searches for the key inside the robotic behavior code (SCXML)
     and not in the Bonsai config ( as is done by the ``ObjectConfigurator``).
 
-    **They are the parameters that can be provided to a skill through the SCXML and not the bonsai configuration.** 
+    **They are the parameters that can be provided to a skill through the SCXML and not the Bonsai configuration.** 
 
 Let's assume we have the following configuration of actuators and sensors in the **Bonsai configuration file**:
 
@@ -166,29 +166,29 @@ With this it can request the sensors, actuators, parameters, slots and ExitToken
 
     public class ExampleSkill implements AbstractSkill {
 
-         // define here the keys of everything we want to get from the configurator
-         private KEY_ACTUATOR = "Example1";
-         private KEY_SENSOR = "Example2";
-         private KEY_STRING_PARAMETER = "StringParam";
-         private KEY_INT_PARAMETER = "IntParam";
-         private KEY_SLOT = "StringSlot";
+        // define here the keys of everything we want to get from the configurator
+        private static final String KEY_ACTUATOR = "Example1";
+        private static final String KEY_SENSOR = "Example2";
+        private static final String KEY_STRING_PARAMETER = "StringParam";
+        private static final String KEY_INT_PARAMETER = "IntParam";
+        private static final String KEY_SLOT = "StringSlot";
 
-         // Declare the Actuators, Sensors, Slots and parameters
-         private ExampleActuatorInterface actuator;
-         private ExampleSensorInterface sensor;
-         private String parameter1;
-         private int parameter2 = 0;
-         private Slot<String> slot;
+        // Declare the Actuators, Sensors, Slots and parameters
+        private ExampleActuatorInterface actuator;
+        private ExampleSensorInterface sensor;
+        private String paramName;
+        private int optValue = 0;
+        private Slot<String> slot;
 
         /*
         * This function uses the Skillconfigurator to get the configured objects and initialize everything
         * that has been declared above
         */
         public void configure(ISkillConfigurator conf) {
-            this.actuator = conf.getActuator(KEY_ACTUATOR, ExampleActuatorInterface.class)    // returns ExampleActuator class
-            this.sensor = conf.getSensor(KEY_SENSOR, DataType.class)          // returns ExampleSensor class
-            this.parameter1 = conf.getValue(KEY_STRING_PARAMETER);
-            this.parameter2 = conf.getOptionalInt(KEY_INT_PARAMETER, parameter2);
+            this.actuator = conf.getActuator(KEY_ACTUATOR, ExampleActuatorInterface.class);    // returns ExampleActuator class
+            this.sensor = conf.getSensor(KEY_SENSOR, DataType.class);          // returns ExampleSensor class
+            this.paramName = conf.getValue(KEY_STRING_PARAMETER);
+            this.optValue = conf.getOptionalInt(KEY_INT_PARAMETER, parameter2);
             this.slot = conf.getReadWriteSlot(KEY_SLOT);
         }
 
@@ -211,9 +211,9 @@ ExitToken
 
 ExitToken are used to create events after the skill is finished. To make sure all possible exit events are captured in the scxml the tokens have to be requested in the configuration method.
 
-There exit three ExitTokens:
+There exist three ExitTokens:
 
-.. list-table:: SkillConfigurator Functions
+.. list-table:: ExitToken Types
    :widths: 15 15
    :header-rows: 1
 
@@ -222,10 +222,10 @@ There exit three ExitTokens:
    * - ``ExitStatus.SUCCESS()``
      - Is used when skill ended successfully.
    * - ``ExitStatus.ERROR()``
-     - | An error or something unexpected occured while trying 
+     - | An error or something unexpected occurred while trying 
        | to execute the skill. 
    * - ``ExitStatus.FATAL()``
-     - | The skill could not be configurated and is not running.
+     - | The skill could not be configured and is not running.
        | Usually, you won't need this one since the init()
        | already sends the FATAL token if something went wrong.
    * - ``ExitStatus.LOOP()``
@@ -249,8 +249,8 @@ ExitTokens can be requested from the configurator:
 
 Sometimes, we need more refined ExitTokens. 
 For that case we can append the tokens with a status.
-Lets take a skill that detects objects as an example. 
-The skill can run successfully. However, that can means it detected no objects or least one object.
+Let's take a skill that detects objects as an example. 
+The skill can run successfully. However, which can mean it detected no objects or at least one object.
 To distinguish this case, we can do the following:
 ::
 
