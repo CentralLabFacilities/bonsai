@@ -4,9 +4,10 @@ Sensors and Actuators
 =====================
 
 The Bonsai sensors and actuators allow for abstraction of system software components and middleware.
+They serve as an interface between hardware or software components to be used to model a system action and/or additional information while concealing the underlying generation and communication process.
 They encapsulate complex interactions between these components and improve robot behaviors code readability, reproducability, and efficiency (in writing them).
 
-Each sensor and actuator implementation has to implement a configre and a cleanup function:
+Each sensor and actuator implementation has to implement a configure and a cleanup function:
 
 .. code-block:: java
 
@@ -66,7 +67,10 @@ Interfaces
 ----------
 
 When using multiple robots with different hardeware components, it can be quite a hassel to adapt the robot behavior to the other robots.
-However, since Bonsai makes use of Sensors and Actuators it can be very simple.
+
+In order to detach the robot behavior model with the hardware, we make use of Interface classes in Java.
+They enable implementation of different Sensors and Actuators and making them configurable while the skills and the robot behavior model
+remains completly oblivious and only know of the sensor and actuator interface classes.
 
 Each Actuator and Sensor is required to inherit from a Java interface class. 
 This interface describes the functions which each subclass *must* implement.
