@@ -3,7 +3,6 @@
 
 .. highlight:: xml
 
-=================
 SCXML Definitions
 =================
 
