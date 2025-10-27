@@ -235,7 +235,8 @@ There exist three ExitTokens:
 
 .. note:: 
 
-    Usually you should only need to request the success and error token.
+    * Usually you should only need to request the success and error token.
+    * ``FATAL`` and ``LOOP`` tokens can always be used without registering
 
 ExitTokens can be requested from the configurator:
 ::
@@ -260,3 +261,9 @@ To distinguish this case, we can do the following:
         tokenSuccessNoObj = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus("no_obj"));
         tokenSuccessDetected = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus("detected"));
     }
+
+
+.. warning:: 
+
+  For each ExitToken, you should make sure that either **ALL** or **NONE** of that exit tokens have a ps.
+  Don't define e.g. ``ExitToken.SUCCESS()`` without a ps when you already have defined ``ExitToken.SUCCESS().ps("example")``
