@@ -1,11 +1,39 @@
-============
+
+.. _section_memory_scxml:
+
 Memory Slots
 ============
 
+Slots are used to store data for other skills/states to use.
+To instantiate a :ref:`memory slot <section_memory>`, a few parameters are needed:
+
+.. list-table:: Slot Parameters
+   :widths: 15 15
+   :header-rows: 1
+
+   * - Parameters
+     - Explanation
+   * - key
+     - | The key is used by the skill to refer to a unique slot **within** the skill. 
+       | It is defined by the skill and the state machine.
+       | has to refer to the slot with the specified key.
+   * - state
+     - | A slots key is only unique within the skill it is being used in.  
+       | Other skills can have slots with the same ID.
+       | Therefore, the state machine needs
+       | the skill name in order to differentiate slots with the (key, skill) pair.
+       | The state parameter is used to assign the skill name.
+   * - xpath
+     - | This parameter is used to define the location of the memory slot.
+       | Different slots can read or write from and into the same location 
+       | and modify the data in that location
+
+.. warning:: 
+
+    Two slots with different Bonsai data types cannot point to the same xpath! This will throw an error when loading.
+
 Skills
 ------
-
-Slots are used to store data for other skills/states to use.
 
 Take a look at the SlotWriter and SlotReader skill:
 
@@ -13,12 +41,14 @@ Take a look at the SlotWriter and SlotReader skill:
 
     class SlotWriter : AbstractSkill() {
 
+        private var KEY_SLOT_WRITE = "StringToWriteTo"
+
         private var tokenSuccess: ExitToken? = null
         private var slot: MemorySlotWriter<String>? = null
 
         override fun configure(configurator: ISkillConfigurator) {
             tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
-            slot = configurator.getWriteSlot("StringToWriteTo", String::class.java)
+            slot = configurator.getWriteSlot(KEY_SLOT_WRITE, String::class.java)
         }
 
         override fun init(): Boolean {
@@ -40,6 +70,8 @@ Take a look at the SlotWriter and SlotReader skill:
 
     class SlotReader : AbstractSkill() {
 
+        private var KEY_SLOT_READ = "StringIAmReading"
+
         private var tokenSuccess: ExitToken? = null
         private var slot: MemorySlot<String>? = null
 
@@ -47,7 +79,7 @@ Take a look at the SlotWriter and SlotReader skill:
 
         override fun configure(configurator: ISkillConfigurator) {
             tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
-            slot = configurator.getReadSlot<String>("StringIAmReading", String::class.java)
+            slot = configurator.getReadSlot<String>(KEY_SLOT_READ, String::class.java)
         }
 
         override fun init(): Boolean {
@@ -71,7 +103,7 @@ The SlotWriter requests access to the slot with the key "StringToWriteTo" in whi
 
 .. code-block:: kotlin
 
-    slot = configurator.getWriteSlot("StringToWriteTo", String::class.java)
+    slot = configurator.getWriteSlot(KEY_SLOT_WRITE, String::class.java)
 
     // ... some other code ...
 
@@ -86,7 +118,7 @@ The read data is then simply printed:
 
 .. code-block:: kotlin
 
-    slot = configurator.getReadSlot<String>("StringIAmReading", String::class.java)
+    slot = configurator.getReadSlot<String>(KEY_SLOT_READ, String::class.java)
 
     // ... some other code ...
 
@@ -124,7 +156,12 @@ There, we can define the path for each slot key.
         </data>
     </datamodel>
 
+.. note:: 
+
+    The ``xpath`` option has to start with “/”
+
 .. warning:: 
+
     Keep in mind that the slot key in the datamodel of the state machine needs to be the same as in the skill!
 
 With the keys being setup correctly, the slot writer will write the string to the /path path and the reader will read from it.
