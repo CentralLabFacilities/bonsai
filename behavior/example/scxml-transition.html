@@ -1,24 +1,24 @@
+
+
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" data-content_root="../../">
 <head>
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Transitions &mdash; Bonsai Docs 0.7-SNAPSHOT documentation</title>
-      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b76e3c8a" />
-      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
+  <title>Transitions &mdash; Bonsai Docs 0.8-SNAPSHOT documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=f06a32cd" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=f06a32cd" />
 
   
     <link rel="shortcut icon" href="../../_static/favicon.ico"/>
-  <!--[if lt IE 9]>
-    <script src="../../_static/js/html5shiv.min.js"></script>
-  <![endif]-->
-  
-        <script src="../../_static/jquery.js?v=5d32c60e"></script>
-        <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-        <script src="../../_static/documentation_options.js?v=b90832ea"></script>
-        <script src="../../_static/doctools.js?v=9a2dae69"></script>
-        <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=3242a324"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
@@ -38,9 +38,6 @@
             Bonsai Docs
               <img src="../../_static/bonsai-l1s.png" class="logo" alt="Logo"/>
           </a>
-              <div class="version">
-                0.7
-              </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
     <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
@@ -66,6 +63,7 @@
 <li class="toctree-l2"><a class="reference internal" href="parameter.html">Parameters and Variables</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="../../general/changes.html">Change Log</a></li>
 </ul>
 
         </div>
@@ -99,46 +97,46 @@
 <h2>Exit Tokens<a class="headerlink" href="#exit-tokens" title="Link to this heading"></a></h2>
 <p>A skill can return several statuses. The main ones are success, fatal and error.</p>
 <p>Take a look at the following example skill:</p>
-<div class="highlight-kotlin notranslate"><div class="highlight"><pre><span></span><span class="k">package</span> <span class="nn">de.unibi.citec.clf.bonsai.skills.example</span>
+<div class="highlight-kotlin notranslate"><div class="highlight"><pre><span></span><span class="k">package</span><span class="w"> </span><span class="nn">de.unibi.citec.clf.bonsai.skills.example</span>
 
-<span class="k">import</span> <span class="nn">de.unibi.citec.clf.bonsai.engine.model.AbstractSkill</span>
-<span class="k">import</span> <span class="nn">de.unibi.citec.clf.bonsai.engine.model.ExitStatus</span>
-<span class="k">import</span> <span class="nn">de.unibi.citec.clf.bonsai.engine.model.ExitToken</span>
-<span class="k">import</span> <span class="nn">de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator</span>
-<span class="k">import</span> <span class="nn">de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException</span>
+<span class="k">import</span><span class="w"> </span><span class="nn">de.unibi.citec.clf.bonsai.engine.model.AbstractSkill</span>
+<span class="k">import</span><span class="w"> </span><span class="nn">de.unibi.citec.clf.bonsai.engine.model.ExitStatus</span>
+<span class="k">import</span><span class="w"> </span><span class="nn">de.unibi.citec.clf.bonsai.engine.model.ExitToken</span>
+<span class="k">import</span><span class="w"> </span><span class="nn">de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator</span>
+<span class="k">import</span><span class="w"> </span><span class="nn">de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException</span>
 
 <span class="cm">/**</span>
 <span class="cm">* This skill only succeeds</span>
 <span class="cm">*/</span>
-<span class="kd">class</span> <span class="nc">Succeeder</span> <span class="p">:</span> <span class="n">AbstractSkill</span><span class="p">()</span> <span class="p">{</span>
-    <span class="kd">private</span> <span class="kd">var</span> <span class="nv">tokenSuccess</span><span class="p">:</span> <span class="n">ExitToken? </span><span class="o">=</span> <span class="kc">null</span>
+<span class="kd">class</span><span class="w"> </span><span class="nc">Succeeder</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">AbstractSkill</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">var</span><span class="w"> </span><span class="nv">tokenSuccess</span><span class="p">:</span><span class="w"> </span><span class="n">ExitToken? </span><span class="o">=</span><span class="w"> </span><span class="kc">null</span>
 
-    <span class="nd">@Throws</span><span class="p">(</span><span class="n">SkillConfigurationException</span><span class="o">::</span><span class="n">class</span><span class="p">)</span>
-    <span class="kd">override</span> <span class="kd">fun</span> <span class="nf">configure</span><span class="p">(</span><span class="n">configurator</span><span class="p">:</span> <span class="n">ISkillConfigurator</span><span class="p">)</span> <span class="p">{</span>
-        <span class="n">tokenSuccess</span> <span class="o">=</span> <span class="n">configurator</span><span class="p">.</span><span class="na">requestExitToken</span><span class="p">(</span><span class="n">ExitStatus</span><span class="p">.</span><span class="na">SUCCESS</span><span class="p">())</span>
-        <span class="n">configurator</span><span class="p">.</span><span class="na">requestExitToken</span><span class="p">(</span><span class="n">ExitStatus</span><span class="p">.</span><span class="na">ERROR</span><span class="p">().</span><span class="na">ps</span><span class="p">(</span><span class="s">&quot;never&quot;</span><span class="p">))</span>
-        <span class="n">configurator</span><span class="p">.</span><span class="na">requestExitToken</span><span class="p">(</span><span class="n">ExitStatus</span><span class="p">.</span><span class="na">ERROR</span><span class="p">().</span><span class="na">ps</span><span class="p">(</span><span class="s">&quot;neverEver&quot;</span><span class="p">))</span>
-    <span class="p">}</span>
+<span class="w">    </span><span class="nd">@Throws</span><span class="p">(</span><span class="n">SkillConfigurationException</span><span class="o">::</span><span class="n">class</span><span class="p">)</span>
+<span class="w">    </span><span class="kd">override</span><span class="w"> </span><span class="kd">fun</span><span class="w"> </span><span class="nf">configure</span><span class="p">(</span><span class="n">configurator</span><span class="p">:</span><span class="w"> </span><span class="n">ISkillConfigurator</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">tokenSuccess</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">configurator</span><span class="p">.</span><span class="na">requestExitToken</span><span class="p">(</span><span class="n">ExitStatus</span><span class="p">.</span><span class="na">SUCCESS</span><span class="p">())</span>
+<span class="w">        </span><span class="n">configurator</span><span class="p">.</span><span class="na">requestExitToken</span><span class="p">(</span><span class="n">ExitStatus</span><span class="p">.</span><span class="na">ERROR</span><span class="p">().</span><span class="na">ps</span><span class="p">(</span><span class="s">&quot;never&quot;</span><span class="p">))</span>
+<span class="w">        </span><span class="n">configurator</span><span class="p">.</span><span class="na">requestExitToken</span><span class="p">(</span><span class="n">ExitStatus</span><span class="p">.</span><span class="na">ERROR</span><span class="p">().</span><span class="na">ps</span><span class="p">(</span><span class="s">&quot;neverEver&quot;</span><span class="p">))</span>
+<span class="w">    </span><span class="p">}</span>
 
-    <span class="kd">override</span> <span class="kd">fun</span> <span class="nf">init</span><span class="p">():</span> <span class="kt">Boolean</span> <span class="p">{</span>
-        <span class="c1">// returning false here makes the skill FATAL</span>
-        <span class="k">return</span> <span class="kc">true</span>
-    <span class="p">}</span>
+<span class="w">    </span><span class="kd">override</span><span class="w"> </span><span class="kd">fun</span><span class="w"> </span><span class="nf">init</span><span class="p">():</span><span class="w"> </span><span class="kt">Boolean</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// returning false here makes the skill FATAL</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="kc">true</span>
+<span class="w">    </span><span class="p">}</span>
 
-    <span class="kd">override</span> <span class="kd">fun</span> <span class="nf">execute</span><span class="p">():</span> <span class="n">ExitToken</span> <span class="p">{</span>
-        <span class="c1">// we always return success</span>
-        <span class="k">return</span> <span class="n">tokenSuccess</span><span class="o">!!</span>
-    <span class="p">}</span>
+<span class="w">    </span><span class="kd">override</span><span class="w"> </span><span class="kd">fun</span><span class="w"> </span><span class="nf">execute</span><span class="p">():</span><span class="w"> </span><span class="n">ExitToken</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// we always return success</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">tokenSuccess</span><span class="o">!!</span>
+<span class="w">    </span><span class="p">}</span>
 
-    <span class="kd">override</span> <span class="kd">fun</span> <span class="nf">end</span><span class="p">(</span><span class="n">curToken</span><span class="p">:</span> <span class="n">ExitToken</span><span class="p">):</span> <span class="n">ExitToken</span> <span class="p">{</span>
-        <span class="k">return</span> <span class="n">curToken</span>
-    <span class="p">}</span>
+<span class="w">    </span><span class="kd">override</span><span class="w"> </span><span class="kd">fun</span><span class="w"> </span><span class="nf">end</span><span class="p">(</span><span class="n">curToken</span><span class="p">:</span><span class="w"> </span><span class="n">ExitToken</span><span class="p">):</span><span class="w"> </span><span class="n">ExitToken</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">curToken</span>
+<span class="w">    </span><span class="p">}</span>
 <span class="p">}</span>
 </pre></div>
 </div>
 <p>Each skill can only return Exit tokens The FATAL and LOOP tokens can be used directly.
 In order to use Success and Error tokens, they have to be requested first:</p>
-<div class="highlight-kotlin notranslate"><div class="highlight"><pre><span></span><span class="n">tokenSuccess</span> <span class="o">=</span> <span class="n">configurator</span><span class="p">.</span><span class="na">requestExitToken</span><span class="p">(</span><span class="n">ExitStatus</span><span class="p">.</span><span class="na">SUCCESS</span><span class="p">())</span>
+<div class="highlight-kotlin notranslate"><div class="highlight"><pre><span></span><span class="n">tokenSuccess</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">configurator</span><span class="p">.</span><span class="na">requestExitToken</span><span class="p">(</span><span class="n">ExitStatus</span><span class="p">.</span><span class="na">SUCCESS</span><span class="p">())</span>
 </pre></div>
 </div>
 <p>If you want several tokens or return more information, you can register Exit tokens with a processing status:</p>
@@ -153,11 +151,11 @@ In this example, you should not use the ExitStatus.ERROR() token without a proce
 </div>
 <p>Depending on the skill, other process statuses can be returned which then need to be considered in the state machine.</p>
 <p>This can be easily done by adding the processing status in the event:</p>
-<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;example.Succeeder&quot;</span><span class="nt">&gt;</span>
-    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">&quot;Succeeder.success&quot;</span> <span class="na">target=</span><span class="s">&quot;End&quot;</span><span class="nt">/&gt;</span>
-    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">&quot;Succeeder.fatal&quot;</span> <span class="na">target=</span><span class="s">&quot;Fatal&quot;</span><span class="nt">/&gt;</span>
-    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">&quot;Succeeder.error.never&quot;</span> <span class="na">target=</span><span class="s">&quot;Fatal&quot;</span><span class="nt">/&gt;</span>
-    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">&quot;Succeeder.error.*&quot;</span> <span class="na">target=</span><span class="s">&quot;Fatal&quot;</span><span class="nt">/&gt;</span>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;example.Succeeder&quot;</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;Succeeder.success&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;End&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;Succeeder.fatal&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;Fatal&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;Succeeder.error.never&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;Fatal&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;Succeeder.error.*&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;Fatal&quot;</span><span class="nt">/&gt;</span>
 <span class="nt">&lt;/state&gt;</span>
 </pre></div>
 </div>
@@ -190,8 +188,8 @@ For example, if we would not include the error transitions above, you would then
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2023, Leroy Rügemer.
-      <span class="lastupdated">Last updated on Jun 10, 2025.
+    <p>&#169; Copyright 2025, Team of Bielefeld.
+      <span class="lastupdated">Last updated on Oct 28, 2025.
       </span></p>
   </div>
 

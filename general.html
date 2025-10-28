@@ -1,28 +1,28 @@
+
+
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" data-content_root="./">
 <head>
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bonsai - Bielefeld Sensor Actuator Interface &mdash; Bonsai Docs 0.7-SNAPSHOT documentation</title>
-      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b76e3c8a" />
-      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
+  <title>Bonsai - Bielefeld Sensor Actuator Interface &mdash; Bonsai Docs 0.8-SNAPSHOT documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="_static/custom.css?v=f06a32cd" />
+      <link rel="stylesheet" type="text/css" href="_static/custom.css?v=f06a32cd" />
 
   
     <link rel="shortcut icon" href="_static/favicon.ico"/>
-  <!--[if lt IE 9]>
-    <script src="_static/js/html5shiv.min.js"></script>
-  <![endif]-->
-  
-        <script src="_static/jquery.js?v=5d32c60e"></script>
-        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-        <script src="_static/documentation_options.js?v=b90832ea"></script>
-        <script src="_static/doctools.js?v=9a2dae69"></script>
-        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=3242a324"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Coding Guidelines" href="general/coding-guideline.html" />
+    <link rel="next" title="Data Types" href="general/datatypes.html" />
     <link rel="prev" title="Examples" href="quickstart/examples.html" /> 
 </head>
 
@@ -38,9 +38,6 @@
             Bonsai Docs
               <img src="_static/bonsai-l1s.png" class="logo" alt="Logo"/>
           </a>
-              <div class="version">
-                0.7
-              </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
     <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
@@ -53,14 +50,15 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="quickstart.html">QuickStart</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Bonsai</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="general/coding-guideline.html">Coding Guideline</a></li>
-<li class="toctree-l2"><a class="reference internal" href="general/general.html">General</a></li>
-<li class="toctree-l2"><a class="reference internal" href="general/core.html">Core</a></li>
+<li class="toctree-l2"><a class="reference internal" href="general/datatypes.html">Data Types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="general/sensor_actuator.html">Sensors and Actuators</a></li>
+<li class="toctree-l2"><a class="reference internal" href="general/memory.html">Memory Slots</a></li>
 <li class="toctree-l2"><a class="reference internal" href="general/skills.html">Skills</a></li>
-<li class="toctree-l2"><a class="reference internal" href="general/memory.html">Memory</a></li>
+<li class="toctree-l2"><a class="reference internal" href="general/config.html">Bonsai Configuration</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="behavior.html">SCXML Behavior Engine</a></li>
+<li class="toctree-l1"><a class="reference internal" href="general/changes.html">Change Log</a></li>
 </ul>
 
         </div>
@@ -88,27 +86,50 @@
              
   <section id="bonsai-bielefeld-sensor-actuator-interface">
 <h1>Bonsai - Bielefeld Sensor Actuator Interface<a class="headerlink" href="#bonsai-bielefeld-sensor-actuator-interface" title="Link to this heading"></a></h1>
+<p>Bonsai is a multi layered Java (and Kotlin) framework for behavior modelling of complex systems
+It serves as an abstraction layer between the robots hardware and the robot behavior.
+With Bonsai, when deploying on another robot you should be able to only reimplement the sensor and actuator interface while the actual robot behavior is agnostic to the robot hardware and can remain unchanged.</p>
+<p>You can read the published paper <a class="reference external" href="https://link.springer.com/article/10.1007/s12369-013-0209-8">here</a> and <a class="reference external" href="https://www.researchgate.net/profile/Sven-Wachsmuth/publication/267687020_A_Modeling_Framework_for_Reusable_Social_Behavior/links/576906bc08aef9750b10337c/A-Modeling-Framework-for-Reusable-Social-Behavior.pdf">here</a></p>
+<p>When using Bonsai, robot behavior consists of <a class="reference internal" href="general/sensor_actuator.html#section-sensor"><span class="std std-ref">Sensors</span></a>, <a class="reference internal" href="general/sensor_actuator.html#section-actuator"><span class="std std-ref">Actuators</span></a> and <a class="reference internal" href="general/skills.html#section-skills"><span class="std std-ref">Skills</span></a>.
+Sensors offer information about the outside world while Actuators are used to activate parts of the robot system.
+Skills use Actuators and Sensors to to a single task.</p>
+<p><strong>Robotic behavior</strong> can then be implemented using some kind of behavior modeling or control logic.
+The behavior model can be modeled e.g. using Behavior Trees or state machines.
+It controls which skills should be used in which sequence.
+Bonsai implements the <a class="reference internal" href="behavior.html#section-scxml"><span class="std std-ref">SCXML Engine</span></a> which is a XML-based language for describing finite state machines in the SCXML standard and executes state-based behavior.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Within this documentation, we will sometimes refer the behavior model as SCXML, robot behavior code or just state machine.</p>
+</div>
 <div class="toctree-wrapper compound">
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="general/coding-guideline.html">Coding Guideline</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="general/coding-guideline.html#skills">Skills</a></li>
-<li class="toctree-l2"><a class="reference internal" href="general/coding-guideline.html#statemachines">Statemachines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="general/datatypes.html">Data Types</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="general/datatypes.html#adapter">Adapter</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="general/general.html">General</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="general/general.html#configuration">Configuration</a></li>
-<li class="toctree-l2"><a class="reference internal" href="general/general.html#test-statemachine-during-developement">Test Statemachine during developement</a></li>
+<li class="toctree-l1"><a class="reference internal" href="general/sensor_actuator.html">Sensors and Actuators</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="general/sensor_actuator.html#sensor">Sensor</a></li>
+<li class="toctree-l2"><a class="reference internal" href="general/sensor_actuator.html#actuator">Actuator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="general/sensor_actuator.html#interfaces">Interfaces</a></li>
+<li class="toctree-l2"><a class="reference internal" href="general/sensor_actuator.html#factory-classes">Factory Classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="general/sensor_actuator.html#actuator-and-sensor-configurator">Actuator and Sensor configurator</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="general/core.html">Core</a></li>
+<li class="toctree-l1"><a class="reference internal" href="general/memory.html">Memory Slots</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="general/memory.html#slot-types">Slot Types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="general/memory.html#usage">Usage</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="general/skills.html">Skills</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="general/skills.html#skillparts">Skillparts</a></li>
-<li class="toctree-l2"><a class="reference internal" href="general/skills.html#configuration">Configuration</a></li>
-<li class="toctree-l2"><a class="reference internal" href="general/skills.html#methods">Methods</a></li>
+<li class="toctree-l2"><a class="reference internal" href="general/skills.html#functions">Functions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="general/skills.html#skillconfigurator">SkillConfigurator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="general/skills.html#exittoken">ExitToken</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="general/memory.html">Memory</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="general/memory.html#scxml">SCXML</a></li>
+<li class="toctree-l1"><a class="reference internal" href="general/config.html">Bonsai Configuration</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="general/config.html#factory-class-configuration">Factory Class Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="general/config.html#actuator-and-sensor-config">Actuator and Sensor Config</a></li>
+<li class="toctree-l2"><a class="reference internal" href="general/config.html#bonsai-configurator">Bonsai Configurator</a></li>
 </ul>
 </li>
 </ul>
@@ -120,14 +141,14 @@
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="quickstart/examples.html" class="btn btn-neutral float-left" title="Examples" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="general/coding-guideline.html" class="btn btn-neutral float-right" title="Coding Guidelines" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="general/datatypes.html" class="btn btn-neutral float-right" title="Data Types" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2023, Leroy Rügemer.
-      <span class="lastupdated">Last updated on Jun 10, 2025.
+    <p>&#169; Copyright 2025, Team of Bielefeld.
+      <span class="lastupdated">Last updated on Oct 28, 2025.
       </span></p>
   </div>
 

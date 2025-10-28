@@ -1,24 +1,24 @@
+
+
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" data-content_root="../../">
 <head>
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Integrate Bonsai Skills into the State Machine &mdash; Bonsai Docs 0.7-SNAPSHOT documentation</title>
-      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b76e3c8a" />
-      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
+  <title>Integrate Bonsai Skills into the State Machine &mdash; Bonsai Docs 0.8-SNAPSHOT documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=f06a32cd" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=f06a32cd" />
 
   
     <link rel="shortcut icon" href="../../_static/favicon.ico"/>
-  <!--[if lt IE 9]>
-    <script src="../../_static/js/html5shiv.min.js"></script>
-  <![endif]-->
-  
-        <script src="../../_static/jquery.js?v=5d32c60e"></script>
-        <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-        <script src="../../_static/documentation_options.js?v=b90832ea"></script>
-        <script src="../../_static/doctools.js?v=9a2dae69"></script>
-        <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=3242a324"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
@@ -38,9 +38,6 @@
             Bonsai Docs
               <img src="../../_static/bonsai-l1s.png" class="logo" alt="Logo"/>
           </a>
-              <div class="version">
-                0.7
-              </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
     <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
@@ -66,6 +63,7 @@
 <li class="toctree-l2"><a class="reference internal" href="parameter.html">Parameters and Variables</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="../../general/changes.html">Change Log</a></li>
 </ul>
 
         </div>
@@ -98,41 +96,41 @@
 <section id="one-skill">
 <h2>One Skill<a class="headerlink" href="#one-skill" title="Link to this heading"></a></h2>
 <p>Let’s take a look at a Bonsai skill which we want to integrate into our state machine:</p>
-<div class="highlight-kotlin notranslate"><div class="highlight"><pre><span></span><span class="k">package</span> <span class="nn">de.unibi.citec.clf.bonsai.skills.example</span>
+<div class="highlight-kotlin notranslate"><div class="highlight"><pre><span></span><span class="k">package</span><span class="w"> </span><span class="nn">de.unibi.citec.clf.bonsai.skills.example</span>
 
-<span class="k">import</span> <span class="nn">de.unibi.citec.clf.bonsai.engine.model.AbstractSkill</span>
-<span class="k">import</span> <span class="nn">de.unibi.citec.clf.bonsai.engine.model.ExitToken</span>
-<span class="k">import</span> <span class="nn">de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator</span>
-<span class="k">import</span> <span class="nn">de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException</span>
+<span class="k">import</span><span class="w"> </span><span class="nn">de.unibi.citec.clf.bonsai.engine.model.AbstractSkill</span>
+<span class="k">import</span><span class="w"> </span><span class="nn">de.unibi.citec.clf.bonsai.engine.model.ExitToken</span>
+<span class="k">import</span><span class="w"> </span><span class="nn">de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator</span>
+<span class="k">import</span><span class="w"> </span><span class="nn">de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException</span>
 
 <span class="cm">/**</span>
 <span class="cm">* This skill does nothing</span>
 <span class="cm">*/</span>
-<span class="kd">class</span> <span class="nc">Nothing</span> <span class="p">:</span> <span class="n">AbstractSkill</span><span class="p">()</span> <span class="p">{</span>
-    <span class="nd">@Throws</span><span class="p">(</span><span class="n">SkillConfigurationException</span><span class="o">::</span><span class="n">class</span><span class="p">)</span>
-    <span class="kd">override</span> <span class="kd">fun</span> <span class="nf">configure</span><span class="p">(</span><span class="n">configurator</span><span class="p">:</span> <span class="n">ISkillConfigurator</span><span class="p">)</span> <span class="p">{</span>
-        <span class="c1">// In configure we can setup the skill</span>
-        <span class="c1">// This is executed during LOAD for verification and again before the skill gets executed</span>
-    <span class="p">}</span>
+<span class="kd">class</span><span class="w"> </span><span class="nc">Nothing</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">AbstractSkill</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nd">@Throws</span><span class="p">(</span><span class="n">SkillConfigurationException</span><span class="o">::</span><span class="n">class</span><span class="p">)</span>
+<span class="w">    </span><span class="kd">override</span><span class="w"> </span><span class="kd">fun</span><span class="w"> </span><span class="nf">configure</span><span class="p">(</span><span class="n">configurator</span><span class="p">:</span><span class="w"> </span><span class="n">ISkillConfigurator</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// In configure we can setup the skill</span>
+<span class="w">        </span><span class="c1">// This is executed during LOAD for verification and again before the skill gets executed</span>
+<span class="w">    </span><span class="p">}</span>
 
-    <span class="kd">override</span> <span class="kd">fun</span> <span class="nf">init</span><span class="p">():</span> <span class="kt">Boolean</span> <span class="p">{</span>
-        <span class="c1">// Init the executed first</span>
-        <span class="c1">// we can only succeed or fail the initialisation</span>
-        <span class="c1">// if we return false the skill is stopped and exists with `FATAL`</span>
-        <span class="k">return</span> <span class="kc">true</span>
-    <span class="p">}</span>
+<span class="w">    </span><span class="kd">override</span><span class="w"> </span><span class="kd">fun</span><span class="w"> </span><span class="nf">init</span><span class="p">():</span><span class="w"> </span><span class="kt">Boolean</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Init the executed first</span>
+<span class="w">        </span><span class="c1">// we can only succeed or fail the initialisation</span>
+<span class="w">        </span><span class="c1">// if we return false the skill is stopped and exists with `FATAL`</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="kc">true</span>
+<span class="w">    </span><span class="p">}</span>
 
-    <span class="kd">override</span> <span class="kd">fun</span> <span class="nf">execute</span><span class="p">():</span> <span class="n">ExitToken</span> <span class="p">{</span>
-        <span class="c1">// In execute the main work of the skill should happen</span>
-        <span class="c1">// By returning `ExitToken.loop` execute gets called again thus creating a loop</span>
-        <span class="k">return</span> <span class="n">ExitToken</span><span class="p">.</span><span class="na">fatal</span><span class="p">()</span>
-    <span class="p">}</span>
+<span class="w">    </span><span class="kd">override</span><span class="w"> </span><span class="kd">fun</span><span class="w"> </span><span class="nf">execute</span><span class="p">():</span><span class="w"> </span><span class="n">ExitToken</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// In execute the main work of the skill should happen</span>
+<span class="w">        </span><span class="c1">// By returning `ExitToken.loop` execute gets called again thus creating a loop</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">ExitToken</span><span class="p">.</span><span class="na">fatal</span><span class="p">()</span>
+<span class="w">    </span><span class="p">}</span>
 
-    <span class="kd">override</span> <span class="kd">fun</span> <span class="nf">end</span><span class="p">(</span><span class="n">curToken</span><span class="p">:</span> <span class="n">ExitToken</span><span class="p">):</span> <span class="n">ExitToken</span> <span class="p">{</span>
-        <span class="c1">// end is called after execute finishes with a non Loop status</span>
-        <span class="c1">// the returned token is the final status of the skill</span>
-        <span class="k">return</span> <span class="n">curToken</span>
-    <span class="p">}</span>
+<span class="w">    </span><span class="kd">override</span><span class="w"> </span><span class="kd">fun</span><span class="w"> </span><span class="nf">end</span><span class="p">(</span><span class="n">curToken</span><span class="p">:</span><span class="w"> </span><span class="n">ExitToken</span><span class="p">):</span><span class="w"> </span><span class="n">ExitToken</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// end is called after execute finishes with a non Loop status</span>
+<span class="w">        </span><span class="c1">// the returned token is the final status of the skill</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">curToken</span>
+<span class="w">    </span><span class="p">}</span>
 <span class="p">}</span>
 </pre></div>
 </div>
@@ -140,16 +138,16 @@
 The file is named <code class="docutils literal notranslate"><span class="pre">Nothing.kt</span></code>. Each Bonsai Skill needs to inherit from the <code class="docutils literal notranslate"><span class="pre">AbstractSkill</span></code> class.</p>
 <p>Now, how to we integrate this skill into our state machine? The following example shows how:</p>
 <div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="cp">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;</span>
-<span class="nt">&lt;scxml</span> <span class="na">xmlns=</span><span class="s">&quot;http://www.w3.org/2005/07/scxml&quot;</span> <span class="na">version=</span><span class="s">&quot;1.0&quot;</span> <span class="na">initial=</span><span class="s">&quot;Nothing&quot;</span><span class="nt">&gt;</span>
-    <span class="nt">&lt;datamodel&gt;</span>
-        <span class="nt">&lt;data</span> <span class="na">id=</span><span class="s">&quot;#_STATE_PREFIX&quot;</span> <span class="na">expr=</span><span class="s">&quot;&#39;de.unibi.citec.clf.bonsai.skills.example.&#39;&quot;</span><span class="nt">/&gt;</span>
-    <span class="nt">&lt;/datamodel&gt;</span>
+<span class="nt">&lt;scxml</span><span class="w"> </span><span class="na">xmlns=</span><span class="s">&quot;http://www.w3.org/2005/07/scxml&quot;</span><span class="w"> </span><span class="na">version=</span><span class="s">&quot;1.0&quot;</span><span class="w"> </span><span class="na">initial=</span><span class="s">&quot;Nothing&quot;</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;datamodel&gt;</span>
+<span class="w">        </span><span class="nt">&lt;data</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;#_STATE_PREFIX&quot;</span><span class="w"> </span><span class="na">expr=</span><span class="s">&quot;&#39;de.unibi.citec.clf.bonsai.skills.example.&#39;&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/datamodel&gt;</span>
 
-    <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;Nothing&quot;</span><span class="nt">&gt;</span>
-        <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">&quot;Nothing.fatal&quot;</span> <span class="na">target=</span><span class="s">&quot;End&quot;</span><span class="nt">/&gt;</span>
-    <span class="nt">&lt;/state&gt;</span>
+<span class="w">    </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;Nothing&quot;</span><span class="nt">&gt;</span>
+<span class="w">        </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;Nothing.fatal&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;End&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/state&gt;</span>
 
-    <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;End&quot;</span> <span class="na">final=</span><span class="s">&quot;true&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;End&quot;</span><span class="w"> </span><span class="na">final=</span><span class="s">&quot;true&quot;</span><span class="nt">/&gt;</span>
 
 <span class="nt">&lt;/scxml&gt;</span>
 </pre></div>
@@ -160,17 +158,17 @@ The file is named <code class="docutils literal notranslate"><span class="pre">N
 </div>
 <p>In order for the state machine to find the Nothing skill in the <code class="docutils literal notranslate"><span class="pre">de.unibi.citec.clf.bonsai.skills.example</span></code> package we have to setup the <code class="docutils literal notranslate"><span class="pre">#_STATE_PREFIX</span></code> (Mind the full stop/period at the end of the prefix):</p>
 <div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;datamodel&gt;</span>
-    <span class="nt">&lt;data</span> <span class="na">id=</span><span class="s">&quot;#_STATE_PREFIX&quot;</span> <span class="na">expr=</span><span class="s">&quot;&#39;de.unibi.citec.clf.bonsai.skills.example.&#39;&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;data</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;#_STATE_PREFIX&quot;</span><span class="w"> </span><span class="na">expr=</span><span class="s">&quot;&#39;de.unibi.citec.clf.bonsai.skills.example.&#39;&quot;</span><span class="nt">/&gt;</span>
 <span class="nt">&lt;/datamodel&gt;</span>
 </pre></div>
 </div>
 <p>The state machine then tries to find the skill “#_STATE_PREFIX.id”.
 The id here is set to ‘Nothing’. Thus, this state uses the de.unibi.citec.clf.bonsai.skills.example.Nothing class.</p>
-<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;Nothing&quot;</span><span class="nt">&gt;</span>
-    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">&quot;Nothing.fatal&quot;</span> <span class="na">target=</span><span class="s">&quot;End&quot;</span><span class="nt">/&gt;</span>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;Nothing&quot;</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;Nothing.fatal&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;End&quot;</span><span class="nt">/&gt;</span>
 <span class="nt">&lt;/state&gt;</span>
 
-<span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;End&quot;</span> <span class="na">final=</span><span class="s">&quot;true&quot;</span><span class="nt">/&gt;</span>
+<span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;End&quot;</span><span class="w"> </span><span class="na">final=</span><span class="s">&quot;true&quot;</span><span class="nt">/&gt;</span>
 </pre></div>
 </div>
 <p>After the skill finishes its exit status gets send as event <cite>id.event</cite>.
@@ -183,14 +181,14 @@ Since the Nothing skill only returns the Fatal exit token, we transition on the 
 <p>The state id are unique to each state. So what do we do when we want to use a skill multiple times?
 For this case, we can add a hashtag some text following it, which will be ignored in the search for the class.</p>
 <p>Following the example above, we can thus add a second state as follows:</p>
-<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;Nothing&quot;</span><span class="nt">&gt;</span>
-    <span class="cm">&lt;!-- The transition only uses the skill name --&gt;</span>
-    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">&quot;Nothing.fatal&quot;</span> <span class="na">target=</span><span class="s">&quot;Nothing#2&quot;</span><span class="nt">/&gt;</span>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;Nothing&quot;</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="cm">&lt;!-- The transition only uses the skill name --&gt;</span>
+<span class="w">    </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;Nothing.fatal&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;Nothing#2&quot;</span><span class="nt">/&gt;</span>
 <span class="nt">&lt;/state&gt;</span>
 
 <span class="cm">&lt;!-- This results in unique state ids we can refer to --&gt;</span>
-<span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">&quot;Nothing#2&quot;</span><span class="nt">&gt;</span>
-    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">&quot;Nothing.fatal&quot;</span> <span class="na">target=</span><span class="s">&quot;End&quot;</span><span class="nt">/&gt;</span>
+<span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;Nothing#2&quot;</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;Nothing.fatal&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;End&quot;</span><span class="nt">/&gt;</span>
 <span class="nt">&lt;/state&gt;</span>
 </pre></div>
 </div>
@@ -210,8 +208,8 @@ To refer to the skill, use the whole unique id with the hashtag as done in the t
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2023, Leroy Rügemer.
-      <span class="lastupdated">Last updated on Jun 10, 2025.
+    <p>&#169; Copyright 2025, Team of Bielefeld.
+      <span class="lastupdated">Last updated on Oct 28, 2025.
       </span></p>
   </div>
 

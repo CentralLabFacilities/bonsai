@@ -1,0 +1,321 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sensors and Actuators &mdash; Bonsai Docs 0.8-SNAPSHOT documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=f06a32cd" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=f06a32cd" />
+
+  
+    <link rel="shortcut icon" href="../_static/favicon.ico"/>
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=3242a324"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Memory Slots" href="memory.html" />
+    <link rel="prev" title="Data Types" href="datatypes.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Bonsai Docs
+              <img src="../_static/bonsai-l1s.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Table of Contents</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">QuickStart</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../general.html">Bonsai</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="datatypes.html">Data Types</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Sensors and Actuators</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#sensor">Sensor</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#actuator">Actuator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#interfaces">Interfaces</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#factory-classes">Factory Classes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#actuator-and-sensor-configurator">Actuator and Sensor configurator</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="memory.html">Memory Slots</a></li>
+<li class="toctree-l2"><a class="reference internal" href="skills.html">Skills</a></li>
+<li class="toctree-l2"><a class="reference internal" href="config.html">Bonsai Configuration</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../behavior.html">SCXML Behavior Engine</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changes.html">Change Log</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Bonsai Docs</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../general.html">Bonsai - Bielefeld Sensor Actuator Interface</a></li>
+      <li class="breadcrumb-item active">Sensors and Actuators</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="sensors-and-actuators">
+<h1>Sensors and Actuators<a class="headerlink" href="#sensors-and-actuators" title="Link to this heading"></a></h1>
+<p>The Bonsai sensors and actuators allow for abstraction of system software components and middleware.
+They serve as an interface between hardware or software components to be used to model a system action and/or additional information while concealing the underlying generation and communication process.
+They encapsulate complex interactions between these components and improve the readability, reproducibility, and efficiency of robot behavior code.</p>
+<p>Each sensor and actuator implementation has to implement a configure and a cleanup function:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span><span class="w"> </span><span class="nf">configure</span><span class="p">(</span><span class="n">IObjectConfigurator</span><span class="w"> </span><span class="n">conf</span><span class="p">)</span><span class="w"> </span><span class="kd">throws</span><span class="w"> </span><span class="n">ConfigurationException</span><span class="p">;</span>
+
+<span class="cm">/**</span>
+<span class="cm"> * Close all communication channels.</span>
+<span class="cm"> */</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">cleanUp</span><span class="p">()</span><span class="w"> </span><span class="kd">throws</span><span class="w"> </span><span class="n">IOException</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>The configure function is being called before everything else within the class.
+This function receives a configurator which contains options for the actuator/sensor that are defined in the <a class="reference internal" href="config.html#section-config"><span class="std std-ref">Bonsai configurations</span></a>.</p>
+<p>In order to better explain the concept of sensors and actuators,
+we will explain with an example behavior “Follow Person”, which should detect and follow a person.</p>
+<section id="sensor">
+<span id="section-sensor"></span><h2>Sensor<a class="headerlink" href="#sensor" title="Link to this heading"></a></h2>
+<div class="quote docutils container">
+<p>“A sensor within the Bonsai framework is the concept of reading information from a single modularity relevant to the current system, generated by either a hardware or software component or a combination of both, to be used to model a system action and/or additional information and concealing the underlying generation and communication process.”</p>
+</div>
+<p>A <strong>Bonsai sensor</strong> returns <strong>information from the outside world</strong>.
+It can be a simple abstraction of a hardware part of the robot, such as camera or laser sensors.
+A bonsai sensor can also be more abstract.
+For example, there can be a person sensor based on different software components, which detects people in the robot’s vicinity.</p>
+<p>The following image shows an example for a Bonsai person sensor:</p>
+<img alt="../_images/sensor_example.png" src="../_images/sensor_example.png" />
+<p>The goal of the sensor depicted in this image is to provide information about a person in the robot’s vicinity.
+The Follow Person behavior would only need to call the <em>readLastSeenPerson()</em> function which provides data about the person and its location.
+Internally, the person sensor is realized by four different software components that manage the detection and tracking of a person over time.</p>
+<p>The code for the robot behavior is completely detached from the robots sensors and the person detection modules.
+It only needs to call the person sensor and it will receive all necessary information.</p>
+</section>
+<section id="actuator">
+<span id="section-actuator"></span><h2>Actuator<a class="headerlink" href="#actuator" title="Link to this heading"></a></h2>
+<div class="quote docutils container">
+<p>“An actuator within the Bonsai framework is the concept of committing singular information available to the current system to a certain hard- or software component or subsystem to generate concrete action of a particular component/subsystem and concealing the underlying communication process.”</p>
+</div>
+<p>The <strong>actuator</strong> is used to <strong>abstract and detach system software components and middleware</strong>.
+The navigation actuator is a typical example for this. It should provide basic functions for navigating a robot, e.g. via a <em>setGoal()</em> method.
+This simple interface then triggers a complex interaction between different software components.</p>
+<p>Assuming we have a skill which converts person data into a navigation goal, we can use navigation actuator example shown below:</p>
+<img alt="../_images/actuator_example.webp" src="../_images/actuator_example.webp" />
+<p>The navigation actuator handles localization, path planning, obstacle avoidance, and goal generation.
+The navigation actuator thus completely detaches the code for robot behavior from the systems software components and the middleware.</p>
+</section>
+<section id="interfaces">
+<span id="section-interface"></span><h2>Interfaces<a class="headerlink" href="#interfaces" title="Link to this heading"></a></h2>
+<p>When using multiple robots with different hardware components, it can be quite a hassle to adapt the robot behavior to the other robots.</p>
+<p>In order to detach the robot behavior model with the hardware, we make use of Interface classes in Java.
+They enable implementation of different Sensors and Actuators and making them configurable while the skills and the robot behavior model
+remains completely oblivious and only know of the sensor and actuator interface classes.</p>
+<p>Each Actuator and Sensor is required to inherit from a Java interface class.
+This interface describes the functions which each subclass <em>must</em> implement.
+This is to make sure that e.g. each grasp actuator implements the <em>graspObject()</em> function or that each navigation actuator has the <em>setGoal()</em> function, whether it may be an Actuator implemented for a TIAGo robot or a Pepper robot.</p>
+<p>With a robot with different hardware and software components, you would only need to reimplement actuators while the robot behavior control can remain unchanged.</p>
+<p>For example, we create the interface <code class="docutils literal notranslate"><span class="pre">GraspActuator</span></code> which has the function <em>graspObject()</em>.
+You want to deploy it on a TIAGo robot with a 7DoF arm which uses MoveIt for motion planning, thus you might create a <code class="docutils literal notranslate"><span class="pre">TIAGoGraspActuator</span></code> which inherits from the <code class="docutils literal notranslate"><span class="pre">GraspActuator</span></code>.
+Now you want the deploy the robot behavior on a Pepper robot and the arm motion is trained using reinforcement learning, for this you would simply create a <code class="docutils literal notranslate"><span class="pre">PepperGraspActuator</span></code>.</p>
+<p>All the skill has to know is, that it uses the <code class="docutils literal notranslate"><span class="pre">GraspActuator</span></code>. It doesn’t care about which actual implementation is being used at the end.</p>
+<p>Using interfaces also enable the possibility to utilize various methods for motion planning.
+You could implement a <code class="docutils literal notranslate"><span class="pre">TIAGoMoveItGraspActuator</span></code> which uses a MoveIt to plan the grasping motion, or a <code class="docutils literal notranslate"><span class="pre">TIAGoDLGraspActuator</span></code> which tries to employ Deep Learning methods for grasping.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<ul class="simple">
+<li><p>Interface classes are stored in the subpackage <code class="docutils literal notranslate"><span class="pre">bonsai_interfaces</span></code>.</p></li>
+<li><p>Which interface implementation to use (for the actuator) is defined in the <a class="reference internal" href="config.html#section-config"><span class="std std-ref">Bonsai configuration</span></a>.</p></li>
+</ul>
+</div>
+</section>
+<section id="factory-classes">
+<span id="section-factory-class"></span><h2>Factory Classes<a class="headerlink" href="#factory-classes" title="Link to this heading"></a></h2>
+<p>Factory classes can be used to configure Sensors, Actuators, and the internal memory.
+The factory class checks if the configuration is correct and configures the sensors and actuators.</p>
+<p>Bonsai already implements <a class="reference internal" href="datatypes.html#section-adapter"><span class="std std-ref">Adapter classes</span></a> for ROS.
+The <code class="docutils literal notranslate"><span class="pre">RosFactory</span></code> class creates ROS nodes for sensors, actuators, and coordinate transforms.
+The RosFactory will check if a ros master node has been started.
+It starts ROS nodes for each sensor, actuator, and coordinate transform and creates the respective Bonsai interface for skills to use.</p>
+<p>Another factory class is the <code class="docutils literal notranslate"><span class="pre">MemoryFactory</span></code> which creates <a class="reference internal" href="memory.html#section-memory"><span class="std std-ref">Memory Slot</span></a> instances.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Factory classes also need to be configured in the <a class="reference internal" href="config.html#section-config-factory"><span class="std std-ref">Bonsai configuration</span></a>.</p>
+</div>
+</section>
+<section id="actuator-and-sensor-configurator">
+<span id="section-object-configurator"></span><h2>Actuator and Sensor configurator<a class="headerlink" href="#actuator-and-sensor-configurator" title="Link to this heading"></a></h2>
+<p>Actuators and Sensors take an <code class="docutils literal notranslate"><span class="pre">ObjectConfigurator</span></code> object when its configure function is being called.
+Using the configurator, the Actuator or Sensor can request parameters from the <a class="reference internal" href="config.html#section-config"><span class="std std-ref">Bonsai configuration</span></a> file.</p>
+<p>Within the <code class="docutils literal notranslate"><span class="pre">configure()</span></code> function, options defined in the configuration file can be requested using the <code class="docutils literal notranslate"><span class="pre">key</span></code> specified in <code class="docutils literal notranslate"><span class="pre">Option</span></code> tag in the configuration file.</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kd">public</span><span class="w"> </span><span class="kd">class</span> <span class="nc">ExampleActuator</span><span class="w"> </span><span class="kd">implements</span><span class="w"> </span><span class="n">AbstractExampleActuator</span><span class="w"> </span><span class="p">{</span>
+
+<span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">static</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">KEY_TOPIC</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;topic&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">static</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">KEY_INT</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;optional_int&quot;</span><span class="p">;</span>
+
+<span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">topic</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">optionalInt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+
+<span class="w">    </span><span class="nd">@Override</span>
+<span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">configure</span><span class="p">(</span><span class="n">IObjectConfigurator</span><span class="w"> </span><span class="n">conf</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">this</span><span class="p">.</span><span class="na">topic</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">conf</span><span class="p">.</span><span class="na">requestValue</span><span class="p">(</span><span class="n">KEY_TOPIC</span><span class="p">);</span>
+<span class="w">        </span><span class="k">this</span><span class="p">.</span><span class="na">optionalInt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">conf</span><span class="p">.</span><span class="na">requestOptionalInt</span><span class="p">(</span><span class="n">KEY_INT</span><span class="p">,</span><span class="w"> </span><span class="n">optionalInt</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="c1">// ...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>From the configurator you can request (optional) parameters of type String, Int, Double, and Bool.
+The Actuator wants to request two options from the configuration, <em>topic</em> and <em>optional_int</em>.</p>
+<p>The Actuator configuration could look like this:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="cm">&lt;!-- ACTUATORS --&gt;</span>
+<span class="nt">&lt;Actuator</span><span class="w"> </span><span class="na">key=</span><span class="s">&quot;Example1&quot;</span>
+<span class="w">          </span><span class="na">factoryClass=</span><span class="s">&quot;ExampleFactoryClass&quot;</span>
+<span class="w">          </span><span class="na">actuatorInterface=</span><span class="s">&quot;AbstractExampleActuator&quot;</span>
+<span class="w">          </span><span class="na">actuatorClass=</span><span class="s">&quot;ExampleActuator&quot;</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;Options&gt;</span>
+<span class="w">        </span><span class="nt">&lt;Option</span><span class="w"> </span><span class="na">key=</span><span class="s">&quot;topic&quot;</span><span class="nt">&gt;</span>/example<span class="nt">&lt;/Option&gt;</span>
+<span class="w">        </span><span class="nt">&lt;Option</span><span class="w"> </span><span class="na">key=</span><span class="s">&quot;optional_int&quot;</span><span class="nt">&gt;</span>1<span class="nt">&lt;/Option&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/Options&gt;</span>
+<span class="nt">&lt;/Actuator&gt;</span>
+</pre></div>
+</div>
+<p>The ExampleActuator requests a parameter with the key <cite>“topic”</cite>.
+Inside the Bonsai configuration within the section where we configure our Actuator we define the parameter with the <code class="docutils literal notranslate"><span class="pre">option</span></code> tag with <code class="docutils literal notranslate"><span class="pre">key</span></code> <cite>“topic”</cite> as <cite>“/example”</cite>.
+Thus, the requested parameter that our Actuator gets is <em>“/example”</em>.</p>
+<table class="docutils align-default" id="id1">
+<caption><span class="caption-text">ObjectConfigurator Functions</span><a class="headerlink" href="#id1" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 50.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Function</p></th>
+<th class="head"><p>Explanation</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>requestValue(String key)</p></td>
+<td><div class="line-block">
+<div class="line">From the Bonsai configuration, request the option</div>
+<div class="line">with key and cast it to a String</div>
+</div>
+</td>
+</tr>
+<tr class="row-odd"><td><p>requestOptionalValue(String key, String default)</p></td>
+<td><div class="line-block">
+<div class="line">From the Bonsai configuration, request the option</div>
+<div class="line">with key and cast it to a String. If the option</div>
+<div class="line">has not been declared in the configuration file,</div>
+<div class="line">then use the default value. The getOptional</div>
+<div class="line">functions are also available for the other types below.</div>
+</div>
+</td>
+</tr>
+<tr class="row-even"><td><div class="line-block">
+<div class="line">requestInt(String key)</div>
+<div class="line">requestOptionalInt(String key, int default)</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">From the Bonsai configuration, request the option</div>
+<div class="line">with key and cast it to an int</div>
+</div>
+</td>
+</tr>
+<tr class="row-odd"><td><div class="line-block">
+<div class="line">requestDouble(String key)</div>
+<div class="line">requestOptionalDouble(String key, double default)</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">From the Bonsai configuration, request the option</div>
+<div class="line">with key and cast it to a double</div>
+</div>
+</td>
+</tr>
+<tr class="row-even"><td><div class="line-block">
+<div class="line">requestBoolean(String key)</div>
+<div class="line">requestOptionalBoolean(String key, boolean default)</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">From the Bonsai configuration, request the option</div>
+<div class="line">with key and cast it to Boolean</div>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+<p>The bonsai configuration for the actuator could look like this:</p>
+<p>The sensor class would look like the actuator example here.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="datatypes.html" class="btn btn-neutral float-left" title="Data Types" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="memory.html" class="btn btn-neutral float-right" title="Memory Slots" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Team of Bielefeld.
+      <span class="lastupdated">Last updated on Oct 28, 2025.
+      </span></p>
+  </div>
+
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

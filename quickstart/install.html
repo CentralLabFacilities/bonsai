@@ -1,24 +1,24 @@
+
+
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" data-content_root="../">
 <head>
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Install &mdash; Bonsai Docs 0.7-SNAPSHOT documentation</title>
-      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b76e3c8a" />
-      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=19f00094" />
+  <title>Install &mdash; Bonsai Docs 0.8-SNAPSHOT documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=f06a32cd" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=f06a32cd" />
 
   
     <link rel="shortcut icon" href="../_static/favicon.ico"/>
-  <!--[if lt IE 9]>
-    <script src="../_static/js/html5shiv.min.js"></script>
-  <![endif]-->
-  
-        <script src="../_static/jquery.js?v=5d32c60e"></script>
-        <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-        <script src="../_static/documentation_options.js?v=b90832ea"></script>
-        <script src="../_static/doctools.js?v=9a2dae69"></script>
-        <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=3242a324"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -38,9 +38,6 @@
             Bonsai Docs
               <img src="../_static/bonsai-l1s.png" class="logo" alt="Logo"/>
           </a>
-              <div class="version">
-                0.7
-              </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
     <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
@@ -77,6 +74,7 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../general.html">Bonsai</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../behavior.html">SCXML Behavior Engine</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../general/changes.html">Change Log</a></li>
 </ul>
 
         </div>
@@ -262,38 +260,38 @@
 <p>Repositories:</p>
 <div class="highlight-xml notranslate"><div class="highlight"><pre><span></span>...
 <span class="nt">&lt;profiles&gt;</span>
-    <span class="nt">&lt;profile&gt;</span>
-        ...
-        <span class="nt">&lt;repositories&gt;</span>
+<span class="w">    </span><span class="nt">&lt;profile&gt;</span>
+<span class="w">        </span>...
+<span class="w">        </span><span class="nt">&lt;repositories&gt;</span>
 
-            <span class="nt">&lt;repository&gt;</span>
-                <span class="nt">&lt;id&gt;</span>citec<span class="nt">&lt;/id&gt;</span>
-                <span class="nt">&lt;name&gt;</span>citec<span class="nt">&lt;/name&gt;</span>
-                <span class="nt">&lt;url&gt;</span>https://mvn.cit-ec.de/nexus/content/repositories/releases<span class="nt">&lt;/url&gt;</span>
-                <span class="nt">&lt;layout&gt;</span>default<span class="nt">&lt;/layout&gt;</span>
-                <span class="nt">&lt;releases&gt;</span>
-                    <span class="nt">&lt;updatePolicy&gt;</span>always<span class="nt">&lt;/updatePolicy&gt;</span>
-                    <span class="nt">&lt;enabled&gt;</span>true<span class="nt">&lt;/enabled&gt;</span>
-                <span class="nt">&lt;/releases&gt;</span>
-            <span class="nt">&lt;/repository&gt;</span>
+<span class="w">            </span><span class="nt">&lt;repository&gt;</span>
+<span class="w">                </span><span class="nt">&lt;id&gt;</span>citec<span class="nt">&lt;/id&gt;</span>
+<span class="w">                </span><span class="nt">&lt;name&gt;</span>citec<span class="nt">&lt;/name&gt;</span>
+<span class="w">                </span><span class="nt">&lt;url&gt;</span>https://mvn.cit-ec.de/nexus/content/repositories/releases<span class="nt">&lt;/url&gt;</span>
+<span class="w">                </span><span class="nt">&lt;layout&gt;</span>default<span class="nt">&lt;/layout&gt;</span>
+<span class="w">                </span><span class="nt">&lt;releases&gt;</span>
+<span class="w">                    </span><span class="nt">&lt;updatePolicy&gt;</span>always<span class="nt">&lt;/updatePolicy&gt;</span>
+<span class="w">                    </span><span class="nt">&lt;enabled&gt;</span>true<span class="nt">&lt;/enabled&gt;</span>
+<span class="w">                </span><span class="nt">&lt;/releases&gt;</span>
+<span class="w">            </span><span class="nt">&lt;/repository&gt;</span>
 
-            <span class="nt">&lt;repository&gt;</span>
-                <span class="nt">&lt;id&gt;</span>citec-snapshots<span class="nt">&lt;/id&gt;</span>
-                <span class="nt">&lt;name&gt;</span>citec-snapshots<span class="nt">&lt;/name&gt;</span>
-                <span class="nt">&lt;url&gt;</span>https://mvn.cit-ec.de/nexus/content/repositories/snapshots<span class="nt">&lt;/url&gt;</span>
-                <span class="nt">&lt;layout&gt;</span>default<span class="nt">&lt;/layout&gt;</span>
-                <span class="nt">&lt;releases&gt;</span>
-                    <span class="nt">&lt;enabled&gt;</span>false<span class="nt">&lt;/enabled&gt;</span>
-                <span class="nt">&lt;/releases&gt;</span>
-                <span class="nt">&lt;snapshots&gt;</span>
-                    <span class="nt">&lt;enabled&gt;</span>true<span class="nt">&lt;/enabled&gt;</span>
-                    <span class="nt">&lt;updatePolicy&gt;</span>always<span class="nt">&lt;/updatePolicy&gt;</span>
-                <span class="nt">&lt;/snapshots&gt;</span>
-            <span class="nt">&lt;/repository&gt;</span>
+<span class="w">            </span><span class="nt">&lt;repository&gt;</span>
+<span class="w">                </span><span class="nt">&lt;id&gt;</span>citec-snapshots<span class="nt">&lt;/id&gt;</span>
+<span class="w">                </span><span class="nt">&lt;name&gt;</span>citec-snapshots<span class="nt">&lt;/name&gt;</span>
+<span class="w">                </span><span class="nt">&lt;url&gt;</span>https://mvn.cit-ec.de/nexus/content/repositories/snapshots<span class="nt">&lt;/url&gt;</span>
+<span class="w">                </span><span class="nt">&lt;layout&gt;</span>default<span class="nt">&lt;/layout&gt;</span>
+<span class="w">                </span><span class="nt">&lt;releases&gt;</span>
+<span class="w">                    </span><span class="nt">&lt;enabled&gt;</span>false<span class="nt">&lt;/enabled&gt;</span>
+<span class="w">                </span><span class="nt">&lt;/releases&gt;</span>
+<span class="w">                </span><span class="nt">&lt;snapshots&gt;</span>
+<span class="w">                    </span><span class="nt">&lt;enabled&gt;</span>true<span class="nt">&lt;/enabled&gt;</span>
+<span class="w">                    </span><span class="nt">&lt;updatePolicy&gt;</span>always<span class="nt">&lt;/updatePolicy&gt;</span>
+<span class="w">                </span><span class="nt">&lt;/snapshots&gt;</span>
+<span class="w">            </span><span class="nt">&lt;/repository&gt;</span>
 
-        <span class="nt">&lt;/repositories&gt;</span>
-        ...
-    <span class="nt">&lt;/profile&gt;</span>
+<span class="w">        </span><span class="nt">&lt;/repositories&gt;</span>
+<span class="w">        </span>...
+<span class="w">    </span><span class="nt">&lt;/profile&gt;</span>
 <span class="nt">&lt;/profiles&gt;</span>
 ...
 </pre></div>
@@ -313,8 +311,8 @@
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2023, Leroy Rügemer.
-      <span class="lastupdated">Last updated on Jun 10, 2025.
+    <p>&#169; Copyright 2025, Team of Bielefeld.
+      <span class="lastupdated">Last updated on Oct 28, 2025.
       </span></p>
   </div>
 
