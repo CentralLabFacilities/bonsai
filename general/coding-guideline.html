@@ -1,29 +1,27 @@
+
+
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" data-content_root="../">
 <head>
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Coding Guidelines &mdash; Bonsai Docs 0.7-SNAPSHOT documentation</title>
-      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b76e3c8a" />
-      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=19f00094" />
+  <title>Coding Guidelines &mdash; Bonsai Docs 0.8-SNAPSHOT documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=f06a32cd" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=f06a32cd" />
 
   
     <link rel="shortcut icon" href="../_static/favicon.ico"/>
-  <!--[if lt IE 9]>
-    <script src="../_static/js/html5shiv.min.js"></script>
-  <![endif]-->
-  
-        <script src="../_static/jquery.js?v=5d32c60e"></script>
-        <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-        <script src="../_static/documentation_options.js?v=b90832ea"></script>
-        <script src="../_static/doctools.js?v=9a2dae69"></script>
-        <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=3242a324"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
-    <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Bonsai Core Tutorial" href="general.html" />
-    <link rel="prev" title="Bonsai - Bielefeld Sensor Actuator Interface" href="../general.html" /> 
+    <link rel="search" title="Search" href="../search.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -38,9 +36,6 @@
             Bonsai Docs
               <img src="../_static/bonsai-l1s.png" class="logo" alt="Logo"/>
           </a>
-              <div class="version">
-                0.7
-              </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
     <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
@@ -50,34 +45,11 @@
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption" role="heading"><span class="caption-text">Table of Contents</span></p>
-<ul class="current">
+<ul>
 <li class="toctree-l1"><a class="reference internal" href="../quickstart.html">QuickStart</a></li>
-<li class="toctree-l1 current"><a class="reference internal" href="../general.html">Bonsai</a><ul class="current">
-<li class="toctree-l2 current"><a class="current reference internal" href="#">Coding Guideline</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#skills">Skills</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#usage-documentation">Usage Documentation</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#code-comments">Code Comments</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#naming-of-variables">Naming of Variables</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#ordering-of-variables">Ordering of Variables</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#order-of-methods">Order of methods</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#how-to-use-init-execute-and-end">How to use init(), execute() and end()</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#defensive-recalling-and-memorizing-of-slots">Defensive recalling and memorizing of slots</a></li>
-</ul>
-</li>
-<li class="toctree-l3"><a class="reference internal" href="#statemachines">Statemachines</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#location">Location</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#id1">Usage Documentation</a></li>
-</ul>
-</li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="general.html">General</a></li>
-<li class="toctree-l2"><a class="reference internal" href="core.html">Core</a></li>
-<li class="toctree-l2"><a class="reference internal" href="skills.html">Skills</a></li>
-<li class="toctree-l2"><a class="reference internal" href="memory.html">Memory</a></li>
-</ul>
-</li>
+<li class="toctree-l1"><a class="reference internal" href="../general.html">Bonsai</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../behavior.html">SCXML Behavior Engine</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changes.html">Change Log</a></li>
 </ul>
 
         </div>
@@ -94,7 +66,6 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
-          <li class="breadcrumb-item"><a href="../general.html">Bonsai - Bielefeld Sensor Actuator Interface</a></li>
       <li class="breadcrumb-item active">Coding Guidelines</li>
       <li class="wy-breadcrumbs-aside">
       </li>
@@ -211,8 +182,8 @@ Analogous to  Actuators.
 <li><p>Skills should <em>NOT</em> be given scxml data parameter <code class="docutils literal notranslate"><span class="pre">&#64;DATA</span></code> if this changes the configure requests.</p></li>
 </ul>
 <p><em>ExampleSkill</em> <code class="docutils literal notranslate"><span class="pre">Configure()</span></code>:</p>
-<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">useAct</span> <span class="o">=</span> <span class="n">configurator</span><span class="p">.</span><span class="na">requestOptionalBool</span><span class="p">(</span><span class="s">&quot;#_USE&quot;</span><span class="p">,</span> <span class="kc">false</span><span class="p">);</span>
-<span class="k">if</span><span class="p">(</span><span class="n">useAct</span><span class="p">)</span> <span class="n">act</span> <span class="o">=</span> <span class="n">configurator</span><span class="p">.</span><span class="na">getActuator</span><span class="p">(</span><span class="s">&quot;Foo&quot;</span><span class="p">,</span> <span class="n">Bar</span><span class="p">.</span><span class="na">class</span><span class="p">);</span>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">useAct</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">configurator</span><span class="p">.</span><span class="na">requestOptionalBool</span><span class="p">(</span><span class="s">&quot;#_USE&quot;</span><span class="p">,</span><span class="w"> </span><span class="kc">false</span><span class="p">);</span>
+<span class="k">if</span><span class="p">(</span><span class="n">useAct</span><span class="p">)</span><span class="w"> </span><span class="n">act</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">configurator</span><span class="p">.</span><span class="na">getActuator</span><span class="p">(</span><span class="s">&quot;Foo&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">Bar</span><span class="p">.</span><span class="na">class</span><span class="p">);</span>
 </pre></div>
 </div>
 <p>If <code class="docutils literal notranslate"><span class="pre">#_USE</span></code> is set to <code class="docutils literal notranslate"><span class="pre">&#64;DATA</span></code> with expression <code class="docutils literal notranslate"><span class="pre">false</span></code> during LOAD but gets changed to <code class="docutils literal notranslate"><span class="pre">true</span></code> with <code class="docutils literal notranslate"><span class="pre">&lt;assign&gt;</span></code> the State will not function properly</p>
@@ -265,16 +236,13 @@ Analogous to  Actuators.
 
            </div>
           </div>
-          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="../general.html" class="btn btn-neutral float-left" title="Bonsai - Bielefeld Sensor Actuator Interface" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="general.html" class="btn btn-neutral float-right" title="Bonsai Core Tutorial" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
-    </div>
+          <footer>
 
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2023, Leroy Rügemer.
-      <span class="lastupdated">Last updated on Jun 10, 2025.
+    <p>&#169; Copyright 2025, Team of Bielefeld.
+      <span class="lastupdated">Last updated on Oct 28, 2025.
       </span></p>
   </div>
 

@@ -1,24 +1,24 @@
+
+
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" data-content_root="../../">
 <head>
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Memory Slots &mdash; Bonsai Docs 0.7-SNAPSHOT documentation</title>
-      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b76e3c8a" />
-      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
+  <title>Memory Slots &mdash; Bonsai Docs 0.8-SNAPSHOT documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=f06a32cd" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=f06a32cd" />
 
   
     <link rel="shortcut icon" href="../../_static/favicon.ico"/>
-  <!--[if lt IE 9]>
-    <script src="../../_static/js/html5shiv.min.js"></script>
-  <![endif]-->
-  
-        <script src="../../_static/jquery.js?v=5d32c60e"></script>
-        <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-        <script src="../../_static/documentation_options.js?v=b90832ea"></script>
-        <script src="../../_static/doctools.js?v=9a2dae69"></script>
-        <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=3242a324"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
@@ -38,9 +38,6 @@
             Bonsai Docs
               <img src="../../_static/bonsai-l1s.png" class="logo" alt="Logo"/>
           </a>
-              <div class="version">
-                0.7
-              </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
     <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
@@ -66,6 +63,7 @@
 <li class="toctree-l2"><a class="reference internal" href="parameter.html">Parameters and Variables</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="../../general/changes.html">Change Log</a></li>
 </ul>
 
         </div>
@@ -94,92 +92,141 @@
            <div itemprop="articleBody">
              
   <section id="memory-slots">
-<h1>Memory Slots<a class="headerlink" href="#memory-slots" title="Link to this heading"></a></h1>
+<span id="section-memory-scxml"></span><h1>Memory Slots<a class="headerlink" href="#memory-slots" title="Link to this heading"></a></h1>
+<p>Slots are used to store data for other skills/states to use.
+To instantiate a <a class="reference internal" href="../../general/memory.html#section-memory"><span class="std std-ref">memory slot</span></a>, a few parameters are needed:</p>
+<table class="docutils align-default" id="id1">
+<caption><span class="caption-text">Slot Parameters</span><a class="headerlink" href="#id1" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 50.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameters</p></th>
+<th class="head"><p>Explanation</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>key</p></td>
+<td><div class="line-block">
+<div class="line">The key is used by the skill to refer to a unique slot <strong>within</strong> the skill.</div>
+<div class="line">It is defined by the skill and the state machine.</div>
+<div class="line">has to refer to the slot with the specified key.</div>
+</div>
+</td>
+</tr>
+<tr class="row-odd"><td><p>state</p></td>
+<td><div class="line-block">
+<div class="line">A slots key is only unique within the skill it is being used in.</div>
+<div class="line">Other skills can have slots with the same ID.</div>
+<div class="line">Therefore, the state machine needs</div>
+<div class="line">the skill name in order to differentiate slots with the (key, skill) pair.</div>
+<div class="line">The state parameter is used to assign the skill name.</div>
+</div>
+</td>
+</tr>
+<tr class="row-even"><td><p>xpath</p></td>
+<td><div class="line-block">
+<div class="line">This parameter is used to define the location of the memory slot.</div>
+<div class="line">Different slots can read or write from and into the same location</div>
+<div class="line">and modify the data in that location</div>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Two slots with different Bonsai data types cannot point to the same xpath! This will throw an error when loading.</p>
+</div>
 <section id="skills">
 <h2>Skills<a class="headerlink" href="#skills" title="Link to this heading"></a></h2>
-<p>Slots are used to store data for other skills/states to use.</p>
 <p>Take a look at the SlotWriter and SlotReader skill:</p>
-<div class="highlight-kotlin notranslate"><div class="highlight"><pre><span></span><span class="kd">class</span> <span class="nc">SlotWriter</span> <span class="p">:</span> <span class="n">AbstractSkill</span><span class="p">()</span> <span class="p">{</span>
+<div class="highlight-kotlin notranslate"><div class="highlight"><pre><span></span><span class="kd">class</span><span class="w"> </span><span class="nc">SlotWriter</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">AbstractSkill</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
 
-    <span class="kd">private</span> <span class="kd">var</span> <span class="nv">tokenSuccess</span><span class="p">:</span> <span class="n">ExitToken? </span><span class="o">=</span> <span class="kc">null</span>
-    <span class="kd">private</span> <span class="kd">var</span> <span class="nv">slot</span><span class="p">:</span> <span class="n">MemorySlotWriter</span><span class="o">&lt;</span><span class="kt">String</span><span class="o">&gt;?</span> <span class="o">=</span> <span class="kc">null</span>
+<span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">var</span><span class="w"> </span><span class="nv">KEY_SLOT_WRITE</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;StringToWriteTo&quot;</span>
 
-    <span class="kd">override</span> <span class="kd">fun</span> <span class="nf">configure</span><span class="p">(</span><span class="n">configurator</span><span class="p">:</span> <span class="n">ISkillConfigurator</span><span class="p">)</span> <span class="p">{</span>
-        <span class="n">tokenSuccess</span> <span class="o">=</span> <span class="n">configurator</span><span class="p">.</span><span class="na">requestExitToken</span><span class="p">(</span><span class="n">ExitStatus</span><span class="p">.</span><span class="na">SUCCESS</span><span class="p">())</span>
-        <span class="n">slot</span> <span class="o">=</span> <span class="n">configurator</span><span class="p">.</span><span class="na">getWriteSlot</span><span class="p">(</span><span class="s">&quot;StringToWriteTo&quot;</span><span class="p">,</span> <span class="kt">String</span><span class="o">::</span><span class="n">class</span><span class="p">.</span><span class="na">java</span><span class="p">)</span>
-    <span class="p">}</span>
+<span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">var</span><span class="w"> </span><span class="nv">tokenSuccess</span><span class="p">:</span><span class="w"> </span><span class="n">ExitToken? </span><span class="o">=</span><span class="w"> </span><span class="kc">null</span>
+<span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">var</span><span class="w"> </span><span class="nv">slot</span><span class="p">:</span><span class="w"> </span><span class="n">MemorySlotWriter</span><span class="o">&lt;</span><span class="kt">String</span><span class="o">&gt;?</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">null</span>
 
-    <span class="kd">override</span> <span class="kd">fun</span> <span class="nf">init</span><span class="p">():</span> <span class="kt">Boolean</span> <span class="p">{</span>
-        <span class="k">return</span> <span class="kc">true</span>
-    <span class="p">}</span>
+<span class="w">    </span><span class="kd">override</span><span class="w"> </span><span class="kd">fun</span><span class="w"> </span><span class="nf">configure</span><span class="p">(</span><span class="n">configurator</span><span class="p">:</span><span class="w"> </span><span class="n">ISkillConfigurator</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">tokenSuccess</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">configurator</span><span class="p">.</span><span class="na">requestExitToken</span><span class="p">(</span><span class="n">ExitStatus</span><span class="p">.</span><span class="na">SUCCESS</span><span class="p">())</span>
+<span class="w">        </span><span class="n">slot</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">configurator</span><span class="p">.</span><span class="na">getWriteSlot</span><span class="p">(</span><span class="n">KEY_SLOT_WRITE</span><span class="p">,</span><span class="w"> </span><span class="kt">String</span><span class="o">::</span><span class="n">class</span><span class="p">.</span><span class="na">java</span><span class="p">)</span>
+<span class="w">    </span><span class="p">}</span>
 
-    <span class="kd">override</span> <span class="kd">fun</span> <span class="nf">execute</span><span class="p">():</span> <span class="n">ExitToken</span> <span class="p">{</span>
-        <span class="n">slot</span><span class="o">!!</span><span class="p">.</span><span class="na">memorize</span><span class="p">(</span><span class="s">&quot;Hello World&quot;</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">tokenSuccess</span><span class="o">!!</span>
-    <span class="p">}</span>
+<span class="w">    </span><span class="kd">override</span><span class="w"> </span><span class="kd">fun</span><span class="w"> </span><span class="nf">init</span><span class="p">():</span><span class="w"> </span><span class="kt">Boolean</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="kc">true</span>
+<span class="w">    </span><span class="p">}</span>
 
-    <span class="kd">override</span> <span class="kd">fun</span> <span class="nf">end</span><span class="p">(</span><span class="n">curToken</span><span class="p">:</span> <span class="n">ExitToken</span><span class="p">):</span> <span class="n">ExitToken</span> <span class="p">{</span>
-        <span class="k">return</span> <span class="n">curToken</span>
-    <span class="p">}</span>
+<span class="w">    </span><span class="kd">override</span><span class="w"> </span><span class="kd">fun</span><span class="w"> </span><span class="nf">execute</span><span class="p">():</span><span class="w"> </span><span class="n">ExitToken</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">slot</span><span class="o">!!</span><span class="p">.</span><span class="na">memorize</span><span class="p">(</span><span class="s">&quot;Hello World&quot;</span><span class="p">)</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">tokenSuccess</span><span class="o">!!</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kd">override</span><span class="w"> </span><span class="kd">fun</span><span class="w"> </span><span class="nf">end</span><span class="p">(</span><span class="n">curToken</span><span class="p">:</span><span class="w"> </span><span class="n">ExitToken</span><span class="p">):</span><span class="w"> </span><span class="n">ExitToken</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">curToken</span>
+<span class="w">    </span><span class="p">}</span>
 
 <span class="p">}</span>
 </pre></div>
 </div>
-<div class="highlight-kotlin notranslate"><div class="highlight"><pre><span></span><span class="kd">class</span> <span class="nc">SlotReader</span> <span class="p">:</span> <span class="n">AbstractSkill</span><span class="p">()</span> <span class="p">{</span>
+<div class="highlight-kotlin notranslate"><div class="highlight"><pre><span></span><span class="kd">class</span><span class="w"> </span><span class="nc">SlotReader</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">AbstractSkill</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
 
-    <span class="kd">private</span> <span class="kd">var</span> <span class="nv">tokenSuccess</span><span class="p">:</span> <span class="n">ExitToken? </span><span class="o">=</span> <span class="kc">null</span>
-    <span class="kd">private</span> <span class="kd">var</span> <span class="nv">slot</span><span class="p">:</span> <span class="n">MemorySlot</span><span class="o">&lt;</span><span class="kt">String</span><span class="o">&gt;?</span> <span class="o">=</span> <span class="kc">null</span>
+<span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">var</span><span class="w"> </span><span class="nv">KEY_SLOT_READ</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;StringIAmReading&quot;</span>
 
-    <span class="kd">private</span> <span class="kd">var</span> <span class="nv">read</span><span class="p">:</span> <span class="kt">String?</span> <span class="o">=</span> <span class="s">&quot;&quot;</span>
+<span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">var</span><span class="w"> </span><span class="nv">tokenSuccess</span><span class="p">:</span><span class="w"> </span><span class="n">ExitToken? </span><span class="o">=</span><span class="w"> </span><span class="kc">null</span>
+<span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">var</span><span class="w"> </span><span class="nv">slot</span><span class="p">:</span><span class="w"> </span><span class="n">MemorySlot</span><span class="o">&lt;</span><span class="kt">String</span><span class="o">&gt;?</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">null</span>
 
-    <span class="kd">override</span> <span class="kd">fun</span> <span class="nf">configure</span><span class="p">(</span><span class="n">configurator</span><span class="p">:</span> <span class="n">ISkillConfigurator</span><span class="p">)</span> <span class="p">{</span>
-        <span class="n">tokenSuccess</span> <span class="o">=</span> <span class="n">configurator</span><span class="p">.</span><span class="na">requestExitToken</span><span class="p">(</span><span class="n">ExitStatus</span><span class="p">.</span><span class="na">SUCCESS</span><span class="p">())</span>
-        <span class="n">slot</span> <span class="o">=</span> <span class="n">configurator</span><span class="p">.</span><span class="na">getReadSlot</span><span class="o">&lt;</span><span class="kt">String</span><span class="o">&gt;</span><span class="p">(</span><span class="s">&quot;StringIAmReading&quot;</span><span class="p">,</span> <span class="kt">String</span><span class="o">::</span><span class="n">class</span><span class="p">.</span><span class="na">java</span><span class="p">)</span>
-    <span class="p">}</span>
+<span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">var</span><span class="w"> </span><span class="nv">read</span><span class="p">:</span><span class="w"> </span><span class="kt">String?</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;&quot;</span>
 
-    <span class="kd">override</span> <span class="kd">fun</span> <span class="nf">init</span><span class="p">():</span> <span class="kt">Boolean</span> <span class="p">{</span>
-        <span class="n">read</span> <span class="o">=</span> <span class="n">slot</span><span class="o">!!</span><span class="p">.</span><span class="na">recall</span><span class="o">&lt;</span><span class="kt">String</span><span class="o">&gt;</span><span class="p">()</span> <span class="o">?:</span> <span class="k">return</span> <span class="kc">false</span>
-        <span class="k">return</span> <span class="kc">true</span>
-    <span class="p">}</span>
+<span class="w">    </span><span class="kd">override</span><span class="w"> </span><span class="kd">fun</span><span class="w"> </span><span class="nf">configure</span><span class="p">(</span><span class="n">configurator</span><span class="p">:</span><span class="w"> </span><span class="n">ISkillConfigurator</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">tokenSuccess</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">configurator</span><span class="p">.</span><span class="na">requestExitToken</span><span class="p">(</span><span class="n">ExitStatus</span><span class="p">.</span><span class="na">SUCCESS</span><span class="p">())</span>
+<span class="w">        </span><span class="n">slot</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">configurator</span><span class="p">.</span><span class="na">getReadSlot</span><span class="o">&lt;</span><span class="kt">String</span><span class="o">&gt;</span><span class="p">(</span><span class="n">KEY_SLOT_READ</span><span class="p">,</span><span class="w"> </span><span class="kt">String</span><span class="o">::</span><span class="n">class</span><span class="p">.</span><span class="na">java</span><span class="p">)</span>
+<span class="w">    </span><span class="p">}</span>
 
-    <span class="kd">override</span> <span class="kd">fun</span> <span class="nf">execute</span><span class="p">():</span> <span class="n">ExitToken</span> <span class="p">{</span>
-        <span class="n">logger</span><span class="p">.</span><span class="na">info</span><span class="p">(</span><span class="s">&quot;current data: </span><span class="si">$</span><span class="n">read</span><span class="s">&quot;</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">tokenSuccess</span><span class="o">!!</span>
-    <span class="p">}</span>
+<span class="w">    </span><span class="kd">override</span><span class="w"> </span><span class="kd">fun</span><span class="w"> </span><span class="nf">init</span><span class="p">():</span><span class="w"> </span><span class="kt">Boolean</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">read</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">slot</span><span class="o">!!</span><span class="p">.</span><span class="na">recall</span><span class="o">&lt;</span><span class="kt">String</span><span class="o">&gt;</span><span class="p">()</span><span class="w"> </span><span class="o">?:</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="kc">false</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="kc">true</span>
+<span class="w">    </span><span class="p">}</span>
 
-    <span class="kd">override</span> <span class="kd">fun</span> <span class="nf">end</span><span class="p">(</span><span class="n">curToken</span><span class="p">:</span> <span class="n">ExitToken</span><span class="p">):</span> <span class="n">ExitToken</span> <span class="p">{</span>
-        <span class="k">return</span> <span class="n">curToken</span>
-    <span class="p">}</span>
+<span class="w">    </span><span class="kd">override</span><span class="w"> </span><span class="kd">fun</span><span class="w"> </span><span class="nf">execute</span><span class="p">():</span><span class="w"> </span><span class="n">ExitToken</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">logger</span><span class="p">.</span><span class="na">info</span><span class="p">(</span><span class="s">&quot;current data: </span><span class="si">$</span><span class="n">read</span><span class="s">&quot;</span><span class="p">)</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">tokenSuccess</span><span class="o">!!</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kd">override</span><span class="w"> </span><span class="kd">fun</span><span class="w"> </span><span class="nf">end</span><span class="p">(</span><span class="n">curToken</span><span class="p">:</span><span class="w"> </span><span class="n">ExitToken</span><span class="p">):</span><span class="w"> </span><span class="n">ExitToken</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">curToken</span>
+<span class="w">    </span><span class="p">}</span>
 
 <span class="p">}</span>
 </pre></div>
 </div>
 <p>Both want to access a slot which stores strings.
 The SlotWriter requests access to the slot with the key “StringToWriteTo” in which he wants to write The string “Hello World”:</p>
-<div class="highlight-kotlin notranslate"><div class="highlight"><pre><span></span><span class="n">slot</span> <span class="o">=</span> <span class="n">configurator</span><span class="p">.</span><span class="na">getWriteSlot</span><span class="p">(</span><span class="s">&quot;StringToWriteTo&quot;</span><span class="p">,</span> <span class="kt">String</span><span class="o">::</span><span class="n">class</span><span class="p">.</span><span class="na">java</span><span class="p">)</span>
+<div class="highlight-kotlin notranslate"><div class="highlight"><pre><span></span><span class="n">slot</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">configurator</span><span class="p">.</span><span class="na">getWriteSlot</span><span class="p">(</span><span class="n">KEY_SLOT_WRITE</span><span class="p">,</span><span class="w"> </span><span class="kt">String</span><span class="o">::</span><span class="n">class</span><span class="p">.</span><span class="na">java</span><span class="p">)</span>
 
 <span class="c1">// ... some other code ...</span>
 
-<span class="kd">override</span> <span class="kd">fun</span> <span class="nf">execute</span><span class="p">():</span> <span class="n">ExitToken</span> <span class="p">{</span>
-    <span class="n">slot</span><span class="o">!!</span><span class="p">.</span><span class="na">memorize</span><span class="p">(</span><span class="s">&quot;Hello World&quot;</span><span class="p">)</span>
-    <span class="k">return</span> <span class="n">tokenSuccess</span><span class="o">!!</span>
+<span class="kd">override</span><span class="w"> </span><span class="kd">fun</span><span class="w"> </span><span class="nf">execute</span><span class="p">():</span><span class="w"> </span><span class="n">ExitToken</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">slot</span><span class="o">!!</span><span class="p">.</span><span class="na">memorize</span><span class="p">(</span><span class="s">&quot;Hello World&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">tokenSuccess</span><span class="o">!!</span>
 <span class="p">}</span>
 </pre></div>
 </div>
 <p>The SlotReader on the other hand requests a slot to read a string from.
 The read data is then simply printed:</p>
-<div class="highlight-kotlin notranslate"><div class="highlight"><pre><span></span><span class="n">slot</span> <span class="o">=</span> <span class="n">configurator</span><span class="p">.</span><span class="na">getReadSlot</span><span class="o">&lt;</span><span class="kt">String</span><span class="o">&gt;</span><span class="p">(</span><span class="s">&quot;StringIAmReading&quot;</span><span class="p">,</span> <span class="kt">String</span><span class="o">::</span><span class="n">class</span><span class="p">.</span><span class="na">java</span><span class="p">)</span>
+<div class="highlight-kotlin notranslate"><div class="highlight"><pre><span></span><span class="n">slot</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">configurator</span><span class="p">.</span><span class="na">getReadSlot</span><span class="o">&lt;</span><span class="kt">String</span><span class="o">&gt;</span><span class="p">(</span><span class="n">KEY_SLOT_READ</span><span class="p">,</span><span class="w"> </span><span class="kt">String</span><span class="o">::</span><span class="n">class</span><span class="p">.</span><span class="na">java</span><span class="p">)</span>
 
 <span class="c1">// ... some other code ...</span>
 
-<span class="kd">override</span> <span class="kd">fun</span> <span class="nf">init</span><span class="p">():</span> <span class="kt">Boolean</span> <span class="p">{</span>
-    <span class="n">read</span> <span class="o">=</span> <span class="n">slot</span><span class="o">!!</span><span class="p">.</span><span class="na">recall</span><span class="o">&lt;</span><span class="kt">String</span><span class="o">&gt;</span><span class="p">()</span> <span class="o">?:</span> <span class="k">return</span> <span class="kc">false</span>
-    <span class="k">return</span> <span class="kc">true</span>
+<span class="kd">override</span><span class="w"> </span><span class="kd">fun</span><span class="w"> </span><span class="nf">init</span><span class="p">():</span><span class="w"> </span><span class="kt">Boolean</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">read</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">slot</span><span class="o">!!</span><span class="p">.</span><span class="na">recall</span><span class="o">&lt;</span><span class="kt">String</span><span class="o">&gt;</span><span class="p">()</span><span class="w"> </span><span class="o">?:</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="kc">false</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="kc">true</span>
 <span class="p">}</span>
 
-<span class="kd">override</span> <span class="kd">fun</span> <span class="nf">execute</span><span class="p">():</span> <span class="n">ExitToken</span> <span class="p">{</span>
-    <span class="n">logger</span><span class="p">.</span><span class="na">info</span><span class="p">(</span><span class="s">&quot;current data: </span><span class="si">$</span><span class="n">read</span><span class="s">&quot;</span><span class="p">)</span>
-    <span class="k">return</span> <span class="n">tokenSuccess</span><span class="o">!!</span>
+<span class="kd">override</span><span class="w"> </span><span class="kd">fun</span><span class="w"> </span><span class="nf">execute</span><span class="p">():</span><span class="w"> </span><span class="n">ExitToken</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">logger</span><span class="p">.</span><span class="na">info</span><span class="p">(</span><span class="s">&quot;current data: </span><span class="si">$</span><span class="n">read</span><span class="s">&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">tokenSuccess</span><span class="o">!!</span>
 <span class="p">}</span>
 </pre></div>
 </div>
@@ -193,17 +240,21 @@ The paths should be the same, so that the writer writes “hello World” and th
 The path for the slots have to be defined in the datamodel. The data id needs to be “#_SLOTS”.
 There, we can define the path for each slot key.</p>
 <div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;datamodel&gt;</span>
-    <span class="nt">&lt;data</span> <span class="na">id=</span><span class="s">&quot;#_STATE_PREFIX&quot;</span> <span class="na">expr=</span><span class="s">&quot;&#39;de.unibi.citec.clf.bonsai.skills.&#39;&quot;</span><span class="nt">/&gt;</span>
-    <span class="cm">&lt;!-- slots are used to store data for other skills/states to use --&gt;</span>
-    <span class="cm">&lt;!-- we have to define the path for each used slot --&gt;</span>
-    <span class="nt">&lt;data</span> <span class="na">id=</span><span class="s">&quot;#_SLOTS&quot;</span><span class="nt">&gt;</span>
-        <span class="nt">&lt;slots&gt;</span>
-            <span class="nt">&lt;slot</span> <span class="na">key=</span><span class="s">&quot;StringToWriteTo&quot;</span> <span class="na">state=</span><span class="s">&quot;example.SlotWriter&quot;</span> <span class="na">xpath=</span><span class="s">&quot;/path&quot;</span><span class="nt">/&gt;</span>
-            <span class="nt">&lt;slot</span> <span class="na">key=</span><span class="s">&quot;StringIAmReading&quot;</span> <span class="na">state=</span><span class="s">&quot;example.SlotReader&quot;</span> <span class="na">xpath=</span><span class="s">&quot;/path&quot;</span><span class="nt">/&gt;</span>
-        <span class="nt">&lt;/slots&gt;</span>
-    <span class="nt">&lt;/data&gt;</span>
+<span class="w">    </span><span class="nt">&lt;data</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;#_STATE_PREFIX&quot;</span><span class="w"> </span><span class="na">expr=</span><span class="s">&quot;&#39;de.unibi.citec.clf.bonsai.skills.&#39;&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="cm">&lt;!-- slots are used to store data for other skills/states to use --&gt;</span>
+<span class="w">    </span><span class="cm">&lt;!-- we have to define the path for each used slot --&gt;</span>
+<span class="w">    </span><span class="nt">&lt;data</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;#_SLOTS&quot;</span><span class="nt">&gt;</span>
+<span class="w">        </span><span class="nt">&lt;slots&gt;</span>
+<span class="w">            </span><span class="nt">&lt;slot</span><span class="w"> </span><span class="na">key=</span><span class="s">&quot;StringToWriteTo&quot;</span><span class="w"> </span><span class="na">state=</span><span class="s">&quot;example.SlotWriter&quot;</span><span class="w"> </span><span class="na">xpath=</span><span class="s">&quot;/path&quot;</span><span class="nt">/&gt;</span>
+<span class="w">            </span><span class="nt">&lt;slot</span><span class="w"> </span><span class="na">key=</span><span class="s">&quot;StringIAmReading&quot;</span><span class="w"> </span><span class="na">state=</span><span class="s">&quot;example.SlotReader&quot;</span><span class="w"> </span><span class="na">xpath=</span><span class="s">&quot;/path&quot;</span><span class="nt">/&gt;</span>
+<span class="w">        </span><span class="nt">&lt;/slots&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/data&gt;</span>
 <span class="nt">&lt;/datamodel&gt;</span>
 </pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">xpath</span></code> option has to start with “/”</p>
 </div>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
@@ -224,8 +275,8 @@ There, we can define the path for each slot key.</p>
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2023, Leroy Rügemer.
-      <span class="lastupdated">Last updated on Jun 10, 2025.
+    <p>&#169; Copyright 2025, Team of Bielefeld.
+      <span class="lastupdated">Last updated on Oct 28, 2025.
       </span></p>
   </div>
 
