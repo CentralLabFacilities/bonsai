@@ -25,8 +25,9 @@ import java.util.regex.Matcher
  *
  * Options:
  *  MSG:                    [String] (Optional)  Message to say. variables: #S=storage #C=category #E=entity(container) #N=giveName
- *  USE_CATEGORY            [Boolean] Read from `Category` Slot (default: false)
- *  USE_MODEL               [Boolean] Read from `Model` Slot (default: false)
+ *  USE_CATEGORY_SLOT       [Boolean] Read from `Category` Slot (default: false)
+ *  USE_MODEL_SLOT          [Boolean] Read from `Model` Slot (default: false)
+ *  CATEGORY                [String] (Optional) Category which default storage should be found. If given, no slot will be used.
  *
  * Slots:
  *  Entity:                 [Entity] (Read, Optional)
@@ -50,9 +51,10 @@ import java.util.regex.Matcher
  * @author lruegeme, lgraesner
  */
 class GetCategoryStorage : AbstractSkill() {
-    private val KEY_CATEROY = "USE_CATEGORY"
-    private val KEY_MODEL = "USE_MODEL"
+    private val KEY_USE_CATEGORY_SLOT = "USE_CATEGORY_SLOT"
+    private val KEY_USE_MODEL_SLOT = "USE_MODEL_SLOT"
     private val KEY_MSG = "MSG"
+    private val KEY_CATEGORY = "CATEGORY"
 
     private var speechActuator: SpeechActuator? = null
     private var tokenSuccessWithStorage: ExitToken? = null
@@ -67,6 +69,8 @@ class GetCategoryStorage : AbstractSkill() {
     private var categorySlot: MemorySlotWriter<String>? = null
     private var storageSlot: MemorySlotWriter<String>? = null
     private var containerSlot: MemorySlotWriter<Entity>? = null
+
+    private var category: String = ""
 
     private var ecwm: ECWMRobocup? = null
     private var fur: Future<Attributes?>? = null
@@ -83,21 +87,28 @@ class GetCategoryStorage : AbstractSkill() {
 
         ecwm = configurator.getActuator<ECWMRobocup>("ECWMRobocup", ECWMRobocup::class.java)
 
-        val useCat = configurator.requestOptionalBool(KEY_CATEROY, false)
-        val useModel = configurator.requestOptionalBool(KEY_MODEL, false)
-        if(useCat && useModel) {
-            throw ConfigurationException("cant combine $KEY_CATEROY with $KEY_MODEL")
+        val useCatSlot = configurator.requestOptionalBool(KEY_USE_CATEGORY_SLOT, false)
+        val useModelSlot = configurator.requestOptionalBool(KEY_USE_MODEL_SLOT, false)
+        category = configurator.requestOptionalValue(KEY_CATEGORY, "")
+
+        if (!category.isEmpty() && useCatSlot || !category.isEmpty() && useModelSlot) {
+            throw ConfigurationException("Cant combine $KEY_CATEGORY with $KEY_USE_MODEL_SLOT or $KEY_USE_CATEGORY_SLOT")
+        }
+        if (useCatSlot && useModelSlot) {
+            throw ConfigurationException("Cant combine $KEY_USE_CATEGORY_SLOT with $KEY_USE_MODEL_SLOT")
         }
 
-        if(useCat) {
+        if (useCatSlot) {
             categoryInSlot = configurator.getReadSlot<String>("Category", String::class.java)
         } else {
+            //Write category to slot if not given per slot always!
             categorySlot = configurator.getWriteSlot<String>("Category", String::class.java)
         }
 
-        if(useModel) {
+        if (useModelSlot) {
             modelInSlot = configurator.getReadSlot<Model>("Model", Model::class.java)
-        } else {
+        } else if (category.isEmpty()) {
+            //Only use entity read slot if no category is given in data model!
             entityInSlot = configurator.getReadSlot<Entity>("Entity", Entity::class.java)
         }
 
@@ -105,15 +116,20 @@ class GetCategoryStorage : AbstractSkill() {
         containerSlot = configurator.getWriteSlot<Entity>("Container", Entity::class.java)
 
         message = configurator.requestOptionalValue(KEY_MSG, message)
-        if(message.isNotEmpty()) {
+        if (message.isNotEmpty()) {
             speechActuator = configurator.getActuator<SpeechActuator>("SpeechActuator", SpeechActuator::class.java)
         }
-        
+
     }
 
     override fun init(): Boolean {
 
-        modelInSlot?.recall<Model>().also{
+        if (!category.isEmpty()) {
+            logger.debug("Using category from data model, ignoring slots!")
+            return true
+        }
+
+        modelInSlot?.recall<Model>().also {
             if (it == null) {
                 logger.error("Model is null")
                 return false
@@ -131,31 +147,42 @@ class GetCategoryStorage : AbstractSkill() {
     }
 
     override fun execute(): ExitToken {
+        return if (category.isEmpty()) {
+            getFromFuture()
+        } else {
+            getFromCategoryString()
+        }
+    }
+
+    override fun end(curToken: ExitToken): ExitToken {
+        return curToken
+    }
+
+    private fun getFromFuture(): ExitToken {
         if (!fur!!.isDone) {
             return ExitToken.loop()
         }
 
-        if(talk != null) {
-            return if(!talk!!.isDone) {
+        if (talk != null) {
+            return if (!talk!!.isDone) {
                 ExitToken.loop()
             } else {
                 if (storage.isEmpty()) tokenSuccessWithStorage!! else tokenSuccessNoStorage!!
             }
         }
 
-
         val attributes: Attributes = fur!!.get() ?: Attributes.empty()
-        val category = attributes.getFirstAttributeOrNull("category") ?: run {
+        val categoryFromSlot = attributes.getFirstAttributeOrNull("category") ?: run {
             logger.warn("object has no category, using unknown")
             "unknown"
         }
         val givenName = attributes.getFirstAttributeOrNull("given_name") ?: attributes.reference
-        categorySlot?.memorize(category)
+        categorySlot?.memorize(categoryFromSlot)
 
-        logger.debug("get Category Storage for: $category")
+        logger.debug("get Category Storage for: $categoryFromSlot")
 
         val entityStorage = try {
-            ecwm!!.getCategoryStorage(category).get()!!
+            ecwm!!.getCategoryStorage(categoryFromSlot).get()!!
         } catch (e: Exception) {
             logger.error("could not get a category storage")
             return tokenNoStorage!!
@@ -169,12 +196,12 @@ class GetCategoryStorage : AbstractSkill() {
             storage = entityStorage.storage!!
         }
 
-        if(message.isEmpty())
-            return if (storage.isEmpty()) tokenSuccessWithStorage!! else tokenSuccessNoStorage!!
+        if (message.isEmpty())
+            return if (!storage.isEmpty()) tokenSuccessWithStorage!! else tokenSuccessNoStorage!!
 
         if (!storage.startsWith("on")) storage = "in $storage"
         message = message.replace(Matcher.quoteReplacement("#S"), storage);
-        message = message.replace(Matcher.quoteReplacement("#C"), category);
+        message = message.replace(Matcher.quoteReplacement("#C"), categoryFromSlot);
         message = message.replace(Matcher.quoteReplacement("#E"), entityStorage.entity.id);
         message = message.replace(Matcher.quoteReplacement("#N"), givenName);
         message = message.replace("_", " ");
@@ -183,7 +210,22 @@ class GetCategoryStorage : AbstractSkill() {
         return ExitToken.loop()
     }
 
-    override fun end(curToken: ExitToken): ExitToken {
-        return curToken
+    private fun getFromCategoryString(): ExitToken {
+        categorySlot?.memorize(category)
+        logger.debug("Getting category storage of $category")
+        val entityStorage = try {
+            ecwm!!.getCategoryStorage(category).get()!!
+        } catch (e: Exception) {
+            logger.error("could not get a category storage")
+            return tokenNoStorage!!
+        }
+        logger.debug("Category storage of $category is $entityStorage")
+        containerSlot?.memorize(entityStorage.entity)
+        if (entityStorage.storage?.isEmpty() == false) {
+            logger.debug("Storage: " + entityStorage.storage)
+            storageSlot!!.memorize<String>(entityStorage.storage)
+            storage = entityStorage.storage!!
+        }
+        return if (!storage.isEmpty()) tokenSuccessWithStorage!! else tokenSuccessNoStorage!!
     }
 }
