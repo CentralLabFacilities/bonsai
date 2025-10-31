@@ -125,7 +125,7 @@ class PlaceInsideStorage : AbstractSkill() {
         maxSize = configurator.requestOptionalDouble(KEY_MAX_SIZE,maxSize.toDouble()).toFloat()
 
         minZ = configurator.requestOptionalDouble(KEY_OVERWRITE_Z_MIN, minZ)
-        minZ = configurator.requestOptionalDouble(KEY_OVERWRITE_Z_MAX, maxZ)
+        maxZ = configurator.requestOptionalDouble(KEY_OVERWRITE_Z_MAX, maxZ)
 
         flip = configurator.requestOptionalBool(KEY_FLIP,flip)
         topdown = configurator.requestOptionalBool(KEY_TOPDOWN,topdown)
@@ -187,11 +187,13 @@ class PlaceInsideStorage : AbstractSkill() {
         var zStorage = (storageArea.sizeZ)
 
 
-        if (minZ == Double.NaN) minZ = 0.0
-        if (maxZ == Double.NaN) maxZ = zStorage
+        if (minZ.isNaN()) minZ = 0.0
+        if (maxZ.isNaN()) maxZ = zStorage
 
         val minDist = Point3D(-xStorage, -yStorage, minZ.toFloat())
         val maxDist = Point3D(xStorage, yStorage, maxZ.toFloat())
+        logger.debug("min place: $minDist")
+        logger.debug("max place: $maxDist")
         return Pair(minDist, maxDist)
     }
 
