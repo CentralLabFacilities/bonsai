@@ -3,6 +3,7 @@ package de.unibi.citec.clf.bonsai.skills.ecwm.list.filter
 import de.unibi.citec.clf.bonsai.actuators.ECWMRobocup
 import de.unibi.citec.clf.bonsai.core.`object`.MemorySlot
 import de.unibi.citec.clf.bonsai.core.`object`.MemorySlotReader
+import de.unibi.citec.clf.bonsai.core.`object`.MemorySlotWriter
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken
@@ -30,7 +31,7 @@ import de.unibi.citec.clf.btl.data.world.EntityList
  *      -> value of the designated attribute to act as a filter, if not set as an option
  *
  * ExitTokens:
- * success:                 Filtered the list
+ * success.notEmpty:                 Filtered the list
  * success.empty:           Filtered the list, which is empty now
  *
  * </pre>
@@ -42,7 +43,8 @@ class FilterEntityListByAttribute : AbstractSkill() {
     private var tokenSuccess: ExitToken? = null
     private var tokenSuccessEmpty: ExitToken? = null
 
-    private var listSlot: MemorySlot<EntityList>? = null
+    private var listSlot: MemorySlotReader<EntityList>? = null
+    private var listWriteSlot: MemorySlotWriter<EntityList>? = null
     private var entitylist: EntityList? = null
     private var key: String = ""
     private var valueSlot: MemorySlotReader<String>? = null
@@ -59,10 +61,12 @@ class FilterEntityListByAttribute : AbstractSkill() {
     private var ecwm: ECWMRobocup? = null
 
     override fun configure(configurator: ISkillConfigurator) {
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
-        tokenSuccessEmpty = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus("empty"))
+        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS().ps("notEmpty"))
+        tokenSuccessEmpty = configurator.requestExitToken(ExitStatus.SUCCESS().ps("empty"))
 
-        listSlot = configurator.getReadWriteSlot("EntityList", EntityList::class.java)
+        listSlot = configurator.getReadSlot("EntityList", EntityList::class.java)
+        listWriteSlot = configurator.getWriteSlot("Filtered", EntityList::class.java)
+
         key = configurator.requestValue(KEY_ATTRIBUTE)
         if (configurator.hasConfigurationKey(KEY_VALUE)) {
             value = configurator.requestValue(KEY_VALUE)
@@ -95,7 +99,7 @@ class FilterEntityListByAttribute : AbstractSkill() {
         }
 
         val newEntityList = EntityList().apply { addAll(filtered) }
-        listSlot!!.memorize(newEntityList)
+        listWriteSlot!!.memorize(newEntityList)
 
         logger.debug("Filtered List:")
         for (e in newEntityList) {
