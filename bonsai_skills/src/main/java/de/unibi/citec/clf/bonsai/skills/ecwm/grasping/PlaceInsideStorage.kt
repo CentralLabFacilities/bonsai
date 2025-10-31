@@ -16,6 +16,7 @@ import de.unibi.citec.clf.btl.data.geometry.Pose3D
 import de.unibi.citec.clf.btl.data.world.Entity
 import de.unibi.citec.clf.btl.units.LengthUnit
 import java.util.concurrent.Future
+import kotlin.math.max
 
 /**
  * Place the Entity anywhere inside the Storage.
@@ -66,6 +67,8 @@ class PlaceInsideStorage : AbstractSkill() {
         private val KEY_FLIP = "flip"
         private val KEY_MAX_SIZE = "maxSize"
         private val KEY_PADDING = "padding"
+        private val KEY_OVERWRITE_Z_MIN = "min_z"
+        private val KEY_OVERWRITE_Z_MAX = "max_z"
     }
 
     //defaults
@@ -77,6 +80,10 @@ class PlaceInsideStorage : AbstractSkill() {
     private var padding = 0.04f
     // max size of target area
     private var maxSize = 0.25f
+
+    // old values as default (TODO should be double.nan)
+    private var minZ = 0.02
+    private var maxZ = 0.06
 
     private var entitySlot: MemorySlotReader<Entity>? = null
     private var spiritSlot: MemorySlotReader<Spirit>? = null
@@ -114,6 +121,9 @@ class PlaceInsideStorage : AbstractSkill() {
 
         padding = configurator.requestOptionalDouble(KEY_PADDING,padding.toDouble()).toFloat()
         maxSize = configurator.requestOptionalDouble(KEY_MAX_SIZE,maxSize.toDouble()).toFloat()
+
+        minZ = configurator.requestOptionalDouble(KEY_OVERWRITE_Z_MIN, minZ)
+        minZ = configurator.requestOptionalDouble(KEY_OVERWRITE_Z_MAX, maxZ)
 
         flip = configurator.requestOptionalBool(KEY_FLIP,flip)
         upright = configurator.requestOptionalBool(KEY_UPRIGHT, upright)
@@ -171,12 +181,14 @@ class PlaceInsideStorage : AbstractSkill() {
         // Decrease size if area is too large
         var xStorage = minOf((storageArea.sizeX / 2).toFloat() - padding,maxSize)
         var yStorage = minOf((storageArea.sizeY / 2).toFloat() - padding,maxSize)
+        var zStorage = (storageArea.sizeZ)
 
-        val minZ = 0.02f
-        val maxZ = 0.06f
 
-        val minDist = Point3D(-xStorage, -yStorage, minZ)
-        val maxDist = Point3D(xStorage, yStorage, maxZ)
+        if (minZ == Double.NaN) minZ = 0.0
+        if (maxZ == Double.NaN) maxZ = zStorage
+
+        val minDist = Point3D(-xStorage, -yStorage, minZ.toFloat())
+        val maxDist = Point3D(xStorage, yStorage, maxZ.toFloat())
         return Pair(minDist, maxDist)
     }
 
