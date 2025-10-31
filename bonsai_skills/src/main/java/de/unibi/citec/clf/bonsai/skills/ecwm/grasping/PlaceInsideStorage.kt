@@ -65,6 +65,7 @@ class PlaceInsideStorage : AbstractSkill() {
         private val KEY_USE_SPIRIT = "use_spirit"
         private val KEY_UPRIGHT = "upright"
         private val KEY_FLIP = "flip"
+        private val KEY_TOPDOWN = "topdown"
         private val KEY_MAX_SIZE = "maxSize"
         private val KEY_PADDING = "padding"
         private val KEY_OVERWRITE_Z_MIN = "min_z"
@@ -75,6 +76,7 @@ class PlaceInsideStorage : AbstractSkill() {
     private var useSpirit = false
     private var upright = false
     private var flip = false
+    private var topdown = false
 
     // padding for target storage
     private var padding = 0.04f
@@ -126,6 +128,7 @@ class PlaceInsideStorage : AbstractSkill() {
         minZ = configurator.requestOptionalDouble(KEY_OVERWRITE_Z_MAX, maxZ)
 
         flip = configurator.requestOptionalBool(KEY_FLIP,flip)
+        topdown = configurator.requestOptionalBool(KEY_TOPDOWN,topdown)
         upright = configurator.requestOptionalBool(KEY_UPRIGHT, upright)
         if(flip && upright) throw ConfigurationException("cant flip and upright at the same time")
     }
@@ -156,7 +159,7 @@ class PlaceInsideStorage : AbstractSkill() {
         logger.info("place object @ $targetPose")
         val (minDist, maxDist) = getMinMaxDist(targetStorageArea!!)
 
-        fur = ecwm?.placeEntity(graspEntity, targetPose, flip, minDist, maxDist, upright)
+        fur = ecwm?.placeEntity(graspEntity, targetPose, flip, minDist, maxDist, upright = upright, topdown = topdown)
 
         return fur != null
     }
