@@ -53,7 +53,7 @@ interface ECWMGrasping : Actuator {
      * Place an ECWM Entity somewhere near the target pose
      */
     @Throws(IOException::class)
-    fun placeEntity(attached_entity: Entity?, pose: Pose3D, flip: Boolean, min_dist : Point3D?, max_dist : Point3D?, upright: Boolean = false): Future<ManipulationActuator.MoveitResult?>
+    fun placeEntity(attached_entity: Entity?, pose: Pose3D, flip: Boolean, min_dist : Point3D?, max_dist : Point3D?, upright: Boolean = false, topdown: Boolean = false): Future<ManipulationActuator.MoveitResult?>
     fun placeEntity(attached_entity: Entity?, pose: Pose3D, flip: Boolean, upright: Boolean = false): Future<ManipulationActuator.MoveitResult?>
 
     /**
