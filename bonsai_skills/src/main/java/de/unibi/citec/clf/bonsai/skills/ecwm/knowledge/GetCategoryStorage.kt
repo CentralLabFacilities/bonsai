@@ -71,6 +71,7 @@ class GetCategoryStorage : AbstractSkill() {
     private var containerSlot: MemorySlotWriter<Entity>? = null
 
     private var category: String = ""
+    private var categoryFromSlot: String = ""
 
     private var ecwm: ECWMRobocup? = null
     private var fur: Future<Attributes?>? = null
@@ -105,11 +106,13 @@ class GetCategoryStorage : AbstractSkill() {
             categorySlot = configurator.getWriteSlot<String>("Category", String::class.java)
         }
 
-        if (useModelSlot) {
-            modelInSlot = configurator.getReadSlot<Model>("Model", Model::class.java)
-        } else if (category.isEmpty()) {
-            //Only use entity read slot if no category is given in data model!
-            entityInSlot = configurator.getReadSlot<Entity>("Entity", Entity::class.java)
+        if (category.isEmpty() && !useCatSlot) {
+            //Only use model/entity if no category is given (via data model or slot)!
+            if (useModelSlot) {
+                modelInSlot = configurator.getReadSlot<Model>("Model", Model::class.java)
+            } else {
+                entityInSlot = configurator.getReadSlot<Entity>("Entity", Entity::class.java)
+            }
         }
 
         storageSlot = configurator.getWriteSlot<String>("Storage", String::class.java)
@@ -124,6 +127,19 @@ class GetCategoryStorage : AbstractSkill() {
 
     override fun init(): Boolean {
 
+        //Try to get category from slot first
+        categoryFromSlot = categoryInSlot?.recall<String>().also {
+            if (it == null) {
+                logger.error("Category from slot is null")
+                return false
+            }
+        } ?: ""
+
+        if (!categoryFromSlot.isEmpty()) {
+            logger.debug("Using category from slot, ignoring other slots!")
+            return true
+        }
+        //Then check if category is given via data model
         if (!category.isEmpty()) {
             logger.debug("Using category from data model, ignoring slots!")
             return true
@@ -147,7 +163,7 @@ class GetCategoryStorage : AbstractSkill() {
     }
 
     override fun execute(): ExitToken {
-        return if (category.isEmpty()) {
+        return if (category.isEmpty() && categoryFromSlot.isEmpty()) {
             getFromFuture()
         } else {
             getFromCategoryString()
@@ -211,6 +227,7 @@ class GetCategoryStorage : AbstractSkill() {
     }
 
     private fun getFromCategoryString(): ExitToken {
+        if (category.isEmpty()) category = categoryFromSlot
         categorySlot?.memorize(category)
         logger.debug("Getting category storage of $category")
         val entityStorage = try {
