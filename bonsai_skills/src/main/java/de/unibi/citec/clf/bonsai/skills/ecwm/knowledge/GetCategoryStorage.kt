@@ -104,6 +104,7 @@ class GetCategoryStorage : AbstractSkill() {
         } else {
             //Write category to slot if not given per slot always!
             categorySlot = configurator.getWriteSlot<String>("Category", String::class.java)
+            categoryInSlot = null
         }
 
         if (category.isEmpty() && !useCatSlot) {
@@ -127,21 +128,16 @@ class GetCategoryStorage : AbstractSkill() {
 
     override fun init(): Boolean {
 
-        //Try to get category from slot first
-        categoryFromSlot = categoryInSlot?.recall<String>().also {
-            if (it == null) {
-                logger.error("Category from slot is null")
-                return false
-            }
-        } ?: ""
+        //Check if category is given via data model
+        if (!category.isEmpty()) {
+            logger.debug("Using category from data model, ignoring slots!")
+            return true
+        }
+
+        categoryFromSlot = categoryInSlot?.recall<String>() ?: ""
 
         if (!categoryFromSlot.isEmpty()) {
             logger.debug("Using category from slot, ignoring other slots!")
-            return true
-        }
-        //Then check if category is given via data model
-        if (!category.isEmpty()) {
-            logger.debug("Using category from data model, ignoring slots!")
             return true
         }
 
