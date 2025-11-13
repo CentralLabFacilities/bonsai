@@ -13,33 +13,38 @@ import de.unibi.citec.clf.btl.data.ecwm.Spirit
 import java.util.concurrent.Future
 
 /**
- * Detects objects in view and uses segmentation to return only those that are inside an entities' storage.
+ * Detects objects view and uses segmentation to return only those that are inside an entities' storage.
+ *
  * <pre>
  *
  * Options:
- *  store:              [String] Optional (default: true)
+ *  #_store:            [String] Optional (default: true)
  *                              -> will add detected objects to the world model
- *  clear:              [String] Optional (default: true)
+ *  #_clear:            [String] Optional (default: true)
  *                              -> will clear objects from the world if they aren't present at their supposed location
- *  minProb             [String] Optional (default: 0.5)
+ *  #_min_prob          [String] Optional (default: 0.5)
  *                              -> the minimal probability for an object to be recognized as such
- *  entityName:         [double] Optional
+ *  #_entity:           [String] Optional
  *                              -> the entity the storage belongs to
- *  storageName:        [double] Optional
+ *  #_storage:          [String] Optional
  *                              -> the storage in which the detected objects have to be present
- *  fastPose:           [Boolean] Optional (default: false)
+ *  #_fast_pose:        [Boolean] Optional (default: false)
  *                              -> do fast but unprecise pose estimate (bad for grasping)
- *  use_spirit:         [Boolean] Optional (default: false)
+ *  #_spirit:           [Boolean] Optional (default: false)
  *                              -> use Spirit instead of entity/storage
+ *  #_padding           [Double] Optional (default: 0.05)
+ *                              -> Padding around storage (x/y)
  *
  * Slots:
- *  Entity: [Entity] [Read]
- *      -> the entity the storage belongs to. Will only be used if option "entityName" is not set.
- *  Storage: [String] [Read]
- *      -> the storage in which the detected objects have to be present. Will only be used if option "storageName" is not set.
- *  Spirit: [Spirit] [Read]
- *      -> Entity + Storage
- *  RecognizedEntities: [EntityList] [Write]
+ *  Entity: [Entity] (Read Optional)
+ *      -> the entity the storage belongs to.
+ *          Will only be used if option "#_entity" or #_spirit is not set.
+ *  Storage: [String] (Read Optional)
+ *      -> the storage in which the detected objects have to be present.
+ *          Will only be used if option "#_storage" or #_spirit is not set.
+ *  Spirit: [Spirit] (Read Optional)
+ *      -> Entity + Storage, only used if #_spirit is True
+ *  RecognizedEntities: [EntityList] (Write)
  *      -> a list of objects detected inside the storage.
  *
  * ExitTokens:
@@ -107,8 +112,6 @@ class RecognizeEntities : AbstractSkill() {
             if (storageName == null || storageName == "null") slotIn2 =
                     configurator.getReadSlot("Storage", String::class.java)
         }
-
-
 
         slotOut = configurator.getWriteSlot("RecognizedEntities", EntityList::class.java)
 
