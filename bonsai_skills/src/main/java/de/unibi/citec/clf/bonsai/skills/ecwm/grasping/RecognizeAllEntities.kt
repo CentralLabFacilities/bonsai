@@ -11,24 +11,28 @@ import de.unibi.citec.clf.btl.data.world.EntityList
 import java.util.concurrent.Future
 
 /**
- * Detects objects in view.
+ * Detects all entities in view.
+ *
  * <pre>
  *
  * Options:
- *  store:              [String] Optional (default: false)
+ *  #_store:              [String] Optional (default: false)
  *                              -> will add detected objects to the world model
- *  minProb             [String] Optional (default: 0.5)
+ *  #_min_prob            [String] Optional (default: 0.5)
  *                              -> the minimal probability for an object to be recognized as such
- *  fastPose:           [Boolean] Optional (default: false)
+ *  #_fast_pose:          [Boolean] Optional (default: false)
  *                              -> do fast but unprecise pose estimate (bad for grasping)
- *  #_safety_height     [Double] Optional (default: 0.0)
- *                              -> add a "safety" collision plane to the planning scene
- *                                  the "arm" will not move through,
- *                                  may move some recognized objects above the given height to avoid them being stuck
+ *  #_safety_height       [Double] Optional (default: 0.0)
+ *                              -> may move some recognized objects above the given height to avoid them being stuck
+ *  #_height_from_slot    [Boolean] Optional (default: false)
+ *                              -> use slot for #_safety_height
  *
  * Slots:
- *  RecognizedEntities: [EntityList] [Write]
+ *  RecognizedEntities: [EntityList] (Write)
  *      -> a list of objects detected inside the storage.
+ *  SafetyHeight:       [Double] (Read Optional)
+ *      -> #_safety_height parameter.
+ *          Will only be used if option "#_height_from_slot" is not set.
  *
  * ExitTokens:
  * success:                Detected one or more objects inside the target storage
