@@ -20,14 +20,16 @@ import kotlin.collections.iterator
  * <pre>
  *
  * Options:
- *  entity:     [String] Optional
- *                  -> Entity Name to fetch goals from
- *  spirit:     [String]
- *                  -> Name of the Spirit to get
- *  storage:    [String] Optional (default "")
- *                  -> Storage
- *  use_storage: [Boolean] Optional (default false)
- *                  -> if storage is not used, finds the first matching one if multiple exists
+ *  entity:             [String] Optional
+ *                          -> Entity Name to fetch goals from
+ *  spirit:             [String]
+ *                          -> Name of the Spirit to get
+ *  storage:            [String] Optional (default "")
+ *                          -> Storage
+ *  use_storage:        [Boolean] Optional (default false)
+ *                          -> if use_storage is false, finds the first matching one if multiple exists
+ *  use_storage_string: [Boolean] Optional (default false)
+ *                          -> use String slot to get storage name
  *
  * Slots:
  *  Entity:   [Entity] (Optional)
@@ -56,6 +58,8 @@ class GetSpirit : AbstractSkill() {
     private val KEY_SPIRIT = "spirit"
     private val KEY_STORAGE = "storage"
     private val KEY_USE_STORAGE = "use_storage"
+    private val KEY_USE_STORAGE_S = "use_storage_string"
+
 
     private var ecwmRobocup: ECWMRobocup? = null
     private var tokenSuccess: ExitToken? = null
@@ -63,11 +67,13 @@ class GetSpirit : AbstractSkill() {
     private var spiritSlot: MemorySlotWriter<Spirit>? = null
     private var entity: MemorySlotReader<Entity>? = null
     private var storage: MemorySlotReader<StorageArea>? = null
+    private var storageS: MemorySlotReader<String>? = null
 
     private var entityname: String = ""
     private var storagename: String = ""
     private var spiritname: String = ""
     private var useStorage = false
+    private var useStorageS = false
 
     private var fut: Future<Map<String, Set<String>>?>? = null
 
@@ -85,6 +91,7 @@ class GetSpirit : AbstractSkill() {
         }
 
         useStorage = configurator.requestOptionalBool(KEY_USE_STORAGE, useStorage)
+        useStorageS = configurator.requestOptionalBool(KEY_USE_STORAGE_S, useStorageS)
 
         if (configurator.hasConfigurationKey(KEY_STORAGE)) {
             storagename = configurator.requestValue(KEY_STORAGE)
@@ -93,7 +100,12 @@ class GetSpirit : AbstractSkill() {
                 logger.warn("parameter $KEY_STORAGE is set, forcing $KEY_USE_STORAGE")
             }
         } else if (useStorage) {
-            storage = configurator.getReadSlot("Storage", StorageArea::class.java)
+            if(useStorageS) {
+                storageS = configurator.getReadSlot("StorageName", String::class.java)
+            } else {
+                storage = configurator.getReadSlot("Storage", StorageArea::class.java)
+            }
+
         }
 
         spiritname = configurator.requestValue(KEY_SPIRIT)
@@ -107,8 +119,13 @@ class GetSpirit : AbstractSkill() {
             entityname = e.id
         }
 
-        if(storage!= null) {
-            storagename = storage!!.recall<StorageArea>()?.name ?: return false
+        storagename = storageS?.recall<String>() ?: storagename
+
+        if(storage != null) {
+            storagename = storage!!.recall<StorageArea>()?.name ?: run {
+                logger.error("Storage is null")
+                return false
+            }
         }
 
         fut = ecwmRobocup?.getEntitySpirits(Entity(entityname,"")) ?: run {
