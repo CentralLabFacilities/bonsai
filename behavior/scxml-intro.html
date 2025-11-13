@@ -244,16 +244,49 @@ BonsaiSCXML is not utilizing the whole <a class="reference external" href="http:
 </section>
 <section id="sourcing">
 <span id="scxml-sourcing"></span><h2>Sourcing<a class="headerlink" href="#sourcing" title="Link to this heading"></a></h2>
-<p>You can source other xmls in a state</p>
+<p>It is possible to use multiple other statemachines by <code class="docutils literal notranslate"><span class="pre">sourcing</span></code> them within your main state machine.
+Within your main state machine, you would <strong>source</strong> other xmls <strong>in a state</strong>.</p>
+<p>When you source another state machine, when compiling it’s states and transitions are copied into the main state machine.
+All <strong>states</strong> and <strong>success</strong>, <strong>error</strong> and <strong>fatal</strong> events of the sub state machine get suffixed by the sourcing state <code class="docutils literal notranslate"><span class="pre">id</span></code> (this includes hashes).
+This means that variables defined within a state machine are <strong>global</strong>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<ul class="simple">
+<li><p>If you define the same variable within mutliple substates  but with different values, the actual value of the parameter is undeterministically one of the defined values <strong>for all</strong> main and sub state machines.</p></li>
+<li><p>To reduce the risk of undeterministic robot behavior, don’t define variables with the same name within your state machine and sub state machines.</p></li>
+<li><p>See the example below</p></li>
+</ul>
+</div>
+<p>Following things have to be made sure when sourcing other state machines:</p>
+<ul class="simple">
+<li><p>all sub state machines have to send either success, error, or fatal when exiting</p></li>
+<li><p>The main state machine needs transitions for all of the exit tokens, using regex here is not allowed.</p></li>
+<li><p>don’t use #suffix in a sourcing state</p></li>
+</ul>
 <p>Example:</p>
-<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span>Document<span class="w"> </span>a.xml:
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span>Document<span class="w"> </span>main.xml:
 <span class="nt">&lt;scxml</span><span class="w"> </span><span class="na">xmlns=</span><span class="s">&quot;http://www.w3.org/2005/07/scxml&quot;</span><span class="w"> </span><span class="na">version=</span><span class="s">&quot;1.0&quot;</span><span class="w"> </span><span class="na">initial=</span><span class="s">&quot;A&quot;</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;datamodel&gt;</span>
+<span class="w">        </span><span class="nt">&lt;data</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;param1&quot;</span><span class="w"> </span><span class="na">expr=</span><span class="s">&quot;&#39;exampleString1&#39;&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/datamodel&gt;</span>
+
 <span class="w">    </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;A&quot;</span><span class="w"> </span><span class="na">src=</span><span class="s">&quot;${MAPPING}/b.xml&quot;</span><span class="nt">/&gt;</span>
 <span class="nt">&lt;/scxml&gt;</span>
 
-Document<span class="w"> </span>b.xml:
+-------------------------------------------------------------------------
+
+Document<span class="w"> </span>sub.xml:
 <span class="nt">&lt;scxml</span><span class="w"> </span><span class="na">xmlns=</span><span class="s">&quot;http://www.w3.org/2005/07/scxml&quot;</span><span class="w"> </span><span class="na">version=</span><span class="s">&quot;1.0&quot;</span><span class="w"> </span><span class="na">initial=</span><span class="s">&quot;B&quot;</span><span class="nt">&gt;</span>
+
+<span class="w">    </span><span class="nt">&lt;datamodel&gt;</span>
+<span class="w">        </span><span class="nt">&lt;data</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;param2&quot;</span><span class="w"> </span><span class="na">expr=</span><span class="s">&quot;&#39;exampleString2&#39;&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/datamodel&gt;</span>
+
 <span class="w">    </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;B&quot;</span><span class="nt">&gt;</span>
+<span class="w">        </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;one&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;C&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/state&gt;</span>
+
+<span class="w">    </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;C&quot;</span><span class="nt">&gt;</span>
 <span class="w">        </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;one&quot;</span><span class="nt">&gt;</span>
 <span class="w">            </span><span class="nt">&lt;send</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;success&quot;</span><span class="nt">/&gt;</span>
 <span class="w">        </span><span class="nt">&lt;/transition&gt;</span>
@@ -263,8 +296,20 @@ Document<span class="w"> </span>b.xml:
 </div>
 <p>Result:</p>
 <div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;scxml</span><span class="w"> </span><span class="na">xmlns=</span><span class="s">&quot;http://www.w3.org/2005/07/scxml&quot;</span><span class="w"> </span><span class="na">version=</span><span class="s">&quot;1.0&quot;</span><span class="w"> </span><span class="na">initial=</span><span class="s">&quot;A&quot;</span><span class="nt">&gt;</span>
+
+<span class="w">    </span><span class="cm">&lt;!-- Combined data model from main and sub--&gt;</span>
+<span class="w">    </span><span class="nt">&lt;datamodel&gt;</span>
+<span class="w">        </span><span class="nt">&lt;data</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;param1&quot;</span><span class="w"> </span><span class="na">expr=</span><span class="s">&quot;&#39;exampleString1&#39;&quot;</span><span class="nt">/&gt;</span>
+<span class="w">        </span><span class="nt">&lt;data</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;param2&quot;</span><span class="w"> </span><span class="na">expr=</span><span class="s">&quot;&#39;exampleString2&#39;&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/datamodel&gt;</span>
+
+<span class="w">    </span><span class="cm">&lt;!-- State machine B has been copied here --&gt;</span>
 <span class="w">    </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;A&quot;</span><span class="w"> </span><span class="na">initial=</span><span class="s">&quot;B#A&quot;</span><span class="nt">&gt;</span>
 <span class="w">        </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;B#A&quot;</span><span class="nt">&gt;</span>
+<span class="w">            </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;one&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;C#A&quot;</span><span class="nt">/&gt;</span>
+<span class="w">        </span><span class="nt">&lt;/state&gt;</span>
+
+<span class="w">        </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;C#A&quot;</span><span class="nt">&gt;</span>
 <span class="w">            </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;one&quot;</span><span class="nt">&gt;</span>
 <span class="w">                 </span><span class="nt">&lt;send</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;A.success&quot;</span><span class="nt">/&gt;</span>
 <span class="w">            </span><span class="nt">&lt;/transition&gt;</span>
@@ -273,17 +318,6 @@ Document<span class="w"> </span>b.xml:
 <span class="nt">&lt;/scxml&gt;</span>
 </pre></div>
 </div>
-<ul class="simple">
-<li><p>send actions using events beginning with <em>success</em>, <em>error</em> and <em>fatal</em> get prefixed by the sourcing state <code class="docutils literal notranslate"><span class="pre">id</span></code> (A)</p></li>
-<li><p>All states get suffixed by the sourcing state <code class="docutils literal notranslate"><span class="pre">id</span></code> (this includes hashes)</p></li>
-<li><p>There are some special cases to keep in mind when sourcing:</p>
-<ul>
-<li><p>dont use #suffix in a sourcing state</p></li>
-<li><p>dont use regex for transition for send events</p></li>
-</ul>
-</li>
-<li><p>different <code class="docutils literal notranslate"><span class="pre">MAPPING</span></code> path variables can be defined in your <code class="docutils literal notranslate"><span class="pre">localMapping.properties</span></code> or with the <code class="docutils literal notranslate"><span class="pre">-m</span></code> commandline parameter</p></li>
-</ul>
 </section>
 <section id="connect-skill-to-state">
 <h2>Connect Skill to State<a class="headerlink" href="#connect-skill-to-state" title="Link to this heading"></a></h2>
@@ -388,7 +422,7 @@ Document<span class="w"> </span>b.xml:
 
   <div role="contentinfo">
     <p>&#169; Copyright 2025, Team of Bielefeld.
-      <span class="lastupdated">Last updated on Oct 28, 2025.
+      <span class="lastupdated">Last updated on Nov 13, 2025.
       </span></p>
   </div>
 
