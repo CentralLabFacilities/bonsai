@@ -10,6 +10,7 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitToken
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
 import de.unibi.citec.clf.btl.data.world.Entity
 import de.unibi.citec.clf.btl.data.ecwm.Spirit
+import de.unibi.citec.clf.btl.data.ecwm.StorageArea
 import java.util.concurrent.Future
 import kotlin.collections.iterator
 
@@ -22,17 +23,19 @@ import kotlin.collections.iterator
  *  entity:     [String] Optional
  *                  -> Entity Name to fetch goals from
  *  spirit:     [String]
- *                  -> Spirit to get
+ *                  -> Name of the Spirit to get
  *  storage:    [String] Optional (default "")
  *                  -> Storage
  *  use_storage: [Boolean] Optional (default false)
  *                  -> if storage is not used, finds the first matching one if multiple exists
  *
  * Slots:
- *  Entity:   [Entity] Optional
+ *  Entity:   [Entity] (Optional)
  *                  -> Entity to fetch goals from, is used if the 'entity' option is not set
- *  Spirit:   [Spirit]
+ *  Spirit:   [Spirit] (Write)
  *                  -> The Spirit
+ *  Storage:  [StorageArea] (Read, Optional)
+ *                  -> The Storage, only read if use_storage is set
  *
  * ExitTokens:
  *  success:        Spirit exists
@@ -59,7 +62,7 @@ class GetSpirit : AbstractSkill() {
 
     private var spiritSlot: MemorySlotWriter<Spirit>? = null
     private var entity: MemorySlotReader<Entity>? = null
-    private var storage: MemorySlotReader<String>? = null
+    private var storage: MemorySlotReader<StorageArea>? = null
 
     private var entityname: String = ""
     private var storagename: String = ""
@@ -90,7 +93,7 @@ class GetSpirit : AbstractSkill() {
                 logger.warn("parameter $KEY_STORAGE is set, forcing $KEY_USE_STORAGE")
             }
         } else if (useStorage) {
-            storage = configurator.getReadSlot("Storage", String::class.java)
+            storage = configurator.getReadSlot("Storage", StorageArea::class.java)
         }
 
         spiritname = configurator.requestValue(KEY_SPIRIT)
@@ -105,7 +108,7 @@ class GetSpirit : AbstractSkill() {
         }
 
         if(storage!= null) {
-            storagename = storage!!.recall<String>() ?: return false
+            storagename = storage!!.recall<StorageArea>()?.name ?: return false
         }
 
         fut = ecwmRobocup?.getEntitySpirits(Entity(entityname,"")) ?: run {
