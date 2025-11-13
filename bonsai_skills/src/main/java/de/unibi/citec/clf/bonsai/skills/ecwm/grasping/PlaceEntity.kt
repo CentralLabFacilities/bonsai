@@ -20,12 +20,13 @@ import java.util.concurrent.Future
  * <pre>
  *
  * Options:
- *      val pose_x: target position x
- *      val pose_y: target position y
- *      val pose_z: target position z
- *      val frame_id: The frame id in which the object should be placed.
- *      val upright: default is false, otherwise the object is placed such that it wont spill anything
- *      val acceptable_margin: acceptable margin of error for the placement. Default is 0.15 / 15 cm
+ *      pose_x: target position x
+ *      pose_y: target position y
+ *      pose_z: target position z
+ *      frame_id: The frame id in which the object should be placed.
+ *      upright: default is false, otherwise the object is placed such that it wont spill anything
+ *      acceptable_margin: acceptable margin of error for the placement. Default is 0.15m
+ *
  * Slots:
  *  AttachedEntity: [Entity] (Read)
  *      -> the entity to be placed. Should be previously attached to gripper. Can be Null
