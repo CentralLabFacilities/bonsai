@@ -11,14 +11,42 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitToken
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
 import de.unibi.citec.clf.btl.data.ecwm.Spirit
 import de.unibi.citec.clf.btl.data.ecwm.SpiritGoal
+import de.unibi.citec.clf.btl.data.ecwm.StorageArea
 import de.unibi.citec.clf.btl.data.geometry.Point3DStamped
 import de.unibi.citec.clf.btl.data.geometry.Pose2D
 import de.unibi.citec.clf.btl.data.geometry.Pose3D
+import de.unibi.citec.clf.btl.data.world.Entity
 import de.unibi.citec.clf.btl.units.LengthUnit
 import java.util.concurrent.Future
 
 /**
  * @author lruegeme
+ *
+ * Assumes the target pose of the current location inside a spirit.
+ *
+ * Requires to be inside the spirit unless "#_ALWAYS" is set.
+ * Mind that the resulting pose may be wrong as only the gaze target is used. (see #_FALLBACK_Z)
+ *
+ * <pre>
+ *
+ * Options:
+ *  #_ALWAYS:               [Boolean] Optional (Default: false)
+ *                              -> Look at Target even if outside spirit area.
+ *  #_FALLBACK_Z            []
+ *  #_FALLBACK_STORAGE      []
+ *  #_Z_OFFSET              []
+ *  #_TIMEOUT               []
+ *  #_TIMEOUT_Z             []
+ *
+ * Slots:
+ *  Spirit                  [Spirit]
+ *                              -> The Spirit
+ *
+ * ExitTokens:
+ *  success:        Spirit exists
+ *
+ * </pre>
+ *
  */
 
 class LookAtSpirit : AbstractSkill() {
@@ -41,6 +69,7 @@ class LookAtSpirit : AbstractSkill() {
     private var fallbackStorage = ""
     private var fallbackZ = TIAGO_CAM_MIN + 0.2
     private var zOffset = 0.0;
+    private var always = false
 
     private var point: Point3DStamped? = null
     private var gazeDone: Future<Void>? = null
@@ -54,7 +83,7 @@ class LookAtSpirit : AbstractSkill() {
     private var gazeActuator: GazeActuator? = null
     private var jointcontroller: JointControllerActuator? = null
 
-    private var always = false
+
 
     private var ecwm: ECWMSpirit? = null
 
