@@ -168,20 +168,52 @@ Assign is used to update data entrys
 Sourcing
 --------
 
-You can source other xmls in a state
+It is possible to use multiple other statemachines by ``sourcing`` them within your main state machine.
+Within your main state machine, you would **source** other xmls **in a state**.
+
+When you source another state machine, when compiling it's states and transitions are copied into the main state machine.
+All **states** and **success**, **error** and **fatal** events of the sub state machine get suffixed by the sourcing state ``id`` (this includes hashes).
+This means that variables defined within a state machine are **global**. 
+
+.. warning::
+
+    * If you define the same variable within mutliple substates  but with different values, the actual value of the parameter is undeterministically one of the defined values **for all** main and sub state machines.
+    * To reduce the risk of undeterministic robot behavior, don't define variables with the same name within your state machine and sub state machines.
+    * See the example below
+
+Following things have to be made sure when sourcing other state machines:
+
+- all sub state machines have to send either success, error, or fatal when exiting
+- The main state machine needs transitions for all of the exit tokens, using regex here is not allowed.
+- don't use #suffix in a sourcing state
 
 Example:
 
 .. code-block:: xml
 
-    Document a.xml:
+    Document main.xml:
     <scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="A">
+        <datamodel>
+            <data id="param1" expr="'exampleString1'"/>
+        </datamodel>
+
         <state id="A" src="${MAPPING}/b.xml"/>
     </scxml>
 
-    Document b.xml:
+    -------------------------------------------------------------------------
+
+    Document sub.xml:
     <scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="B">
+
+        <datamodel>
+            <data id="param2" expr="'exampleString2'"/>
+        </datamodel>
+
         <state id="B">
+            <transition event="one" target="C"/>
+        </state>
+
+        <state id="C">
             <transition event="one">
                 <send event="success"/>
             </transition>
@@ -193,8 +225,20 @@ Result:
 .. code-block:: xml
 
     <scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="A">
+
+        <!-- Combined data model from main and sub-->
+        <datamodel>
+            <data id="param1" expr="'exampleString1'"/>
+            <data id="param2" expr="'exampleString2'"/>
+        </datamodel>
+
+        <!-- State machine B has been copied here -->
         <state id="A" initial="B#A">
             <state id="B#A">
+                <transition event="one" target="C#A"/>
+            </state>
+
+            <state id="C#A">
                 <transition event="one">
                      <send event="A.success"/>
                 </transition>
@@ -202,14 +246,7 @@ Result:
         </state>
     </scxml>
 
-- send actions using events beginning with *success*, *error* and *fatal* get prefixed by the sourcing state ``id`` (A)
-- All states get suffixed by the sourcing state ``id`` (this includes hashes)
-- There are some special cases to keep in mind when sourcing:
 
-  - dont use #suffix in a sourcing state
-  - dont use regex for transition for send events
-
-- different ``MAPPING`` path variables can be defined in your ``localMapping.properties`` or with the ``-m`` commandline parameter
 
 Connect Skill to State
 ----------------------
