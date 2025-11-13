@@ -18,7 +18,7 @@ import java.util.concurrent.Future
  *  entity:         [String] Optional
  *                           -> the name of the entity to be grasped
  * Slots:
- *  Entity: [Entity] [Read]
+ *  Entity: [Entity] (Read optional)
  *      -> the entity to be grasped. Will be used if option "entity" is not set
  *
  * ExitTokens:
