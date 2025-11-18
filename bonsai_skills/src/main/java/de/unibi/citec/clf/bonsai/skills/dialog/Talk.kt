@@ -24,7 +24,8 @@ import java.util.concurrent.Future
  *      -> Read Language slot to determine speak language
  * #_LANG:  [Language] text language (default: EN)
  *      -> Use the given language to speak the (same language) #_MESSAGE.
- *      This Defaults #_USE_LANGUAGE to false, set it to enable translation to current language
+ *         !! Setting this changes the default of #_USE_LANGUAGE to false, letting the robot always speak in #_LANG !!
+ *         set #_USE_LANGUAGE to enable translation of #_MESSAGE from #_LANG to current slot language
  * Slots:
  *
  * ExitTokens:
