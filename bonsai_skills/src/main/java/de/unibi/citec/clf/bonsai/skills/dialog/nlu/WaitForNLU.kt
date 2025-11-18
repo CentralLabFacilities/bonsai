@@ -81,7 +81,9 @@ class WaitForNLU : AbstractSkill() {
         sensorkey = configurator.requestOptionalValue(KEY_SENSOR, sensorkey)
         any = configurator.requestOptionalBool(KEY_ANY, any)
         if (!any) {
-            required_entities = configurator.requestOptionalValue(KEY_ENTITY, "").split(";")
+            if (configurator.hasConfigurationKey(KEY_ENTITY)) {
+                required_entities = configurator.requestValue(KEY_ENTITY).split(";")
+            }
             possible_intents = configurator.requestValue(KEY_DEFAULT).split(";")
             for (nt in possible_intents) {
                 if (nt.isBlank()) continue
