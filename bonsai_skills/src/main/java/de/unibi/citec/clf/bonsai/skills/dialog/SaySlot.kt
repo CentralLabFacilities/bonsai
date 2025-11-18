@@ -58,10 +58,12 @@ class SaySlot : AbstractSkill() {
 
     override fun configure(configurator: ISkillConfigurator) {
         sayText = configurator.requestOptionalValue(SAY_TEXT, sayText)
+        if (sayText.contains(REPLACE_STRING)) {
+            stringSlot = configurator.getReadSlot("StringSlot", String::class.java)
+        }
         blocking = configurator.requestOptionalBool(KEY_BLOCKING, blocking)
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
         speechActuator = configurator.getActuator("SpeechActuator", SpeechActuator::class.java)
-        stringSlot = configurator.getReadSlot("StringSlot", String::class.java)
         if(configurator.hasConfigurationKey(KEY_TEXT_LANGUAGE)) {
             val input = configurator.requestValue(KEY_TEXT_LANGUAGE)
             textLang = Language.valueOf(input)
@@ -83,7 +85,7 @@ class SaySlot : AbstractSkill() {
         var sayStr = stringSlot?.recall<String>()
 
         if (sayStr == null) {
-            logger.info("String from slot was not set, will use \"\" and ")
+            logger.info("String from slot was not set, will use '' ")
             sayStr = ""
         }
 
