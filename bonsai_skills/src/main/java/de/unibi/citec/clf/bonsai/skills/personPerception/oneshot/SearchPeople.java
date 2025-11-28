@@ -37,14 +37,14 @@ import java.util.concurrent.Future;
  *
  * Options:
  *  #_MAX_DIST:         [double] Optional (default: Double.MAX_VALUE)
- *                          -> How far the person can be away from the robot in mm
+ *                          -> How far the person can be away from the robot in meter
  *  #_MAX_ANGLE:        [double] Optional (default: Double.MAX_VALUE)
  *                          -> Person must be inside this angle cone in front of the robot in rad
- *  #_DO_FACE_ID:       [int] Optional (default: 1)
+ *  #_DO_FACE_ID:       [int] DEPRECATED! Optional (default: 0)
  *                          -> Whether face id gets called or not [0 = false, 1 = true]
- *  #_DO_GENDER_AGE:    [int] Optional (default: 1)
+ *  #_DO_GENDER_AGE:    [int] DEPRECATED! Optional (default: 0)
  *                          -> Whether gender and age gets called or not [0 = false, 1 = true]
- *  #_RESIZE_OUT_RATION:[double] Optional (default: 8.0)
+ *  #_RESIZE_OUT_RATION:[double] DEPRECATED! Optional (default: 8.0)
  *                          -> Affects the speed and the quality of the person detection; values to use:
  *                          4.0 -> quick (approx 2 secs)
  *                          8.0 -> better quality (approx 4 secs)
@@ -89,8 +89,8 @@ public class SearchPeople extends AbstractSkill {
     private double searchAngle = Double.MAX_VALUE;
     private int do_face_id = 0;
     private int do_gender_age = 0;
-    private boolean do_face_id_bool = true;
-    private boolean do_gender_age_bool = true;
+    private boolean do_face_id_bool = false;
+    private boolean do_gender_age_bool = false;
     private float resize_out_ratio = 8.0f;
     private long search_timeout = -1L;
     private long actuator_timeout = 20000;
@@ -136,21 +136,20 @@ public class SearchPeople extends AbstractSkill {
 
     @Override
     public boolean init() {
-        logger.debug("Scanning for persons ... searchDist:" + searchRadius + " searchAngle:" + searchAngle);
+        logger.debug("Settings: [SearchDist: " + searchRadius + " m," + " SearchAngle: " + searchAngle+ " rad]");
         if (search_timeout > 0) {
-            logger.debug("using search timeout of " + search_timeout + " ms");
+            logger.debug("Using search timeout of " + search_timeout + " ms");
             search_timeout += Time.currentTimeMillis();
         }
         try {
             robotPosition = positionSensor.readLast(200);
         } catch (IOException | InterruptedException e) {
-            logger.error("could not read robot position");
+            logger.error("Could not read robot position");
             return false;
         }
         do_face_id_bool = (do_face_id == 1);
         do_gender_age_bool = (do_gender_age == 1);
-        logger.debug("Detecting Persons");
-        logger.info("Do face id = " + do_face_id_bool + ". Do gender and age = " + do_gender_age_bool + ". Resize Out Ratio = " + resize_out_ratio);
+        logger.debug("Detecting Persons now");
 
         try {
             possiblePersons = null;
@@ -207,10 +206,10 @@ public class SearchPeople extends AbstractSkill {
                 globalPersonPos = CoordinateSystemConverter.localToGlobal(localPersonPos, robotPosition);
             }
 
-            logger.info("I saw a person - checking angle now; searchangle= " + searchAngle + ". Local Person position "
+            logger.info("Person found - checking angle now; searchangle= " + searchAngle + ". Local Person position "
                     + localPersonPos.toString() + ". Global Person position " + globalPersonPos.toString());
 
-            logger.info("Persons gesture: " + currentPerson.getPersonAttribute().getGestures().toString());
+            logger.info("Persons gesture(s): " + currentPerson.getPersonAttribute().getGestures().toString());
 
             double angle = robotPosition.getRelativeAngle(globalPersonPos, AngleUnit.RADIAN);
 
@@ -221,18 +220,18 @@ public class SearchPeople extends AbstractSkill {
                 );
                 //continue;
             }
-            if (localPersonPos.getDistance(new Point2DStamped(0.0, 0.0, LengthUnit.METER, StampedType.LOCAL_FRAME), LengthUnit.MILLIMETER) > searchRadius) {
-                logger.info("search distance is: " + searchRadius + "mm. person to far away: "
-                        + localPersonPos.getDistance(new Point2DStamped(0.0, 0.0, LengthUnit.METER, StampedType.LOCAL_FRAME), LengthUnit.MILLIMETER) + " mm.");
+            if (localPersonPos.getDistance(new Point2DStamped(0.0, 0.0, LengthUnit.METER, StampedType.LOCAL_FRAME), LengthUnit.METER) > searchRadius) {
+                logger.info("Search distance is: " + searchRadius + "m. Person to far away: "
+                        + localPersonPos.getDistance(new Point2DStamped(0.0, 0.0, LengthUnit.METER, StampedType.LOCAL_FRAME), LengthUnit.METER) + " m.");
                 continue;
             }
 
-            logger.info("FOUND PERSON IN SEARCH ANGLE - Person angle" + angle);
+            logger.info("Found person in search angle. Person angle is " + angle + " rad.");
             currentPerson.setPosition(globalPersonPos);
             foundPersons.add(currentPerson);
         }
 
-        if (foundPersons.elements.size() > 0) {
+        if (!foundPersons.elements.isEmpty()) {
             return tokenSuccessPeople;
         }
         return tokenSuccessNoPeople;
@@ -241,7 +240,7 @@ public class SearchPeople extends AbstractSkill {
     @Override
     public ExitToken end(ExitToken curToken) {
         if (curToken.getExitStatus().isSuccess()) {
-            if (foundPersons.elements.size() > 0) {
+            if (!foundPersons.elements.isEmpty()) {
                 try {
                     personDataListSlot.memorize(foundPersons);
                 } catch (CommunicationException ex) {
