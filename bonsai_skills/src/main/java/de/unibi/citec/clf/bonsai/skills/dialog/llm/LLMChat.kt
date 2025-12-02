@@ -70,7 +70,7 @@ class LLMChat : AbstractSkill() {
         addReply = configurator.requestOptionalBool(KEY_ADD_REPLY,addReply)
 
         if (addReply && !blocking) {
-            throw ConfigurationException("cant $KEY_ADD_REPLY while not blocking")
+            throw ConfigurationException("cant $KEY_ADD_REPLY while non blocking")
         }
 
         useTools = configurator.requestOptionalBool(KEY_USE_TOOLS,useTools)
@@ -106,7 +106,7 @@ class LLMChat : AbstractSkill() {
 
         val msg = Message(Role.USER, promt)
         history.add(msg)
-        slotHistory?.memorize(history)
+        //slotHistory?.memorize(history)
         logger.info("Sending Request '$promt'")
         fut = llm?.query(history, tools)
 
