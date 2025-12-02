@@ -25,7 +25,7 @@ import kotlin.collections.iterator
  *  spirit:             [String]
  *                          -> Name of the Spirit to get
  *  storage:            [String] Optional (default "")
- *                          -> Storage
+ *                          -> Storage of the spirit, if this parameter is set 'use_storage' is set to true
  *  use_storage:        [Boolean] Optional (default false)
  *                          -> if use_storage is false, finds the first matching one if multiple exists
  *  use_storage_string: [Boolean] Optional (default false)
