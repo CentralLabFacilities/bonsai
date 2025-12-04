@@ -150,17 +150,52 @@ BonsaiSCXML is not utilizing the whole <a class="reference external" href="http:
 <li><p>More exactly: first child states of parallel should not have transitions.</p></li>
 </ul>
 <p>Example:</p>
-<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;parallel</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;one&quot;</span><span class="nt">&gt;</span>
-<span class="w">    </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;A&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;three&quot;</span><span class="nt">/&gt;</span>
-<span class="w">    </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;twoA&quot;</span><span class="w"> </span><span class="na">initial=</span><span class="s">&quot;two#1&quot;</span><span class="nt">&gt;</span>
-<span class="w">        </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;two#1&quot;</span><span class="nt">&gt;</span>
-<span class="w">            </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;B&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;two#2&quot;</span><span class="nt">/&gt;</span>
-<span class="w">        </span><span class="nt">&lt;/state&gt;</span>
-<span class="w">        </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;two#2&quot;</span><span class="nt">/&gt;</span>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;parallel</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;Talk&quot;</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="cm">&lt;!-- Transitions from child states to outside the parallel need to be defined here --&gt;</span>
+<span class="w">    </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;DoThingsA.fatal&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;Fatal&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;DoThingsA.success&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;End&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;DoThingsB.fatal&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;Fatal&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;DoThingsB.success&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;End&quot;</span><span class="nt">/&gt;</span>
+
+<span class="w">    </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;DoThingsA&quot;</span><span class="nt">&gt;</span>
+<span class="w">        </span><span class="cm">&lt;!-- transitions going out of this child state are defined above --&gt;</span>
 <span class="w">    </span><span class="nt">&lt;/state&gt;</span>
-<span class="w">    </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;twoB&quot;</span><span class="nt">/&gt;</span>
+
+<span class="w">    </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;DoThingsB&quot;</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/state&gt;</span>
+
 <span class="nt">&lt;/parallel&gt;</span>
+
 <span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;three&quot;</span><span class="nt">/&gt;</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<ul class="simple">
+<li><p>You can combine compound states with parallel states to run a <cite>sequence of states</cite> in parallel with something else.</p></li>
+<li><p>Within the compound states you can only transition to child states of the compound. Otherwise the state machine will break!</p></li>
+</ul>
+</div>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;parallel</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;ParallelState&quot;</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="cm">&lt;!-- Transitions from child states to outside the parallel need to be defined here --&gt;</span>
+<span class="w">    </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;compoundChild.fatal&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;Fatal&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;anotherCompoundChild.*&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;End&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;parallelChild.*&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;End&quot;</span><span class="nt">/&gt;</span>
+
+<span class="w">    </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;CompoundState&quot;</span><span class="w"> </span><span class="na">initial=</span><span class="s">&quot;compundChild&quot;</span><span class="nt">&gt;</span>
+
+<span class="w">        </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;compoundChild&quot;</span><span class="nt">&gt;</span>
+<span class="w">            </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;compundChild.success&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;anotherCompoundChild&quot;</span><span class="nt">/&gt;</span>
+<span class="w">        </span><span class="nt">&lt;/state&gt;</span>
+
+<span class="w">        </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;anotherCompoundChild&quot;</span><span class="nt">&gt;</span>
+<span class="w">        </span><span class="nt">&lt;/state&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/state&gt;</span>
+
+<span class="w">    </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;parallelChild&quot;</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/state&gt;</span>
+
+<span class="nt">&lt;/parallel&gt;</span>
 </pre></div>
 </div>
 </section>
@@ -422,7 +457,7 @@ Document<span class="w"> </span>sub.xml:
 
   <div role="contentinfo">
     <p>&#169; Copyright 2025, Team of Bielefeld.
-      <span class="lastupdated">Last updated on Nov 13, 2025.
+      <span class="lastupdated">Last updated on Dec 04, 2025.
       </span></p>
   </div>
 
