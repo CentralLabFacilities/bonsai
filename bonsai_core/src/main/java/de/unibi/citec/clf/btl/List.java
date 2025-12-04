@@ -74,6 +74,10 @@ public class List<T extends Type> extends TypeCollection<T> implements java.util
         return elements.addAll(c);
     }
 
+    public boolean addAll(java.util.List<? extends T> c) {
+        return elements.addAll(c);
+    }
+
     @Override
     public boolean addAll(int index, Collection<? extends T> c) {
         return elements.addAll(index, c);
