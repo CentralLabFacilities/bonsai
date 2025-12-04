@@ -203,16 +203,19 @@ class FilterPeopleList : AbstractSkill() {
 
     private fun filterByPosture() {
         val postures = postureString?.split(";")?.map { PersonAttribute.Posture.fromString(it) } ?: listOf()
+        logger.info("filter for postures: ${postures.joinToString("; ")}")
         personDataList = PersonDataList().also { list ->
             list.addAll(personDataList?.filter {
-                postures.contains(it.personAttribute.posture)
+                val ret = postures.contains(it.personAttribute.posture)
+                if(ret) logger.info("remove person $it")
+                ret
             })
         }
     }
 
     private fun filterByGesture() {
         val gestures = gestureString?.split(";")?.map { PersonAttribute.Gesture.fromString(it) } ?: listOf()
-
+        logger.info("filter for gestures: ${gestures.joinToString("; ")}")
         personDataList = PersonDataList().also { list ->
             list.addAll(personDataList?.filter {
                 for (gesture in gestures) {
@@ -220,6 +223,7 @@ class FilterPeopleList : AbstractSkill() {
                         return@filter true
                     }
                 }
+                logger.info("remove person $it")
                 false
             })
         }
@@ -227,14 +231,17 @@ class FilterPeopleList : AbstractSkill() {
     }
 
     private fun filterByRoom() {
+        logger.info("filter for rooms")
 
         personDataList = PersonDataList().also { list ->
             list.addAll(personDataList?.filter {
                 for (room in rooms) {
+
                     if (room?.contains(coordTransformer?.transform(it.position, "map")?.translation) == true) {
                         return@filter true
                     }
                 }
+                logger.info("remove person $it")
                 false
             })
         }
