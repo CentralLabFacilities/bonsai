@@ -107,7 +107,7 @@ class FilterPeopleList : AbstractSkill() {
 
         ecwm = configurator.getActuator("ECWMSpirit", ECWMSpirit::class.java)
 
-        coordTransformer = configurator.getTransform() as CoordinateTransformer
+        coordTransformer = configurator.getTransform() as? CoordinateTransformer
 
         if (configurator.hasConfigurationKey(KEY_GESTURES)) {
             gestureString = configurator.requestValue(KEY_GESTURES)
@@ -203,35 +203,42 @@ class FilterPeopleList : AbstractSkill() {
 
     private fun filterByPosture() {
         val postures = postureString?.split(";")?.map { PersonAttribute.Posture.fromString(it) } ?: listOf()
-        personDataList?.filter {
-            postures.contains(it.personAttribute.posture)
+        personDataList = PersonDataList().also { list ->
+            list.addAll(personDataList?.filter {
+                postures.contains(it.personAttribute.posture)
+            })
         }
     }
 
     private fun filterByGesture() {
         val gestures = gestureString?.split(";")?.map { PersonAttribute.Gesture.fromString(it) } ?: listOf()
 
-        personDataList?.filter {
-            for (gesture in gestures) {
-                if (it.personAttribute.gestures.contains(gesture)) {
-                    return@filter true
+        personDataList = PersonDataList().also { list ->
+            list.addAll(personDataList?.filter {
+                for (gesture in gestures) {
+                    if (it.personAttribute.gestures.contains(gesture)) {
+                        return@filter true
+                    }
                 }
-            }
-            false
+                false
+            })
         }
 
     }
 
     private fun filterByRoom() {
 
-        personDataList?.filter {
-            for (room in rooms) {
-                if (room?.contains(coordTransformer?.transform(it.position, "map")?.translation) == true) {
-                    return@filter true
+        personDataList = PersonDataList().also { list ->
+            list.addAll(personDataList?.filter {
+                for (room in rooms) {
+                    if (room?.contains(coordTransformer?.transform(it.position, "map")?.translation) == true) {
+                        return@filter true
+                    }
                 }
-            }
-            false
+                false
+            })
         }
+
     }
 
     companion object {
