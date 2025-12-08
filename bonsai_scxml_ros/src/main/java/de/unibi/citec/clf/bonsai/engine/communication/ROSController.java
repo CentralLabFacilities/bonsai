@@ -107,7 +107,7 @@ public class ROSController extends RosNode implements SCXMLRemote {
     }
 
     @Override
-    public String load(String pathToConfig, String pathToTask, Map<String, String> includeMapping) {
+    public String load(String pathToConfig, String pathToTask, Map<String, String> includeMapping, boolean forceConfigure) {
         final LoadStatemachineRequest req = clientLoad.newMessage();
 
         try {
