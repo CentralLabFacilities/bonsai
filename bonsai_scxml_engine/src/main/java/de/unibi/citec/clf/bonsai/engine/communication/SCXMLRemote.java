@@ -16,7 +16,7 @@ public interface SCXMLRemote {
 
     List<String> getTransitions();
 
-    String load(String pathToConfig, String pathToTask, Map<String, String> includeMapping);
+    String load(String pathToConfig, String pathToTask, Map<String, String> includeMapping, boolean forceConfigure);
 
     boolean pause();
 
