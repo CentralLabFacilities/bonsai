@@ -89,7 +89,7 @@ public class RosFactory implements CoreObjectFactory {
 
             local = System.getenv("basepc");
             if (local == null || local.isEmpty()) {
-                logger.warn("basepc not set, using 127.0.0.1");
+                logger.debug("basepc not set, using 127.0.0.1");
                 try {
                     local = InetAddressFactory.newNonLoopback().getHostName();
                 } catch (org.ros.exception.RosRuntimeException e) {
@@ -155,17 +155,21 @@ public class RosFactory implements CoreObjectFactory {
         actuatorLoop:
         for (ActuatorToConfigure actuator : actuators) {
             logger.debug("Processing actuator to configure: " + actuator);
+            if (configuredObjectsByKey.containsKey(actuator.getKey())) {
+                logger.debug("..already configured.");
+                continue;
+            }
 
             // find the actuator configuration that can handle this requested
             for (Class<? extends RosNode> actuatorClass : knownActuators) {
 
-                logger.debug("Checking if class " + actuatorClass + " satifies actuator " + actuator);
+                logger.trace("Checking if class " + actuatorClass + " satifies actuator " + actuator);
 
                 boolean isSuitable = actuatorClass.equals(actuator.getActuatorClass())
                         && actuator.getInterfaceClass().isAssignableFrom(actuatorClass);
 
                 if (!isSuitable) {
-                    logger.debug("Actuator class " + actuatorClass + " does not satify actuator " + actuator);
+                    logger.trace("Actuator class " + actuatorClass + " does not satify actuator " + actuator);
                     logger.trace("actuator class: " + actuatorClass);
                     logger.trace("actuator needs: " + actuator.getActuatorClass());
                     logger.trace("actuator class == " + (actuatorClass.equals(actuator.getActuatorClass())));
@@ -197,7 +201,7 @@ public class RosFactory implements CoreObjectFactory {
                     results.exceptions.add(e);
                     for (ConfigurationException ex : configured.conf.getExceptions()) {
                         results.exceptions.add(ex);
-                        logger.trace(ex.getMessage());
+                        logger.debug(ex.getMessage());
                     }
 
                     for (Map.Entry<String, Class> entry : configured.conf.getUnusedOptionalParams().entrySet()) {
@@ -257,13 +261,13 @@ public class RosFactory implements CoreObjectFactory {
             // find the sensor configuration that can handle this requested
             for (Class<? extends RosSensor> sensorClass : knownSensors) {
 
-                logger.debug("Checking if class " + sensorClass + " satifies sensor " + sensor);
+                logger.trace("Checking if class " + sensorClass + " satifies sensor " + sensor);
 
                 boolean isSuitable = sensorClass.equals(sensor.getSensorClass())
                         && org.ros.internal.message.Message.class.isAssignableFrom(sensor.getWireClass());
 
                 if (!isSuitable) {
-                    logger.debug("Sensor class " + sensorClass + " does not satify sensor " + sensor);
+                    logger.trace("Sensor class " + sensorClass + " does not satify sensor " + sensor);
                     logger.trace("Sensor class: " + sensorClass);
                     logger.trace("Sensor needs: " + sensor.getSensorClass());
                     logger.trace("Sensor class == " + sensorClass.equals(sensor.getSensorClass()));
@@ -301,11 +305,11 @@ public class RosFactory implements CoreObjectFactory {
                     results.exceptions.add(e);
                     for (ConfigurationException ex : configured.conf.getExceptions()) {
                         results.exceptions.add(ex);
-                        logger.trace(ex.getMessage());
+                        logger.debug(ex.getMessage());
                     }
 
                     for (Map.Entry<String, Class> entry : configured.conf.getUnusedOptionalParams().entrySet()) {
-                        logger.trace("unused opt param: " + entry.getKey());
+                        logger.info("unused opt param: " + entry.getKey());
                     }
                     continue sensorLoop;
                 } catch (IllegalAccessException | InstantiationException | NoSuchMethodException | SecurityException |
@@ -331,12 +335,18 @@ public class RosFactory implements CoreObjectFactory {
         FactoryConfigurationResults results = new FactoryConfigurationResults();
 
         if (transformer.getTransformerClass().equals(TFTransformer.class)) {
-            coordinateTransformer = new TFTransformer(GraphName.of(RosNode.NODE_PREFIX + "tf"), GraphName.of(RosNode.NODE_PREFIX + "tf2"));
+            if (coordinateTransformer == null || !(coordinateTransformer instanceof TFTransformer)) {
+                coordinateTransformer = new TFTransformer(GraphName.of(RosNode.NODE_PREFIX + "tf"), GraphName.of(RosNode.NODE_PREFIX + "tf2"));
+            }
         } else if (transformer.getTransformerClass().equals(TfRosjavaWrapper.class)) {
-            coordinateTransformer = new TfRosjavaWrapper(GraphName.of(RosNode.NODE_PREFIX + "Transformer"));
-            ((TfRosjavaWrapper) coordinateTransformer).getNode().setKey("Transformer");
+            if (coordinateTransformer == null || !(coordinateTransformer instanceof TfRosjavaWrapper)) {
+                coordinateTransformer = new TfRosjavaWrapper(GraphName.of(RosNode.NODE_PREFIX + "Transformer"));
+                ((TfRosjavaWrapper) coordinateTransformer).getNode().setKey("Transformer");
+            }
         } else if (transformer.getTransformerClass().equals(TFTransformerTimestamps.class)) {
-            coordinateTransformer = new TFTransformerTimestamps(GraphName.of(RosNode.NODE_PREFIX + "tf"), GraphName.of(RosNode.NODE_PREFIX + "tf2"));
+            if (coordinateTransformer == null || !(coordinateTransformer instanceof TFTransformerTimestamps)) {
+                coordinateTransformer = new TFTransformerTimestamps(GraphName.of(RosNode.NODE_PREFIX + "tf"), GraphName.of(RosNode.NODE_PREFIX + "tf2"));
+            }
         } else {
             throw new IllegalArgumentException("can only create " + TFTransformer.class + " or " + TFTransformerTimestamps.class + " or " + TfRosjavaWrapper.class +
                     " but requested is: " + transformer.getTransformerClass());
@@ -347,7 +357,7 @@ public class RosFactory implements CoreObjectFactory {
 
     public <T extends Actuator> T createActuator(String key, Class<T> actuatorClass, boolean wait)
             throws IllegalArgumentException, CoreObjectCreationException {
-        logger.trace("create actuator: " + actuatorClass);
+        logger.debug("create actuator: " + actuatorClass);
 
         if (isActuatorInitialized.get(key)) {
             //check if actuator is still connected
@@ -433,7 +443,7 @@ public class RosFactory implements CoreObjectFactory {
     public <T> Sensor<T> createSensor(String key, Class<T> dataType, boolean wait)
             throws IllegalArgumentException, CoreObjectCreationException {
 
-        logger.trace("create sensor for: " + dataType);
+        logger.debug("create sensor for: " + dataType);
         //check if actuator was already initialized
         if (isSensorInitialized.get(key)) {
             return (Sensor<T>) initializedSensorsByKey.get(key);
@@ -564,6 +574,7 @@ public class RosFactory implements CoreObjectFactory {
     @Override
     public <T extends TransformLookup> T createCoordinateTransformer() throws IllegalArgumentException,
             CoreObjectCreationException {
+        logger.debug("createCoordinateTransformer ");
 
         if (coordinateTransformer == null)
             throw new CoreObjectCreationException("no ros transformer configured");
@@ -639,27 +650,30 @@ public class RosFactory implements CoreObjectFactory {
 
     @Override
     public FactoryConfigurationResults createAndCacheAllConfiguredObjects() throws CoreObjectCreationException {
-
+        logger.debug("createAndCacheAllConfiguredObjects()");
         FactoryConfigurationResults res = new FactoryConfigurationResults();
         Queue<RosNode> nodesQuene = new ConcurrentLinkedQueue<>();
 
 
         if (coordinateTransformer != null) {
+            logger.debug("starting coordinateTransformer ");
             if (coordinateTransformer instanceof TFTransformer) {
                 TFTransformer c = (TFTransformer) coordinateTransformer;
+                logger.debug("data: " + c.getNode().initialized);
                 try {
-                    spawnRosNode(c.getNode(), false);
-                    spawnRosNode(c.getNode2(), false);
+                    if(!c.getNode().connectionsAlive()) spawnRosNode(c.getNode(), false);
+                    if(!c.getNode2().connectionsAlive()) spawnRosNode(c.getNode2(), false);
                 } catch (TimeoutException | ExecutionException | InterruptedException e) {
                     logger.error(e);
                 }
                 nodesQuene.add(c.getNode());
                 nodesQuene.add(c.getNode2());
+
             } else  if (coordinateTransformer instanceof TFTransformerTimestamps) {
                 TFTransformerTimestamps c = (TFTransformerTimestamps) coordinateTransformer;
                 try {
-                    spawnRosNode(c.getNode(), false);
-                    spawnRosNode(c.getNode2(), false);
+                    if(!c.getNode().connectionsAlive()) spawnRosNode(c.getNode(), false);
+                    if(!c.getNode2().connectionsAlive()) spawnRosNode(c.getNode2(), false);
                 } catch (TimeoutException | ExecutionException | InterruptedException e) {
                     logger.error(e);
                 }
@@ -669,14 +683,12 @@ public class RosFactory implements CoreObjectFactory {
             }else {
                 TfRosjavaWrapper c = (TfRosjavaWrapper) coordinateTransformer;
                 try {
-                    spawnRosNode(c.getNode(), false);
+                    if(!c.getNode().connectionsAlive()) spawnRosNode(c.getNode(), false);
                 } catch (TimeoutException | ExecutionException | InterruptedException e) {
                     logger.error(e);
                 }
                 nodesQuene.add(c.getNode());
             }
-
-
         }
 
         configuredObjectsByKey.entrySet().parallelStream().forEach((entry) -> {
@@ -684,19 +696,28 @@ public class RosFactory implements CoreObjectFactory {
             ConfiguredObject obj = entry.getValue();
 
             RosNode node;
+            logger.trace("Creating node " + key);
 
             try {
                 if (obj instanceof ConfiguredActuator) {
-                    ConfiguredActuator act = (ConfiguredActuator) obj;
-                    node = (RosNode) createActuator(key, act.clazz, false);
+                    if (isActuatorInitialized.getOrDefault(key,false)) {
+                        logger.trace("already Initialized");
+                    } else {
+                        ConfiguredActuator act = (ConfiguredActuator) obj;
+                        node = (RosNode) createActuator(key, act.clazz, false);
+                        nodesQuene.add(node);
+                    }
                 } else if (obj instanceof ConfiguredSensor) {
-                    ConfiguredSensor sen = (ConfiguredSensor) obj;
-                    node = (RosNode) createSensor(key, sen.clazz, false);
+                    if(isSensorInitialized.getOrDefault(key,false)) {
+                        logger.trace("already Initialized");
+                    } else {
+                        ConfiguredSensor sen = (ConfiguredSensor) obj;
+                        node = (RosNode) createSensor(key, sen.clazz, false);
+                        nodesQuene.add(node);
+                    }
                 } else {
                     throw new CoreObjectCreationException("?");
                 }
-
-                nodesQuene.add(node);
 
             } catch (ClassCastException | IllegalArgumentException | CoreObjectCreationException ex) {
                 logger.fatal("object " + key + " with class " + obj.clazz + " cached creation error");

@@ -58,6 +58,7 @@ public class XmlConfigurationParser implements ConfigurationParser {
     private static final String ACTUATOR_KEY_ARG = KEY;
     private static final String ACTUATOR_CLASS_ARG = "actuatorClass";
     private static final String ACTUATOR_INTERFACE_ARG = "actuatorInterface";
+    private static final String BONSAI_OPTION_NAME = "BonsaiOptions";
     private boolean parsingCompleted = false;
 
     private static final URL PATH_TO_XSL = XmlConfigurationParser.class.getClassLoader()
@@ -66,6 +67,7 @@ public class XmlConfigurationParser implements ConfigurationParser {
             .getResource("BonsaiConfiguration.xsd");
 
     private BonsaiConfigurationData config;
+    private String hash;
 
     /**
      * Constructor.
@@ -95,6 +97,28 @@ public class XmlConfigurationParser implements ConfigurationParser {
         return doc;
     }
 
+    public void parse(Document doc) throws IOException, ParseException, IllegalStateException {
+        config = new BonsaiConfigurationData();
+
+        hash = doc.toXML();
+        logger.debug("Parsed Config:\n" + hash);
+
+        {
+            Nodes bonsai = doc.query("/" + ROOT_ELEMENT_NAME + "/" + BONSAI_OPTION_NAME);
+            if (bonsai.size() == 1) {
+                config.options = parseOptions((Element) bonsai.get(0));
+            }
+        }
+
+        parseFactorySettings(doc);
+        parseSensors(doc);
+        parseActuators(doc);
+        parseWorkingMemories(doc);
+        parseCoordinateTransformer(doc);
+
+        parsingCompleted = true;
+    }
+
     /**
      * {@inheritDoc}
      */
@@ -116,24 +140,9 @@ public class XmlConfigurationParser implements ConfigurationParser {
             logger.warn("Parser already parsed a file");
         }
 
-        config = new BonsaiConfigurationData();
-        config.actuators = new HashMap<>();
-        config.factories = new HashMap<>();
-        config.memories = new HashMap<>();
-        config.sensors = new HashMap<>();
-
         try {
             Document doc = transformXML(configurationFile);
-
-            logger.debug("Parsed Config:\n" + doc.toXML());
-
-            parseFactorySettings(doc);
-            parseSensors(doc);
-            parseActuators(doc);
-            parseWorkingMemories(doc);
-            parseCoordinateTransformer(doc);
-
-            parsingCompleted = true;
+            parse(doc);
 
         } catch (ParsingException e) {
             throw new ParseException(e);
@@ -165,16 +174,7 @@ public class XmlConfigurationParser implements ConfigurationParser {
             Builder builder = new Builder(xerces, true);
 
             Document doc = builder.build(configuration);
-
-            logger.debug("Parsed Config:\n" + doc.toXML());
-
-            parseFactorySettings(doc);
-            parseSensors(doc);
-            parseActuators(doc);
-            parseWorkingMemories(doc);
-            parseCoordinateTransformer(doc);
-
-            parsingCompleted = true;
+            parse(doc);
 
         } catch (ParsingException e) {
             throw new ParseException(e);
@@ -497,6 +497,15 @@ public class XmlConfigurationParser implements ConfigurationParser {
 
         return finalValue;
 
+    }
+
+    @Override
+    public String getHash() {
+        if (!parsingCompleted) {
+            throw new IllegalStateException("Parsing was not invoked or failed. " + "No results can be fetched.");
+        }
+
+        return hash;
     }
 
     @Override
