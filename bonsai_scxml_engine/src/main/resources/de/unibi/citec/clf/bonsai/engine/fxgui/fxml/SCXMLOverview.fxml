@@ -37,7 +37,7 @@
                 </GridPane>
                 <HBox minHeight="-Infinity" prefHeight="30.0" prefWidth="200.0">
                     <children>
-                        <Button maxHeight="1.7976931348623157E308" mnemonicParsing="false" onAction="#buttonLoad" prefWidth="5000.0" text="Load" />
+                        <Button fx:id="buttonLoad" maxHeight="1.7976931348623157E308" mnemonicParsing="false" onAction="#buttonLoad" prefWidth="5000.0" text="Load" />
                     </children>
                 </HBox>
                 <HBox fillHeight="false" maxHeight="-Infinity" minHeight="-Infinity" prefHeight="24.0" prefWidth="200.0">

@@ -181,7 +181,10 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
      * Is the state machine stopped?
      */
     private boolean running = false;
-    private boolean isInitialized = false;
+    private enum InitlializedState {
+        FALSE, TRUE, CONFIG_ERROR
+    }
+    private InitlializedState isInitialized = InitlializedState.FALSE;
     private boolean isLoading = false;
     private StateMachineConfigurator configurator;
     private SCXMLValidator validator;
@@ -236,8 +239,10 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     @NotNull
     public StatemachineStatus getStatemachineStatus() {
         StatemachineStatus status = StatemachineStatus.UNKNOWN;
-        if (isInitialized) {
-            status = StatemachineStatus.INITIALIZED;
+
+        switch (isInitialized) {
+            case TRUE -> status = StatemachineStatus.INITIALIZED;
+            case CONFIG_ERROR -> status = StatemachineStatus.INITIALIZED_BUT_WARNINGS;
         }
         if(isLoading) {
             status = StatemachineStatus.LOADING;
@@ -336,19 +341,23 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
                 }
 
             } catch (Throwable t) {
-                isInitialized = false;
+                isInitialized = InitlializedState.FALSE;
                 isLoading = false;
                 logger.error(t.getMessage(), t);
                 throw new LoadingException("configure failed: " + t.getMessage());
             }
-
-            isInitialized = true;
 
             results.statePrefix = config.statePrefix;
             results.configurationResults = confResults;
             results.stateMachineResults = smResults;
             results.validationResult = scxmlValid;
             results.showDefaultSlotWarnings = config.showDefaultSlotWarnings;
+
+            if (results.success()) {
+                isInitialized = InitlializedState.TRUE;
+            } else {
+                isInitialized = InitlializedState.CONFIG_ERROR;
+            }
         } else {
 
             results.stateMachineResults = configurator.configureSlotsOnly(scxml);
@@ -356,16 +365,20 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
                 BonsaiManager bm = BonsaiManager.getInstance();
                 confResults = bm.configure(pathToConfig,parser);
             } catch (Throwable t) {
-                isInitialized = false;
+                isInitialized = InitlializedState.FALSE;
                 isLoading = false;
                 logger.error(t.getMessage(), t);
                 throw new LoadingException("configure failed: " + t.getMessage());
             }
 
-            isInitialized = true;
             results.statePrefix = config.statePrefix;
             results.configurationResults = confResults;
             results.showDefaultSlotWarnings = config.showDefaultSlotWarnings;
+            if (results.success()) {
+                isInitialized = InitlializedState.TRUE;
+            } else {
+                isInitialized = InitlializedState.CONFIG_ERROR;
+            }
         }
 
         if (!results.success()) {
@@ -586,7 +599,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
      * Starts the state machine.
      */
     public synchronized void startMachine() {
-        if (!isInitialized) {
+        if (isInitialized == InitlializedState.FALSE) {
             throw new StateMachineException("State Machine was "
                     + "not successfully initialized");
         }
@@ -696,7 +709,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     }
 
     public boolean isInitialized() {
-        return isInitialized;
+        return isInitialized != InitlializedState.FALSE;
     }
 
     private void actionCheck(List<Action> actions) {
