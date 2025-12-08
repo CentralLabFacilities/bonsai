@@ -46,7 +46,9 @@ public class FXGUI extends Application implements IStateControlListener {
     }
 
     public static void setEnabled(boolean b) {
-        logger.trace("set enabled not working");
+        if (b) FXGUI.primaryStage.setTitle("BonSAI - FX");
+        else FXGUI.primaryStage.setTitle("LOADING");
+        rootLayout.setDisable(!b);
     }
 
     @Override

@@ -2,10 +2,12 @@ package de.unibi.citec.clf.bonsai.engine.fxgui.controller;
 
 
 
+import com.sun.javafx.css.StyleManager;
 import de.unibi.citec.clf.bonsai.engine.fxgui.FXGUI;
 import de.unibi.citec.clf.bonsai.engine.fxgui.communication.FXGUISCXMLRemote;
 import de.unibi.citec.clf.bonsai.engine.fxgui.communication.IStateListener;
 import de.unibi.citec.clf.bonsai.engine.fxgui.renameme.IStateControlListener;
+import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
@@ -23,6 +25,7 @@ import javafx.stage.FileChooser.ExtensionFilter;
 import org.apache.commons.text.similarity.FuzzyScore;
 
 import java.io.File;
+import java.net.URL;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.prefs.Preferences;
@@ -52,6 +55,9 @@ public class SCXMLOverviewController implements IStateListener {
     private Label labelStatus;
 
     @FXML
+    private Button buttonLoad;
+
+    @FXML
     private TextField textScxml;
     private Map<String, String> includeMapping = new HashMap<>();
 
@@ -68,7 +74,7 @@ public class SCXMLOverviewController implements IStateListener {
     public void updateStateList() {
         ObservableList data = FXCollections.observableArrayList();
         System.out.println("gettingStates");
-        List<String> stateIds = remote.getStateIds();
+        List<String> stateIds = new ArrayList<>(new HashSet<>(remote.getStateIds()));
         System.out.println("got states ");
         if (stateIds != null) {
             System.out.println("got states " + stateIds.size());
@@ -178,7 +184,6 @@ public class SCXMLOverviewController implements IStateListener {
 
     @FXML
     protected void buttonStart() {
-
         if (remote == null) {
             logger.fatal("remote not set");
             return;
@@ -238,21 +243,26 @@ public class SCXMLOverviewController implements IStateListener {
             logger.fatal("remote not set");
             return;
         }
+        FXGUI.setEnabled(false);
+
         Preferences prefs = Preferences.userRoot().node("StateMachine FXGUI");
         prefs.put("configFilePath", textConfig.getText());
         prefs.put("taskFilePath", textScxml.getText());
 
-        FXGUI.setEnabled(false);
         filterField.textProperty().setValue("");
 
-        String ret = remote.load(textConfig.getText(), textScxml.getText(), includeMapping);
-        if (!ret.isEmpty()) {
-            showResultAlert(ret);
-        } else {
-            logger.info("loading finished without error");
-        }
+        new Thread(()-> {
+            String ret = remote.load(textConfig.getText(), textScxml.getText(), includeMapping);
+            Platform.runLater(() -> {
+                if (!ret.isEmpty()) {
+                    showResultAlert(ret);
+                } else {
+                    logger.info("loading finished without error");
 
-        FXGUI.setEnabled(true);
+                }
+                FXGUI.setEnabled(true);
+            });
+        }).start();
 
         //logger.info("getting states...");
 
