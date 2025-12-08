@@ -72,10 +72,10 @@ public class DirectControlRemote implements FXGUISCXMLRemote {
     }
 
     @Override
-    public String load(String pathToConfig, String pathToTask, Map<String, String> includeMapping) {
+    public String load(String pathToConfig, String pathToTask, Map<String, String> includeMapping, boolean force) {
         smc.setConfigPath(pathToConfig);
         smc.setTaskPath(pathToTask);
-        return smc.load().toString();
+        return smc.load(force).toString();
     }
 
     @Override

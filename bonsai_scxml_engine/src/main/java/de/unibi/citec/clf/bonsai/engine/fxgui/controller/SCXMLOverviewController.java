@@ -55,6 +55,9 @@ public class SCXMLOverviewController implements IStateListener {
     private Label labelStatus;
 
     @FXML
+    private ToggleButton forceLoad;
+
+    @FXML
     private Button buttonLoad;
 
     @FXML
@@ -250,9 +253,10 @@ public class SCXMLOverviewController implements IStateListener {
         prefs.put("taskFilePath", textScxml.getText());
 
         filterField.textProperty().setValue("");
+        boolean force = forceLoad.isSelected();
 
         new Thread(()-> {
-            String ret = remote.load(textConfig.getText(), textScxml.getText(), includeMapping);
+            String ret = remote.load(textConfig.getText(), textScxml.getText(), includeMapping, force);
             Platform.runLater(() -> {
                 if (!ret.isEmpty()) {
                     showResultAlert(ret);
