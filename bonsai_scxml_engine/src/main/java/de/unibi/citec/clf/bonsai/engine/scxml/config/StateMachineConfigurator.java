@@ -85,7 +85,7 @@ public class StateMachineConfigurator {
         List<Node> slotNodes = getSlotNodes(dataList);
 
         for (Node n : slotNodes) {
-            logger.trace("SLOT " + n.toString());
+            logger.error("trace " + n.toString());
             NamedNodeMap attr = n.getAttributes();
             String slotKey = attr.getNamedItem("key").getNodeValue();
             String state = attr.getNamedItem("state").getNodeValue();
@@ -171,7 +171,7 @@ public class StateMachineConfigurator {
                     logger.trace("FOUND SLOTS NODE_LIST");
                     NodeListValue node = (NodeListValue) value;
                     logger.trace(node.toString());
-                    node.getValue().forEach(it -> logger.trace(it.toString()));
+                    node.getValue().forEach(it -> logger.trace("n: " + it.toString()));
                     slotNodes.addAll(node.getValue());
                 } else {
                     throw new RuntimeException("something slots");

@@ -11,6 +11,7 @@ import de.unibi.citec.clf.bonsai.core.exception.CoreObjectCreationException;
 import de.unibi.citec.clf.bonsai.core.exception.InitializationException;
 import de.unibi.citec.clf.bonsai.core.exception.ParseException;
 import de.unibi.citec.clf.bonsai.core.object.*;
+import de.unibi.citec.clf.bonsai.util.MapReader;
 import de.unibi.citec.clf.bonsai.util.helper.ListClass;
 import org.apache.log4j.Logger;
 
@@ -43,9 +44,8 @@ public class BonsaiManager {
     /**
      * The parser instance used for initial configuration.
      * <p>
-     * {@link BonsaiManager} does not need a {@link ConfigurationParser}. Use      {@link BonsaiManager#configure(java.lang.String,
-     * de.unibi.airobots.bonsai.core.configuration.ConfigurationParser)} or
-     * {@link BonsaiManager#configure(java.net.URI, de.unibi.airobots.bonsai.core.configuration.ConfigurationParser)}
+     * {@link BonsaiManager} does not need a {@link ConfigurationParser}. Use {@link BonsaiManager#configure(String, ConfigurationParser)}  or
+     * {@link BonsaiManager#configure(URI, ConfigurationParser)}
      * instead.
      */
     @Deprecated
@@ -74,11 +74,23 @@ public class BonsaiManager {
      * Singleton instance variable.
      */
     private static BonsaiManager instance = new BonsaiManager();
+    private String oldConfig;
+
+
+    private boolean OPTION_CACHE_CONFIG = false;
 
     /**
      * Private constructor for singleton pattern.
      */
     private BonsaiManager() {
+    }
+
+    private void configureBonsaiOptions(Map<String,String> options) {
+        try {
+            OPTION_CACHE_CONFIG = MapReader.readConfigBool("CACHE_CONFIG", OPTION_CACHE_CONFIG, options);
+        } catch (MapReader.KeyNotFound e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /**
@@ -102,8 +114,8 @@ public class BonsaiManager {
      *
      * @param parser new parser to use
      * @deprecated {@link BonsaiManager} does not need a {@link ConfigurationParser}. Use      {@link BonsaiManager#configure(java.lang.String,
-     * de.unibi.airobots.bonsai.core.configuration.ConfigurationParser)} or      {@link BonsaiManager#configure(java.net.URI,
-     * de.unibi.airobots.bonsai.core.configuration.ConfigurationParser)} instead.
+     * ConfigurationParser)} or      {@link BonsaiManager#configure(java.net.URI,
+     * ConfigurationParser)} instead.
      */
     @Deprecated
     public void setParser(ConfigurationParser parser) {
@@ -115,8 +127,8 @@ public class BonsaiManager {
      *
      * @return current parser instance
      * @deprecated Use
-     * {@link BonsaiManager#configure(java.lang.String, de.unibi.airobots.bonsai.core.configuration.ConfigurationParser)}
-     * or {@link BonsaiManager#configure(java.net.URI, de.unibi.airobots.bonsai.core.configuration.ConfigurationParser)}
+     * {@link BonsaiManager#configure(java.lang.String, ConfigurationParser)}
+     * or {@link BonsaiManager#configure(java.net.URI, ConfigurationParser)}
      * instead.
      */
     @Deprecated
@@ -324,7 +336,7 @@ public class BonsaiManager {
      * @param configurationStream Stream of the configuration file
      * @param parser              Parser to parse the given file.
      * @param aSensorKeySet       Map that contains all required sensor keys.
-     * @param aListSensorKeySet   Set that contains all required list sensor keys.
+     * @param aListSensorKeySet   Set that contains all required/** list sensor keys.
      * @param aActuatorKeySet     Set that contains all required actuator keys.
      * @param aMemoryKeySet       Set that contains all required working memory keys.
      * @throws ConfigurationException error configuring the {@link BonsaiManager}. If this is the case, this class is in
@@ -364,8 +376,16 @@ public class BonsaiManager {
         Set<String> actuatorKeySet = aActuatorKeySet == null ? null : new HashSet<>(aActuatorKeySet);
         Set<String> memoryKeySet = aMemoryKeySet == null ? null : new HashSet<>(aMemoryKeySet);
 
-        logger.trace("Creating factories");
-        createFactories(config.factories.values());
+        configureBonsaiOptions(config.options);
+
+        if (OPTION_CACHE_CONFIG && oldConfig != null && oldConfig.equals(parser.getHash())) {
+            // Skip creation
+            logger.fatal("SKIP CREATION");
+        } else {
+            logger.trace("Creating factories");
+            createFactories(config.factories.values());
+            oldConfig = parser.getHash();
+        }
 
         logger.trace("Initializing coordinate transformer");
         results.merge(initializeCoordinateTransformer(config.transformer));
@@ -873,7 +893,7 @@ public class BonsaiManager {
      * Afterwards the mapping {@link #actuatorKeysToFactories} is populated.
      *
      * @param configuredActuators actuators to initialize
-     * @throws ConfigurationExceptionerror initialization error
+     * @throws ConfigurationException initialization error
      */
     private ConfigurationResults initializeActuators(Collection<ActuatorData> configuredActuators)
             throws ConfigurationException {
@@ -997,7 +1017,7 @@ public class BonsaiManager {
      * {@link #configuredFactoriesByClass}. Afterwards the mapping {@link #memoryKeysToFactories} is populated.
      *
      * @param configuredMemories working memories to initialize
-     * @throws ConfigurationExceptionerror initialization error
+     * @throws ConfigurationException initialization error
      */
     private ConfigurationResults initializeWorkingMemories(Collection<MemoryData> configuredMemories) {
         ConfigurationResults results = new ConfigurationResults();
@@ -1051,7 +1071,7 @@ public class BonsaiManager {
     }
 
     /**
-     * Maps {@link ConfiguredActuator}s to {@link ActuatorToConfigure}s with appropriate class checking.
+     * Maps {@link ActuatorData}s to {@link ActuatorToConfigure}s with appropriate class checking.
      *
      * @param confAct actuator to map
      * @return mapped actuator
@@ -1099,7 +1119,7 @@ public class BonsaiManager {
      * @param <T>               type of the core objects to map
      * @param configuredObjects sensors to map
      * @param mapper            mapper from <code>T</code> to <code>U</code>
-     * @return map that maps every given {@link ConfiguredSensor} to the factory object that can create it
+     * @return map that maps every given {@link SensorToConfigure} to the factory object that can create it
      * @throws ConfigurationException on of the sensors cannot be mapped to a factory instance
      */
     private <T extends CoreObjectData, U> Map<CoreObjectFactory, Set<U>> mapConfiguredCoreObjectToFactories(
@@ -1165,7 +1185,7 @@ public class BonsaiManager {
      * @param <T>               type of the core objects to map
      * @param configuredObjects sensors to map
      * @param mapper            mapper from <code>T</code> to <code>U</code>
-     * @return map that maps every given {@link ConfiguredSensor} to the factory object that can create it
+     * @return map that maps every given {@link SensorToConfigure} to the factory object that can create it
      * @throws ConfigurationException on of the sensors cannot be mapped to a factory instance
      */
     private <T extends CoreObjectData, U> Map<CoreObjectFactory, Set<U>> mapCoreObjectDataToFactories(
@@ -1213,7 +1233,7 @@ public class BonsaiManager {
     }
 
     /**
-     * Maps {@link ConfiguredSensor}s to {@link ActuatorToConfigure}s with appropriate class checking.
+     * Maps {@link SensorData}s to {@link SensorToConfigure}s with appropriate class checking.
      *
      * @param confSensor sensor to map
      * @return mapped sensor
@@ -1259,7 +1279,7 @@ public class BonsaiManager {
     }
 
     /**
-     * Maps {@link ConfiguredWorkingMemory}s to {@link WorkingMemoryToConfigure} s with appropriate class checking.
+     * Maps {@link MemoryData}s to {@link WorkingMemoryToConfigure} s with appropriate class checking.
      *
      * @param confMemory memory to map
      * @return mapped memory

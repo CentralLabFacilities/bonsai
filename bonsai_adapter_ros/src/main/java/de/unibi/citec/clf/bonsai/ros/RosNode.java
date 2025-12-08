@@ -35,7 +35,7 @@ public abstract class RosNode extends AbstractNodeMain {
     }
 
     public boolean connectionsAlive() {
-        return true;
+        return initialized;
     }
 
     public abstract void destroyNode();
