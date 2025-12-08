@@ -267,7 +267,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
      * @throws LoadingException
      * @throws TransformerException
      */
-    public LoadingResults initalize(String pathToTask, String pathToConfig)
+    public LoadingResults initalize(String pathToTask, String pathToConfig, boolean forceConfigure)
             throws StateNotFoundException, StateIDException, LoadingException, TransformerException {
         isLoading = true;
         pathToTask = pathToTask.replaceFirst("^~/", System.getProperty("user.home"));
@@ -330,7 +330,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
             try {
                 BonsaiManager bm = BonsaiManager.getInstance();
                 confResults = bm.configure(pathToConfig, parser, rs.keySet(),
-                        rls.keySet(), ra.keySet(), rwm);
+                        rls.keySet(), ra.keySet(), rwm, forceConfigure);
 
                 confResults.merge(bm.canCreateSensors(rs));
                 confResults.merge(bm.canCreateListSensors(rls));
@@ -363,7 +363,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
             results.stateMachineResults = configurator.configureSlotsOnly(scxml);
             try {
                 BonsaiManager bm = BonsaiManager.getInstance();
-                confResults = bm.configure(pathToConfig,parser);
+                confResults = bm.configure(pathToConfig,parser, forceConfigure);
             } catch (Throwable t) {
                 isInitialized = InitlializedState.FALSE;
                 isLoading = false;

@@ -148,7 +148,7 @@ public class ROSServer extends ROSMinimalServer implements SCXMLServerWithContro
                 smc.setConfigPath(t.getConfig());
                 smc.setTaskPath(t.getTask());
                 try {
-                    s.setResp(smc.load().toString());
+                    s.setResp(smc.load(true).toString());
                 } catch (ConfigurationException ex) {
                     logger.error(ex);
                     throw new ServiceException(ex);
@@ -159,7 +159,7 @@ public class ROSServer extends ROSMinimalServer implements SCXMLServerWithContro
                 smc.setConfigPath(cfgPath);
                 smc.setTaskPath(taskPath);
                 try {
-                    s.setResp(smc.load().toString());
+                    s.setResp(smc.load(true).toString());
                     //Files.delete(Paths.get(cfgPath));
                     //Files.delete(Paths.get(taskPath));
                 } catch (ConfigurationException ex) {
