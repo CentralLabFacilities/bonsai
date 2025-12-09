@@ -33,7 +33,7 @@ public class TestTools {
 
         SkillStateMachine skillStateMachine = new SkillStateMachine(mapping);
         try {
-            return skillStateMachine.initalize(pathSM,pathToConfig);
+            return skillStateMachine.initalize(pathSM,pathToConfig,true);
         }  catch (Exception t) {
             System.err.println("Fatal state machine configuration error: " + t.getClass().getSimpleName() + ": " + t.getMessage());
             throw new ConfigurationException(t);
@@ -58,7 +58,7 @@ public class TestTools {
 
         skillStateMachine.addListener(test);
 
-        if(!stateMachineController.load().success()) return false;
+        if(!stateMachineController.load(true).success()) return false;
 
         stateMachineController.executeStateMachine();
 
