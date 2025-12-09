@@ -236,7 +236,6 @@ class FilterPeopleList : AbstractSkill() {
         personDataList = PersonDataList().also { list ->
             list.addAll(personDataList?.filter {
                 for (room in rooms) {
-
                     if (room?.contains(coordTransformer?.transform(it.position, "map")?.translation) == true) {
                         return@filter true
                     }
