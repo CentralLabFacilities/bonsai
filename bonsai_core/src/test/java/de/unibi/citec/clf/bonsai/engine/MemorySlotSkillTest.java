@@ -42,7 +42,7 @@ public class MemorySlotSkillTest {
     @Test
     public void WriteReadStringSlotSkillTest() {
         ConfigurationParser parser = new XmlConfigurationParser();
-        ConfigurationResults configure = BonsaiManager.getInstance().configure(PATH_TO_TESTCONFIG, parser);
+        ConfigurationResults configure = BonsaiManager.getInstance().configure(PATH_TO_TESTCONFIG, parser, true);
 
         try {
             ExitStatus execute = executeSkill(WriteReadStringSlotSkill.class);
