@@ -88,19 +88,20 @@ public class PersonAttribute extends Type {
         public static Gesture fromString(String gestureName){
 
             String gestureLowercase = gestureName.toLowerCase();
+            gestureLowercase = gestureLowercase.replaceAll(" +", " ");
 
             switch (gestureLowercase) {
-                case "pointing left": case "pointing to the left":
+                case "pointing left": case "pointing to the left": case "pointing_left": case "1":
                     return POINTING_LEFT;
-                case "pointing right": case "pointing to the right":
+                case "pointing right": case "pointing to the right": case "pointing_right": case "2":
                     return POINTING_RIGHT;
-                case "raising left arm":
+                case "raising left arm": case "raising_left_arm": case "3":
                     return RAISING_LEFT_ARM;
-                case "raising right arm":
+                case "raising right arm": case "raising_right_arm": case "4":
                     return RAISING_RIGHT_ARM;
-                case "waving":
+                case "waving": case "5":
                     return WAVING;
-                case "neutral":
+                case "neutral": case "6":
                     return NEUTRAL;
             }
             return null;
