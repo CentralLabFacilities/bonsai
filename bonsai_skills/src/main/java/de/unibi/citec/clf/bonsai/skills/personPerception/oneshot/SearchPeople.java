@@ -75,6 +75,7 @@ import java.util.concurrent.Future;
  *
  * @author pvonneumanncosel
  */
+@Deprecated
 public class SearchPeople extends AbstractSkill {
 
     private final static String KEY_DISTANCE = "#_MAX_DIST";
@@ -153,7 +154,7 @@ public class SearchPeople extends AbstractSkill {
 
         try {
             possiblePersons = null;
-            peopleFuture = peopleActuator.getPeople(do_gender_age_bool, do_face_id_bool, resize_out_ratio);
+            peopleFuture = peopleActuator.getPeople();
             current_actuator_timeout = actuator_timeout + Time.currentTimeMillis();
         } catch (InterruptedException | ExecutionException e) {
             logger.error(e);
