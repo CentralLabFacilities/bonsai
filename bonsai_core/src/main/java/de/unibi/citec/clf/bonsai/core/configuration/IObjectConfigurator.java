@@ -15,6 +15,10 @@ public interface IObjectConfigurator {
 
     double requestOptionalDouble(String key, double def) throws ConfigurationException;
 
+    float requestFloat(String key) throws ConfigurationException;
+
+    float requestOptionalFloat(String key, float def) throws ConfigurationException;
+
     String requestValue(String key) throws ConfigurationException;
 
     String requestOptionalValue(String key, String def) throws ConfigurationException;
