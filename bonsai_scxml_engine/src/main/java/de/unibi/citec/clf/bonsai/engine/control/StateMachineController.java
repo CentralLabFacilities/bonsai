@@ -80,6 +80,10 @@ public class StateMachineController extends TimerTask implements SkillExceptionH
         }
     }
 
+    public LoadingResults load() {
+        return load(pathToConfig, pathToTask, true);
+    }
+
     public LoadingResults load(boolean force) {
         return load(pathToConfig, pathToTask, force);
     }
