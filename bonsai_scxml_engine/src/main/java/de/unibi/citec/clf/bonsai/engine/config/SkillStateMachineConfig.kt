@@ -22,6 +22,8 @@ class SkillStateMachineConfig {
     var hashSkillConfigurations = false
     @JvmField
     var sendAllPossibleTransitions = false
+    @JvmField
+    var ignoredStates = mutableSetOf<String>()
     
     @Throws(MapReader.KeyNotFound::class)
     fun configure(data: Map<String?, String?>?) {
@@ -52,6 +54,10 @@ class SkillStateMachineConfig {
         sendAllPossibleTransitions =
             MapReader.readConfigBool("#_SEND_ALL_TRANSITIONS", sendAllPossibleTransitions, data)
         logger.debug("Send all Taransitions: $sendAllPossibleTransitions")
+
+        val ign = MapReader.readConfigString("#_VALIDATE_IGNORE_THESE_STATES", "", data)
+        ignoredStates = ign.split(";").toMutableSet()
+        logger.error("Ignore following ids during validate: $ignoredStates")
     }
 
     companion object {
