@@ -53,15 +53,15 @@ public class SCXMLValidator {
     public ValidationResult validateSCXML(SCXML aSCXML) throws StateNotFoundException,
             StateIDException {
         Map<StateID, Set<ExitToken>> emptyTokens = new HashMap<>();
-        return validateAll(aSCXML, emptyTokens, true, false, false);
+        return validateAll(aSCXML, emptyTokens, true, false, false, Set.of());
     }
 
     public ValidationResult validateTransitions(SCXML aSCXML, Map<StateID, Set<ExitToken>> tokens) throws StateIDException, StateNotFoundException {
-        return validateAll(aSCXML, tokens, false, true, true);
+        return validateAll(aSCXML, tokens, false, true, true, Set.of());
     }
 
-    public ValidationResult validate(SCXML aSCXML, Map<StateID, Set<ExitToken>> tokens) throws StateIDException, StateNotFoundException {
-        return validateAll(aSCXML, tokens, true, true, true);
+    public ValidationResult validate(SCXML aSCXML, Map<StateID, Set<ExitToken>> tokens, Set<String> ignoredStates) throws StateIDException, StateNotFoundException {
+        return validateAll(aSCXML, tokens, true, true, true, ignoredStates);
     }
 
     public static boolean hasDuplicates(InputSource is)
@@ -99,10 +99,9 @@ public class SCXMLValidator {
         return false;
     }
 
-    private ValidationResult validateAll(SCXML aSCXML, Map<StateID, Set<ExitToken>> tokens, boolean vExistance, boolean vTransition, boolean vSends) throws StateNotFoundException,
+    private ValidationResult validateAll(SCXML aSCXML, Map<StateID, Set<ExitToken>> tokens, boolean vExistence, boolean vTransition, boolean vSends, Set<String> ignoredStates) throws StateNotFoundException,
             StateIDException {
 
-        @SuppressWarnings("unchecked")
         Map<String, TransitionTarget> map = aSCXML.getTargets();
 
         ValidationResult results = new ValidationResult();
@@ -114,6 +113,11 @@ public class SCXMLValidator {
         for (String id : map.keySet()) {
 
             logger.debug("Found TransitionTarget: " + id);
+            if(ignoredStates.contains(id)) {
+                logger.debug("... ignoring.");
+                continue;
+            }
+
             if (map.get(id) instanceof Parallel) {
                 logger.debug("... is instance of parallel.");
                 continue;
@@ -126,9 +130,9 @@ public class SCXMLValidator {
                     continue;
                 }
                 StateID state = new StateID(prefix, id);
-                // if state does not exists, no need to check transitions
+                // if state does not exist, no need to check transitions
                 try {
-                    if (vExistance) {
+                    if (vExistence) {
                         isValid &= validateExistance(state);
                     }
                     if (vTransition) {

@@ -308,14 +308,14 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
         // Check if skills use existing sensors/actuators
         if(config.configureSkills) {
             StateMachineConfiguratorResults smResults = configurator
-                    .configureSkills(scxml, config.generateDefaultSlots);
+                    .configureSkills(scxml, config.generateDefaultSlots, config.ignoredStates);
 
             Map<StateID, Set<ExitToken>> registeredTokens
                     = configurator.getRegisteredExitTokens();
 
             // Check if classes and transitions exist
             validator = new SCXMLValidator(this, config.statePrefix);
-            ValidationResult scxmlValid = validator.validate(scxml, registeredTokens);
+            ValidationResult scxmlValid = validator.validate(scxml, registeredTokens, config.ignoredStates);
 
             Map<String, Class<?>> rs = configurator.getRequestedSensors();
             @SuppressWarnings("rawtypes")
@@ -351,13 +351,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
             results.configurationResults = confResults;
             results.stateMachineResults = smResults;
             results.validationResult = scxmlValid;
-            results.showDefaultSlotWarnings = config.showDefaultSlotWarnings;
 
-            if (results.success()) {
-                isInitialized = InitlializedState.TRUE;
-            } else {
-                isInitialized = InitlializedState.CONFIG_ERROR;
-            }
         } else {
 
             results.stateMachineResults = configurator.configureSlotsOnly(scxml);
@@ -373,12 +367,12 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
 
             results.statePrefix = config.statePrefix;
             results.configurationResults = confResults;
-            results.showDefaultSlotWarnings = config.showDefaultSlotWarnings;
-            if (results.success()) {
-                isInitialized = InitlializedState.TRUE;
-            } else {
-                isInitialized = InitlializedState.CONFIG_ERROR;
-            }
+        }
+        results.showDefaultSlotWarnings = config.showDefaultSlotWarnings;
+        if (results.success()) {
+            isInitialized = InitlializedState.TRUE;
+        } else {
+            isInitialized = InitlializedState.CONFIG_ERROR;
         }
 
         if (!results.success()) {
