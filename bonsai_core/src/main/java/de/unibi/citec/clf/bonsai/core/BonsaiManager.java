@@ -11,6 +11,7 @@ import de.unibi.citec.clf.bonsai.core.exception.CoreObjectCreationException;
 import de.unibi.citec.clf.bonsai.core.exception.InitializationException;
 import de.unibi.citec.clf.bonsai.core.exception.ParseException;
 import de.unibi.citec.clf.bonsai.core.object.*;
+import de.unibi.citec.clf.bonsai.util.MapReader;
 import de.unibi.citec.clf.bonsai.util.helper.ListClass;
 import org.apache.log4j.Logger;
 
@@ -43,9 +44,8 @@ public class BonsaiManager {
     /**
      * The parser instance used for initial configuration.
      * <p>
-     * {@link BonsaiManager} does not need a {@link ConfigurationParser}. Use      {@link BonsaiManager#configure(java.lang.String,
-     * de.unibi.airobots.bonsai.core.configuration.ConfigurationParser)} or
-     * {@link BonsaiManager#configure(java.net.URI, de.unibi.airobots.bonsai.core.configuration.ConfigurationParser)}
+     * {@link BonsaiManager} does not need a {@link ConfigurationParser}. Use {@link BonsaiManager#configure(String, ConfigurationParser)}  or
+     * {@link BonsaiManager#configure(URI, ConfigurationParser)}
      * instead.
      */
     @Deprecated
@@ -74,11 +74,23 @@ public class BonsaiManager {
      * Singleton instance variable.
      */
     private static BonsaiManager instance = new BonsaiManager();
+    private String oldConfig;
+
+
+    private boolean OPTION_CACHE_CONFIG = false;
 
     /**
      * Private constructor for singleton pattern.
      */
     private BonsaiManager() {
+    }
+
+    private void configureBonsaiOptions(Map<String,String> options) {
+        try {
+            OPTION_CACHE_CONFIG = MapReader.readConfigBool("CACHE_CONFIG", OPTION_CACHE_CONFIG, options);
+        } catch (MapReader.KeyNotFound e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /**
@@ -102,8 +114,8 @@ public class BonsaiManager {
      *
      * @param parser new parser to use
      * @deprecated {@link BonsaiManager} does not need a {@link ConfigurationParser}. Use      {@link BonsaiManager#configure(java.lang.String,
-     * de.unibi.airobots.bonsai.core.configuration.ConfigurationParser)} or      {@link BonsaiManager#configure(java.net.URI,
-     * de.unibi.airobots.bonsai.core.configuration.ConfigurationParser)} instead.
+     * ConfigurationParser)} or      {@link BonsaiManager#configure(java.net.URI,
+     * ConfigurationParser)} instead.
      */
     @Deprecated
     public void setParser(ConfigurationParser parser) {
@@ -115,8 +127,8 @@ public class BonsaiManager {
      *
      * @return current parser instance
      * @deprecated Use
-     * {@link BonsaiManager#configure(java.lang.String, de.unibi.airobots.bonsai.core.configuration.ConfigurationParser)}
-     * or {@link BonsaiManager#configure(java.net.URI, de.unibi.airobots.bonsai.core.configuration.ConfigurationParser)}
+     * {@link BonsaiManager#configure(java.lang.String, ConfigurationParser)}
+     * or {@link BonsaiManager#configure(java.net.URI, ConfigurationParser)}
      * instead.
      */
     @Deprecated
@@ -145,9 +157,9 @@ public class BonsaiManager {
      * {@link BonsaiManager#configure(java.net.URI, ConfigurationParser)} instead.
      */
     @Deprecated
-    public ConfigurationResults configure(String configurationFilename) throws ConfigurationException {
+    public ConfigurationResults configure(String configurationFilename, boolean forceCleanup) throws ConfigurationException {
         try {
-            return configure(new URI("file://" + configurationFilename.replace(" ", "%20")));
+            return configure(new URI("file://" + configurationFilename.replace(" ", "%20")), forceCleanup);
         } catch (URISyntaxException e) {
             throw new RuntimeException(e);
         }
@@ -162,10 +174,10 @@ public class BonsaiManager {
      * @throws ConfigurationException error configuring the {@link BonsaiManager}. If this is the case, this class is in
      *                                an unpredictable state and cannot be used afterwards
      */
-    public ConfigurationResults configure(String configurationFilename, ConfigurationParser parser)
+    public ConfigurationResults configure(String configurationFilename, ConfigurationParser parser, boolean forceCleanup)
             throws ConfigurationException {
         try {
-            return configure(new URI(configurationFilename.replace(" ", "%20")), parser);
+            return configure(new URI(configurationFilename.replace(" ", "%20")), parser, forceCleanup);
         } catch (URISyntaxException e) {
             throw new RuntimeException(e);
         }
@@ -183,8 +195,8 @@ public class BonsaiManager {
      * {@link BonsaiManager#configure(java.net.URI, ConfigurationParser)} instead.
      */
     @Deprecated
-    public ConfigurationResults configure(URI configurationFile) throws IllegalStateException, ConfigurationException {
-        return configure(configurationFile, configurationParser);
+    public ConfigurationResults configure(URI configurationFile, boolean forceCleanup) throws IllegalStateException, ConfigurationException {
+        return configure(configurationFile, configurationParser, forceCleanup);
     }
 
     /**
@@ -195,9 +207,9 @@ public class BonsaiManager {
      * @throws ConfigurationException error configuring the {@link BonsaiManager}. If this is the case, this class is in
      *                                an unpredictable state and cannot be used afterwards.
      */
-    public ConfigurationResults configure(URI configurationFile, ConfigurationParser parser)
+    public ConfigurationResults configure(URI configurationFile, ConfigurationParser parser, boolean forceCleanup)
             throws ConfigurationException {
-        return configure(configurationFile, parser, null, null, null, null);
+        return configure(configurationFile, parser, null, null, null, null, forceCleanup);
     }
 
     /**
@@ -208,9 +220,9 @@ public class BonsaiManager {
      * @throws ConfigurationException error configuring the {@link BonsaiManager}. If this is the case, this class is in
      *                                an unpredictable state and cannot be used afterwards.
      */
-    public ConfigurationResults configure(InputStream configurationStream, ConfigurationParser parser)
+    public ConfigurationResults configure(InputStream configurationStream, ConfigurationParser parser, boolean forceCleanup)
             throws ConfigurationException {
-        return configure(configurationStream, parser, null, null, null, null);
+        return configure(configurationStream, parser, null, null, null, null, forceCleanup);
     }
 
     /**
@@ -221,9 +233,9 @@ public class BonsaiManager {
      * @throws ConfigurationException error configuring the {@link BonsaiManager}. If this is the case, this class is in
      *                                an unpredictable state and cannot be used afterwards.
      */
-    public ConfigurationResults configureByString(String configuration, ConfigurationParser parser)
+    public ConfigurationResults configureByString(String configuration, ConfigurationParser parser, boolean forceCleanup)
             throws ConfigurationException {
-        return configureByString(configuration, parser, null, null, null, null);
+        return configureByString(configuration, parser, null, null, null, null, forceCleanup);
     }
 
     /**
@@ -240,11 +252,11 @@ public class BonsaiManager {
      *                                an unpredictable state and cannot be used afterwards.
      */
     public ConfigurationResults configure(String configurationFile, ConfigurationParser parser,
-                                          Set<String> sensorKeySet, Set<String> listSensorKeySet, Set<String> actuatorKeySet, Set<String> memoryKeySet)
+                                          Set<String> sensorKeySet, Set<String> listSensorKeySet, Set<String> actuatorKeySet, Set<String> memoryKeySet, boolean forceCleanup)
             throws ConfigurationException {
 
         return configure(new File(configurationFile).toURI(), parser, sensorKeySet, listSensorKeySet,
-                actuatorKeySet, memoryKeySet);
+                actuatorKeySet, memoryKeySet, forceCleanup);
 
     }
 
@@ -263,12 +275,12 @@ public class BonsaiManager {
      */
     public ConfigurationResults configureByString(String configuration, ConfigurationParser parser,
                                                   Set<String> aSensorKeySet, Set<String> aListSensorKeySet, Set<String> aActuatorKeySet,
-                                                  Set<String> aMemoryKeySet) throws ConfigurationException {
+                                                  Set<String> aMemoryKeySet, boolean forceCleanup) throws ConfigurationException {
         logger.trace("Parsing configuration file");
         try {
             logger.trace("Parsing configuration file");
             parser.parse(configuration);
-            return configure(parser, aSensorKeySet, aListSensorKeySet, aActuatorKeySet, aMemoryKeySet);
+            return configure(parser, aSensorKeySet, aListSensorKeySet, aActuatorKeySet, aMemoryKeySet, forceCleanup);
         } catch (ParseException e) {
             throw new ConfigurationException("Error parsing the configuration file \"" + configuration
                     + "\". Message (ParseException): " + e.getMessage(), e);
@@ -295,13 +307,13 @@ public class BonsaiManager {
      *                                an unpredictable state and cannot be used afterwards.
      */
     public ConfigurationResults configure(URI configurationFile, ConfigurationParser parser, Set<String> aSensorKeySet,
-                                          Set<String> aListSensorKeySet, Set<String> aActuatorKeySet, Set<String> aMemoryKeySet)
+                                          Set<String> aListSensorKeySet, Set<String> aActuatorKeySet, Set<String> aMemoryKeySet, boolean forceCleanup)
             throws ConfigurationException {
         try {
             logger.trace("Parsing configuration file");
             parser.parse(configurationFile);
             return configure(parser, aSensorKeySet, aListSensorKeySet, aActuatorKeySet,
-                    aMemoryKeySet);
+                    aMemoryKeySet, forceCleanup);
         } catch (ParseException e) {
             throw new ConfigurationException(
                     "Error parsing the configuration stream. Message (ParseException): "
@@ -324,7 +336,7 @@ public class BonsaiManager {
      * @param configurationStream Stream of the configuration file
      * @param parser              Parser to parse the given file.
      * @param aSensorKeySet       Map that contains all required sensor keys.
-     * @param aListSensorKeySet   Set that contains all required list sensor keys.
+     * @param aListSensorKeySet   Set that contains all required/** list sensor keys.
      * @param aActuatorKeySet     Set that contains all required actuator keys.
      * @param aMemoryKeySet       Set that contains all required working memory keys.
      * @throws ConfigurationException error configuring the {@link BonsaiManager}. If this is the case, this class is in
@@ -332,12 +344,12 @@ public class BonsaiManager {
      */
     public ConfigurationResults configure(InputStream configurationStream,
                                           ConfigurationParser parser, Set<String> aSensorKeySet, Set<String> aListSensorKeySet,
-                                          Set<String> aActuatorKeySet, Set<String> aMemoryKeySet) throws ConfigurationException {
+                                          Set<String> aActuatorKeySet, Set<String> aMemoryKeySet, boolean forceCleanup) throws ConfigurationException {
         try {
             logger.trace("Parsing configuration file");
             parser.parse(configurationStream);
             return configure(parser, aSensorKeySet, aListSensorKeySet, aActuatorKeySet,
-                    aMemoryKeySet);
+                    aMemoryKeySet, forceCleanup);
         } catch (ParseException e) {
             throw new ConfigurationException(
                     "Error parsing the configuration stream. Message (ParseException): "
@@ -354,7 +366,7 @@ public class BonsaiManager {
     }
 
     public ConfigurationResults configure(ConfigurationParser parser, Set<String> aSensorKeySet,
-                                          Set<String> aListSensorKeySet, Set<String> aActuatorKeySet, Set<String> aMemoryKeySet)
+                                          Set<String> aListSensorKeySet, Set<String> aActuatorKeySet, Set<String> aMemoryKeySet, boolean forceCleanup)
             throws ConfigurationException {
 
         ConfigurationResults results = new ConfigurationResults();
@@ -364,8 +376,16 @@ public class BonsaiManager {
         Set<String> actuatorKeySet = aActuatorKeySet == null ? null : new HashSet<>(aActuatorKeySet);
         Set<String> memoryKeySet = aMemoryKeySet == null ? null : new HashSet<>(aMemoryKeySet);
 
-        logger.trace("Creating factories");
-        createFactories(config.factories.values());
+        configureBonsaiOptions(config.options);
+
+        if (!forceCleanup && OPTION_CACHE_CONFIG && oldConfig != null && oldConfig.equals(parser.getHash())) {
+            // Skip creation
+            logger.fatal("SKIP CREATION");
+        } else {
+            logger.trace("Creating factories");
+            createFactories(config.factories.values());
+            oldConfig = parser.getHash();
+        }
 
         logger.trace("Initializing coordinate transformer");
         results.merge(initializeCoordinateTransformer(config.transformer));
@@ -873,7 +893,7 @@ public class BonsaiManager {
      * Afterwards the mapping {@link #actuatorKeysToFactories} is populated.
      *
      * @param configuredActuators actuators to initialize
-     * @throws ConfigurationExceptionerror initialization error
+     * @throws ConfigurationException initialization error
      */
     private ConfigurationResults initializeActuators(Collection<ActuatorData> configuredActuators)
             throws ConfigurationException {
@@ -997,7 +1017,7 @@ public class BonsaiManager {
      * {@link #configuredFactoriesByClass}. Afterwards the mapping {@link #memoryKeysToFactories} is populated.
      *
      * @param configuredMemories working memories to initialize
-     * @throws ConfigurationExceptionerror initialization error
+     * @throws ConfigurationException initialization error
      */
     private ConfigurationResults initializeWorkingMemories(Collection<MemoryData> configuredMemories) {
         ConfigurationResults results = new ConfigurationResults();
@@ -1051,7 +1071,7 @@ public class BonsaiManager {
     }
 
     /**
-     * Maps {@link ConfiguredActuator}s to {@link ActuatorToConfigure}s with appropriate class checking.
+     * Maps {@link ActuatorData}s to {@link ActuatorToConfigure}s with appropriate class checking.
      *
      * @param confAct actuator to map
      * @return mapped actuator
@@ -1099,7 +1119,7 @@ public class BonsaiManager {
      * @param <T>               type of the core objects to map
      * @param configuredObjects sensors to map
      * @param mapper            mapper from <code>T</code> to <code>U</code>
-     * @return map that maps every given {@link ConfiguredSensor} to the factory object that can create it
+     * @return map that maps every given {@link SensorToConfigure} to the factory object that can create it
      * @throws ConfigurationException on of the sensors cannot be mapped to a factory instance
      */
     private <T extends CoreObjectData, U> Map<CoreObjectFactory, Set<U>> mapConfiguredCoreObjectToFactories(
@@ -1165,7 +1185,7 @@ public class BonsaiManager {
      * @param <T>               type of the core objects to map
      * @param configuredObjects sensors to map
      * @param mapper            mapper from <code>T</code> to <code>U</code>
-     * @return map that maps every given {@link ConfiguredSensor} to the factory object that can create it
+     * @return map that maps every given {@link SensorToConfigure} to the factory object that can create it
      * @throws ConfigurationException on of the sensors cannot be mapped to a factory instance
      */
     private <T extends CoreObjectData, U> Map<CoreObjectFactory, Set<U>> mapCoreObjectDataToFactories(
@@ -1213,7 +1233,7 @@ public class BonsaiManager {
     }
 
     /**
-     * Maps {@link ConfiguredSensor}s to {@link ActuatorToConfigure}s with appropriate class checking.
+     * Maps {@link SensorData}s to {@link SensorToConfigure}s with appropriate class checking.
      *
      * @param confSensor sensor to map
      * @return mapped sensor
@@ -1259,7 +1279,7 @@ public class BonsaiManager {
     }
 
     /**
-     * Maps {@link ConfiguredWorkingMemory}s to {@link WorkingMemoryToConfigure} s with appropriate class checking.
+     * Maps {@link MemoryData}s to {@link WorkingMemoryToConfigure} s with appropriate class checking.
      *
      * @param confMemory memory to map
      * @return mapped memory

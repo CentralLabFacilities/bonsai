@@ -81,13 +81,17 @@ public class StateMachineController extends TimerTask implements SkillExceptionH
     }
 
     public LoadingResults load() {
-        return load(pathToConfig, pathToTask);
+        return load(pathToConfig, pathToTask, true);
     }
 
-    public LoadingResults load(String pathToConfig, String pathToTask) {
+    public LoadingResults load(boolean force) {
+        return load(pathToConfig, pathToTask, force);
+    }
+
+    public LoadingResults load(String pathToConfig, String pathToTask, boolean force) {
         LoadingResults results;
         try {
-            results = skillStateMachine.initalize(pathToTask, pathToConfig);
+            results = skillStateMachine.initalize(pathToTask, pathToConfig, force);
         } catch (Exception t) {
             logger.error("Fatal state machine configuration error: " + t.getClass().getSimpleName() + ": " + t.getMessage(), t);
             logger.debug(t);
@@ -151,7 +155,7 @@ public class StateMachineController extends TimerTask implements SkillExceptionH
     public void run() {
         if (pathToConfig != null && pathToTask != null) {
             logger.debug("config: " + pathToConfig + "\nTask:" + pathToTask);
-            if (load().success()) {
+            if (load(true).success()) {
                 logger.debug("load successful");
             } else {
                 logger.debug("load failed");

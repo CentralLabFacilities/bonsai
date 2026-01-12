@@ -19,7 +19,9 @@ import java.util.concurrent.Future
 import kotlin.math.max
 
 /**
- * Place the Entity anywhere inside the Storage.
+ * Place the Entity anywhere inside the Storage. (Prefers Center)
+ *
+ * TODO: currently samples gripper target poses inside the storage, set min_z/max_z depending on task
  *
  * The Place Task will sample goal positions starting from the center of the area
  *

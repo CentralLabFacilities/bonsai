@@ -11,9 +11,7 @@ import javafx.concurrent.Task;
 import org.apache.commons.scxml2.model.Transition;
 import org.apache.log4j.Logger;
 
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Created by lruegeme on 1/22/18.
@@ -27,10 +25,19 @@ public class DirectControlRemote implements FXGUISCXMLRemote {
     private boolean running = true;
 
     private ExitListener exitListener;
+    private Timer timer;
 
     public DirectControlRemote(StateMachineController smc) {
         this.smc = smc;
         status = new SimpleStringProperty();
+
+        timer = new Timer();
+        timer.scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+                status.setValue(smc.getStatus().toString());
+            }
+        }, 0, 100L);
     }
 
 
@@ -65,10 +72,10 @@ public class DirectControlRemote implements FXGUISCXMLRemote {
     }
 
     @Override
-    public String load(String pathToConfig, String pathToTask, Map<String, String> includeMapping) {
+    public String load(String pathToConfig, String pathToTask, Map<String, String> includeMapping, boolean force) {
         smc.setConfigPath(pathToConfig);
         smc.setTaskPath(pathToTask);
-        return smc.load().toString();
+        return smc.load(force).toString();
     }
 
     @Override

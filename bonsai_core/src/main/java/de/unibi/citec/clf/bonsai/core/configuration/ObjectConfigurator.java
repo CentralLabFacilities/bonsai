@@ -177,6 +177,16 @@ public class ObjectConfigurator implements IObjectConfigurator {
     }
 
     @Override
+    public float requestFloat(String key) throws ConfigurationException {
+        return (float) requestDouble(key);
+    }
+
+    @Override
+    public float requestOptionalFloat(String key, float def) throws ConfigurationException {
+        return (float) requestOptionalDouble(key, def);
+    }
+
+    @Override
     public String requestValue(String key) throws ConfigurationException {
         switch (phase) {
             case CONFIG:

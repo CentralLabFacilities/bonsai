@@ -181,7 +181,10 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
      * Is the state machine stopped?
      */
     private boolean running = false;
-    private boolean isInitialized = false;
+    private enum InitlializedState {
+        FALSE, TRUE, CONFIG_ERROR
+    }
+    private InitlializedState isInitialized = InitlializedState.FALSE;
     private boolean isLoading = false;
     private StateMachineConfigurator configurator;
     private SCXMLValidator validator;
@@ -236,8 +239,10 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     @NotNull
     public StatemachineStatus getStatemachineStatus() {
         StatemachineStatus status = StatemachineStatus.UNKNOWN;
-        if (isInitialized) {
-            status = StatemachineStatus.INITIALIZED;
+
+        switch (isInitialized) {
+            case TRUE -> status = StatemachineStatus.INITIALIZED;
+            case CONFIG_ERROR -> status = StatemachineStatus.INITIALIZED_BUT_WARNINGS;
         }
         if(isLoading) {
             status = StatemachineStatus.LOADING;
@@ -262,7 +267,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
      * @throws LoadingException
      * @throws TransformerException
      */
-    public LoadingResults initalize(String pathToTask, String pathToConfig)
+    public LoadingResults initalize(String pathToTask, String pathToConfig, boolean forceConfigure)
             throws StateNotFoundException, StateIDException, LoadingException, TransformerException {
         isLoading = true;
         pathToTask = pathToTask.replaceFirst("^~/", System.getProperty("user.home"));
@@ -303,14 +308,14 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
         // Check if skills use existing sensors/actuators
         if(config.configureSkills) {
             StateMachineConfiguratorResults smResults = configurator
-                    .configureSkills(scxml, config.generateDefaultSlots);
+                    .configureSkills(scxml, config.generateDefaultSlots, config.ignoredStates);
 
             Map<StateID, Set<ExitToken>> registeredTokens
                     = configurator.getRegisteredExitTokens();
 
             // Check if classes and transitions exist
             validator = new SCXMLValidator(this, config.statePrefix);
-            ValidationResult scxmlValid = validator.validate(scxml, registeredTokens);
+            ValidationResult scxmlValid = validator.validate(scxml, registeredTokens, config.ignoredStates);
 
             Map<String, Class<?>> rs = configurator.getRequestedSensors();
             @SuppressWarnings("rawtypes")
@@ -325,7 +330,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
             try {
                 BonsaiManager bm = BonsaiManager.getInstance();
                 confResults = bm.configure(pathToConfig, parser, rs.keySet(),
-                        rls.keySet(), ra.keySet(), rwm);
+                        rls.keySet(), ra.keySet(), rwm, forceConfigure);
 
                 confResults.merge(bm.canCreateSensors(rs));
                 confResults.merge(bm.canCreateListSensors(rls));
@@ -336,36 +341,38 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
                 }
 
             } catch (Throwable t) {
-                isInitialized = false;
+                isInitialized = InitlializedState.FALSE;
                 isLoading = false;
                 logger.error(t.getMessage(), t);
                 throw new LoadingException("configure failed: " + t.getMessage());
             }
-
-            isInitialized = true;
 
             results.statePrefix = config.statePrefix;
             results.configurationResults = confResults;
             results.stateMachineResults = smResults;
             results.validationResult = scxmlValid;
-            results.showDefaultSlotWarnings = config.showDefaultSlotWarnings;
+
         } else {
 
             results.stateMachineResults = configurator.configureSlotsOnly(scxml);
             try {
                 BonsaiManager bm = BonsaiManager.getInstance();
-                confResults = bm.configure(pathToConfig,parser);
+                confResults = bm.configure(pathToConfig,parser, forceConfigure);
             } catch (Throwable t) {
-                isInitialized = false;
+                isInitialized = InitlializedState.FALSE;
                 isLoading = false;
                 logger.error(t.getMessage(), t);
                 throw new LoadingException("configure failed: " + t.getMessage());
             }
 
-            isInitialized = true;
             results.statePrefix = config.statePrefix;
             results.configurationResults = confResults;
-            results.showDefaultSlotWarnings = config.showDefaultSlotWarnings;
+        }
+        results.showDefaultSlotWarnings = config.showDefaultSlotWarnings;
+        if (results.success()) {
+            isInitialized = InitlializedState.TRUE;
+        } else {
+            isInitialized = InitlializedState.CONFIG_ERROR;
         }
 
         if (!results.success()) {
@@ -586,7 +593,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
      * Starts the state machine.
      */
     public synchronized void startMachine() {
-        if (!isInitialized) {
+        if (isInitialized == InitlializedState.FALSE) {
             throw new StateMachineException("State Machine was "
                     + "not successfully initialized");
         }
@@ -696,7 +703,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     }
 
     public boolean isInitialized() {
-        return isInitialized;
+        return isInitialized != InitlializedState.FALSE;
     }
 
     private void actionCheck(List<Action> actions) {

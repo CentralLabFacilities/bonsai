@@ -6,83 +6,88 @@ import de.unibi.citec.clf.bonsai.core.exception.TransformException
 import de.unibi.citec.clf.bonsai.core.`object`.MemorySlotReader
 import de.unibi.citec.clf.bonsai.core.`object`.MemorySlotWriter
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill
-import de.unibi.citec.clf.bonsai.engine.model.ExitStatus
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
 import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException
 import de.unibi.citec.clf.bonsai.util.CoordinateTransformer
 import de.unibi.citec.clf.btl.data.geometry.PrecisePolygon
-import de.unibi.citec.clf.btl.data.person.PersonAttribute
 import de.unibi.citec.clf.btl.data.person.PersonDataList
 import de.unibi.citec.clf.btl.data.world.Entity
-import java.io.IOException
-import java.util.concurrent.ExecutionException
-import java.util.concurrent.Future
+import de.unibi.citec.clf.bonsai.engine.model.ExitStatus
+import de.unibi.citec.clf.btl.data.person.PersonAttribute
 
 /**
  * This Skill is used to filter a List of Persons by one or more specific attributes.
- * These Attributes can be any of the Attributes found in PersonAttribute, i.e. gesture, posture, gender, shirt color
- * and age. They are read via Slots (see below). Multiple values can be given, if e.g. the gestures are separated by
- * semicolons ("waving;pointing left;neutral")
+ *
+ * These Attributes can be any of the Attributes found in PersonAttribute,
+ * i.e. gesture, posture and if they are inside a specific room.
+ *
+ * Multiple values can be given, if e.g. the gestures are separated by semicolons
+ * ("waving;pointing left;neutral")
+ *
  * <pre>
  *
  * Options:
+ * #_DO_GESTURE_FILTERING  [boolean] Optional (default: false)
+ *      -> Filter by gesture using option or slot
+ * #_DO_POSTURE_FILTERING  [boolean] Optional (default: false)
+ *      -> Filter by person posture using option or slot
+ * #_DO_ROOM_FILTERING     [boolean] Optional (default: false)
+ *      -> Filter by room using option or slot
  * #_GESTURES              [String] Optional
- * -> The gestures to filter for. If set, but expr is empty String, slot will be used instead.
+ *      -> The gestures to filter for. Also, sets DO_GESTURE_FILTERING
  * #_POSTURE               [String] Optional
- * -> The postures to filter for. If set, but expr is empty String, slot will be used instead.
+ *      -> The postures to filter for. Also, sets DO_POSTURE_FILTERING
  * #_ROOMS                 [String] Optional
- * -> The rooms to filter for. If set, but expr is empty String, slot will be used instead.
+ *      -> The rooms to filter for. Also, sets DO_ROOM_FILTERING
  *
  * Slots:
- * PersonDataListReadSlot: [PersonDataList] [Read]
- * -> Memory slot the unfiltered list of persons will be read from
- * PersonDataListWriteSlot: [PersonDataList] [Write]
- * -> Memory slot the filtered list of persons will be written to
- * GestureReadSlot: [String] [Read]
- * -> Memory Slot for the Gesture by that shall be filtered
- * PostureReadSlot: [String] [Read]
- * -> Memory Slot for the Posture by that shall be filtered
- * RoomReadSlot: [String] [Read]
- * -> Memory Slot for the Room by that shall be filtered
+ * PersonDataListReadSlot: [PersonDataList] (Read)
+ *      -> Memory slot the unfiltered list of persons will be read from
+ * PersonDataListWriteSlot: [PersonDataList] (Write)
+ *      -> Memory slot the filtered list of persons will be written to
+ *
+ * GestureReadSlot: [String] (Optional, Read)
+ *      -> Memory Slot for the Gesture by that shall be filtered
+ * PostureReadSlot: [String] (Optional, Read)
+ *      -> Memory Slot for the Posture by that shall be filtered
+ * RoomReadSlot: [String] (Optional, Read)
+ *      -> Memory Slot for the Room by that shall be filtered
  *
  * ExitTokens:
- * success:                List successfully filtered, at least one PersonData remaining
- * success.noPeople        List successfully filtered, but no Person remaining/ List empty
- * error:                  Name of the Location could not be retrieved
+ * success.notEmpty:        List successfully filtered, at least one PersonData remaining
+ * success.empty:           List successfully filtered, but no Person remaining / List empty
+ * error:                   Name of the Location could not be retrieved
  *
  * Sensors:
  *
  * Actuators:
- * ECWMSpirit
+ *  ECWMSpirit
  *
 </pre> *
  *
  * @author
  */
 class FilterPeopleList : AbstractSkill() {
-    private var tokenSuccess: ExitToken? = null
+    private var tokenSuccessHasPeople: ExitToken? = null
     private var tokenSuccessNoPeople: ExitToken? = null
     private var tokenError: ExitToken? = null
 
-    private var personDataReadSlot: MemorySlotReader<PersonDataList>? = null
-    private var personDataWriteSlot: MemorySlotWriter<PersonDataList>? = null
+    private var personDataReadSlot: MemorySlotReader<PersonDataList?>? = null
+    private var personDataWriteSlot: MemorySlotWriter<PersonDataList?>? = null
 
-    private var gestureReadSlot: MemorySlotReader<String>? = null
+    private var gestureReadSlot: MemorySlotReader<String?>? = null
     private var roomReadSlot: MemorySlotReader<String>? = null
-    private var postureReadSlot: MemorySlotReader<String>? = null
+    private var postureReadSlot: MemorySlotReader<String?>? = null
 
     private var personDataList: PersonDataList? = null
-    private var postureString = ""
-    private var gestureString = ""
+    private var postureString: String? = ""
+    private var gestureString: String? = ""
     private var roomString = ""
-    private lateinit var postureStringList: List<String>
-    private lateinit var gestureStringList: List<String>
-    private lateinit var roomStringList: List<String>
+    private val rooms: MutableList<PrecisePolygon?> = mutableListOf()
 
     private var ecwm: ECWMSpirit? = null
-    private var coordinateTransformer: CoordinateTransformer? = null
-    private var room: PrecisePolygon? = null
+    private var coordTransformer: CoordinateTransformer? = null
 
     private var doGestureFiltering = false
     private var doPostureFiltering = false
@@ -91,111 +96,79 @@ class FilterPeopleList : AbstractSkill() {
 
     @Throws(SkillConfigurationException::class)
     override fun configure(configurator: ISkillConfigurator) {
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
-        tokenSuccessNoPeople = configurator.requestExitToken(ExitStatus.SUCCESS().ps("noPeople"))
+        tokenSuccessHasPeople = configurator.requestExitToken(ExitStatus.SUCCESS().ps("notEmpty"))
+        tokenSuccessNoPeople = configurator.requestExitToken(ExitStatus.SUCCESS().ps("empty"))
         tokenError = configurator.requestExitToken(ExitStatus.ERROR())
 
-        personDataReadSlot = configurator.getReadSlot("PersonDataListReadSlot", PersonDataList::class.java)
-        personDataWriteSlot = configurator.getWriteSlot("PersonDataListWriteSlot", PersonDataList::class.java)
+        personDataReadSlot =
+            configurator.getReadSlot("PersonDataListReadSlot", PersonDataList::class.java)
+        personDataWriteSlot =
+            configurator.getWriteSlot("PersonDataListWriteSlot", PersonDataList::class.java)
 
         ecwm = configurator.getActuator("ECWMSpirit", ECWMSpirit::class.java)
 
-        coordinateTransformer = configurator.getTransform() as CoordinateTransformer?
+        coordTransformer = configurator.getTransform() as? CoordinateTransformer
 
         if (configurator.hasConfigurationKey(KEY_GESTURES)) {
-            gestureString = configurator.requestOptionalValue(KEY_GESTURES, gestureString)
+            gestureString = configurator.requestValue(KEY_GESTURES)
             doGestureFiltering = true
+            doGestureFiltering = configurator.requestOptionalBool(KEY_GESTURE_FILTERING, doGestureFiltering)
+        } else {
+            doGestureFiltering = configurator.requestOptionalBool(KEY_GESTURE_FILTERING, doGestureFiltering)
+            if (doGestureFiltering) {
+                gestureReadSlot = configurator.getReadSlot("GestureStringSlot", String::class.java)
+            }
         }
-        if (configurator.hasConfigurationKey(KEY_POSTURES)) {
-            postureString = configurator.requestOptionalValue(KEY_POSTURES, postureString)
-            doPostureFiltering = true
-        }
+
         if (configurator.hasConfigurationKey(KEY_ROOMS)) {
-            roomString = configurator.requestOptionalValue(KEY_ROOMS, roomString)
             doRoomFiltering = true
+            roomString = configurator.requestValue(KEY_ROOMS)
+            doRoomFiltering = configurator.requestOptionalBool(KEY_ROOM_FILTERING, doRoomFiltering)
+        } else {
+            doRoomFiltering = configurator.requestOptionalBool(KEY_ROOM_FILTERING, doRoomFiltering)
+            if (doRoomFiltering) {
+                roomReadSlot = configurator.getReadSlot("RoomStringSlot", String::class.java)
+            }
         }
 
-        logger.info("Config: [GestureFiltering: $doGestureFiltering; PostureFiltering: $doPostureFiltering; RoomFiltering: $doRoomFiltering]")
+        if (configurator.hasConfigurationKey(KEY_POSTURES)) {
+            doPostureFiltering = true
+            postureString = configurator.requestValue(KEY_POSTURES)
+            doPostureFiltering = configurator.requestOptionalBool(KEY_POSTURE_FILTERING, doPostureFiltering)
+        } else {
+            doPostureFiltering = configurator.requestOptionalBool(KEY_POSTURE_FILTERING, doPostureFiltering)
+            if (doPostureFiltering) {
+                postureReadSlot = configurator.getReadSlot("PostureStringSlot", String::class.java)
+            }
+        }
 
-        if (doGestureFiltering && gestureString.isEmpty()) {
-            gestureReadSlot = configurator.getReadSlot("GestureStringSlot", String::class.java)
-        }
-        if (doPostureFiltering && postureString.isEmpty()) {
-            postureReadSlot = configurator.getReadSlot("PostureStringSlot", String::class.java)
-        }
-        if (doRoomFiltering && roomString.isEmpty()) {
-            roomReadSlot = configurator.getReadSlot("RoomStringSlot", String::class.java)
-        }
-
-        logger.info("Used slots: [GestureStringSlot: ${gestureReadSlot != null}; PostureStringSlot: ${postureReadSlot != null}; RoomStringSlot: ${roomReadSlot != null}]")
     }
 
     override fun init(): Boolean {
-        try {
-            personDataList = personDataReadSlot!!.recall<PersonDataList>().also {
-                if (it == null) {
-                    logger.error("PersonDataListReadSlot didn't contain a PersonDataList, aborting")
+        personDataList = personDataReadSlot?.recall<PersonDataList>() ?: run {
+            logger.error("personDataList is null")
+            return false
+        }
+
+        if (doRoomFiltering) {
+            roomString = roomReadSlot?.recall<String>() ?: roomString
+            val roomStringList = roomString.split(";")
+            for (room in roomStringList) {
+                val roomFuture = ecwm?.getRoomPolygon(Entity(room, "/misc/room", null)) ?: run {
                     return false
                 }
+                rooms.add(roomFuture.get())
             }
-
-            if (doGestureFiltering) {
-                if (gestureString.isEmpty()) {
-                    gestureString = gestureReadSlot!!.recall<String>()
-                }
-                gestureStringList = gestureString.split(";".toRegex()).dropLastWhile { it.isEmpty() }.forEach {
-
-                }
-                gestureStringList.forEach { gestureStr ->
-                    if (PersonAttribute.Gesture.fromString(gestureStr) == null) {
-                        logger.error("Encountered unknown gesture '$gestureStr', aborting")
-                        return false
-                    }
-                }
-            }
-
-
-        } catch (ex: CommunicationException) {
-            logger.fatal("Unable to read from memory: ", ex)
-            return false
         }
 
-        try {
-            if (doRoomFiltering) {
-                if (roomString.isEmpty() && roomReadSlot != null) roomString = roomReadSlot!!.recall<String?>()
-                val roomStringList = roomString.split(";".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
-                for (room in roomStringList) {
-                    val roomFuture: Future<PrecisePolygon?>?
-                    try {
-                        roomFuture = ecwm?.getRoomPolygon(Entity(room, "/misc/room", null))
-                    } catch (e: IOException) {
-                        logger.error("Unable to get room: " + room, e)
-                        return false
-                    }
-                    try {
-                        this@FilterPeopleList.room = roomFuture!!.get()
-                    } catch (e: InterruptedException) {
-                        logger.error("Unable to get room: " + room, e)
-                        return false
-                    } catch (e: ExecutionException) {
-                        logger.error("Unable to get room: " + room, e)
-                        return false
-                    }
-                }
-            }
-            if (doPostureFiltering) {
-                if (postureString.isEmpty() && postureReadSlot != null) {
-                    postureString = postureReadSlot!!.recall<String?>()
-                }
-            }
-            if (doGestureFiltering) {
-                if (gestureString.isEmpty() && gestureReadSlot != null) gestureString =
-                    gestureReadSlot!!.recall<String?>()
-            }
-        } catch (ex: CommunicationException) {
-            logger.fatal("Unable to read from memory: ", ex)
-            return false
+        if (doPostureFiltering) {
+            postureString = postureReadSlot?.recall<String?>() ?: postureString
         }
+
+        if (doGestureFiltering) {
+            gestureString = gestureReadSlot?.recall<String?>() ?: gestureString
+        }
+
 
         return true
     }
@@ -211,92 +184,67 @@ class FilterPeopleList : AbstractSkill() {
         if (doRoomFiltering) {
             filterByRoom()
         }
-        if (personDataList == null || personDataList!!.isEmpty()) {
-            logger.info("No People")
+
+        if (personDataList?.isEmpty() == true) {
+            logger.info("No more People left")
             return tokenSuccessNoPeople
+        } else {
+            logger.info("still have ${personDataList?.size} People")
+            personDataWriteSlot?.memorize<PersonDataList?>(personDataList)
+            return tokenSuccessHasPeople
         }
-        return tokenSuccess
+
+
     }
 
-    override fun end(curToken: ExitToken): ExitToken? {
-        if (curToken.getExitStatus().isSuccess()) {
-            try {
-                personDataWriteSlot?.memorize<PersonDataList?>(personDataList)
-            } catch (ex: CommunicationException) {
-                logger.error("Could not memorize personDataList")
-                return tokenError
-            }
-        }
+    override fun end(curToken: ExitToken): ExitToken {
         return curToken
     }
 
     private fun filterByPosture() {
-        if (postureString == null || postureString!!.isEmpty()) {
-            logger.warn("your PostureSlot was empty, will not filter by posture ")
-        } else {
-            val postureArray = postureString!!.split(";".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
-
-            for (person in personDataList!!) {
-                var has_posture = false
-                for (p in postureArray) {
-                    val posture: PersonAttribute.Posture? = PersonAttribute.Posture.fromString(p)
-                    if (posture == null) {
-                        logger.error("Could not retrieve posture for string: " + p)
-                        continue
-                    }
-                    if (person.getPersonAttribute().getPosture().compareTo(posture) == 0) {
-                        has_posture = true
-                    }
-                }
-                if (!has_posture) {
-                    personDataList?.remove(person)
-                }
-            }
+        val postures = postureString?.split(";")?.map { PersonAttribute.Posture.fromString(it) } ?: listOf()
+        logger.info("filter for postures: ${postures.joinToString("; ")}")
+        personDataList = PersonDataList().also { list ->
+            list.addAll(personDataList?.filter {
+                val ret = postures.contains(it.personAttribute.posture)
+                if(ret) logger.info("remove person $it")
+                ret
+            })
         }
     }
 
     private fun filterByGesture() {
-        if (gestureString == null || gestureString!!.isEmpty()) {
-            logger.warn("your GestureSlot was empty, will not filter by gesture ")
-        } else {
-            val gestureArray = gestureString.split(";".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
-            logger.debug("Gesture slot was not null. Filtering by gestures from slot")
-            for (person in personDataList!!) {
-                var hasGesture = false
-                for (personGesture in person.getPersonAttribute().getGestures()) {
-                    for (g in gestureArray) {
-                        logger.info("Using string '" + "g" + "' to get gesture")
-                        val gesture: PersonAttribute.Gesture? = PersonAttribute.Gesture.fromString(g)
-                        if (gesture == null) {
-                            logger.error("Could not retrieve gesture for string: " + g)
-                            continue
-                        }
-                        if (personGesture.compareTo(gesture) == 0) hasGesture = true
+        val gestures = gestureString?.split(";")?.map { PersonAttribute.Gesture.fromString(it) } ?: listOf()
+        logger.info("filter for gestures: ${gestures.joinToString("; ")}")
+        personDataList = PersonDataList().also { list ->
+            list.addAll(personDataList?.filter {
+                for (gesture in gestures) {
+                    if (it.personAttribute.gestures.contains(gesture)) {
+                        return@filter true
                     }
-                    if (!hasGesture) personDataList?.remove(person)
                 }
-            }
+                logger.info("remove person $it")
+                false
+            })
         }
+
     }
 
     private fun filterByRoom() {
-        logger.debug("Retrieved " + personDataList!!.size + " people, filtering by room...")
+        logger.info("filter for rooms")
 
-        for (person in personDataList!!) {
-            logger.debug(person.getPosition())
-
-            try {
-                logger.debug(
-                    room.toString() + "          " + coordinateTransformer!!.transform(person.getPosition(), "map")
-                        .getTranslation()
-                )
-                if (!room!!.contains(coordinateTransformer!!.transform(person.getPosition(), "map").getTranslation())) {
-                    personDataList!!.remove(person)
+        personDataList = PersonDataList().also { list ->
+            list.addAll(personDataList?.filter {
+                for (room in rooms) {
+                    if (room?.contains(coordTransformer?.transform(it.position, "map")?.translation) == true) {
+                        return@filter true
+                    }
                 }
-            } catch (e: TransformException) {
-                throw RuntimeException(e)
-            }
+                logger.info("remove person $it")
+                false
+            })
         }
+
     }
 
     companion object {
