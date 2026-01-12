@@ -29,6 +29,7 @@ import java.net.URI;
  */
 public interface ConfigurationParser {
 
+    String getHash();
     BonsaiConfigurationData getconfiguration();
 
     /**

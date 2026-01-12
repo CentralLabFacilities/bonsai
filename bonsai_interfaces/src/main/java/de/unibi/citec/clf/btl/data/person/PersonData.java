@@ -21,6 +21,9 @@ public class PersonData extends StampedType {
     private Point3D headPosition;
     private Point3D rightHandPosition;
     private Point3D leftHandPosition;
+    private Point3D leftEyePosition;
+    private Point3D rightEyePosition;
+    private Point3D nosePosition;
     private Double estimate_angle;
     protected PersonAttribute attributes = new PersonAttribute();
 
@@ -80,6 +83,27 @@ public class PersonData extends StampedType {
     }
     public void setLeftHandPosition(Point3D leftHandPosition){
         this.leftHandPosition = leftHandPosition;
+    }
+
+    public Point3DStamped getRightEyePosition(){
+        return new Point3DStamped(rightEyePosition, frameId);
+    }
+    public void setRightEyePosition(Point3D rightEyePosition){
+        this.rightEyePosition = rightEyePosition;
+    }
+
+    public Point3DStamped getLeftEyePosition(){
+        return new Point3DStamped(leftEyePosition, frameId);
+    }
+    public void setLeftEyePosition(Point3D leftEyePosition){
+        this.leftEyePosition = leftEyePosition;
+    }
+
+    public Point3DStamped getNosePosition(){
+        return new Point3DStamped(nosePosition, frameId);
+    }
+    public void setNosePosition(Point3D nosePosition){
+        this.nosePosition = nosePosition;
     }
 
     public void setPersonAttribute(PersonAttribute attributes) {

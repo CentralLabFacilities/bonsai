@@ -1,5 +1,6 @@
 package de.unibi.citec.clf.bonsai.core.configuration.data;
 
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -7,10 +8,11 @@ import java.util.Map;
  */
 public class BonsaiConfigurationData {
 
-    public Map<String, ActuatorData> actuators;
-    public Map<String, SensorData> sensors;
-    public Map<String, FactoryData> factories;
-    public Map<String, MemoryData> memories;
+    public Map<String, String> options = new HashMap<>();
+    public Map<String, ActuatorData> actuators = new HashMap<>();
+    public Map<String, SensorData> sensors = new HashMap<>();
+    public Map<String, FactoryData> factories = new HashMap<>();;
+    public Map<String, MemoryData> memories = new HashMap<>();;
     public TransformerData transformer;
 
 }

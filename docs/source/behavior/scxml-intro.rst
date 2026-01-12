@@ -59,17 +59,53 @@ Example:
 
 ::
 
-    <parallel id="one">
-        <transition event="A" target="three"/>
-        <state id="twoA" initial="two#1">  
-            <state id="two#1"> 
-                <transition event="B" target="two#2"/>
-            </state>
-            <state id="two#2"/> 
+    <parallel id="Talk">
+        <!-- Transitions from child states to outside the parallel need to be defined here -->
+        <transition event="DoThingsA.fatal" target="Fatal"/>
+        <transition event="DoThingsA.success" target="End"/>
+        <transition event="DoThingsB.fatal" target="Fatal"/>
+        <transition event="DoThingsB.success" target="End"/>
+
+        <state id="DoThingsA">
+            <!-- transitions going out of this child state are defined above -->
         </state>
-        <state id="twoB"/>  
+
+        <state id="DoThingsB">
+        </state>
+
     </parallel>
+
     <state id="three"/>
+
+.. note::
+
+    * You can combine compound states with parallel states to run a `sequence of states` in parallel with something else.
+    * Within the compound states you can only transition to child states of the compound. Otherwise the state machine will break!
+
+
+::
+
+    <parallel id="ParallelState">
+        <!-- Transitions from child states to outside the parallel need to be defined here -->
+        <transition event="compoundChild.fatal" target="Fatal"/>
+        <transition event="anotherCompoundChild.*" target="End"/>
+        <transition event="parallelChild.*" target="End"/>
+
+        <state id="CompoundState" initial="compundChild">
+
+            <state id="compoundChild">
+                <transition event="compundChild.success" target="anotherCompoundChild"/>
+            </state>
+
+            <state id="anotherCompoundChild">
+            </state>
+        </state>
+
+        <state id="parallelChild">
+        </state>
+
+    </parallel>
+
 
 Datamodel
 ---------

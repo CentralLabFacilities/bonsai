@@ -85,7 +85,7 @@ public class StateMachineConfigurator {
         List<Node> slotNodes = getSlotNodes(dataList);
 
         for (Node n : slotNodes) {
-            logger.trace("SLOT " + n.toString());
+            logger.trace("trace " + n.toString());
             NamedNodeMap attr = n.getAttributes();
             String slotKey = attr.getNamedItem("key").getNodeValue();
             String state = attr.getNamedItem("state").getNodeValue();
@@ -171,7 +171,7 @@ public class StateMachineConfigurator {
                     logger.trace("FOUND SLOTS NODE_LIST");
                     NodeListValue node = (NodeListValue) value;
                     logger.trace(node.toString());
-                    node.getValue().forEach(it -> logger.trace(it.toString()));
+                    node.getValue().forEach(it -> logger.trace("n: " + it.toString()));
                     slotNodes.addAll(node.getValue());
                 } else {
                     throw new RuntimeException("something slots");
@@ -227,9 +227,9 @@ public class StateMachineConfigurator {
         return results;
     }
 
-    public synchronized StateMachineConfiguratorResults configureSkills(SCXML scxml, boolean generateDefaultSlots) throws StateIDException {
+    public synchronized StateMachineConfiguratorResults configureSkills(SCXML scxml, boolean generateDefaultSlots, Set<String> ignoredStates) throws StateIDException {
         @SuppressWarnings("unchecked")
-        Map<String, TransitionTarget> map = scxml.getTargets();
+        Map<String, TransitionTarget> targetMap = scxml.getTargets();
 
         Map<String, String> globals = createGlobalVars(scxml);
 
@@ -237,16 +237,20 @@ public class StateMachineConfigurator {
         StateMachineConfiguratorResults slotResults = readSlotXPathsFromStateMachine(scxml);
         results.merge(slotResults);
 
-        for (String id : map.keySet()) {
-            if (map.get(id) instanceof Parallel) {
+        for (String id : targetMap.keySet()) {
+            if (ignoredStates.contains(id)) {
+                logger.debug("Ignoring state: " + id);
+                continue;
+            }
+            if (targetMap.get(id) instanceof Parallel) {
                 logger.debug("... is instance of parallel.");
                 continue;
             }
-            if (!(map.get(id) instanceof State)) {
+            if (!(targetMap.get(id) instanceof State)) {
                 logger.debug("... is no child of State.");
                 continue;
             }
-            State currentState = (State) map.get(id);
+            State currentState = (State) targetMap.get(id);
             if (!currentState.isSimple()) {
                 logger.debug("... is not a simple state.");
                 continue;
@@ -258,7 +262,7 @@ public class StateMachineConfigurator {
             results.merge(skillResults);
         }
 
-        logger.info("configured " + map.size() + " skills with " + results.numErrors() + " errors");
+        logger.info("configured " + targetMap.size() + " skills with " + results.numErrors() + " errors");
 
         return results;
     }
