@@ -68,7 +68,7 @@ import de.unibi.citec.clf.btl.data.person.PersonAttribute
  *
  * @author
  */
-class FilterPeopleList : AbstractSkill() {
+class FilterPersonDataList : AbstractSkill() {
     private var tokenSuccessHasPeople: ExitToken? = null
     private var tokenSuccessNoPeople: ExitToken? = null
     private var tokenError: ExitToken? = null

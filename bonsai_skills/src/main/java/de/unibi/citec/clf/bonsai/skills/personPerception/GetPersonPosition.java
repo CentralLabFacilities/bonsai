@@ -36,6 +36,7 @@ import de.unibi.citec.clf.btl.data.person.PersonData;
  *
  * @author rfeldhans
  */
+@Deprecated
 public class GetPersonPosition extends AbstractSkill{
 
     private ExitToken tokenSuccess;
