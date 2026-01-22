@@ -15,6 +15,7 @@ import de.unibi.citec.clf.btl.data.person.PersonDataList
 import de.unibi.citec.clf.btl.data.world.Entity
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus
 import de.unibi.citec.clf.btl.data.person.PersonAttribute
+import de.unibi.citec.clf.btl.units.LengthUnit
 
 /**
  * This Skill is used to filter a List of Persons by one or more specific attributes.
@@ -92,6 +93,8 @@ class FilterPersonDataList : AbstractSkill() {
     private var doGestureFiltering = false
     private var doPostureFiltering = false
     private var doRoomFiltering = false
+
+    private val lum = LengthUnit.METER
 
 
     @Throws(SkillConfigurationException::class)
@@ -204,6 +207,7 @@ class FilterPersonDataList : AbstractSkill() {
     private fun filterByPosture() {
         val postures = postureString?.split(";")?.map { PersonAttribute.Posture.fromString(it) } ?: listOf()
         logger.info("filter for postures: ${postures.joinToString("; ")}")
+
         personDataList = PersonDataList().also { list ->
             list.addAll(personDataList?.filter {
                 val ret = postures.contains(it.personAttribute.posture)
@@ -216,6 +220,7 @@ class FilterPersonDataList : AbstractSkill() {
     private fun filterByGesture() {
         val gestures = gestureString?.split(";")?.map { PersonAttribute.Gesture.fromString(it) } ?: listOf()
         logger.info("filter for gestures: ${gestures.joinToString("; ")}")
+
         personDataList = PersonDataList().also { list ->
             list.addAll(personDataList?.filter {
                 for (gesture in gestures) {
@@ -236,11 +241,14 @@ class FilterPersonDataList : AbstractSkill() {
         personDataList = PersonDataList().also { list ->
             list.addAll(personDataList?.filter {
                 for (room in rooms) {
-                    if (room?.contains(coordTransformer?.transform(it.position, "map")?.translation) == true) {
+                    val map = coordTransformer?.transform(it.position, "map")?.translation
+                    logger.debug("check if ${map?.getX(lum)},${map?.getY(lum)} is in $room")
+                    if (room?.contains(map) == true) {
+                        logger.debug("person is in room")
                         return@filter true
                     }
                 }
-                logger.info("remove person $it")
+                logger.info("remove person ${it.position}")
                 false
             })
         }
