@@ -58,6 +58,7 @@ public class RosFactory implements CoreObjectFactory {
      */
     public RosFactory() {
         String master = System.getenv("ROS_MASTER_URI");
+
         if (master == null || master.isEmpty()) {
             logger.warn("ROS_MASTER_URI not set");
             master = "http://localhost:11311/";
@@ -72,6 +73,26 @@ public class RosFactory implements CoreObjectFactory {
         nodeMainExecutor = DefaultNodeMainExecutor.newDefault();
         //spawn message factory node
         MsgTypeFactory.getInstance();
+
+        //Check ip settings
+        String local = System.getenv("ROS_IP");
+        if (local == null || local.isEmpty()) {
+            logger.warn("ROS_IP not set");
+            //local;= InetAddressFactory.newNonLoopback().getHostAddress();
+            //local = "127.0.0.1";
+            local = System.getenv("basepc");
+            if (local == null || local.isEmpty()) {
+                try {
+                    local = InetAddressFactory.newNonLoopback().getHostName();
+                } catch (org.ros.exception.RosRuntimeException e) {
+                    local = InetAddressFactory.newLoopback().getHostName();
+                }
+
+            }
+        }
+        logger.info("running nodes on: " + local);
+
+
     }
 
     /**
@@ -99,7 +120,7 @@ public class RosFactory implements CoreObjectFactory {
             }
         }
 
-        logger.debug("running node on: " + local + " , master: " + rosMasterUri);
+        logger.debug("running node: '" + node.getDefaultNodeName() +"' on: " + local + " , master: " + rosMasterUri);
         NodeConfiguration c = NodeConfiguration.newPublic(local, rosMasterUri);
         c.setNodeName(node.getDefaultNodeName());
         nodeMainExecutor.execute(node, c);
