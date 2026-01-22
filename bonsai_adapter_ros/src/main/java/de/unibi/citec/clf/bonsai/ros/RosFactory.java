@@ -69,7 +69,7 @@ public class RosFactory implements CoreObjectFactory {
             logger.fatal(e);
             throw new RuntimeException(e);
         }
-        logger.info("using ros master: " + rosMasterUri);
+        logger.info("using ros master uri: " + rosMasterUri);
         nodeMainExecutor = DefaultNodeMainExecutor.newDefault();
         //spawn message factory node
         MsgTypeFactory.getInstance();
