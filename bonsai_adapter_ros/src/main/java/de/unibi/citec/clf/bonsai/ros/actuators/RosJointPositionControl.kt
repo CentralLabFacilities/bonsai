@@ -54,12 +54,13 @@ class RosJointPositionControl(private val nodeName: GraphName) : RosNode(), Join
         )
 
 
-        if (ac?.waitForActionServerToStart(Duration(20.0)) == true) {
-            logger.info("connected to $controllerTopic/follow_joint_trajectory")
-            initialized = true
-        } else {
-            logger.error("not started for $controllerTopic")
-        }
+        initialized = true
+        //if (ac?.waitForActionServerToStart(Duration(20.0)) == true) {
+        //    logger.info("connected to $controllerTopic/follow_joint_trajectory")
+        //    initialized = true
+        //} else {
+        //    logger.error("not started for $controllerTopic")
+        //}
 
     }
 
