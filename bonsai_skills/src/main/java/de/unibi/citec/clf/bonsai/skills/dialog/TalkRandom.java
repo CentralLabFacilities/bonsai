@@ -91,6 +91,10 @@ public class TalkRandom extends AbstractSkill {
 
     @Override
     public ExitToken end(ExitToken curToken) {
+        if(curToken.getExitStatus().isFatal()) {
+            logger.error("cancel speak");
+            sayingComplete.cancel(true);
+        }
         return curToken;
     }
 }

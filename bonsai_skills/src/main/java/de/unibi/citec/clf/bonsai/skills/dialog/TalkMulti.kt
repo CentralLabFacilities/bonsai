@@ -104,7 +104,8 @@ class TalkMulti : AbstractSkill() {
     }
 
     override fun end(curToken: ExitToken): ExitToken {
-        if(curToken.exitStatus == ExitStatus.FATAL()) {
+        if(curToken.exitStatus.isFatal) {
+            logger.error("cancel speak")
             sayingComplete?.cancel(true)
         }
         return curToken
