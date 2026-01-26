@@ -7,8 +7,28 @@ import java.io.IOException
 import java.util.concurrent.Future
 
 interface LLM : Actuator {
+    /**
+     * Query an LLM for Vision.
+     *
+     * Uses a default system message
+     *
+     * @param prompt the query
+     * @return Generated response
+     */
     @Throws(IOException::class)
     fun queryVision(prompt: String): Future<String?>
+
+    /**
+     * Query an LLM for Vision
+     *
+     * With a custom system message
+     *
+     * @param system the system message
+     * @param prompt the query
+     * @return Generated response
+     */
+    @Throws(IOException::class)
+    fun queryVision(system: String, prompt: String): Future<String?>
 
     /**
      * Query an LLM.
