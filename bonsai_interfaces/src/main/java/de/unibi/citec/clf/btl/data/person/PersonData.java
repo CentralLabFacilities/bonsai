@@ -13,7 +13,7 @@ import de.unibi.citec.clf.btl.data.geometry.Pose2D;
  * @author rfeldhans
  *
  */
-public class PersonData extends StampedType {
+public class PersonData extends StampedType implements Cloneable {
 
     private double reliability = 0.0;
     private String uuid;
@@ -172,4 +172,27 @@ public class PersonData extends StampedType {
         return strb.toString();
     }
 
+    @Override
+    public PersonData clone() {
+        try {
+            PersonData clone = (PersonData) super.clone();
+            clone.reliability = this.reliability;
+            clone.uuid = this.uuid;
+            clone.name = this.name;
+            clone.headPosition = this.headPosition;
+            clone.leftHandPosition = this.leftHandPosition;
+            clone.rightHandPosition = this.rightHandPosition;
+            clone.leftEyePosition = this.leftEyePosition;
+            clone.rightEyePosition = this.rightEyePosition;
+            clone.attributes = this.attributes;
+            clone.position = this.position;
+            clone.estimate_angle = this.estimate_angle;
+            clone.nosePosition = this.nosePosition;
+            clone.frameId = this.frameId;
+            clone.timestamp = this.timestamp;
+            return clone;
+        } catch (CloneNotSupportedException e) {
+            throw new AssertionError();
+        }
+    }
 }
