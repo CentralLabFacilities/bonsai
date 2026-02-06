@@ -13,10 +13,10 @@ import java.util.concurrent.Future
 
 interface ECWMSpirit : Actuator {
 
-    enum class BlockageHandling {
-        FAIL,
-        USE_BEST,
-        USE_NEAREST,
+    enum class BlockageHandling(val value: Int) {
+        FAIL(0),
+        USE_BEST(1),
+        USE_NEAREST(2);
     }
 
     enum class SpiritGoalStatus(val value: Int) {
@@ -52,7 +52,7 @@ interface ECWMSpirit : Actuator {
     @Throws(IOException::class)
     fun getSpiritGoal(entity: Entity, spirit: String?, storage: String?, forceMoveThreshold: Int = 255, onBlocked: BlockageHandling = BlockageHandling.USE_NEAREST, considerRoom : Boolean = true): Future<SpiritGoalResult?>
     fun getSpiritGoal(spirit: Spirit, forceMoveThreshold: Int = 255, onBlocked: BlockageHandling = BlockageHandling.USE_NEAREST, considerRoom : Boolean = true): Future<SpiritGoalResult?>
-    fun getSpiritGoalCurrent(spirit: Spirit): Future<SpiritGoal?>
+    fun getSpiritGoalCurrent(spirit: Spirit, onBlocked: BlockageHandling = BlockageHandling.USE_NEAREST, blockedMaxDist: Float = 0.2f): Future<SpiritGoal?>
 
     @Throws(IOException::class)
     fun getRoomsOf(pose : Pose3D): Future<EntityList?>
