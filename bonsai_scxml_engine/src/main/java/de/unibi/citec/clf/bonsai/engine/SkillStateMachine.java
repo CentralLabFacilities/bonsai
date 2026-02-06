@@ -878,7 +878,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
      * @see SkillStateMachine#activeStates
      */
     private void stopAndRemoveState(StateID id, boolean inParallel) {
-        logger.trace("Stop and Remove State " + id.getCanonicalID());
+        logger.error("Stop and Remove State " + id.getCanonicalID());
         // Check if state is corrupt
         if (corruptStates.containsKey(id)) {
             logger.info("Not waiting for corrupt state/class: " + id);
