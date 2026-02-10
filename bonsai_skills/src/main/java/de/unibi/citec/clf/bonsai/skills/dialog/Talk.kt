@@ -1,7 +1,9 @@
 package de.unibi.citec.clf.bonsai.skills.dialog
 
 import de.unibi.citec.clf.bonsai.actuators.SpeechActuator
+import de.unibi.citec.clf.bonsai.core.exception.ConfigurationException
 import de.unibi.citec.clf.bonsai.core.`object`.MemorySlotReader
+import de.unibi.citec.clf.bonsai.core.`object`.Sensor
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken
@@ -22,10 +24,12 @@ import java.util.concurrent.Future
  *      -> If true skill ends after talk was completed
  * #_USE_LANGUAGE: [boolean] Optional (default: true)
  *      -> Read Language slot to determine speak language
- * #_LANG:  [Language] text language (default: EN)
+ * #_LANG:          [Language] text language (default: EN)
  *      -> Use the given language to speak the (same language) #_MESSAGE.
  *         !! Setting this changes the default of #_USE_LANGUAGE to false, letting the robot always speak in #_LANG !!
  *         set #_USE_LANGUAGE to enable translation of #_MESSAGE from #_LANG to current slot language
+ * #_INTERRUPTIBLE: [boolean] Optional (default: false)
+ *      -> Talking can be interrupted (by someone speaking)
  * Slots:
  *
  * ExitTokens:
@@ -44,6 +48,9 @@ import java.util.concurrent.Future
  * @author jkummert
  */
 class Talk : AbstractSkill() {
+    private var tokenInt: ExitToken? = null
+    private var someoneSpeaking: Sensor<Boolean>? = null
+
     private var tokenSuccess: ExitToken? = null
     private var blocking = true
     private var text = ""
@@ -73,6 +80,12 @@ class Talk : AbstractSkill() {
             langSlot = configurator.getReadSlot("Language", LanguageType::class.java)
         }
 
+        if(configurator.requestOptionalBool(KEY_INTERRUPT, false)) {
+            if(!blocking) throw ConfigurationException("cant use $KEY_INTERRUPT while not $KEY_BLOCKING")
+            tokenInt = configurator.requestExitToken(ExitStatus.ERROR().ps("interrupted"))
+            someoneSpeaking = configurator.getSensor("SomeoneTalkingSensor", Boolean::class.java)
+        }
+
     }
 
     override fun init(): Boolean {
@@ -84,7 +97,14 @@ class Talk : AbstractSkill() {
 
     override fun execute(): ExitToken {
         return if (!sayingComplete!!.isDone && blocking) {
-            ExitToken.loop(50)
+            if(someoneSpeaking?.readLast(50) == true) {
+                logger.warn("someone is speaking")
+                sayingComplete?.cancel(true)
+                tokenInt!!
+            }
+            else {
+                ExitToken.loop(50)
+            }
         } else tokenSuccess!!
     }
 
@@ -97,6 +117,7 @@ class Talk : AbstractSkill() {
     }
 
     companion object {
+        private const val KEY_INTERRUPT = "#_INTERRUPTIBLE"
         private const val KEY_MESSAGE = "#_MESSAGE"
         private const val KEY_BLOCKING = "#_BLOCKING"
         private const val KEY_USE_LANGUAGE = "#_USE_LANGUAGE"
