@@ -1,7 +1,9 @@
 package de.unibi.citec.clf.bonsai.skills.dialog
 
 import de.unibi.citec.clf.bonsai.actuators.SpeechActuator
+import de.unibi.citec.clf.bonsai.core.exception.ConfigurationException
 import de.unibi.citec.clf.bonsai.core.`object`.MemorySlotReader
+import de.unibi.citec.clf.bonsai.core.`object`.Sensor
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken
@@ -40,11 +42,14 @@ import java.util.concurrent.Future
  */
 class TalkMulti : AbstractSkill() {
     companion object {
+        private const val KEY_INTERRUPT = "#_INTERRUPTIBLE"
         private const val KEY_MESSAGE_PREFIX = "#_MSG_"
         private const val KEY_BLOCKING = "#_BLOCKING"
         private const val KEY_DEFAULT = "#_DEFAULT"
     }
 
+    private var tokenInt: ExitToken? = null
+    private var someoneSpeaking: Sensor<Boolean>? = null
     private var default = Language.EN
     private var tokenSuccess: ExitToken? = null
     private var blocking = true
@@ -73,6 +78,12 @@ class TalkMulti : AbstractSkill() {
             logger.warn("Default msg to use is $default, but no #_MSG_${default.name} is defined")
         }
 
+        if(configurator.requestOptionalBool(KEY_INTERRUPT, false)) {
+            if(!blocking) throw ConfigurationException("cant use $KEY_INTERRUPT while not $KEY_BLOCKING")
+            tokenInt = configurator.requestExitToken(ExitStatus.ERROR().ps("interrupted"))
+            someoneSpeaking = configurator.getSensor("SomeoneTalkingSensor", Boolean::class.java)
+        }
+
     }
 
     override fun init(): Boolean {
@@ -96,7 +107,14 @@ class TalkMulti : AbstractSkill() {
 
     override fun execute(): ExitToken {
         return if (!sayingComplete!!.isDone && blocking) {
-            ExitToken.loop(50)
+            if(someoneSpeaking?.readLast(50) == true) {
+                logger.warn("someone is speaking")
+                sayingComplete?.cancel(true)
+                tokenInt!!
+            }
+            else {
+                ExitToken.loop(50)
+            }
         } else {
             logger.info("said: ${sayingComplete?.get()}")
             tokenSuccess!!
