@@ -1,7 +1,9 @@
 package de.unibi.citec.clf.bonsai.skills.dialog
 
 import de.unibi.citec.clf.bonsai.actuators.SpeechActuator
+import de.unibi.citec.clf.bonsai.core.exception.ConfigurationException
 import de.unibi.citec.clf.bonsai.core.`object`.MemorySlotReader
+import de.unibi.citec.clf.bonsai.core.`object`.Sensor
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken
@@ -26,6 +28,8 @@ import java.util.concurrent.Future
  * #_LANG:          [Language] text language (default: EN)
  *                      -> Use the given language to speak the (same language) #_MESSAGE.
  *                         This Defaults #_USE_LANGUAGE to false, set it to enable translation to current language
+ * #_INTERRUPTIBLE: [boolean] Optional (default: false)
+ *      -> Talking can be interrupted (by someone speaking)
  *
  * Slots:
  *  StringSlot: [String] [Read]
@@ -46,6 +50,8 @@ import java.util.concurrent.Future
  * @author jkummert
  */
 class SaySlot : AbstractSkill() {
+    private var tokenInt: ExitToken? = null
+    private var someoneSpeaking: Sensor<Boolean>? = null
     private var blocking = true
     private var sayText = REPLACE_STRING
     private var tokenSuccess: ExitToken? = null
@@ -77,6 +83,12 @@ class SaySlot : AbstractSkill() {
         } else if (configurator.requestOptionalBool(KEY_USE_LANGUAGE, true)) {
             langSlot = configurator.getReadSlot("Language", LanguageType::class.java)
         }
+
+        if(configurator.requestOptionalBool(KEY_INTERRUPT, false)) {
+            if(!blocking) throw ConfigurationException("cant use $KEY_INTERRUPT while not $KEY_BLOCKING")
+            tokenInt = configurator.requestExitToken(ExitStatus.ERROR().ps("interrupted"))
+            someoneSpeaking = configurator.getSensor("SomeoneTalkingSensor", Boolean::class.java)
+        }
     }
 
     override fun init(): Boolean {
@@ -99,7 +111,14 @@ class SaySlot : AbstractSkill() {
 
     override fun execute(): ExitToken {
         return if (!sayingComplete!!.isDone && blocking) {
-            ExitToken.loop(50)
+            if(someoneSpeaking?.readLast(50) == true) {
+                logger.warn("someone is speaking")
+                sayingComplete?.cancel(true)
+                tokenInt!!
+            }
+            else {
+                ExitToken.loop(50)
+            }
         } else tokenSuccess!!
     }
 
@@ -112,6 +131,7 @@ class SaySlot : AbstractSkill() {
     }
 
     companion object {
+        private const val KEY_INTERRUPT = "#_INTERRUPTIBLE"
         private const val SAY_TEXT = "#_MESSAGE"
         private const val KEY_BLOCKING = "#_BLOCKING"
         private const val KEY_USE_LANGUAGE = "#_USE_LANGUAGE"

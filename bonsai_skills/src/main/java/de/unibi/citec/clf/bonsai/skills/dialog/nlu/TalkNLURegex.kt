@@ -2,6 +2,7 @@ package de.unibi.citec.clf.bonsai.skills.dialog.nlu
 
 import de.unibi.citec.clf.bonsai.actuators.SpeechActuator
 import de.unibi.citec.clf.bonsai.core.`object`.MemorySlotReader
+import de.unibi.citec.clf.bonsai.core.`object`.Sensor
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken
@@ -46,6 +47,8 @@ import java.util.concurrent.Future
  *                              '\byou\b' -> 'ME'
  *  #_USE_LANGUAGE: [Boolean] Optional (default: false)
  *                          -> Read Language slot to determine speak language else it defaults to "EN"
+ *  #_INTERRUPTIBLE:[Boolean] Optional (default: false)
+ *      -> Talking can be interrupted (by someone speaking)
  *
  * Slots:
  *
@@ -59,6 +62,9 @@ import java.util.concurrent.Future
  * @author lruegeme
  */
 class TalkNLURegex : AbstractSkill() {
+    private var tokenInt: ExitToken? = null
+    private var someoneSpeaking: Sensor<Boolean>? = null
+
     private val finalReplacements = mapOf("""\bme\b""" to "YOU", """\byou\b""" to "ME")
     private var doFinalReplacements = true
     private var message = "#M"
@@ -108,6 +114,11 @@ class TalkNLURegex : AbstractSkill() {
             val s = m.trim().split("=")
             if (s.size != 2) throw SkillConfigurationException("error in intentMapping for '$m' size:${s.size} != 2")
             intentMapping[s.first()] = s.last()
+        }
+
+        if(configurator.requestOptionalBool(KEY_INTERRUPT, false)) {
+            tokenInt = configurator.requestExitToken(ExitStatus.ERROR().ps("interrupted"))
+            someoneSpeaking = configurator.getSensor("SomeoneTalkingSensor", Boolean::class.java)
         }
     }
 
@@ -175,7 +186,14 @@ class TalkNLURegex : AbstractSkill() {
         }
 
         if(!sayingComplete!!.isDone) {
-            return ExitToken.loop(50)
+            if(someoneSpeaking?.readLast(50) == true) {
+                logger.warn("someone is speaking")
+                sayingComplete?.cancel(true)
+                tokenInt!!
+            }
+            else {
+                ExitToken.loop(50)
+            }
         }
 
         return tokenSuccess!!
@@ -190,6 +208,7 @@ class TalkNLURegex : AbstractSkill() {
     }
 
     companion object {
+        private const val KEY_INTERRUPT = "#_INTERRUPTIBLE"
         private const val KEY_USE_LANGUAGE = "#_USE_LANGUAGE"
         private const val KEY_MAPPING = "#_INTENT_MAPPING"
         private const val KEY_TEXT = "#_MESSAGE"
