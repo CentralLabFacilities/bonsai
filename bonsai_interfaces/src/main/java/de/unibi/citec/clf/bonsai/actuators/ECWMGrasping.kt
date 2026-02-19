@@ -41,7 +41,7 @@ interface ECWMGrasping : Actuator {
      * @param unknownEntity grasp an unknown entity that is not added to the world model
      */
     @Throws(IOException::class)
-    fun graspEntity(entity: Entity, upright: Boolean = false, carryPose: String? = null, unknownEntity: Boolean = false, keepScene: Boolean = true): Future<ManipulationActuator.MoveitResult?>
+    fun graspEntity(entity: Entity, upright: Boolean = false, carryPose: String? = null, unknownEntity: Boolean = false, keepScene: Boolean = true, addFallback: Boolean = true): Future<ManipulationActuator.MoveitResult?>
 
     /**
      * Place an ECWM Entity somewhere inside the target entities storage
