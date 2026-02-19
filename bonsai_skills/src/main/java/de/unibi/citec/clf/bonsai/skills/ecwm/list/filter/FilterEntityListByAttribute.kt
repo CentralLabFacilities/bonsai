@@ -92,9 +92,14 @@ class FilterEntityListByAttribute : AbstractSkill() {
         logger.debug("Filter by $key: $value")
 
         val filtered = entitylist!!.filter { e ->
-            logger.debug("entity ${ecwm?.getEntityAttributes(e)?.get()}")
-            logger.debug("entity ${ecwm?.getEntityAttributes(e)?.get()?.getAttribute(key)}")
-            val attributeValues = ecwm?.getEntityAttributes(e)?.get()?.getAttribute(key) ?: listOf()
+            var attributeValues = listOf<String>()
+            try {
+                attributeValues = ecwm?.getEntityAttributes(e)?.get()?.getAttribute(key) ?: listOf()
+            }
+            catch (ex: Exception) {
+                attributeValues = ecwm?.getModelAttributes(e)?.get()?.getAttribute(key) ?: listOf()
+            }
+
             logger.debug("entity ${e.id} has $key: $attributeValues")
             val match = if (useRegex) attributeValues.map { attr -> value!!.toRegex().matches(attr.lowercase()) }.any { it } else attributeValues.contains(value)
             if (invert) !match else match
