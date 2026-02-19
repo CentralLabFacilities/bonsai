@@ -92,7 +92,7 @@ class FilterEntityListByAttribute : AbstractSkill() {
         logger.debug("Filter by $key: $value")
 
         val filtered = entitylist!!.filter { e ->
-            logger.debug("entity ${ecwm?.getEntityAttributes(e)}")
+            logger.debug("entity ${ecwm?.getEntityAttributes(e)?.get()}")
             logger.debug("entity ${ecwm?.getEntityAttributes(e)?.get()?.getAttribute(key)}")
             val attributeValues = ecwm?.getEntityAttributes(e)?.get()?.getAttribute(key) ?: listOf()
             logger.debug("entity ${e.id} has $key: $attributeValues")
