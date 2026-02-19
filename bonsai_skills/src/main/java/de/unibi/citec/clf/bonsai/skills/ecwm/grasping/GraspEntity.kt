@@ -17,6 +17,8 @@ import java.util.concurrent.Future
  * Options:
  *  entity:         [String] Optional
  *                           -> the name of the entity to be grasped
+ *  add_fallback:    [Boolean] Optional, default false
+ *                           -> add top grasp fallback if classic grasp fails
  * Slots:
  *  Entity: [Entity] (Read optional)
  *      -> the entity to be grasped. Will be used if option "entity" is not set
@@ -42,6 +44,7 @@ class GraspEntity : AbstractSkill() {
     private val KEY_UPRIGHT = "upright_grasp"
     private val KEY_CARRY_POSE = "carry_pose"
     private val KEY_KEEP_SCENE = "keep_scene"
+    private val KEY_ADD_FALLBACK = "add_fallback"
     private var entityName: String? = null
 
     private var slot: MemorySlotReader<Entity>? = null
@@ -56,6 +59,7 @@ class GraspEntity : AbstractSkill() {
     private var upright = false
     private var carryPose: String? = null
     private var keep_scene = true
+    private var add_fallback = false
 
     override fun configure(configurator: ISkillConfigurator) {
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
@@ -74,6 +78,8 @@ class GraspEntity : AbstractSkill() {
         keep_scene = configurator.requestOptionalBool(KEY_KEEP_SCENE, keep_scene)
         upright = configurator.requestOptionalBool(KEY_UPRIGHT,upright)
         carryPose = configurator.requestOptionalValue(KEY_CARRY_POSE,carryPose)
+        carryPose = configurator.requestOptionalValue(KEY_CARRY_POSE,carryPose)
+        add_fallback = configurator.requestOptionalBool(KEY_ADD_FALLBACK, add_fallback)
 
     }
 
@@ -87,7 +93,7 @@ class GraspEntity : AbstractSkill() {
 
         logger.debug("try to grasp '$entity' ${if(upright) " (upright)"  else ""}  carry pose: '$carryPose'")
 
-        fur = ecwm?.graspEntity(entity,upright, carryPose, keepScene = keep_scene)
+        fur = ecwm?.graspEntity(entity,upright, carryPose, keepScene = keep_scene, addFallback = add_fallback)
 
         return fur != null
     }
