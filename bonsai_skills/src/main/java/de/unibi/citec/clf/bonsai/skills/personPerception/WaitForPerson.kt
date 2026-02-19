@@ -115,7 +115,7 @@ class WaitForPerson : AbstractSkill() {
     override fun execute(): ExitToken {
         if (timeout > 0) {
             if (Time.currentTimeMillis() > timeout) {
-                logger.info("WaitForPerson timeout")
+                logger.debug("WaitForPerson timeout")
                 return tokenTimeout!!
             }
         }
@@ -138,7 +138,7 @@ class WaitForPerson : AbstractSkill() {
             if (filtered.isNullOrEmpty()) {
                 var personsDebug = ""
                 personsDebug = persons?.stream()?.map { person: PersonData -> "uuid '${person.uuid}' name: '${person.name}'" }?.reduce(personsDebug) { obj: String, str: String -> obj + str } ?: ""
-                logger.info("persons: $personsDebug")
+                logger.debug("persons: $personsDebug")
                 logger.debug("requested persons name not found.")
                 return ExitToken.loop()
             }
@@ -162,7 +162,7 @@ class WaitForPerson : AbstractSkill() {
         var polar: PolarCoordinate
         var personsDebug = ""
         personsDebug = persons?.stream()?.map { person: PersonData -> person.uuid + " " }?.reduce(personsDebug) { obj: String, str: String -> obj + str } ?: ""
-        logger.info("persons: $personsDebug")
+        logger.debug("persons: $personsDebug")
         if (!persons!!.isEmpty() && !persons?.get(0)!!.isInBaseFrame) {
             for (p in persons!!) {
                 p.position = getLocalPosition(p.position)
@@ -178,7 +178,8 @@ class WaitForPerson : AbstractSkill() {
             // if person too far away
             if (polar.getDistance(LengthUnit.METER) < maxDist
                     && abs(polar.getAngle(AngleUnit.RADIAN)) < maxAngle) {
-                logger.info("person is in front!" + p.uuid)
+                logger.debug("person is in front!" + p.uuid)
+                logger.info("storing person frame person:${p.frameId}, position frame: ${p.position.frameId}, position x: ${p.position.getX(LengthUnit.METER)}, position y: ${p.position.getY(LengthUnit.METER)}")
                 personInFront = p
                 break
             }
