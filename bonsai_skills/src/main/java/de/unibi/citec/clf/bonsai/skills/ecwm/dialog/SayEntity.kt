@@ -108,8 +108,13 @@ class SayEntity : AbstractSkill() {
 
             if (useGivenName) {
                 logger.info("getting attributes of ${entity.modelName}")
-                val attrib = ecwm?.getEntityAttributes(entity)?.get()
-                sayStr = attrib?.getFirstAttributeOrNull(GIVEN_NAME) ?: sayStr
+                try {
+                    val attrib = ecwm?.getEntityAttributes(entity)?.get()
+                    sayStr = attrib?.getFirstAttributeOrNull(GIVEN_NAME) ?: sayStr
+                } catch (ex : Exception) {
+                    val attrib = ecwm?.getModelAttributes(entity)?.get()
+                    sayStr = attrib?.getFirstAttributeOrNull(GIVEN_NAME) ?: sayStr
+                }
             }
 
             sayStr = sayText.replace(REPLACE_STRING, sayStr ?: "")
