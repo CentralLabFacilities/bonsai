@@ -24,6 +24,8 @@ class SkillStateMachineConfig {
     var sendAllPossibleTransitions = false
     @JvmField
     var ignoredStates = mutableSetOf<String>()
+    @JvmField
+    var checkForMixedTokens = false
     
     @Throws(MapReader.KeyNotFound::class)
     fun configure(data: Map<String?, String?>?) {
@@ -49,7 +51,10 @@ class SkillStateMachineConfig {
         logger.debug("Enable configuration cache: $hashSkillConfigurations")
 
         customFinalStates = MapReader.readConfigBool("#_FINAL_STATES", customFinalStates, data)
-        logger.debug("Using End and Fatal as final states")
+        logger.debug("customFinalStates: $customFinalStates")
+
+        checkForMixedTokens = MapReader.readConfigBool("#_CHECK_FOR_PS_TOKENS", checkForMixedTokens, data)
+        logger.debug("checkForMixedTokens: $checkForMixedTokens")
 
         sendAllPossibleTransitions =
             MapReader.readConfigBool("#_SEND_ALL_TRANSITIONS", sendAllPossibleTransitions, data)

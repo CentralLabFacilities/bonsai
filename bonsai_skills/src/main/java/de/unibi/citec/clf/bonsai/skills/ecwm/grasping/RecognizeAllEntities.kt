@@ -72,7 +72,7 @@ class RecognizeAllEntities : AbstractSkill() {
     private var slotIn: MemorySlotReader<Float>? = null
 
     override fun configure(configurator: ISkillConfigurator) {
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
+        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus("some"))
         tokenSuccessNone = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus("none"))
         tokenError = configurator.requestExitToken(ExitStatus.ERROR())
 
