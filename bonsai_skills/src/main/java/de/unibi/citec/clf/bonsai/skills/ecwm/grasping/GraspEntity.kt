@@ -62,7 +62,7 @@ class GraspEntity : AbstractSkill() {
     private var add_fallback = false
 
     override fun configure(configurator: ISkillConfigurator) {
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
+        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS().ps("grasped"))
         tokenSuccessMaybe = configurator.requestExitToken(ExitStatus.SUCCESS().ps("maybe"))
         tokenErrorNoPlan = configurator.requestExitToken(ExitStatus.ERROR().ps("no_plan"))
         tokenErrorOther = configurator.requestExitToken(ExitStatus.ERROR().ps("other"))

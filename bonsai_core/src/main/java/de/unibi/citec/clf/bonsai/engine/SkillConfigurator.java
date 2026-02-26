@@ -8,6 +8,7 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException;
 import org.apache.log4j.Logger;
+import org.apache.xpath.operations.Bool;
 
 import java.util.*;
 
@@ -84,6 +85,7 @@ public class SkillConfigurator implements ISkillConfigurator {
         private Config() {
         }
 
+        public boolean checkPSmix = false;
         public boolean checkCoreCreation = false;
         public boolean unusedParamsAsError = false;
         public boolean activateObjectAnyway = false;
@@ -104,17 +106,6 @@ public class SkillConfigurator implements ISkillConfigurator {
         this.phase = phase;
         this.config = cfg;
         this.configValues = vars;
-    }
-
-
-    /**
-     * Creates a {@link SkillConfigurator} instance for the global configuration phase. The created configurator will
-     * not generate any actually working sensors or actuators, but collect a list of requested instances.
-     *
-     * @return a {@link SkillConfigurator} instance for the global configuration phase.
-     */
-    public static SkillConfigurator createConfigPhase(Map<String, String> vars) {
-        return new SkillConfigurator(SkillConfigurationPhase.CONFIG, getDefaultConf(), vars);
     }
 
     /**
@@ -707,6 +698,12 @@ public class SkillConfigurator implements ISkillConfigurator {
 
     @Override
     public ExitToken requestExitToken(ExitStatus status) throws SkillConfigurationException {
+        boolean hasStatus = status.hasProcessingStatus();
+        ExitStatus.Status kind = status.getStatus();
+        for (ExitToken tok : tokens) {
+            if (tok.getExitStatus().getStatus() == kind && tok.getExitStatus().hasProcessingStatus() != hasStatus)
+                throw new SkillConfigurationException("Mixing Tokens with and without PS is forbidden");
+        }
         return ExitToken.createToken(status, this);
     }
 
