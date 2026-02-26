@@ -67,13 +67,16 @@ class TurnTo<IOException> : AbstractSkill() {
     @Throws(SkillConfigurationException::class)
     override fun configure(configurator: ISkillConfigurator) {
         timeout = configurator.requestOptionalInt(KEY_TIMEOUT, timeout.toInt()).toLong()
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
+
         tokenError = configurator.requestExitToken(ExitStatus.ERROR())
         navActuator = configurator.getActuator("NavigationActuator", NavigationActuator::class.java)
         navigationGoalDataSlot = configurator.getReadSlot("NavigationGoalDataSlot", NavigationGoalData::class.java)
         robotPositionSensor = configurator.getSensor("PositionSensor", Pose2D::class.java)
         if (timeout > 0) {
             tokenSuccessPsTimeout = configurator.requestExitToken(ExitStatus.SUCCESS().ps("timeout"))
+            tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS().ps("finished"))
+        } else {
+            tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
         }
     }
 

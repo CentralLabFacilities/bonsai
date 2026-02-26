@@ -49,7 +49,7 @@ import java.util.concurrent.Future;
  *
  * ExitTokens:
  *  success:            Drive successful
- *  success.timeout:    Timeout reached (only used when #_TIMEOUT is set)
+ *  error.timeout:    Timeout reached (only used when #_TIMEOUT is set)
  *  error.cancelled:    Drive was cancelled by NavigationActuator
  *  error.unknownResult: Drive was failed with unknown result
  *
@@ -66,7 +66,7 @@ import java.util.concurrent.Future;
  */
 public class DriveDirect extends AbstractSkill {
 
-    private ExitToken tokenSuccessPsTimeout;
+    private ExitToken tokenErrorTimeout;
     private ExitToken tokenSuccess;
     private ExitToken tokenErrorResultErrorUnhandled;
     private ExitToken tokenErrorCancelled;
@@ -119,7 +119,7 @@ public class DriveDirect extends AbstractSkill {
         }
 
         if (timeout > 0) {
-            tokenSuccessPsTimeout = configurator.requestExitToken(ExitStatus.SUCCESS().ps("timeout"));
+            tokenErrorTimeout = configurator.requestExitToken(ExitStatus.ERROR().ps("timeout"));
         }
     }
 
@@ -169,7 +169,7 @@ public class DriveDirect extends AbstractSkill {
                 } catch (IOException e) {
                     logger.fatal("could not manual Stop", e);
                 }
-                return tokenSuccessPsTimeout;
+                return tokenErrorTimeout;
             }
         }
 

@@ -227,7 +227,7 @@ public class StateMachineConfigurator {
         return results;
     }
 
-    public synchronized StateMachineConfiguratorResults configureSkills(SCXML scxml, boolean generateDefaultSlots, Set<String> ignoredStates) throws StateIDException {
+    public synchronized StateMachineConfiguratorResults configureSkills(SCXML scxml, boolean generateDefaultSlots, Set<String> ignoredStates, boolean checkExitTokenPS) throws StateIDException {
         @SuppressWarnings("unchecked")
         Map<String, TransitionTarget> targetMap = scxml.getTargets();
 
@@ -258,7 +258,7 @@ public class StateMachineConfigurator {
 
             StateID idState = new StateID(prefix, id);
 
-            StateMachineConfiguratorResults skillResults = configureSkill(idState, currentState, globals, generateDefaultSlots);
+            StateMachineConfiguratorResults skillResults = configureSkill(idState, currentState, globals, generateDefaultSlots, checkExitTokenPS);
             results.merge(skillResults);
         }
 
@@ -373,7 +373,7 @@ public class StateMachineConfigurator {
         return registeredExitTokens;
     }
 
-    private StateMachineConfiguratorResults configureSkill(StateID id, State state, Map<String, String> globals, boolean generateDefaultSlots) {
+    private StateMachineConfiguratorResults configureSkill(StateID id, State state, Map<String, String> globals, boolean generateDefaultSlots, boolean checkExitTokenPS) {
 
         StateMachineConfiguratorResults results = new StateMachineConfiguratorResults();
 
@@ -427,7 +427,9 @@ public class StateMachineConfigurator {
 
         Map<String, String> datamodelVars = readVariables(state.getDatamodel(), globals);
         // create a SkillConfigurator
-        SkillConfigurator conf = SkillConfigurator.createConfigPhase(datamodelVars);
+        SkillConfigurator.Config cfg = SkillConfigurator.getDefaultConf();
+        cfg.checkPSmix = checkExitTokenPS;
+        SkillConfigurator conf = SkillConfigurator.createConfigPhase(cfg, datamodelVars);
         logger.debug("using settings:");
         for (Map.Entry<String, String> a : datamodelVars.entrySet()) {
             logger.debug(" -" + a.getKey() + "=" + a.getValue());

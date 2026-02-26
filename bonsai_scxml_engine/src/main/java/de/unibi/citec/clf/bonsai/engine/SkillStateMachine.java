@@ -308,7 +308,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
         // Check if skills use existing sensors/actuators
         if(config.configureSkills) {
             StateMachineConfiguratorResults smResults = configurator
-                    .configureSkills(scxml, config.generateDefaultSlots, config.ignoredStates);
+                    .configureSkills(scxml, config.generateDefaultSlots, config.ignoredStates, config.checkForMixedTokens);
 
             Map<StateID, Set<ExitToken>> registeredTokens
                     = configurator.getRegisteredExitTokens();
