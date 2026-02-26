@@ -700,7 +700,7 @@ public class SkillConfigurator implements ISkillConfigurator {
     public ExitToken requestExitToken(ExitStatus status) throws SkillConfigurationException {
         boolean hasStatus = status.hasProcessingStatus();
         ExitStatus.Status kind = status.getStatus();
-        for (ExitToken tok : tokens) {
+        if (config.checkPSmix) for (ExitToken tok : tokens) {
             if (tok.getExitStatus().getStatus() == kind && tok.getExitStatus().hasProcessingStatus() != hasStatus)
                 throw new SkillConfigurationException("Mixing Tokens with and without PS is forbidden");
         }
