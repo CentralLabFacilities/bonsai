@@ -3,13 +3,10 @@ package de.unibi.citec.clf.bonsai.skills.slots;
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlot;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
-import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
-import de.unibi.citec.clf.btl.List;
-import de.unibi.citec.clf.btl.Type;
 
 /**
  * Pushes (Appends) an item to the back of a List.
@@ -42,7 +39,7 @@ import de.unibi.citec.clf.btl.Type;
  *
  * @author lruegeme
  */
-public class PushList<T extends Type, L extends List<T>> extends AbstractSkill {
+public class PushList<T, L extends java.util.List<T>> extends AbstractSkill {
 
     private ExitToken tokenSuccess;
     private ExitToken tokenError;
