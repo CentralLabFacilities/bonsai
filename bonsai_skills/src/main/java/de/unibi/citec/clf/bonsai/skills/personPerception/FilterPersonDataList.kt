@@ -108,8 +108,6 @@ class FilterPersonDataList : AbstractSkill() {
         personDataWriteSlot =
             configurator.getWriteSlot("PersonDataListWriteSlot", PersonDataList::class.java)
 
-        ecwm = configurator.getActuator("ECWMSpirit", ECWMSpirit::class.java)
-
         coordTransformer = configurator.getTransform() as? CoordinateTransformer
 
         if (configurator.hasConfigurationKey(KEY_GESTURES)) {
@@ -131,6 +129,7 @@ class FilterPersonDataList : AbstractSkill() {
             doRoomFiltering = configurator.requestOptionalBool(KEY_ROOM_FILTERING, doRoomFiltering)
             if (doRoomFiltering) {
                 roomReadSlot = configurator.getReadSlot("RoomStringSlot", String::class.java)
+                ecwm = configurator.getActuator("ECWMSpirit", ECWMSpirit::class.java)
             }
         }
 
