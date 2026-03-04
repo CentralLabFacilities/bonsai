@@ -42,7 +42,7 @@ import de.unibi.citec.clf.btl.Type;
  *
  * @author lruegeme
  */
-public class PopList<T extends Type, L extends List<T>> extends AbstractSkill {
+public class PopList<T, L extends java.util.List<T>> extends AbstractSkill {
 
     private ExitToken tokenSuccess;
     private ExitToken tokenError;
