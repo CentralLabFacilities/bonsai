@@ -43,7 +43,6 @@ public class RosTriggerActuator extends RosNode implements Actuator {
 
     @Override
     public void onStart(final ConnectedNode connectedNode) {
-        logger.fatal("on start, RosGuidingActuator done");
         try {
             clientTrigger = connectedNode.newServiceClient(server, Trigger._TYPE);
         } catch (ServiceNotFoundException e) {

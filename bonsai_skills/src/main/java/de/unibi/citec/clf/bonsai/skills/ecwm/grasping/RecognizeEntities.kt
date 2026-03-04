@@ -82,8 +82,8 @@ class RecognizeEntities : AbstractSkill() {
 
     private var fur: Future<EntityList?>? = null
     private var ecwm: ECWMGrasping? = null
-    private var tokenSuccess: ExitToken? = null
-    private var tokenSuccessError: ExitToken? = null
+    private var tokenSuccessNone: ExitToken? = null
+    private var tokenSuccessSome: ExitToken? = null
 
     private var slotIn: MemorySlotReader<Entity?>? = null
     private var slotIn2: MemorySlotReader<String?>? = null
@@ -92,8 +92,8 @@ class RecognizeEntities : AbstractSkill() {
 
 
     override fun configure(configurator: ISkillConfigurator) {
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
-        tokenSuccessError = configurator.requestExitToken(ExitStatus.ERROR())
+        tokenSuccessSome = configurator.requestExitToken(ExitStatus.SUCCESS().ps("some"))
+        tokenSuccessNone = configurator.requestExitToken(ExitStatus.SUCCESS().ps("none"))
 
         padding = configurator.requestOptionalDouble(KEY_PADDING, padding.toDouble()).toFloat()
         store = configurator.requestOptionalBool(KEY_STORE, store)
@@ -153,7 +153,7 @@ class RecognizeEntities : AbstractSkill() {
         try {
             ents = fur?.get()
         } catch (e: Exception) {
-            logger.error(e)
+            logger.fatal(e)
         }
 
         if (ents != null) {
@@ -164,7 +164,7 @@ class RecognizeEntities : AbstractSkill() {
             slotOut?.memorize(ents)
         }
 
-        return if (ents == null) tokenSuccessError!! else tokenSuccess!!
+        return if (ents?.isNotEmpty() == true) tokenSuccessSome!! else tokenSuccessNone!!
 
     }
 
