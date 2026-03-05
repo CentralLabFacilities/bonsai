@@ -5,6 +5,13 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitStatus
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
 import de.unibi.citec.clf.bonsai.actuators.ECWMGrasping
+import de.unibi.citec.clf.bonsai.core.`object`.MemorySlotReader
+import de.unibi.citec.clf.bonsai.util.CoordinateTransformer
+import de.unibi.citec.clf.btl.data.ecwm.Spirit
+import de.unibi.citec.clf.btl.data.geometry.Point3D
+import de.unibi.citec.clf.btl.data.geometry.Point3DStamped
+import de.unibi.citec.clf.btl.data.geometry.Pose3D
+import de.unibi.citec.clf.btl.units.LengthUnit
 
 import java.util.concurrent.Future
 
@@ -33,16 +40,22 @@ class SetupPlanningScene : AbstractSkill() {
     private val KEY_CLEARATTACHED= "clear_attached"
     private val KEY_NO_OBJECTS= "no_objects"
     private val KEY_DISTANCE= "distance"
+    private val KEY_SAFETY= "safety_plane"
 
     private var fur: Future<Boolean>? = null
     private var ecwm: ECWMGrasping? = null
     private var tokenSuccess: ExitToken? = null
+
+    private var spirit: MemorySlotReader<Spirit>? = null
 
     private var clear = true
     private var clear_attached = false
     private var no_objects = false
 
     private var distance = 2.0
+    private var coordTransformer: CoordinateTransformer? = null
+
+
 
     override fun configure(configurator: ISkillConfigurator) {
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
@@ -54,10 +67,27 @@ class SetupPlanningScene : AbstractSkill() {
         distance = configurator.requestOptionalDouble(KEY_DISTANCE,distance)
         no_objects = configurator.requestOptionalBool(KEY_NO_OBJECTS, no_objects)
 
+        if (configurator.requestOptionalBool(KEY_SAFETY, false)) {
+            spirit = configurator.getReadSlot("Spirit", Spirit::class.java)
+            coordTransformer = configurator.getTransform() as? CoordinateTransformer
+        }
+
     }
 
     override fun init(): Boolean {
-        fur = ecwm?.setupPlanningSceneArea(distance.toFloat(),clear,clear_attached, no_objects)
+        var height: Float? = null
+        if (spirit != null) {
+            val s = spirit?.recall<Spirit>() ?: run {
+                logger.error("could not read spirit. Needed for $KEY_SAFETY=true")
+                return false
+            }
+            val point = Point3DStamped().apply {frameId = "${s.entity.id}/${s.storage}"}
+            val z = coordTransformer?.transform(point, "map")?.getZ(LengthUnit.METER)
+            height = z?.toFloat()?.minus(0.01f)
+            logger.info("spawning plane @${height}m (calculated using ${s.entity.id}/${s.storage}")
+        }
+
+        fur = ecwm?.setupPlanningSceneArea(distance.toFloat(),clear,clear_attached, no_objects, safetyHeight = height)
 
         return fur != null
     }

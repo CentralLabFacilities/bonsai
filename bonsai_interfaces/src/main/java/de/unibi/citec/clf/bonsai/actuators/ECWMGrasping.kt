@@ -90,7 +90,7 @@ interface ECWMGrasping : Actuator {
      * add entities inside -size to size box around base_link to planning scene
      */
     @Throws(IOException::class)
-    fun setupPlanningSceneArea(size: Float, clear_scene: Boolean = false, clear_attached : Boolean = false, no_graspable : Boolean = false): Future<Boolean>
+    fun setupPlanningSceneArea(size: Float, clear_scene: Boolean = false, clear_attached : Boolean = false, no_graspable : Boolean = false, safetyHeight: Float? = null): Future<Boolean>
 
     @Throws(IOException::class)
     fun attachEntity(entity: Entity, pose: Pose3D? = null,  create: Boolean = true): Future<Boolean>
