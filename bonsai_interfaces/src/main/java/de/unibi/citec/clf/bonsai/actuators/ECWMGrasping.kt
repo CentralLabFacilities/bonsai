@@ -102,6 +102,9 @@ interface ECWMGrasping : Actuator {
     fun closeDoor(door: Entity): Future<ManipulationActuator.MoveitResult?>
 
     @Throws(IOException::class)
+    fun pullOutDrawer(door: Entity): Future<ManipulationActuator.MoveitResult?>
+
+    @Throws(IOException::class)
     fun getBoundingBox(type: Model): Future<BoundingBox3D?>
 
     @Throws(IOException::class)
