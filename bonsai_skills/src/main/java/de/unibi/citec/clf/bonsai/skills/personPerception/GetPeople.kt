@@ -9,9 +9,13 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitToken
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
 import de.unibi.citec.clf.bonsai.util.CoordinateSystemConverter
 import de.unibi.citec.clf.btl.List
+import de.unibi.citec.clf.btl.data.geometry.Point2DStamped
+import de.unibi.citec.clf.btl.data.geometry.Point3D
+import de.unibi.citec.clf.btl.data.geometry.Point3DStamped
 import de.unibi.citec.clf.btl.data.geometry.Pose2D
 import de.unibi.citec.clf.btl.data.person.PersonData
 import de.unibi.citec.clf.btl.data.person.PersonDataList
+import de.unibi.citec.clf.btl.units.LengthUnit
 import java.io.IOException
 
 /**
@@ -32,6 +36,7 @@ import java.io.IOException
  *
  * @author  lruegeme
  */
+@Deprecated("uses converter")
 class GetPeople : AbstractSkill() {
     // used tokens
     private var tokenSuccess: ExitToken? = null
@@ -72,7 +77,12 @@ class GetPeople : AbstractSkill() {
 
         if (!persons.isEmpty() && !persons[0].isInBaseFrame) {
             for (p in persons) {
-                p.position = getLocalPosition(p.position)
+                if (p.position.getFrameId() == Pose2D.ReferenceFrame.GLOBAL.frameName) {
+                    p.position = getLocalPosition(p.position)
+                    p.makeLocalHeadPosition(robotPosition)
+                    p.frameId = Pose2D.ReferenceFrame.LOCAL.frameName
+                }
+
             }
         }
 
@@ -94,6 +104,8 @@ class GetPeople : AbstractSkill() {
             CoordinateSystemConverter.globalToLocal(position, robotPosition)
         }
     }
+
+
 
     override fun end(curToken: ExitToken?): ExitToken? {
         return curToken

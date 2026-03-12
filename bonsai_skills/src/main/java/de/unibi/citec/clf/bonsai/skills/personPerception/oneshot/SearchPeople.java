@@ -12,6 +12,8 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.bonsai.util.CoordinateSystemConverter;
 import de.unibi.citec.clf.btl.StampedType;
 import de.unibi.citec.clf.btl.data.geometry.Point2DStamped;
+import de.unibi.citec.clf.btl.data.geometry.Point3D;
+import de.unibi.citec.clf.btl.data.geometry.Point3DStamped;
 import de.unibi.citec.clf.btl.data.geometry.Pose2D;
 import de.unibi.citec.clf.btl.data.person.PersonData;
 import de.unibi.citec.clf.btl.data.person.PersonDataList;
@@ -203,8 +205,11 @@ public class SearchPeople extends AbstractSkill {
         for (PersonData currentPerson : possiblePersons) {
             Pose2D localPersonPos = currentPerson.getPosition();
             Pose2D globalPersonPos = localPersonPos;
+            Point3D globalHeadPos = new Point3DStamped(currentPerson.getHeadPosition()).toUnstamped();
             if(localPersonPos.isInBaseFrame()) {
                 globalPersonPos = CoordinateSystemConverter.localToGlobal(localPersonPos, robotPosition);
+                Point2DStamped tmp = CoordinateSystemConverter.localToGlobal(new Point2DStamped(globalHeadPos.getX(LengthUnit.METER), globalHeadPos.getY(LengthUnit.METER), LengthUnit.METER, localPersonPos.getFrameId()), robotPosition);
+                globalHeadPos = new Point3D(tmp.getX(LengthUnit.METER), tmp.getY(LengthUnit.METER), globalHeadPos.getZ(LengthUnit.METER), LengthUnit.METER);
             }
 
             logger.info("Person found - checking angle now; searchangle= " + searchAngle + ". Local Person position "
@@ -229,6 +234,7 @@ public class SearchPeople extends AbstractSkill {
 
             logger.info("Found person in search angle. Person angle is " + angle + " rad.");
             currentPerson.setPosition(globalPersonPos);
+            currentPerson.setHeadPosition(globalHeadPos);
             foundPersons.add(currentPerson);
         }
 
