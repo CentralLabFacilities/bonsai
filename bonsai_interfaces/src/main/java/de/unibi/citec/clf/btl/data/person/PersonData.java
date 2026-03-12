@@ -1,9 +1,12 @@
 package de.unibi.citec.clf.btl.data.person;
 
 
+import de.unibi.citec.clf.bonsai.util.CoordinateSystemConverter;
 import de.unibi.citec.clf.btl.StampedType;
+import de.unibi.citec.clf.btl.data.geometry.Point2DStamped;
 import de.unibi.citec.clf.btl.data.geometry.Point3D;
 import de.unibi.citec.clf.btl.data.geometry.Point3DStamped;
+import de.unibi.citec.clf.btl.units.LengthUnit;
 import org.apache.log4j.Logger;
 
 import de.unibi.citec.clf.btl.data.geometry.Pose2D;
@@ -47,6 +50,7 @@ public class PersonData extends StampedType implements Cloneable {
 
     @Override
     public void setFrameId(String frame) {
+        frameId = frame;
         getPosition().setFrameId(frame);
     }
 
@@ -69,6 +73,42 @@ public class PersonData extends StampedType implements Cloneable {
     }
     public void setHeadPosition(Point3D headPosition){
         this.headPosition = headPosition;
+    }
+
+    public void makeLocalHeadPosition(Pose2D robotPosition) {
+        Point3D globalHeadPos = new Point3D(headPosition);
+        Point2DStamped tmp = CoordinateSystemConverter.globalToLocal(
+                    new Point2DStamped(
+                            globalHeadPos.getX(LengthUnit.METER),
+                            globalHeadPos.getY(LengthUnit.METER),
+                            LengthUnit.METER,
+                            Pose2D.GLOBAL_FRAME
+                    ), robotPosition
+            );
+        headPosition = new Point3D(
+                tmp.getX(LengthUnit.METER),
+                tmp.getY(LengthUnit.METER),
+                globalHeadPos.getZ(LengthUnit.METER),
+                LengthUnit.METER
+        );
+    }
+
+    public void makeGlobalHeadPosition(Pose2D robotPosition) {
+        Point3D localHeadPos = new Point3D(headPosition);
+        Point2DStamped tmp = CoordinateSystemConverter.localToGlobal(
+                new Point2DStamped(
+                        localHeadPos.getX(LengthUnit.METER),
+                        localHeadPos.getY(LengthUnit.METER),
+                        LengthUnit.METER,
+                        Pose2D.LOCAL_FRAME
+                ), robotPosition
+        );
+        headPosition = new Point3D(
+                tmp.getX(LengthUnit.METER),
+                tmp.getY(LengthUnit.METER),
+                localHeadPos.getZ(LengthUnit.METER),
+                LengthUnit.METER
+        );
     }
 
     public Point3DStamped getRightHandPosition(){
