@@ -40,8 +40,10 @@ public class ObjectSlot<T extends Object> implements MemorySlot<T> {
     public <S extends T> T recall() throws CommunicationException {
 
         if (savedObject == null) {
+            logger.debug("object to recall is null");
             return null;
         }
+        logger.debug("recall " + savedObject.toString());
 
         //try different copy methods
         Class<T> clazz = (Class<T>) savedObject.getClass();
