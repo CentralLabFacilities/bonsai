@@ -63,6 +63,7 @@ import kotlin.math.abs
  *
  * @author nschmitz
  */
+@Deprecated("uses Converter")
 class SearchPeopleWithPoses : AbstractSkill() {
 
     private var tokenErrorNoPeople: ExitToken? = null
@@ -165,11 +166,15 @@ class SearchPeopleWithPoses : AbstractSkill() {
         }
         unfilteredDetectedPersons.forEach { detectedPerson ->
             val localPos = detectedPerson.position
+            var transformed = false
             val globalPos =
-                if (detectedPerson.position.isInBaseFrame) CoordinateSystemConverter.localToGlobal(
-                    detectedPerson.position,
-                    robotPosition
-                ) else detectedPerson.position
+                if (detectedPerson.position.isInBaseFrame) {
+                    transformed = true
+                    CoordinateSystemConverter.localToGlobal(
+                        detectedPerson.position,
+                        robotPosition
+                    )
+                } else detectedPerson.position
             val localAsPolar = PolarCoordinate(localPos)
             val angle = localAsPolar.getAngle(ANGLE_UNIT)
             val distance = localAsPolar.getDistance(LENGTH_UNIT)
@@ -184,6 +189,7 @@ class SearchPeopleWithPoses : AbstractSkill() {
             }
             logger.info("Found person at distance $distance m at angle ${Math.toDegrees(angle)} degree")
             detectedPerson.position = globalPos
+            if (transformed) detectedPerson.makeGlobalHeadPosition(robotPosition)
             filteredDetectedPersons.add(detectedPerson)
         }
         return if (filteredDetectedPersons.isEmpty()) tokenErrorNoPeople!! else tokenSuccessPeople!!

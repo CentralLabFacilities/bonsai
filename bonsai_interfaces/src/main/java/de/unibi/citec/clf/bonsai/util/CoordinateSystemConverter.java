@@ -146,6 +146,7 @@ public class CoordinateSystemConverter {
         return tgt;
     }
 
+    @Deprecated
     public static Point2DStamped localToGlobal(Point2DStamped src, Pose2D currentPosition) {
 
         LengthUnit meter = LengthUnit.METER;
@@ -169,6 +170,7 @@ public class CoordinateSystemConverter {
         return tgt;
     }
 
+    @Deprecated
     public static Pose2D globalToLocal(Pose2D src, Pose2D referencePosition) {
 
         Point2DStamped pointLocal = globalToLocal((Point2DStamped) src, referencePosition);
@@ -184,6 +186,7 @@ public class CoordinateSystemConverter {
         return tgt;
     }
 
+    @Deprecated
     public static Point2DStamped globalToLocal(Point2DStamped src, Pose2D referencePosition) {
 
         LengthUnit meter = LengthUnit.METER;
