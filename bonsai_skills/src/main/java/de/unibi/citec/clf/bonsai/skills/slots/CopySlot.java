@@ -1,6 +1,7 @@
 package de.unibi.citec.clf.bonsai.skills.slots;
 
 import de.unibi.citec.clf.bonsai.core.exception.CommunicationException;
+import de.unibi.citec.clf.bonsai.core.exception.ConfigurationException;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotReader;
 import de.unibi.citec.clf.bonsai.core.object.MemorySlotWriter;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
@@ -61,7 +62,7 @@ public class CopySlot extends AbstractSkill {
             type = Class.forName(typeString);
         } catch (ClassNotFoundException e) {
             logger.error(e);
-            return;
+            throw new ConfigurationException(e);
         }
         readSlot = configurator.getReadSlot("ReadSlot", type);
         writeSlot = configurator.getWriteSlot("WriteSlot", type);
