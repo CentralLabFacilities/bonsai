@@ -210,6 +210,8 @@ public class SearchPeople extends AbstractSkill {
                 globalPersonPos = CoordinateSystemConverter.localToGlobal(localPersonPos, robotPosition);
                 Point2DStamped tmp = CoordinateSystemConverter.localToGlobal(new Point2DStamped(globalHeadPos.getX(LengthUnit.METER), globalHeadPos.getY(LengthUnit.METER), LengthUnit.METER, localPersonPos.getFrameId()), robotPosition);
                 globalHeadPos = new Point3D(tmp.getX(LengthUnit.METER), tmp.getY(LengthUnit.METER), globalHeadPos.getZ(LengthUnit.METER), LengthUnit.METER);
+            } else {
+                logger.error("Person not in base frame, this is skill is deprecated");
             }
 
             logger.info("Person found - checking angle now; searchangle= " + searchAngle + ". Local Person position "
