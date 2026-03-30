@@ -70,6 +70,7 @@ class PlaceEntity : AbstractSkill() {
     lateinit private var  frame_id : String
 
     private var placement_margin = 0.15
+    private var max_z_offset = 0.2
     private var own_margin = false
 
     private var slot: MemorySlotReader<Entity>? = null
@@ -102,6 +103,9 @@ class PlaceEntity : AbstractSkill() {
         if(configurator.hasConfigurationKey(KEY_ACCEPTABLE_MARGIN)) {
             placement_margin = configurator.requestOptionalDouble(KEY_ACCEPTABLE_MARGIN, placement_margin)
             own_margin = true
+            max_z_offset = configurator.requestOptionalDouble("max_z", max_z_offset)
+        } else if (configurator.hasConfigurationKey("max_z")) {
+            throw ConfigurationException("max_z only with own margins")
         }
         upright = configurator.requestOptionalBool(KEY_UPRIGHT,upright)
         flip = configurator.requestOptionalBool(KEY_UPSIDE_DOWN, flip)
@@ -128,7 +132,7 @@ class PlaceEntity : AbstractSkill() {
 
         fur = if (own_margin) {
             val min_dist = Point3D(-placement_margin, -placement_margin, -0.02, LengthUnit.METER)
-            val max_dist = Point3D(placement_margin, placement_margin, 0.2, LengthUnit.METER)
+            val max_dist = Point3D(placement_margin, placement_margin, max_z_offset, LengthUnit.METER)
             ecwm?.placeEntity(entity, pose, flip, min_dist, max_dist, upright)
         } else {
             ecwm?.placeEntity(entity, pose, flip, upright)
