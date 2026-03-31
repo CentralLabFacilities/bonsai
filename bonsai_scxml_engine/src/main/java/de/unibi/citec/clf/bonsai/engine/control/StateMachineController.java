@@ -230,7 +230,11 @@ public class StateMachineController extends TimerTask implements SkillExceptionH
     }
 
     public List<String> getCurrentStateList() {
-        List<String> l = skillStateMachine.getActiveStates();
+        return getCurrentStateList(false);
+    }
+
+    public List<String> getCurrentStateList(boolean all) {
+        List<String> l = skillStateMachine.getActiveStates(all);
         logger.trace("active:" + l);
         return l;
     }
