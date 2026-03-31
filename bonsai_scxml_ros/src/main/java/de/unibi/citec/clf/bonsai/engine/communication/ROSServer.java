@@ -128,7 +128,7 @@ public class ROSServer extends ROSMinimalServer implements SCXMLServerWithContro
         @Override
         public void build(GetCurrentStatusRequest t, GetCurrentStatusResponse s) throws ServiceException {
             s.setStatus(smc.getStatus().ordinal());
-            s.setCurrentStates(new LinkedList<>(smc.getCurrentStateList()));
+            s.setCurrentStates(new LinkedList<>(smc.getCurrentStateList(true)));
             s.setIds(new LinkedList<>(smc.getAllStateIds()));
             List<String> transitions = new LinkedList<>();
             smc.getPossibleTransitions().forEach((trans) -> transitions.add(trans.getEvent()));
