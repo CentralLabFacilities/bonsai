@@ -129,6 +129,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
         }
 
         public void sendCurrentStates() {
+            if(config.newStatePublishing) return;
 
             List<String> states = new LinkedList<>();
             List<BonsaiTransition> transitions = new LinkedList<>();
@@ -253,6 +254,8 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
         if (PAUSE && running) {
             status = StatemachineStatus.PAUSED;
         }
+        //logger.info("isInitialized: " + isInitialized + " running:" + running + " PAUSE:"+PAUSE);
+        //logger.info("status: " + status);
         return status;
     }
 
@@ -672,6 +675,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
         }
 
         PAUSE = false;
+        running = false;
         logger.info("\n#######################\nSTATE MACHINE STOPPED AND RESET\n#######################");
 
     }
@@ -743,7 +747,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
             if (scxmlExecutor.getStatus().getStates().isEmpty()) {
                 logger.trace(" -- NONE --");
             }
-            for(EnterableState s : scxmlExecutor.getStatus().getStates()) {
+            for (EnterableState s : scxmlExecutor.getStatus().getStates()) {
                 logger.trace("- " + s.getId());
             }
         }
@@ -787,6 +791,19 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
                 running = false;
             }
         }
+        publishStates();
+    }
+
+    private void publishStates() {
+        if (!config.newStatePublishing) return;
+
+        List<String> states = scxmlExecutor.getStatus().getStates().stream().map(TransitionTarget::getId).toList();
+        var t = getCurrentPossibleTransitions();
+        logger.trace("publishStates: " + states + " " + t);
+        scxmlServers.forEach((it) -> {
+            it.sendCurrentStatesAndTransitions(states,t);
+        });
+
     }
 
     /**
@@ -1097,10 +1114,22 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     }
 
     public List<String> getActiveStates() {
+        return getActiveStates(false);
+    }
+
+    public List<String> getActiveStates(boolean all) {
         List<String> list = new LinkedList<>();
-        activeStates.keySet().stream().forEach((i) -> {
-            list.add(i.getCanonicalID());
-        });
+        if (all) {
+            if (scxmlExecutor == null) return list;
+            scxmlExecutor.getStatus().getActiveStates().stream().forEach((es) -> {
+                list.add(es.getId());
+            });
+        } else {
+            activeStates.keySet().stream().forEach((i) -> {
+                list.add(i.getCanonicalID());
+            });
+        }
+
         return list;
     }
 

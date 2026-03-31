@@ -23,6 +23,8 @@ class SkillStateMachineConfig {
     @JvmField
     var sendAllPossibleTransitions = false
     @JvmField
+    var newStatePublishing = false
+    @JvmField
     var ignoredStates = mutableSetOf<String>()
     @JvmField
     var checkForMixedTokens = false
@@ -59,6 +61,11 @@ class SkillStateMachineConfig {
         sendAllPossibleTransitions =
             MapReader.readConfigBool("#_SEND_ALL_TRANSITIONS", sendAllPossibleTransitions, data)
         logger.debug("Send all Taransitions: $sendAllPossibleTransitions")
+
+        newStatePublishing =
+            MapReader.readConfigBool("#_NEW_STATE_PUBLISHING", newStatePublishing, data)
+        logger.debug("new state publishing: $newStatePublishing")
+
 
         val ign = MapReader.readConfigString("#_VALIDATE_IGNORE_THESE_STATES", "", data)
         ignoredStates = ign.split(";").toMutableSet()
