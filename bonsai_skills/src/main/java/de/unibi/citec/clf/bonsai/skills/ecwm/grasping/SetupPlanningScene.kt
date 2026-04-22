@@ -16,7 +16,7 @@ import de.unibi.citec.clf.btl.units.LengthUnit
 import java.util.concurrent.Future
 
 /**
- * Setup the planning scene by adding close Entities
+ * Setup the planning scene by adding Entities known to the World Model
  *
  * <pre>
  *
@@ -29,6 +29,14 @@ import java.util.concurrent.Future
  *                  -> Do not add graspable objects
  *  distance:           [Double] (Default 2.0)
  *                  -> Max distance to added entities
+ *  safety_plane        [Boolean] (Default false)
+ *                  -> read Spirit from slot and add a plane at height z-0.01
+ *                      where z is from the transform of
+ *                          (0,0,0) frame=${spirit.entity.id}/${spirit.storage} -> map
+ *
+ * Slots:
+ *  Spirit:             [Spirit] (Read Optional)
+ *                  -> read if safety_plane is true
  *
  * </pre>
  *
