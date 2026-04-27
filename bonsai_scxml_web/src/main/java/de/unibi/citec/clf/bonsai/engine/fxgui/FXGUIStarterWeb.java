@@ -2,7 +2,7 @@ package de.unibi.citec.clf.bonsai.engine.fxgui;
 
 import de.unibi.citec.clf.bonsai.engine.SCXMLStarterWeb;
 import de.unibi.citec.clf.bonsai.engine.fxgui.communication.FXGUISCXMLRemote;
-import de.unibi.citec.clf.bonsai.engine.fxgui.communication.RemoteWebController;
+import de.unibi.citec.clf.bonsai.engine.fxgui.communication.web.RemoteWebController;
 import org.kohsuke.args4j.Option;
 
 /**
@@ -10,16 +10,9 @@ import org.kohsuke.args4j.Option;
  */
 public class FXGUIStarterWeb extends FXGUIStarter {
 
-    /**
-     * @param args the command line arguments
-     */
     public static void main(String[] args) {
         new FXGUIStarterWeb(args);
     }
-
-    @Option(name = "-b", aliases = {"--bonsai_server"}, metaVar = "VALUE", usage = "scope for bonsai (the server that gets the xml files), default is: "
-            + SCXMLStarterWeb.DEFAULT_SERVER_TOPIC)
-    public static String bonsaiScope = SCXMLStarterWeb.DEFAULT_SERVER_TOPIC;
 
     private FXGUIStarterWeb(String[] args) {
         super(args);
@@ -27,7 +20,6 @@ public class FXGUIStarterWeb extends FXGUIStarter {
 
     @Override
     protected FXGUISCXMLRemote createRemote() {
-
 
         RemoteWebController srv = new RemoteWebController();
 
