@@ -30,6 +30,12 @@
     <dependencies>
 
         <dependency>
+            <groupId>de.unibi.citec.clf</groupId>
+            <artifactId>robocuptasks-skills</artifactId>
+            <version>0.1-SNAPSHOT</version>
+        </dependency>
+
+        <dependency>
             <groupId>org.jetbrains.kotlin</groupId>
             <artifactId>kotlin-stdlib-jdk8</artifactId>
             <version>${kotlin.version}</version>
@@ -43,13 +49,19 @@
 
         <dependency>
             <groupId>io.ktor</groupId>
+            <artifactId>ktor-server-html-builder-jvm</artifactId>
+            <version>${ktor.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>io.ktor</groupId>
             <artifactId>ktor-server-netty-jvm</artifactId>
             <version>${ktor.version}</version>
         </dependency>
 
         <dependency>
             <groupId>io.ktor</groupId>
-            <artifactId>ktor-client-content-negotiation-jvm</artifactId>
+            <artifactId>ktor-server-content-negotiation-jvm</artifactId>
             <version>${ktor.version}</version>
         </dependency>
 
@@ -138,6 +150,9 @@
                     </execution>
                 </executions>
                 <configuration>
+                    <compilerPlugins>
+                        <plugin>kotlinx-serialization</plugin>
+                    </compilerPlugins>
                     <jvmTarget>11</jvmTarget>
                 </configuration>
             </plugin>

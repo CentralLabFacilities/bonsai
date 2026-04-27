@@ -1,6 +1,9 @@
-package de.unibi.citec.clf.bonsai.engine.fxgui.communication;
+package de.unibi.citec.clf.bonsai.engine.fxgui.communication.web;
 
 
+import de.unibi.citec.clf.bonsai.engine.fxgui.communication.FXGUISCXMLRemote;
+import de.unibi.citec.clf.bonsai.engine.fxgui.communication.ICurrentStateListener;
+import de.unibi.citec.clf.bonsai.engine.fxgui.communication.IStateListener;
 import javafx.beans.property.StringProperty;
 
 import java.util.List;
