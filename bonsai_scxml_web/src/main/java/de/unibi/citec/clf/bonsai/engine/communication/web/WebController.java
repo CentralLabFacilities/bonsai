@@ -1,5 +1,8 @@
-package de.unibi.citec.clf.bonsai.engine.communication;
+package de.unibi.citec.clf.bonsai.engine.communication.web;
 
+
+import de.unibi.citec.clf.bonsai.engine.communication.SCXMLRemote;
+import de.unibi.citec.clf.bonsai.engine.control.StateMachineController;
 
 import java.util.List;
 import java.util.Map;
@@ -10,7 +13,6 @@ import java.util.Map;
 public class WebController implements SCXMLRemote {
 
     private static final org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger(WebController.class);
-
 
     @Override
     public boolean fireEvent(String event) {
@@ -34,11 +36,6 @@ public class WebController implements SCXMLRemote {
 
     @Override
     public String load(String pathToConfig, String pathToTask, Map<String, String> includeMapping, boolean forceConfigure) {
-        return "";
-    }
-
-    public String load(String configXML, String taskXML, boolean forceConfigure) {
-        // Save file locally and then call load PATH
         return "";
     }
 
