@@ -317,7 +317,7 @@ public class SkillConfigurator implements ISkillConfigurator {
 
     private <T> void insertSlot(String slotName, Class<T> slotType, SlotDirection dir) {
 
-        logger.debug("Requested slot \"" + slotName + "\" of type \"" + slotType.getSimpleName() + "\"");
+        logger.debug("Requested slot \"" + slotName + "\" of type \"" + slotType.getSimpleName() + "\"" + " dir: " + dir.toString());
 
         if (config.checkCoreCreation) {
             //todo
@@ -325,8 +325,10 @@ public class SkillConfigurator implements ISkillConfigurator {
 
         if (!slotRequests.containsKey(slotName)) {
             slotRequests.put(slotName, slotType);
-            if (dir == SlotDirection.BI) {
+            if(dir == SlotDirection.IN || dir == SlotDirection.BI) {
                 slotReaderRequests.put(slotName, slotType);
+            }
+            if (dir == SlotDirection.OUT || dir == SlotDirection.BI) {
                 slotWriterRequests.put(slotName, slotType);
             }
         } else if (dir != SlotDirection.BI) {
