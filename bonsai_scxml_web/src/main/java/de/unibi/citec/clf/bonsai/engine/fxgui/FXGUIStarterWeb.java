@@ -14,6 +14,12 @@ public class FXGUIStarterWeb extends FXGUIStarter {
         new FXGUIStarterWeb(args);
     }
 
+    @Option(name = "-p", aliases = {"--port"}, metaVar = "VALUE", usage = "port to listen")
+    public static int port = 8080;
+
+    @Option(name = "-h", aliases = {"--host"}, metaVar = "VALUE", usage = "ip address to listen")
+    public static String host = "localhost";
+
     private FXGUIStarterWeb(String[] args) {
         super(args);
     }
@@ -21,7 +27,7 @@ public class FXGUIStarterWeb extends FXGUIStarter {
     @Override
     protected FXGUISCXMLRemote createRemote() {
 
-        RemoteWebController srv = new RemoteWebController();
+        RemoteWebController srv = new RemoteWebController(host, port);
 
         try {
             return srv;
