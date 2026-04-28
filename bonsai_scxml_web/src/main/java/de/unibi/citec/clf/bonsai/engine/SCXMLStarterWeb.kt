@@ -3,6 +3,7 @@ package de.unibi.citec.clf.bonsai.engine
 import de.unibi.citec.clf.bonsai.engine.communication.SCXMLServer
 import de.unibi.citec.clf.bonsai.engine.communication.web.WebServer
 import de.unibi.citec.clf.bonsai.engine.communication.web.model.*
+import de.unibi.citec.clf.bonsai.engine.communication.web.serverRoutes
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill
 import de.unibi.citec.clf.bonsai.engine.model.StateID
 import io.ktor.http.*
@@ -42,6 +43,7 @@ class SCXMLStarterWeb : SCXMLStarter() {
     val reflections = Reflections(SKILL_PREFIX)
     val allClasses: Set<Class<out AbstractSkill>> = reflections.getSubTypesOf(AbstractSkill::class.java)
     val allClassMap: Map<String, Class<out AbstractSkill>> = allClasses.associateBy { it.name }
+    var srv: WebServer? = null
 
     @Option(name = "-p", aliases = ["--port"], metaVar = "VALUE", usage = "port to listen")
     private var port: Int = 8080
@@ -50,14 +52,15 @@ class SCXMLStarterWeb : SCXMLStarter() {
     private var host: String = "localhost"
 
     override fun createServer(): SCXMLServer {
-        val srv = WebServer()
-        srv.setController(stateMachineController)
+        srv = WebServer()
+        srv!!.setController(stateMachineController)
 
         val server = embeddedServer(Netty, port, host) {
             install(ContentNegotiation) {
                 json()
             }
             routing {
+                serverRoutes(srv!!)
                 get("/") {
                     call.respondHtml(HttpStatusCode.OK) {
                         head {}
@@ -178,7 +181,7 @@ class SCXMLStarterWeb : SCXMLStarter() {
 
         logger.info("Web server started")
 
-        return srv
+        return srv!!
     }
 
     @OptIn(ExperimentalTime::class)
@@ -195,24 +198,8 @@ class SCXMLStarterWeb : SCXMLStarter() {
         val configFile = File("/tmp/config_$timestamp.xml")
         configFile.writeBytes(config)
 
-        val msg = mutableListOf<String>()
-        var success = false
-        try {
-            val results = skillStateMachine.initalize(scxmlFile.absolutePath,configFile.absolutePath,cfg.forceLoad)
-            success = results.success()
-            msg.addAll(results.loadingExceptions.map { it.message.toString() })
-            msg.addAll(results.validationResult.stateNotFoundException.map { it.message.toString() })
-            msg.addAll(results.validationResult.transitionNotFoundException.map { it.message })
-
-            logger.info("ConfigurationResults:\n${results.configurationResults}")
-            logger.info("ValidationResults:\n${results.validationResult}")
-            logger.info("stateMachineResults:\n${results.stateMachineResults}")
-
-        } catch (e: Exception) {
-            msg.add(e.message.toString())
-        }
-
-        return LoadingResult(success, msg)
+        val data = LoadData(configFile.absolutePath, scxmlFile.absolutePath, mutableMapOf(), cfg.forceLoad)
+        return srv!!.load(data)
     }
 
     private fun getSkill(id: String, vars: Map<String, String> = mapOf()): SkillInfo? {

@@ -64,8 +64,6 @@ public class RemoteROSController extends ROSController implements FXGUISCXMLRemo
             protected Void call() throws Exception {
                 while (running) {
                     List<String> ids = r.getStateIds();
-
-
                     if (ids != null && changed(ids, old)) {
                         ObservableList o = FXCollections.observableArrayList();
                         o.addAll(ids);
