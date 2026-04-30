@@ -66,15 +66,13 @@ class FilterEntityListByType : AbstractSkill() {
         entityListMemorySlot = configurator.getReadSlot("EntityList", EntityList::class.java)
         filteredListMemorySlot = configurator.getWriteSlot("FilteredEntities", EntityList::class.java)
 
-        if (configurator.hasConfigurationKey(KEY_PATTERN)) {
-            pattern = configurator.requestValue(KEY_PATTERN)
-        } else {
+        pattern = configurator.requestOptionalValue(KEY_PATTERN, pattern)
+        if (!configurator.hasConfigurationKey(KEY_PATTERN)) {
             typePatternSlot = configurator.getReadSlot("Pattern", String::class.java)
         }
 
         invert = configurator.requestOptionalBool(KEY_INVERT, invert)
         useRegex = configurator.requestOptionalBool(KEY_REGEX, useRegex)
-
 
     }
 

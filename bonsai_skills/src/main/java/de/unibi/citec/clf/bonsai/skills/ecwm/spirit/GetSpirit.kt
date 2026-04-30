@@ -84,17 +84,16 @@ class GetSpirit : AbstractSkill() {
 
         ecwmRobocup = configurator.getActuator("ECWMRobocup", ECWMRobocup::class.java)
 
-        if (configurator.hasConfigurationKey(KEY_ENTITY)) {
-            entityname = configurator.requestValue(KEY_ENTITY)
-        } else {
+        entityname = configurator.requestOptionalValue(KEY_ENTITY, entityname)
+        if (!configurator.hasConfigurationKey(KEY_ENTITY)) {
             entity = configurator.getReadSlot("Entity", Entity::class.java)
         }
 
         useStorage = configurator.requestOptionalBool(KEY_USE_STORAGE, useStorage)
         useStorageS = configurator.requestOptionalBool(KEY_USE_STORAGE_S, useStorageS)
 
+        storagename = configurator.requestOptionalValue(KEY_STORAGE, storagename)
         if (configurator.hasConfigurationKey(KEY_STORAGE)) {
-            storagename = configurator.requestValue(KEY_STORAGE)
             if(!useStorage) {
                 useStorage = true
                 logger.warn("parameter $KEY_STORAGE is set, forcing $KEY_USE_STORAGE")

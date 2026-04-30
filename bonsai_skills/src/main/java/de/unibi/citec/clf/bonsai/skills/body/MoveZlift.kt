@@ -71,9 +71,8 @@ class MoveZlift: AbstractSkill() {
         speed = configurator.requestOptionalDouble(KEY_SPEED, speed)
         timeout = configurator.requestOptionalInt(KEY_TIMEOUT, timeout.toInt()).toLong()
 
-        if (configurator.hasConfigurationKey(KEY_POSITION)) {
-            pos = configurator.requestDouble(KEY_POSITION).toFloat()
-        } else {
+        pos = configurator.requestOptionalDouble(KEY_POSITION, pos.toDouble()).toFloat()
+        if (!configurator.hasConfigurationKey(KEY_POSITION)) {
             heightSlot = configurator.getReadSlot("ZLiftHeight", Double::class.java)
         }
     }

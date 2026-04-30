@@ -68,8 +68,8 @@ class TalkRandom : AbstractSkill() {
         speechActuator = configurator.getActuator(SPEECH_ACTUATOR_NAME, SpeechActuator::class.java)
         text = text.trim().replace(" +".toRegex(), " ")
 
+        val input = configurator.requestOptionalValue(KEY_TEXT_LANGUAGE, "")
         if (configurator.hasConfigurationKey(KEY_TEXT_LANGUAGE)) {
-            val input = configurator.requestValue(KEY_TEXT_LANGUAGE)
             textLang = Language.valueOf(input)
             speakerLang = textLang
             if (!configurator.hasConfigurationKey(KEY_USE_LANGUAGE)) {

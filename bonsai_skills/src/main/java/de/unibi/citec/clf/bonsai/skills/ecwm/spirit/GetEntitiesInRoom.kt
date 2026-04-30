@@ -60,9 +60,8 @@ class GetEntitiesInRoom : AbstractSkill() {
 
         ecwm = configurator.getActuator("ECWMSpirit", ECWMSpirit::class.java)
 
-        if (configurator.hasConfigurationKey(KEY_ENTITY)) {
-            entityname = configurator.requestValue(KEY_ENTITY)
-        } else {
+        entityname = configurator.requestOptionalValue(KEY_ENTITY, entityname)
+        if (!configurator.hasConfigurationKey(KEY_ENTITY)) {
             entity = configurator.getReadSlot("RoomEntity", Entity::class.java)
         }
 

@@ -52,9 +52,8 @@ class PlanToPose : AbstractSkill() {
         pose = configurator.requestValue(KEY_POSE)
         upright = configurator.requestOptionalBool(KEY_UPRIGHT, upright)
 
-        if (configurator.hasConfigurationKey(KEY_GROUP)) {
-            group = configurator.requestValue(KEY_GROUP)
-        } else {
+        group = configurator.requestOptionalValue(KEY_GROUP, group);
+        if (!configurator.hasConfigurationKey(KEY_GROUP)) {
             val useSlot = configurator.requestOptionalBool(KEY_CHOOSE_GROUP, false)
             if (useSlot) {
                 groupSlot = configurator.getReadSlot("GroupSlot", String::class.java)

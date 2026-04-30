@@ -71,19 +71,19 @@ class CreateEntity : AbstractSkill() {
         type = configurator.requestOptionalValue(KEY_TYPE, type)
         usePositionData = configurator.requestOptionalBool(KEY_USE_POSITION, usePositionData)
 
-        if (configurator.hasConfigurationKey(KEY_NAME)) {
-            name = configurator.requestValue(KEY_NAME)
-        } else {
+        name = configurator.requestOptionalValue(KEY_NAME, "")
+        if (!configurator.hasConfigurationKey(KEY_NAME)) {
             nameslot = configurator.getReadSlot("EntityName", String::class.java)
         }
 
+        x = configurator.requestOptionalDouble(KEY_X, x)
+        y = configurator.requestOptionalDouble(KEY_Y, y)
+        z = configurator.requestOptionalDouble(KEY_Z, z)
         if (configurator.hasConfigurationKey(KEY_X) ||
             configurator.hasConfigurationKey(KEY_Y) ||
             configurator.hasConfigurationKey(KEY_Z)
         ) {
-            x = configurator.requestOptionalDouble(KEY_X, x)
-            y = configurator.requestOptionalDouble(KEY_Y, y)
-            z = configurator.requestOptionalDouble(KEY_Z, z)
+            //nothing
         } else {
             if (usePositionData)
                 positionSlot = configurator.getReadSlot("PositionData", Pose2D::class.java)
