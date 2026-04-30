@@ -2,6 +2,8 @@ package de.unibi.citec.clf.bonsai.core.configuration;
 
 import de.unibi.citec.clf.bonsai.core.exception.ConfigurationException;
 
+import javax.annotation.Nonnull;
+
 /**
  * @author lruegeme
  */
@@ -21,7 +23,7 @@ public interface IObjectConfigurator {
 
     String requestValue(String key) throws ConfigurationException;
 
-    String requestOptionalValue(String key, String def) throws ConfigurationException;
+    String requestOptionalValue(String key, @Nonnull String def) throws ConfigurationException;
 
     boolean requestBool(String key) throws ConfigurationException;
 

@@ -44,7 +44,7 @@ import java.util.concurrent.Future
 class GetStorages : AbstractSkill() {
 
     private val KEY_ENTITY= "entity"
-    private var id: String? = null
+    private var id: String = ""
 
     private var tokenSuccess: ExitToken? = null
     private var tokenErrorNone: ExitToken? = null
@@ -75,7 +75,7 @@ class GetStorages : AbstractSkill() {
 
     override fun init(): Boolean {
 
-        var entity = entitySlot?.recall<Entity>() ?: Entity(id!!)
+        var entity = entitySlot?.recall<Entity>() ?: Entity(id)
 
         fur = ecwm!!.fetchEntityStorages(entity)
         logger.debug("fetching storages from ${entity.id}")

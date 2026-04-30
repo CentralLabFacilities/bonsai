@@ -111,13 +111,13 @@ public class LookToPerson extends AbstractSkill {
         personSensor = configurator.getSensor("PersonSensor", PersonDataList.class);
         positionSensor = configurator.getSensor("PositionSensor", Pose2D.class);
 
-        targetID = configurator.requestOptionalValue(KEY_UUID, null);
+        targetID = configurator.requestOptionalValue(KEY_UUID, "");
     }
 
     @Override
     public boolean init() {
 
-        if (targetID == null) {
+        if (targetID.isEmpty()) {
             try {
                 targetID = targetPersonSlot.recall().getUuid();
             } catch (CommunicationException ex) {

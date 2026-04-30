@@ -75,8 +75,8 @@ class RecognizeEntities : AbstractSkill() {
     private var fast = false
     private var clear = true
     private var store = true
-    private var entityName: String? = null
-    private var storageName: String? = null
+    private var entityName: String = ""
+    private var storageName: String = ""
     private var minProb = 0.5
     private var useSpirit = false
 
@@ -106,11 +106,10 @@ class RecognizeEntities : AbstractSkill() {
             slotSpirit = configurator.getReadSlot("Spirit", Spirit::class.java)
         } else {
             entityName = configurator.requestOptionalValue(KEY_ENTITY, entityName)
-            if (entityName == null || entityName == "null") slotIn = configurator.getReadSlot("Entity", Entity::class.java)
+            if(!configurator.hasConfigurationKey(KEY_ENTITY)) slotIn = configurator.getReadSlot("Entity", Entity::class.java)
 
             storageName = configurator.requestOptionalValue(KEY_STORAGE, storageName)
-            if (storageName == null || storageName == "null") slotIn2 =
-                    configurator.getReadSlot("Storage", String::class.java)
+            if(!configurator.hasConfigurationKey(KEY_STORAGE)) slotIn2 = configurator.getReadSlot("Storage", String::class.java)
         }
 
         slotOut = configurator.getWriteSlot("RecognizedEntities", EntityList::class.java)

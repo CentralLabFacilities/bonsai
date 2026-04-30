@@ -48,7 +48,7 @@ class FilterEntityListByAttribute : AbstractSkill() {
     private var entitylist: EntityList? = null
     private var key: String = ""
     private var valueSlot: MemorySlotReader<String>? = null
-    private var value: String? = ""
+    private var value: String = ""
 
     private val KEY_ATTRIBUTE = "#_ATTRIBUTE"
     private val KEY_VALUE = "#_VALUE"
@@ -82,7 +82,7 @@ class FilterEntityListByAttribute : AbstractSkill() {
 
         entitylist = listSlot!!.recall<EntityList>() ?: return false
         value = valueSlot?.recall<String>() ?: value
-        value = value?.lowercase()
+        value = value.lowercase()
         return true
     }
 
@@ -100,7 +100,7 @@ class FilterEntityListByAttribute : AbstractSkill() {
             }
 
             logger.debug("entity ${e.id} has $key: $attributeValues")
-            val match = if (useRegex) attributeValues.map { attr -> value!!.toRegex().matches(attr.lowercase()) }.any { it } else attributeValues.contains(value)
+            val match = if (useRegex) attributeValues.map { attr -> value.toRegex().matches(attr.lowercase()) }.any { it } else attributeValues.contains(value)
             if (invert) !match else match
         }
 

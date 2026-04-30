@@ -46,7 +46,7 @@ public class SlotIO extends AbstractSkill {
 
         // request all tokens that you plan to return from other methods
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
-        String w = configurator.requestOptionalValue(KEY_WRITE, null);
+        String w = configurator.requestOptionalValue(KEY_WRITE, "null");
         if (configurator.hasConfigurationKey(KEY_WRITE)) {
             write = w;
         }
