@@ -75,10 +75,19 @@ class SCXMLStarterWeb : SCXMLStarter() {
                                 li { a("/skill/dialog.Talk") { +"Get dialog.Talk" } }
                                 li { a("/skill/dialog.nlu.CheckIntent") { +"Get dialog.nlu.CheckIntent" } }
                                 li {
-                                    +"Use this to test with parameters #_INTENTS='Foo;Bar':"
+                                    +"Use this to test with parameters #_INTENTS='Foo;Bar', this will add more transition:"
                                     br
                                     code {
                                         +"""curl -s -X POST http://localhost:8080/skill/dialog.nlu.CheckIntent -H 'Content-Type: application/json' -d '{"params":{"#_INTENTS":"Foo;Bar"}}'"""
+                                    }
+                                    br
+                                }
+                                li { a("/skill/ecwm.core.GetEntity") { +"Get ecwm.core.GetEntity" } }
+                                li {
+                                    +"Use this to test with parameters name=foo, this will disable the String slot:"
+                                    br
+                                    code {
+                                        +"""curl -s -X POST http://localhost:8080/skill/ecwm.core.GetEntity -H 'Content-Type: application/json' -d '{"params":{"name":"Foo"}}'"""
                                     }
                                     br
                                 }
@@ -221,8 +230,8 @@ class SCXMLStarterWeb : SCXMLStarter() {
         val outSlots = runner.inspectionGetOutSlots().map { SkillSlot(it.key, it.value.simpleName) }
         val transitions = runner.inspectionGetRequestedTokens().map { SkillTransition(it.exitStatus.fullStatus) }
         val params = mutableListOf<SkillParameter>()
-        params.addAll(runner.inspectionGetRequiredParams().map { SkillParameter(it.key, true) })
-        params.addAll(runner.inspectionGetAllOptionalParams().map { SkillParameter(it.key, false) })
+        params.addAll(runner.inspectionGetRequiredParams().map { SkillParameter(it.key, it.value.simpleName, true) })
+        params.addAll(runner.inspectionGetAllOptionalParams().map { SkillParameter(it.key, it.value.type.simpleName, false, it.value.defaultValue.toString()) })
         return SkillInfo(mid, inSlots, outSlots, params, transitions)
     }
 

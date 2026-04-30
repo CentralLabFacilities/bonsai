@@ -182,4 +182,5 @@ public class List<T extends Type> extends TypeCollection<T> implements java.util
         s += "]";
         return s;
     }
+
 }

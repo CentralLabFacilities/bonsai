@@ -168,7 +168,7 @@ public class SkillRunner implements Runnable {
 
     public Map<String, Class> inspectionGetRequiredParams() { return configurator.getRequiredParams(); }
 
-    public Map<String, Class> inspectionGetAllOptionalParams() {
+    public Map<String, SkillConfigurator.OptionalParam> inspectionGetAllOptionalParams() {
         return configurator.getOptionalParams();
     }
 
@@ -176,7 +176,7 @@ public class SkillRunner implements Runnable {
         return configurator.getUnusedParams();
     }
 
-    public Map<String, Class> inspectionGetUnusedOptionalParams() {
+    public Map<String, SkillConfigurator.OptionalParam> inspectionGetUnusedOptionalParams() {
         return configurator.getUnusedOptionalParams();
     }
 
