@@ -69,15 +69,13 @@ class AttachEntity : AbstractSkill() {
         useSlot = configurator.requestOptionalBool(KEY_USE_SLOT, useSlot)
         create = configurator.requestOptionalBool(KEY_CREATE, create)
 
-        if (configurator.hasConfigurationKey(KEY_TYPE)) {
-            entityType = configurator.requestValue(KEY_TYPE)
-        } else if (!useSlot) {
+        entityType = configurator.requestOptionalValue(KEY_TYPE, entityType)
+        if (!configurator.hasConfigurationKey(KEY_TYPE) && !useSlot) {
             slotTypename = configurator.getReadSlot("Type", String::class.java)
         }
 
-        if (configurator.hasConfigurationKey(KEY_NAME)) {
-            entityName = configurator.requestValue(KEY_NAME)
-        } else {
+        entityName = configurator.requestOptionalValue(KEY_NAME, entityName)
+        if (!configurator.hasConfigurationKey(KEY_NAME)) {
             entityName = UUID.randomUUID().toString()
         }
 

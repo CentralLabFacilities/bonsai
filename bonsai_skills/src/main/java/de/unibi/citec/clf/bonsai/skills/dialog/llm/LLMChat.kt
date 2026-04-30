@@ -54,9 +54,8 @@ class LLMChat : AbstractSkill() {
         llm = configurator.getActuator("LLM", LLM::class.java)
         timeout = configurator.requestOptionalInt(KEY_TIMEOUT, timeout.toInt()).toLong()
 
-        if(configurator.hasConfigurationKey(KEY_PROMPT)) {
-            promt = configurator.requestValue(KEY_PROMPT)
-        } else {
+        promt = configurator.requestOptionalValue(KEY_PROMPT, promt)
+        if(!configurator.hasConfigurationKey(KEY_PROMPT)) {
             slotPrompt = configurator.getReadSlot("prompt", String::class.java)
         }
 

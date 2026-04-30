@@ -70,8 +70,9 @@ class SaySlot : AbstractSkill() {
         blocking = configurator.requestOptionalBool(KEY_BLOCKING, blocking)
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
         speechActuator = configurator.getActuator("SpeechActuator", SpeechActuator::class.java)
+
+        val input = configurator.requestOptionalValue(KEY_TEXT_LANGUAGE, "")
         if(configurator.hasConfigurationKey(KEY_TEXT_LANGUAGE)) {
-            val input = configurator.requestValue(KEY_TEXT_LANGUAGE)
             textLang = Language.valueOf(input)
             speakerlang = textLang
             if(!configurator.hasConfigurationKey(KEY_USE_LANGUAGE)) {

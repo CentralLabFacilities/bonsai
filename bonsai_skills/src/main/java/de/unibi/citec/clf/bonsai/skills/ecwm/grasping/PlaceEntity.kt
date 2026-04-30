@@ -100,8 +100,8 @@ class PlaceEntity : AbstractSkill() {
             slotTargetPose = configurator.getReadSlot("TargetPose", Pose3D::class.java)
         }
 
+        placement_margin = configurator.requestOptionalDouble(KEY_ACCEPTABLE_MARGIN, placement_margin)
         if(configurator.hasConfigurationKey(KEY_ACCEPTABLE_MARGIN)) {
-            placement_margin = configurator.requestOptionalDouble(KEY_ACCEPTABLE_MARGIN, placement_margin)
             own_margin = true
             max_z_offset = configurator.requestOptionalDouble("max_z", max_z_offset)
         } else if (configurator.hasConfigurationKey("max_z")) {

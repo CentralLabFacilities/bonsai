@@ -66,9 +66,8 @@ class GetStorages : AbstractSkill() {
 
         storageListSlot = configurator.getWriteSlot("Storages", StorageList::class.java)
 
-        if (configurator.hasConfigurationKey(KEY_ENTITY)) {
-            id = configurator.requestOptionalValue(KEY_ENTITY, id)
-        } else {
+        id = configurator.requestOptionalValue(KEY_ENTITY, id)
+        if (!configurator.hasConfigurationKey(KEY_ENTITY)) {
             entitySlot = configurator.getReadSlot("Entity", Entity::class.java)
         }
 

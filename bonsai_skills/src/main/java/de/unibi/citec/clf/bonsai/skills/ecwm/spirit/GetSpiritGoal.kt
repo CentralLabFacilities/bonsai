@@ -100,15 +100,13 @@ class GetSpiritGoal : AbstractSkill() {
         if (useSpirit) {
             spiritSlot = configurator.getReadSlot("SpiritSlot", Spirit::class.java)
         } else {
-            if (configurator.hasConfigurationKey(KEY_ENTITY)) {
-                entityname = configurator.requestValue(KEY_ENTITY)
-            } else {
+            entityname = configurator.requestOptionalValue(KEY_ENTITY,entityname)
+            if (!configurator.hasConfigurationKey(KEY_ENTITY)) {
                 entity = configurator.getReadSlot("Entity", Entity::class.java)
             }
 
-            if (configurator.hasConfigurationKey(KEY_STORAGE)) {
-                storageName = configurator.requestValue(KEY_STORAGE)
-            } else {
+            storageName = configurator.requestOptionalValue(KEY_STORAGE,storageName)
+            if (!configurator.hasConfigurationKey(KEY_STORAGE)) {
                 storage = configurator.getReadSlot("Storage", String::class.java)
             }
             spiritName = configurator.requestOptionalValue(KEY_SPIRIT, spiritName)

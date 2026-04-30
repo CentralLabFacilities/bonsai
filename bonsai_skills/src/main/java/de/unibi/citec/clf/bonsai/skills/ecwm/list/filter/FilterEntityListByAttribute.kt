@@ -68,9 +68,8 @@ class FilterEntityListByAttribute : AbstractSkill() {
         listWriteSlot = configurator.getWriteSlot("Filtered", EntityList::class.java)
 
         key = configurator.requestValue(KEY_ATTRIBUTE)
-        if (configurator.hasConfigurationKey(KEY_VALUE)) {
-            value = configurator.requestValue(KEY_VALUE)
-        } else {
+        value = configurator.requestOptionalValue(KEY_VALUE, value)
+        if (!configurator.hasConfigurationKey(KEY_VALUE)) {
             valueSlot = configurator.getReadSlot("Value", String::class.java)
         }
         invert = configurator.requestOptionalBool(KEY_INVERT, invert)

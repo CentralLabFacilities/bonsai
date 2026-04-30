@@ -60,8 +60,8 @@ class UnpackNLU : AbstractSkill() {
     override fun configure(configurator: ISkillConfigurator) {
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
 
+        intent = configurator.requestOptionalValue("#_INTENT", "")
         if (configurator.hasConfigurationKey("#_INTENT")) {
-            intent = configurator.requestValue("#_INTENT")
             tokenErrorIntent = configurator.requestExitToken(ExitStatus.ERROR().ps("wrongIntent"))
         }
 
