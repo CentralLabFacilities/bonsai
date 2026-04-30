@@ -45,7 +45,7 @@ class GraspEntity : AbstractSkill() {
     private val KEY_CARRY_POSE = "carry_pose"
     private val KEY_KEEP_SCENE = "keep_scene"
     private val KEY_ADD_FALLBACK = "add_fallback"
-    private var entityName: String? = null
+    private var entityName: String = ""
 
     private var slot: MemorySlotReader<Entity>? = null
 
@@ -57,7 +57,7 @@ class GraspEntity : AbstractSkill() {
     private var tokenSuccessMaybe: ExitToken? = null
 
     private var upright = false
-    private var carryPose: String? = null
+    private var carryPose: String = ""
     private var keep_scene = true
     private var add_fallback = false
 
@@ -70,7 +70,7 @@ class GraspEntity : AbstractSkill() {
         ecwm = configurator.getActuator("ECWMGrasping", ECWMGrasping::class.java)
 
         entityName = configurator.requestOptionalValue(KEY_ENTITY, entityName)
-        if(entityName == null || entityName == "null") {
+        if(!configurator.hasConfigurationKey(KEY_ENTITY)) {
             slot = configurator.getReadSlot("Entity", Entity::class.java)
             logger.info("using slot")
         }
@@ -78,18 +78,12 @@ class GraspEntity : AbstractSkill() {
         keep_scene = configurator.requestOptionalBool(KEY_KEEP_SCENE, keep_scene)
         upright = configurator.requestOptionalBool(KEY_UPRIGHT,upright)
         carryPose = configurator.requestOptionalValue(KEY_CARRY_POSE,carryPose)
-        carryPose = configurator.requestOptionalValue(KEY_CARRY_POSE,carryPose)
         add_fallback = configurator.requestOptionalBool(KEY_ADD_FALLBACK, add_fallback)
 
     }
 
     override fun init(): Boolean {
-        val entity = if(entityName == null || entityName == "null") {
-            logger.info("recall")
-            slot?.recall<Entity>() ?: return false
-        } else {
-            Entity(entityName!!)
-        }
+        val entity = slot?.recall<Entity>() ?:  Entity(entityName!!)
 
         logger.debug("try to grasp '$entity' ${if(upright) " (upright)"  else ""}  carry pose: '$carryPose'")
 

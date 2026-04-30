@@ -8,6 +8,7 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException;
 import org.apache.log4j.Logger;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 
@@ -583,7 +584,7 @@ public class SkillConfigurator implements ISkillConfigurator {
     }
 
     @Override
-    public String requestOptionalValue(String key, String def) throws ConfigurationException {
+    public String requestOptionalValue(String key, @NotNull String def) throws ConfigurationException {
         switch (phase) {
             case CONFIG:
                 logger.debug("request value " + key + " default:" + def);

@@ -4,6 +4,7 @@ import de.unibi.citec.clf.bonsai.core.exception.ConfigurationException;
 import de.unibi.citec.clf.bonsai.core.exception.MissingKeyConfigurationException;
 import de.unibi.citec.clf.bonsai.core.exception.ParameterCastConfigurationException;
 import org.apache.log4j.Logger;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 import java.util.Map.Entry;
@@ -201,7 +202,7 @@ public class ObjectConfigurator implements IObjectConfigurator {
     }
 
     @Override
-    public String requestOptionalValue(String key, String def) throws ConfigurationException {
+    public String requestOptionalValue(String key, @NotNull String def) throws ConfigurationException {
         switch (phase) {
             case CONFIG:
                 optionalParams.put(key, String.class);
