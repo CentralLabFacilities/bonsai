@@ -9,9 +9,17 @@ import java.io.IOException;
 
 /**
  *
- * @author lruegme
+ * @author lruegeme
  */
 public class ImageData extends Type {
+
+    public ImageData(ImageData d) {
+        this.colorMode = d.colorMode;
+        this.width = d.width;
+        this.height = d.height;
+        this.depth = d.depth;
+        this.data =  java.util.Arrays.copyOf(d.data, d.data.length);
+    }
 
     private void writePPM(File file) throws IOException {
 
@@ -58,7 +66,6 @@ public class ImageData extends Type {
     }
 
     public enum ColorMode {
-
         RGB,
         BGR
     }

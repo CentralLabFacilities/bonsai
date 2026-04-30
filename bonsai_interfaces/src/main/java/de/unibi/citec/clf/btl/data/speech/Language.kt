@@ -2,7 +2,9 @@ package de.unibi.citec.clf.btl.data.speech
 
 import de.unibi.citec.clf.btl.Type
 
-data class LanguageType(val value : Language) : Type()
+data class LanguageType(val value : Language) : Type() {
+    constructor(e: LanguageType) : this(e.value)
+}
 
 enum class Language(val value: Byte) {
     // From Whisper Language codes

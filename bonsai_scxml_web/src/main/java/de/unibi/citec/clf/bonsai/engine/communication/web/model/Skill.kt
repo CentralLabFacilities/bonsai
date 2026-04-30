@@ -9,7 +9,7 @@ data class SkillNames(val skills: List<String>) {}
 data class SkillTransition(val event: String)
 
 @Serializable
-data class SkillParameter(val key: String, val required: Boolean, val default: String? = null)
+data class SkillParameter(val key: String, val type: String, val required: Boolean, val default: String? = null)
 
 @Serializable
 data class SkillSlot(val key: String, val type: String)

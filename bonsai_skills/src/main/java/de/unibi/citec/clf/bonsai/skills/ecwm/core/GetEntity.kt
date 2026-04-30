@@ -49,9 +49,8 @@ class GetEntity : AbstractSkill() {
         slot = configurator.getWriteSlot("Entity", Entity::class.java)
         ecwm = configurator.getActuator("ECWMCore", WorldModel::class.java)
 
-        if (configurator.hasConfigurationKey(KEY_EXPRESSION)) {
-            exp = configurator.requestOptionalValue(KEY_EXPRESSION, exp)
-        } else {
+        exp = configurator.requestOptionalValue(KEY_EXPRESSION, exp)
+        if (!configurator.hasConfigurationKey(KEY_EXPRESSION)) {
             expSlot = configurator.getReadSlot("StringSlot", String::class.java)
         }
     }

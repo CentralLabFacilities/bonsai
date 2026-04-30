@@ -8,7 +8,6 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException;
 import org.apache.log4j.Logger;
-import org.apache.xpath.operations.Bool;
 
 import java.util.*;
 
@@ -71,9 +70,24 @@ public class SkillConfigurator implements ISkillConfigurator {
     private Map<String, Object> values = new HashMap<>();
     private Map<String, String> configValues = null;
 
+    class OptionalParam<T> {
+        Class<T> type;
+        T defaultValue;
+
+        OptionalParam(Class<T> type, T defaultValue) {
+            this.type = type;
+            this.defaultValue = defaultValue;
+        }
+
+        @Override
+        public String toString() {
+            return type.getName() + " (" + defaultValue.toString() + ")";
+        }
+    }
+
     private Map<String, Class> requiredParams = new HashMap<>();
-    private Map<String, Class> optionalParams = new HashMap<>();
-    private Map<String, Class> unusedOptionalParams = new HashMap<>();
+    private Map<String, OptionalParam> optionalParams = new HashMap<>();
+    private Map<String, OptionalParam> unusedOptionalParams = new HashMap<>();
     private List<ConfigurationException> exceptions = new LinkedList<>();
 
     private Map<String, Sensor<?>> localSensorCache = new HashMap<>();
@@ -135,7 +149,7 @@ public class SkillConfigurator implements ISkillConfigurator {
                     exceptions.add(new ParameterCastConfigurationException(key, c, value));
                 }
             } else if (optionalParams.containsKey(key)) {
-                Class c = optionalParams.get(key);
+                Class c = optionalParams.get(key).type;
                 try {
                     values.put(key, castValue(value, c));
                 } catch (ConfigurationException e) {
@@ -222,7 +236,7 @@ public class SkillConfigurator implements ISkillConfigurator {
         return exceptions;
     }
 
-    public Map<String, Class> getUnusedOptionalParams() {
+    public Map<String, OptionalParam> getUnusedOptionalParams() {
         return unusedOptionalParams;
     }
 
@@ -273,7 +287,7 @@ public class SkillConfigurator implements ISkillConfigurator {
         return requiredParams;
     }
 
-    public Map<String, Class> getOptionalParams() {
+    public Map<String, OptionalParam> getOptionalParams() {
         return optionalParams;
     }
 
@@ -505,7 +519,7 @@ public class SkillConfigurator implements ISkillConfigurator {
         switch (phase) {
             case CONFIG:
                 logger.debug("request INT " + key + " default:" + def);
-                optionalParams.put(key, Integer.class);
+                optionalParams.put(key, new OptionalParam(Integer.class, def));
                 return getConfigValue(key, def, Integer.class);
             case BLOCKED:
                 throw new ConfigurationException("Configurator is blocked, had errors during configuration");
@@ -533,7 +547,7 @@ public class SkillConfigurator implements ISkillConfigurator {
         switch (phase) {
             case CONFIG:
                 logger.debug("request double " + key + " default:" + def);
-                optionalParams.put(key, Double.class);
+                optionalParams.put(key, new OptionalParam(Double.class, def));
                 return getConfigValue(key, def, Double.class);
             case BLOCKED:
                 throw new ConfigurationException("Configurator is blocked, had errors during configuration");
@@ -573,7 +587,7 @@ public class SkillConfigurator implements ISkillConfigurator {
         switch (phase) {
             case CONFIG:
                 logger.debug("request value " + key + " default:" + def);
-                optionalParams.put(key, String.class);
+                optionalParams.put(key, new OptionalParam(String.class, def));
                 return getConfigValue(key, def, String.class);
             case BLOCKED:
                 throw new ConfigurationException("Configurator is blocked, had errors during configuration");
@@ -602,7 +616,7 @@ public class SkillConfigurator implements ISkillConfigurator {
         switch (phase) {
             case CONFIG:
                 logger.debug("request bool " + key + " default:" + def);
-                optionalParams.put(key, Boolean.class);
+                optionalParams.put(key, new OptionalParam(Boolean.class, def));
                 return getConfigValue(key, def, Boolean.class);
             case BLOCKED:
                 throw new ConfigurationException("Configurator is blocked, had errors during configuration");

@@ -12,7 +12,6 @@ import org.apache.log4j.Logger;
 import de.unibi.citec.clf.btl.data.geometry.Pose2D;
 
 /**
- *
  * @author rfeldhans
  *
  */
@@ -37,6 +36,7 @@ public class PersonData extends StampedType implements Cloneable {
     public PersonData() {
 
     }
+
 
     @Override
     public String getFrameId() {
