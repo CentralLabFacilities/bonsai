@@ -30,7 +30,7 @@ public class ExecutePosture extends AbstractSkill {
     //default values
     private boolean blocking = true;
     private String pose;
-    private String group = null;
+    private String group = "";
     private long timeout = 10000;
 
     private PostureActuator poseActuator;
