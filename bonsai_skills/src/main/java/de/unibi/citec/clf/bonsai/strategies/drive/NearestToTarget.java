@@ -48,7 +48,7 @@ public class NearestToTarget extends DriveStrategyWithTryGoal {
         } catch (InterruptedException | ExecutionException e) {
             logger.error("Could not recieve global plan ", e);
         }
-        if (planToTarget == null || planToTarget.size() <= 1) {
+        if (planSucceeded(planToTarget, targetGoal) || planToTarget.size() <= 1) {
             if (oldPlan == null || oldPlan.isEmpty()) {
                 if (closerSteps < closerMaxSteps) {
                     logger.warn("Could not make plan. Setting Target nearer to robot");
@@ -64,14 +64,14 @@ public class NearestToTarget extends DriveStrategyWithTryGoal {
 
                     double distance = targetPolar.getDistance(LengthUnit.METER);
                     logger.debug("Old goal distance: " + distance);
-                    
+
                     if (distance - (closerSteps * closerStepSize) < 0) {
                         distance = 0;
                     } else {
                         distance = distance - (closerSteps * closerStepSize);
                     }
                     logger.debug("New goal distance: " + distance);
-                    
+
                     ++closerSteps;
 
                     return CoordinateSystemConverter.polar2NavigationGoalData(
@@ -85,14 +85,25 @@ public class NearestToTarget extends DriveStrategyWithTryGoal {
             }
         }
         oldPlan = planToTarget;
-        logger.debug("Try Goal took: " + (System.nanoTime() - startTime));
-        if ((!planToTarget.isEmpty()) && (takeGoal < replan)) {
+        logger.debug("Try Goal took: " + (System.currentTimeMillis() - startTime));
+        if ((!planSucceeded(planToTarget, targetGoal)) && (takeGoal < replan)) {
             logger.info("Target goal reachable");
+            logger.debug("plan is" + planToTarget);
             planToTarget.get(Math.max(planToTarget.size() - takeGoal, 0)).setYaw(targetGoal.getYaw(AngleUnit.RADIAN), AngleUnit.RADIAN);
             return planToTarget.get(Math.max(planToTarget.size() - takeGoal, 0));
         }
         logger.error("Already took " + replan + " replan steps. Giving up.");
         return null;
+    }
+
+    public boolean planSucceeded(GlobalPlan plan, NavigationGoalData goal) {
+        if (plan == null || plan.isEmpty()) {return false;}
+        NavigationGoalData last = plan.stream().toList().get(plan.stream().toList().size()-1);
+        var distance = goal.getDistance(last.toUnstamped(), LengthUnit.METER);
+        if (distance > 0.5) {
+            return false;
+        }
+        return true;
     }
 
     @Override
