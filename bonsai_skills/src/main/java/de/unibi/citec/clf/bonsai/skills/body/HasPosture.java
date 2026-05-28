@@ -27,7 +27,7 @@ public class HasPosture extends AbstractSkill {
 
     //default values
     private String pose;
-    private String group = null;
+    private String group = "";
 
     private PostureActuator poseActuator;
     private Future<Boolean> ret;
