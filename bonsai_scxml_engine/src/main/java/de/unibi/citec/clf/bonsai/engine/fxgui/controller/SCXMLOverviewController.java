@@ -256,10 +256,18 @@ public class SCXMLOverviewController implements IStateListener {
         boolean force = forceLoad.isSelected();
 
         new Thread(()-> {
-            String ret = remote.load(textConfig.getText(), textScxml.getText(), includeMapping, force);
+            String ret;
+            try {
+                ret = remote.load(textConfig.getText(), textScxml.getText(), includeMapping, force);
+            } catch (Exception e) {
+                ret = "Parsing Error:\n" + e.getMessage();
+                logger.fatal("Loading Error: " + e.getMessage());
+            }
+
+            String finalRet = ret;
             Platform.runLater(() -> {
-                if (!ret.isEmpty()) {
-                    showResultAlert(ret);
+                if (!finalRet.isEmpty()) {
+                    showResultAlert(finalRet);
                 } else {
                     logger.info("loading finished without error");
 
