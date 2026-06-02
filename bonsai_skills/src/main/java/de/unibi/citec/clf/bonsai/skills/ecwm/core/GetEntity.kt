@@ -17,7 +17,7 @@ import javax.naming.CommunicationException
  * <pre>
  *
  * Options:
- *  name:   [String] (optional) Entity name
+ *  id:   [String] (optional) Entity id
  *
  * Slots:
  *  StringSlot: [String] [Read]
@@ -47,12 +47,19 @@ class GetEntity : AbstractSkill() {
         tokenError = configurator.requestExitToken(ExitStatus.ERROR())
 
         slot = configurator.getWriteSlot("Entity", Entity::class.java)
-        ecwm = configurator.getActuator("ECWMCore", WorldModel::class.java)
 
-        exp = configurator.requestOptionalValue(KEY_EXPRESSION, exp)
-        if (!configurator.hasConfigurationKey(KEY_EXPRESSION)) {
+        //todo find replace name -> id
+        if(configurator.hasConfigurationKey(KEY_EXPRESSION)) {
+            logger.warn("use old name parameter")
+            exp = configurator.requestOptionalValue(KEY_EXPRESSION, exp)
+        }
+        exp = configurator.requestOptionalValue(KEY_ID, exp)
+
+        if (!configurator.hasConfigurationKey(KEY_ID) && !configurator.hasConfigurationKey(KEY_EXPRESSION)) {
             expSlot = configurator.getReadSlot("StringSlot", String::class.java)
         }
+
+        ecwm = configurator.getActuator("ECWMCore", WorldModel::class.java)
     }
 
     override fun init(): Boolean {
@@ -102,5 +109,6 @@ class GetEntity : AbstractSkill() {
 
     companion object {
         private const val KEY_EXPRESSION = "name"
+        private const val KEY_ID = "id"
     }
 }
