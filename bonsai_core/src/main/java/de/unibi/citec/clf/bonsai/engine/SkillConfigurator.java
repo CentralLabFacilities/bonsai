@@ -420,7 +420,7 @@ public class SkillConfigurator implements ISkillConfigurator {
             String def_string = (def == null) ? null : String.valueOf(def);
             String value = configValues.getOrDefault(key, def_string);
             ret = castValue(value, type);
-            logger.debug(".. using config value " + value);
+            logger.debug(".. using config value '" + value+ "'");
         } catch (Exception ex) {
             logger.debug(".. using config value failed" + ex.getMessage(), ex);
             logger.debug(".. have the following values");
@@ -519,7 +519,7 @@ public class SkillConfigurator implements ISkillConfigurator {
     public int requestOptionalInt(String key, int def) throws ConfigurationException {
         switch (phase) {
             case CONFIG:
-                logger.debug("request INT " + key + " default:" + def);
+                logger.debug("request INT " + key + " default: " + def);
                 optionalParams.put(key, new OptionalParam(Integer.class, def));
                 return getConfigValue(key, def, Integer.class);
             case BLOCKED:
@@ -547,7 +547,7 @@ public class SkillConfigurator implements ISkillConfigurator {
     public double requestOptionalDouble(String key, double def) throws ConfigurationException {
         switch (phase) {
             case CONFIG:
-                logger.debug("request double " + key + " default:" + def);
+                logger.debug("request double " + key + " default: " + def);
                 optionalParams.put(key, new OptionalParam(Double.class, def));
                 return getConfigValue(key, def, Double.class);
             case BLOCKED:
@@ -572,7 +572,7 @@ public class SkillConfigurator implements ISkillConfigurator {
     public String requestValue(String key) throws ConfigurationException {
         switch (phase) {
             case CONFIG:
-                logger.debug("request value " + key);
+                logger.debug("request value '" + key + "'");
                 requiredParams.put(key, String.class);
                 return getConfigValue(key, "", String.class);
             case BLOCKED:
@@ -587,7 +587,7 @@ public class SkillConfigurator implements ISkillConfigurator {
     public String requestOptionalValue(String key, @NotNull String def) throws ConfigurationException {
         switch (phase) {
             case CONFIG:
-                logger.debug("request value " + key + " default:" + def);
+                logger.debug("request value '" + key + "' default:'" + def + "'");
                 optionalParams.put(key, new OptionalParam(String.class, def));
                 return getConfigValue(key, def, String.class);
             case BLOCKED:
@@ -602,7 +602,7 @@ public class SkillConfigurator implements ISkillConfigurator {
     public boolean requestBool(String key) throws ConfigurationException {
         switch (phase) {
             case CONFIG:
-                logger.debug("request bool " + key);
+                logger.debug("request bool '" + key + "'");
                 requiredParams.put(key, Boolean.class);
                 return getConfigValue(key, false, Boolean.class);
             case BLOCKED:
@@ -616,7 +616,7 @@ public class SkillConfigurator implements ISkillConfigurator {
     public boolean requestOptionalBool(String key, boolean def) throws ConfigurationException {
         switch (phase) {
             case CONFIG:
-                logger.debug("request bool " + key + " default:" + def);
+                logger.debug("request bool '" + key + "' default: '" + def + "'");
                 optionalParams.put(key, new OptionalParam(Boolean.class, def));
                 return getConfigValue(key, def, Boolean.class);
             case BLOCKED:
