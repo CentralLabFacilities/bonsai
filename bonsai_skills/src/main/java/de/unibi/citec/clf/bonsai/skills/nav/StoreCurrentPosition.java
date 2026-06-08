@@ -61,7 +61,7 @@ public class StoreCurrentPosition extends AbstractSkill {
                 logger.error("position data from position sensor was null");
                 return false;
             }
-            logger.info("Read current position from memory: " + posData.toString());
+            logger.info("Read current position from sensor: " + posData.toString());
         } catch (IOException | InterruptedException e) {
             logger.error("Could not read from position sensor");
             return false;
