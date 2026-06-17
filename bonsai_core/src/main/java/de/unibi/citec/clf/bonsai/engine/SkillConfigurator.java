@@ -359,8 +359,6 @@ public class SkillConfigurator implements ISkillConfigurator {
             logger.error("Slot \"" + slotName + "\" requested twice");
             exceptions.add(new SkillConfigurationException("A slot for name \"" + slotName + "\" was already requested."));
         }
-
-
     }
 
     private <T> Sensor<T> getCheckedSensor(String sensorName, Class<T> dataType) throws SkillConfigurationException {
