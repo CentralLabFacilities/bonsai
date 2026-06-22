@@ -11,6 +11,9 @@ import de.unibi.citec.clf.btl.units.AngleUnit;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 import de.unibi.citec.clf.btl.units.UnitConverter;
 
+import java.util.Arrays;
+import java.util.NoSuchElementException;
+
 /**
  * Domain class for LaserData of BonSAI. The currently mounted Laser has a
  * resolution of 0.5 degrees and scans an angle of 180 degrees in front of the
@@ -258,6 +261,47 @@ public class LaserData extends StampedType {
         value = value / (double) count;
 
         return value;
+    }
+
+    public double getMinimalScanValue(double angle, double widthAngle,
+                                      AngleUnit au, LengthUnit lu)
+            throws OutOfRangeException {
+
+        double value = Double.MAX_VALUE;
+
+        angle = UnitConverter.convert(angle, au, AngleUnit.RADIAN);
+        widthAngle = UnitConverter.convert(widthAngle, au, AngleUnit.RADIAN);
+
+        double startAngle = angle - widthAngle / 2.0;
+        double endAngle = angle + widthAngle / 2.0;
+
+        // make window smaller if it exceeds the laser's range.
+        double sideAngle = widthAngle / 2.0;
+        if (startAngle < -sideAngle) {
+            startAngle = -sideAngle;
+        }
+        if (endAngle > sideAngle) {
+            endAngle = sideAngle;
+        }
+
+        logger.debug("get min dist between angles: " + startAngle + " and " + endAngle);
+
+        int scanNumStart = LaserInfo.calcScanIndex(scanAngle, scanValues.length, startAngle);
+        int scanNumEnd = LaserInfo.calcScanIndex(scanAngle, scanValues.length, endAngle);
+
+        try {
+            value = Arrays.stream(getScanValues(lu))
+                    .skip(scanNumStart)
+                    .limit(scanNumEnd - scanNumStart + 1)
+                    .min()
+                    .orElseThrow();
+        } catch (NoSuchElementException e) {
+            throw new OutOfRangeException("could not calculate min");
+        }
+
+        value = UnitConverter.convert(value, iLU, lu);
+        return value;
+
     }
 
     public double getScanAngle(AngleUnit unit) {
