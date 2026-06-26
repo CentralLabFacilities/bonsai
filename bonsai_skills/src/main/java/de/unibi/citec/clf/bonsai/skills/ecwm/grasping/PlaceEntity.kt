@@ -26,6 +26,7 @@ import java.util.concurrent.Future
  *      frame_id: The frame id in which the object should be placed.
  *      upright: default is false, otherwise the object is placed such that it wont spill anything
  *      acceptable_margin: acceptable margin of error for the placement. Default is 0.15m
+ *      keep_scene: do not update planning scene
  *
  * Slots:
  *  AttachedEntity: [Entity] (Read)
@@ -58,7 +59,9 @@ class PlaceEntity : AbstractSkill() {
     private val KEY_ACCEPTABLE_MARGIN = "acceptable_margin"
     private val KEY_UPSIDE_DOWN = "upside_down"
     private val KEY_UPRIGHT = "upright_place"
+    private val KEY_KEEP_SCENE = "keep_scene"
 
+    private var keepScene = false
     private var flip = false
     private var upright = false
 
@@ -90,6 +93,8 @@ class PlaceEntity : AbstractSkill() {
         ecwm = configurator.getActuator("ECWMGrasping", ECWMGrasping::class.java)
 
         slot = configurator.getReadSlot("AttachedEntity", Entity::class.java)
+
+        keepScene = configurator.requestOptionalBool(KEY_KEEP_SCENE, keepScene)
 
         if(configurator.hasConfigurationKey(KEY_POSE_X) || configurator.hasConfigurationKey(KEY_POSE_Y)) {
             pose_x = configurator.requestDouble(KEY_POSE_X)
@@ -133,9 +138,9 @@ class PlaceEntity : AbstractSkill() {
         fur = if (own_margin) {
             val min_dist = Point3D(-placement_margin, -placement_margin, -0.02, LengthUnit.METER)
             val max_dist = Point3D(placement_margin, placement_margin, max_z_offset, LengthUnit.METER)
-            ecwm?.placeEntity(entity, pose, flip, min_dist, max_dist, upright)
+            ecwm?.placeEntity(entity, pose, flip, min_dist, max_dist, upright, keepScene = keepScene)
         } else {
-            ecwm?.placeEntity(entity, pose, flip, upright)
+            ecwm?.placeEntity(entity, pose, flip, upright, keepScene = keepScene)
         }
         return fur != null
     }
