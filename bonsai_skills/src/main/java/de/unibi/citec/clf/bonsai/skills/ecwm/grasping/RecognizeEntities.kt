@@ -34,6 +34,8 @@ import java.util.concurrent.Future
  *                              -> use Spirit instead of entity/storage
  *  #_padding           [Double] Optional (default: 0.05)
  *                              -> Padding around storage (x/y)
+ *  #_add_plane:        [String] Optional (default: false)
+ *                              -> Add a Plane at storage bottom to planning scene
  *
  * Slots:
  *  Entity: [Entity] (Read Optional)
@@ -69,8 +71,10 @@ class RecognizeEntities : AbstractSkill() {
     private val KEY_FAST = "#_fast_pose"
     private val KEY_USE_SPIRIT = "#_spirit"
     private val KEY_PADDING = "#_padding"
+    private val KEY_ADD_PLANE = "#_add_plane"
 
     //defaults
+    private var addPlane = false
     private var padding = 0.05f
     private var fast = false
     private var clear = true
@@ -95,6 +99,7 @@ class RecognizeEntities : AbstractSkill() {
         tokenSuccessSome = configurator.requestExitToken(ExitStatus.SUCCESS().ps("some"))
         tokenSuccessNone = configurator.requestExitToken(ExitStatus.SUCCESS().ps("none"))
 
+        addPlane = configurator.requestOptionalBool(KEY_ADD_PLANE,addPlane)
         padding = configurator.requestOptionalDouble(KEY_PADDING, padding.toDouble()).toFloat()
         store = configurator.requestOptionalBool(KEY_STORE, store)
         clear = configurator.requestOptionalBool(KEY_CLEAR, clear)
@@ -139,7 +144,8 @@ class RecognizeEntities : AbstractSkill() {
             fastPose = fast,
             addEntities = store,
             clearStorage = clear,
-            padding = padding
+            padding = padding,
+            addPlane = addPlane
         )
         return fur != null
     }

@@ -23,7 +23,7 @@ interface ECWMGrasping : Actuator {
      * @param addEntities add all recognized entities to the world model
      */
     @Throws(IOException::class)
-    fun recognizeObjects(entity: Entity, storage: String, minProb: Double, fastPose: Boolean = false, addEntities: Boolean = false, clearStorage : Boolean = true, padding : Float = 0.05f): Future<EntityList?>
+    fun recognizeObjects(entity: Entity, storage: String, minProb: Double, fastPose: Boolean = false, addEntities: Boolean = false, clearStorage : Boolean = true, padding : Float = 0.05f, addPlane : Boolean = false): Future<EntityList?>
 
     /**
      * Recognizes objects in view
