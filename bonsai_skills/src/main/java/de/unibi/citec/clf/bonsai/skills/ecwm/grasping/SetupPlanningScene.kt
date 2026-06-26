@@ -91,7 +91,7 @@ class SetupPlanningScene : AbstractSkill() {
             }
             val point = Point3DStamped().apply {frameId = "${s.entity.id}/${s.storage}"}
             val z = coordTransformer?.transform(point, "map")?.getZ(LengthUnit.METER)
-            height = z?.toFloat()?.minus(0.01f)
+            height = z?.toFloat()
             logger.info("spawning plane @${height}m (calculated using ${s.entity.id}/${s.storage}")
         }
 
