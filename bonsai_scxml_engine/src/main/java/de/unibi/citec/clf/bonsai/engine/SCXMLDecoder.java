@@ -51,6 +51,10 @@ public class SCXMLDecoder {
      * @return
      */
     public static SCXML parseSCXML(File scxml, Map<String, String> includeMapping) throws TransformerException {
+        return parseSCXML(scxml, includeMapping, new SCXMLReader.Configuration());
+
+    }
+    public static SCXML parseSCXML(File scxml, Map<String, String> includeMapping, SCXMLReader.Configuration conf) throws TransformerException {
         String transformed = transformSCXML(scxml, includeMapping);
         InputSource is = new InputSource(new StringReader(transformed));
         is.setEncoding("UTF-16");
@@ -66,7 +70,7 @@ public class SCXMLDecoder {
         logger.debug(transformed);
 
         is = new InputSource(new StringReader(transformed));
-        return parseSCXML(is);
+        return parseSCXML(is, conf);
 
     }
 
@@ -79,15 +83,20 @@ public class SCXMLDecoder {
      * @return the scxml as SCXML
      * @throws TransformerException something went wrong
      */
-    public static SCXML parseSCXML(InputSource in) throws TransformerException { try {
-            SCXML parsed = SCXMLReader.read(in.getCharacterStream());
+    public static SCXML parseSCXML(InputSource in) throws TransformerException {
+        return parseSCXML(in, new SCXMLReader.Configuration());
+    }
+
+    public static SCXML parseSCXML(InputSource in, SCXMLReader.Configuration conf) throws TransformerException {
+        try {
+            SCXML parsed = SCXMLReader.read(in.getCharacterStream(), conf);
             return parsed;
         } catch (IOException | ModelException ex) {
             logger.error(ex.getMessage());
             throw new TransformerException(ex);
-    } catch (XMLStreamException e) {
-        throw new RuntimeException(e);
-    }
+        } catch (XMLStreamException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /**
