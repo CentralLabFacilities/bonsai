@@ -47,14 +47,14 @@ interface ECWMGrasping : Actuator {
      * Place an ECWM Entity somewhere inside the target entities storage
      */
     @Throws(IOException::class)
-    fun placeEntity(target_entity: Entity, targetStorage: String, attachedEntity: Entity? = null, upright: Boolean = false): Future<ManipulationActuator.MoveitResult?>
+    fun placeEntity(target_entity: Entity, targetStorage: String, attachedEntity: Entity? = null, upright: Boolean = false, keepScene: Boolean = false): Future<ManipulationActuator.MoveitResult?>
 
     /**
      * Place an ECWM Entity somewhere near the target pose
      */
     @Throws(IOException::class)
-    fun placeEntity(attached_entity: Entity?, pose: Pose3D, flip: Boolean, min_dist : Point3D?, max_dist : Point3D?, upright: Boolean = false, topdown: Boolean = false): Future<ManipulationActuator.MoveitResult?>
-    fun placeEntity(attached_entity: Entity?, pose: Pose3D, flip: Boolean, upright: Boolean = false): Future<ManipulationActuator.MoveitResult?>
+    fun placeEntity(attached_entity: Entity?, pose: Pose3D, flip: Boolean, min_dist : Point3D?, max_dist : Point3D?, upright: Boolean = false, topdown: Boolean = false, keepScene: Boolean = false): Future<ManipulationActuator.MoveitResult?>
+    fun placeEntity(attached_entity: Entity?, pose: Pose3D, flip: Boolean, upright: Boolean = false, keepScene: Boolean = false): Future<ManipulationActuator.MoveitResult?>
 
     /**
      * Wipe an area at the target entity (e.g. table)
