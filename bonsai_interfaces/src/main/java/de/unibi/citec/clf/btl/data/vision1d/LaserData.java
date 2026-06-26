@@ -293,6 +293,7 @@ public class LaserData extends StampedType {
             value = Arrays.stream(getScanValues(lu))
                     .skip(scanNumStart)
                     .limit(scanNumEnd - scanNumStart + 1)
+                    .filter(Double::isFinite)
                     .min()
                     .orElseThrow();
         } catch (NoSuchElementException e) {
