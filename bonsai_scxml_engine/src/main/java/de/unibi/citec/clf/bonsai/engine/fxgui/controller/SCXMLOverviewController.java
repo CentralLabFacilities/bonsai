@@ -260,7 +260,7 @@ public class SCXMLOverviewController implements IStateListener {
             try {
                 ret = remote.load(textConfig.getText(), textScxml.getText(), includeMapping, force);
             } catch (Exception e) {
-                ret = "Parsing Error:\n" + e.getMessage();
+                ret = "Parsing Error: (" + e.getClass() + ")\n" + e.getMessage();
                 logger.fatal("Loading Error: " + e.getMessage());
             }
 

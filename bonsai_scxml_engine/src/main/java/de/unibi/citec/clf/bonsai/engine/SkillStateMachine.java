@@ -16,6 +16,7 @@ import de.unibi.citec.clf.bonsai.engine.communication.SCXMLServer;
 import de.unibi.citec.clf.bonsai.engine.communication.StateChangePublisher;
 import de.unibi.citec.clf.bonsai.engine.communication.StatemachineStatus;
 import de.unibi.citec.clf.bonsai.engine.config.SkillStateMachineConfig;
+import de.unibi.citec.clf.bonsai.engine.scxml.BonsaiActionProvider;
 import de.unibi.citec.clf.bonsai.engine.scxml.BonsaiTransition;
 import de.unibi.citec.clf.bonsai.engine.scxml.SCXMLSkillRunner;
 import de.unibi.citec.clf.bonsai.engine.scxml.SkillExceptionHandler;
@@ -30,6 +31,7 @@ import de.unibi.citec.clf.bonsai.util.helper.ListClass;
 import org.apache.commons.scxml2.*;
 import org.apache.commons.scxml2.env.SimpleErrorReporter;
 import org.apache.commons.scxml2.env.jexl.JexlEvaluator;
+import org.apache.commons.scxml2.io.SCXMLReader;
 import org.apache.commons.scxml2.model.*;
 import org.apache.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
@@ -277,7 +279,12 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
         pathToConfig = pathToConfig.replaceFirst("^~/", System.getProperty("user.home"));
         lastPathToTask = pathToTask;
         lastPathToConfig = pathToConfig;
-        scxml = SCXMLDecoder.parseSCXML(new File(pathToTask), includeMapping);
+        var actions = BonsaiActionProvider.getActions();
+        logger.info("Loaded " + actions.size() + " custom actions: \n "
+                + actions.stream().map(it -> it.getNamespaceURI() + " >> " + it.getLocalName()).collect(Collectors.joining("\n ")) +
+                "\n");
+        SCXMLReader.Configuration conf = new SCXMLReader.Configuration(null, null, actions);
+        scxml = SCXMLDecoder.parseSCXML(new File(pathToTask), includeMapping, conf);
         if (scxml == null) {
             LoadingException e = new LoadingException(
                     "Error while decoding/parsing SCXML file.");
