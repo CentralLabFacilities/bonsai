@@ -260,6 +260,9 @@
         <xsd:attribute name="initial" type="bonsai.scxml.id"/>
         <xsd:attribute name="src" type="xsd:anyURI"/>
         <xsd:attributeGroup ref="scxml.extra.attribs"/>
+        <xsd:attribute name="final"
+                       type="Boolean.datatype"
+                       default="false"/>
     </xsd:attributeGroup>
 
 
@@ -661,7 +664,7 @@
         <xsd:attribute name="expr" type="ValueLang.datatype" use="required"/>
         <xsd:attribute default="replacechildren" name="type" type="AssignType.datatype"/>
         <xsd:attribute name="attr" type="xsd:NMTOKEN"/>
-        <xsd:attribute name="name" type="xsd:NCName" use="required"/>
+        <xsd:attribute name="name" type="xsd:NCName"/>
         <xsd:attributeGroup ref="scxml.extra.attribs"/>
     </xsd:attributeGroup>
     <xsd:group name="scxml.assign.content">
