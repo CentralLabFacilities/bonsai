@@ -28,15 +28,15 @@ import java.util.concurrent.Future
  *  use_model_slot:     [Boolean] Use Model instead of Entity (default: False)
  *
  * Slots:
- *  Entity      [Entity] Optional, Uses this slot to get the entity if `type` option is not set
- *  Model       [Model] Optional, Uses this slot to get the modeltype if `use_model_slot` is set
- *  Type        [String] Optional, Use this if option `type_from_string` is set
- *  Value:      [String] The Attribute Value
+ *  Entity      [Entity] [Read] Optional, Uses this slot to get the entity if `type` option is not set
+ *  Model       [Model] [Read] Optional, Uses this slot to get the modeltype if `use_model_slot` is set
+ *  Type        [String] [Read] Optional, Use this if option `type_from_string` is set
+ *  Value:      [String] [Write] The Attribute Value
  *
  * ExitTokens:
  *  Error.missing:        does not have the requested attribute
  *  Error.multiple:       does have multiple values for the requested attribute
- *
+ *  success:            Requested attribute was found and its value was stored successfully
  * </pre>
  *
  * @author lruegeme

@@ -17,8 +17,38 @@ import de.unibi.citec.clf.btl.units.AngleUnit;
 import de.unibi.citec.clf.btl.units.LengthUnit;
 
 import java.io.IOException;
-
 /**
+ * Creates a navigation goal for a person and stores it in a NavigationGoalDataSlot.
+ *
+ *
+ * <pre>
+ *
+ * Options:
+ *  #_STOP_DISTANCE:       [double] Optional (default: 1000)
+ *                          -> Distance in mm to keep from the person.
+ *
+ * Slots:
+ *  PersonDataSlot:         [PersonData] [Read]
+ *                          -> Person whose position is used as the navigation goal.
+ *
+ *  NavigationGoalDataSlot: [NavigationGoalData] [Write]
+ *                          -> Slot in which the generated navigation goal
+ *                             is stored.
+ *
+ * ExitTokens:
+ *  success:
+ *                          -> Navigation goal was successfully created.
+ *
+ * Sensors:
+ *  PositionSensor:         [Pose2D]
+ *                          -> Provides the current robot position, which is
+ *                             used to calculate the person's position
+ *                             relative to the robot.
+ *
+ * Actuators:
+ *
+ * </pre>
+ *
  * @author lruegeme
  */
 public class SetPersonAsNavigationGoal extends AbstractSkill {

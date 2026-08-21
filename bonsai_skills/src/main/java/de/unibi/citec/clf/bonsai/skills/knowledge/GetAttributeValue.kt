@@ -19,12 +19,13 @@ import java.util.concurrent.ExecutionException
  *  attribute:          [String] The attribute key
  *
  * Slots:
- *  Attributes  [Attributes] Attributes
- *  Value:      [String] The Attribute Value
+ *  Attributes  [Attributes] [Read] Attributes
+ *  Value:      [String] [Write] The Attribute Value
  *
  * ExitTokens:
- *  Error.missing:        does not have the requested attribute
- *  Error.multiple:       does have multiple values for the requested attribute
+ *  success:                Attribute value was successfully retrieved and stored.
+ *  error.missing:          The requested attribute does not exist.
+ *  error.multiple:         The requested attribute has multiple values and error_on_multiple is enabled.
  *
  * </pre>
  *

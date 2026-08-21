@@ -10,13 +10,73 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
 import de.unibi.citec.clf.btl.data.geometry.Point3DStamped
 import de.unibi.citec.clf.btl.units.LengthUnit
 import java.util.concurrent.Future
-
 /**
  * Turn head towards a Pose.
  *
+ * The target point can either be provided directly through configuration
+ * options or read from the Point memory slot. If any of the point-related
+ * configuration options (#_X, #_Y, #_Z, #_FRAMEID) are present, the point
+ * is constructed from the configured values and the Point slot is not used.
+ *
+ * The Skill can operate in blocking or non-blocking mode. In blocking mode,
+ * it waits until the gaze movement has finished or the configured timeout
+ * has been reached.
+ *
+ * <pre>
+ *
+ * Options:
+ * #_ACTUATOR             [String] Optional (default: GazeActuator)
+ *      -> Name of the GazeActuator used to control the robot's gaze.
+ *
+ * #_TIMEOUT              [int] Optional (default: 4000)
+ *      -> Maximum waiting time in milliseconds.
+ *      -> A value less than or equal to 0 disables the timeout.
+ *
+ * #_MIN_DURATION         [int] Optional (default: 0)
+ *      -> Minimum duration of the gaze movement in milliseconds.
+ *
+ * #_MAX_VELOCITY         [double] Optional (default: 1.0)
+ *      -> Maximum velocity used for the gaze movement.
+ *
+ * #_BLOCKING             [boolean] Optional (default: true)
+ *      -> Whether the Skill waits for the gaze movement to finish.
+ *      -> If false, the Skill returns success immediately after starting
+ *         the gaze movement.
+ *
+ * #_FRAMEID              [String] Optional
+ *      -> Reference frame of the target point.
+ *      -> Used together with #_X, #_Y and #_Z when specifying the point
+ *         through configuration.
+ *
+ * #_X                    [double] Optional (default: 0.0)
+ *      -> X coordinate of the target point in meters.
+ *
+ * #_Y                    [double] Optional (default: 0.0)
+ *      -> Y coordinate of the target point in meters.
+ *
+ * #_Z                    [double] Optional (default: 0.0)
+ *      -> Z coordinate of the target point in meters.
+ *
+ * Slots:
+ * Point: [Point3DStamped] (Read, Optional)
+ *      -> Memory slot containing the point the robot should look at.
+ *      -> This slot is used only when none of the point configuration
+ *         options (#_X, #_Y, #_Z, #_FRAMEID) are specified.
+ *
+ * ExitTokens:
+ * success:               Gaze movement successfully started or completed
+ * error.timeout:         Gaze movement did not finish within the configured timeout
+ *
+ * Sensors:
+ *
+ * Actuators:
+ *  GazeActuator
+ *      -> Used to move the robot's gaze towards the target point.
+ *
+ * </pre>
+ *
  * @author lruegeme
  */
-
 class LookToPoint : AbstractSkill() {
     private var actuator = "GazeActuator"
     private var blocking = true

@@ -14,7 +14,41 @@ import de.unibi.citec.clf.btl.units.LengthUnit;
 import static de.unibi.citec.clf.btl.units.LengthUnit.METER;
 
 /**
- * Use this state to wait until the door opens.
+ * Waits until a door is detected as open based on a change in the
+ * average laser distance in front of the robot.
+ *
+ * <pre>
+ *
+ * Options:
+ *  #_TIMEOUT:  [int] Optional (Default: -1)
+ *                          -> Maximum time to wait for the door to open in ms.
+ *                          -> If greater than 0, the skill returns
+ *                             error.timeout when the timeout is reached.
+ *
+ *  #_DIFF:  [double] Optional (Default: 1.5)
+ *                          -> Minimum increase in average laser distance
+ *                             in meters required to detect that the door
+ *                             has opened.
+ *
+ * Slots:
+ *
+ * ExitTokens:
+ *  success:
+ *      Door was detected as open.
+ *
+ *  error.timeout:
+ *      Timeout was reached before the door opened.
+ *      Only available when #_TIMEOUT is greater than 0.
+ *
+ * Sensors:
+ *  LaserSensor:        [LaserData]
+ *                          -> Used to measure the average laser distance
+ *                             in front of the robot and detect a change
+ *                             indicating that the door has opened.
+ *
+ * Actuators:
+ *
+ * </pre>
  *
  * @author nkoester
  * @author lkettenb

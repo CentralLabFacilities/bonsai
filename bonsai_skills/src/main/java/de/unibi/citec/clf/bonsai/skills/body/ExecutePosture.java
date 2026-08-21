@@ -9,13 +9,36 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-
 /**
  * Executes a prerecorded movement.
- * 
+ * <pre>
+ *
+ * Options:
+ * #_BLOCKING             [boolean] Optional (default: true)
+ *      -> Whether to wait until the movement has finished.
+ *      -> If false, the Skill returns immediately after starting the movement.
+ *
+ * #_POSE                 [String] Required
+ *      -> Name of the prerecorded movement to execute.
+ *
+ * #_TIMEOUT              [long] Optional (default: 10000)
+ *      -> Maximum waiting time in milliseconds when #_BLOCKING is true.
+ *      -> If the timeout is reached, the Skill returns a fatal exit.
+ *
+ * Slots:
+ *
+ * ExitTokens:
+ * success:               Movement successfully started or completed
+ *
+ * Sensors:
+ *
+ * Actuators:
+ *  PostureActuator
+ *      -> Used to execute the prerecorded movement.
+ *
+ * </pre>
+ *
  * @author lruegeme
- *
- *
  */
 public class ExecutePosture extends AbstractSkill {
 

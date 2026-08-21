@@ -7,36 +7,49 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitStatus
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
 import de.unibi.citec.clf.btl.data.world.EntityList
-
 /**
- * Filter an [EntityList] by type
+ * Filters an [EntityList]  by the model type of each entity.
+ *
  *
  * <pre>
  *
  * Options:
- *  #_PATTERN   [String] (Optional):
- *      -> (RegEx) for the entity types
- *  #_INVERT    [Boolean] (default: False):
- *      -> invert matches
- *  #_REGEX     [Boolean] (default True):
- *      -> use Regex to match
+ *  #_PATTERN:          [String] Optional
+ *                      -> Pattern used to match the entity model types.
+ *                      -> If not configured, the pattern is read from
+ *                         the Pattern slot.
+ *
+ *  #_INVERT:           [Boolean] Optional (Default: false)
+ *                      -> Invert the matching result.
+ *                      -> If true, matching entities are removed and
+ *                         non-matching entities are kept.
+ *
+ *  #_REGEX:            [Boolean] Optional (Default: true)
+ *                      -> Interpret #_PATTERN as a regular expression.
+ *                      -> If false, the pattern is compared directly
+ *                         with the entity model name.
  *
  * Slots:
- *  Pattern         [String] (Optional, Read):
- *      -> RegEx for the entity types, used if #_PATTERN is not set
- *  EntityList            [EntityList] (Read):
- *      -> Slot for the list that should be filtered
- *  FilteredEntities    [EntityList] (Write):
- *      -> The Filtered Output
+ *  Pattern:            [String] [Read] Optional
+ *                      -> Pattern used to filter entity types.
+ *                      -> Used when #_PATTERN is not configured.
  *
+ *  EntityList:         [EntityList] [Read]
+ *                      -> Input list of entities that shall be filtered.
+ *
+ *  FilteredEntities:   [EntityList] [Write]
+ *                      -> Output list containing the entities that
+ *                         passed the filter.
  *
  * ExitTokens:
- *  success.empty:
- *      -> Filtered is empty
- *  success.notEmpty:
- *      -> Filtered is not empty
+ *  success.empty:      The filtering completed and the resulting list
+ *                      is empty.
+ *
+ *  success.notEmpty:   The filtering completed and the resulting list
+ *                      contains at least one entity.
  *
  * </pre>
+ *
  * @author lruegeme, lgraesner
  */
 class FilterEntityListByType : AbstractSkill() {

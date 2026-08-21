@@ -21,9 +21,9 @@ import java.util.concurrent.Future
  *                  -> Entity id to fetch goals from
  *
  * Slots:
- *  Entity:   [de.unibi.citec.clf.btl.data.world.Entity] Optional
+ *  Entity:   [de.unibi.citec.clf.btl.data.world.Entity] [Read] Optional
  *                  -> Entity to retrieve storages from, used if the 'entity' option is not set
- *  Storages [de.unibi.citec.clf.btl.data.ecwm.StorageList]
+ *  Storages  [de.unibi.citec.clf.btl.data.ecwm.StorageList] [Write]
  *                  -> A list of present storages
  *
  * ExitTokens:

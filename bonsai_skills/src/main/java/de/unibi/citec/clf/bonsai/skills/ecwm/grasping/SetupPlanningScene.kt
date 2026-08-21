@@ -14,29 +14,44 @@ import de.unibi.citec.clf.btl.data.geometry.Pose3D
 import de.unibi.citec.clf.btl.units.LengthUnit
 
 import java.util.concurrent.Future
-
 /**
  * Setup the planning scene by adding Entities known to the World Model
  *
  * <pre>
  *
  * Options:
- *  clear:              [Boolean] (Default: true)
- *                  -> clear before adding
- *  clear_attached:     [Boolean] (Default: false)
- *                  -> Also clear attached objects
- *  no_objects:         [Boolean] (Default false)
- *                  -> Do not add graspable objects
- *  distance:           [Double] (Default 2.0)
- *                  -> Max distance to added entities
- *  safety_plane        [Boolean] (Default false)
- *                  -> read Spirit from slot and add a plane at height z-0.01
- *                      where z is from the transform of
- *                          (0,0,0) frame=${spirit.entity.id}/${spirit.storage} -> map
+ *  clear:              [boolean] Optional (Default: true)
+ *                      -> Clear the planning scene before adding entities.
+ *
+ *  clear_attached:     [boolean] Optional (Default: false)
+ *                      -> Also clear objects attached to the robot.
+ *
+ *  no_objects:         [boolean] Optional (Default: false)
+ *                      -> Do not add graspable objects to the planning scene.
+ *
+ *  distance:           [double] Optional (Default: 2.0)
+ *                      -> Maximum distance from the robot for entities
+ *                         to be added to the planning scene.
+ *
+ *  safety_plane:       [boolean] Optional (Default: false)
+ *                      -> If enabled, calculate the height of a safety plane
+ *                         using the Spirit slot and coordinate transformation.
  *
  * Slots:
- *  Spirit:             [Spirit] (Read Optional)
- *                  -> read if safety_plane is true
+ *  Spirit: [Spirit] [Read]
+ *      -> Memory slot containing the current Spirit information.
+ *      -> Only required when safety_plane is enabled.
+ *      -> The entity and storage information is used to calculate the
+ *         height of the safety plane.
+ *
+ * ExitTokens:
+ *  success:            Planning scene successfully set up
+ *
+ * Sensors:
+ *
+ * Actuators:
+ *  ECWMGrasping: [ECWMGrasping]
+ *      -> Used to configure the planning scene and add nearby entities.
  *
  * </pre>
  *

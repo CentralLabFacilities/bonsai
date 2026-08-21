@@ -15,6 +15,28 @@ import de.unibi.citec.clf.btl.data.speech.NLUEntity
 import java.lang.StringBuilder
 
 /**
+ * Convert a tool call Message into an NLU object.
+ *
+ * <pre>
+ *
+ * Options:
+ * #_SPLIT_PARAMETER      [boolean] Optional (default: true)
+ *      -> Whether to split tool parameter names at the first underscore.
+ *      -> The part before the underscore is used as the entity key.
+ *      -> The part after the underscore is used as the entity role.
+ *
+ * Slots:
+ * replyMessage: [Message] (Read)
+ *      -> Memory slot containing the tool call Message.
+ *      -> The Message must have the TOOL_CALL role.
+ *
+ * NLUSlot: [NLU] (Write)
+ *      -> Memory slot where the resulting NLU object is stored.
+ *
+ * ExitTokens:
+ * success:              Tool call successfully converted to an NLU object
+
+ * </pre>
  *
  * @author lruegeme
  */

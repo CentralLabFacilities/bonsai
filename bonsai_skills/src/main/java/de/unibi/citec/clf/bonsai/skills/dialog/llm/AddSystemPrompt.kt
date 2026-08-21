@@ -9,6 +9,27 @@ import de.unibi.citec.clf.btl.data.speech.llm.Message
 import de.unibi.citec.clf.btl.data.speech.llm.MessageList
 import de.unibi.citec.clf.btl.data.speech.llm.Role
 
+/**
+ * Add a system prompt to a conversation history.
+ *
+ * <pre>
+ *
+ * Options:
+ * #_PROMPT              [String] Required
+ *      -> The system prompt that shall be added to the conversation history.
+ *
+ * Slots:
+ * history: [MessageList] (Read, Write)
+ *      -> Memory slot containing the conversation history.
+ *      -> The system prompt is added as a SYSTEM message to this history.
+ *
+ * ExitTokens:
+ * success:               System prompt successfully added to the history
+ * </pre>
+ *
+ * @author
+ */
+
 class AddSystemPrompt : AbstractSkill() {
 
     companion object {

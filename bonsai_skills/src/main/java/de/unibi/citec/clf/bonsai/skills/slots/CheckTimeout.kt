@@ -11,6 +11,22 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
 /**
  * Compares the time against a timeout
  *
+ * <pre>
+ *
+ * Options:
+ *  #_TIMEOUT:          [int] Optional (Default: 1000)
+ *                          -> Timeout duration in milliseconds.
+ *                          -> The stored timestamp is considered timed out
+ *                             when the current time is greater than the
+ *                             stored timestamp plus this timeout.
+ *
+ * ExitTokens:
+ *  success.timeout:
+ *      The configured timeout has elapsed.
+ *
+ *  success.good:
+ *      The configured timeout has not elapsed yet.
+ *
  */
 class CheckTimeout : AbstractSkill() {
     private var timeout: Long = 1000

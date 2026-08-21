@@ -39,8 +39,6 @@ import java.io.IOException;
  *  success:    Drive finished successfully
  *  error:      Drive failed
  *
- * Sensors:
- *
  *
  * Actuators:
  *  NavigationActuator: [NavigationActuator]

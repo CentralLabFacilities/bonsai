@@ -9,13 +9,32 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-
 /**
- * Checks for a prerecorded pose.
- * 
+ * Check whether the robot is currently in a specified prerecorded pose.
+ * <pre>
+ *
+ * Options:
+ * #_POSE                 [String] Required
+ *      -> Name of the prerecorded pose to check.
+ *
+ * #_GROUP                [String] Optional (default: null)
+ *      -> Name of the planning group to use when checking the pose.
+ *
+ * Slots:
+ *
+ * ExitTokens:
+ * success.yes:           Robot is currently in the requested pose
+ * success.no:            Robot is not currently in the requested pose
+ *
+ * Sensors:
+ *
+ * Actuators:
+ *  PostureActuator
+ *      -> Used to check whether the robot is in the requested pose.
+ *
+ * </pre>
+ *
  * @author lruegeme
- *
- *
  */
 public class HasPosture extends AbstractSkill {
 

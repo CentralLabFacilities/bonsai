@@ -9,9 +9,38 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
 import de.unibi.citec.clf.btl.data.world.Entity
 import de.unibi.citec.clf.btl.data.world.EntityList
 import java.util.concurrent.Future
-
 /**
  * Add entities to the world
+ * <pre>
+ *
+ * Options:
+ * LIST                    [boolean] Optional (default: false)
+ *      -> Specifies whether to add a single Entity or a list of Entities.
+ *      -> If false, the Entity slot is used.
+ *      -> If true, the EntitiesIn slot is used.
+ *
+ * Slots:
+ * Entity: [Entity] (Read, Conditional)
+ *      -> Memory slot containing the Entity to be added to the world model.
+ *      -> Used when LIST is false.
+ *
+ * EntitiesIn: [EntityList] (Read, Conditional)
+ *      -> Memory slot containing the list of Entities to be added to the
+ *         world model.
+ *      -> Used when LIST is true.
+ *
+ * ExitTokens:
+ * success: Entities successfully added to the world model
+ *
+ * Sensors:
+ *
+ * Actuators:
+ *  ECWMCore: [WorldModel]
+ *      -> Used to add the Entities to the world model.
+ *
+ * </pre>
+ *
+ * @author
  */
 class SpawnEntities : AbstractSkill() {
 

@@ -12,19 +12,34 @@ import de.unibi.citec.clf.btl.units.LengthUnit
 import java.util.concurrent.Future
 
 /**
+ * Starts tracking a person based on the person data stored in memory.
+ *
+ * The tracking target is normally calculated from the person's position.
+ * If a valid head position is available, the head position is used instead.
  *
  * <pre>
  *
+ *
+ * Slots:
+ *  PersonDataSlot:      [PersonData] [Read]
+ *                          -> Person whose position shall be used as the
+ *                             tracking target.
+ *
  * ExitTokens:
- *   error:              did not find a person to track
- *   success:            all good
+ *  success:
+ *      Person tracking was started successfully.
+ *
+ *  error:
+ *      The tracking actuator could not find a person close to the
+ *      specified tracking position.
+ *
+ * Sensors:
  *
  * Actuators:
- *   ClfTracker: [TrackingActuator]
- *      -> Called to start tracking
+ *  ClfTracker:          [TrackingActuator]
+ *                          -> Used to start tracking the person.
  *
  * </pre>
- *
  *
  * @author lruegeme
  */

@@ -11,24 +11,44 @@ import de.unibi.citec.clf.btl.data.world.Entity
 import de.unibi.citec.clf.btl.data.world.EntityList
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Future
-
 /**
- * Gets all Entities in the given Room
+ * Gets all Entities located in the given room and stores them in an EntityList.
  *
  * <pre>
  *
  * Options:
- *  room:               [String] Optional (default: "")
- *  objects:            [Boolean] Optional include GraspeableObjects (default: False)
- *  rooms:              [Boolean] Optional include Rooms (default: False)
+ *  room:               [String] Optional
+ *                      -> ID of the room whose entities shall be retrieved.
+ *                      -> If not configured, the room is read from the
+ *                         RoomEntity slot.
+ *
+ *  objects:            [Boolean] Optional (Default: false)
+ *                      -> Include graspable objects located in the room.
+ *
+ *  rooms:              [Boolean] Optional (Default: false)
+ *                      -> Include rooms in the resulting EntityList.
  *
  * Slots:
- *  RoomEntity          [de.unibi.citec.clf.btl.data.world.Entity] Uses this slot to get room if not set with datamodel
- *  EntityList:         [de.unibi.citec.clf.btl.data.world.EntityList]
+ *  RoomEntity:         [de.unibi.citec.clf.btl.data.world.Entity] [Read] Optional
+ *                      -> Entity representing the room to query.
+ *                      -> Used when the "room" option is not configured.
+ *
+ *  EntityList:          [de.unibi.citec.clf.btl.data.world.EntityList] [Write]
+ *                      -> Memory slot in which the entities found in the
+ *                         room are stored.
  *
  * ExitTokens:
- *  success:        Got Entities
- *  error.empty:    No Matching Entities found
+ *  success:            Entities were successfully retrieved and the
+ *                      resulting list contains at least one entity.
+ *
+ *  error.empty:        No matching entities were found in the room.
+ *
+ * Sensors:
+ *
+ * Actuators:
+ *  ECWMSpirit:         [ECWMSpirit]
+ *                      -> Used to retrieve the entities located in
+ *                         the specified room.
  *
  * </pre>
  *

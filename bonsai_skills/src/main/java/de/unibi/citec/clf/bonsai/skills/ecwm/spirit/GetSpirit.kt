@@ -34,9 +34,9 @@ import kotlin.collections.iterator
  * Slots:
  *  Entity:   [Entity] (Optional)
  *                  -> Entity to fetch goals from, is used if the 'entity' option is not set
- *  Spirit:   [Spirit] (Write)
+ *  Spirit:   [Spirit] [Write]
  *                  -> The Spirit
- *  Storage:  [StorageArea] (Read, Optional)
+ *  Storage:  [StorageArea] [Read] (Optional)
  *                  -> The Storage, only read if use_storage is set
  *
  * ExitTokens:
