@@ -12,21 +12,29 @@ import java.util.concurrent.Future;
 /**
  * Clear the planning scene.
  *
+ * <pre>
+ *
  * Options:
- *  #_KEEP_ATTACHED: [boolean] Optional (Default: false)
- *                    -> Specify whether collision objects attached to the robot should also be deleted or kept
+ * #_KEEP_ATTACHED        [boolean] Optional (default: false)
+ *      -> Specify whether collision objects attached to the robot
+ *         should be kept instead of being deleted.
+ *
+ * Slots:
  *
  * ExitTokens:
- *  success:    Clearing successful
- *  error       Clearing not successful
+ * success:               Planning scene successfully cleared
+ * error:                 Planning scene could not be cleared
  *
  * Sensors:
  *
  * Actuators:
  *  PlanningSceneActuator
  *
+ * </pre>
+ *
  * @author lruegeme
  */
+
 public class ClearPlanningScene extends AbstractSkill {
     private static final String KEY_KEEP_ATTACHED = "#_KEEP_ATTACHED";
 

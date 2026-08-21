@@ -18,35 +18,75 @@ import de.unibi.citec.clf.btl.data.geometry.Pose3D
 import de.unibi.citec.clf.btl.data.world.Entity
 import de.unibi.citec.clf.btl.units.LengthUnit
 import java.util.concurrent.Future
-
 /**
- * @author lruegeme
- *
- * Assumes the target pose of the current location inside a spirit.
- *
- * Requires to be inside the spirit unless "#_ALWAYS" is set.
- * Mind that the resulting pose may be wrong as only the gaze target is used. (see #_FALLBACK_Z)
+ * Looks at the current view target of a Spirit and adjusts the camera height
+ * to the height specified by the current SpiritGoal.
  *
  * <pre>
  *
  * Options:
  *  #_ALWAYS:               [Boolean] Optional (Default: false)
- *                              -> Look at Target even if outside spirit area.
- *  #_FALLBACK_Z            []
- *  #_FALLBACK_STORAGE      []
- *  #_Z_OFFSET              []
- *  #_TIMEOUT               []
- *  #_TIMEOUT_Z             []
+ *                              -> If true, handle failure to retrieve the current
+ *                                 SpiritGoal by looking at the Spirit's entity/storage
+ *                                 frame instead of failing.
+ *
+ *  #_FALLBACK_Z:           [Double] Optional (Default: 1.4)
+ *                              -> Camera height used when #_ALWAYS is true and
+ *                                 the current SpiritGoal cannot be retrieved.
+ *
+ *  #_FALLBACK_STORAGE:     [String] Optional (Default: "")
+ *                              -> Storage name used for the fallback frame when
+ *                                 #_ALWAYS is true. If empty, the Spirit's
+ *                                 configured storage is used; if that is also
+ *                                 empty, the entity frame is used.
+ *
+ *  #_Z_OFFSET:             [Double] Optional (Default: 0.0)
+ *                              -> Offset added to the Z coordinate of the gaze target.
+ *
+ *  #_TIMEOUT:              [Integer] Optional (Default: 0)
+ *                              -> Maximum time in milliseconds to wait for the
+ *                                 gaze movement after it has been started.
+ *                              -> A timeout exit token is only configured when
+ *                                 this value is greater than 0.
+ *
+ *  #_TIMEOUT_Z:            [Integer] Optional (Default: 8000)
+ *                              -> Maximum time in milliseconds to wait for the
+ *                                 camera height movement before forcing the
+ *                                 gaze movement to start.
  *
  * Slots:
- *  Spirit                  [Spirit]
- *                              -> The Spirit
+ *  Spirit                  [Spirit] [Read]
+ *                              -> Spirit whose current goal is used to determine
+ *                                 the gaze target and camera height.
  *
  * ExitTokens:
- *  success:        Spirit exists
+ *  success:                Gaze movement completed successfully.
+ *
+ *  error.timeout:          The gaze movement did not complete within #_TIMEOUT.
+ *
+ *  error.handled:          The current SpiritGoal could not be retrieved, but
+ *                              #_ALWAYS was enabled and the fallback behavior
+ *                              was used.
+ *
+ *  fatal:                  The skill could not initialize or the gaze movement
+ *                              could not be started.
+ *
+ * Sensors:
+ *
+ * Actuators:
+ *  ECWMSpirit:             [ECWMSpirit]
+ *                              -> Used to retrieve the current SpiritGoal.
+ *
+ *  ZLiftActuator:          [JointControllerActuator]
+ *                              -> Used to move the camera/lift to the target
+ *                                 camera height.
+ *
+ *  GazeActuator:           [GazeActuator]
+ *                              -> Used to look at the SpiritGoal's view target.
  *
  * </pre>
  *
+ * @author lruegeme
  */
 
 class LookAtSpirit : AbstractSkill() {

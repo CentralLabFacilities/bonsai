@@ -11,6 +11,10 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
 /**
  * Stores the current Time
  *
+ * ExitTokens:
+ *  success:    Current time was successfully stored.
+ *
+ *
  * @author lruegeme
  */
 class StoreTime : AbstractSkill() {

@@ -45,7 +45,7 @@ import java.util.concurrent.Future;
  *
  * Slots:
  *  PersonDataSlot:       [PersonData] [Read and Write]
- *      -> Read in person to drive to. If successfull save the person to memory
+ *      -> Read in person to drive to. If successfully save the person to memory
  *
  * ExitTokens:
  *  success:                No goal was set in #_NO_GOAL_TIMEOUT ms

@@ -27,15 +27,19 @@ import java.util.concurrent.Future
  *  use_model_slot:     [Boolean] Use Model instead of Entity (default: False)
  *
  * Slots:
- *  Entity      [Entity] Optional, Uses this slot to get the entity if `type` option is not set
- *  Model       [Model] Optional, Uses this slot to get the modeltype if `use_model_slot` is set
- *  Type        [String] Optional, Use this if option `type_from_string` is set
- *  Attributes: [Attributes]
+ *  Entity      [Entity] [Read] Optional, Uses this slot to get the entity if `type` option is not set
+ *  Model       [Model] [Read] Optional, Uses this slot to get the modeltype if `use_model_slot` is set
+ *  Type        [String] [Read] Optional, Use this if option `type_from_string` is set
+ *  Attributes: [Attributes] [Write] Stores the retrieved attributes.
  *
  *
  * ExitTokens:
  *  success:        Got Entities
  *
+ * Actuators:
+ *  ECWMRobocup: [ECWMRobocup]
+ *              -> Used to retrieve model or entity attributes
+ *                 from the RoboCup world model.
  * </pre>
  *
  * @author lruegeme

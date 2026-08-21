@@ -11,12 +11,17 @@ import java.util.concurrent.Future
 
 /**
  * Clear the planning scene.
- *
  * <pre>
  *
- * Options:
- *  clear_attached:     [Boolean] (Default: false)
- *                  -> Also clear attached objects
+ * Slots:
+ *
+ * ExitTokens:
+ * success:  Planning scene successfully cleared
+ *
+ *
+ * Actuators:
+ *  ECWMGrasping: [ECWMGrasping]
+ *      -> Used to clear and set up the planning scene.
  *
  * </pre>
  *

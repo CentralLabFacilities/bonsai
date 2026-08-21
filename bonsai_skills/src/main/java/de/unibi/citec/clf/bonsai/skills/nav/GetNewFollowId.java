@@ -20,28 +20,52 @@ import java.io.IOException;
 
 /**
  * Find a person to follow close to the last followed person.
- * <p>
- * Possible recovery if target person was lost or got a new uuid
  *
  * <pre>
  *
  * Options:
- *  #_MAX_DIST:    [double] Optional (default: 500)
- *                      -> Max distance a person can have to the old person to be considered a new follow target in mm
+ *  use_person_slot      [Boolean] Optional (Default: false)
+ *                          -> If true, read the previously followed person from
+ *                             the PersonInput slot.
+ *                          -> If false, read the previously known position from
+ *                             the LastPersonPositionSlot.
+ *
+ *  #_MAX_DIST           [double] Optional (Default: 500)
+ *                          -> Maximum distance in mm at which a person can be
+ *                             considered as a new follow target.
+ *
+ *  #_TIMEOUT            [int] Optional (Default: 0)
+ *                          -> Maximum time in ms to search for a new follow
+ *                             target.
+ *                          -> If 0, the skill does not wait and immediately
+ *                             returns error if no person is found.
  *
  * Slots:
- *  PersonDataSlot: [PersonData] [Read and Write]
- *      -> Read in last followed person. Write new person to follow.
+ *  PersonInput:         [PersonData] [Read] Optional
+ *                          -> Previously followed person.
+ *                          -> Used when use_person_slot is true.
  *
- * ExitTokens:
- *  success:    Found new person in range to follow
- *  error:      Could not find new person to follow
+ *  LastPersonPositionSlot: [Pose2D] [Read] Optional
+ *                          -> Last known position of the previously followed
+ *                             person.
+ *                          -> Used when use_person_slot is false.
+ *
+ *  PersonDataSlot:      [PersonData] [Write]
+ *                          -> The newly selected person to follow.
  *
  * Sensors:
- *  PersonSensor :  [PersonDataList]
- *      -> Read currently seen persons
+ *  PersonSensor:        [PersonDataList]
+ *                          -> Provides the currently detected persons.
  *
  * Actuators:
+ *
+ * ExitTokens:
+ *  success:
+ *      A new person was found within #_MAX_DIST and stored in
+ *      PersonDataSlot.
+ *
+ *  error:
+ *      No person was found within #_MAX_DIST before the timeout expired.
  *
  * </pre>
  *

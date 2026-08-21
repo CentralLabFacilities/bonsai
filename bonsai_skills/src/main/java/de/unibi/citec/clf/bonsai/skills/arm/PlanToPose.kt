@@ -10,11 +10,17 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
 import java.util.concurrent.Future
 import java.util.logging.Level
 import java.util.logging.Logger
-
 /**
- * Arm moves to the pose given in the Key #_POSE.
+ * Move the robot arm to a predefined pose.
+ * <pre>
+ * ExitTokens:
+ * success:              Arm successfully moved to the requested pose
  *
- * grasp_up, fold_up, carry_side, home
+ * Actuators:
+ *  PostureActuator
+ *      -> Used to move the arm to the requested pose.
+ *
+ * </pre>
  *
  * @author lruegeme
  */

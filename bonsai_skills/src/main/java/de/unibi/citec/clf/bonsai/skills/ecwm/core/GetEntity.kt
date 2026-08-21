@@ -17,7 +17,7 @@ import javax.naming.CommunicationException
  * <pre>
  *
  * Options:
- *  id:   [String] (optional) Entity id
+ *  name:   [String] (optional) Entity name. Spaces in the name are replaced by _ before querying the world model.
  *
  * Slots:
  *  StringSlot: [String] [Read]
