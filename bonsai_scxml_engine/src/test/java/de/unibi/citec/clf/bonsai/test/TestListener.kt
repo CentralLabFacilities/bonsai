@@ -47,7 +47,7 @@ class TestListener private constructor() : SCXMLListener {
             requiredSkills[cleanStateId] = requiredSkills[cleanStateId]!! - 1
         }
 
-        if (state.id == successState)
+        if (state.id.split(".").last() == successState)
             if (requiredSkills.isEmpty() || requiredSkills.filter { it.value != 0 }.isEmpty()) {
                 this.state = State.success
             } else {
