@@ -60,7 +60,7 @@ class SkillStateMachineConfig {
 
         sendAllPossibleTransitions =
             MapReader.readConfigBool("#_SEND_ALL_TRANSITIONS", sendAllPossibleTransitions, data)
-        logger.debug("Send all Taransitions: $sendAllPossibleTransitions")
+        logger.debug("Send all Transitions: $sendAllPossibleTransitions")
 
         newStatePublishing =
             MapReader.readConfigBool("#_NEW_STATE_PUBLISHING", newStatePublishing, data)
