@@ -6,23 +6,16 @@ import kotlinx.serialization.Serializable
 data class SkillNames(val skills: List<String>) {}
 
 @Serializable
-data class SkillTransition(val event: String, val description: String = "")
+data class SkillTransition(val event: String)
 
 @Serializable
-data class SkillParameter(val key: String, val type: String, val required: Boolean, val default: String? = null, val description: String = "")
+data class SkillParameter(val key: String, val type: String, val required: Boolean, val default: String? = null)
 
 @Serializable
-data class SkillSlot(val key: String, val type: String, val description: String = "")
+data class SkillSlot(val key: String, val type: String)
 
 @Serializable
 data class ParameterMap(val params: Map<String, String>)
-
-
-@Serializable
-data class SkillSensor(val key: String, val value: String)
-
-@Serializable
-data class SkillActuator(val key: String, val value: String)
 
 @Serializable
 data class SkillInfo(
@@ -30,8 +23,6 @@ data class SkillInfo(
     val inSlots: List<SkillSlot>,
     val outSlots: List<SkillSlot>,
     val params: List<SkillParameter>,
-    val events: List<SkillTransition>,
-    val sensors: List<SkillSensor>,
-    val actuator: List<SkillActuator>
+    val events: List<SkillTransition>
 )
 

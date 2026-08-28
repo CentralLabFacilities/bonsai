@@ -16,6 +16,73 @@ import de.unibi.citec.clf.btl.data.speech.llm.Role
 import de.unibi.citec.clf.btl.data.speech.llm.ToolList
 import java.util.concurrent.Future
 
+/**
+ * Send a message to an LLM and optionally handle the reply
+ * and tool calls.
+ *
+ *
+ * <pre>
+ *
+ * Options:
+ * #_TIMEOUT             [Integer] Optional (default: 5000)
+ *      -> Maximum time in milliseconds to wait for the LLM response in blocking mode.
+ * #_BLOCKING            [boolean] Optional (default: true)
+ *      -> Whether to wait for the LLM response.
+ * #_PROMPT              [String] Optional
+ *      -> The prompt to send to the LLM.
+ *      -> If not provided, the prompt is read from the "prompt" slot.
+ * #_ADD_REPLY           [boolean] Optional (default: true)
+ *      -> Whether to add the LLM reply to the conversation history.
+ *      -> Only available in blocking mode.
+ * #_MEMORIZE_MSG        [boolean] Optional (default: false)
+ *      -> Whether to store the LLM reply as a Message.
+ *      -> If false, the reply content is stored as a String.
+ *      -> Automatically enabled when tool usage is enabled.
+ * #_USE_TOOLS           [boolean] Optional (default: false)
+ *      -> Whether to provide tools to the LLM.
+ * #_REQUIRE_TOOL        [boolean] Optional (default: false)
+ *      -> Require the LLM to call a tool.
+ *      -> If enabled and no tool is called, the "noTool" error exit token is returned.
+ *
+ * Slots:
+ * prompt: [String] (Optional, Read)
+ *      -> Memory slot containing the prompt to send to the LLM.
+ *      -> Used only if #_PROMPT is not configured.
+ *
+ * history: [MessageList] (Read, Write)
+ *      -> Memory slot containing the conversation history.
+ *      -> The user prompt is added to the history before sending the request.
+ *      -> The LLM reply is added to the history if #_ADD_REPLY is enabled.
+ *
+ * tools: [ToolList] (Optional, Read)
+ *      -> Memory slot containing the tools available to the LLM.
+ *      -> Used when #_USE_TOOLS is enabled.
+ *
+ * reply: [String] (Write)
+ *      -> Memory slot where the content of the LLM reply is stored.
+ *      -> Used when #_MEMORIZE_MSG is false.
+ *
+ * replyMessage: [Message] (Write)
+ *      -> Memory slot where the complete LLM reply message is stored.
+ *      -> Used when #_MEMORIZE_MSG is true.
+ *
+ * ExitTokens:
+ * success:              LLM request successfully completed
+ * success.agent:        LLM returned a normal agent reply when tool usage is enabled
+ * success.tool:         LLM returned a tool call
+ * error.timeout:        LLM did not respond within the configured timeout
+ * error.noTool:         #_REQUIRE_TOOL is enabled but the LLM did not call a tool
+ *
+ * Sensors:
+ *
+ * Actuators:
+ *  LLM
+ *
+ * </pre>
+ *
+ * @author
+ */
+
 class LLMChat : AbstractSkill() {
 
     companion object {
