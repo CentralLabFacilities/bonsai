@@ -25,6 +25,8 @@ the 'src' attribute of states. - Appends a suffix to all sourced 'id' and
         <xsl:param name="prefix" tunnel="yes"/>
         <xsl:variable name="full" select="."/>
         <xsl:variable name="stateid" select="../@id"/>
+        <xsl:variable name="inheritSlots"
+                      select="root(.)/scxml/datamodel/data/slots"/>
         <xsl:analyze-string select="$full" regex="\{{(.*)\}}">
             <xsl:matching-substring>
                 <xsl:variable name="part" select="regex-group(1)"/>
@@ -38,9 +40,22 @@ the 'src' attribute of states. - Appends a suffix to all sourced 'id' and
                             select="concat(document($finish)/scxml/@initial, '#', $stateid,  $suffix)"/>
                 </xsl:attribute>
                 <xsl:apply-templates select="document($finish)/scxml/*">
+                    <!-- Suffix dieser neu eingebundenen SCXML -->
                     <xsl:with-param name="suffix"
-                                    select="concat('#', $stateid, $suffix)" tunnel="yes"/>
-                    <xsl:with-param name="prefix" select="concat($stateid, '.')"
+                                    select="concat('#', $stateid, $suffix)"
+                                    tunnel="yes"/>
+
+                    <!-- Suffix der SCXML, die uns eingebunden hat -->
+                    <xsl:with-param name="parentSuffix"
+                                    select="$suffix"
+                                    tunnel="yes"/>
+
+                    <xsl:with-param name="inheritSlots"
+                                    select="$inheritSlots"
+                                    tunnel="yes"/>
+
+                    <xsl:with-param name="prefix"
+                                    select="concat($stateid, '.')"
                                     tunnel="yes"/>
                 </xsl:apply-templates>
             </xsl:matching-substring>
@@ -65,10 +80,94 @@ the 'src' attribute of states. - Appends a suffix to all sourced 'id' and
     </xsl:template>
 
     <!-- Change the 'state' attribute of all <slot> nodes. -->
-    <xsl:template match="data/slots/slot/@state">
+    <xsl:template match="
+    data/slots/slot/@state |
+    data/slots/inheritSlot/@state">
+
         <xsl:param name="suffix" tunnel="yes"/>
+
         <xsl:attribute name="state">
             <xsl:value-of select="concat(., $suffix)"/>
+        </xsl:attribute>
+    </xsl:template>
+
+    <!-- Normal slot: belongs to the current sourced state machine -->
+    <xsl:template match="data/slots/slot/@xpath">
+        <xsl:param name="suffix" tunnel="yes"/>
+
+        <xsl:attribute name="xpath">
+            <xsl:value-of select="concat(., $suffix)"/>
+        </xsl:attribute>
+    </xsl:template>
+
+    <xsl:template match="data/slots/inheritSlot/@xpath">
+
+        <xsl:param name="inheritSlots" tunnel="yes"/>
+        <xsl:param name="parentSuffix" tunnel="yes"/>
+
+        <xsl:variable name="xpath" select="."/>
+
+        <!-- Find the parent's slot referring to the same path -->
+        <xsl:variable name="inheritSlot"
+                      select="$inheritSlots/*
+                          [@xpath = $xpath][1]"/>
+
+        <xsl:attribute name="xpath">
+            <xsl:choose>
+
+                <!-- Parent is a normal slot:
+                     its xpath belongs to the parent scope -->
+                <xsl:when test="$inheritSlot[self::slot]">
+                    <xsl:value-of
+                            select="concat($inheritSlot/@xpath, $parentSuffix)"/>
+                </xsl:when>
+
+                <!-- Parent is itself slotIn / slotOut -->
+                <xsl:when test="$inheritSlot[self::slotIn or self::slotOut]">
+                    <xsl:value-of select="$inheritSlot/@xpath"/>
+                </xsl:when>
+
+                <!-- No parent binding -->
+                <xsl:otherwise>
+                    <xsl:value-of select="."/>
+                </xsl:otherwise>
+
+            </xsl:choose>
+        </xsl:attribute>
+    </xsl:template>
+
+    <xsl:template match="data/slots/inheritSlot">
+        <xsl:element name="slot"
+                     namespace="http://www.w3.org/2005/07/scxml">
+            <xsl:apply-templates select="@* | node()"/>
+        </xsl:element>
+    </xsl:template>
+
+    <xsl:template match="scxml/datamodel/data/@id">
+        <xsl:param name="suffix" tunnel="yes"/>
+        <xsl:variable name="dataSuffix"
+                      select="replace($suffix, '#', '_')"/>
+
+        <xsl:attribute name="id">
+            <xsl:choose>
+                <xsl:when test=". = '#_SLOTS' or . = '#_STATE_PREFIX'">
+                    <xsl:value-of select="."/>
+                </xsl:when>
+                <xsl:otherwise>
+                    <xsl:value-of select="concat(., $dataSuffix)"/>
+                </xsl:otherwise>
+            </xsl:choose>
+        </xsl:attribute>
+    </xsl:template>
+
+    <xsl:template match="scxml/state/datamodel/data/@expr[starts-with(., '@')]">
+        <xsl:param name="suffix" tunnel="yes"/>
+
+        <xsl:variable name="dataSuffix"
+                      select="replace($suffix, '#', '_')"/>
+
+        <xsl:attribute name="expr">
+            <xsl:value-of select="concat(., $dataSuffix)"/>
         </xsl:attribute>
     </xsl:template>
 
@@ -81,6 +180,40 @@ the 'src' attribute of states. - Appends a suffix to all sourced 'id' and
             <xsl:if test=".!=''">
                 <xsl:value-of select="concat(., $suffix)"/>
             </xsl:if>
+        </xsl:attribute>
+    </xsl:template>
+
+    <!-- assign in a state with src -> reference child scope -->
+    <xsl:template match="
+    state[@src]/onentry//assign/@location |
+    state[@src]/onexit//assign/@location">
+
+        <xsl:param name="suffix" tunnel="yes"/>
+
+        <xsl:variable name="dataSuffix"
+                      select="replace($suffix, '#', '_')"/>
+
+        <xsl:variable name="stateid"
+                      select="ancestor::state[@src][1]/@id"/>
+
+        <xsl:attribute name="location">
+            <xsl:value-of select="concat(., '_', $stateid, $dataSuffix)"/>
+        </xsl:attribute>
+    </xsl:template>
+
+    <!-- assign in normal states -> current scope -->
+    <xsl:template match="
+    onentry//assign[not(ancestor::state[@src])]/@location |
+    onexit//assign[not(ancestor::state[@src])]/@location  |
+    transition//assign/@location">
+
+        <xsl:param name="suffix" tunnel="yes"/>
+
+        <xsl:variable name="dataSuffix"
+                      select="replace($suffix, '#', '_')"/>
+
+        <xsl:attribute name="location">
+            <xsl:value-of select="concat(., $dataSuffix)"/>
         </xsl:attribute>
     </xsl:template>
 
@@ -98,6 +231,68 @@ the 'src' attribute of states. - Appends a suffix to all sourced 'id' and
                         select="current()"/>
                 </xsl:otherwise>
             </xsl:choose>
+        </xsl:attribute>
+    </xsl:template>
+
+
+    <xsl:template match="
+    state[@src]/onentry//assign/@expr |
+    state[@src]/onexit//assign/@expr">
+
+        <xsl:param name="suffix" tunnel="yes"/>
+
+        <xsl:variable name="dataSuffix"
+                      select="replace($suffix, '#', '_')"/>
+
+        <xsl:attribute name="expr">
+            <xsl:choose>
+                <xsl:when test="starts-with(., '#')">
+                    <xsl:value-of select="substring(., 2)"/>
+                </xsl:when>
+                <xsl:otherwise>
+                    <xsl:value-of select="concat(., $dataSuffix)"/>
+                </xsl:otherwise>
+            </xsl:choose>
+        </xsl:attribute>
+    </xsl:template>
+
+
+    <xsl:template match="
+    transition/@cond |
+    transition//assign/@expr |
+    onentry//assign[not(ancestor::state[@src])]/@expr |
+    onexit//assign[not(ancestor::state[@src])]/@expr">
+
+        <xsl:param name="suffix" tunnel="yes"/>
+
+        <xsl:variable name="dataSuffix"
+                      select="replace($suffix, '#', '_')"/>
+
+        <xsl:variable name="dataIds"
+                      select="root(.)//datamodel/data/@id"/>
+
+        <xsl:attribute name="{name()}">
+            <xsl:analyze-string select="."
+                                regex="[A-Za-z_][A-Za-z0-9_]*">
+
+                <xsl:matching-substring>
+                    <xsl:variable name="name" select="."/>
+
+                    <xsl:choose>
+                        <xsl:when test="$name = $dataIds">
+                            <xsl:value-of select="concat($name, $dataSuffix)"/>
+                        </xsl:when>
+                        <xsl:otherwise>
+                            <xsl:value-of select="$name"/>
+                        </xsl:otherwise>
+                    </xsl:choose>
+                </xsl:matching-substring>
+
+                <xsl:non-matching-substring>
+                    <xsl:value-of select="."/>
+                </xsl:non-matching-substring>
+
+            </xsl:analyze-string>
         </xsl:attribute>
     </xsl:template>
 

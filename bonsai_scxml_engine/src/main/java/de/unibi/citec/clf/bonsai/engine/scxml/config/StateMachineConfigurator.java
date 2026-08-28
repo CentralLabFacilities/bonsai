@@ -153,7 +153,7 @@ public class StateMachineConfigurator {
 
                     logger.trace("  String:" + node.toString());
                     String ln = node.getLocalName();
-                    if (ln.equals("slot")) {
+                    if (ln.equals("slot") || (ln.equals("inheritSlot"))) {
                         slotNodes.add(node);
                     } else {
                         logger.trace("local name: '" + ln + "'");
@@ -161,7 +161,7 @@ public class StateMachineConfigurator {
                         for (int i = 0; i < shitlist.getLength(); ++i) {
                             Node maybeSlotNode = shitlist.item(i);
                             ln = maybeSlotNode.getLocalName();
-                            if (ln != null && ln.equals("slot")) {
+                            if (ln != null && (ln.equals("slot") || ln.equals("inheritSlot"))) {
                                 slotNodes.add(maybeSlotNode);
                             }
                         }
