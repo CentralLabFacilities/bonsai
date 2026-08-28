@@ -9,6 +9,32 @@ import de.unibi.citec.clf.btl.data.speech.llm.Tool
 import de.unibi.citec.clf.btl.data.speech.llm.ToolList
 import de.unibi.citec.clf.btl.data.speech.llm.ToolParameter
 
+/**
+ * Add a tool to a list of available tools.
+ *
+ * <pre>
+ *
+ * Options:
+ * #_NAME                [String] Required
+ *      -> The name of the tool to be added.
+ * #_DESCRIPTION         [String] Optional
+ *      -> The description of the tool.
+ * #_PARAM_<name>        [String] Optional
+ *      -> Description of a tool parameter.
+ *      -> Prefix the description with "!" to mark the parameter as required.
+ *
+ * Slots:
+ * tools: [ToolList] (Read, Write)
+ *      -> Memory slot containing the list of available tools.
+ *      -> The configured tool is added to this list.
+ *
+ * ExitTokens:
+ * success:              Tool successfully added to the tool list
+ * </pre>
+ *
+ * @author
+ */
+
 class AddTool : AbstractSkill() {
 
     companion object {
