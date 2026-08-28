@@ -45,6 +45,23 @@ class SCXMLStarterWeb : SCXMLStarter() {
     val allClassMap: Map<String, Class<out AbstractSkill>> = allClasses.associateBy { it.name }
     var srv: WebServer? = null
 
+    private val skillDescriptions: Map<String, String> by lazy { loadSkillDescriptions() }
+
+    private fun loadSkillDescriptions(): Map<String, String> {
+        return try {
+            val stream = this::class.java.classLoader.getResourceAsStream("skillDescriptions.json")
+            if (stream == null) {
+                logger.warn("skillDescriptions.json not found on classpath, descriptions will be empty")
+                return emptyMap()
+            }
+            val text = stream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+            kotlinx.serialization.json.Json.decodeFromString<Map<String, String>>(text)
+        } catch (e: Exception) {
+            logger.error("Failed to load skillDescriptions.json: ${e.message}")
+            emptyMap()
+        }
+    }
+
     @Option(name = "-p", aliases = ["--port"], metaVar = "VALUE", usage = "port to listen")
     private var port: Int = 8080
 
@@ -232,7 +249,9 @@ class SCXMLStarterWeb : SCXMLStarter() {
         val params = mutableListOf<SkillParameter>()
         params.addAll(runner.inspectionGetRequiredParams().map { SkillParameter(it.key, it.value.simpleName, true) })
         params.addAll(runner.inspectionGetAllOptionalParams().map { SkillParameter(it.key, it.value.type.simpleName, false, it.value.defaultValue.toString()) })
-        return SkillInfo(mid, inSlots, outSlots, params, transitions)
+        val description = skillDescriptions[mid] ?: ""
+
+        return SkillInfo(mid, inSlots, outSlots, params, transitions, description)
     }
 
     companion object {

@@ -9,6 +9,41 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitToken
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
 import java.util.concurrent.Future
 
+/**
+ * Send a query to an LLM and optionally wait for the response.
+ *
+ *
+ * <pre>
+ *
+ * Options:
+ * #_TIMEOUT             [Integer] Optional (default: 5000)
+ *      -> Maximum time in milliseconds to wait for the LLM response
+ *         in blocking mode.
+ * #_BLOCKING            [boolean] Optional (default: true)
+ *      -> Whether to wait for the LLM response.
+ * #_PROMPT              [String] Required
+ *      -> The query to send to the LLM.
+ *
+ * Slots:
+ * reply: [String] (Write, Optional)
+ *      -> Memory slot where the LLM response is stored.
+ *      -> Used only when #_BLOCKING is true.
+ *
+ * ExitTokens:
+ * success:              LLM query successfully completed
+ * error.timeout:        LLM did not respond within the configured timeout
+ *
+ * Sensors:
+ *
+ * Actuators:
+ *  LLM
+ *
+ * </pre>
+ *
+ * @author
+ */
+
+
 class LLMQuery : AbstractSkill() {
 
     companion object {

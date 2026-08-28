@@ -23,6 +23,7 @@ data class SkillInfo(
     val inSlots: List<SkillSlot>,
     val outSlots: List<SkillSlot>,
     val params: List<SkillParameter>,
-    val events: List<SkillTransition>
+    val events: List<SkillTransition>,
+    val description: String = ""
 )
 
