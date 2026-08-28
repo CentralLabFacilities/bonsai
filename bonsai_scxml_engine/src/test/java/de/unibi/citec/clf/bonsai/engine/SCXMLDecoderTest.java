@@ -5,6 +5,7 @@
  */
 package de.unibi.citec.clf.bonsai.engine;
 
+import org.apache.commons.scxml2.model.Data;
 import org.apache.commons.scxml2.model.SCXML;
 import org.apache.log4j.Logger;
 import org.apache.log4j.PropertyConfigurator;
@@ -17,6 +18,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.HashMap;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static org.junit.Assert.*;
 
@@ -47,6 +51,36 @@ public class SCXMLDecoderTest {
         assert (scxml.getDatamodel() == null);
 
         //TODO check if file is merged
+    }
+
+    @Test
+    public void sourcedDatamodelIsScopedCorrectly() throws TransformerException {
+
+        String path = PATH_TO_CORE + "/src_test.xml";
+
+        HashMap<String, String> hashMap = new HashMap<>();
+        hashMap.put("TEST", PATH_TO_CORE);
+
+        SCXML scxml = SCXMLDecoder.parseSCXML(new File(path), hashMap);
+
+        assertNotNull(scxml.getDatamodel());
+
+        Map<String, Data> data = scxml.getDatamodel()
+                .getData()
+                .stream()
+                .filter(d -> !d.getId().startsWith("#"))
+                .collect(Collectors.toMap(
+                        Data::getId,
+                        Function.identity()
+                ));
+
+        assertEquals("1", data.get("test_val").getExpr());
+        assertEquals("1", data.get("test_val_s1").getExpr());
+        assertEquals("2", data.get("test_val_s2_s1").getExpr());
+
+        assertEquals("0", data.get("no_change_test_val").getExpr());
+        assertEquals("1", data.get("no_change_test_val_s1").getExpr());
+        assertEquals("2", data.get("no_change_test_val_s2_s1").getExpr());
     }
 
     @Test

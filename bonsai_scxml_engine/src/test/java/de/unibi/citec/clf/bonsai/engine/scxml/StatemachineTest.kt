@@ -31,6 +31,16 @@ class StatemachineTest {
 
     @Test
     @Throws(TransformerException::class, TimeoutException::class)
+    fun localAndInheritedVariables() {
+        var sm = "src_test.xml"
+        var conf = "TestConfig.xml"
+        var test = newEndFatal()
+
+        TestCase.assertTrue(TestTools.testStatemachine(conf, sm, test))
+    }
+
+    @Test
+    @Throws(TransformerException::class, TimeoutException::class)
     fun moreVariables() {
         var sm = "variables.xml"
         var conf = "TestConfig.xml"

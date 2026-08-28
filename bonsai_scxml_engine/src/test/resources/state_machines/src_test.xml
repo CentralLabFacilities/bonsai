@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="skills.slots.SlotIO#A">
+    <!-- Tests if local and inherited slot work and if local data and assigning on entry works -->
+    <datamodel>
+        <data id="#_STATE_PREFIX" expr="'de.unibi.citec.clf.bonsai.'"/>
+        <data id="#_SLOTS">
+            <slots>
+                <slot key="StringSlot" state="skills.slots.SlotIO#A" xpath="/A#test"/>
+                <slot key="StringSlot" state="skills.slots.SlotIO#B" xpath="/B"/>
+
+                <slot key="ReadSlotOne" state="test.skills.CompareSlots#AB" xpath="/A#test"/>
+                <slot key="ReadSlotTwo" state="test.skills.CompareSlots#AB" xpath="/B"/>
+
+                <slot key="ReadSlotOne" state="test.skills.CompareSlots#AB2" xpath="/A#test"/>
+                <slot key="ReadSlotTwo" state="test.skills.CompareSlots#AB2" xpath="/B"/>
+
+                <slot key="ReadSlotOne" state="test.skills.CompareSlots#BC" xpath="/B"/>
+                <slot key="ReadSlotTwo" state="test.skills.CompareSlots#BC" xpath="/C#s1"/>
+
+                <slot key="ReadSlotOne" state="test.skills.CompareSlots#CD" xpath="/D#s2#s1"/>
+                <slot key="ReadSlotTwo" state="test.skills.CompareSlots#CD" xpath="/C#s1"/>
+            </slots>
+        </data>
+        <data id="test_val" expr="1"/>
+        <data id="no_change_test_val" expr="0"/>
+    </datamodel>
+
+    <state id="skills.slots.SlotIO#A">
+        <onentry>
+            <!-- Change the SCXML variable.  -->
+            <assign location="test_val" expr="test_val - 1"/>
+        </onentry>
+        <datamodel>
+            <data id="#_WRITE" expr="@test_val"/>
+        </datamodel>
+        <transition event="SlotIO.*" cond="test_val == 0" target="skills.slots.SlotIO#B"/>
+        <transition event="SlotIO.*" cond="test_val == -1" target="skills.slots.SlotIO#B"/>
+        <transition event="SlotIO.*" target="skills.slots.SlotIO#B"/>
+    </state>
+
+    <state id="skills.slots.SlotIO#B">
+        <datamodel>
+            <data id="#_WRITE" expr="@test_val"/>
+        </datamodel>
+        <transition event="SlotIO.*" target="test.skills.CompareSlots#AB"/>
+    </state>
+
+    <state id="test.skills.CompareSlots#AB">
+        <transition event="CompareSlots.success.match" target="s1"/>
+        <transition event="CompareSlots.success.misMatch" target="skills.Fatal"/>
+        <transition event="CompareSlots.*" target="skills.Fatal"/>
+    </state>
+
+    <!-- <state id="s1" src="${TEST}/sourcing_test.xml"> -->
+    <state id="s1" src="${TEST}/sourcing_test.xml">
+        <onentry>
+            <assign location="test_val" expr="test_val"/>
+        </onentry>
+        <transition event="s1.success" target="test.skills.CompareSlots#AB2"/>
+
+    </state>
+
+    <state id="test.skills.CompareSlots#AB2">
+        <transition event="CompareSlots.success.match" target="skills.Fatal"/>
+        <transition event="CompareSlots.success.misMatch" target="test.skills.CompareSlots#BC"/>
+        <transition event="CompareSlots.error" target="skills.Fatal"/>
+        <transition event="CompareSlots.*" target="skills.Fatal"/>
+    </state>
+
+    <state id="test.skills.CompareSlots#BC">
+        <transition event="CompareSlots.success.match" target="test.skills.CompareSlots#CD"/>
+        <transition event="CompareSlots.success.misMatch" target="skills.Fatal"/>
+        <transition event="CompareSlots.error" target="skills.Fatal"/>
+        <transition event="CompareSlots.*" target="skills.Fatal"/>
+    </state>
+
+    <state id="test.skills.CompareSlots#CD">
+        <transition event="CompareSlots.success.match" target="test.skills.CompareData"/>
+        <transition event="CompareSlots.success.misMatch" target="skills.Fatal"/>
+        <transition event="CompareSlots.error" target="skills.Fatal"/>
+        <transition event="CompareSlots.*" target="skills.Fatal"/>
+    </state>
+
+    <state id="test.skills.CompareData">
+        <datamodel>
+            <data id="data1" expr="0"/>
+            <data id="data2" expr="@no_change_test_val"/>
+        </datamodel>
+        <transition event="CompareData.success.match" target="test.skills.CompareData#1"/>
+        <transition event="CompareData.success.misMatch" target="skills.Fatal"/>
+        <transition event="CompareData.error" target="skills.Fatal"/>
+        <transition event="CompareData.*" target="skills.Fatal"/>
+    </state>
+
+    <state id="test.skills.CompareData#1">
+        <datamodel>
+            <data id="data1" expr="1"/>
+            <data id="data2" expr="@no_change_test_val_s1"/>
+        </datamodel>
+        <transition event="CompareData.success.match" target="test.skills.CompareData#2"/>
+        <transition event="CompareData.success.misMatch" target="skills.Fatal"/>
+        <transition event="CompareData.error" target="skills.Fatal"/>
+        <transition event="CompareData.*" target="skills.Fatal"/>
+    </state>
+
+    <state id="test.skills.CompareData#2">
+        <datamodel>
+            <data id="data1" expr="2"/>
+            <data id="data2" expr="@no_change_test_val_s2_s1"/>
+        </datamodel>
+        <transition event="CompareData.success.match" target="skills.End"/>
+        <transition event="CompareData.success.misMatch" target="skills.Fatal"/>
+        <transition event="CompareData.error" target="skills.Fatal"/>
+        <transition event="CompareData.*" target="skills.Fatal"/>
+    </state>
+
+    <state id="skills.End" final="true"/>
+    <state id="skills.Fatal" final="true"/>
+
+
+</scxml>
