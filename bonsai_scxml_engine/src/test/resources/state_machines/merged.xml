@@ -5,13 +5,13 @@
         <data id="#_SLOTS">
             <slots>
                 <slot key="StringSlot" state="slots.SlotIO#readA#consume#superConsume"
-                xpath="/test/one"/>
+                xpath="/test/one#consume#superConsume"/>
                 <slot key="StringSlot" state="slots.SlotIO#readB#consume#superConsume"
-                xpath="/test/two"/>
+                xpath="/test/two#consume#superConsume"/>
                 <slot key="StringSlot" state="slots.SlotIO#writeB#consume#superConsume"
-                xpath="/test/two"/>
+                xpath="/test/two#consume#superConsume"/>
                 <slot key="StringSlot" state="slots.SlotIO#writeA#consume#superConsume"
-                xpath="/test/one"/>
+                xpath="/test/one#consume#superConsume"/>
             </slots>
         </data>
     </datamodel>
