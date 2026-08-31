@@ -47,17 +47,18 @@ class TestListener private constructor() : SCXMLListener {
             requiredSkills[cleanStateId] = requiredSkills[cleanStateId]!! - 1
         }
 
-        if (state.id == successState) if (requiredSkills.isEmpty() || requiredSkills.filter { it.value != 0 }.isEmpty()) {
-            this.state = State.success
-        } else {
-            this.state = State.failure
-            logger.fatal("missing states")
-            requiredSkills.forEach { (key: String, value: Int) ->
-                logger.fatal(
-                    "$key: $value"
-                )
+        if (state.id == successState)
+            if (requiredSkills.isEmpty() || requiredSkills.filter { it.value != 0 }.isEmpty()) {
+                this.state = State.success
+            } else {
+                this.state = State.failure
+                logger.fatal("missing states")
+                requiredSkills.forEach { (key: String, value: Int) ->
+                    logger.fatal(
+                        "$key: $value"
+                    )
+                }
             }
-        }
 
         if (state.id == failureState) this.state = State.failure
     }
