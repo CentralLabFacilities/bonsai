@@ -11,7 +11,7 @@
 
     <state id="consume" src="${TEST}/partialResuseableVariale.xml">
         <onentry>
-            <assign location="hellosToSpeak" expr="1"></assign>
+            <assign location="hellosToSpeak" expr="1"/>
         </onentry>
         <transition event="consume.success" target="consume2"/>
         <transition event="consume.error" target="Fatal"/>

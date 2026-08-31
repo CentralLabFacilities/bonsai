@@ -4,8 +4,6 @@
     <datamodel>
         <data id="#_STATE_PREFIX" expr="'de.unibi.citec.clf.bonsai.skills.'" />
         <!-- Counter -->
-        <data id="HELLOS_TO_SPEAK_PRIVATE" expr="0"/>
-        <data id="HELLOS_TO_SPEAK_DEFAULT" expr="3"/>
         <data id="hellosToSpeak" expr="3"/>
     </datamodel>
 
@@ -15,28 +13,19 @@
     </state>
 
     <state id="init" initial="dialog.Talk">
-        <onentry>
-            <assign location="HELLOS_TO_SPEAK_PRIVATE" expr="hellosToSpeak"/>
-        </onentry>
-        <onexit>
-            <!-- We reset hellosToSpeak to default after this statemachine completes -->
-            <assign location="hellosToSpeak" expr="HELLOS_TO_SPEAK_DEFAULT"/>
-        </onexit>
-
         <state id="dialog.Talk">
             <datamodel>
                 <data id="#_MESSAGE" expr="'Hello'" />
             </datamodel>
             <!-- Repeat state if not all hellos have been said by now ...  -->
-            <transition event="Talk.*" cond="HELLOS_TO_SPEAK_PRIVATE > 1" target="dialog.Talk" >
+            <transition event="Talk.*" cond="hellosToSpeak > 1" target="dialog.Talk" >
                 <!-- Decrease the SCXML variable.  -->
-                <assign location="HELLOS_TO_SPEAK_PRIVATE" expr="HELLOS_TO_SPEAK_PRIVATE - 1"/>
+                <assign location="hellosToSpeak" expr="hellosToSpeak - 1"/>
             </transition>
             <!-- ... otherwise go to next state. -->
             <transition event="Talk.*" target="Nop#end" />
         </state>
     </state>
-
 
     <state id="Nop#end">
         <transition event="Nop.*">
