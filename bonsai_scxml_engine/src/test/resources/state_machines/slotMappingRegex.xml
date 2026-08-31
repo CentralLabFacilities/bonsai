@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="slots.SlotIO#writeA">
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="skills.slots.SlotIO#writeA">
     <datamodel>
-        <data id="#_STATE_PREFIX" expr="'de.unibi.citec.clf.bonsai.skills.'"/>
+        <data id="#_STATE_PREFIX" expr="'de.unibi.citec.clf.bonsai.'"/>
         <data id="#_CONFIGURE_AND_VALIDATE" expr="true"/>
         <data id="#_SLOTS">
             <slots>
@@ -14,46 +14,46 @@
 
     </datamodel>
 
-    <state id="slots.SlotIO#writeA">
+    <state id="skills.slots.SlotIO#writeA">
         <datamodel>
             <data id="#_WRITE" expr="'A'"/>
         </datamodel>
-        <transition event="SlotIO.success" target="slots.SlotIO#writeB"/>
-        <transition event="SlotIO.error" target="Fatal"/>
-        <transition event="SlotIO.fatal" target="Fatal"/>
+        <transition event="SlotIO.success" target="skills.slots.SlotIO#writeB"/>
+        <transition event="SlotIO.error" target="skills.Fatal"/>
+        <transition event="SlotIO.fatal" target="skills.Fatal"/>
     </state>
 
-    <state id="slots.SlotIO#writeB">
+    <state id="skills.slots.SlotIO#writeB">
         <datamodel>
             <data id="#_WRITE" expr="'B'"/>
         </datamodel>
-        <transition event="SlotIO.success" target="slots.CompareSlot#readA"/>
-        <transition event="SlotIO.error" target="Fatal"/>
-        <transition event="SlotIO.fatal" target="Fatal"/>
+        <transition event="SlotIO.success" target="test.skills.CompareSlot#readA"/>
+        <transition event="SlotIO.error" target="skills.Fatal"/>
+        <transition event="SlotIO.fatal" target="skills.Fatal"/>
     </state>
 
-    <state id="slots.CompareSlot#readA">
+    <state id="test.skills.CompareSlot#readA">
         <datamodel>
             <data id="#_COMPARE_STRING" expr="'A'"/>
         </datamodel>
-        <transition event="CompareSlot.success.match" target="slots.CompareSlot#readB"/>
-        <transition event="CompareSlot.success.misMatch" target="Fatal"/>
-        <transition event="CompareSlot.error" target="Fatal"/>
-        <transition event="CompareSlot.fatal" target="Fatal"/>
+        <transition event="CompareSlot.success.match" target="test.skills.CompareSlot#readB"/>
+        <transition event="CompareSlot.success.misMatch" target="skills.Fatal"/>
+        <transition event="CompareSlot.error" target="skills.Fatal"/>
+        <transition event="CompareSlot.fatal" target="skills.Fatal"/>
     </state>
 
-    <state id="slots.CompareSlot#readB">
+    <state id="test.skills.CompareSlot#readB">
         <datamodel>
             <data id="#_COMPARE_STRING" expr="'B'"/>
         </datamodel>
-        <transition event="CompareSlot.success.match" target="End"/>
-        <transition event="CompareSlot.success.misMatch" target="Fatal"/>
-        <transition event="CompareSlot.error" target="Fatal"/>
-        <transition event="CompareSlot.fatal" target="Fatal"/>
+        <transition event="CompareSlot.success.match" target="skills.End"/>
+        <transition event="CompareSlot.success.misMatch" target="skills.Fatal"/>
+        <transition event="CompareSlot.error" target="skills.Fatal"/>
+        <transition event="CompareSlot.fatal" target="skills.Fatal"/>
     </state>
 
 
-    <state id="Fatal" final="true"/>
+    <state id="skills.Fatal" final="true"/>
 
-    <state id="End" final="true"/>
+    <state id="skills.End" final="true"/>
 </scxml>
