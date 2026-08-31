@@ -633,11 +633,14 @@
     </xsd:attributeGroup>
     <xsd:group name="scxml.data.content">
         <xsd:sequence>
-            <xsd:any maxOccurs="unbounded" minOccurs="0" namespace="##any" processContents="lax"/>
+            <xsd:element ref="slots" minOccurs="0" maxOccurs="1"/>
         </xsd:sequence>
     </xsd:group>
+
     <xsd:complexType mixed="true" name="scxml.data.type">
-        <xsd:group ref="scxml.data.content"/>
+        <xsd:group ref="scxml.data.content"
+                   minOccurs="0"
+                   maxOccurs="unbounded"/>
         <xsd:attributeGroup ref="scxml.data.attlist"/>
     </xsd:complexType>
     <xsd:element name="data" type="scxml.data.type"/>
@@ -658,6 +661,46 @@
         <xsd:attributeGroup ref="scxml.param.attlist"/>
     </xsd:complexType>
     <xsd:element name="param" type="scxml.param.type"/>
+    <!-- slots -->
+    <xsd:group name="scxml.slots.content">
+        <xsd:choice>
+            <xsd:element ref="slot"/>
+            <xsd:element ref="inheritSlot"/>
+        </xsd:choice>
+    </xsd:group>
+
+    <xsd:complexType name="scxml.slots.type">
+        <xsd:group ref="scxml.slots.content"
+                   minOccurs="0"
+                   maxOccurs="unbounded"/>
+    </xsd:complexType>
+
+    <xsd:element name="slots" type="scxml.slots.type"/>
+
+
+    <!-- Common attributes for slot and inheritSlot -->
+    <xsd:attributeGroup name="scxml.slot.attlist">
+        <xsd:attribute name="key" type="xsd:string" use="required"/>
+        <xsd:attribute name="state" type="bonsai.scxml.id.nuq" use="required"/>
+        <xsd:attribute name="xpath" type="xsd:string" use="required"/>
+        <xsd:attributeGroup ref="scxml.extra.attribs"/>
+    </xsd:attributeGroup>
+
+
+    <!-- slot -->
+    <xsd:complexType name="scxml.slot.type">
+        <xsd:attributeGroup ref="scxml.slot.attlist"/>
+    </xsd:complexType>
+
+    <xsd:element name="slot" type="scxml.slot.type"/>
+
+
+    <!-- inheritSlot -->
+    <xsd:complexType name="scxml.inheritSlot.type">
+        <xsd:attributeGroup ref="scxml.slot.attlist"/>
+    </xsd:complexType>
+
+    <xsd:element name="inheritSlot" type="scxml.inheritSlot.type"/>
     <!--  assign  -->
     <xsd:attributeGroup name="scxml.assign.attlist">
         <xsd:attribute name="location" type="LocLang.datatype"/>
