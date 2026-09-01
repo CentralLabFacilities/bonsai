@@ -6,13 +6,13 @@ import kotlinx.serialization.Serializable
 data class SkillNames(val skills: List<String>) {}
 
 @Serializable
-data class SkillTransition(val event: String)
+data class SkillTransition(val event: String, val description: String = "")
 
 @Serializable
-data class SkillParameter(val key: String, val type: String, val required: Boolean, val default: String? = null)
+data class SkillParameter(val key: String, val type: String, val required: Boolean, val default: String? = null, val description: String = "")
 
 @Serializable
-data class SkillSlot(val key: String, val type: String)
+data class SkillSlot(val key: String, val type: String, val description: String = "")
 
 @Serializable
 data class ParameterMap(val params: Map<String, String>)
