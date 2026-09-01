@@ -14,7 +14,7 @@ import java.util.*;
 
 /**
  * This class is a configuration object that is passed to skill implementations in order to receive a list of used
- * sensors and actuators also also to provide these to the implementation.
+ * sensors and actuators also to provide these to the implementation.
  *
  * @author lziegler
  */
@@ -65,6 +65,9 @@ public class SkillConfigurator implements ISkillConfigurator {
     private final Map<String, Class<?>> slotRequests = new HashMap<>();
     private final Map<String, Class<?>> slotReaderRequests = new HashMap<>();
     private final Map<String, Class<?>> slotWriterRequests = new HashMap<>();
+    private final Map<String, String> parameterDescriptions = new HashMap<>();
+    private final Map<String, String> slotDescriptions = new HashMap<>();
+    private final Map<ExitStatus, String> exitTokenDescriptions = new HashMap<>();
 
     private Map<String, String> slotXPathMapping = new HashMap<>();
 
@@ -131,6 +134,18 @@ public class SkillConfigurator implements ISkillConfigurator {
      */
     public static SkillConfigurator createConfigPhase(Config cfg, Map<String, String> vars) {
         return new SkillConfigurator(SkillConfigurationPhase.CONFIG, cfg, vars);
+    }
+
+    public Map<String, String> getParameterDescriptions() {
+        return Collections.unmodifiableMap(parameterDescriptions);
+    }
+
+    public Map<String, String> getSlotDescriptions() {
+        return Collections.unmodifiableMap(slotDescriptions);
+    }
+
+    public Map<ExitStatus, String> getExitTokenDescriptions() {
+        return Collections.unmodifiableMap(exitTokenDescriptions);
     }
 
     private boolean checkParameters(Map<String, String> params) {
@@ -472,19 +487,28 @@ public class SkillConfigurator implements ISkillConfigurator {
         IN, OUT, BI
     }
 
-    private <T> MemorySlot<T> getSlot(String slotName, Class<T> slotType, SlotDirection dir) throws SkillConfigurationException {
+    private <T> MemorySlot<T> getSlot(
+            String slotName,
+            Class<T> slotType,
+            SlotDirection dir,
+            String description
+    ) throws SkillConfigurationException {
 
         switch (phase) {
             case CONFIG:
                 insertSlot(slotName, slotType, dir);
+                slotDescriptions.put(slotName, description);
                 return null;
+
             case OBJECT:
                 return getCheckedSlot(slotName, slotType);
+
             case BLOCKED:
             default:
                 logger.warn("Slot requested in non-configuration phase");
-                throw new SkillConfigurationException("Receiving of slots is " + "blocked. Slots can only be received "
-                        + "in configuration phase.");
+                throw new SkillConfigurationException(
+                        "Receiving of slots is blocked. Slots can only be received in configuration phase."
+                );
         }
     }
 
@@ -500,11 +524,12 @@ public class SkillConfigurator implements ISkillConfigurator {
     // Implementations
     // ########################################################################
     @Override
-    public int requestInt(String key) throws ConfigurationException {
+    public int requestInt(String key, String description) throws ConfigurationException {
         switch (phase) {
             case CONFIG:
                 logger.debug("request INT " + key);
                 requiredParams.put(key, Integer.class);
+                parameterDescriptions.put(key, description);
                 return getConfigValue(key, 0, Integer.class);
             case BLOCKED:
                 throw new ConfigurationException("Configurator is blocked, had errors during configuration");
@@ -514,11 +539,12 @@ public class SkillConfigurator implements ISkillConfigurator {
     }
 
     @Override
-    public int requestOptionalInt(String key, int def) throws ConfigurationException {
+    public int requestOptionalInt(String key, int def, String description) throws ConfigurationException {
         switch (phase) {
             case CONFIG:
                 logger.debug("request INT " + key + " default: " + def);
                 optionalParams.put(key, new OptionalParam(Integer.class, def));
+                parameterDescriptions.put(key, description);
                 return getConfigValue(key, def, Integer.class);
             case BLOCKED:
                 throw new ConfigurationException("Configurator is blocked, had errors during configuration");
@@ -528,11 +554,12 @@ public class SkillConfigurator implements ISkillConfigurator {
     }
 
     @Override
-    public double requestDouble(String key) throws ConfigurationException {
+    public double requestDouble(String key, String description) throws ConfigurationException {
         switch (phase) {
             case CONFIG:
                 logger.debug("request Double " + key);
                 requiredParams.put(key, Double.class);
+                parameterDescriptions.put(key, description);
                 return getConfigValue(key, 0.0, Double.class);
             case BLOCKED:
                 throw new ConfigurationException("Configurator is blocked, had errors during configuration");
@@ -542,66 +569,71 @@ public class SkillConfigurator implements ISkillConfigurator {
     }
 
     @Override
-    public double requestOptionalDouble(String key, double def) throws ConfigurationException {
+    public double requestOptionalDouble(String key, double def, String description) throws ConfigurationException {
         switch (phase) {
             case CONFIG:
                 logger.debug("request double " + key + " default: " + def);
                 optionalParams.put(key, new OptionalParam(Double.class, def));
+                parameterDescriptions.put(key, description);
                 return getConfigValue(key, def, Double.class);
             case BLOCKED:
                 throw new ConfigurationException("Configurator is blocked, had errors during configuration");
             default:
                 return getValue(key, def, Double.class);
         }
-
     }
 
     @Override
-    public float requestFloat(String key) throws ConfigurationException {
-        return (float) requestDouble(key);
+    public float requestFloat(String key, String description) throws ConfigurationException {
+        return (float) requestDouble(key, description);
     }
 
     @Override
-    public float requestOptionalFloat(String key, float def) throws ConfigurationException {
-        return (float) requestOptionalDouble(key, def);
+    public float requestOptionalFloat(String key, float def, String description) throws ConfigurationException {
+        return (float) requestOptionalDouble(key, def, description);
     }
 
     @Override
-    public String requestValue(String key) throws ConfigurationException {
+    public String requestValue(String key, String description) throws ConfigurationException {
         switch (phase) {
             case CONFIG:
                 logger.debug("request value '" + key + "'");
                 requiredParams.put(key, String.class);
+                parameterDescriptions.put(key, description);
                 return getConfigValue(key, "", String.class);
             case BLOCKED:
                 throw new ConfigurationException("Configurator is blocked, had errors during configuration");
             default:
                 return getValue(key, String.class);
         }
-
     }
 
     @Override
-    public String requestOptionalValue(String key, @NotNull String def) throws ConfigurationException {
+    public String requestOptionalValue(
+            String key,
+            @NotNull String def,
+            String description
+    ) throws ConfigurationException {
         switch (phase) {
             case CONFIG:
                 logger.debug("request value '" + key + "' default:'" + def + "'");
                 optionalParams.put(key, new OptionalParam(String.class, def));
+                parameterDescriptions.put(key, description);
                 return getConfigValue(key, def, String.class);
             case BLOCKED:
                 throw new ConfigurationException("Configurator is blocked, had errors during configuration");
             default:
                 return getValue(key, def, String.class);
         }
-
     }
 
     @Override
-    public boolean requestBool(String key) throws ConfigurationException {
+    public boolean requestBool(String key, String description) throws ConfigurationException {
         switch (phase) {
             case CONFIG:
                 logger.debug("request bool '" + key + "'");
                 requiredParams.put(key, Boolean.class);
+                parameterDescriptions.put(key, description);
                 return getConfigValue(key, false, Boolean.class);
             case BLOCKED:
                 throw new ConfigurationException("Configurator is blocked, had errors during configuration");
@@ -611,11 +643,16 @@ public class SkillConfigurator implements ISkillConfigurator {
     }
 
     @Override
-    public boolean requestOptionalBool(String key, boolean def) throws ConfigurationException {
+    public boolean requestOptionalBool(
+            String key,
+            boolean def,
+            String description
+    ) throws ConfigurationException {
         switch (phase) {
             case CONFIG:
                 logger.debug("request bool '" + key + "' default: '" + def + "'");
                 optionalParams.put(key, new OptionalParam(Boolean.class, def));
+                parameterDescriptions.put(key, description);
                 return getConfigValue(key, def, Boolean.class);
             case BLOCKED:
                 throw new ConfigurationException("Configurator is blocked, had errors during configuration");
@@ -687,23 +724,39 @@ public class SkillConfigurator implements ISkillConfigurator {
      */
     @Override
     @Deprecated
-    public <T> MemorySlot<T> getSlot(String slotName, Class<T> slotType) throws SkillConfigurationException {
-        return getSlot(slotName, slotType, SlotDirection.BI);
+    public <T> MemorySlot<T> getSlot(
+            String slotName,
+            Class<T> slotType,
+            String description
+    ) throws SkillConfigurationException {
+        return getSlot(slotName, slotType, SlotDirection.BI, description);
     }
 
     @Override
-    public <T> MemorySlotReader<T> getReadSlot(String slotName, Class<T> slotType) throws SkillConfigurationException {
-        return getSlot(slotName, slotType, SlotDirection.IN);
+    public <T> MemorySlotReader<T> getReadSlot(
+            String slotName,
+            Class<T> slotType,
+            String description
+    ) throws SkillConfigurationException {
+        return getSlot(slotName, slotType, SlotDirection.IN, description);
     }
 
     @Override
-    public <T> MemorySlot<T> getReadWriteSlot(String slotName, Class<T> slotType) throws SkillConfigurationException {
-        return getSlot(slotName, slotType, SlotDirection.BI);
+    public <T> MemorySlot<T> getReadWriteSlot(
+            String slotName,
+            Class<T> slotType,
+            String description
+    ) throws SkillConfigurationException {
+        return getSlot(slotName, slotType, SlotDirection.BI, description);
     }
 
     @Override
-    public <T> MemorySlotWriter<T> getWriteSlot(String slotName, Class<T> slotType) throws SkillConfigurationException {
-        return getSlot(slotName, slotType, SlotDirection.OUT);
+    public <T> MemorySlotWriter<T> getWriteSlot(
+            String slotName,
+            Class<T> slotType,
+            String description
+    ) throws SkillConfigurationException {
+        return getSlot(slotName, slotType, SlotDirection.OUT, description);
     }
 
     @Override
@@ -712,13 +765,27 @@ public class SkillConfigurator implements ISkillConfigurator {
     }
 
     @Override
-    public ExitToken requestExitToken(ExitStatus status) throws SkillConfigurationException {
+    public ExitToken requestExitToken(
+            ExitStatus status,
+            String description
+    ) throws SkillConfigurationException {
+
         boolean hasStatus = status.hasProcessingStatus();
         ExitStatus.Status kind = status.getStatus();
-        if (config.checkPSmix) for (ExitToken tok : tokens) {
-            if (tok.getExitStatus().getStatus() == kind && tok.getExitStatus().hasProcessingStatus() != hasStatus)
-                throw new SkillConfigurationException("Mixing Tokens with and without PS is forbidden");
+
+        if (config.checkPSmix) {
+            for (ExitToken tok : tokens) {
+                if (tok.getExitStatus().getStatus() == kind
+                        && tok.getExitStatus().hasProcessingStatus() != hasStatus) {
+                    throw new SkillConfigurationException(
+                            "Mixing Tokens with and without PS is forbidden"
+                    );
+                }
+            }
         }
+
+        exitTokenDescriptions.put(status, description);
+
         return ExitToken.createToken(status, this);
     }
 
