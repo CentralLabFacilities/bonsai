@@ -60,56 +60,77 @@ class Talk : AbstractSkill() {
     private var speakerlang: Language = Language.EN
     private var textLang: Language = Language.EN
     override fun configure(configurator: ISkillConfigurator) {
-        text = configurator.requestValue(KEY_MESSAGE)
-        blocking = configurator.requestOptionalBool(KEY_BLOCKING, blocking)
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
+        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS(), "Talk completed successfully")
         speechActuator = configurator.getActuator("SpeechActuator", SpeechActuator::class.java)
-        text = text.trim().replace(" +".toRegex(), " ")
 
-        val input = configurator.requestOptionalValue(KEY_TEXT_LANGUAGE, "")
-        if(configurator.hasConfigurationKey(KEY_TEXT_LANGUAGE)) {
+        text = configurator.requestValue(KEY_MESSAGE, "Text said by the robot")
+        blocking = configurator.requestOptionalBool(KEY_BLOCKING, blocking, "If true skill ends after talk was completed")
+        val input = configurator.requestOptionalValue(
+            KEY_TEXT_LANGUAGE, "",
+            "Use the given language to speak the (same language) #_MESSAGE. " +
+                    "!! Setting this changes the default of #_USE_LANGUAGE to false, letting the robot always speak in #_LANG !!" +
+                    "set #_USE_LANGUAGE to enable translation of #_MESSAGE from #_LANG to current slot language"
+        )
+
+        if (configurator.hasConfigurationKey(KEY_TEXT_LANGUAGE)) {
             textLang = Language.valueOf(input)
             speakerlang = textLang
-            if(!configurator.hasConfigurationKey(KEY_USE_LANGUAGE)) {
+            if (!configurator.hasConfigurationKey(KEY_USE_LANGUAGE)) {
                 logger.warn("$KEY_TEXT_LANGUAGE is defined, $KEY_USE_LANGUAGE defaults to false")
             }
-            if(configurator.requestOptionalBool(KEY_USE_LANGUAGE, false)) {
+            val use_lang = configurator.requestOptionalBool(
+                KEY_USE_LANGUAGE,
+                false,
+                "Read Language slot to determine speak language"
+            )
+            if (use_lang) {
                 langSlot = configurator.getReadSlot("Language", LanguageType::class.java)
             }
-        } else if (configurator.requestOptionalBool(KEY_USE_LANGUAGE, true)) {
-            langSlot = configurator.getReadSlot("Language", LanguageType::class.java)
+        } else {
+            val use_lang = configurator.requestOptionalBool(
+                KEY_USE_LANGUAGE,
+                true,
+                "Read Language slot to determine speak language"
+            )
+            if (use_lang) {
+                langSlot = configurator.getReadSlot("Language", LanguageType::class.java)
+            }
         }
-
-        if(configurator.requestOptionalBool(KEY_INTERRUPT, false)) {
-            if(!blocking) throw ConfigurationException("cant use $KEY_INTERRUPT while not $KEY_BLOCKING")
+        val interrupt = configurator.requestOptionalBool(
+            KEY_INTERRUPT,
+            false,
+            "Talking can be interrupted (by someone speaking)"
+        )
+        if (interrupt) {
+            if (!blocking) throw ConfigurationException("cant use $KEY_INTERRUPT while not $KEY_BLOCKING")
             tokenInt = configurator.requestExitToken(ExitStatus.ERROR().ps("interrupted"))
             someoneSpeaking = configurator.getSensor("SomeoneTalkingSensor", Boolean::class.java)
         }
 
+        text = text.trim().replace(" +".toRegex(), " ")
     }
 
     override fun init(): Boolean {
-        speakerlang  = langSlot?.recall<LanguageType>()?.value ?: speakerlang
+        speakerlang = langSlot?.recall<LanguageType>()?.value ?: speakerlang
         logger.debug("saying(in ${speakerlang}): $text [$textLang]")
-        sayingComplete = speechActuator!!.sayTranslated(text,speakerlang, textLang)
+        sayingComplete = speechActuator!!.sayTranslated(text, speakerlang, textLang)
         return true
     }
 
     override fun execute(): ExitToken {
         return if (!sayingComplete!!.isDone && blocking) {
-            if(someoneSpeaking?.readLast(50) == true) {
+            if (someoneSpeaking?.readLast(50) == true) {
                 logger.warn("someone is speaking")
                 sayingComplete?.cancel(true)
                 tokenInt!!
-            }
-            else {
+            } else {
                 ExitToken.loop(50)
             }
         } else tokenSuccess!!
     }
 
     override fun end(curToken: ExitToken): ExitToken {
-        if(curToken.exitStatus.isFatal) {
+        if (curToken.exitStatus.isFatal) {
             logger.error("cancel speak")
             sayingComplete?.cancel(true)
         }
