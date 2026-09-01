@@ -131,5 +131,31 @@ class SkillConfiguratorTest {
 
     }
 
+    @Test
+    fun configureDescriptionTest() {
+        val config = SkillConfigurator.getDefaultConf()
+        config.activateObjectAnyway = true
+
+        val conf = SkillConfigurator.createConfigPhase(config, requiredParams)
+        val skill = ParameterSkill()
+        skill.configure(conf)
+        conf.activateObjectPhase(requiredParams + optionalParams, HashMap())
+        skill.configure(conf)
+
+        assertEquals(conf.optionalParams.size.toLong(), 4)
+
+        for (s in conf.optionalParams.keys) {
+            assert(optionalParams.containsKey(s))
+        }
+
+        assertEquals(skill.optBool, false)
+        assertEquals(skill.optDouble, 2.5, 0.0)
+        assertEquals(skill.optInt, 2);
+        assertEquals(skill.optString, "bar");
+        assertEquals(conf.parameterDescriptions["OPTIONAL"], "opt string description");
+        assertEquals(conf.parameterDescriptions["OPTBOOL"], "opt boolean description");
+        assertEquals(conf.parameterDescriptions["OPTINT"], "");
+    }
+
 
 }
