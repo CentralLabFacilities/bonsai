@@ -12,6 +12,7 @@ import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException
 public class ParameterSkill extends AbstractSkill {
 
     private ExitToken tokenSuccess;
+    private ExitToken tokenSuccessDescription;
 
     public static final String KEY_INTEGER = "VALINT";
     public static final String KEY_BOOL = "VALBOOL";
@@ -37,14 +38,15 @@ public class ParameterSkill extends AbstractSkill {
     @Override
     public void configure(ISkillConfigurator configurator) throws SkillConfigurationException {
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
+        tokenSuccessDescription = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus("description"), "token description");
 
-        valString = configurator.requestValue(KEY_VALUE);
-        valBool = configurator.requestBool(KEY_BOOL);
+        valString = configurator.requestValue(KEY_VALUE, "String description");
+        valBool = configurator.requestBool(KEY_BOOL, "Boolean description");
         valDouble = configurator.requestDouble(KEY_DOUBLE);
         valInt = configurator.requestInt(KEY_INTEGER);
 
-        optString = configurator.requestOptionalValue(KEY_OPT_VALUE, valString);
-        optBool = configurator.requestOptionalBool(KEY_OPT_BOOL, valBool);
+        optString = configurator.requestOptionalValue(KEY_OPT_VALUE, valString, "opt string description");
+        optBool = configurator.requestOptionalBool(KEY_OPT_BOOL, valBool, "opt boolean description");
         optDouble = configurator.requestOptionalDouble(KEY_OPT_DOUBLE, valDouble);
         optInt = configurator.requestOptionalInt(KEY_OPT_INTEGER, valInt);
     }
