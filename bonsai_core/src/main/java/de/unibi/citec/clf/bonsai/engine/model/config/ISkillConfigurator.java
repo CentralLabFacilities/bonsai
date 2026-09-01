@@ -10,22 +10,90 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
  */
 public interface ISkillConfigurator extends IObjectConfigurator {
 
-    <T> Sensor<T> getSensor(String sensorName, Class<T> dataType) throws SkillConfigurationException;
+    <T> Sensor<T> getSensor(
+            String sensorName,
+            Class<T> dataType
+    ) throws SkillConfigurationException;
 
-    <T extends Actuator> T getActuator(String actuatorName, Class<T> actuatorType) throws SkillConfigurationException;
+    <T extends Actuator> T getActuator(
+            String actuatorName,
+            Class<T> actuatorType
+    ) throws SkillConfigurationException;
+
 
     @Deprecated
-    <T> MemorySlot<T> getSlot(String slotName, Class<T> slotType) throws SkillConfigurationException;
+    default <T> MemorySlot<T> getSlot(
+            String slotName,
+            Class<T> slotType
+    ) throws SkillConfigurationException {
+        return getSlot(slotName, slotType, "");
+    }
 
-    <T> MemorySlotReader<T> getReadSlot(String slotName, Class<T> slotType) throws SkillConfigurationException;
+    @Deprecated
+    <T> MemorySlot<T> getSlot(
+            String slotName,
+            Class<T> slotType,
+            String description
+    ) throws SkillConfigurationException;
 
-    <T> MemorySlot<T> getReadWriteSlot(String slotName, Class<T> slotType) throws SkillConfigurationException;
 
-    <T> MemorySlotWriter<T> getWriteSlot(String slotName, Class<T> slotType) throws SkillConfigurationException;
+    default <T> MemorySlotReader<T> getReadSlot(
+            String slotName,
+            Class<T> slotType
+    ) throws SkillConfigurationException {
+        return getReadSlot(slotName, slotType, "");
+    }
 
-    public TransformLookup getTransform() throws SkillConfigurationException;
+    <T> MemorySlotReader<T> getReadSlot(
+            String slotName,
+            Class<T> slotType,
+            String description
+    ) throws SkillConfigurationException;
 
-    ExitToken requestExitToken(ExitStatus status) throws SkillConfigurationException;
+
+    default <T> MemorySlot<T> getReadWriteSlot(
+            String slotName,
+            Class<T> slotType
+    ) throws SkillConfigurationException {
+        return getReadWriteSlot(slotName, slotType, "");
+    }
+
+    <T> MemorySlot<T> getReadWriteSlot(
+            String slotName,
+            Class<T> slotType,
+            String description
+    ) throws SkillConfigurationException;
+
+
+    default <T> MemorySlotWriter<T> getWriteSlot(
+            String slotName,
+            Class<T> slotType
+    ) throws SkillConfigurationException {
+        return getWriteSlot(slotName, slotType, "");
+    }
+
+    <T> MemorySlotWriter<T> getWriteSlot(
+            String slotName,
+            Class<T> slotType,
+            String description
+    ) throws SkillConfigurationException;
+
+
+    TransformLookup getTransform()
+            throws SkillConfigurationException;
+
+
+    default ExitToken requestExitToken(
+            ExitStatus status
+    ) throws SkillConfigurationException {
+        return requestExitToken(status, "");
+    }
+
+    ExitToken requestExitToken(
+            ExitStatus status,
+            String description
+    ) throws SkillConfigurationException;
+
 
     boolean hasConfigurationKey(String key);
 

@@ -25,6 +25,7 @@ public class ObjectConfigurator implements IObjectConfigurator {
     private Map<String, Class> requestedParams = new HashMap<>();
     private Map<String, Class> optionalParams = new HashMap<>();
     private Map<String, String> unusedParams = new HashMap<>();
+    private final Map<String, String> parameterDescriptions = new HashMap<>();
     private ObjectConfigurationPhase phase = ObjectConfigurationPhase.BLOCKED;
     private List<ConfigurationException> exceptions = new LinkedList<>();
 
@@ -87,6 +88,10 @@ public class ObjectConfigurator implements IObjectConfigurator {
         return optionalParams;
     }
 
+    public Map<String, String> getParameterDescriptions() {
+        return Collections.unmodifiableMap(parameterDescriptions);
+    }
+
     private <T> T castValue(String value, Class<T> type) throws ConfigurationException {
         try {
             if (type.equals(Double.class)) {
@@ -126,9 +131,15 @@ public class ObjectConfigurator implements IObjectConfigurator {
 
     @Override
     public int requestInt(String key) throws ConfigurationException {
+        return requestInt(key, "");
+    }
+
+    @Override
+    public int requestInt(String key, String description) throws ConfigurationException {
         switch (phase) {
             case CONFIG:
                 requestedParams.put(key, Integer.class);
+                parameterDescriptions.put(key, description);
                 return 0;
             case BLOCKED:
                 throw new ConfigurationException(BLOCKED_ERROR);
@@ -139,9 +150,16 @@ public class ObjectConfigurator implements IObjectConfigurator {
 
     @Override
     public int requestOptionalInt(String key, int def) throws ConfigurationException {
+        return requestOptionalInt(key, def, "");
+    }
+
+    @Override
+    public int requestOptionalInt(String key, int def, String description)
+            throws ConfigurationException {
         switch (phase) {
             case CONFIG:
                 optionalParams.put(key, Integer.class);
+                parameterDescriptions.put(key, description);
                 return def;
             case BLOCKED:
                 throw new ConfigurationException(BLOCKED_ERROR);
@@ -152,9 +170,16 @@ public class ObjectConfigurator implements IObjectConfigurator {
 
     @Override
     public double requestDouble(String key) throws ConfigurationException {
+        return requestDouble(key, "");
+    }
+
+    @Override
+    public double requestDouble(String key, String description)
+            throws ConfigurationException {
         switch (phase) {
             case CONFIG:
                 requestedParams.put(key, Double.class);
+                parameterDescriptions.put(key, description);
                 return 0.0;
             case BLOCKED:
                 throw new ConfigurationException(BLOCKED_ERROR);
@@ -164,62 +189,111 @@ public class ObjectConfigurator implements IObjectConfigurator {
     }
 
     @Override
-    public double requestOptionalDouble(String key, double def) throws ConfigurationException {
+    public double requestOptionalDouble(String key, double def)
+            throws ConfigurationException {
+        return requestOptionalDouble(key, def, "");
+    }
+
+    @Override
+    public double requestOptionalDouble(
+            String key,
+            double def,
+            String description
+    ) throws ConfigurationException {
         switch (phase) {
             case CONFIG:
                 optionalParams.put(key, Double.class);
+                parameterDescriptions.put(key, description);
                 return def;
             case BLOCKED:
                 throw new ConfigurationException(BLOCKED_ERROR);
             default:
                 return getValue(key, def, Double.class);
         }
-
     }
 
     @Override
     public float requestFloat(String key) throws ConfigurationException {
-        return (float) requestDouble(key);
+        return requestFloat(key, "");
     }
 
     @Override
-    public float requestOptionalFloat(String key, float def) throws ConfigurationException {
-        return (float) requestOptionalDouble(key, def);
+    public float requestFloat(String key, String description)
+            throws ConfigurationException {
+        return (float) requestDouble(key, description);
+    }
+
+    @Override
+    public float requestOptionalFloat(String key, float def)
+            throws ConfigurationException {
+        return requestOptionalFloat(key, def, "");
+    }
+
+    @Override
+    public float requestOptionalFloat(
+            String key,
+            float def,
+            String description
+    ) throws ConfigurationException {
+        return (float) requestOptionalDouble(key, def, description);
     }
 
     @Override
     public String requestValue(String key) throws ConfigurationException {
+        return requestValue(key, "");
+    }
+
+    @Override
+    public String requestValue(String key, String description)
+            throws ConfigurationException {
         switch (phase) {
             case CONFIG:
                 requestedParams.put(key, String.class);
+                parameterDescriptions.put(key, description);
                 return "";
             case BLOCKED:
                 throw new ConfigurationException(BLOCKED_ERROR);
             default:
                 return getValue(key, null, String.class);
         }
-
     }
 
     @Override
-    public String requestOptionalValue(String key, @NotNull String def) throws ConfigurationException {
+    public String requestOptionalValue(String key, @NotNull String def)
+            throws ConfigurationException {
+        return requestOptionalValue(key, def, "");
+    }
+
+    @Override
+    public String requestOptionalValue(
+            String key,
+            @NotNull String def,
+            String description
+    ) throws ConfigurationException {
         switch (phase) {
             case CONFIG:
                 optionalParams.put(key, String.class);
+                parameterDescriptions.put(key, description);
                 return def;
             case BLOCKED:
                 throw new ConfigurationException(BLOCKED_ERROR);
             default:
                 return getValue(key, def, String.class);
         }
-
     }
 
     @Override
     public boolean requestBool(String key) throws ConfigurationException {
+        return requestBool(key, "");
+    }
+
+    @Override
+    public boolean requestBool(String key, String description)
+            throws ConfigurationException {
         switch (phase) {
             case CONFIG:
                 requestedParams.put(key, Boolean.class);
+                parameterDescriptions.put(key, description);
                 return false;
             case BLOCKED:
                 throw new ConfigurationException(BLOCKED_ERROR);
@@ -229,10 +303,21 @@ public class ObjectConfigurator implements IObjectConfigurator {
     }
 
     @Override
-    public boolean requestOptionalBool(String key, boolean def) throws ConfigurationException {
+    public boolean requestOptionalBool(String key, boolean def)
+            throws ConfigurationException {
+        return requestOptionalBool(key, def, "");
+    }
+
+    @Override
+    public boolean requestOptionalBool(
+            String key,
+            boolean def,
+            String description
+    ) throws ConfigurationException {
         switch (phase) {
             case CONFIG:
                 optionalParams.put(key, Boolean.class);
+                parameterDescriptions.put(key, description);
                 return def;
             case BLOCKED:
                 throw new ConfigurationException(BLOCKED_ERROR);

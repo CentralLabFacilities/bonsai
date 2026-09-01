@@ -158,6 +158,10 @@ public class SkillRunner implements Runnable {
         return configurator.getSlotReaderRequests();
     }
 
+    public Map<String, String> inspectionGetSlotDescription() {
+        return configurator.getSlotDescriptions();
+    }
+
     public Map<String, Class<?>> inspectionGetOutSlots() {
         return configurator.getSlotWriterRequests();
     }
@@ -170,6 +174,14 @@ public class SkillRunner implements Runnable {
 
     public Map<String, SkillConfigurator.OptionalParam> inspectionGetAllOptionalParams() {
         return configurator.getOptionalParams();
+    }
+
+    public Map<String, String> inspectionGetAllParamsDescription() {
+        return configurator.getParameterDescriptions();
+    }
+
+    public Map<ExitStatus, String> inspectionGetTokenDescription() {
+        return configurator.getExitTokenDescriptions();
     }
 
     public Set<String> inspectionGetUnusedParams() {
