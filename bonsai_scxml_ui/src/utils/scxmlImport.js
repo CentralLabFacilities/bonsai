@@ -164,11 +164,15 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                 if (count > maxStatesInAnyLane) maxStatesInAnyLane = count;
             });
 
-            // 2. Kompakte Dimensionen exakt berechnen
-            const laneHeight = 110;
+            // 2. Kompakte Dimensionen dynamisch berechnen
+            // Falls Lanes Compound-States enthalten, brauchen sie mehr vertikale Höhe
+            const hasCompoundLane = branchElements.some(
+                (b) => Array.from(b.children).filter((c) => c.localName === "state").length > 0
+            );
+            const laneHeight = hasCompoundLane ? 150 : 110;
             const headerHeight = 40;
-            const containerWidth = Math.max(260, maxStatesInAnyLane * 200 + 40);
-            const containerHeight = headerHeight + branchElements.length * laneHeight;
+            const containerWidth = Math.max(300, maxStatesInAnyLane * 220 + 60);
+            const containerHeight = headerHeight + branchElements.length * laneHeight + 10;
 
             // 3. Parallel Container-Knoten anlegen
             newNodes.push({
@@ -209,18 +213,115 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                     }
                 });
 
-            // 5. Kind-Knoten kompakt in den Lanes platzieren
+            // 5. Kind-Knoten in den Lanes platzieren (mit Compound-Unterstützung)
             for (let laneIdx = 0; laneIdx < branchElements.length; laneIdx++) {
                 const branchElem = branchElements[laneIdx];
-                const innerStateElements = Array.from(branchElem.children).filter((c) => c.localName === "state");
-                const statesToCreate = innerStateElements.length > 0 ? innerStateElements : [branchElem];
+                const branchId = branchElem.getAttribute("id");
+                const innerStates = Array.from(branchElem.children).filter((c) => c.localName === "state");
 
-                for (let stateIdx = 0; stateIdx < statesToCreate.length; stateIdx++) {
-                    const stElem = statesToCreate[stateIdx];
-                    const stId = stElem.getAttribute("id");
+                // FALL A1: Die Lane ist ein Compound State (z. B. TalkPart mit dialog.Talk)
+                if (innerStates.length > 0) {
+                    const compoundNodeId = getNodeId();
+                    const branchTransElems = Array.from(branchElem.children).filter((c) => c.localName === "transition");
+
+                    const parentEvents = branchTransElems.map((tr) => {
+                        const rawEvent = tr.getAttribute("event") || "";
+                        const handleId = rawEvent.includes('.*')
+                            ? (rawEvent.split('.*')[0].split('.').pop() || 'success')
+                            : (rawEvent.split('.').pop() || rawEvent);
+                        return {
+                            id: handleId,
+                            name: rawEvent,
+                            rawEvent: rawEvent,
+                            target: tr.getAttribute("target"),
+                            cond: tr.getAttribute("cond") || "",
+                        };
+                    });
+
+                    branchTransElems.forEach((tr) => {
+                        const eventName = tr.getAttribute("event") || "";
+                        const targetState = tr.getAttribute("target");
+                        const cond = tr.getAttribute("cond") || "";
+                        const assignElem = Array.from(tr.children).find((c) => c.localName === "assign");
+
+                        if (targetState) {
+                            rawTransitions.push({
+                                sourceNodeId: compoundNodeId,
+                                sourceSkillName: branchId,
+                                eventId: eventName,
+                                targetStateName: targetState,
+                                cond: cond.trim(),
+                                assignLocation: assignElem?.getAttribute("location")?.trim() || "",
+                                assignExpr: assignElem?.getAttribute("expr")?.trim() || "",
+                            });
+                        }
+                    });
+
+                    const compoundWidth = Math.max(220, innerStates.length * 190 + 30);
+                    const compoundHeight = laneHeight - 20;
+
+                    // Compound-Rahmen in der Lane anlegen
+                    newNodes.push({
+                        id: compoundNodeId,
+                        position: { x: 20, y: headerHeight + 10 + laneIdx * laneHeight },
+                        parentId: parallelNodeId,
+                        extent: "parent",
+                        type: "compound",
+                        style: { width: compoundWidth, height: compoundHeight },
+                        data: {
+                            label: branchId.split(".").pop().split("#")[0], // Zeigt sauber "TalkPart"
+                            fullSkillName: branchId,
+                            isInitial: false, // Kein fetter Start-Rahmen!
+                            events: parentEvents,
+                        },
+                    });
+
+                    // Sub-State in den Compound-Kasten legen (z. B. dialog.Talk)
+                    for (let sIdx = 0; sIdx < innerStates.length; sIdx++) {
+                        const stElem = innerStates[sIdx];
+                        const stId = stElem.getAttribute("id");
+                        const stNodeId = getNodeId();
+
+                        Array.from(stElem.children)
+                            .filter((c) => c.localName === "transition")
+                            .forEach((tr) => {
+                                const eventName = tr.getAttribute("event") || "";
+                                const targetState = tr.getAttribute("target");
+                                const cond = tr.getAttribute("cond") || "";
+                                const assignElem = Array.from(tr.children).find((c) => c.localName === "assign");
+
+                                if (targetState) {
+                                    rawTransitions.push({
+                                        sourceNodeId: stNodeId,
+                                        sourceSkillName: stId,
+                                        eventId: eventName,
+                                        targetStateName: targetState,
+                                        cond: cond.trim(),
+                                        assignLocation: assignElem?.getAttribute("location")?.trim() || "",
+                                        assignExpr: assignElem?.getAttribute("expr")?.trim() || "",
+                                    });
+                                }
+                            });
+
+                        // isInitial bewusst auf FALSE, damit Talk nicht fett umrandet wird
+                        const nodeData = await buildSkillNodeData(stId, false, false, "", stElem);
+
+                        newNodes.push({
+                            id: stNodeId,
+                            position: { x: 15 + sIdx * 180, y: 35 },
+                            parentId: compoundNodeId,
+                            extent: "parent",
+                            type: "custom",
+                            data: nodeData,
+                        });
+                    }
+                }
+                // FALL A2: Die Lane ist ein normaler State (z. B. Wait)
+                else {
+                    const stId = branchElem.getAttribute("id");
                     const stNodeId = getNodeId();
 
-                    Array.from(stElem.children)
+                    Array.from(branchElem.children)
                         .filter((c) => c.localName === "transition")
                         .forEach((tr) => {
                             const eventName = tr.getAttribute("event") || "";
@@ -241,12 +342,11 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                             }
                         });
 
-                    const nodeData = await buildSkillNodeData(stId, false, false, "", stElem);
+                    const nodeData = await buildSkillNodeData(stId, false, false, "", branchElem);
 
                     newNodes.push({
                         id: stNodeId,
-                        // Zentriert in der jeweiligen Lane platzieren
-                        position: { x: 20 + stateIdx * 200, y: headerHeight + 15 + laneIdx * laneHeight },
+                        position: { x: 20, y: headerHeight + 25 + laneIdx * laneHeight },
                         parentId: parallelNodeId,
                         extent: "parent",
                         type: "custom",
@@ -459,6 +559,7 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             target: targetNode.id,
             sourceHandle: eventHandleId,
             targetHandle: null,
+            type: sourceNode.id === targetNode.id ? "smoothstep" : "default",
             label: labelText,
             markerEnd: { type: MarkerType.ArrowClosed },
             data: {
