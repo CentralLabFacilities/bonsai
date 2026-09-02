@@ -1,0 +1,30 @@
+:root {
+  --background: #1e2c3a;
+  --header-background: #3e4e5c;;
+  --sidebar-background: #1e2c3a;
+  --panel-background: #ffffffc0;
+  --border: #000000;
+  --text-color: #ffffff;
+  --primary-color: #857492;
+  --secondary-color:  #3e4e5c;
+  
+  
+}
+
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0px;
+  
+}
+
+
+body  {
+
+  font-family: Arial, sans-serif;
+  background-color: var(--background);
+  color: var(--text-color); 
+}

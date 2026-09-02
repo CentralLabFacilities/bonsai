@@ -1,0 +1,10 @@
+{
+  "identifier": "default",
+  "description": "Default capability for Bonsai UI",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "dialog:default",
+    "fs:default"
+  ]
+}
