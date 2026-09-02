@@ -267,12 +267,28 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             const compoundNodeId = getNodeId();
             const compoundInitial = stateElem.getAttribute("initial") || "";
 
-            // Dynamische Dimensionierung basierend auf der Anzahl der Sub-States
             const headerHeight = 45;
             const containerWidth = Math.max(260, childStates.length * 220 + 40);
             const containerHeight = headerHeight + 110;
 
-            // 1. Compound Frame Node erzeugen
+            // 1. Parent-Level Transitions auslesen
+            const parentTransitionElems = Array.from(stateElem.children).filter((c) => c.localName === "transition");
+            const parentEvents = parentTransitionElems.map((tr) => {
+                const rawEvent = tr.getAttribute("event") || "";
+                const handleId = rawEvent.includes('.*')
+                    ? (rawEvent.split('.*')[0].split('.').pop() || 'success')
+                    : (rawEvent.split('.').pop() || rawEvent);
+
+                return {
+                    id: handleId,
+                    name: rawEvent,
+                    rawEvent: rawEvent,
+                    target: tr.getAttribute("target"),
+                    cond: tr.getAttribute("cond") || "",
+                };
+            });
+
+            // 2. Compound Frame Node anlegen
             newNodes.push({
                 id: compoundNodeId,
                 position: { x, y },
@@ -282,7 +298,7 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                     label: fullSkillName.split(".").pop().split("#")[0],
                     fullSkillName: fullSkillName,
                     isInitial: isInitial,
-                    events: [],
+                    events: parentEvents, // Wichtig für die Handles im CompoundNode
                 },
             });
 
@@ -308,14 +324,14 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                     }
                 });
 
-            // 3. Sub-States als vollwertige, normale Skills in den Kasten setzen
+            // 4. Sub-States als vollwertige, normale Skills in den Kasten setzen
             for (let i = 0; i < childStates.length; i++) {
                 const csElem = childStates[i];
                 const csId = csElem.getAttribute("id");
                 const csNodeId = getNodeId();
                 const isSubInitial = csId === compoundInitial;
 
-                // Transitions des Sub-States (bleiben intern oder gehen nach außen)
+                // Transitions des Sub-States
                 Array.from(csElem.children)
                     .filter((c) => c.localName === "transition")
                     .forEach((tr) => {
@@ -344,7 +360,7 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                     position: { x: 20 + i * 220, y: headerHeight + 10 },
                     parentId: compoundNodeId,
                     extent: "parent",
-                    type: "custom", // ganz normale Skill-Node
+                    type: "custom",
                     data: nodeData,
                 });
             }
@@ -428,9 +444,13 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             ? (trans.eventId.split(".*")[0].split(".").pop() || "success")
             : (trans.eventId.split(".").pop() || trans.eventId);
 
-        const edgeId = `edge-${sourceNode.id}-${eventHandleId}-${targetNode.id}-${crypto.randomUUID()}`;
+        const isFromCompound = sourceNode.type === "compound";
         const hasCond = Boolean(trans.cond && trans.cond.trim() !== "");
-        const labelText = hasCond ? `${eventHandleId} [${trans.cond}]` : eventHandleId;
+        const labelText = isFromCompound
+            ? (hasCond ? `[${trans.cond}]` : "")
+            : (hasCond ? `${eventHandleId} [${trans.cond}]` : eventHandleId);
+
+        const edgeId = `edge-${sourceNode.id}-${eventHandleId}-${targetNode.id}-${crypto.randomUUID()}`;
 
         // Kante anlegen
         newEdges.push({
@@ -452,6 +472,8 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
         // Event-Eintrag im Quell-Knoten für DetailsPanel & ConditionModal
         sourceNode.data.events.push({
             id: eventHandleId,
+            name: trans.eventId,
+            rawEvent: trans.eventId,
             selectedPackage: targetNode.data.fullSkillName ? targetNode.data.fullSkillName.split(".")[0] : "",
             selectedSkill: targetNode.data.fullSkillName ? targetNode.data.fullSkillName.split("#")[0] : "",
             target: targetNode.id,

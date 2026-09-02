@@ -1106,7 +1106,6 @@
   border-radius: 6px;
   position: relative;
   box-sizing: border-box;
-  pointer-events: none; /* Klicks gehen durch auf die Kind-Nodes */
 }
 
 .compound-frame-node.initial-compound {
@@ -1117,11 +1116,45 @@
   position: absolute;
   top: 8px;
   left: 12px;
-  pointer-events: all;
 }
 
 .compound-frame-title {
   font-size: 13px;
   font-weight: 700;
   color: #000000;
+}
+
+/* Parent-Exit-Handles am rechten Rand */
+.compound-frame-exits {
+  position: absolute;
+  bottom: 8px;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: all;
+}
+
+.compound-frame-exit-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 12px;
+}
+
+.compound-frame-exit-label {
+  font-size: 10px;
+  color: #000000;
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+.compound-frame-source-handle {
+  background-color: #000000 !important;
+  border: 1.5px solid #ffffff !important;
+  width: 8px !important;
+  height: 8px !important;
 }
