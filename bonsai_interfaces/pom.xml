@@ -4,7 +4,7 @@
 
     <!-- The Basics -->
     <groupId>de.unibi.citec.clf</groupId>
-    <version>0.8-SNAPSHOT</version>
+    <version>0.9-SNAPSHOT</version>
     <artifactId>bonsai_interfaces</artifactId>
     <packaging>jar</packaging>
 
@@ -31,7 +31,7 @@
         <dependency>
             <groupId>de.unibi.citec.clf</groupId>
             <artifactId>bonsai_core</artifactId>
-            <version>0.8-SNAPSHOT</version>
+            <version>0.9-SNAPSHOT</version>
         </dependency>
 
         <!-- util.slam -->

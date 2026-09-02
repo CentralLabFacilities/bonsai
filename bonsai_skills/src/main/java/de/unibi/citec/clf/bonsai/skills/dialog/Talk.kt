@@ -64,11 +64,11 @@ class Talk : AbstractSkill() {
         speechActuator = configurator.getActuator("SpeechActuator", SpeechActuator::class.java)
 
         text = configurator.requestValue(KEY_MESSAGE, "Text said by the robot")
-        blocking = configurator.requestOptionalBool(KEY_BLOCKING, blocking, "If true skill ends after talk was completed")
+        blocking = configurator.requestOptionalBool(KEY_BLOCKING, blocking, "Wait for Talk to finished")
         val input = configurator.requestOptionalValue(
             KEY_TEXT_LANGUAGE, "",
             "Use the given language to speak the (same language) #_MESSAGE. " +
-                    "!! Setting this changes the default of #_USE_LANGUAGE to false, letting the robot always speak in #_LANG !!" +
+                    "!! Setting this changes the default of #_USE_LANGUAGE to false !!" +
                     "set #_USE_LANGUAGE to enable translation of #_MESSAGE from #_LANG to current slot language"
         )
 

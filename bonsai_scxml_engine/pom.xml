@@ -31,7 +31,7 @@
         <dependency>
             <groupId>de.unibi.citec.clf</groupId>
             <artifactId>bonsai_interfaces</artifactId>
-            <version>0.8-SNAPSHOT</version>
+            <version>0.9-SNAPSHOT</version>
         </dependency>
 
         <dependency>
@@ -91,7 +91,7 @@
         <dependency>
             <groupId>de.unibi.citec.clf</groupId>
             <artifactId>bonsai_skills</artifactId>
-            <version>0.8-SNAPSHOT</version>
+            <version>0.9-SNAPSHOT</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -108,7 +108,7 @@
         <dependency>
             <groupId>de.unibi.citec.clf</groupId>
             <artifactId>bonsai_core</artifactId>
-            <version>0.8-SNAPSHOT</version>
+            <version>0.9-SNAPSHOT</version>
             <scope>compile</scope>
         </dependency>
 
