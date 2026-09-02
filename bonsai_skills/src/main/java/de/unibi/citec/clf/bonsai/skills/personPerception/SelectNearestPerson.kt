@@ -16,19 +16,28 @@ import de.unibi.citec.clf.btl.units.LengthUnit
  *
  * <pre>
  *
+ * Options:
+ *  #_MAX_DIST:              [double] Optional (Default: Double.MAX_VALUE)
+ *                              -> Maximum distance in mm within which a person
+ *                                 is considered as a candidate.
+ *
  * Slots:
- * PersonDataListSlot:             [PersonDataList] [Read]
- * -> All found persons in a list
- * PositionSlot:                   [Position] [Read]
- * -> the robot position to calculate relative distance.
- * PersonDataSlot:             [PersonData] [Write]
- * -> The nearest person
+ *  PersonDataListSlot:      [PersonDataList] [Read]
+ *                              -> List of detected persons from which the nearest
+ *                                 person is selected.
+ *
+ *  PositionDataSlot:        [Pose2D] [Read]
+ *                              -> Current robot position used to calculate the
+ *                                 distance to each person.
+ *
+ *  PersonDataSlot:          [PersonData] [Write]
+ *                              -> Memory slot in which the nearest person is stored.
  *
  * ExitTokens:
- * success:         The nearest Person has been written to memory.
- * error:           The nearest Person has not been written to memory.
+ *  success:                 The nearest person was found and written to memory.
+ *  error:                   No person was within the configured maximum distance.
  *
-</pre> *
+ * </pre>
  *
  * @author pvonneumanncosel
  */

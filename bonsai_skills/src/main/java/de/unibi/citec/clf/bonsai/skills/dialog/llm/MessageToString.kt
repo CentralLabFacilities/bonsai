@@ -10,10 +10,26 @@ import de.unibi.citec.clf.btl.data.speech.llm.Message
 import de.unibi.citec.clf.btl.data.speech.llm.Role
 
 /**
- *  Load Message content into a string slot
+ * Load Message content into a string slot.
+ *
+ * <pre>
+ *
+ * Slots:
+ * Message: [Message] (Read)
+ *      -> Memory slot containing the Message to be converted.
+ *      -> The Message must have the AGENT role.
+ *
+ * Text: [String] (Write)
+ *      -> Memory slot where the content of the Message is stored.
+ *
+ * ExitTokens:
+ * success:              Message content successfully converted to a String
+ *
+ * </pre>
  *
  * @author lruegeme
  */
+
 class MessageToString : AbstractSkill() {
 
     private var tokenSuccess: ExitToken? = null

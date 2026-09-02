@@ -8,7 +8,7 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 
 /**
- * Reads a StringSlot and returns wether there was content inside
+ * Reads a StringSlot and returns whether there was content inside
  *
  * <pre>
  *
