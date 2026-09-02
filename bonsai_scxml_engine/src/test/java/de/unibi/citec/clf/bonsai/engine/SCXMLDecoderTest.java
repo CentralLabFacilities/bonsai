@@ -81,6 +81,7 @@ public class SCXMLDecoderTest {
         assertEquals("0", data.get("no_change_test_val").getExpr());
         assertEquals("1", data.get("no_change_test_val_s1").getExpr());
         assertEquals("2", data.get("no_change_test_val_s2_s1").getExpr());
+        assertEquals("true", data.get("_USE_LANG").getExpr());
     }
 
     @Test

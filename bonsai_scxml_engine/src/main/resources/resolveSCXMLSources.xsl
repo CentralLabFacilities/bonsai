@@ -23,6 +23,16 @@ the 'src' attribute of states. - Appends a suffix to all sourced 'id' and
     <xsl:template match="@src">
         <xsl:param name="suffix" tunnel="yes"/>
         <xsl:param name="prefix" tunnel="yes"/>
+        <!-- Globals already defined by parent SCXMLs -->
+        <xsl:param name="ancestorGlobalIds"
+                   tunnel="yes"
+                   select="()"/>
+        <!-- Globals defined by THIS state machine -->
+        <xsl:variable name="currentGlobalIds"
+                      select="root(.)/scxml/datamodel/data[
+                          (starts-with(@id, '#') or starts-with(@id, '_'))
+                          and @id != '#_SLOTS'
+                      ]/@id"/>
         <xsl:variable name="full" select="."/>
         <xsl:variable name="stateid" select="../@id"/>
         <xsl:variable name="inheritSlots"
@@ -57,9 +67,32 @@ the 'src' attribute of states. - Appends a suffix to all sourced 'id' and
                     <xsl:with-param name="prefix"
                                     select="concat($stateid, '.')"
                                     tunnel="yes"/>
+                    <xsl:with-param name="ancestorGlobalIds"
+                                    select="distinct-values(($ancestorGlobalIds, $currentGlobalIds))"
+                                    tunnel="yes"/>
                 </xsl:apply-templates>
             </xsl:matching-substring>
         </xsl:analyze-string>
+    </xsl:template>
+
+    <!--
+    Global data that already exists in a parent SCXML is omitted.
+
+    A global introduced in this SCXML is retained.
+    -->
+    <xsl:template match="scxml/datamodel/data[
+        (starts-with(@id, '#') or starts-with(@id, '_'))
+        and @id != '#_SLOTS'
+    ]">
+        <xsl:param name="ancestorGlobalIds"
+                   tunnel="yes"
+                   select="()"/>
+
+        <xsl:if test="not(@id = $ancestorGlobalIds)">
+            <xsl:copy>
+                <xsl:apply-templates select="@* | node()"/>
+            </xsl:copy>
+        </xsl:if>
     </xsl:template>
 
     <!-- Change the 'id' attribute of all <state>, <final> and <parallel> nodes. -->
@@ -145,14 +178,17 @@ the 'src' attribute of states. - Appends a suffix to all sourced 'id' and
 
     <xsl:template match="scxml/datamodel/data/@id">
         <xsl:param name="suffix" tunnel="yes"/>
+
         <xsl:variable name="dataSuffix"
                       select="replace($suffix, '#', '_')"/>
 
         <xsl:attribute name="id">
             <xsl:choose>
-                <xsl:when test=". = '#_SLOTS' or . = '#_STATE_PREFIX'">
+                <!-- Global data and SLOTS remain unchanged-->
+                <xsl:when test="starts-with(., '#_SLOTS') or starts-with(., '_')">
                     <xsl:value-of select="."/>
                 </xsl:when>
+                <!-- Local data -->
                 <xsl:otherwise>
                     <xsl:value-of select="concat(., $dataSuffix)"/>
                 </xsl:otherwise>
@@ -197,7 +233,15 @@ the 'src' attribute of states. - Appends a suffix to all sourced 'id' and
                       select="ancestor::state[@src][1]/@id"/>
 
         <xsl:attribute name="location">
-            <xsl:value-of select="concat(., '_', $stateid, $dataSuffix)"/>
+            <xsl:choose>
+                <xsl:when test="starts-with(., '#')">
+                    <xsl:value-of select="."/>
+                </xsl:when>
+                <xsl:otherwise>
+                    <xsl:value-of
+                            select="concat(., '_', $stateid, $dataSuffix)"/>
+                </xsl:otherwise>
+            </xsl:choose>
         </xsl:attribute>
     </xsl:template>
 
@@ -213,9 +257,18 @@ the 'src' attribute of states. - Appends a suffix to all sourced 'id' and
                       select="replace($suffix, '#', '_')"/>
 
         <xsl:attribute name="location">
-            <xsl:value-of select="concat(., $dataSuffix)"/>
+            <xsl:choose>
+                <xsl:when test="starts-with(., '#')">
+                    <xsl:value-of select="."/>
+                </xsl:when>
+                <xsl:otherwise>
+                    <xsl:value-of select="concat(., $dataSuffix)"/>
+                </xsl:otherwise>
+            </xsl:choose>
         </xsl:attribute>
     </xsl:template>
+
+
 
     <!-- Change the 'events' attribute of <transition nodes. -->
     <xsl:template match="send/@event">
