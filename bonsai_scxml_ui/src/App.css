@@ -1097,94 +1097,31 @@
 .parallel-group-lane-row:last-child {
   border-bottom: none;
 }
-/* ================= COMPOUND NODE ================= */
-.compound-node-container {
-  background: #f8fafc;
-  border: 2px solid #6366f1;
-  border-radius: 8px;
-  min-width: 260px;
-  padding: 10px;
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.12);
+/* ================= COMPOUND FRAME CONTAINER ================= */
+.compound-frame-node {
+  width: 100%;
+  height: 100%;
+  background-color: transparent;
+  border: 1.5px solid #000000;
+  border-radius: 6px;
   position: relative;
+  box-sizing: border-box;
+  pointer-events: none; /* Klicks gehen durch auf die Kind-Nodes */
 }
 
-.initial-compound {
-  border: 3.5px solid #4338ca !important;
+.compound-frame-node.initial-compound {
+  border: 3px solid #000000;
 }
 
-.compound-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #e0e7ff;
+.compound-frame-header {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  pointer-events: all;
 }
 
-.compound-badge {
-  background-color: #6366f1;
-  color: white;
-  font-size: 10px;
-  font-weight: bold;
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-
-.compound-initial-badge {
-  font-size: 10px;
-  color: #4f46e5;
-  background: #e0e7ff;
-  padding: 2px 6px;
-  border-radius: 4px;
-  margin-left: auto;
-}
-
-.compound-inner-flow {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 8px;
-}
-
-.compound-substate-card {
-  background: #ffffff;
-  border: 1px solid #cbd5e1;
-  border-radius: 4px;
-  padding: 6px 8px;
-}
-
-.substate-header .substate-name {
-  font-weight: 600;
-  font-size: 12px;
-  color: #1e293b;
-}
-
-.substate-loop-item {
-  font-size: 10px;
-  color: #4338ca;
-  background: #eef2ff;
-  padding: 2px 5px;
-  border-radius: 3px;
-  margin-top: 4px;
-}
-
-.compound-events {
-  margin-top: 8px;
-  border-top: 1px dashed #cbd5e1;
-  padding-top: 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.compound-event-row {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding-right: 8px;
-}
-
-.compound-event-name {
-  font-size: 11px;
-  color: #475569;
+.compound-frame-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #000000;
 }

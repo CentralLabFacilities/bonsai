@@ -258,14 +258,107 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
         }
 
         // ==========================================
-        // FALL B: REGULÄRER STATE / SUBMACHINE / INIT
+        // FALL B: COMPOUND STATE
+        // ==========================================
+        const childStates = Array.from(stateElem.children).filter((c) => c.localName === "state");
+        const isCompound = !isParallel && childStates.length > 0;
+
+        if (isCompound) {
+            const compoundNodeId = getNodeId();
+            const compoundInitial = stateElem.getAttribute("initial") || "";
+
+            // Dynamische Dimensionierung basierend auf der Anzahl der Sub-States
+            const headerHeight = 45;
+            const containerWidth = Math.max(260, childStates.length * 220 + 40);
+            const containerHeight = headerHeight + 110;
+
+            // 1. Compound Frame Node erzeugen
+            newNodes.push({
+                id: compoundNodeId,
+                position: { x, y },
+                type: "compound",
+                style: { width: containerWidth, height: containerHeight },
+                data: {
+                    label: fullSkillName.split(".").pop().split("#")[0],
+                    fullSkillName: fullSkillName,
+                    isInitial: isInitial,
+                    events: [],
+                },
+            });
+
+            // 2. Transitions auf Compound-Ebene erfassen (z.B. Fallbacks wie Succeeder.*)
+            Array.from(stateElem.children)
+                .filter((c) => c.localName === "transition")
+                .forEach((tr) => {
+                    const eventName = tr.getAttribute("event") || "";
+                    const targetState = tr.getAttribute("target");
+                    const cond = tr.getAttribute("cond") || "";
+                    const assignElem = Array.from(tr.children).find((c) => c.localName === "assign");
+
+                    if (targetState) {
+                        rawTransitions.push({
+                            sourceNodeId: compoundNodeId,
+                            sourceSkillName: fullSkillName,
+                            eventId: eventName,
+                            targetStateName: targetState,
+                            cond: cond.trim(),
+                            assignLocation: assignElem?.getAttribute("location")?.trim() || "",
+                            assignExpr: assignElem?.getAttribute("expr")?.trim() || "",
+                        });
+                    }
+                });
+
+            // 3. Sub-States als vollwertige, normale Skills in den Kasten setzen
+            for (let i = 0; i < childStates.length; i++) {
+                const csElem = childStates[i];
+                const csId = csElem.getAttribute("id");
+                const csNodeId = getNodeId();
+                const isSubInitial = csId === compoundInitial;
+
+                // Transitions des Sub-States (bleiben intern oder gehen nach außen)
+                Array.from(csElem.children)
+                    .filter((c) => c.localName === "transition")
+                    .forEach((tr) => {
+                        const eventName = tr.getAttribute("event") || "";
+                        const targetState = tr.getAttribute("target");
+                        const cond = tr.getAttribute("cond") || "";
+                        const assignElem = Array.from(tr.children).find((c) => c.localName === "assign");
+
+                        if (targetState) {
+                            rawTransitions.push({
+                                sourceNodeId: csNodeId,
+                                sourceSkillName: csId,
+                                eventId: eventName,
+                                targetStateName: targetState,
+                                cond: cond.trim(),
+                                assignLocation: assignElem?.getAttribute("location")?.trim() || "",
+                                assignExpr: assignElem?.getAttribute("expr")?.trim() || "",
+                            });
+                        }
+                    });
+
+                const nodeData = await buildSkillNodeData(csId, isSubInitial, false, "", csElem);
+
+                newNodes.push({
+                    id: csNodeId,
+                    position: { x: 20 + i * 220, y: headerHeight + 10 },
+                    parentId: compoundNodeId,
+                    extent: "parent",
+                    type: "custom", // ganz normale Skill-Node
+                    data: nodeData,
+                });
+            }
+            continue;
+        }
+
+        // ==========================================
+        // FALL C: REGULÄRER ATOMIC STATE / SUBMACHINE / INIT
         // ==========================================
         const innerState = stateElem.querySelector(":scope > state");
         const effectiveElem = innerState || stateElem;
         const effectiveSkillName = effectiveElem.getAttribute("id") || fullSkillName;
         const nodeId = getNodeId();
 
-        // Transitions erfassen
         const transitionElements = [
             ...Array.from(stateElem.children).filter((c) => c.localName === "transition"),
             ...(innerState ? Array.from(innerState.children).filter((c) => c.localName === "transition") : []),
