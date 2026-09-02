@@ -8,13 +8,14 @@
                 <slot key="StringSlot" state="skills.slots.SlotIO#2" xpath="/C"/>
             </slots>
         </data>
+        <data id="_USE_LANG" expr="false"/>
         <data id="test_val" expr="1"/>
         <data id="no_change_test_val" expr="1"/>
     </datamodel>
 
     <state id="skills.slots.SlotIO">
         <datamodel>
-            <data id="#_WRITE" expr="intermediate"/>
+            <data id="#_WRITE" expr="@_USE_LANG"/>
         </datamodel>
         <transition event="SlotIO.*" target="skills.slots.SlotIO#1"/>
     </state>
