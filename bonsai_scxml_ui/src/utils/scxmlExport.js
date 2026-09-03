@@ -2,13 +2,23 @@
  * Generiert den SCXML-Code-String inklusive <metadata> Positionen, Slots,
  * Sub-State-Machines und Condition/Assign-Transitions.
  */
-export const generateXmlString = (nodes, globalDataModel = []) => {
+export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel = []) => {
     if (!nodes || nodes.length === 0) return "";
 
-    const initialNode = nodes.find((n) => n.data?.isInitial) || nodes[0];
+    // Parameter-Flexibilität (edges vs. globalDataModel)
+    const edges = Array.isArray(edgesOrDataModel) && edgesOrDataModel.length > 0 && edgesOrDataModel[0]?.source
+        ? edgesOrDataModel
+        : [];
+    const globalDataModel = edges.length > 0
+        ? (Array.isArray(maybeDataModel) ? maybeDataModel : [])
+        : (Array.isArray(edgesOrDataModel) ? edgesOrDataModel : []);
+
+    // 1. Initial Node ermitteln
+    const topLevelNodes = nodes.filter((n) => !n.parentId);
+    const initialNode = topLevelNodes.find((n) => n.data?.isInitial) || topLevelNodes[0];
     const initialId = initialNode ? initialNode.data.fullSkillName || initialNode.data.label : "";
 
-    // 1. Slots aus den Knoten sammeln
+    // 2. Slots sammeln
     const slotEntries = [];
     nodes.forEach((node) => {
         const skillName = node.data.fullSkillName || node.data.label;
@@ -28,78 +38,161 @@ export const generateXmlString = (nodes, globalDataModel = []) => {
         ? `        <data id="#_SLOTS">\n            <slots>\n${slotEntries.join("\n")}\n            </slots>\n        </data>`
         : "";
 
-    // 2. Globales Datamodel zusammenbauen
+    // 3. Globales Datamodel
     const globalDataLines = (globalDataModel || []).map((d) => `        <data id="${d.id}" expr="${d.expr}"/>`);
     if (slotsXml) {
         globalDataLines.splice(1, 0, slotsXml);
     }
     const globalDataXml = globalDataLines.join("\n");
 
-    // 3. States / Sub-Machines aufbauen
-    const statesXml = nodes
-        .map((node) => {
-            const skillId = node.data.fullSkillName || node.data.label;
-            const isSubMachine = Boolean(node.data?.src);
-            const isFinal = node.data?.isFinal || skillId.toLowerCase() === "end" || skillId.toLowerCase() === "fatal";
+    // 4. Transitions ermitteln & formatieren
+    const buildTransitionsXml = (node, indent) => {
+        const connectedEdges = edges.filter((e) => e.source === node.id);
+        const nodeEvents = (node.data?.events || []).filter((ev) => ev.target);
 
-            if (isFinal && !isSubMachine) {
-                return `    <final id="${skillId}"/>`;
-            }
+        const combinedTransitions = [];
 
-            const srcAttr = isSubMachine ? ` src="${node.data.src}"` : "";
+        // Kanten aus der Canvas erfassen
+        connectedEdges.forEach((edge) => {
+            const targetNode = nodes.find((n) => n.id === edge.target);
+            const targetId = targetNode
+                ? targetNode.data.fullSkillName || targetNode.data.label
+                : edge.target;
 
-            // A) Position als Metadata Tag
-            const posX = Math.round(node.position?.x || 0);
-            const posY = Math.round(node.position?.y || 0);
-            const metadataXml = `        <metadata>\n            <editor:position x="${posX}" y="${posY}"/>\n        </metadata>`;
+            const rawHandle = edge.sourceHandle || edge.label || "success";
+            const cond = edge.data?.cond || "";
+            const assign = edge.data?.assign || null;
 
-            // B) Lokale Parameter
-            const localParams = (node.data.params || []).filter(
-                (p) => (p.expr && p.expr.trim() !== "") || (p.default && p.default.trim() !== "")
+            combinedTransitions.push({
+                rawEvent: rawHandle,
+                targetId,
+                cond,
+                assignLocation: assign?.location || "",
+                assignExpr: assign?.expr || "",
+            });
+        });
+
+        // Event-Einträge aus data.events abgleichen
+        nodeEvents.forEach((ev) => {
+            const targetNode = nodes.find((n) => n.id === ev.target);
+            const targetId = targetNode
+                ? targetNode.data.fullSkillName || targetNode.data.label
+                : ev.target;
+
+            const alreadyExists = combinedTransitions.some(
+                (ct) => ct.targetId === targetId && (ct.rawEvent === ev.id || ct.rawEvent === ev.name)
             );
-            const paramsXml = localParams
-                .map((p) => `            <data id="${p.key}" expr="${p.expr || p.default}"/>`)
-                .join("\n");
 
-            const datamodelBlock = paramsXml && !isSubMachine
-                ? `        <datamodel>\n${paramsXml}\n        </datamodel>`
-                : "";
-
-            // C) OnEntry Assigns
-            const assignments = (node.data.params || []).filter((p) => p.location && p.expr);
-            const onentryBlock = assignments.length > 0
-                ? `        <onentry>\n${assignments.map((a) => `            <assign location="${a.location}" expr="${a.expr}"/>`).join("\n")}\n        </onentry>`
-                : "";
-
-            // D) Transitions
-            const transitionsXml = (node.data.events || [])
-                .filter((ev) => ev.target)
-                .map((ev) => {
-                    const targetNode = nodes.find((n) => n.id === ev.target);
-                    const targetId = targetNode ? targetNode.data.fullSkillName || targetNode.data.label : ev.target;
-
-                    const prefix = isSubMachine ? node.data.label : node.data.label.split(".")[0];
-                    const eventName = ev.id.includes(".") ? ev.id : `${prefix}.${ev.id}`;
-                    const condAttr = ev.cond && ev.cond.trim() !== "" ? ` cond="${ev.cond}"` : "";
-
-                    if (ev.assignLocation && ev.assignExpr) {
-                        return `        <transition event="${eventName}" target="${targetId}"${condAttr}>\n            <assign location="${ev.assignLocation}" expr="${ev.assignExpr}"/>\n        </transition>`;
-                    }
-                    return `        <transition event="${eventName}" target="${targetId}"${condAttr}/>`;
-                })
-                .join("\n");
-
-            const innerParts = [metadataXml, datamodelBlock, onentryBlock, transitionsXml]
-                .filter(Boolean)
-                .join("\n");
-
-            if (!innerParts) {
-                return `    <state id="${skillId}"${srcAttr}/>`;
+            if (!alreadyExists) {
+                combinedTransitions.push({
+                    rawEvent: ev.rawEvent || ev.name || ev.id,
+                    targetId,
+                    cond: ev.cond || "",
+                    assignLocation: ev.assignLocation || "",
+                    assignExpr: ev.assignExpr || "",
+                });
             }
+        });
 
-            return `    <state id="${skillId}"${srcAttr}>\n${innerParts}\n    </state>`;
-        })
-        .join("\n\n");
+        // Basis-Name für den State-Präfix ermitteln (z.B. SayMultipleSlots aus dialog.SayMultipleSlots#1)
+        const rawState = node.data?.label || node.data?.fullSkillName || "";
+        const skillBaseName = rawState.split("#")[0].split(".").pop();
+
+        return combinedTransitions
+            .map((tr) => {
+                let eventName = tr.rawEvent;
+
+                // Präfix anhängen, falls noch kein Namespace vorhanden ist
+                if (!eventName.includes(".")) {
+                    if (eventName === "*") {
+                        eventName = `${skillBaseName}.*`;
+                    } else {
+                        eventName = `${skillBaseName}.${eventName}`;
+                    }
+                }
+
+                const condAttr = tr.cond && tr.cond.trim() !== "" ? ` cond="${tr.cond}"` : "";
+
+                if (tr.assignLocation && tr.assignExpr) {
+                    return `${indent}<transition event="${eventName}" target="${tr.targetId}"${condAttr}>\n${indent}    <assign location="${tr.assignLocation}" expr="${tr.assignExpr}"/>\n${indent}</transition>`;
+                }
+                return `${indent}<transition event="${eventName}" target="${tr.targetId}"${condAttr}/>`;
+            })
+            .join("\n");
+    };
+
+    // 5. Rekursives Rendern der Knoten
+    const renderNode = (node, depth = 1) => {
+        const indent = "    ".repeat(depth);
+        const skillId = node.data.fullSkillName || node.data.label;
+        const isParallel = node.type === "parallel";
+        const isCompound = node.type === "compound";
+        const isSubMachine = Boolean(node.data?.src);
+        const isFinal = node.data?.isFinal || skillId.toLowerCase() === "end" || skillId.toLowerCase() === "fatal";
+
+        const children = nodes.filter((n) => n.parentId === node.id);
+
+        if (isFinal && !isSubMachine && children.length === 0) {
+            return `${indent}<final id="${skillId}"/>`;
+        }
+
+        const tagName = isParallel ? "parallel" : "state";
+        const srcAttr = isSubMachine ? ` src="${node.data.src}"` : "";
+
+        let initialAttr = "";
+        if (isCompound || children.length > 0) {
+            const initialChild = children.find((c) => c.data?.isInitial);
+            if (initialChild) {
+                initialAttr = ` initial="${initialChild.data.fullSkillName || initialChild.data.label}"`;
+            } else if (node.data?.initialSubState) {
+                initialAttr = ` initial="${node.data.initialSubState}"`;
+            }
+        }
+
+        // A) Position
+        const posX = Math.round(node.position?.x || 0);
+        const posY = Math.round(node.position?.y || 0);
+        const metadataXml = `${indent}    <metadata>\n${indent}        <editor:position x="${posX}" y="${posY}"/>\n${indent}    </metadata>`;
+
+        // B) Datamodel
+        const localParams = (node.data.params || []).filter(
+            (p) => (p.expr && p.expr.trim() !== "") || (p.default && p.default.trim() !== "")
+        );
+        const paramsLines = localParams.map(
+            (p) => `${indent}        <data id="${p.key}" expr="${p.expr || p.default}"/>`
+        );
+        const datamodelBlock = paramsLines.length > 0 && !isSubMachine
+            ? `${indent}    <datamodel>\n${paramsLines.join("\n")}\n${indent}    </datamodel>`
+            : "";
+
+        // C) OnEntry
+        const assignments = (node.data.params || []).filter((p) => p.location && p.expr);
+        const onentryBlock = assignments.length > 0
+            ? `${indent}    <onentry>\n${assignments.map((a) => `${indent}        <assign location="${a.location}" expr="${a.expr}"/>`).join("\n")}\n${indent}    </onentry>`
+            : "";
+
+        // D) Transitions
+        const transitionsXml = buildTransitionsXml(node, indent + "    ");
+
+        // E) Sub-States
+        const childrenXml = children.map((child) => renderNode(child, depth + 1)).join("\n\n");
+
+        const innerBlocks = [
+            metadataXml,
+            datamodelBlock,
+            onentryBlock,
+            transitionsXml,
+            childrenXml,
+        ].filter(Boolean);
+
+        if (innerBlocks.length === 0) {
+            return `${indent}<${tagName} id="${skillId}"${srcAttr}${initialAttr}/>`;
+        }
+
+        return `${indent}<${tagName} id="${skillId}"${srcAttr}${initialAttr}>\n${innerBlocks.join("\n\n")}\n${indent}</${tagName}>`;
+    };
+
+    const statesXml = topLevelNodes.map((node) => renderNode(node, 1)).join("\n\n");
 
     return `<?xml version="1.0" encoding="UTF-8"?>
 <scxml xmlns="http://www.w3.org/2005/07/scxml"
@@ -135,7 +228,6 @@ export const saveScxmlFileTauri = async (xmlString, filePath = null, defaultName
  * Browser-mode save (File System Access API or download fallback).
  */
 export const saveScxmlFile = async (xmlString, fileHandle = null, defaultName = "workflow.xml") => {
-    // 1. Wenn bereits ein geöffnetes FileHandle existiert -> Direkt überschreiben
     if (fileHandle && fileHandle.createWritable) {
         try {
             const writable = await fileHandle.createWritable();
@@ -147,7 +239,6 @@ export const saveScxmlFile = async (xmlString, fileHandle = null, defaultName = 
         }
     }
 
-    // 2. Neuer Speicher-Dialog via File System Access API
     if ("showSaveFilePicker" in window) {
         try {
             const handle = await window.showSaveFilePicker({
