@@ -732,7 +732,7 @@ function AppContent() {
         }
 
         const currentActiveTab = tabs.find((t) => t.id === activeTabId);
-        const xml = generateXmlString(nodes, globalDataModel);
+        const xml = generateXmlString(nodes, edges, globalDataModel);
         const defaultName = currentActiveTab?.fileName || `${currentActiveTab?.title || "workflow"}.xml`;
 
         let result;
@@ -893,7 +893,7 @@ function AppContent() {
                     >
                         {activeMode === "code" ? (
                             <CodeView
-                                codeString={generateXmlString(nodes, globalDataModel)}
+                                codeString={generateXmlString(nodes, edges, globalDataModel)}
                                 activeMode={activeMode}
                                 setActiveMode={setActiveMode}
                             />
