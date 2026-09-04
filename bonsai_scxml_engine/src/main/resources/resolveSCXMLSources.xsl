@@ -196,14 +196,38 @@ the 'src' attribute of states. - Appends a suffix to all sourced 'id' and
         </xsl:attribute>
     </xsl:template>
 
-    <xsl:template match="scxml/state/datamodel/data/@expr[starts-with(., '@')]">
+    <xsl:template match="state/datamodel/data/@expr[contains(., '@')]">
         <xsl:param name="suffix" tunnel="yes"/>
 
         <xsl:variable name="dataSuffix"
                       select="replace($suffix, '#', '_')"/>
 
         <xsl:attribute name="expr">
-            <xsl:value-of select="concat(., $dataSuffix)"/>
+            <xsl:analyze-string select="."
+                                regex="@([A-Za-z_][A-Za-z0-9_]*)">
+
+                <xsl:matching-substring>
+                    <xsl:variable name="name" select="regex-group(1)"/>
+
+                    <xsl:choose>
+                        <!-- Global variable: keep unchanged -->
+                        <xsl:when test="starts-with($name, '_')">
+                            <xsl:value-of select="concat('@', $name)"/>
+                        </xsl:when>
+
+                        <!-- Local variable: suffix referenced variable -->
+                        <xsl:otherwise>
+                            <xsl:value-of
+                                    select="concat('@', $name, $dataSuffix)"/>
+                        </xsl:otherwise>
+                    </xsl:choose>
+                </xsl:matching-substring>
+
+                <xsl:non-matching-substring>
+                    <xsl:value-of select="."/>
+                </xsl:non-matching-substring>
+
+            </xsl:analyze-string>
         </xsl:attribute>
     </xsl:template>
 
@@ -297,14 +321,33 @@ the 'src' attribute of states. - Appends a suffix to all sourced 'id' and
         <xsl:variable name="dataSuffix"
                       select="replace($suffix, '#', '_')"/>
 
+        <!-- Variables defined in the current SCXML -->
+        <xsl:variable name="dataIds"
+                      select="root(.)/scxml/datamodel/data/@id"/>
+
         <xsl:attribute name="expr">
             <xsl:choose>
+
+                <!-- Existing special syntax -->
                 <xsl:when test="starts-with(., '#')">
                     <xsl:value-of select="substring(., 2)"/>
                 </xsl:when>
-                <xsl:otherwise>
+
+                <!-- Global variable -->
+                <xsl:when test="starts-with(., '_')">
+                    <xsl:value-of select="."/>
+                </xsl:when>
+
+                <!-- Actual local datamodel variable -->
+                <xsl:when test=". = $dataIds">
                     <xsl:value-of select="concat(., $dataSuffix)"/>
+                </xsl:when>
+
+                <!-- Literal: 2, 3.14, true, 'foo', etc. -->
+                <xsl:otherwise>
+                    <xsl:value-of select="."/>
                 </xsl:otherwise>
+
             </xsl:choose>
         </xsl:attribute>
     </xsl:template>
