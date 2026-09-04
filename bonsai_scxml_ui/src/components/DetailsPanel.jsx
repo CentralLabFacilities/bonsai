@@ -181,6 +181,7 @@ function DetailsPanel({
                                     <h4>{slot.key}</h4>
                                     <div className="slot-row"><input className="slot-field-readonly" type="text" value="Read / Write: Read" readOnly /></div>
                                     <div className="slot-row"><input className="slot-field-readonly" type="text" value={`Type: ${slot.type}`} readOnly /></div>
+                                    <div className="slot-row"><input className="slot-field-readonly" type="text" value={`Slot: ${slot.slotKind || ""}`} readOnly /></div>
                                     <div className="slot-row">
                                         <input
                                             className="slot-field-edit"
@@ -198,6 +199,7 @@ function DetailsPanel({
                                     <h4>{slot.key}</h4>
                                     <div className="slot-row"><input className="slot-field-readonly" type="text" value="Read / Write: Write" readOnly /></div>
                                     <div className="slot-row"><input className="slot-field-readonly" type="text" value={`Type: ${slot.type}`} readOnly /></div>
+                                    <div className="slot-row"><input className="slot-field-readonly" type="text" value={`Slot: ${slot.slotKind || ""}`} readOnly /></div>
                                     <div className="slot-row">
                                         <input
                                             className="slot-field-edit"

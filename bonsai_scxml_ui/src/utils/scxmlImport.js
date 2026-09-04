@@ -32,14 +32,22 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             const expr = dataTag.getAttribute("expr");
 
             if (id === "#_SLOTS") {
-                const slotTags = dataTag.getElementsByTagName("slot");
-                Array.from(slotTags).forEach((sn) => {
-                    parsedSlots.push({
-                        key: sn.getAttribute("key"),
-                        state: sn.getAttribute("state"),
-                        xpath: sn.getAttribute("xpath"),
+                const slotsElement = Array.from(dataTag.children).find(
+                    (c) => c.localName === "slots"
+                );
+
+                if (slotsElement) {
+                    Array.from(slotsElement.children).forEach((sn) => {
+                        if (sn.localName !== "slot" && sn.localName !== "inheritSlot") return;
+
+                        parsedSlots.push({
+                            key: sn.getAttribute("key"),
+                            state: sn.getAttribute("state"),
+                            xpath: sn.getAttribute("xpath"),
+                            slotKind: sn.localName,
+                        });
                     });
-                });
+                }
             } else if (id) {
                 globalDataEntries.push({
                     id: id,
@@ -50,14 +58,14 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
     }
 
     const findSlotMatch = (fullSkillName, baseSkillName, slotKey) => {
-        return parsedSlots.find((ps) => {
-            if (ps.key !== slotKey) return false;
-            if (ps.state === "*") return true;
-            if (ps.state === fullSkillName) return true;
-            if (ps.state === baseSkillName) return true;
-            if (fullSkillName.startsWith(ps.state + "#")) return true;
-            return false;
-        });
+        const candidates = parsedSlots.filter((ps) => ps.key === slotKey);
+
+        return (
+            candidates.find((ps) => ps.state === fullSkillName) ||
+            candidates.find((ps) => ps.state === baseSkillName) ||
+            candidates.find((ps) => ps.state === "*") ||
+            candidates.find((ps) => fullSkillName.startsWith(ps.state + "#"))
+        );
     };
 
     // Hilfsfunktion: Vollständiges NodeData-Objekt erzeugen
@@ -81,6 +89,7 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             return {
                 key: s.key,
                 type: s.type,
+                slotKind: match?.slotKind || "",
                 path: match ? match.xpath.replace(/^\//, "") : "",
             };
         });
@@ -90,6 +99,7 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             return {
                 key: s.key,
                 type: s.type,
+                slotKind: match?.slotKind || "",
                 path: match ? match.xpath.replace(/^\//, "") : "",
             };
         });
