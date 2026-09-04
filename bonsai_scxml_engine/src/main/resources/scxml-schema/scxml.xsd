@@ -632,8 +632,15 @@
     </xsd:complexType>
     <xsd:element name="datamodel" type="scxml.datamodel.type"/>
     <!-- data -->
+    <xsd:simpleType name="bonsai.scxml.data.id">
+        <xsd:restriction base="xsd:string">
+            <xsd:whiteSpace value="collapse"/>
+            <xsd:pattern
+                    value="([a-zA-Z_$][a-zA-Z\d_$]*\.)*[a-zA-Z\d_$]*(#[a-zA-Z\d_$:]+)*"/>
+        </xsd:restriction>
+    </xsd:simpleType>
     <xsd:attributeGroup name="scxml.data.attlist">
-        <xsd:attribute name="id" type="bonsai.scxml.id.nuq" use="required"/>
+        <xsd:attribute name="id" type="bonsai.scxml.data.id" use="required"/>
         <xsd:attribute name="src" type="URI.datatype"/>
         <xsd:attribute name="expr" type="ValueLang.datatype"/>
         <xsd:attributeGroup ref="scxml.extra.attribs"/>
@@ -710,7 +717,7 @@
     <xsd:element name="inheritSlot" type="scxml.inheritSlot.type"/>
     <!--  assign  -->
     <xsd:attributeGroup name="scxml.assign.attlist">
-        <xsd:attribute name="location" type="LocLang.datatype"/>
+        <xsd:attribute name="location" use="required" type="LocLang.datatype"/>
         <xsd:attribute name="expr" type="ValueLang.datatype" use="required"/>
         <xsd:attribute default="replacechildren" name="type" type="AssignType.datatype"/>
         <xsd:attribute name="attr" type="xsd:NMTOKEN"/>
