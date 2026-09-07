@@ -709,6 +709,76 @@ function AppContent() {
         setSlotEdges(newSlotEdges);
     };
 
+    // Dynamische Aktualisierung der Events basierend auf neuen Parameterwerten
+    const updateEventsFromParameters = async (nodeId) => {
+        const node = nodes.find((n) => n.id === nodeId);
+        if (!node) return;
+
+        const fullSkillName = node.data.fullSkillName.split("#")[0];
+        const params = {};
+
+        node.data.params.forEach((param) => {
+            params[param.key] = param.expr;
+        });
+
+        try {
+            const response = await fetch(`/api/skill/${fullSkillName}`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ params }),
+            });
+
+            const data = await response.json();
+
+            const newEvents = data.events.map((event) => ({
+                id: event.event,
+                selectedPackage: "",
+                selectedSkill: "",
+                target: null,
+                cond: "",
+                assignLocation: "",
+                assignExpr: "",
+            }));
+
+            newEvents.push({
+                id: "fatal",
+                selectedPackage: "",
+                selectedSkill: "",
+                target: null,
+                cond: "",
+                assignLocation: "",
+                assignExpr: "",
+            });
+
+            newEvents.push({
+                id: "*",
+                selectedPackage: "",
+                selectedSkill: "",
+                target: null,
+                cond: "",
+                assignLocation: "",
+                assignExpr: "",
+            });
+
+            setNodes((nds) =>
+                nds.map((n) => {
+                    if (n.id !== nodeId) return n;
+                    return {
+                        ...n,
+                        data: {
+                            ...n.data,
+                            events: newEvents,
+                        },
+                    };
+                })
+            );
+        } catch (error) {
+            console.error("Error updating events from parameters:", error);
+        }
+    };
+
     const handleImportFile = async (event) => {
         // Tauri desktop mode: event.fromDesktop triggers file picker via Tauri
         if (IS_DESKTOP && event?.fromDesktop) {
@@ -1065,6 +1135,8 @@ function AppContent() {
                                 nds.map((n) => (n.id === selectedNode.id ? { ...n, data: { ...n.data, params: n.data.params.map((p, i) => (i === idx ? { ...p, expr: val } : p)) } } : n))
                             )
                         }
+
+                        onUpdateParameterBlur={updateEventsFromParameters}
                         onUpdateInSlotPath={(idx, val) =>
                             setNodes((nds) =>
                                 nds.map((n) => (n.id === selectedNode.id ? { ...n, data: { ...n.data, inSlots: n.data.inSlots.map((s, i) => (i === idx ? { ...s, path: val } : s)) } } : n))

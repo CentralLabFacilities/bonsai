@@ -16,6 +16,7 @@ function DetailsPanel({
     onUpdateOutSlotPath,
     onCheckSlots,
     onUpdateSrc,
+    onUpdateParameterBlur,
 }) {
     const isSubMachine = selectedNode.type === "submachine" || Boolean(selectedNode.data.src);
 
@@ -182,6 +183,7 @@ function DetailsPanel({
                                             value={param.expr || ""}
                                             placeholder={param.default != null ? String(param.default) : ""}
                                             onChange={(e) => onUpdateParameter(index, e.target.value)}
+                                            onBlur={() => onUpdateParameterBlur && onUpdateParameterBlur(selectedNode.id)}
                                         />
                                     </div>
                                 </div>
