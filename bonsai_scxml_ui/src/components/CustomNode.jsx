@@ -1,14 +1,60 @@
-import { Handle, Position } from "@xyflow/react";
+import { useMemo } from "react";
+import { Handle, Position, useEdges } from "@xyflow/react";
+import { FiAlertCircle } from "react-icons/fi";
 
-function CustomNode({ data }) {
-  // Holt z. B. "#1" aus "skills.dialog.Say#1"
+function CustomNode({ id, data }) {
+  const edges = useEdges();
+
   const instanceId = data.fullSkillName && data.fullSkillName.includes("#")
     ? `#${data.fullSkillName.split("#")[1]}`
     : "";
 
+  const validation = useMemo(() => {
+    const allSlots = [...(data.inSlots || []), ...(data.outSlots || [])];
+    const missingSlots = allSlots.some(
+      (slot) => !slot.path || String(slot.path).trim() === ""
+    );
+
+    const missingParams = (data.params || []).some((param) => {
+      if (!param.required) return false;
+      const val = param.expr !== undefined && param.expr !== null ? String(param.expr).trim() : "";
+      const def = param.default !== undefined && param.default !== null ? String(param.default).trim() : "";
+      return val === "" && def === "";
+    });
+
+    const outgoingHandles = new Set(
+      edges.filter((e) => e.source === id).map((e) => e.sourceHandle)
+    );
+
+    const hasWildcard = outgoingHandles.has("*");
+
+    let missingTransitions = false;
+    if (!hasWildcard) {
+      const specificEvents = (data.events || []).filter((e) => e.id !== "*");
+
+      missingTransitions = specificEvents.some((e) => !outgoingHandles.has(e.id));
+    }
+
+    const hasError = missingSlots || missingParams || missingTransitions;
+
+    const reasons = [];
+    if (missingSlots) reasons.push("Nicht alle Slots haben einen Pfad");
+    if (missingParams) reasons.push("Erforderliche Parameter fehlen");
+    if (missingTransitions) reasons.push("Nicht alle Transitions sind abgedeckt");
+
+    return { hasError, tooltip: reasons.join("\n") };
+  }, [data, edges, id]);
+
   return (
     <div className={data.isInitial ? "costum-node initial-node" : "costum-node"}>
-      {/* Target handle for incoming transitions*/}
+      {/* Warnungs-Badge / Ausrufezeichen */}
+      {validation.hasError && (
+        <div className="node-warning-badge" title={validation.tooltip}>
+          <FiAlertCircle />
+        </div>
+      )}
+
+      {/* Target handle for incoming transitions */}
       <Handle
         type="target"
         position={Position.Left}
@@ -39,7 +85,7 @@ function CustomNode({ data }) {
         />
       ))}
 
-      {/* Label  */}
+      {/* Label */}
       <div className="custom-node-label">
         {data.label}
         {instanceId && (
