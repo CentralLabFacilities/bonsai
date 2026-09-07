@@ -378,25 +378,46 @@ function AppContent() {
                 isInitial: false,
                 src: "",
                 events: [
-                    ...(data.events || []).map((e) => ({
-                        id: e.event,
-                        selectedPackage: "",
-                        selectedSkill: "",
-                        target: null,
-                        cond: "",
-                        assignLocation: "",
-                        assignExpr: "",
-                    })),
-                    {
-                        id: "*",
-                        selectedPackage: "",
-                        selectedSkill: "",
-                        target: null,
-                        cond: "",
-                        assignLocation: "",
-                        assignExpr: "",
-                    },
-                ],
+                        ...(data.events || []).map((e) => ({
+                            id: e.event,
+                            selectedPackage: "",
+                            selectedSkill: "",
+                            target: null,
+                            cond: "",
+                            assignLocation: "",
+                            assignExpr: "",
+                        })),
+
+                        ...(selectedSkill.split(".").pop() !== "End" &&
+                        selectedSkill.split(".").pop() !== "Fatal"
+                            ? [
+                                  {
+                                      id: "fatal",
+                                      selectedPackage: "",
+                                      selectedSkill: "",
+                                      target: null,
+                                      cond: "",
+                                      assignLocation: "",
+                                      assignExpr: "",
+                                  },
+                              ]
+                            : []),
+
+                        ...(selectedSkill.split(".").pop() !== "End" &&
+                         selectedSkill.split(".").pop() !== "Fatal"
+                            ? [
+                                  {
+                                      id: "*",
+                                      selectedPackage: "",
+                                      selectedSkill: "",
+                                      target: null,
+                                      cond: "",
+                                      assignLocation: "",
+                                      assignExpr: "",
+                                  },
+                              ]
+                            : []),
+                    ],
 
                 inSlots: (data.inSlots || []).map((s) => ({ key: s.key, type: s.type, path: "" })),
                 outSlots: (data.outSlots || []).map((s) => ({ key: s.key, type: s.type, path: "" })),
