@@ -15,7 +15,7 @@ function DetailsPanel({
     onUpdateInSlotPath,
     onUpdateOutSlotPath,
     onCheckSlots,
-    onUpdateSrc, // Optional: Pfad editieren
+    onUpdateSrc,
 }) {
     const isSubMachine = selectedNode.type === "submachine" || Boolean(selectedNode.data.src);
 
@@ -107,6 +107,24 @@ function DetailsPanel({
                                         type="text"
                                         value={selectedNode.data.fullSkillName?.split("#")[1] || ""}
                                         onChange={(e) => onUpdateName(e.target.value)}
+                                    />
+                                </div>
+                                <div className="field-row">
+                                    <label className="field-label">Sensors:</label>
+                                    <input
+                                        className="text-field"
+                                        type="text"
+                                        value="Hier müssen die Sensoren angezeigt werden"
+                                        readOnly
+                                    />
+                                </div>
+                                <div className="field-row">
+                                    <label className="field-label">Actuators:</label>
+                                    <input
+                                        className="text-field"
+                                        type="text"
+                                        value="Hier müssen die Akkuartoren angezeigt werden"
+                                        readOnly
                                     />
                                 </div>
                             </>

@@ -1160,3 +1160,30 @@
   width: 8px !important;
   height: 8px !important;
 }
+
+.back-button-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px;
+    background-color: #0b1120;
+    border-bottom: 1px solid var(--secondary-color);
+}
+
+.back-button {
+    padding: 6px 12px;
+    background-color: var(--secondary-color);
+    color: white;
+    border: 1px solid var(--secondary-color);
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    transition: background-color 0.15s ease;
+}
+
+.back-button:hover {
+    background-color: #1c7fcf;
+}
