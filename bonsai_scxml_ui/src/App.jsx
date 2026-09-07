@@ -243,6 +243,254 @@ function AppContent() {
         }
     };
 
+    const selectedNodes = useMemo(() => {
+        return nodes.filter((n) => n.selected && !n.parentId);
+    }, [nodes]);
+
+    // Hilfsfunktion: Bounding Box um alle ausgewählten Nodes berechnen
+    const getSelectionBoundingBox = (selectedList) => {
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
+
+        selectedList.forEach((n) => {
+            const x = n.position.x;
+            const y = n.position.y;
+            const w = n.style?.width || 180;
+            const h = n.style?.height || 80;
+
+            if (x < minX) minX = x;
+            if (y < minY) minY = y;
+            if (x + w > maxX) maxX = x + w;
+            if (y + h > maxY) maxY = y + h;
+        });
+
+        return { minX, minY, maxX, maxY };
+    };
+
+    // 1. Compound State erstellen
+    const handleCreateCompoundFromSelected = () => {
+        if (selectedNodes.length < 2) return;
+
+        const { minX, minY, maxX, maxY } = getSelectionBoundingBox(selectedNodes);
+        const padding = 40;
+        const headerOffset = 50;
+
+        const containerWidth = Math.max(260, maxX - minX + padding * 2);
+        const containerHeight = Math.max(160, maxY - minY + padding * 2 + headerOffset);
+
+        const compoundId = getNodeId();
+        const compoundName = `Compound_${nodes.filter((n) => n.type === "compound").length + 1}`;
+
+        const compoundNode = {
+            id: compoundId,
+            type: "compound",
+            position: { x: minX - padding, y: minY - padding - headerOffset },
+            style: { width: containerWidth, height: containerHeight },
+            data: {
+                label: compoundName,
+                fullSkillName: compoundName,
+                isInitial: selectedNodes.some((n) => n.data?.isInitial),
+                events: [],
+            },
+        };
+
+        // Kind-Knoten relativ im Compound ausrichten
+        const selectedIds = new Set(selectedNodes.map((n) => n.id));
+        const updatedNodes = nodes.map((node) => {
+            if (selectedIds.has(node.id)) {
+                return {
+                    ...node,
+                    parentId: compoundId,
+                    extent: "parent",
+                    position: {
+                        x: node.position.x - (minX - padding),
+                        y: node.position.y - (minY - padding - headerOffset),
+                    },
+                    selected: false,
+                };
+            }
+            return node;
+        });
+
+        setNodes([compoundNode, ...updatedNodes]);
+    };
+
+    // 2. Parallel State erstellen
+    const handleCreateParallelFromSelected = () => {
+        if (selectedNodes.length < 2) return;
+
+        const { minX, minY, maxX, maxY } = getSelectionBoundingBox(selectedNodes);
+        const padding = 40;
+        const headerHeight = 45;
+
+        const containerWidth = Math.max(320, maxX - minX + padding * 2);
+        const containerHeight = Math.max(180, maxY - minY + padding * 2 + headerHeight);
+
+        const parallelId = getNodeId();
+        const parallelName = `Parallel_${nodes.filter((n) => n.type === "parallel").length + 1}`;
+        const branchNames = selectedNodes.map((n) => n.data.label || n.id);
+
+        const parallelNode = {
+            id: parallelId,
+            type: "parallel",
+            position: { x: minX - padding, y: minY - padding - headerHeight },
+            style: { width: containerWidth, height: containerHeight },
+            data: {
+                label: parallelName,
+                fullSkillName: parallelName,
+                isInitial: selectedNodes.some((n) => n.data?.isInitial),
+                lanes: branchNames,
+                events: [],
+            },
+        };
+
+        const selectedIds = new Set(selectedNodes.map((n) => n.id));
+        const updatedNodes = nodes.map((node) => {
+            if (selectedIds.has(node.id)) {
+                return {
+                    ...node,
+                    parentId: parallelId,
+                    extent: "parent",
+                    position: {
+                        x: node.position.x - (minX - padding),
+                        y: node.position.y - (minY - padding - headerHeight),
+                    },
+                    selected: false,
+                };
+            }
+            return node;
+        });
+
+        setNodes([parallelNode, ...updatedNodes]);
+    };
+
+    // 3. Sub-State-Machine erstellen & direkt in neuem Tab öffnen
+    const handleCreateSubMachineFromSelected = () => {
+        if (selectedNodes.length < 1) return;
+
+        const { minX, minY } = getSelectionBoundingBox(selectedNodes);
+        const subMachineId = getNodeId();
+        const subMachineLabel = `SubMachine_${nodes.filter((n) => n.type === "submachine").length + 1}`;
+        const selectedIds = new Set(selectedNodes.map((n) => n.id));
+
+        // 1. Externe Transitions für die Handles der Sub-Machine-Node im Parent sammeln
+        const externalEvents = [];
+        edges.forEach((edge) => {
+            if (selectedIds.has(edge.source) && !selectedIds.has(edge.target)) {
+                const evHandle = edge.sourceHandle || "success";
+                if (!externalEvents.some((e) => e.id === evHandle)) {
+                    externalEvents.push({
+                        id: evHandle,
+                        name: evHandle,
+                        rawEvent: evHandle,
+                        target: edge.target,
+                        cond: edge.data?.cond || "",
+                    });
+                }
+            }
+        });
+
+        // 2. Neue Sub-Machine-Knoten für den aktuellen (Parent-)Workflow vorbereiten
+        const subMachineNode = {
+            id: subMachineId,
+            type: "submachine",
+            position: { x: minX, y: minY },
+            data: {
+                label: subMachineLabel,
+                fullSkillName: subMachineLabel,
+                src: `\${EXERCISE}/${subMachineLabel}.xml`,
+                isInitial: selectedNodes.some((n) => n.data?.isInitial),
+                events: externalEvents.length > 0 ? externalEvents : [{ id: "success" }, { id: "failure" }],
+                onOpenSubMachine: handleOpenSubMachine,
+            },
+        };
+
+        // 3. Kanten im Parent anpassen (externe Kanten an die SubMachine heften, interne entfernen)
+        const updatedParentEdges = edges
+            .map((edge) => {
+                if (selectedIds.has(edge.source) && !selectedIds.has(edge.target)) {
+                    return { ...edge, source: subMachineId };
+                }
+                if (!selectedIds.has(edge.source) && selectedIds.has(edge.target)) {
+                    return { ...edge, target: subMachineId };
+                }
+                if (selectedIds.has(edge.source) && selectedIds.has(edge.target)) {
+                    return null; // Geht in den neuen Sub-Tab über
+                }
+                return edge;
+            })
+            .filter(Boolean);
+
+        const remainingParentNodes = [
+            ...nodes.filter((n) => !selectedIds.has(n.id)),
+            subMachineNode,
+        ];
+
+        // 4. Nodes für das neue Sub-Machine-Tab normalisieren (Koordinaten relativ zum Ursprung)
+        const subTabNodes = selectedNodes.map((n) => ({
+            ...n,
+            position: {
+                x: n.position.x - minX + 50,
+                y: n.position.y - minY + 50,
+            },
+            selected: false,
+        }));
+
+        // Nur interne Kanten für den Sub-Tab mitnehmen
+        const subTabEdges = edges.filter(
+            (edge) => selectedIds.has(edge.source) && selectedIds.has(edge.target)
+        );
+
+        // 5. Neues Tab-Objekt anlegen
+        const newTabId = `tab-sub-${crypto.randomUUID().slice(0, 6)}`;
+        const newTabObj = {
+            id: newTabId,
+            title: subMachineLabel,
+            fileName: `${subMachineLabel}.xml`,
+            fileHandle: null,
+            filePath: null,
+            nodes: subTabNodes,
+            edges: subTabEdges,
+            slotNodes: [],
+            slotEdges: [],
+            globalDataModel: [
+                { id: "#_STATE_PREFIX", expr: "'de.unibi.citec.clf.bonsai.skills.'" },
+            ],
+        };
+
+        // 6. Parent-Tab mit verbleibenden Nodes speichern und neuen Sub-Tab anhängen
+        setTabs((prevTabs) => [
+            ...prevTabs.map((t) =>
+                t.id === activeTabId
+                    ? {
+                          ...t,
+                          nodes: remainingParentNodes,
+                          edges: updatedParentEdges,
+                          slotNodes,
+                          slotEdges,
+                          globalDataModel,
+                      }
+                    : t
+            ),
+            newTabObj,
+        ]);
+
+        // 7. Direkt in den neuen Sub-Machine-Tab wechseln
+        setActiveTabId(newTabId);
+        setNodes(subTabNodes);
+        setEdges(subTabEdges);
+        setSlotNodes([]);
+        setSlotEdges([]);
+        setGlobalDataModel(newTabObj.globalDataModel);
+        setSelectedNodeId(null);
+
+        // Slot-Verbindungen des neuen Tabs berechnen & View zentrieren
+        checkSlotConnection(subTabNodes);
+        setTimeout(() => fitView({ padding: 0.2, duration: 300 }), 80);
+    };
+
     const injectedNodes = useMemo(() => {
         return nodes.map((n) => {
             if (n.type === "submachine") {
@@ -1069,6 +1317,25 @@ function AppContent() {
                                     </div>
                                 )}
 
+                                {/* Floating Grouping Toolbar bei Mehrfachauswahl */}
+                                {selectedNodes.length >= 2 && activeMode !== "code" && (
+                                    <div className="multi-selection-toolbar">
+                                        <span className="selection-count">{selectedNodes.length} Nodes ausgewählt</span>
+                                        <div className="selection-actions">
+                                            <button className="group-btn compound-btn" onClick={handleCreateCompoundFromSelected}>
+                                                Compound State
+                                            </button>
+                                            <button className="group-btn parallel-btn" onClick={handleCreateParallelFromSelected}>
+                                                Parallel State
+                                            </button>
+                                            <button className="group-btn submachine-btn" onClick={handleCreateSubMachineFromSelected}>
+                                                Sub-Machine
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* ReactFlow mit Strg-Support */}
                                 <ReactFlow
                                     nodes={visibleNodes}
                                     edges={visibleEdges}
@@ -1078,16 +1345,18 @@ function AppContent() {
                                     onEdgeDoubleClick={onEdgeDoubleClick}
                                     nodeTypes={nodeTypes}
                                     onNodeClick={(_, n) => setSelectedNodeId(n.id)}
+                                    onPaneClick={() => setSelectedNodeId(null)}
+                                    multiSelectionKeyCode={["Control", "Meta"]}
+                                    selectionKeyCode={["Control", "Meta"]}
+                                    deleteKeyCode={["Delete"]}
                                     onNodeDoubleClick={(_, n) => {
                                         if (n.type === "submachine" && n.data?.src) {
                                             handleOpenSubMachine(n.data.src, n.data.label);
                                         }
                                     }}
-                                    onPaneClick={() => setSelectedNodeId(null)}
                                     onNodeDragStart={() => setIsDraggingNode(true)}
                                     onNodeDrag={(e) => setIsOverTrash(Boolean(document.elementFromPoint(e.clientX, e.clientY)?.closest(".trash-bin-dropzone")))}
                                     onNodeDragStop={handleNodeDragStop}
-                                    deleteKeyCode={["Delete"]}
                                 >
                                     <Background />
                                     <Controls />

@@ -1220,3 +1220,76 @@
 .back-button:hover {
     background-color: #1c7fcf;
 }
+
+.multi-selection-toolbar {
+  position: absolute;
+  top: 15px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background-color: #0f172a;
+  border: 1.5px solid #38bdf8;
+  padding: 8px 16px;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  animation: fadeInDown 0.2s ease-out;
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -10px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.selection-count {
+  font-size: 13px;
+  font-weight: bold;
+  color: #94a3b8;
+  border-right: 1px solid #334155;
+  padding-right: 12px;
+}
+
+.selection-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.group-btn {
+  background-color: #1e293b;
+  color: #ffffff;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.group-btn:hover {
+  transform: translateY(-1px);
+}
+
+.compound-btn:hover {
+  background-color: #334155;
+  border-color: #94a3b8;
+}
+
+.parallel-btn:hover {
+  background-color: #0369a1;
+  border-color: #38bdf8;
+}
+
+.submachine-btn:hover {
+  background-color: #7e22ce;
+  border-color: #c084fc;
+}
