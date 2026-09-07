@@ -45,6 +45,7 @@ const IS_DESKTOP = isTauri();
 function AppContent() {
     const [skills, setSkills] = useState({ skills: [] });
     const [selectedPackage, setSelectedPackage] = useState(null);
+    const [selectedSubPackage, setSelectedSubPackage] = useState(null);
     const [activeFilter, setActiveFilter] = useState("Alle");
     const [searchText, setSearchText] = useState("");
 
@@ -282,14 +283,66 @@ function AppContent() {
     const selectedNode = nodes.find((node) => node.id === selectedNodeId) || null;
     const hasInitialNode = nodes.some((node) => node.data?.isInitial);
 
-    const packages = Array.from(new Set((skills.skills || []).map((s) => s.split(".")[6]).filter(Boolean)));
+    // Multi-level package/subpackage parser
+    let packages = [];
+    let directSkills = [];
+
+    (skills.skills || []).forEach((skill) => {
+        const afterSkills = skill.split("skills.")[1];
+        if (!afterSkills) return;
+        const parts = afterSkills.split(".");
+
+        if (parts.length === 1) {
+            directSkills.push(skill);
+        } else {
+            const packageName = parts[0];
+            if (!packages.includes(packageName)) {
+                packages.push(packageName);
+            }
+        }
+    });
+
+    let packageSkills = [];
+    let subPackages = [];
+
+    if (selectedPackage !== null) {
+        (skills.skills || []).forEach((skill) => {
+            const afterSkill = skill.split("skills.")[1];
+            if (!afterSkill) return;
+            const parts = afterSkill.split(".");
+
+            if (parts[0] !== selectedPackage) {
+                return;
+            }
+
+            if (selectedSubPackage === null) {
+                if (parts.length === 2) {
+                    packageSkills.push(skill);
+                }
+                if (parts.length > 2) {
+                    const subPackageName = parts[1];
+                    if (!subPackages.includes(subPackageName)) {
+                        subPackages.push(subPackageName);
+                    }
+                }
+            } else {
+                if (parts[1] === selectedSubPackage && parts.length === 3) {
+                    packageSkills.push(skill);
+                }
+            }
+        });
+    }
+
+    packageSkills = packageSkills.filter((skill) =>
+        skill.toLowerCase().includes(searchText.toLowerCase())
+    );
+
     const searchedSkills = (skills.skills || []).filter((s) => s.toLowerCase().includes(searchText.toLowerCase()));
-    const packageSkills = selectedPackage
-        ? (skills.skills || []).filter((s) => s.includes(`skills.${selectedPackage}.`) && s.toLowerCase().includes(searchText.toLowerCase()))
-        : [];
+
     const filteredSkills = (skills.skills || [])
-        .filter((s) => (activeFilter === "Alle" ? true : s.includes(activeFilter)))
+        .filter((s) => (activeFilter === "Everything" ? true : s.includes(activeFilter)))
         .filter((s) => s.toLowerCase().includes(searchText.toLowerCase()));
+
 
     let visibleNodes = injectedNodes;
     let visibleEdges = edges;
@@ -835,10 +888,17 @@ function AppContent() {
                     setActiveFilter={setActiveFilter}
                     packages={packages}
                     selectedPackage={selectedPackage}
-                    setSelectedPackage={setSelectedPackage}
+                    setSelectedPackage={(pkg) => {
+                        setSelectedPackage(pkg);
+                        setSelectedSubPackage(null);
+                    }}
                     searchedSkills={searchedSkills}
                     packageSkills={packageSkills}
                     filteredSkills={filteredSkills}
+                    subPackages={subPackages}
+                    selectedSubPackage={selectedSubPackage}
+                    setSelectedSubPackage={setSelectedSubPackage}
+                    directSkills={directSkills}
                 />
 
                 <main className="editor-area">
