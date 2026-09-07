@@ -1,6 +1,11 @@
 import { Handle, Position } from "@xyflow/react";
 
 function CustomNode({ data }) {
+  // Holt z. B. "#1" aus "skills.dialog.Say#1"
+  const instanceId = data.fullSkillName && data.fullSkillName.includes("#")
+    ? `#${data.fullSkillName.split("#")[1]}`
+    : "";
+
   return (
     <div className={data.isInitial ? "costum-node initial-node" : "costum-node"}>
       {/* Target handle for incoming transitions*/}
@@ -34,7 +39,15 @@ function CustomNode({ data }) {
         />
       ))}
 
-      <div className="custom-node-label">{data.label}</div>
+      {/* Label  */}
+      <div className="custom-node-label">
+        {data.label}
+        {instanceId && (
+          <span style={{ marginLeft: "4px", color: "#64748b", fontWeight: 600 }}>
+            {instanceId}
+          </span>
+        )}
+      </div>
 
       {/* Event outputs */}
       <div className="event-list">
