@@ -4,6 +4,10 @@ import { FiExternalLink, FiLayers } from "react-icons/fi";
 function SubMachineNode({ data }) {
     const isInitial = data.isInitial;
 
+    const instanceId = data.fullSkillName && data.fullSkillName.includes("#")
+        ? `#${data.fullSkillName.split("#")[1]}`
+        : "";
+
     return (
         <div className={`costum-node submachine-node ${isInitial ? "initial-node" : ""}`}>
             <Handle type="target" position={Position.Left} className="target-handle" />
@@ -29,6 +33,11 @@ function SubMachineNode({ data }) {
 
             <div className="custom-node-label" style={{ fontWeight: "bold", color: "#ffffff" }}>
                 {data.label}
+                {data.fullSkillName && data.fullSkillName.includes("#") && (
+                    <span style={{ marginLeft: "4px", opacity: 0.8, fontSize: "12px" }}>
+                        #{data.fullSkillName.split("#")[1]}
+                    </span>
+                )}
             </div>
 
             <div className="event-list" style={{ marginTop: "6px" }}>
