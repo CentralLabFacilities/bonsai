@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { Handle, Position, useEdges } from "@xyflow/react";
 import { FiAlertCircle } from "react-icons/fi";
 
-function CustomNode({ id, data }) {
+function CustomNode({ id, data, selected }) {
   const edges = useEdges();
 
   const instanceId = data.fullSkillName && data.fullSkillName.includes("#")
@@ -46,7 +46,11 @@ function CustomNode({ id, data }) {
   }, [data, edges, id]);
 
   return (
-    <div className={data.isInitial ? "costum-node initial-node" : "costum-node"}>
+      <div
+        className={`costum-node ${data.isInitial ? "initial-node" : ""} ${
+          selected ? "selected-node" : ""
+        }`}
+      >
       {/* Warnungs-Badge / Ausrufezeichen */}
       {validation.hasError && (
         <div className="node-warning-badge" title={validation.tooltip}>
