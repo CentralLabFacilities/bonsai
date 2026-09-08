@@ -61,6 +61,15 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
     }
     const globalDataXml = globalDataLines.join("\n");
 
+    const isDescendantOf = (childNodeId, ancestorNodeId) => {
+        let current = nodes.find((n) => n.id === childNodeId);
+        while (current && current.parentId) {
+            if (current.parentId === ancestorNodeId) return true;
+            current = nodes.find((n) => n.id === current.parentId);
+        }
+        return false;
+    };
+
     const buildStateActionXml = (actionName, assignments, indent) => {
         const configuredAssignments = getConfiguredAssignments(assignments);
         if (configuredAssignments.length === 0) return "";
@@ -76,13 +85,14 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
     };
 
     // 4. Transitions ermitteln & formatieren
-    const buildTransitionsXml = (node, indent) => {
-        const connectedEdges = edges.filter((e) => e.source === node.id);
+    const buildTransitionsXml = (node, indent, containerParentId = null) => {
+        const connectedEdges = edges.filter(
+            (e) => e.source === node.id && !e.id.startsWith("edge-internal-")
+        );
         const nodeEvents = (node.data?.events || []).filter((ev) => ev.target);
 
         const combinedTransitions = [];
 
-        // Kanten aus der Canvas erfassen
         connectedEdges.forEach((edge) => {
             const targetNode = nodes.find((n) => n.id === edge.target);
             const targetId = targetNode
@@ -100,12 +110,12 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
             combinedTransitions.push({
                 rawEvent: rawHandle,
                 targetId,
+                targetNodeId: edge.target,
                 cond,
                 assignments,
             });
         });
 
-        // Event-Einträge aus data.events abgleichen
         nodeEvents.forEach((ev) => {
             const targetNode = nodes.find((n) => n.id === ev.target);
             const targetId = targetNode
@@ -120,6 +130,7 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
                 combinedTransitions.push({
                     rawEvent: ev.rawEvent || ev.name || ev.id,
                     targetId,
+                    targetNodeId: ev.target,
                     cond: ev.cond || "",
                     assignments: Array.isArray(ev.assignments)
                         ? ev.assignments
@@ -135,11 +146,16 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
             }
         });
 
-        // Basis-Name für den State-Präfix ermitteln (z.B. SayMultipleSlots aus dialog.SayMultipleSlots#1)
+
+        const filteredTransitions = combinedTransitions.filter((tr) => {
+            if (!containerParentId) return true;
+            return isDescendantOf(tr.targetNodeId, containerParentId);
+        });
+
         const rawState = node.data?.label || node.data?.fullSkillName || "";
         const skillBaseName = rawState.split("#")[0].split(".").pop();
 
-        return combinedTransitions
+        return filteredTransitions
             .map((tr) => {
                 const eventName = getScxmlTransitionEvent(
                     tr.rawEvent,
@@ -175,11 +191,13 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
     };
 
     // 5. Rekursives Rendern der Knoten
-    const renderNode = (node, depth = 1) => {
+    const renderNode = (node, depth = 1, currentContainerId = null) => {
         const indent = "    ".repeat(depth);
         const skillId = node.data.fullSkillName || node.data.label;
         const isParallel = node.type === "parallel";
         const isCompound = node.type === "compound";
+        const isContainer = isParallel || isCompound;
+        const isLane = node.type === "parallelLane";
         const isSubMachine = Boolean(node.data?.src);
         const isFinal = node.data?.isFinal || skillId.toLowerCase() === "end" || skillId.toLowerCase() === "fatal";
 
@@ -221,7 +239,9 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
         // A) Position
         const posX = Math.round(node.position?.x || 0);
         const posY = Math.round(node.position?.y || 0);
-        const metadataXml = `${indent}    <metadata>\n${indent}        <editor:position x="${posX}" y="${posY}"/>\n${indent}    </metadata>`;
+        const metadataXml = !isLane
+            ? `${indent}    <metadata>\n${indent}        <editor:position x="${posX}" y="${posY}"/>\n${indent}    </metadata>`
+            : "";
 
         // B) Datamodel
         const localParams = (node.data.params || []).filter(
@@ -238,11 +258,61 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
             ? `${indent}    <datamodel>\n${paramsLines.join("\n")}\n${indent}    </datamodel>`
             : "";
 
-        // C) Transitions
-        const transitionsXml = buildTransitionsXml(node, indent + "    ");
+        // C) Transitions:
+        // Für Container (Parallel & Compound) ziehen wir austretende Transitions hoch
+        const activeContainerId = isContainer ? node.id : currentContainerId;
+        let transitionsXml = "";
+
+        if (isContainer) {
+            const leavingTransitions = [];
+
+            // 1. Eigene Parent-Transitions erfassen (z. B. Fallback 'Succeeder.*')
+            const directParentTransitions = buildTransitionsXml(node, indent + "    ", null);
+            if (directParentTransitions) {
+                leavingTransitions.push(directParentTransitions);
+            }
+
+            // 2. Transitions aller Kindknoten erfassen, die nach DRAUSSEN führen
+            nodes.forEach((n) => {
+                if (isDescendantOf(n.id, node.id)) {
+                    const outgoing = edges.filter(
+                        (e) => e.source === n.id && !e.id.startsWith("edge-internal-") && !isDescendantOf(e.target, node.id)
+                    );
+
+                    outgoing.forEach((e) => {
+                        const targetNode = nodes.find((tn) => tn.id === e.target);
+                        const targetId = targetNode
+                            ? targetNode.data.fullSkillName || targetNode.data.label
+                            : e.target;
+
+                        const rawHandle = e.sourceHandle || e.label || "success";
+                        const baseSkill = n.data?.label || n.data?.fullSkillName?.split("#")[0]?.split(".")?.pop() || "";
+                        const fullEvent = rawHandle.includes(".") ? rawHandle : `${baseSkill}.${rawHandle}`;
+                        const condAttr = e.data?.cond ? ` cond="${e.data.cond}"` : "";
+
+                        if (e.data?.assign?.location && e.data?.assign?.expr) {
+                            leavingTransitions.push(
+                                `${indent}    <transition event="${fullEvent}" target="${targetId}"${condAttr}>\n${indent}        <assign location="${e.data.assign.location}" expr="${e.data.assign.expr}"/>\n${indent}    </transition>`
+                            );
+                        } else {
+                            leavingTransitions.push(
+                                `${indent}    <transition event="${fullEvent}" target="${targetId}"${condAttr}/>`
+                            );
+                        }
+                    });
+                }
+            });
+
+            // Doppelte Einträge vermeiden
+            transitionsXml = Array.from(new Set(leavingTransitions)).join("\n");
+        } else if (!isLane) {
+            transitionsXml = buildTransitionsXml(node, indent + "    ", activeContainerId);
+        }
 
         // D) Sub-States
-        const childrenXml = children.map((child) => renderNode(child, depth + 1)).join("\n\n");
+        const childrenXml = children
+            .map((child) => renderNode(child, depth + 1, activeContainerId))
+            .join("\n\n");
 
         const innerBlocks = [
             metadataXml,

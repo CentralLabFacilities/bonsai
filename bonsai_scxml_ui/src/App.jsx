@@ -479,6 +479,8 @@ function AppContent() {
         };
 
         setNodes((nds) => [...nds, newNode]);
+        setSelectedNodeId(compoundId); // <-- Details-Panel direkt öffnen
+        setActiveTab("allgemein");
         setContextMenu(null);
     };
 
@@ -576,6 +578,8 @@ function AppContent() {
         };
 
         setNodes((nds) => [...nds, parallelNode, lane1, lane2]);
+        setSelectedNodeId(parallelId);
+        setActiveTab("allgemein");
         setContextMenu(null);
     };
 
@@ -789,42 +793,113 @@ function AppContent() {
         });
 
         setNodes([compoundNode, ...updatedNodes]);
+        setSelectedNodeId(compoundId);
+        setActiveTab("allgemein");
     };
 
     // 2. Parallel State erstellen
     const handleCreateParallelFromSelected = () => {
         if (selectedNodes.length < 1) return;
 
-        const { minX, minY, maxX, maxY } = getSelectionBoundingBox(selectedNodes);
-        const padding = 35;
-        const headerHeight = 45;
-        const buttonReserve = 35;
+        const selectedIds = new Set(selectedNodes.map((n) => n.id));
 
-        // 1. Tatsächliche Höhe der größten ausgewählten Node ermitteln
-        let maxNodeHeight = 70;
-        selectedNodes.forEach((node) => {
-            // Falls viele Events vorhanden sind, wächst die Node in die Höhe
+        // 1. Zusammenhangskomponenten finden (über interne Kanten)
+        const internalEdges = edges.filter(
+            (e) => selectedIds.has(e.source) && selectedIds.has(e.target)
+        );
+
+        const visited = new Set();
+        const groups = [];
+
+        selectedNodes.forEach((startNode) => {
+            if (visited.has(startNode.id)) return;
+
+            const currentGroup = [];
+            const queue = [startNode.id];
+            visited.add(startNode.id);
+
+            while (queue.length > 0) {
+                const currentId = queue.shift();
+                const nodeObj = selectedNodes.find((n) => n.id === currentId);
+                if (nodeObj) currentGroup.push(nodeObj);
+
+                internalEdges.forEach((edge) => {
+                    let neighborId = null;
+                    if (edge.source === currentId && !visited.has(edge.target)) {
+                        neighborId = edge.target;
+                    } else if (edge.target === currentId && !visited.has(edge.source)) {
+                        neighborId = edge.source;
+                    }
+
+                    if (neighborId && selectedIds.has(neighborId)) {
+                        visited.add(neighborId);
+                        queue.push(neighborId);
+                    }
+                });
+            }
+
+            groups.push(currentGroup);
+        });
+
+        // 2. Präzise Breiten & Höhen pro Gruppe berechnen
+        // Eine CustomNode mit langem Label oder Instance-ID benötigt ca. 220-250px
+        const getNodeWidth = (node) => {
+            const labelLen = (node.data?.label || "").length + (node.data?.fullSkillName || "").length;
+            return Math.max(210, Math.min(300, 160 + labelLen * 3));
+        };
+
+        const getNodeHeight = (node) => {
             const eventCount = node.data?.events?.length || 0;
-            const estimatedHeight = Math.max(node.style?.height || 70, 50 + eventCount * 18);
-            if (estimatedHeight > maxNodeHeight) {
-                maxNodeHeight = estimatedHeight;
+            return Math.max(node.style?.height || 70, 50 + eventCount * 18);
+        };
+
+        const headerHeight = 45;
+        const buttonReserve = 40;
+        const laneSpacing = 15;
+        const laneHeights = [];
+        const groupWidths = [];
+
+        groups.forEach((group) => {
+            const isCompound = group.length > 1;
+
+            let maxH = 70;
+            let totalW = 0;
+
+            group.forEach((n) => {
+                const h = getNodeHeight(n);
+                if (h > maxH) maxH = h;
+                totalW += getNodeWidth(n) + 40; // 40px Abstand zwischen Nodes
+            });
+
+            if (isCompound) {
+                // Compound-Rahmen: Header (35px) + Node-Höhe + Rand-Padding (40px)
+                laneHeights.push(Math.max(170, maxH + 75));
+                // Breite: Padding links/rechts (60px) + Exit-Handle-Puffer (120px)
+                groupWidths.push(totalW + 160);
+            } else {
+                laneHeights.push(Math.max(130, maxH + 40));
+                groupWidths.push(getNodeWidth(group[0]) + 160); // Platz für Exit-Labels
             }
         });
 
-        // Lane-Höhe dynamisch anpassen: Node-Höhe + 40px Bewegungs-Spielraum
-        const laneHeight = Math.max(140, maxNodeHeight + 40);
-        const numLanes = selectedNodes.length;
-        const containerWidth = Math.max(420, maxX - minX + padding * 2);
-        const containerHeight = headerHeight + numLanes * laneHeight + buttonReserve;
+        // Der Gesamt-Container muss so breit sein wie die breiteste Gruppe (mind. 480px)
+        const containerWidth = Math.max(480, ...groupWidths);
+        const totalLanesHeight = laneHeights.reduce((sum, h) => sum + h, 0);
+        const containerHeight = headerHeight + totalLanesHeight + buttonReserve;
 
+        const { minX, minY } = getSelectionBoundingBox(selectedNodes);
         const parallelId = getNodeId();
         const parallelName = `Parallel_${nodes.filter((n) => n.type === "parallel").length + 1}`;
-        const branchNames = selectedNodes.map((n, i) => n.data.label || `Lane_${i + 1}`);
+
+        const branchNames = groups.map((g, idx) => {
+            if (g.length > 1) return `Group_${idx + 1}`;
+            return g[0].data?.label || `Lane_${idx + 1}`;
+        });
 
         const parallelNode = {
             id: parallelId,
             type: "parallel",
-            position: { x: minX - padding, y: minY - padding - headerHeight },
+            position: { x: minX - 30, y: minY - 30 - headerHeight },
             style: { width: containerWidth, height: containerHeight },
             data: {
                 label: parallelName,
@@ -839,23 +914,32 @@ function AppContent() {
         };
 
         const newLanes = [];
+        const newCompounds = [];
         const movedNodes = [];
-        const selectedIds = new Set(selectedNodes.map((n) => n.id));
+        let currentLaneY = headerHeight;
+        const nodeToLaneMap = new Map();
 
-        selectedNodes.forEach((node, idx) => {
+        // 3. Lanes, Compounds und Nodes erzeugen
+        groups.forEach((group, idx) => {
             const laneId = getNodeId();
             const laneName = branchNames[idx];
+            const laneHeight = laneHeights[idx];
+            const isCompound = group.length > 1;
+
+            group.forEach((n) => nodeToLaneMap.set(n.id, laneId));
 
             newLanes.push({
                 id: laneId,
-                position: { x: 0, y: headerHeight + idx * laneHeight },
+                position: { x: 0, y: currentLaneY },
                 parentId: parallelId,
                 extent: "parent",
+                draggable: false,
+                selectable: false,
                 type: "parallelLane",
                 style: {
                     width: containerWidth,
                     height: laneHeight,
-                    borderBottom: idx < numLanes - 1 ? "1.5px solid #0284c7" : "none",
+                    borderBottom: idx < groups.length - 1 ? "1.5px solid #0284c7" : "none",
                 },
                 data: {
                     label: laneName,
@@ -863,18 +947,113 @@ function AppContent() {
                 },
             });
 
-            // Node sauber zentriert in ihrer Lane platzieren
-            movedNodes.push({
-                ...node,
-                parentId: laneId,
-                extent: "parent",
-                position: { x: 25, y: 15 },
-                selected: false,
-            });
+            if (isCompound) {
+                const compoundId = getNodeId();
+                const compoundName = `${laneName}_Part`;
+                const compoundWidth = containerWidth - 130;
+                const compoundHeight = laneHeight - 10;
+
+                newCompounds.push({
+                    id: compoundId,
+                    position: { x: 15, y: 5 },
+                    parentId: laneId,
+                    extent: "parent",
+                    type: "compound",
+                    className: "compound-in-lane", // <-- Macht den Rahmen unsichtbar
+                    style: { width: compoundWidth, height: compoundHeight },
+                    data: {
+                        label: compoundName,
+                        fullSkillName: compoundName,
+                        isInitial: group.some((n) => n.data?.isInitial),
+                        events: [],
+                    },
+                });
+
+                // Nodes horizontal nacheinander platzieren
+                let currentX = 15;
+                group.forEach((node) => {
+                    const w = getNodeWidth(node);
+                    movedNodes.push({
+                        ...node,
+                        parentId: compoundId,
+                        extent: "parent",
+                        position: { x: currentX, y: 15 }, // <-- Weiter oben, da kein Header stört
+                        selected: false,
+                    });
+                    currentX += w + 35;
+                });
+            } else {
+                movedNodes.push({
+                    ...group[0],
+                    parentId: laneId,
+                    extent: "parent",
+                    position: { x: 25, y: 20 },
+                    selected: false,
+                });
+            }
+
+            currentLaneY += laneHeight;
+        });
+
+        // 4. Kanten umbiegen
+        const newEdgesToAdd = [];
+        const updatedEdges = edges.map((edge) => {
+            const isSourceSelected = selectedIds.has(edge.source);
+            const isTargetSelected = selectedIds.has(edge.target);
+
+            // Eingehend von außen -> auf den Parallel-Container
+            if (!isSourceSelected && isTargetSelected) {
+                return {
+                    ...edge,
+                    target: parallelId,
+                    targetHandle: "target",
+                };
+            }
+
+            // Ausgehend nach außen -> an den Rand der entsprechenden Lane
+            if (isSourceSelected && !isTargetSelected) {
+                const laneId = nodeToLaneMap.get(edge.source);
+                const laneNode = newLanes.find((l) => l.id === laneId);
+                const handleId = edge.sourceHandle || "success";
+
+                const sourceNode = selectedNodes.find((n) => n.id === edge.source);
+                const baseSkillName = sourceNode?.data?.label || sourceNode?.data?.fullSkillName?.split("#")[0]?.split(".")?.pop() || "";
+                const exitLabel = `${baseSkillName}.${handleId}`;
+
+                if (laneNode && !laneNode.data.events.some((ev) => ev.id === handleId)) {
+                    laneNode.data.events.push({
+                        id: handleId,
+                        rawEvent: exitLabel,
+                        name: exitLabel,
+                        target: edge.target,
+                    });
+                }
+
+                newEdgesToAdd.push({
+                    id: `edge-internal-${edge.source}-${handleId}-${laneId}`,
+                    source: edge.source,
+                    target: laneId,
+                    sourceHandle: handleId,
+                    targetHandle: `target-${handleId}`,
+                    style: { strokeDasharray: "4 4", stroke: "#0284c7", strokeWidth: 1.5 },
+                    type: "smoothstep",
+                });
+
+                return {
+                    ...edge,
+                    source: laneId,
+                    sourceHandle: handleId,
+                };
+            }
+
+            return edge;
         });
 
         const remainingNodes = nodes.filter((n) => !selectedIds.has(n.id));
-        setNodes([parallelNode, ...newLanes, ...movedNodes, ...remainingNodes]);
+        setNodes([parallelNode, ...newLanes, ...newCompounds, ...movedNodes, ...remainingNodes]);
+        setSelectedNodeId(parallelId);
+        setActiveTab("allgemein");
+        setEdges([...updatedEdges, ...newEdgesToAdd]);
     };
 
     // 3. Sub-State-Machine erstellen & direkt in neuem Tab öffnen
@@ -2336,7 +2515,20 @@ function AppContent() {
                                 }
                                 onUpdateName={(name) =>
                                     setNodes((nds) =>
-                                        nds.map((n) => (n.id === selectedNode.id ? { ...n, data: { ...n.data, fullSkillName: `${n.data.fullSkillName.split("#")[0]}#${name}` } } : n))
+                                        nds.map((n) => {
+                                    if (n.id !== selectedNode.id) return n;
+                                    const isContainerOrSub = n.type === "compound" || n.type === "parallel" || n.type === "submachine";
+                                    return {
+                                        ...n,
+                                        data: {
+                                            ...n.data,
+                                            label: name,
+                                            fullSkillName: isContainerOrSub
+                                                ? name
+                                                : `${n.data.fullSkillName?.split("#")[0]}#${name}`,
+                                        },
+                                    };
+                                })
                                     )
                                 }
                                 onUpdateSrc={(nodeId, newSrc) =>
