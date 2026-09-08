@@ -1,11 +1,11 @@
 import { Handle, Position } from '@xyflow/react';
 import StateActionBadges from './StateActionBadges';
+import { FiPlus } from 'react-icons/fi';
 
 export default function ParallelNode({ id, data }) {
-  const lanes = data.lanes || data.branches || ['Lane 1', 'Lane 2'];
-
   return (
     <div className="parallel-group-container">
+      {/* Target-Handle links für Transitions auf den gesamten Parallel-State */}
       <StateActionBadges onEntry={data.onEntry} onExit={data.onExit} />
 
       {/* Target handle for transitions to the entire parallel state */}
@@ -21,12 +21,18 @@ export default function ParallelNode({ id, data }) {
         <strong className="parallel-title">{data.label || id}</strong>
       </div>
 
-      {/* Horizontal lines without text watermarks */}
-      <div className="parallel-group-lanes">
-        {lanes.map((_, idx) => (
-          <div key={idx} className="parallel-group-lane-row" />
-        ))}
-      </div>
+        <button
+          className="parallel-add-lane-btn"
+          title="Add new row"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (data.onAddLane) {
+              data.onAddLane(id);
+            }
+          }}
+        >
+          <FiPlus size={12} />
+        </button>
     </div>
   );
 }

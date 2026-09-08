@@ -41,7 +41,7 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
             if (slot.path && slot.path.trim() !== "") {
                 const formattedPath = slot.path.startsWith("/") ? slot.path : `/${slot.path}`;
                 slotEntries.push(
-                    `            <slot key="${slot.key}" state="${skillName}" xpath="${formattedPath}"/>`
+                    `                <slot key="${slot.key}" state="${skillName}" xpath="${formattedPath}"/>`
                 );
             }
         });
