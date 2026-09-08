@@ -2039,8 +2039,8 @@ function AppContent() {
                                     >
                                         <div className="context-menu-header">
                                             {selectedNodes.length > 0
-                                                ? `${selectedNodes.length} Node(s) umwandeln in:`
-                                                : "Neues Element erstellen"}
+                                                ? `change ${selectedNodes.length} node(s) in:`
+                                                : "Create new element"}
                                         </div>
                                         <button className="context-menu-item" onClick={() => handleSelectAction("compound")}>
                                             Compound State
