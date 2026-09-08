@@ -3439,3 +3439,60 @@
     overflow-y: auto;
   }
 }
+
+
+/* Kontextmenü für Rechtsklick auf Canvas */
+.context-menu {
+  position: fixed;
+  z-index: 1000;
+  background-color: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 190px;
+  animation: fadeInMenu 0.15s ease-out;
+}
+
+@keyframes fadeInMenu {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.context-menu-header {
+  font-size: 11px;
+  font-weight: bold;
+  color: #64748b;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  border-bottom: 1px solid #1e293b;
+  margin-bottom: 2px;
+  letter-spacing: 0.5px;
+}
+
+.context-menu-item {
+  background: transparent;
+  border: none;
+  color: #f8fafc;
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 13px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.context-menu-item:hover {
+  background-color: #38bdf8;
+  color: #0f172a;
+  font-weight: 600;
+}

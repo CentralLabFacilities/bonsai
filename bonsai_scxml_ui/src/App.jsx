@@ -164,6 +164,7 @@ function AppContent() {
     const [selectedSubPackage, setSelectedSubPackage] = useState(null);
     const [activeFilter, setActiveFilter] = useState("Everything");
     const [searchText, setSearchText] = useState("");
+    const [contextMenu, setContextMenu] = useState(null);
 
     //---- TAB MANAGEMENT ----
     const [tabs, setTabs] = useState([
@@ -403,6 +404,162 @@ function AppContent() {
         }
     };
 
+    const handleContextMenuOpen = useCallback((event, clickedNode = null) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (clickedNode && !clickedNode.selected) {
+            setNodes((nds) =>
+                nds.map((n) => ({
+                    ...n,
+                    selected: n.id === clickedNode.id,
+                }))
+            );
+            setSelectedNodeId(clickedNode.id);
+        }
+
+        const flowPos = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+        setContextMenu({
+            x: event.clientX,
+            y: event.clientY,
+            flowPosition: flowPos,
+        });
+    }, [screenToFlowPosition, setNodes]);
+
+    const handleSelectAction = (type) => {
+        const hasSelection = selectedNodes.length > 0;
+
+        if (type === "compound") {
+            if (hasSelection) {
+                handleCreateCompoundFromSelected();
+            } else {
+                handleCreateEmptyCompound(contextMenu.flowPosition);
+            }
+        } else if (type === "parallel") {
+            if (hasSelection) {
+                handleCreateParallelFromSelected();
+            } else {
+                handleCreateEmptyParallel(contextMenu.flowPosition);
+            }
+        } else if (type === "submachine") {
+            if (hasSelection) {
+                handleCreateSubMachineFromSelected();
+            } else {
+                handleCreateEmptySubMachine(contextMenu.flowPosition);
+            }
+        }
+
+        setContextMenu(null);
+    };
+
+    useEffect(() => {
+        const handleClickOutside = () => {
+            if (contextMenu) setContextMenu(null);
+        };
+        document.addEventListener("click", handleClickOutside);
+        return () => document.removeEventListener("click", handleClickOutside);
+    }, [contextMenu]);
+
+    const handleCreateEmptyCompound = (pos) => {
+        const compoundId = getNodeId();
+        const compoundName = `Compound_${nodes.filter((n) => n.type === "compound").length + 1}`;
+
+        const newNode = {
+            id: compoundId,
+            type: "compound",
+            position: pos,
+            style: { width: 320, height: 220 },
+            data: {
+                label: compoundName,
+                fullSkillName: compoundName,
+                isInitial: nodes.length === 0,
+                events: [],
+            },
+        };
+
+        setNodes((nds) => [...nds, newNode]);
+        setContextMenu(null);
+    };
+
+    const handleCreateEmptyParallel = (pos) => {
+        const parallelId = getNodeId();
+        const parallelName = `Parallel_${nodes.filter((n) => n.type === "parallel").length + 1}`;
+
+        const newNode = {
+            id: parallelId,
+            type: "parallel",
+            position: pos,
+            style: { width: 400, height: 260 },
+            data: {
+                label: parallelName,
+                fullSkillName: parallelName,
+                isInitial: nodes.length === 0,
+                lanes: ["Lane 1", "Lane 2"],
+                events: [],
+            },
+        };
+
+        setNodes((nds) => [...nds, newNode]);
+        setContextMenu(null);
+    };
+
+    const handleCreateEmptySubMachine = (pos) => {
+        const subMachineId = getNodeId();
+        const subMachineLabel = `SubMachine_${nodes.filter((n) => n.type === "submachine").length + 1}`;
+
+        const subMachineNode = {
+            id: subMachineId,
+            type: "submachine",
+            position: pos,
+            data: {
+                label: subMachineLabel,
+                fullSkillName: subMachineLabel,
+                src: `\${EXERCISE}/${subMachineLabel}.xml`,
+                isInitial: nodes.length === 0,
+                events: [{ id: "success" }, { id: "failure" }],
+                onOpenSubMachine: handleOpenSubMachine,
+            },
+        };
+
+        const newTabId = `tab-sub-${crypto.randomUUID().slice(0, 6)}`;
+        const newTabObj = {
+            id: newTabId,
+            title: subMachineLabel,
+            fileName: `${subMachineLabel}.xml`,
+            fileHandle: null,
+            filePath: null,
+            nodes: [],
+            edges: [],
+            slotNodes: [],
+            slotEdges: [],
+            globalDataModel: [
+                { id: "#_STATE_PREFIX", expr: "'de.unibi.citec.clf.bonsai.skills.'" },
+            ],
+        };
+
+        setTabs((prevTabs) => [
+            ...prevTabs.map((t) =>
+                t.id === activeTabId
+                    ? { ...t, nodes, edges, slotNodes, slotEdges, globalDataModel }
+                    : t
+            ),
+            newTabObj,
+        ]);
+
+        setNodes((nds) => [...nds, subMachineNode]);
+        setContextMenu(null);
+
+        // Direkt in den neuen Sub-Tab wechseln
+        setActiveTabId(newTabId);
+        setNodes([]);
+        setEdges([]);
+        setSlotNodes([]);
+        setSlotEdges([]);
+        setGlobalDataModel(newTabObj.globalDataModel);
+        setSelectedNodeId(null);
+        setTimeout(() => fitView({ padding: 0.2, duration: 300 }), 80);
+    };
+
     const handleOpenSubMachine = async (srcPath, label) => {
         if (!srcPath) return;
 
@@ -511,7 +668,7 @@ function AppContent() {
 
     // 1. Compound State erstellen
     const handleCreateCompoundFromSelected = () => {
-        if (selectedNodes.length < 2) return;
+        if (selectedNodes.length < 1) return;
 
         const { minX, minY, maxX, maxY } = getSelectionBoundingBox(selectedNodes);
         const padding = 40;
@@ -538,7 +695,6 @@ function AppContent() {
             },
         };
 
-        // Kind-Knoten relativ im Compound ausrichten
         const selectedIds = new Set(selectedNodes.map((n) => n.id));
         const updatedNodes = nodes.map((node) => {
             if (selectedIds.has(node.id)) {
@@ -561,7 +717,7 @@ function AppContent() {
 
     // 2. Parallel State erstellen
     const handleCreateParallelFromSelected = () => {
-        if (selectedNodes.length < 2) return;
+        if (selectedNodes.length < 1) return;
 
         const { minX, minY, maxX, maxY } = getSelectionBoundingBox(selectedNodes);
         const padding = 40;
@@ -583,7 +739,7 @@ function AppContent() {
                 label: parallelName,
                 fullSkillName: parallelName,
                 isInitial: selectedNodes.some((n) => n.data?.isInitial),
-                lanes: branchNames,
+                lanes: branchNames.length > 1 ? branchNames : [...branchNames, "Lane 2"],
                 events: [],
                 onEntry: [],
                 onExit: [],
@@ -1874,21 +2030,27 @@ function AppContent() {
                                     </div>
                                 )}
 
-                                {/* Floating Grouping Toolbar bei Mehrfachauswahl */}
-                                {selectedNodes.length >= 2 && activeMode !== "code" && (
-                                    <div className="multi-selection-toolbar">
-                                        <span className="selection-count">{selectedNodes.length} Nodes ausgewählt</span>
-                                        <div className="selection-actions">
-                                            <button className="group-btn compound-btn" onClick={handleCreateCompoundFromSelected}>
-                                                Compound State
-                                            </button>
-                                            <button className="group-btn parallel-btn" onClick={handleCreateParallelFromSelected}>
-                                                Parallel State
-                                            </button>
-                                            <button className="group-btn submachine-btn" onClick={handleCreateSubMachineFromSelected}>
-                                                Sub-Machine
-                                            </button>
+                                {/* Dynamisches Kontextmenü */}
+                                {contextMenu && (
+                                    <div
+                                        className="context-menu"
+                                        style={{ top: contextMenu.y, left: contextMenu.x }}
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <div className="context-menu-header">
+                                            {selectedNodes.length > 0
+                                                ? `${selectedNodes.length} Node(s) umwandeln in:`
+                                                : "Neues Element erstellen"}
                                         </div>
+                                        <button className="context-menu-item" onClick={() => handleSelectAction("compound")}>
+                                            Compound State
+                                        </button>
+                                        <button className="context-menu-item" onClick={() => handleSelectAction("parallel")}>
+                                            Parallel State
+                                        </button>
+                                        <button className="context-menu-item" onClick={() => handleSelectAction("submachine")}>
+                                            Sub-State-Machine
+                                        </button>
                                     </div>
                                 )}
 
@@ -1909,6 +2071,8 @@ function AppContent() {
                                         setSelectedNodeId(null);
                                         setRightPanelTab("datamodel");
                                     }}
+                                    onPaneContextMenu={(e) => handleContextMenuOpen(e)}
+                                    onNodeContextMenu={(e, node) => handleContextMenuOpen(e, node)}
                                     multiSelectionKeyCode={["Control", "Meta"]}
                                     selectionKeyCode={["Control", "Meta"]}
                                     deleteKeyCode={["Delete"]}
