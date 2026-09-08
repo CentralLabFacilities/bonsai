@@ -1888,25 +1888,49 @@ function AppContent() {
             return;
         }
 
-        const usedPaths = new Set();
+        const usedPaths = new Map();
+
         targetNodes.forEach((node) => {
-            (node.data.inSlots || []).forEach((s) => s.path && s.path.trim() && usedPaths.add(s.path.trim().replace(/^\//, "")));
-            (node.data.outSlots || []).forEach((s) => s.path && s.path.trim() && usedPaths.add(s.path.trim().replace(/^\//, "")));
+            (node.data.inSlots || []).forEach((s) => {
+                if (s.path && s.path.trim()) {
+                    const cleanPath = s.path.trim().replace(/^\//, "");
+
+                    usedPaths.set(cleanPath, s.type || "Unknown");
+                }
+            });
+
+            (node.data.outSlots || []).forEach((s) => {
+                if (s.path && s.path.trim()) {
+                    const cleanPath = s.path.trim().replace(/^\//, "");
+
+                    usedPaths.set(cleanPath, s.type || "Unknown");
+                }
+            });
         });
 
         const generatedSlotNodes = [];
         let index = 0;
 
-        usedPaths.forEach((path) => {
+        usedPaths.forEach((slotType, path) => {
             const slotNodeId = `slot-${path}`;
+
             generatedSlotNodes.push({
                 id: slotNodeId,
-                position: { x: 380 + (index % 3) * 200, y: 120 + Math.floor(index / 3) * 140 },
+                position: {
+                    x: 380 + (index % 3) * 200,
+                    y: 120 + Math.floor(index / 3) * 140
+                },
                 type: "slot",
-                data: { path: `/${path}`, label: `/${path}` },
+                data: {
+                    path: `/${path}`,
+                    label: `/${path}`,
+                    slotType: slotType,
+                },
             });
+
             index++;
         });
+
 
         setSlotNodes(generatedSlotNodes);
 
