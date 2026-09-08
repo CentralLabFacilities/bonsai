@@ -38,9 +38,9 @@ function CustomNode({ id, data, selected }) {
     const hasError = missingSlots || missingParams || missingTransitions;
 
     const reasons = [];
-    if (missingSlots) reasons.push("Nicht alle Slots haben einen Pfad");
-    if (missingParams) reasons.push("Erforderliche Parameter fehlen");
-    if (missingTransitions) reasons.push("Nicht alle Transitions sind abgedeckt");
+    if (missingSlots) reasons.push("Not every slot has a path");
+    if (missingParams) reasons.push("Required parameters are missing");
+    if (missingTransitions) reasons.push("Not every transition is set");
 
     return { hasError, tooltip: reasons.join("\n") };
   }, [data, edges, id]);
