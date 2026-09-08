@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FiChevronDown, FiExternalLink, FiLayers } from "react-icons/fi";
+import { FiChevronDown, FiExternalLink, FiLayers, FiGitCommit, FiFolder } from "react-icons/fi";
 import StateActionsEditor from "./StateActionsEditor";
 import TypedValueEditor from "./TypedValueEditor";
 import { getVariableType, normalizeValueType } from "../utils/valueTypes";
@@ -119,8 +119,12 @@ function DetailsPanel({
         selectedNode.type === "submachine" ||
         Boolean(selectedNode.data.src);
 
+
     const [openTargetSelector, setOpenTargetSelector] = useState(null);
     const [targetQueries, setTargetQueries] = useState({});
+    const isCompound = selectedNode.type === "compound";
+    const isParallel = selectedNode.type === "parallel";
+    const isContainer = isCompound || isParallel;
 
     const targetNodeOptions = (availableTargetNodes || []).map((node) => {
         const fullSkillName = node.data?.fullSkillName || "";
@@ -272,33 +276,25 @@ function DetailsPanel({
 
     return (
         <aside className="details-panel">
-            <h3>Details: {selectedNode.data.label}</h3>
-
+            <h3>Details: {selectedNode.data?.label || selectedNode.id}</h3>
             <div className="tabs">
                 <div
-                    className={`tab ${
-                        activeTab === "allgemein" ? "active-tab" : ""
-                    }`}
+                    className={`tab ${activeTab === "allgemein" ? "active-tab" : ""}`}
                     onClick={() => setActiveTab("allgemein")}
                 >
                     Overall
                 </div>
 
-                {!isSubMachine && (
+                {!isSubMachine && !isContainer && (
                     <>
                         <div
-                            className={`tab ${
-                                activeTab === "parameter" ? "active-tab" : ""
-                            }`}
+                            className={`tab ${activeTab === "parameter" ? "active-tab" : ""}`}
                             onClick={() => setActiveTab("parameter")}
                         >
                             Parameter
                         </div>
-
                         <div
-                            className={`tab ${
-                                activeTab === "slots" ? "active-tab" : ""
-                            }`}
+                            className={`tab ${activeTab === "slots" ? "active-tab" : ""}`}
                             onClick={() => setActiveTab("slots")}
                         >
                             Slots
@@ -319,7 +315,7 @@ function DetailsPanel({
             <div className="tab-content">
                 {activeTab === "allgemein" && (
                     <div className="allgemein-container">
-                        {selectedNode.data.description && (
+                        {selectedNode.data?.description && (
                             <div className="node-description">
                                 {selectedNode.data.description}
                             </div>
@@ -327,24 +323,80 @@ function DetailsPanel({
 
                         <div className="description-header">
                             <h3>
-                                {isSubMachine
+                                {isParallel
+                                    ? "Parallel State View"
+                                    : isCompound
+                                    ? "Compound State View"
+                                    : isSubMachine
                                     ? "Sub-Machine View"
                                     : "General View"}
                             </h3>
-
-                            <button
-                                className="initial-button"
-                                disabled={
-                                    hasInitialNode &&
-                                    !selectedNode.data.isInitial
-                                }
-                                onClick={onSetInitial}
-                            >
-                                Initial set
-                            </button>
+                            {!isParallel && (
+                                <button
+                                    className="initial-button"
+                                    disabled={hasInitialNode && !selectedNode.data?.isInitial}
+                                    onClick={onSetInitial}
+                                >
+                                    Initial set
+                                </button>
+                            )}
                         </div>
 
-                        {isSubMachine ? (
+                        {/* A) CONTAINER STATES: PARALLEL & COMPOUND */}
+                        {isContainer ? (
+                            <>
+                                <div className="field-row">
+                                    <label className="field-label">Typ:</label>
+                                    <div
+                                        style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "6px",
+                                            color: isParallel ? "#38bdf8" : "#f59e0b",
+                                            fontWeight: "bold",
+                                            fontSize: "13px",
+                                        }}
+                                    >
+                                        {isParallel ? <FiGitCommit /> : <FiFolder />}
+                                        <span>{isParallel ? "Parallel State" : "Compound State"}</span>
+                                    </div>
+                                </div>
+                                <div className="field-row">
+                                    <label className="field-label">State ID:</label>
+                                    <input
+                                        className="text-field"
+                                        type="text"
+                                        value={selectedNode.data?.label || ""}
+                                        onChange={(e) => onUpdateName(e.target.value)}
+                                        placeholder="Enter name / ID"
+                                    />
+                                </div>
+
+                                {isParallel && (selectedNode.data?.lanes || []).length > 0 && (
+                                    <div className="events-container">
+                                        <h3>Lanes ({selectedNode.data.lanes.length}):</h3>
+                                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                                            {selectedNode.data.lanes.map((lane, idx) => (
+                                                <div
+                                                    key={idx}
+                                                    style={{
+                                                        background: "#1e293b",
+                                                        padding: "6px 10px",
+                                                        borderRadius: "4px",
+                                                        fontSize: "12px",
+                                                        border: "1px solid #334155",
+                                                        color: "#94a3b8",
+                                                    }}
+                                                >
+                                                    {lane}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </>
+                        ) : isSubMachine ? (
+                            /* B) SUB-MACHINE */
                             <>
                                 <div className="field-row">
                                     <span className="field-label">Type:</span>
@@ -387,7 +439,7 @@ function DetailsPanel({
                                     <input
                                         className="text-field"
                                         type="text"
-                                        value={selectedNode.data.src || ""}
+                                        value={selectedNode.data?.src || ""}
                                         placeholder="${EXERCISE}/..."
                                         onChange={(e) =>
                                             onUpdateSrc?.(
@@ -406,6 +458,7 @@ function DetailsPanel({
                                         justifyContent: "center",
                                     }}
                                     onClick={() =>
+                                        selectedNode.data?.onOpenSubMachine &&
                                         selectedNode.data.onOpenSubMachine?.(
                                             selectedNode.data.src,
                                             selectedNode.data.label
@@ -423,9 +476,11 @@ function DetailsPanel({
                                         Package:
                                     </span>
 
-                                    <span className="field-value">
+                                    <span
+                                        className="field-
+                                        value">
                                         {getSkillPackageName(
-                                            selectedNode.data.fullSkillName
+                                            selectedNode.data?.fullSkillName
                                         ) || "—"}
                                     </span>
                                 </div>
@@ -439,7 +494,6 @@ function DetailsPanel({
                                         {selectedNode.data.label || "—"}
                                     </span>
                                 </div>
-
                                 <div className="field-row">
                                     <label className="field-label">
                                         Name:
@@ -449,7 +503,7 @@ function DetailsPanel({
                                         className="text-field"
                                         type="text"
                                         value={
-                                            selectedNode.data.fullSkillName
+                                            selectedNode.data?.fullSkillName
                                                 ?.split("#")[1] || ""
                                         }
                                         onChange={(e) =>
@@ -687,12 +741,12 @@ function DetailsPanel({
                     </div>
                 )}
 
-                {activeTab === "parameter" && !isSubMachine && (
+                {activeTab === "parameter" && !isContainer && !isSubMachine && (
                     <div className="slots-container">
                         <h3>Parameters</h3>
 
                         <div className="slot-list">
-                            {(selectedNode.data.params || []).map(
+                            {(selectedNode.data?.params || []).map(
                                 (param, index) => (
                                     <div
                                         className={`slot-text-field parameter-card parameter-card-type-${(normalizeValueType(param.type) || "other").toLowerCase()}`}
@@ -709,9 +763,8 @@ function DetailsPanel({
                                                         *
                                                     </span>
                                                 )}
-                                            </div>
-
-                                            <div className="parameter-badges">
+                                    </div>
+                                    <div className="parameter-badges">
                                                 {param.required && (
                                                     <span className="parameter-required-badge">
                                                         Required
@@ -731,9 +784,7 @@ function DetailsPanel({
                                                     {param.type || "Unknown"}
                                                 </span>
                                             </div>
-                                        </div>
-
-                                        {param.description && (
+                                    </div>{param.description && (
                                             <div className="parameter-description">
                                                 {param.description}
                                             </div>
@@ -763,12 +814,12 @@ function DetailsPanel({
                     </div>
                 )}
 
-                {activeTab === "slots" && !isSubMachine && (
+                {activeTab === "slots" && !isContainer && !isSubMachine && (
                     <div className="slots-container">
                         <h3>Slots</h3>
 
                         <div className="slot-list">
-                            {(selectedNode.data.inSlots || []).map(
+                            {(selectedNode.data?.inSlots || []).map(
                                 (slot, index) => (
                                     <div
                                         className="slot-text-field compact-slot-card compact-slot-read"
@@ -777,9 +828,8 @@ function DetailsPanel({
                                         <div className="compact-slot-header">
                                             <div className="compact-slot-name">
                                                 {slot.key}
-                                            </div>
-
-                                            <div className="compact-slot-badges">
+                                    </div>
+                                    <div className="compact-slot-badges">
                                                 <span
                                                     className={`parameter-type-badge parameter-type-${String(
                                                         slot.type || "other"
@@ -796,15 +846,14 @@ function DetailsPanel({
                                                 <span className="slot-access-badge slot-access-read">
                                                     Read
                                                 </span>
-                                            </div>
-                                        </div>
+                                    </div>
+                                    </div>
 
                                         {slot.description && (
                                             <div className="parameter-description">
                                                 {slot.description}
                                             </div>
                                         )}
-
                                         <input
                                             id={`in-slot-${selectedNode.id}-${index}`}
                                             className="parameter-value-input compact-slot-path-input"
@@ -823,7 +872,7 @@ function DetailsPanel({
                                 )
                             )}
 
-                            {(selectedNode.data.outSlots || []).map(
+                            {(selectedNode.data?.outSlots || []).map(
                                 (slot, index) => (
                                     <div
                                         className="slot-text-field compact-slot-card compact-slot-write"
@@ -832,9 +881,8 @@ function DetailsPanel({
                                         <div className="compact-slot-header">
                                             <div className="compact-slot-name">
                                                 {slot.key}
-                                            </div>
-
-                                            <div className="compact-slot-badges">
+                                    </div>
+                                    <div className="compact-slot-badges">
                                                 <span
                                                     className={`parameter-type-badge parameter-type-${String(
                                                         slot.type || "other"
@@ -851,15 +899,13 @@ function DetailsPanel({
                                                 <span className="slot-access-badge slot-access-write">
                                                     Write
                                                 </span>
-                                            </div>
-                                        </div>
+                                    </div></div>
 
                                         {slot.description && (
                                             <div className="parameter-description">
                                                 {slot.description}
                                             </div>
                                         )}
-
                                         <input
                                             id={`out-slot-${selectedNode.id}-${index}`}
                                             className="parameter-value-input compact-slot-path-input"

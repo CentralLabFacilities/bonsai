@@ -1468,6 +1468,20 @@
   transform: translateX(-50%) scale(1.15);
 }
 /* ================= COMPOUND FRAME CONTAINER ================= */
+.compound-in-lane {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.compound-in-lane .compound-frame-header {
+  display: none !important;
+}
+
+.compound-in-lane .target-handle {
+  display: none !important;
+}
+
 .compound-frame-node {
   width: 100%;
   height: 100%;
