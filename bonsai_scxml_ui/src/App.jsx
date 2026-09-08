@@ -1942,13 +1942,12 @@ function AppContent() {
                     const slotNodeId = `slot-${cleanPath}`;
                     newSlotEdges.push({
                         id: `edge-read-${slotNodeId}-${node.id}-${inIndex}`,
-                        source: slotNodeId,
-                        target: node.id,
-                        sourceHandle: "read-source",
-                        targetHandle: `read-target-${inIndex}`,
-                        label: inslot.key,
-                        style: { stroke: "#38bdf8", strokeWidth: 1.5, strokeDasharray: "5 5" },
-                        markerEnd: { type: MarkerType.ArrowClosed },
+                            source: slotNodeId,
+                            target: node.id,
+                            sourceHandle: "read-source",
+                            targetHandle: `read-target-${inIndex}`,
+                            style: { stroke: "#38bdf8", strokeWidth: 1.5, strokeDasharray: "5 5" },
+                            markerEnd: { type: MarkerType.ArrowClosed },
                     });
                 }
             });
@@ -1963,7 +1962,6 @@ function AppContent() {
                         target: slotNodeId,
                         sourceHandle: `write-source-${outIndex}`,
                         targetHandle: "write-target",
-                        label: outslot.key,
                         style: { stroke: "#22c55e", strokeWidth: 1.5, strokeDasharray: "5 5" },
                         markerEnd: { type: MarkerType.ArrowClosed },
                     });
