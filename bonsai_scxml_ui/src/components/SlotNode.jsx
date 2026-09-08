@@ -2,6 +2,7 @@ import { Handle, Position } from "@xyflow/react";
 
 function SlotNode({ data }) {
     const displayPath = data.path || data.label || "Undefined slot";
+    const slotType = data.slotType || "Unknown";
 
     return (
         <div className="slot-node">
@@ -14,6 +15,10 @@ function SlotNode({ data }) {
 
             <div className="slot-node-label">
                 {displayPath.startsWith("/") ? displayPath : `/${displayPath}`}
+            </div>
+
+            <div className="slot-node-type">
+                {slotType}
             </div>
 
             <Handle
