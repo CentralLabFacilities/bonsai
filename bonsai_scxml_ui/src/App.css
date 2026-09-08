@@ -1440,6 +1440,33 @@
 .parallel-group-lane-row:last-child {
   border-bottom: none;
 }
+
+.parallel-add-lane-btn {
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background-color: #ffffff;
+  border: 1px solid #0284c7;
+  color: #0284c7;
+  border-radius: 50%;
+  cursor: pointer;
+  padding: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  transition: all 0.15s ease;
+}
+
+.parallel-add-lane-btn:hover {
+  background-color: #0284c7;
+  color: #ffffff;
+  transform: translateX(-50%) scale(1.15);
+}
 /* ================= COMPOUND FRAME CONTAINER ================= */
 .compound-frame-node {
   width: 100%;

@@ -26,6 +26,7 @@ import WorkflowPanel from "./components/WorkflowPanel";
 import CodeView from "./components/CodeView";
 import ConditionModal from "./components/ConditionModal";
 import CompoundNode from "./components/CompoundNode";
+import ParallelLaneNode from "./components/ParallelLaneNode";
 
 // Ausgelagerte Utils (saveScxmlFile statt exportScxmlFile)
 import { generateXmlString, saveScxmlFile, saveScxmlFileTauri, openScxmlFileTauri, readScxmlFileContent } from "./utils/scxmlExport";
@@ -37,7 +38,7 @@ import "./App.css";
 // Initialize API proxy for Tauri desktop mode (intercepts /api/* fetch calls)
 initApiProxy();
 
-const nodeTypes = { custom: CustomNode, slot: SlotNode, submachine: SubMachineNode, parallel: ParallelNode, compound: CompoundNode };
+const nodeTypes = { custom: CustomNode, slot: SlotNode, submachine: SubMachineNode, parallel: ParallelNode, compound: CompoundNode, parallelLane: ParallelLaneNode, };
 const getNodeId = () => `skill-node-${crypto.randomUUID()}`;
 
 // Detect if running in Tauri desktop app
@@ -481,25 +482,100 @@ function AppContent() {
         setContextMenu(null);
     };
 
+    const handleAddLaneToParallel = useCallback((parallelId) => {
+        setNodes((nds) => {
+            const parallelNode = nds.find((n) => n.id === parallelId);
+            if (!parallelNode) return nds;
+
+            const existingLanes = nds.filter((n) => n.parentId === parallelId && n.type === "parallelLane");
+            const laneIndex = existingLanes.length;
+            const laneHeight = 140; // <-- auf 140px erhöht
+            const headerHeight = 45;
+            const buttonReserve = 35;
+
+            const newLaneId = getNodeId();
+            const newLaneName = `Lane_${laneIndex + 1}`;
+            const containerWidth = parallelNode.style?.width || 420;
+
+            const newLaneNode = {
+                id: newLaneId,
+                position: { x: 0, y: headerHeight + laneIndex * laneHeight },
+                parentId: parallelId,
+                extent: "parent",
+                type: "parallelLane",
+                style: {
+                    width: containerWidth,
+                    height: laneHeight,
+                    borderBottom: "1.5px solid #0284c7",
+                },
+                data: {
+                    label: newLaneName,
+                    events: [],
+                },
+            };
+
+            const newTotalHeight = headerHeight + (laneIndex + 1) * laneHeight + buttonReserve;
+
+            return nds.map((n) => {
+                if (n.id === parallelId) {
+                    return {
+                        ...n,
+                        style: { ...n.style, height: newTotalHeight },
+                        data: {
+                            ...n.data,
+                            lanes: [...(n.data.lanes || []), newLaneName],
+                        },
+                    };
+                }
+                return n;
+            }).concat(newLaneNode);
+        });
+    }, [setNodes]);
+
     const handleCreateEmptyParallel = (pos) => {
         const parallelId = getNodeId();
         const parallelName = `Parallel_${nodes.filter((n) => n.type === "parallel").length + 1}`;
+        const laneHeight = 110;
+        const headerHeight = 40;
+        const containerWidth = 420;
+        const containerHeight = headerHeight + 2 * laneHeight + 35;
 
-        const newNode = {
+        const parallelNode = {
             id: parallelId,
             type: "parallel",
             position: pos,
-            style: { width: 400, height: 260 },
+            style: { width: containerWidth, height: containerHeight },
             data: {
                 label: parallelName,
                 fullSkillName: parallelName,
                 isInitial: nodes.length === 0,
-                lanes: ["Lane 1", "Lane 2"],
+                lanes: ["Lane_1", "Lane_2"],
                 events: [],
+                onAddLane: handleAddLaneToParallel,
             },
         };
 
-        setNodes((nds) => [...nds, newNode]);
+        const lane1 = {
+            id: getNodeId(),
+            position: { x: 0, y: headerHeight },
+            parentId: parallelId,
+            extent: "parent",
+            type: "parallelLane",
+            style: { width: containerWidth, height: laneHeight, borderBottom: "1.5px solid #0284c7" },
+            data: { label: "Lane_1", events: [] },
+        };
+
+        const lane2 = {
+            id: getNodeId(),
+            position: { x: 0, y: headerHeight + laneHeight },
+            parentId: parallelId,
+            extent: "parent",
+            type: "parallelLane",
+            style: { width: containerWidth, height: laneHeight, borderBottom: "none" },
+            data: { label: "Lane_2", events: [] },
+        };
+
+        setNodes((nds) => [...nds, parallelNode, lane1, lane2]);
         setContextMenu(null);
     };
 
@@ -720,15 +796,30 @@ function AppContent() {
         if (selectedNodes.length < 1) return;
 
         const { minX, minY, maxX, maxY } = getSelectionBoundingBox(selectedNodes);
-        const padding = 40;
+        const padding = 35;
         const headerHeight = 45;
+        const buttonReserve = 35;
 
-        const containerWidth = Math.max(320, maxX - minX + padding * 2);
-        const containerHeight = Math.max(180, maxY - minY + padding * 2 + headerHeight);
+        // 1. Tatsächliche Höhe der größten ausgewählten Node ermitteln
+        let maxNodeHeight = 70;
+        selectedNodes.forEach((node) => {
+            // Falls viele Events vorhanden sind, wächst die Node in die Höhe
+            const eventCount = node.data?.events?.length || 0;
+            const estimatedHeight = Math.max(node.style?.height || 70, 50 + eventCount * 18);
+            if (estimatedHeight > maxNodeHeight) {
+                maxNodeHeight = estimatedHeight;
+            }
+        });
+
+        // Lane-Höhe dynamisch anpassen: Node-Höhe + 40px Bewegungs-Spielraum
+        const laneHeight = Math.max(140, maxNodeHeight + 40);
+        const numLanes = selectedNodes.length;
+        const containerWidth = Math.max(420, maxX - minX + padding * 2);
+        const containerHeight = headerHeight + numLanes * laneHeight + buttonReserve;
 
         const parallelId = getNodeId();
         const parallelName = `Parallel_${nodes.filter((n) => n.type === "parallel").length + 1}`;
-        const branchNames = selectedNodes.map((n) => n.data.label || n.id);
+        const branchNames = selectedNodes.map((n, i) => n.data.label || `Lane_${i + 1}`);
 
         const parallelNode = {
             id: parallelId,
@@ -739,31 +830,51 @@ function AppContent() {
                 label: parallelName,
                 fullSkillName: parallelName,
                 isInitial: selectedNodes.some((n) => n.data?.isInitial),
-                lanes: branchNames.length > 1 ? branchNames : [...branchNames, "Lane 2"],
+                lanes: branchNames,
                 events: [],
+                onAddLane: handleAddLaneToParallel,
                 onEntry: [],
                 onExit: [],
             },
         };
 
+        const newLanes = [];
+        const movedNodes = [];
         const selectedIds = new Set(selectedNodes.map((n) => n.id));
-        const updatedNodes = nodes.map((node) => {
-            if (selectedIds.has(node.id)) {
-                return {
-                    ...node,
-                    parentId: parallelId,
-                    extent: "parent",
-                    position: {
-                        x: node.position.x - (minX - padding),
-                        y: node.position.y - (minY - padding - headerHeight),
-                    },
-                    selected: false,
-                };
-            }
-            return node;
+
+        selectedNodes.forEach((node, idx) => {
+            const laneId = getNodeId();
+            const laneName = branchNames[idx];
+
+            newLanes.push({
+                id: laneId,
+                position: { x: 0, y: headerHeight + idx * laneHeight },
+                parentId: parallelId,
+                extent: "parent",
+                type: "parallelLane",
+                style: {
+                    width: containerWidth,
+                    height: laneHeight,
+                    borderBottom: idx < numLanes - 1 ? "1.5px solid #0284c7" : "none",
+                },
+                data: {
+                    label: laneName,
+                    events: [],
+                },
+            });
+
+            // Node sauber zentriert in ihrer Lane platzieren
+            movedNodes.push({
+                ...node,
+                parentId: laneId,
+                extent: "parent",
+                position: { x: 25, y: 15 },
+                selected: false,
+            });
         });
 
-        setNodes([parallelNode, ...updatedNodes]);
+        const remainingNodes = nodes.filter((n) => !selectedIds.has(n.id));
+        setNodes([parallelNode, ...newLanes, ...movedNodes, ...remainingNodes]);
     };
 
     // 3. Sub-State-Machine erstellen & direkt in neuem Tab öffnen
@@ -916,9 +1027,20 @@ function AppContent() {
                     },
                 };
             }
+
+            if (n.type === "parallel") {
+                return {
+                    ...n,
+                    data: {
+                        ...n.data,
+                        onAddLane: handleAddLaneToParallel,
+                    },
+                };
+            }
+
             return n;
         });
-    }, [nodes, tabs, activeTabId]);
+    }, [nodes, tabs, activeTabId, handleAddLaneToParallel]);
 
     useEffect(() => {
         const fetchSkills = async () => {
@@ -1872,12 +1994,38 @@ function AppContent() {
     const handleNodeDragStop = useCallback((event, node) => {
         const elem = document.elementFromPoint(event.clientX, event.clientY);
         if (elem && elem.closest(".trash-bin-dropzone")) {
-            setNodes((nds) => nds.filter((n) => n.id !== node.id));
-            setEdges((eds) => eds.filter((e) => e.source !== node.id && e.target !== node.id));
-            setSlotEdges((eds) => {
-                const updated = eds.filter((e) => e.source !== node.id && e.target !== node.id);
-                setSlotNodes((sNodes) => sNodes.filter((sn) => updated.some((e) => e.source === sn.id || e.target === sn.id)));
-                return updated;
+            setNodes((currentNodes) => {
+                // 1. Alle Kind-IDs rekursiv ermitteln
+                const idsToDelete = new Set([node.id]);
+                let foundNew = true;
+
+                while (foundNew) {
+                    foundNew = false;
+                    currentNodes.forEach((n) => {
+                        if (n.parentId && idsToDelete.has(n.parentId) && !idsToDelete.has(n.id)) {
+                            idsToDelete.add(n.id);
+                            foundNew = true;
+                        }
+                    });
+                }
+
+                // 2. Kanten aufräumen, die an gelöschten Knoten hängen
+                setEdges((eds) =>
+                    eds.filter((e) => !idsToDelete.has(e.source) && !idsToDelete.has(e.target))
+                );
+
+                setSlotEdges((eds) => {
+                    const updated = eds.filter((e) => !idsToDelete.has(e.source) && !idsToDelete.has(e.target));
+                    setSlotNodes((sNodes) =>
+                        sNodes.filter((sn) => updated.some((e) => e.source === sn.id || e.target === sn.id))
+                    );
+                    return updated;
+                });
+
+                setSelectedNodeId((id) => (idsToDelete.has(id) ? null : id));
+
+                // 3. Alle identifizierten Knoten auf einmal entfernen
+                return currentNodes.filter((n) => !idsToDelete.has(n.id));
             });
             setSelectedNodeId((id) => (id === node.id ? null : id));
         }

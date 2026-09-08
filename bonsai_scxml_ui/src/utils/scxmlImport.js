@@ -161,7 +161,6 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
         return {
             label: fullSkillName.split(".").pop().split("#")[0],
             fullSkillName: fullSkillName,
-            description: skillApiData.description || "",
             isInitial: isInitial,
             isFinal: isFinal,
             src: srcAttr || "",
@@ -176,6 +175,7 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
 
     // 3. States & Parallels parsen
     const newNodes = [];
+    const newEdges = [];
     const rawTransitions = [];
     let hasCustomPositions = true;
 
@@ -215,7 +215,6 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             const branchElements = Array.from(stateElem.children).filter((c) => c.localName === "state");
             const branchNames = branchElements.map((b) => b.getAttribute("id"));
 
-            // 1. Zähle die maximale Anzahl an hintereinanderliegenden States über alle Lanes
             let maxStatesInAnyLane = 1;
             branchElements.forEach((branchElem) => {
                 const innerStates = Array.from(branchElem.children).filter((c) => c.localName === "state");
@@ -223,8 +222,6 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                 if (count > maxStatesInAnyLane) maxStatesInAnyLane = count;
             });
 
-            // 2. Kompakte Dimensionen dynamisch berechnen
-            // Falls Lanes Compound-States enthalten, brauchen sie mehr vertikale Höhe
             const hasCompoundLane = branchElements.some(
                 (b) => Array.from(b.children).filter((c) => c.localName === "state").length > 0
             );
@@ -233,7 +230,7 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             const containerWidth = Math.max(300, maxStatesInAnyLane * 220 + 60);
             const containerHeight = headerHeight + branchElements.length * laneHeight + 10;
 
-            // 3. Parallel Container-Knoten anlegen
+            // 1. Parallel Container-Knoten (reiner Rahmen, keine eigenen Exits)
             newNodes.push({
                 id: parallelNodeId,
                 position: { x, y },
@@ -276,72 +273,91 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                     }
                 });
 
-            // 5. Kind-Knoten in den Lanes platzieren (mit Compound-Unterstützung)
+            // 3. Jede Lane als Container anlegen
             for (let laneIdx = 0; laneIdx < branchElements.length; laneIdx++) {
                 const branchElem = branchElements[laneIdx];
                 const branchId = branchElem.getAttribute("id");
                 const innerStates = Array.from(branchElem.children).filter((c) => c.localName === "state");
+                const laneNodeId = getNodeId();
 
-                // FALL A1: Die Lane ist ein Compound State (z. B. TalkPart mit dialog.Talk)
-                if (innerStates.length > 0) {
-                    const compoundNodeId = getNodeId();
-                    const branchTransElems = Array.from(branchElem.children).filter((c) => c.localName === "transition");
+                // Nur Transitions filtern, die zu dieser Lane gehören (z. B. "Wait.fatal")
+                const matchingTrans = parallelTransElems.filter((tr) =>
+                    (tr.getAttribute("event") || "").startsWith(`${branchId}.`)
+                );
 
-                    const parentEvents = branchTransElems.map((tr) => {
-                        const rawEvent = tr.getAttribute("event") || "";
-                        const handleId = getTransitionExitToken(rawEvent, branchId);
-                        return {
-                            id: handleId,
-                            name: rawEvent,
-                            rawEvent: rawEvent,
-                            target: tr.getAttribute("target"),
-                            cond: tr.getAttribute("cond") || "",
-                        };
-                    });
+                const laneEvents = matchingTrans.map((tr) => {
+                    const rawEvent = tr.getAttribute("event") || "";
+                    const handleId = getTransitionExitToken(rawEvent, branchId);
+                    return {
+                        id: handleId,
+                        name: rawEvent,
+                        rawEvent: rawEvent,
+                        target: tr.getAttribute("target"),
+                    };
+                });
 
-                    branchTransElems.forEach((tr) => {
-                        const eventName = tr.getAttribute("event") || "";
-                        const targetState = tr.getAttribute("target");
-                        const cond = tr.getAttribute("cond") || "";
-                        const assignments = parseTransitionAssignments(tr);
+                // Echter Lane-Container
+                newNodes.push({
+                    id: laneNodeId,
+                    position: { x: 0, y: headerHeight + laneIdx * laneHeight },
+                    parentId: parallelNodeId,
+                    extent: "parent",
+                    type: "parallelLane",
+                    style: {
+                        width: containerWidth,
+                        height: laneHeight,
+                        borderBottom: laneIdx < branchElements.length - 1 ? "1.5px solid #0284c7" : "none",
+                    },
+                    data: {
+                        label: branchId,
+                        events: laneEvents,
+                    },
+                });
+
+                // Transitions nach außen registrieren (starten NUR an laneNodeId)
+                matchingTrans.forEach((tr) => {
+                    const eventName = tr.getAttribute("event") || "";
+                    const targetState = tr.getAttribute("target");
+                    const cond = tr.getAttribute("cond") || "";
+                    const assignments = parseTransitionAssignments(tr);
                         const firstAssignment = assignments[0] || null;
 
-                        if (targetState) {
-                            rawTransitions.push({
-                                sourceNodeId: compoundNodeId,
-                                sourceSkillName: branchId,
-                                eventId: eventName,
-                                targetStateName: targetState,
-                                cond: cond.trim(),
-                                assignments,
+                    if (targetState) {
+                        rawTransitions.push({
+                            sourceNodeId: laneNodeId,
+                            sourceSkillName: branchId,
+                            eventId: eventName,
+                            targetStateName: targetState,
+                            cond: cond.trim(),
+                            assignments,
                                 assignLocation: firstAssignment?.location || "",
-                                assignExpr: firstAssignment?.expr || "",
-                            });
-                        }
-                    });
+                            assignExpr: firstAssignment?.expr || "",
+                        });
+                    }
+                });
 
+                // FALL A1: Lane ist ein Compound (z.B. TalkPart)
+                if (innerStates.length > 0) {
+                    const compoundNodeId = getNodeId();
                     const compoundWidth = Math.max(220, innerStates.length * 190 + 30);
-                    const compoundHeight = laneHeight - 20;
 
-                    // Compound-Rahmen in der Lane anlegen
                     newNodes.push({
                         id: compoundNodeId,
-                        position: { x: 20, y: headerHeight + 10 + laneIdx * laneHeight },
-                        parentId: parallelNodeId,
+                        position: { x: 20, y: 10 },
+                        parentId: laneNodeId,
                         extent: "parent",
                         type: "compound",
-                        style: { width: compoundWidth, height: compoundHeight },
+                        style: { width: compoundWidth, height: laneHeight - 20 },
                         data: {
-                            label: branchId.split(".").pop().split("#")[0], // Zeigt sauber "TalkPart"
+                            label: branchId.split(".").pop().split("#")[0],
                             fullSkillName: branchId,
-                            isInitial: false, // Kein fetter Start-Rahmen!
-                            events: parentEvents,
+                            isInitial: false,
+                            events: [],
                             onEntry: parseStateAssignments(branchElem, "onentry"),
                             onExit: parseStateAssignments(branchElem, "onexit"),
                         },
                     });
 
-                    // Sub-State in den Compound-Kasten legen (z. B. dialog.Talk)
                     for (let sIdx = 0; sIdx < innerStates.length; sIdx++) {
                         const stElem = innerStates[sIdx];
                         const stId = stElem.getAttribute("id");
@@ -350,7 +366,6 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                         Array.from(stElem.children)
                             .filter((c) => c.localName === "transition")
                             .forEach((tr) => {
-                                const eventName = tr.getAttribute("event") || "";
                                 const targetState = tr.getAttribute("target");
                                 const cond = tr.getAttribute("cond") || "";
                                 const assignments = parseTransitionAssignments(tr);
@@ -362,17 +377,15 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                                         sourceSkillName: stId,
                                         eventId: eventName,
                                         targetStateName: targetState,
-                                        cond: cond.trim(),
+                                        cond: (tr.getAttribute("cond") || "").trim(),
                                         assignments,
-                                        assignLocation: firstAssignment?.location || "",
-                                        assignExpr: firstAssignment?.expr || "",
+                                        assignLocation: "",
+                                        assignExpr: "",
                                     });
                                 }
                             });
 
-                        // isInitial bewusst auf FALSE, damit Talk nicht fett umrandet wird
                         const nodeData = await buildSkillNodeData(stId, false, false, "", stElem);
-
                         newNodes.push({
                             id: stNodeId,
                             position: { x: 15 + sIdx * 180, y: 35 },
@@ -383,7 +396,7 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                         });
                     }
                 }
-                // FALL A2: Die Lane ist ein normaler State (z. B. Wait)
+                // FALL A2: Lane ist ein einfacher State (z.B. Wait)
                 else {
                     const stId = branchElem.getAttribute("id");
                     const stNodeId = getNodeId();
@@ -415,14 +428,37 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
 
                     newNodes.push({
                         id: stNodeId,
-                        position: { x: 20, y: headerHeight + 25 + laneIdx * laneHeight },
-                        parentId: parallelNodeId,
+                        position: { x: 20, y: 25 },
+                        parentId: laneNodeId,
                         extent: "parent",
                         type: "custom",
                         data: nodeData,
                     });
+
+                    // Verbindung von Wait zum Lane-Rand herstellen (nur 1x)
+                    laneEvents.forEach((levt) => {
+                        if (!nodeData.events.some((ev) => ev.id === levt.id)) {
+                            nodeData.events.push({
+                                id: levt.id,
+                                name: levt.name,
+                                rawEvent: levt.rawEvent,
+                                target: laneNodeId,
+                            });
+                        }
+
+                        newEdges.push({
+                            id: `edge-internal-${stNodeId}-${levt.id}-${laneNodeId}`,
+                            source: stNodeId,
+                            target: laneNodeId,
+                            sourceHandle: levt.id,
+                            targetHandle: `target-${levt.id}`,
+                            style: { strokeDasharray: "4 4", stroke: "#0284c7", strokeWidth: 1.5 },
+                            type: "smoothstep",
+                        });
+                    });
                 }
             }
+
             continue;
         }
 
@@ -622,7 +658,6 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
     });
 
     // 4. Edges und Node-Events mit exakter Struktur aufbauen
-    const newEdges = [];
 
     rawTransitions.forEach((trans) => {
         // Zielknoten finden
