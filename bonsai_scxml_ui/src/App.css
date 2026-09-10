@@ -671,18 +671,13 @@
   font-size: 12px;
 }
 
-.slot-node {
-  color: black;
-  background-color: white;
-  border: 1px dashed #555;
-  border-radius: 6px;
-  padding: 12px 15px;
-  font-size: 13px;
-  font-weight: bold;
+.event-list-hidden {
+    height: 0;
+    overflow: hidden;
 }
 
-.slot-node-inherit {
-  color: #00CED1;
+.slot-node {
+  color: black;
   background-color: white;
   border: 1px dashed #555;
   border-radius: 6px;
