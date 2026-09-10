@@ -3,9 +3,10 @@ import { Handle, Position } from "@xyflow/react";
 function SlotNode({ data }) {
     const displayPath = data.path || data.label || "Undefined slot";
     const slotType = data.slotType || "Unknown";
+    const isInherited = data.inherited || data.slotKind === "inheritSlot";
 
     return (
-        <div className="slot-node">
+        <div className={`slot-node ${isInherited ? "slot-node-inherited" : ""}`}>
             <Handle
                 id="write-target"
                 type="target"
@@ -20,6 +21,12 @@ function SlotNode({ data }) {
             <div className="slot-node-type">
                 {slotType}
             </div>
+
+            {isInherited && (
+                            <div className="slot-node-inherited-label">
+                                inherited
+                            </div>
+            )}
 
             <Handle
                 id="read-source"

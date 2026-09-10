@@ -1,29 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="skills.slots.SlotIO">
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="slots.SlotIO">
     <datamodel>
         <data id="#_SLOTS">
             <slots>
-                <inheritSlot key="StringSlot" state="skills.slots.SlotIO" xpath="/A#test"/>
-                <inheritSlot key="StringSlot" state="skills.slots.SlotIO#1" xpath="/B"/>
-                <slot key="StringSlot" state="skills.slots.SlotIO#2" xpath="/C"/>
+                <inheritSlot key="StringSlot" state="slots.SlotIO" xpath="/A#test"/>
+                <inheritSlot key="StringSlot" state="slots.SlotIO#1" xpath="/B"/>
+                <slot key="StringSlot" state="slots.SlotIO#2" xpath="/C"/>
             </slots>
         </data>
         <data id="test_val" expr="1"/>
         <data id="no_change_test_val" expr="1"/>
     </datamodel>
 
-    <state id="skills.slots.SlotIO">
+    <state id="slots.SlotIO">
         <datamodel>
             <data id="#_WRITE" expr="intermediate"/>
         </datamodel>
-        <transition event="SlotIO.*" target="skills.slots.SlotIO#1"/>
+        <transition event="SlotIO.*" target="slots.SlotIO#1"/>
     </state>
 
-    <state id="skills.slots.SlotIO#1">
-        <transition event="SlotIO.*" target="skills.slots.SlotIO#2"/>
+    <state id="slots.SlotIO#1">
+        <transition event="SlotIO.*" target="slots.SlotIO#2"/>
     </state>
 
-    <state id="skills.slots.SlotIO#2">
+    <state id="slots.SlotIO#2">
         <datamodel>
             <data id="#_WRITE" expr="@test_val"/>
         </datamodel>
@@ -34,11 +34,11 @@
         <onentry>
             <assign location="test_val" expr="test_val"/>
         </onentry>
-        <transition event="s2.success" target="skills.Nop"/>
+        <transition event="s2.success" target="Nop"/>
 
     </state>
 
-    <state id="skills.Nop">
+    <state id="Nop">
         <transition event="Nop.*">
             <send event="success"/>
         </transition>
