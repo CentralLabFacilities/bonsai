@@ -686,6 +686,16 @@
   font-weight: bold;
 }
 
+.slot-node-inherited {
+   color: #5a3a24;
+   background-color: white;
+   border: 1px dashed #555;
+   border-radius: 6px;
+   padding: 12px 15px;
+   font-size: 13px;
+   font-weight: bold;
+}
+
 .slot-write-handle,
 .slot-read-handle {
   width: 0;
