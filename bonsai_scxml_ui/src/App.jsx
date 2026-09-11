@@ -636,6 +636,7 @@ function AppContent() {
                 events: [
                         ...(data.events || []).map((e) => ({
                             id: e.event,
+                            description: e.description || "",
                             selectedPackage: "",
                             selectedSkill: "",
                             target: null,
@@ -675,9 +676,27 @@ function AppContent() {
                             : []),
                     ],
 
-                inSlots: (data.inSlots || []).map((s) => ({ key: s.key, type: s.type, path: "" })),
-                outSlots: (data.outSlots || []).map((s) => ({ key: s.key, type: s.type, path: "" })),
-                params: (data.params || []).map((p) => ({ key: p.key, type: p.type, required: p.required, default: p.default })),
+                inSlots: (data.inSlots || []).map((s) => ({
+                    key: s.key,
+                    type: s.type,
+                    description: s.description || "",
+                    path: "",
+                })),
+
+                outSlots: (data.outSlots || []).map((s) => ({
+                    key: s.key,
+                    type: s.type,
+                    description: s.description || "",
+                    path: "",
+                })),
+
+                params: (data.params || []).map((p) => ({
+                    key: p.key,
+                    type: p.type,
+                    required: p.required,
+                    default: p.default,
+                    description: p.description || "",
+                })),
             },
         };
     };
@@ -860,12 +879,20 @@ function AppContent() {
 
                 const reorderedHandleEvents = updatedTransitions.map((t) => {
                     const existingEv = (node.data.events || []).find(
-                        (ev) => ev.id === sourceHandle && ev.target === t.target
+                        (ev) =>
+                            ev.id === sourceHandle &&
+                            ev.target === t.target
                     );
+
+                    const baseEvent = existingEv ||
+                        (node.data.events || []).find(
+                            (ev) => ev.id === sourceHandle
+                        );
+
                     return {
+                        ...baseEvent,
+
                         id: sourceHandle,
-                        selectedPackage: existingEv?.selectedPackage || "",
-                        selectedSkill: existingEv?.selectedSkill || "",
                         target: t.target,
                         cond: t.cond || "",
                         assignLocation: t.assignLocation || "",
@@ -1011,6 +1038,7 @@ function AppContent() {
 
             const newEvents = data.events.map((event) => ({
                 id: event.event,
+                description: event.description || "",
                 selectedPackage: "",
                 selectedSkill: "",
                 target: null,
@@ -1246,6 +1274,7 @@ function AppContent() {
                     selectedSubPackage={selectedSubPackage}
                     setSelectedSubPackage={setSelectedSubPackage}
                     directSkills={directSkills}
+                    fetchSkillData={fetchSkillData}
                 />
 
                 <main className="editor-area">
