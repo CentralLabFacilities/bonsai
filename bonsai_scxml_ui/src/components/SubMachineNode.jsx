@@ -1,15 +1,14 @@
 import { Handle, Position } from "@xyflow/react";
 import { FiExternalLink, FiLayers } from "react-icons/fi";
+import StateActionBadges from "./StateActionBadges";
 
 function SubMachineNode({ data }) {
     const isInitial = data.isInitial;
 
-    const instanceId = data.fullSkillName && data.fullSkillName.includes("#")
-        ? `#${data.fullSkillName.split("#")[1]}`
-        : "";
-
     return (
         <div className={`costum-node submachine-node ${isInitial ? "initial-node" : ""}`}>
+            <StateActionBadges onEntry={data.onEntry} onExit={data.onExit} />
+
             <Handle type="target" position={Position.Left} className="target-handle" />
 
             <div className="submachine-header">

@@ -293,6 +293,8 @@ function AppContent() {
                 fullSkillName: compoundName,
                 isInitial: selectedNodes.some((n) => n.data?.isInitial),
                 events: [],
+                onEntry: [],
+                onExit: [],
             },
         };
 
@@ -343,6 +345,8 @@ function AppContent() {
                 isInitial: selectedNodes.some((n) => n.data?.isInitial),
                 lanes: branchNames,
                 events: [],
+                onEntry: [],
+                onExit: [],
             },
         };
 
@@ -403,6 +407,8 @@ function AppContent() {
                 src: `\${EXERCISE}/${subMachineLabel}.xml`,
                 isInitial: selectedNodes.some((n) => n.data?.isInitial),
                 events: externalEvents.length > 0 ? externalEvents : [{ id: "success" }, { id: "failure" }],
+                onEntry: [],
+                onExit: [],
                 onOpenSubMachine: handleOpenSubMachine,
             },
         };
@@ -625,6 +631,8 @@ function AppContent() {
                 description: data.description || "",
                 isInitial: false,
                 src: "",
+                onEntry: [],
+                onExit: [],
                 events: [
                         ...(data.events || []).map((e) => ({
                             id: e.event,
@@ -1427,6 +1435,22 @@ function AppContent() {
                         }
 
                         onUpdateParameterBlur={updateEventsFromParameters}
+                        globalDataModel={globalDataModel}
+                        onUpdateStateActions={(nodeId, actionType, assignments) =>
+                            setNodes((nds) =>
+                                nds.map((node) =>
+                                    node.id === nodeId
+                                        ? {
+                                              ...node,
+                                              data: {
+                                                  ...node.data,
+                                                  [actionType]: assignments,
+                                              },
+                                          }
+                                        : node
+                                )
+                            )
+                        }
                         onUpdateInSlotPath={(idx, val) =>
                             setNodes((nds) =>
                                 nds.map((n) => (n.id === selectedNode.id ? { ...n, data: { ...n.data, inSlots: n.data.inSlots.map((s, i) => (i === idx ? { ...s, path: val } : s)) } } : n))

@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Handle, Position, useEdges } from "@xyflow/react";
 import { FiAlertCircle } from "react-icons/fi";
+import StateActionBadges from "./StateActionBadges";
 
 function CustomNode({ id, data, selected }) {
   const edges = useEdges();
@@ -51,6 +52,8 @@ function CustomNode({ id, data, selected }) {
           selected ? "selected-node" : ""
         }`}
       >
+      <StateActionBadges onEntry={data.onEntry} onExit={data.onExit} />
+
       {/* Warnungs-Badge / Ausrufezeichen */}
       {validation.hasError && (
         <div className="node-warning-badge" title={validation.tooltip}>

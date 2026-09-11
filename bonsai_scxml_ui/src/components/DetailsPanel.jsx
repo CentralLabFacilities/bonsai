@@ -1,4 +1,5 @@
 import { FiExternalLink, FiLayers } from "react-icons/fi";
+import StateActionsEditor from "./StateActionsEditor";
 
 function DetailsPanel({
     selectedNode,
@@ -17,8 +18,14 @@ function DetailsPanel({
     onCheckSlots,
     onUpdateSrc,
     onUpdateParameterBlur,
+    globalDataModel,
+    onUpdateStateActions,
 }) {
     const isSubMachine = selectedNode.type === "submachine" || Boolean(selectedNode.data.src);
+    const availableActionLocations = [
+        ...(globalDataModel || []).map((parameter) => parameter.id),
+        ...(selectedNode.data.params || []).map((parameter) => parameter.key),
+    ].filter((location, index, locations) => location && locations.indexOf(location) === index);
 
     return (
         <aside className="details-panel">
@@ -37,6 +44,9 @@ function DetailsPanel({
                         </div>
                     </>
                 )}
+                <div className={`tab ${activeTab === "actions" ? "active-tab" : ""}`} onClick={() => setActiveTab("actions")}>
+                    Entry / Exit
+                </div>
             </div>
 
             <div className="tab-content">
@@ -231,6 +241,29 @@ function DetailsPanel({
                                 </div>
                             ))}
                         </div>
+                    </div>
+                )}
+
+                {activeTab === "actions" && (
+                    <div className="state-actions-container">
+                        <StateActionsEditor
+                            actionName="onentry"
+                            actions={selectedNode.data.onEntry}
+                            availableLocations={availableActionLocations}
+                            listId={`onentry-locations-${selectedNode.id}`}
+                            onChange={(assignments) =>
+                                onUpdateStateActions(selectedNode.id, "onEntry", assignments)
+                            }
+                        />
+                        <StateActionsEditor
+                            actionName="onexit"
+                            actions={selectedNode.data.onExit}
+                            availableLocations={availableActionLocations}
+                            listId={`onexit-locations-${selectedNode.id}`}
+                            onChange={(assignments) =>
+                                onUpdateStateActions(selectedNode.id, "onExit", assignments)
+                            }
+                        />
                     </div>
                 )}
             </div>

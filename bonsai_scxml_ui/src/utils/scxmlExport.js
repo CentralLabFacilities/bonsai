@@ -1,3 +1,11 @@
+import { getConfiguredAssignments } from "./stateActions.js";
+
+const escapeXmlAttribute = (value) => String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+
 /**
  * Generiert den SCXML-Code-String inklusive <metadata> Positionen, Slots,
  * Sub-State-Machines und Condition/Assign-Transitions.
@@ -44,6 +52,17 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
         globalDataLines.splice(1, 0, slotsXml);
     }
     const globalDataXml = globalDataLines.join("\n");
+
+    const buildStateActionXml = (actionName, assignments, indent) => {
+        const configuredAssignments = getConfiguredAssignments(assignments);
+        if (configuredAssignments.length === 0) return "";
+
+        const assignmentLines = configuredAssignments.map((assignment) =>
+            `${indent}    <assign location="${escapeXmlAttribute(String(assignment.location).trim())}" expr="${escapeXmlAttribute(String(assignment.expr).trim())}"/>`
+        );
+
+        return `${indent}<${actionName}>\n${assignmentLines.join("\n")}\n${indent}</${actionName}>`;
+    };
 
     // 4. Transitions ermitteln & formatieren
     const buildTransitionsXml = (node, indent) => {
@@ -132,7 +151,23 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
 
         const children = nodes.filter((n) => n.parentId === node.id);
 
+        const legacyOnEntryAssignments = (node.data.params || []).filter(
+            (parameter) => parameter.location && parameter.expr
+        );
+        const onEntryAssignments = Array.isArray(node.data?.onEntry)
+            ? node.data.onEntry
+            : legacyOnEntryAssignments;
+        const onExitAssignments = Array.isArray(node.data?.onExit)
+            ? node.data.onExit
+            : [];
+        const onentryBlock = buildStateActionXml("onentry", onEntryAssignments, indent + "    ");
+        const onexitBlock = buildStateActionXml("onexit", onExitAssignments, indent + "    ");
+
         if (isFinal && !isSubMachine && children.length === 0) {
+            const finalActionBlocks = [onentryBlock, onexitBlock].filter(Boolean);
+            if (finalActionBlocks.length > 0) {
+                return `${indent}<final id="${skillId}">\n${finalActionBlocks.join("\n\n")}\n${indent}</final>`;
+            }
             return `${indent}<final id="${skillId}"/>`;
         }
 
@@ -165,22 +200,17 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
             ? `${indent}    <datamodel>\n${paramsLines.join("\n")}\n${indent}    </datamodel>`
             : "";
 
-        // C) OnEntry
-        const assignments = (node.data.params || []).filter((p) => p.location && p.expr);
-        const onentryBlock = assignments.length > 0
-            ? `${indent}    <onentry>\n${assignments.map((a) => `${indent}        <assign location="${a.location}" expr="${a.expr}"/>`).join("\n")}\n${indent}    </onentry>`
-            : "";
-
-        // D) Transitions
+        // C) Transitions
         const transitionsXml = buildTransitionsXml(node, indent + "    ");
 
-        // E) Sub-States
+        // D) Sub-States
         const childrenXml = children.map((child) => renderNode(child, depth + 1)).join("\n\n");
 
         const innerBlocks = [
             metadataXml,
             datamodelBlock,
             onentryBlock,
+            onexitBlock,
             transitionsXml,
             childrenXml,
         ].filter(Boolean);
