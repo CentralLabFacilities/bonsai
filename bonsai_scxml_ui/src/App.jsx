@@ -46,7 +46,7 @@ function AppContent() {
     const [skills, setSkills] = useState({ skills: [] });
     const [selectedPackage, setSelectedPackage] = useState(null);
     const [selectedSubPackage, setSelectedSubPackage] = useState(null);
-    const [activeFilter, setActiveFilter] = useState("Alle");
+    const [activeFilter, setActiveFilter] = useState("Everything");
     const [searchText, setSearchText] = useState("");
 
     //---- TAB MANAGEMENT ----
