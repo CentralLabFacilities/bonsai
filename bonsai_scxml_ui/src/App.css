@@ -488,6 +488,40 @@
   box-sizing: border-box;
 }
 
+.state-action-badges {
+  position: absolute;
+  top: -23px;
+  left: 3px;
+  right: 3px;
+  height: 15px;
+  z-index: 8;
+  pointer-events: none;
+}
+
+.state-action-badge {
+  position: absolute;
+  top: 0;
+  padding: 1px 5px;
+  border: 1px solid #94a3b8;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #334155;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 12px;
+  letter-spacing: 0.1px;
+  text-transform: lowercase;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
+}
+
+.state-action-badge-entry {
+  left: 0;
+}
+
+.state-action-badge-exit {
+  right: 0;
+}
+
 /* Warnungs-Icon oben rechts an der Node */
 .node-warning-badge {
   position: absolute;
@@ -605,13 +639,17 @@
 .tabs {
   display: flex;
   border-bottom: 1px solid #4a5568;
+  overflow-x: auto;
+  flex-shrink: 0;
+  scrollbar-width: thin;
 }
 
 .tab {
-  padding: 10px 24px;
+  padding: 10px 12px;
   font-size: 14px;
   cursor: pointer;
   color: #a0aec0;
+  white-space: nowrap;
 }
 
 .tab:hover {
@@ -774,6 +812,117 @@
 .slot-field-edit::placeholder {
   color: #8fa0b5;
   font-style: italic;
+}
+
+.state-actions-container {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-bottom: 6px;
+}
+
+.state-action-editor {
+  border: 1px solid var(--secondary-color);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(15, 23, 42, 0.24);
+}
+
+.state-action-editor-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.state-action-editor-header h3 {
+  margin: 0 0 4px;
+  font-family: monospace;
+  font-size: 14px;
+}
+
+.state-action-editor-header p {
+  margin: 0;
+  color: #a0aec0;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.state-action-add-button {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 8px;
+  border: 1px solid #4d87e6;
+  border-radius: 6px;
+  background: #245ea8;
+  color: #ffffff;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.state-action-add-button:hover {
+  background: #2f72c9;
+}
+
+.state-action-empty {
+  padding: 12px;
+  border: 1px dashed #526174;
+  border-radius: 6px;
+  color: #94a3b8;
+  font-size: 12px;
+  text-align: center;
+}
+
+.state-action-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.state-action-row {
+  padding: 10px;
+  border: 1px solid var(--secondary-color);
+  border-radius: 6px;
+  background: var(--secondary-color);
+}
+
+.state-action-row-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.state-action-remove-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: #fca5a5;
+  cursor: pointer;
+}
+
+.state-action-remove-button:hover {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.14);
+  color: #ffffff;
+}
+
+.state-action-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 7px;
+  color: #cbd5e1;
+  font-size: 11px;
 }
 
 /* ==========================================================================

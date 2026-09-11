@@ -1,5 +1,6 @@
 import { MarkerType } from "@xyflow/react";
 import { getLayoutedElements } from "./layoutUtils";
+import { parseStateAssignments } from "./stateActions.js";
 
 export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
     const parser = new DOMParser();
@@ -112,6 +113,8 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             inSlots: inSlots,
             outSlots: outSlots,
             params: params,
+            onEntry: parseStateAssignments(stateElem, "onentry"),
+            onExit: parseStateAssignments(stateElem, "onexit"),
         };
     };
 
@@ -186,6 +189,8 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                     isInitial: isInitial,
                     lanes: branchNames,
                     events: [],
+                    onEntry: parseStateAssignments(stateElem, "onentry"),
+                    onExit: parseStateAssignments(stateElem, "onexit"),
                 },
             });
 
@@ -273,6 +278,8 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                             fullSkillName: branchId,
                             isInitial: false, // Kein fetter Start-Rahmen!
                             events: parentEvents,
+                            onEntry: parseStateAssignments(branchElem, "onentry"),
+                            onExit: parseStateAssignments(branchElem, "onexit"),
                         },
                     });
 
@@ -399,6 +406,8 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                     fullSkillName: fullSkillName,
                     isInitial: isInitial,
                     events: parentEvents, // Wichtig für die Handles im CompoundNode
+                    onEntry: parseStateAssignments(stateElem, "onentry"),
+                    onExit: parseStateAssignments(stateElem, "onexit"),
                 },
             });
 

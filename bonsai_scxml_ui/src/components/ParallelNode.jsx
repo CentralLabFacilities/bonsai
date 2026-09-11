@@ -1,11 +1,13 @@
-import React from 'react';
 import { Handle, Position } from '@xyflow/react';
+import StateActionBadges from './StateActionBadges';
 
 export default function ParallelNode({ id, data }) {
   const lanes = data.lanes || data.branches || ['Lane 1', 'Lane 2'];
 
   return (
     <div className="parallel-group-container">
+      <StateActionBadges onEntry={data.onEntry} onExit={data.onExit} />
+
       {/* Target handle for transitions to the entire parallel state */}
       <Handle
         type="target"
