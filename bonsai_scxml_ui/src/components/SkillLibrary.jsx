@@ -1,5 +1,5 @@
 import React from "react";
-import { FiSearch, FiUser, FiMessageCircle, FiTag } from "react-icons/fi";
+import { FiSearch, FiUser, FiMessageCircle, FiTag, FiChevronRight } from "react-icons/fi";
 import { MdAssistantNavigation } from "react-icons/md";
 import { FaHandPaper } from "react-icons/fa";
 import { GoPackage } from "react-icons/go";
@@ -36,20 +36,51 @@ function SkillLibrary({
 
             {/* Filter-Buttons */}
             <div className="filter-container">
-                <button className="filter-button" onClick={() => setActiveFilter("Everything")}>Everything</button>
-                <button className="filter-button" onClick={() => setActiveFilter("nav")}>
+                <button
+                    className={`filter-button ${activeFilter === "Everything" ? "active" : ""}`}
+                    onClick={() => setActiveFilter("Everything")}
+                    aria-pressed={activeFilter === "Everything"}
+                >
+                    Everything
+                </button>
+
+                <button
+                    className={`filter-button ${activeFilter === "nav" ? "active" : ""}`}
+                    onClick={() => setActiveFilter("nav")}
+                    aria-pressed={activeFilter === "nav"}
+                >
                     Navigation <MdAssistantNavigation />
                 </button>
-                <button className="filter-button" onClick={() => setActiveFilter("person")}>
+
+                <button
+                    className={`filter-button ${activeFilter === "person" ? "active" : ""}`}
+                    onClick={() => setActiveFilter("person")}
+                    aria-pressed={activeFilter === "person"}
+                >
                     Person <FiUser />
                 </button>
-                <button className="filter-button" onClick={() => setActiveFilter("dialog")}>
+
+                <button
+                    className={`filter-button ${activeFilter === "dialog" ? "active" : ""}`}
+                    onClick={() => setActiveFilter("dialog")}
+                    aria-pressed={activeFilter === "dialog"}
+                >
                     Dialog <FiMessageCircle />
                 </button>
-                <button className="filter-button" onClick={() => setActiveFilter("grasping")}>
+
+                <button
+                    className={`filter-button ${activeFilter === "grasping" ? "active" : ""}`}
+                    onClick={() => setActiveFilter("grasping")}
+                    aria-pressed={activeFilter === "grasping"}
+                >
                     Grasping <FaHandPaper />
                 </button>
-                <button className="filter-button" onClick={() => setActiveFilter("slots")}>
+
+                <button
+                    className={`filter-button ${activeFilter === "slots" ? "active" : ""}`}
+                    onClick={() => setActiveFilter("slots")}
+                    aria-pressed={activeFilter === "slots"}
+                >
                     Slots <FiTag />
                 </button>
             </div>
@@ -58,12 +89,25 @@ function SkillLibrary({
                 {/* 1. Hauptübersicht: Zeigt Hauptpakete & direkte Skills */}
                 {activeFilter === "Everything" && selectedPackage === null && searchText === "" && (
                     <ul className="skill-list">
+                        {packages.length > 0 && (
+                            <li className="library-section-label">Packages</li>
+                        )}
                         {packages.map((pkg) => (
-                            <li key={pkg} className="package-item" onClick={() => setSelectedPackage(pkg)}>
-                                <span className="package-icon"><GoPackage /></span>
-                                <span className="package-name">{pkg}</span>
+                            <li key={pkg} className="package-list-item">
+                                <button
+                                    type="button"
+                                    className="package-button"
+                                    onClick={() => setSelectedPackage(pkg)}
+                                >
+                                    <span className="package-icon"><GoPackage /></span>
+                                    <span className="package-name">{pkg}</span>
+                                    <FiChevronRight className="package-chevron" />
+                                </button>
                             </li>
                         ))}
+                        {directSkills && directSkills.length > 0 && (
+                            <li className="library-section-label library-section-label-skills">Skills</li>
+                        )}
                         {directSkills && directSkills.map((skill) => (
                             <li
                                 key={skill}
@@ -114,21 +158,30 @@ function SkillLibrary({
                         </div>
                         <ul className="skill-list">
                             {/* Unterpakete auflisten */}
+                            {selectedSubPackage === null && subPackages && subPackages.length > 0 && (
+                                <li className="library-section-label">Packages</li>
+                            )}
                             {selectedSubPackage === null && subPackages &&
                                 subPackages.map((subPackage) => (
-                                    <li
-                                        key={subPackage}
-                                        className="package-item"
-                                        onClick={() => setSelectedSubPackage(subPackage)}
-                                    >
-                                        <span className="package-icon">
-                                            <GoPackage />
-                                        </span>
-                                        <span className="package-name">{subPackage}</span>
+                                    <li key={subPackage} className="package-list-item">
+                                        <button
+                                            type="button"
+                                            className="package-button"
+                                            onClick={() => setSelectedSubPackage(subPackage)}
+                                        >
+                                            <span className="package-icon">
+                                                <GoPackage />
+                                            </span>
+                                            <span className="package-name">{subPackage}</span>
+                                            <FiChevronRight className="package-chevron" />
+                                        </button>
                                     </li>
                                 ))
                             }
                             {/* Skills auflisten */}
+                            {packageSkills.length > 0 && (
+                                <li className="library-section-label library-section-label-skills">Skills</li>
+                            )}
                             {packageSkills.map((skill, index) => (
                                 <li
                                     key={index}
