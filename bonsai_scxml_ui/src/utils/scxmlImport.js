@@ -82,6 +82,7 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             return {
                 key: s.key,
                 type: s.type,
+                description: s.description || "",
                 path: match ? match.xpath.replace(/^\//, "") : "",
             };
         });
@@ -91,6 +92,7 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             return {
                 key: s.key,
                 type: s.type,
+                description: s.description || "",
                 path: match ? match.xpath.replace(/^\//, "") : "",
             };
         });
@@ -100,16 +102,29 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             type: param.type,
             required: param.required,
             default: param.default,
+            description: param.description || "",
             expr: localParams[param.key] !== undefined ? localParams[param.key] : "",
+        }));
+
+        const events = (skillApiData.events || []).map((event) => ({
+            id: event.event,
+            description: event.description || "",
+            selectedPackage: "",
+            selectedSkill: "",
+            target: null,
+            cond: "",
+            assignLocation: "",
+            assignExpr: "",
         }));
 
         return {
             label: fullSkillName.split(".").pop().split("#")[0],
             fullSkillName: fullSkillName,
+            description: skillApiData.description || "",
             isInitial: isInitial,
             isFinal: isFinal,
             src: srcAttr || "",
-            events: [],
+            events: events,
             inSlots: inSlots,
             outSlots: outSlots,
             params: params,
@@ -540,11 +555,11 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
         const sourceNode = trans.sourceNodeId
             ? newNodes.find((n) => n.id === trans.sourceNodeId)
             : newNodes.find(
-                  (n) =>
-                      n.data.fullSkillName === trans.sourceSkillName ||
-                      n.data.label === trans.sourceSkillName ||
-                      (n.data.fullSkillName && n.data.fullSkillName.startsWith(trans.sourceSkillName))
-              );
+                (n) =>
+                    n.data.fullSkillName === trans.sourceSkillName ||
+                    n.data.label === trans.sourceSkillName ||
+                    (n.data.fullSkillName && n.data.fullSkillName.startsWith(trans.sourceSkillName))
+            );
 
         if (!targetNode || !sourceNode) return;
 
@@ -579,54 +594,80 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             },
         });
 
-        // Event-Eintrag im Quell-Knoten für DetailsPanel & ConditionModal
-        sourceNode.data.events.push({
-            id: eventHandleId,
+        // Merge the SCXML transition into the API-defined ExitToken so
+        // static metadata such as the description is preserved.
+        const transitionData = {
             name: trans.eventId,
             rawEvent: trans.eventId,
-            selectedPackage: targetNode.data.fullSkillName ? targetNode.data.fullSkillName.split(".")[0] : "",
-            selectedSkill: targetNode.data.fullSkillName ? targetNode.data.fullSkillName.split("#")[0] : "",
+            selectedPackage: targetNode.data.fullSkillName
+                ? targetNode.data.fullSkillName.split(".")[0]
+                : "",
+            selectedSkill: targetNode.data.fullSkillName
+                ? targetNode.data.fullSkillName.split("#")[0]
+                : "",
             target: targetNode.id,
             cond: trans.cond || "",
             assignLocation: trans.assignLocation || "",
             assignExpr: trans.assignExpr || "",
-        });
+        };
+
+        // Reuse an API event which has not been assigned to a transition yet.
+        // If the same ExitToken has multiple conditional transitions, create an
+        // additional event entry while copying its static metadata.
+        const unusedEvent = sourceNode.data.events.find(
+            (event) => event.id === eventHandleId && !event.target
+        );
+
+        if (unusedEvent) {
+            Object.assign(unusedEvent, transitionData);
+        } else {
+            const baseEvent = sourceNode.data.events.find(
+                (event) => event.id === eventHandleId
+            );
+
+            sourceNode.data.events.push({
+                ...(baseEvent || {}),
+                id: eventHandleId,
+                description: baseEvent?.description || "",
+                ...transitionData,
+            });
+        }
     });
 
-   // 5. Automatisches Dagre-Layouting (Dagre nutzt exakt berechnete Maße)
-   let finalNodes = newNodes;
-   let finalEdges = newEdges;
+    // 5. Automatisches Dagre-Layouting (Dagre nutzt exakt berechnete Maße)
+    let finalNodes = newNodes;
+    let finalEdges = newEdges;
 
-   if (!hasCustomPositions && newNodes.length > 0) {
-       const topLevelNodes = newNodes.filter((n) => !n.parentId);
+    if (!hasCustomPositions && newNodes.length > 0) {
+        const topLevelNodes = newNodes.filter((n) => !n.parentId);
 
-       const topLevelEdgesForDagre = newEdges
-           .map((edge) => {
-               const sourceNode = newNodes.find((n) => n.id === edge.source);
-               const targetNode = newNodes.find((n) => n.id === edge.target);
+        const topLevelEdgesForDagre = newEdges
+            .map((edge) => {
+                const sourceNode = newNodes.find((n) => n.id === edge.source);
+                const targetNode = newNodes.find((n) => n.id === edge.target);
 
-               const effectiveSourceId = sourceNode?.parentId || edge.source;
-               const effectiveTargetId = targetNode?.parentId || edge.target;
+                const effectiveSourceId = sourceNode?.parentId || edge.source;
+                const effectiveTargetId = targetNode?.parentId || edge.target;
 
-               if (effectiveSourceId !== effectiveTargetId) {
-                   return {
-                       source: effectiveSourceId,
-                       target: effectiveTargetId,
-                   };
-               }
-               return null;
-           })
-           .filter(Boolean);
+                if (effectiveSourceId !== effectiveTargetId) {
+                    return {
+                        source: effectiveSourceId,
+                        target: effectiveTargetId,
+                    };
+                }
+                return null;
+            })
+            .filter(Boolean);
 
-       const layouted = getLayoutedElements(topLevelNodes, topLevelEdgesForDagre);
+        const layouted = getLayoutedElements(topLevelNodes, topLevelEdgesForDagre);
 
-       topLevelNodes.forEach((tlNode) => {
-           const match = layouted.nodes.find((ln) => ln.id === tlNode.id);
-           if (match) {
-               tlNode.position = match.position;
-           }
-       });
-   }
+        topLevelNodes.forEach((tlNode) => {
+            const match = layouted.nodes.find((ln) => ln.id === tlNode.id);
+            if (match) {
+                tlNode.position = match.position;
+            }
+        });
+    }
 
-        return { nodes: finalNodes, edges: finalEdges, globalDataModel: globalDataEntries };
+    return { nodes: finalNodes, edges: finalEdges, globalDataModel: globalDataEntries };
 };
