@@ -226,7 +226,8 @@ class SCXMLStarterWeb : SCXMLStarter() {
         } catch (e: NotImplementedError) {
             throw Exception(e)
         }
-
+        val sensors = runner.inspectionGetSensors().map { SkillSensor(it.key, it.value.toString()) }
+        val actuators = runner.inspectionGetActuators().map { SkillActuator(it.key, it.value.toString()) }
         val slotDescriptions = runner.inspectionGetSlotDescription()
         val exitTokenDescription =  runner.inspectionGetTokenDescription()
         val paramDescription = runner.inspectionGetAllParamsDescription()
@@ -236,7 +237,7 @@ class SCXMLStarterWeb : SCXMLStarter() {
         val params = mutableListOf<SkillParameter>()
         params.addAll(runner.inspectionGetRequiredParams().map { SkillParameter(it.key, it.value.simpleName, true,  description = paramDescription[it.key] ?: "") })
         params.addAll(runner.inspectionGetAllOptionalParams().map { SkillParameter(it.key, it.value.type.simpleName, false, it.value.defaultValue.toString(),  paramDescription[it.key] ?: "") })
-        return SkillInfo(mid, inSlots, outSlots, params, transitions)
+        return SkillInfo(mid, inSlots, outSlots, params, transitions, sensors, actuators)
     }
 
     companion object {

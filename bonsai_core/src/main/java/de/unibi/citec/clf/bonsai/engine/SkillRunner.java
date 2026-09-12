@@ -2,6 +2,8 @@ package de.unibi.citec.clf.bonsai.engine;
 
 import de.unibi.citec.clf.bonsai.core.exception.ConfigurationException;
 import de.unibi.citec.clf.bonsai.core.exception.StateIDException;
+import de.unibi.citec.clf.bonsai.core.object.Actuator;
+import de.unibi.citec.clf.bonsai.core.object.Sensor;
 import de.unibi.citec.clf.bonsai.core.time.Time;
 import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill;
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus;
@@ -174,6 +176,14 @@ public class SkillRunner implements Runnable {
 
     public Map<String, SkillConfigurator.OptionalParam> inspectionGetAllOptionalParams() {
         return configurator.getOptionalParams();
+    }
+
+    public Map<String, Class<?>> inspectionGetSensors() {
+        return configurator.getSensorRequests();
+    }
+
+    public Map<String, Class<?>> inspectionGetActuators() {
+        return configurator.getActuatorRequests();
     }
 
     public Map<String, String> inspectionGetAllParamsDescription() {
