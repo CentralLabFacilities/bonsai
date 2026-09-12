@@ -107,13 +107,13 @@ function AppContent() {
             prevTabs.map((t) =>
                 t.id === activeTabId
                     ? {
-                          ...t,
-                          nodes,
-                          edges,
-                          slotNodes,
-                          slotEdges,
-                          globalDataModel,
-                      }
+                        ...t,
+                        nodes,
+                        edges,
+                        slotNodes,
+                        slotEdges,
+                        globalDataModel,
+                    }
                     : t
             )
         );
@@ -413,7 +413,7 @@ function AppContent() {
             },
         };
 
-        // 3. Kanten im Parent anpassen (externe Kanten an die SubMachine heften, interne entfernen)
+// 3. Kanten im Parent anpassen (externe Kanten an die SubMachine heften, interne entfernen)
         const updatedParentEdges = edges
             .map((edge) => {
                 if (selectedIds.has(edge.source) && !selectedIds.has(edge.target)) {
@@ -434,7 +434,7 @@ function AppContent() {
             subMachineNode,
         ];
 
-        // 4. Nodes für das neue Sub-Machine-Tab normalisieren (Koordinaten relativ zum Ursprung)
+// 4. Nodes für das neue Sub-Machine-Tab normalisieren (Koordinaten relativ zum Ursprung)
         const subTabNodes = selectedNodes.map((n) => ({
             ...n,
             position: {
@@ -444,12 +444,12 @@ function AppContent() {
             selected: false,
         }));
 
-        // Nur interne Kanten für den Sub-Tab mitnehmen
+// Nur interne Kanten für den Sub-Tab mitnehmen
         const subTabEdges = edges.filter(
             (edge) => selectedIds.has(edge.source) && selectedIds.has(edge.target)
         );
 
-        // 5. Neues Tab-Objekt anlegen
+// 5. Neues Tab-Objekt anlegen
         const newTabId = `tab-sub-${crypto.randomUUID().slice(0, 6)}`;
         const newTabObj = {
             id: newTabId,
@@ -466,24 +466,24 @@ function AppContent() {
             ],
         };
 
-        // 6. Parent-Tab mit verbleibenden Nodes speichern und neuen Sub-Tab anhängen
+// 6. Parent-Tab mit verbleibenden Nodes speichern und neuen Sub-Tab anhängen
         setTabs((prevTabs) => [
             ...prevTabs.map((t) =>
                 t.id === activeTabId
                     ? {
-                          ...t,
-                          nodes: remainingParentNodes,
-                          edges: updatedParentEdges,
-                          slotNodes,
-                          slotEdges,
-                          globalDataModel,
-                      }
+                        ...t,
+                        nodes: remainingParentNodes,
+                        edges: updatedParentEdges,
+                        slotNodes,
+                        slotEdges,
+                        globalDataModel,
+                    }
                     : t
             ),
             newTabObj,
         ]);
 
-        // 7. Direkt in den neuen Sub-Machine-Tab wechseln
+// 7. Direkt in den neuen Sub-Machine-Tab wechseln
         setActiveTabId(newTabId);
         setNodes(subTabNodes);
         setEdges(subTabEdges);
@@ -492,7 +492,7 @@ function AppContent() {
         setGlobalDataModel(newTabObj.globalDataModel);
         setSelectedNodeId(null);
 
-        // Slot-Verbindungen des neuen Tabs berechnen & View zentrieren
+// Slot-Verbindungen des neuen Tabs berechnen & View zentrieren
         checkSlotConnection(subTabNodes);
         setTimeout(() => fitView({ padding: 0.2, duration: 300 }), 80);
     };
@@ -537,7 +537,7 @@ function AppContent() {
     const selectedNode = nodes.find((node) => node.id === selectedNodeId) || null;
     const hasInitialNode = nodes.some((node) => node.data?.isInitial);
 
-    // Multi-level package/subpackage parser
+// Multi-level package/subpackage parser
     let packages = [];
     let directSkills = [];
 
@@ -634,47 +634,50 @@ function AppContent() {
                 onEntry: [],
                 onExit: [],
                 events: [
-                        ...(data.events || []).map((e) => ({
-                            id: e.event,
-                            description: e.description || "",
-                            selectedPackage: "",
-                            selectedSkill: "",
-                            target: null,
-                            cond: "",
-                            assignLocation: "",
-                            assignExpr: "",
-                        })),
+                    ...(data.events || []).map((e) => ({
+                        id: e.event,
+                        description: e.description || "",
+                        selectedPackage: "",
+                        selectedSkill: "",
+                        target: null,
+                        cond: "",
+                        assignLocation: "",
+                        assignExpr: "",
+                    })),
 
-                        ...(selectedSkill.split(".").pop() !== "End" &&
-                        selectedSkill.split(".").pop() !== "Fatal"
-                            ? [
-                                  {
-                                      id: "fatal",
-                                      selectedPackage: "",
-                                      selectedSkill: "",
-                                      target: null,
-                                      cond: "",
-                                      assignLocation: "",
-                                      assignExpr: "",
-                                  },
-                              ]
-                            : []),
+                    ...(selectedSkill.split(".").pop() !== "End" &&
+                    selectedSkill.split(".").pop() !== "Fatal"
+                        ? [
+                            {
+                                id: "fatal",
+                                selectedPackage: "",
+                                selectedSkill: "",
+                                target: null,
+                                cond: "",
+                                assignLocation: "",
+                                assignExpr: "",
+                            },
+                        ]
+                        : []),
 
-                        ...(selectedSkill.split(".").pop() !== "End" &&
-                         selectedSkill.split(".").pop() !== "Fatal"
-                            ? [
-                                  {
-                                      id: "*",
-                                      selectedPackage: "",
-                                      selectedSkill: "",
-                                      target: null,
-                                      cond: "",
-                                      assignLocation: "",
-                                      assignExpr: "",
-                                  },
-                              ]
-                            : []),
-                    ],
+                    ...(selectedSkill.split(".").pop() !== "End" &&
+                    selectedSkill.split(".").pop() !== "Fatal"
+                        ? [
+                            {
+                                id: "*",
+                                selectedPackage: "",
+                                selectedSkill: "",
+                                target: null,
+                                cond: "",
+                                assignLocation: "",
+                                assignExpr: "",
+                            },
+                        ]
+                        : []),
+                ],
+
+                sensors: data.sensors || [],
+                actuators: data.actuator || data.actuators || [],
 
                 inSlots: (data.inSlots || []).map((s) => ({
                     key: s.key,
@@ -1013,7 +1016,7 @@ function AppContent() {
         setSlotEdges(newSlotEdges);
     };
 
-    // Dynamische Aktualisierung der Events basierend auf neuen Parameterwerten
+// Dynamische Aktualisierung der Events basierend auf neuen Parameterwerten
     const updateEventsFromParameters = async (nodeId) => {
         const node = nodes.find((n) => n.id === nodeId);
         if (!node) return;
@@ -1075,6 +1078,16 @@ function AppContent() {
                         data: {
                             ...n.data,
                             events: newEvents,
+                            sensors:
+                                data.sensors !== undefined
+                                    ? data.sensors
+                                    : n.data.sensors || [],
+                            actuators:
+                                data.actuator !== undefined
+                                    ? data.actuator
+                                    : data.actuators !== undefined
+                                        ? data.actuators
+                                        : n.data.actuators || [],
                         },
                     };
                 })
@@ -1274,7 +1287,6 @@ function AppContent() {
                     selectedSubPackage={selectedSubPackage}
                     setSelectedSubPackage={setSelectedSubPackage}
                     directSkills={directSkills}
-                    fetchSkillData={fetchSkillData}
                 />
 
                 <main className="editor-area">
@@ -1411,14 +1423,14 @@ function AppContent() {
                         newParamExpr={newParamExpr}
                         setNewParamExpr={setNewParamExpr}
                         onUpdateGlobalParam={(index, value) => {
-                                    setGlobalDataModel((prev) =>
-                                        prev.map((param, i) =>
-                                            i === index
-                                                ? { ...param, expr: value }
-                                                : param
-                                        )
-                                    );
-                                }}
+                            setGlobalDataModel((prev) =>
+                                prev.map((param, i) =>
+                                    i === index
+                                        ? { ...param, expr: value }
+                                        : param
+                                )
+                            );
+                        }}
                         onAddGlobalParam={() => {
                             if (!newParamId.trim()) return;
                             setGlobalDataModel((prev) => [...prev, { id: newParamId, expr: newParamExpr }]);
@@ -1470,12 +1482,12 @@ function AppContent() {
                                 nds.map((node) =>
                                     node.id === nodeId
                                         ? {
-                                              ...node,
-                                              data: {
-                                                  ...node.data,
-                                                  [actionType]: assignments,
-                                              },
-                                          }
+                                            ...node,
+                                            data: {
+                                                ...node.data,
+                                                [actionType]: assignments,
+                                            },
+                                        }
                                         : node
                                 )
                             )

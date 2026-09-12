@@ -125,6 +125,8 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             isFinal: isFinal,
             src: srcAttr || "",
             events: events,
+            sensors: skillApiData.sensors || [],
+            actuators: skillApiData.actuator || skillApiData.actuators || [],
             inSlots: inSlots,
             outSlots: outSlots,
             params: params,

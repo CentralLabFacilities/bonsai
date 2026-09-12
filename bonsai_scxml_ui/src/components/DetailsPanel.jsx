@@ -14,6 +14,22 @@ function MetadataRow({ label, value }) {
     );
 }
 
+
+function formatResourceKeys(items) {
+    if (!Array.isArray(items) || items.length === 0) {
+        return "—";
+    }
+
+    const keys = items
+        .map((item) => {
+            if (typeof item === "string") return item;
+            return item?.key || "";
+        })
+        .filter(Boolean);
+
+    return keys.length > 0 ? keys.join(", ") : "—";
+}
+
 function DetailsPanel({
                           selectedNode,
                           hasInitialNode,
@@ -239,7 +255,7 @@ function DetailsPanel({
                                     </span>
 
                                     <span className="field-value">
-                                        Hier müssen die Sensoren angezeigt werden
+                                        {formatResourceKeys(selectedNode.data.sensors)}
                                     </span>
                                 </div>
 
@@ -249,7 +265,7 @@ function DetailsPanel({
                                     </span>
 
                                     <span className="field-value">
-                                        Hier müssen die Aktuatoren angezeigt werden
+                                        {formatResourceKeys(selectedNode.data.actuators)}
                                     </span>
                                 </div>
                             </>
