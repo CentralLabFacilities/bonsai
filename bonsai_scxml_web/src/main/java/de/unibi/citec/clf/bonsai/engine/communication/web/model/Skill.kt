@@ -17,12 +17,21 @@ data class SkillSlot(val key: String, val type: String, val description: String 
 @Serializable
 data class ParameterMap(val params: Map<String, String>)
 
+
+@Serializable
+data class SkillSensor(val key: String, val value: String)
+
+@Serializable
+data class SkillActuator(val key: String, val value: String)
+
 @Serializable
 data class SkillInfo(
     val name: String,
     val inSlots: List<SkillSlot>,
     val outSlots: List<SkillSlot>,
     val params: List<SkillParameter>,
-    val events: List<SkillTransition>
+    val events: List<SkillTransition>,
+    val sensors: List<SkillSensor>,
+    val actuator: List<SkillActuator>
 )
 
