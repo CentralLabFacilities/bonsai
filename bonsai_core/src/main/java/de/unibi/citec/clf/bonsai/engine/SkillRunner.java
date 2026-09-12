@@ -176,6 +176,10 @@ public class SkillRunner implements Runnable {
         return configurator.getOptionalParams();
     }
 
+    public String inspectionGetDescription() {
+        return SkillDescriptionRegistry.getDescription(skill.getClass());
+    }
+
     public Map<String, String> inspectionGetAllParamsDescription() {
         return configurator.getParameterDescriptions();
     }

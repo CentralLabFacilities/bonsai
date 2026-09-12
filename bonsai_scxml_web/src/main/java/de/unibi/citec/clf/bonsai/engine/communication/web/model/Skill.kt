@@ -20,6 +20,7 @@ data class ParameterMap(val params: Map<String, String>)
 @Serializable
 data class SkillInfo(
     val name: String,
+    val description: String,
     val inSlots: List<SkillSlot>,
     val outSlots: List<SkillSlot>,
     val params: List<SkillParameter>,
