@@ -1870,3 +1870,203 @@
   font-weight: 600;
 }
 
+
+/* ==========================================================================
+   COMPACT DATAMODEL LAYOUT
+   ========================================================================== */
+
+.datamodel-add-compact {
+  margin-top: 0;
+  margin-bottom: 12px;
+  padding: 9px 10px;
+  gap: 7px;
+}
+
+.datamodel-add-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.datamodel-add-topline h4 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.datamodel-add-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) 32px;
+  gap: 6px;
+  align-items: center;
+}
+
+.datamodel-add-row .slot-field-edit {
+  min-width: 0;
+  padding: 6px 7px;
+}
+
+.datamodel-add-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--secondary-color);
+  border-radius: 6px;
+  background-color: var(--secondary-color);
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.datamodel-add-button:hover:not(:disabled) {
+  background-color: #1c7fcf;
+}
+
+.datamodel-add-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.datamodel-global-toggle {
+  white-space: nowrap;
+}
+
+.datamodel-compact-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.datamodel-compact-row {
+  display: grid;
+  grid-template-columns: minmax(80px, 0.9fr) minmax(0, 1.4fr) 28px;
+  gap: 6px;
+  align-items: center;
+  padding: 6px 7px;
+  border: 1px solid var(--secondary-color);
+  border-radius: 6px;
+  background: var(--secondary-color);
+}
+
+.datamodel-compact-id {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #e2e8f0;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.datamodel-compact-value-input {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 5px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 5px;
+  background-color: var(--background);
+  color: #ffffff;
+  font-size: 12px;
+}
+
+.datamodel-compact-value-input:focus {
+  outline: none;
+  border-color: #4d87e6;
+}
+
+.datamodel-compact-readonly-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 5px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 5px;
+  background-color: var(--background);
+  color: #b8c0c8;
+  font-size: 12px;
+}
+
+.datamodel-sourced-section {
+  margin-top: 0;
+}
+
+.datamodel-sourced-row {
+  grid-template-columns:
+    minmax(80px, 0.8fr)
+    minmax(0, 1.25fr)
+    minmax(70px, auto);
+  border-style: dashed;
+}
+
+.datamodel-sourced-row .datamodel-parent-badge,
+.datamodel-sourced-row .datamodel-child-badge {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.datamodel-row-message {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding-top: 1px;
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+.datamodel-compact-row .datamodel-delete-button {
+  width: 26px;
+  height: 26px;
+}
+
+.datamodel-overwritten-parameter {
+  border-color: #ef4444;
+}
+
+@media (max-width: 1150px) {
+  .datamodel-add-row {
+    grid-template-columns: minmax(0, 1fr) 32px;
+  }
+
+  .datamodel-add-row > input:first-child {
+    grid-column: 1 / 2;
+  }
+
+  .datamodel-add-row > input:nth-child(2) {
+    grid-column: 1 / 2;
+  }
+
+  .datamodel-add-button {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    height: 100%;
+  }
+}
+
+
+/* Restored card-style display for sourced globals */
+.datamodel-sourced-section {
+  margin-top: 0;
+  margin-bottom: 12px;
+}
+
+.datamodel-sourced-section .datamodel-inherited-list {
+  margin-bottom: 0;
+}
+
+.datamodel-sourced-section .slot-text-field {
+  margin-bottom: 6px;
+}
+
+.datamodel-sourced-section .datamodel-inherited-value {
+  margin-top: 4px;
+}
+
+.datamodel-sourced-section .datamodel-descendant-section {
+  margin-top: 10px;
+}
+
