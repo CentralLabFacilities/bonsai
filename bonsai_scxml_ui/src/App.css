@@ -2202,3 +2202,126 @@
   text-align: center;
 }
 
+
+/* ==========================================================================
+   COMPACT SKILL PARAMETER VIEW
+   ========================================================================== */
+
+.parameter-card {
+  padding: 9px 10px;
+  margin-bottom: 7px;
+}
+
+.parameter-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+.parameter-name {
+  min-width: 0;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.parameter-required-star {
+  margin-left: 3px;
+  color: #fca5a5;
+  font-weight: 800;
+}
+
+.parameter-badges {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.parameter-type-badge,
+.parameter-required-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.parameter-type-badge {
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(71, 85, 105, 0.3);
+  color: #cbd5e1;
+}
+
+/* Common parameter types */
+.parameter-type-string {
+  border-color: rgba(56, 189, 248, 0.45);
+  background: rgba(56, 189, 248, 0.13);
+  color: #7dd3fc;
+}
+
+.parameter-type-boolean,
+.parameter-type-bool {
+  border-color: rgba(192, 132, 252, 0.45);
+  background: rgba(168, 85, 247, 0.13);
+  color: #d8b4fe;
+}
+
+.parameter-type-int,
+.parameter-type-integer,
+.parameter-type-long,
+.parameter-type-short,
+.parameter-type-float,
+.parameter-type-double,
+.parameter-type-number {
+  border-color: rgba(45, 212, 191, 0.45);
+  background: rgba(20, 184, 166, 0.13);
+  color: #5eead4;
+}
+
+.parameter-required-badge {
+  border: 1px solid rgba(248, 113, 113, 0.5);
+  background: rgba(239, 68, 68, 0.13);
+  color: #fca5a5;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.parameter-description {
+  margin: 0 0 7px;
+  color: #aeb8c4;
+  font-size: 11px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.parameter-value-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  border-radius: 6px;
+  background: var(--background);
+  color: #ffffff;
+  font-size: 12px;
+}
+
+.parameter-value-input:focus {
+  outline: none;
+  border-color: #4d87e6;
+}
+
+.parameter-value-input::placeholder {
+  color: #8fa0b5;
+  font-style: italic;
+}
+

@@ -612,77 +612,78 @@ function DetailsPanel({
                             {(selectedNode.data.params || []).map(
                                 (param, index) => (
                                     <div
-                                        className="slot-text-field"
+                                        className="slot-text-field parameter-card"
                                         key={param.key}
                                     >
-                                        <div className="detail-card-header">
-                                            <span className="detail-card-title">
+                                        <div className="parameter-card-header">
+                                            <div className="parameter-name">
                                                 {param.key}
-                                            </span>
+                                                {param.required && (
+                                                    <span
+                                                        className="parameter-required-star"
+                                                        title="Required parameter"
+                                                    >
+                                                        *
+                                                    </span>
+                                                )}
+                                            </div>
 
-                                            <span className="detail-badge">
-                                                Parameter
-                                            </span>
+                                            <div className="parameter-badges">
+                                                <span
+                                                    className={`parameter-type-badge parameter-type-${String(
+                                                        param.type || "other"
+                                                    )
+                                                        .toLowerCase()
+                                                        .replace(
+                                                            /[^a-z0-9]+/g,
+                                                            "-"
+                                                        )}`}
+                                                >
+                                                    {param.type || "Unknown"}
+                                                </span>
+
+                                                {param.required && (
+                                                    <span className="parameter-required-badge">
+                                                        Required
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
 
                                         {param.description && (
-                                            <div className="detail-description">
+                                            <div className="parameter-description">
                                                 {param.description}
                                             </div>
                                         )}
 
-                                        <div className="metadata-container">
-                                            <MetadataRow
-                                                label="Type"
-                                                value={param.type}
-                                            />
-
-                                            <MetadataRow
-                                                label="Required"
-                                                value={
-                                                    param.required
-                                                        ? "Yes"
-                                                        : "No"
+                                        <input
+                                            id={`param-${selectedNode.id}-${index}`}
+                                            className="parameter-value-input"
+                                            type="text"
+                                            value={param.expr || ""}
+                                            placeholder={
+                                                param.default != null
+                                                    ? String(param.default)
+                                                    : "Enter value"
+                                            }
+                                            onChange={(e) =>
+                                                onUpdateParameter(
+                                                    index,
+                                                    e.target.value
+                                                )
+                                            }
+                                            onKeyDown={(e) => {
+                                                if (e.key === "Enter") {
+                                                    e.preventDefault();
+                                                    e.currentTarget.blur();
                                                 }
-                                            />
-
-                                            <MetadataRow
-                                                label="Default"
-                                                value={param.default}
-                                            />
-                                        </div>
-
-                                        <div className="editable-field">
-                                            <label
-                                                className="editable-field-label"
-                                                htmlFor={`param-${selectedNode.id}-${index}`}
-                                            >
-                                                Value
-                                            </label>
-
-                                            <input
-                                                id={`param-${selectedNode.id}-${index}`}
-                                                className="slot-field-edit"
-                                                type="text"
-                                                value={param.expr || ""}
-                                                placeholder={
-                                                    param.default != null
-                                                        ? String(param.default)
-                                                        : "Enter value"
-                                                }
-                                                onChange={(e) =>
-                                                    onUpdateParameter(
-                                                        index,
-                                                        e.target.value
-                                                    )
-                                                }
-                                                onBlur={() =>
-                                                    onUpdateParameterBlur?.(
-                                                        selectedNode.id
-                                                    )
-                                                }
-                                            />
-                                        </div>
+                                            }}
+                                            onBlur={() =>
+                                                onUpdateParameterBlur?.(
+                                                    selectedNode.id
+                                                )
+                                            }
+                                        />
                                     </div>
                                 )
                             )}
