@@ -1,4 +1,5 @@
-import { FiExternalLink, FiLayers } from "react-icons/fi";
+import { useState } from "react";
+import { FiChevronDown, FiExternalLink, FiLayers } from "react-icons/fi";
 import StateActionsEditor from "./StateActionsEditor";
 
 function MetadataRow({ label, value }) {
@@ -40,7 +41,8 @@ function DetailsPanel({
                           onSetInitial,
                           onUpdateName,
                           onUpdateEvent,
-                          onCreateNodeForEvent,
+                          availableTargetNodes = [],
+                          onSetEventTarget,
                           onUpdateParameter,
                           onUpdateInSlotPath,
                           onUpdateOutSlotPath,
@@ -53,6 +55,137 @@ function DetailsPanel({
     const isSubMachine =
         selectedNode.type === "submachine" ||
         Boolean(selectedNode.data.src);
+
+    const [openTargetSelector, setOpenTargetSelector] = useState(null);
+    const [targetQueries, setTargetQueries] = useState({});
+
+    const targetNodeOptions = (availableTargetNodes || []).map((node) => {
+        const fullSkillName = node.data?.fullSkillName || "";
+        const stateName = fullSkillName.includes("#")
+            ? fullSkillName.split("#").pop()
+            : "";
+
+        const skillName =
+            node.data?.label ||
+            fullSkillName.split(".").pop().split("#")[0] ||
+            node.id;
+
+        const displayName =
+            stateName && stateName !== skillName
+                ? `${skillName} (${stateName})`
+                : skillName;
+
+        return {
+            id: node.id,
+            displayName,
+            skillName,
+            stateName,
+            fullSkillName,
+        };
+    });
+
+    const getTargetSelectorKey = (event, index) =>
+        `${selectedNode.id}:${event.id}:${index}`;
+
+    const getCurrentTargetDisplayName = (event) => {
+        if (!event.target) return "";
+
+        const option = targetNodeOptions.find(
+            (candidate) => candidate.id === event.target
+        );
+
+        return option?.displayName || event.target;
+    };
+
+    const getTargetQuery = (event, index) => {
+        const key = getTargetSelectorKey(event, index);
+
+        if (
+            Object.prototype.hasOwnProperty.call(
+                targetQueries,
+                key
+            )
+        ) {
+            return targetQueries[key];
+        }
+
+        return getCurrentTargetDisplayName(event);
+    };
+
+    const getMatchingTargetNodes = (query) => {
+        const normalizedQuery = query.trim().toLowerCase();
+
+        if (!normalizedQuery) {
+            return targetNodeOptions;
+        }
+
+        return targetNodeOptions.filter((option) =>
+            [
+                option.displayName,
+                option.skillName,
+                option.stateName,
+                option.fullSkillName,
+                option.id,
+            ].some((value) =>
+                String(value || "")
+                    .toLowerCase()
+                    .includes(normalizedQuery)
+            )
+        );
+    };
+
+    const selectExistingTarget = (event, index, option) => {
+        const key = getTargetSelectorKey(event, index);
+
+        setTargetQueries((previous) => ({
+            ...previous,
+            [key]: option.displayName,
+        }));
+
+        setOpenTargetSelector(null);
+        onSetEventTarget?.(event, option.id);
+    };
+
+    const handleTargetKeyDown = (
+        keyboardEvent,
+        event,
+        index
+    ) => {
+        if (keyboardEvent.key !== "Enter") {
+            return;
+        }
+
+        keyboardEvent.preventDefault();
+
+        const query = getTargetQuery(event, index).trim();
+
+        if (!query) return;
+
+        const exactMatch = targetNodeOptions.find((option) =>
+            [
+                option.displayName,
+                option.skillName,
+                option.stateName,
+                option.fullSkillName,
+                option.id,
+            ].some(
+                (value) =>
+                    String(value || "").toLowerCase() ===
+                    query.toLowerCase()
+            )
+        );
+
+        if (exactMatch) {
+            selectExistingTarget(event, index, exactMatch);
+            return;
+        }
+
+        const matches = getMatchingTargetNodes(query);
+
+        if (matches.length === 1) {
+            selectExistingTarget(event, index, matches[0]);
+        }
+    };
 
     const availableActionLocations = [
         ...(globalDataModel || []).map((parameter) => parameter.id),
@@ -300,89 +433,167 @@ function DetailsPanel({
 
                                                 <div className="editable-field">
                                                     <label className="editable-field-label">
-                                                        Target package
+                                                        Target
                                                     </label>
 
-                                                    <select
-                                                        className="skill-select"
-                                                        value={
-                                                            event.selectedPackage ||
-                                                            ""
-                                                        }
-                                                        onChange={(e) =>
-                                                            onUpdateEvent(
-                                                                selectedNode.id,
-                                                                event.id,
-                                                                {
-                                                                    selectedPackage:
-                                                                    e.target.value,
-                                                                    selectedSkill:
-                                                                        "",
-                                                                }
-                                                            )
-                                                        }
-                                                    >
-                                                        <option value="">
-                                                            Select package
-                                                        </option>
-
-                                                        {packages.map((pkg) => (
-                                                            <option
-                                                                key={pkg}
-                                                                value={pkg}
-                                                            >
-                                                                {pkg}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-
-                                                <div className="editable-field">
-                                                    <label className="editable-field-label">
-                                                        Target skill
-                                                    </label>
-
-                                                    <select
-                                                        className="skill-select"
-                                                        value={
-                                                            event.selectedSkill ||
-                                                            ""
-                                                        }
-                                                        onChange={(e) =>
-                                                            onCreateNodeForEvent(
+                                                    {(() => {
+                                                        const selectorKey =
+                                                            getTargetSelectorKey(
                                                                 event,
-                                                                e.target.value
-                                                            )
-                                                        }
-                                                    >
-                                                        <option value="">
-                                                            Select Skill
-                                                        </option>
-
-                                                        {getPackageSkillEvent(
-                                                            event.selectedPackage
-                                                        ).map((pkg) => {
-                                                            const skillName =
-                                                                pkg.split(
-                                                                    "skills."
-                                                                )[1];
-
-                                                            return (
-                                                                <option
-                                                                    key={pkg}
-                                                                    value={
-                                                                        skillName
-                                                                    }
-                                                                >
-                                                                    {skillName
-                                                                        ?.split(
-                                                                            "."
-                                                                        )
-                                                                        .pop()}
-                                                                </option>
+                                                                index
                                                             );
-                                                        })}
-                                                    </select>
+
+                                                        const query =
+                                                            getTargetQuery(
+                                                                event,
+                                                                index
+                                                            );
+
+                                                        const matches =
+                                                            getMatchingTargetNodes(
+                                                                query
+                                                            );
+
+                                                        const isOpen =
+                                                            openTargetSelector ===
+                                                            selectorKey;
+
+                                                        return (
+                                                            <div className="exit-target-selector">
+                                                                <div className="exit-target-input-row">
+                                                                    <input
+                                                                        className="exit-target-input"
+                                                                        type="text"
+                                                                        value={query}
+                                                                        placeholder="Type or select an existing node..."
+                                                                        autoComplete="off"
+                                                                        onFocus={() =>
+                                                                            setOpenTargetSelector(
+                                                                                selectorKey
+                                                                            )
+                                                                        }
+                                                                        onChange={(e) => {
+                                                                            setTargetQueries(
+                                                                                (
+                                                                                    previous
+                                                                                ) => ({
+                                                                                    ...previous,
+                                                                                    [selectorKey]:
+                                                                                    e
+                                                                                        .target
+                                                                                        .value,
+                                                                                })
+                                                                            );
+
+                                                                            setOpenTargetSelector(
+                                                                                selectorKey
+                                                                            );
+                                                                        }}
+                                                                        onKeyDown={(
+                                                                            keyboardEvent
+                                                                        ) =>
+                                                                            handleTargetKeyDown(
+                                                                                keyboardEvent,
+                                                                                event,
+                                                                                index
+                                                                            )
+                                                                        }
+                                                                        onBlur={() =>
+                                                                            window.setTimeout(
+                                                                                () =>
+                                                                                    setOpenTargetSelector(
+                                                                                        (
+                                                                                            current
+                                                                                        ) =>
+                                                                                            current ===
+                                                                                            selectorKey
+                                                                                                ? null
+                                                                                                : current
+                                                                                    ),
+                                                                                120
+                                                                            )
+                                                                        }
+                                                                    />
+
+                                                                    <button
+                                                                        type="button"
+                                                                        className="exit-target-dropdown-button"
+                                                                        title="Show nodes in current workflow"
+                                                                        onMouseDown={(e) =>
+                                                                            e.preventDefault()
+                                                                        }
+                                                                        onClick={() =>
+                                                                            setOpenTargetSelector(
+                                                                                (
+                                                                                    current
+                                                                                ) =>
+                                                                                    current ===
+                                                                                    selectorKey
+                                                                                        ? null
+                                                                                        : selectorKey
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        <FiChevronDown />
+                                                                    </button>
+                                                                </div>
+
+                                                                {isOpen && (
+                                                                    <div className="exit-target-suggestions">
+                                                                        {matches.length >
+                                                                        0 ? (
+                                                                            matches.map(
+                                                                                (
+                                                                                    option
+                                                                                ) => (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        className={`exit-target-suggestion ${
+                                                                                            option.id ===
+                                                                                            event.target
+                                                                                                ? "selected"
+                                                                                                : ""
+                                                                                        }`}
+                                                                                        key={
+                                                                                            option.id
+                                                                                        }
+                                                                                        onMouseDown={(
+                                                                                            e
+                                                                                        ) =>
+                                                                                            e.preventDefault()
+                                                                                        }
+                                                                                        onClick={() =>
+                                                                                            selectExistingTarget(
+                                                                                                event,
+                                                                                                index,
+                                                                                                option
+                                                                                            )
+                                                                                        }
+                                                                                    >
+                                                                                        <span className="exit-target-suggestion-name">
+                                                                                            {
+                                                                                                option.displayName
+                                                                                            }
+                                                                                        </span>
+
+                                                                                        <span className="exit-target-suggestion-path">
+                                                                                            {
+                                                                                                option.fullSkillName
+                                                                                            }
+                                                                                        </span>
+                                                                                    </button>
+                                                                                )
+                                                                            )
+                                                                        ) : (
+                                                                            <div className="exit-target-no-match">
+                                                                                No matching nodes in this workflow
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })()}
                                                 </div>
                                             </div>
                                         )

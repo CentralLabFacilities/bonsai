@@ -1102,24 +1102,61 @@ function AppContent() {
         );
     };
 
-    const createNodeforEvent = async (event, selectedSkill) => {
-        if (!selectedSkill || !selectedNode) return;
-        if (event.target) {
-            setNodes((nds) => nds.filter((n) => n.id !== event.target));
-            setEdges((eds) => eds.filter((e) => e.target !== event.target));
-        }
+    const setExistingTargetForEvent = (event, targetNodeId) => {
+        if (!selectedNode || !targetNodeId) return;
 
-        const newNodeId = getNodeId();
-        const newNode = await createNode(selectedSkill, newNodeId, {
-            x: selectedNode.position.x + 240,
-            y: selectedNode.position.y + 60,
+        const targetNode = nodes.find((node) => node.id === targetNodeId);
+        if (!targetNode) return;
+
+        setEdges((currentEdges) => {
+            const withoutPreviousDirectTarget = currentEdges.filter((edge) => {
+                if (
+                    edge.source !== selectedNode.id ||
+                    edge.sourceHandle !== event.id
+                ) {
+                    return true;
+                }
+
+                if (!event.target) {
+                    return true;
+                }
+
+                return edge.target !== event.target;
+            });
+
+            const alreadyExists = withoutPreviousDirectTarget.some(
+                (edge) =>
+                    edge.source === selectedNode.id &&
+                    edge.sourceHandle === event.id &&
+                    edge.target === targetNodeId
+            );
+
+            if (alreadyExists) {
+                return withoutPreviousDirectTarget;
+            }
+
+            return addEdge(
+                {
+                    id: `edge-${selectedNode.id}-${event.id}-${targetNodeId}-${crypto.randomUUID()}`,
+                    source: selectedNode.id,
+                    target: targetNodeId,
+                    sourceHandle: event.id,
+                    label: event.id,
+                    markerEnd: { type: MarkerType.ArrowClosed },
+                    data: { cond: "", assign: null },
+                },
+                withoutPreviousDirectTarget
+            );
         });
 
-        setNodes((nds) => [...nds, newNode]);
-        setEdges((eds) =>
-            addEdge({ source: selectedNode.id, target: newNodeId, sourceHandle: event.id, label: event.id, markerEnd: { type: MarkerType.ArrowClosed } }, eds)
-        );
-        updateNodeEvent(selectedNode.id, event.id, { selectedSkill, target: newNodeId });
+        updateNodeEvent(selectedNode.id, event.id, {
+            selectedPackage: "",
+            selectedSkill:
+                targetNode.data?.fullSkillName?.split("#")[0] ||
+                targetNode.data?.label ||
+                "",
+            target: targetNodeId,
+        });
     };
 
     const checkSlotConnection = (customNodes = null) => {
@@ -1744,7 +1781,8 @@ function AppContent() {
                                     )
                                 }
                                 onUpdateEvent={updateNodeEvent}
-                                onCreateNodeForEvent={createNodeforEvent}
+                                availableTargetNodes={nodes}
+                                onSetEventTarget={setExistingTargetForEvent}
                                 onUpdateParameter={(idx, val) =>
                                     setNodes((nds) =>
                                         nds.map((n) => (n.id === selectedNode.id ? { ...n, data: { ...n.data, params: n.data.params.map((p, i) => (i === idx ? { ...p, expr: val } : p)) } } : n))
