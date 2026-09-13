@@ -2070,3 +2070,26 @@
   margin-top: 10px;
 }
 
+
+/* ==========================================================================
+   WORKFLOW / STATE-MACHINE TAB PATH TOOLTIP
+   ========================================================================== */
+
+.workflow-tab-path-tooltip {
+  position: fixed;
+  z-index: 10000;
+  width: 300px;
+  max-width: calc(100vw - 20px);
+  padding: 8px 10px;
+  background: #25282d;
+  border: 1px solid #454a52;
+  border-radius: 7px;
+  box-shadow: 0 5px 18px rgba(0, 0, 0, 0.35);
+  color: #d1d5db;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+
