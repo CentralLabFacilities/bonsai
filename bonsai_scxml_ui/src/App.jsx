@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { FiTrash2, FiPlus, FiX } from "react-icons/fi";
 import {
     ReactFlow,
@@ -127,6 +128,7 @@ function AppContent() {
         },
     ]);
     const [activeTabId, setActiveTabId] = useState("tab-1");
+    const [tabPathTooltip, setTabPathTooltip] = useState(null);
 
     const [nodes, setNodes, onNodesChange] = useNodesState([]);
     const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -364,6 +366,7 @@ function AppContent() {
                 title: label || baseName,
                 fileName: fileName,
                 fileHandle: null,
+                sourcePath: srcPath,
                 nodes: parsed.nodes,
                 edges: parsed.edges,
                 slotNodes: [],
@@ -625,6 +628,7 @@ function AppContent() {
             fileName: `${subMachineLabel}.xml`,
             fileHandle: null,
             filePath: null,
+            sourcePath: `\${EXERCISE}/${subMachineLabel}.xml`,
             nodes: subTabNodes,
             edges: subTabEdges,
             slotNodes: [],
@@ -1436,6 +1440,45 @@ function AppContent() {
         setIsOverTrash(false);
     }, [setNodes, setEdges, setSlotEdges, setSlotNodes]);
 
+
+    const getTabDisplayPath = (tab) => {
+        if (!tab) return "";
+
+        return (
+            tab.filePath ||
+            tab.sourcePath ||
+            tab.fileName ||
+            "Unsaved workflow"
+        );
+    };
+
+    const handleTabMouseEnter = (event, tab) => {
+        const rect = event.currentTarget.getBoundingClientRect();
+
+        const tooltipWidth = 320;
+        const gap = 8;
+        const viewportPadding = 8;
+
+        let left = rect.left;
+
+        if (left + tooltipWidth > window.innerWidth - viewportPadding) {
+            left = Math.max(
+                viewportPadding,
+                window.innerWidth - tooltipWidth - viewportPadding
+            );
+        }
+
+        setTabPathTooltip({
+            path: getTabDisplayPath(tab),
+            left,
+            top: rect.bottom + gap,
+        });
+    };
+
+    const handleTabMouseLeave = () => {
+        setTabPathTooltip(null);
+    };
+
     return (
         <div className="container">
             <Header onImportFile={handleImportFile} onSaveFile={handleSaveCurrentTab} onSaveAsFile={handleSaveAsCurrentTab} hasFilePath={IS_DESKTOP && tabs.find(t => t.id === activeTabId)?.filePath !== null} />
@@ -1474,6 +1517,10 @@ function AppContent() {
                                     key={tab.id}
                                     className={`intellij-tab ${activeTabId === tab.id ? "active" : ""}`}
                                     onClick={() => switchTab(tab.id)}
+                                    onMouseEnter={(event) =>
+                                        handleTabMouseEnter(event, tab)
+                                    }
+                                    onMouseLeave={handleTabMouseLeave}
                                 >
                                     <span>{tab.title}</span>
                                     {tabs.length > 1 && (
@@ -1737,6 +1784,20 @@ function AppContent() {
                     </div>
                 </div>
             </div>
+
+            {tabPathTooltip &&
+                createPortal(
+                    <div
+                        className="workflow-tab-path-tooltip"
+                        style={{
+                            left: tabPathTooltip.left,
+                            top: tabPathTooltip.top,
+                        }}
+                    >
+                        {tabPathTooltip.path}
+                    </div>,
+                    document.body
+                )}
 
             <ConditionModal
                 isOpen={drawerData.isOpen}
