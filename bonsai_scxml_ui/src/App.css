@@ -1673,3 +1673,200 @@
   border-radius: 0;
   background-color: transparent;
 }
+
+/* ==========================================================================
+   DATAMODEL: GLOBAL / LOCAL PARAMETER SECTIONS
+   ========================================================================== */
+
+.datamodel-parameter-section {
+  margin-bottom: 14px;
+  padding: 10px;
+  border: 1px solid var(--secondary-color);
+  border-radius: 8px;
+}
+
+.datamodel-section-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.datamodel-section-header h3 {
+  margin: 0;
+}
+
+.datamodel-section-hint {
+  color: #8fa0b5;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.datamodel-empty {
+  padding: 10px 4px;
+  color: #8fa0b5;
+  font-size: 12px;
+  font-style: italic;
+}
+
+.datamodel-global-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #cbd5e1;
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.datamodel-global-toggle input {
+  margin: 0;
+}
+
+.datamodel-name-preview {
+  color: #94a3b8;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.datamodel-name-preview strong {
+  color: #e2e8f0;
+}
+
+.datamodel-name-error {
+  color: #fca5a5;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.datamodel-name-error strong {
+  color: #fecaca;
+}
+
+.addparam-container .filter-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.addparam-container .filter-button:disabled:hover {
+  background-color: transparent;
+  color: var(--secondary-color);
+}
+
+.datamodel-parameter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.datamodel-parameter-header h4 {
+  margin: 0;
+}
+
+.datamodel-delete-button {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 16px;
+  transition:
+          background-color 0.15s ease,
+          border-color 0.15s ease,
+          color 0.15s ease;
+}
+
+.datamodel-delete-button:hover {
+  background-color: rgba(239, 68, 68, 0.14);
+  border-color: #ef4444;
+  color: #fca5a5;
+}
+
+/* ==========================================================================
+   DATAMODEL HIERARCHY
+   ========================================================================== */
+
+.datamodel-inherited-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.datamodel-inherited-parameter {
+  opacity: 0.92;
+  border-style: dashed;
+}
+
+.datamodel-parent-badge {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  border: 1px solid #64748b;
+  border-radius: 8px;
+  color: #cbd5e1;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.datamodel-inherited-value {
+  padding: 8px;
+  border-radius: 6px;
+  background-color: var(--background);
+  color: #b8c0c8;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.datamodel-overwritten-parameter {
+  border-color: #ef4444;
+}
+
+.datamodel-overwrite-error {
+  margin: 2px 0 8px;
+  color: #fca5a5;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+/* Globals originating from sub-state machines */
+.datamodel-descendant-section {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.datamodel-subsection-label {
+  margin-bottom: 8px;
+  color: #8fa0b5;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.datamodel-descendant-parameter {
+  opacity: 0.92;
+  border-style: dashed;
+}
+
+.datamodel-child-badge {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  border: 1px solid #64748b;
+  border-radius: 8px;
+  color: #cbd5e1;
+  font-size: 10px;
+  font-weight: 600;
+}
+
