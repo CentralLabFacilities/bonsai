@@ -2325,3 +2325,274 @@
   font-style: italic;
 }
 
+
+/* ==========================================================================
+   CLEAN ONENTRY / ONEXIT EDITOR
+   ========================================================================== */
+
+.state-actions-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.state-action-editor {
+  padding: 10px;
+  border: 1px solid var(--secondary-color);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.2);
+}
+
+.state-action-editor-entry {
+  border-top: 3px solid #22c55e;
+}
+
+.state-action-editor-exit {
+  border-top: 3px solid #f59e0b;
+}
+
+.state-action-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.state-action-title-group {
+  min-width: 0;
+}
+
+.state-action-title-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.state-action-title-row h3 {
+  margin: 0;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.state-action-title-group p {
+  margin: 3px 0 0;
+  color: #94a3b8;
+  font-size: 10.5px;
+  line-height: 1.3;
+}
+
+.state-action-kind-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.state-action-kind-entry {
+  border: 1px solid rgba(34, 197, 94, 0.45);
+  background: rgba(34, 197, 94, 0.12);
+  color: #86efac;
+}
+
+.state-action-kind-exit {
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.12);
+  color: #fcd34d;
+}
+
+.state-action-add-button {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 8px;
+  border: 1px solid #4d87e6;
+  border-radius: 6px;
+  background: #245ea8;
+  color: #ffffff;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.state-action-add-button:hover {
+  background: #2f72c9;
+}
+
+.state-action-empty {
+  padding: 9px;
+  border: 1px dashed #526174;
+  border-radius: 6px;
+  color: #94a3b8;
+  font-size: 11px;
+  text-align: center;
+}
+
+.state-action-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.state-action-row {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 26px;
+  gap: 7px;
+  align-items: center;
+  padding: 7px;
+  border: 1px solid var(--secondary-color);
+  border-radius: 6px;
+  background: var(--secondary-color);
+}
+
+.state-action-row-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.state-action-compact-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 14px minmax(0, 1fr);
+  gap: 5px;
+  align-items: end;
+  min-width: 0;
+}
+
+.state-action-compact-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  color: #aeb8c4;
+  font-size: 9.5px;
+  font-weight: 600;
+}
+
+.state-action-compact-field .slot-field-edit {
+  min-width: 0;
+  padding: 6px 7px;
+  font-size: 11px;
+}
+
+.state-action-arrow {
+  padding-bottom: 7px;
+  color: #64748b;
+  font-size: 13px;
+  text-align: center;
+}
+
+.state-action-remove-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: #fca5a5;
+  cursor: pointer;
+}
+
+.state-action-remove-button:hover {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.14);
+  color: #ffffff;
+}
+
+@media (max-width: 1150px) {
+  .state-action-compact-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .state-action-arrow {
+    display: none;
+  }
+}
+
+
+/* ==========================================================================
+   EXIT TOKEN TYPE ACCENTS
+   ========================================================================== */
+
+.exit-token-card {
+  position: relative;
+  overflow: hidden;
+  border-left-width: 4px;
+  border-left-style: solid;
+  transition:
+          border-color 0.15s ease,
+          box-shadow 0.15s ease;
+}
+
+/* success / success.* */
+.exit-token-success {
+  border-left-color: #22c55e;
+}
+
+.exit-token-success .detail-card-title {
+  color: #86efac;
+}
+
+.exit-token-badge-success {
+  border-color: rgba(34, 197, 94, 0.45);
+  background: rgba(34, 197, 94, 0.12);
+  color: #86efac;
+}
+
+/* error / error.* */
+.exit-token-error {
+  border-left-color: #f59e0b;
+}
+
+.exit-token-error .detail-card-title {
+  color: #fcd34d;
+}
+
+.exit-token-badge-error {
+  border-color: rgba(245, 158, 11, 0.5);
+  background: rgba(245, 158, 11, 0.12);
+  color: #fcd34d;
+}
+
+/* fatal / fatal.* */
+.exit-token-fatal {
+  border-left-color: #ef4444;
+}
+
+.exit-token-fatal .detail-card-title {
+  color: #fca5a5;
+}
+
+.exit-token-badge-fatal {
+  border-color: rgba(239, 68, 68, 0.5);
+  background: rgba(239, 68, 68, 0.13);
+  color: #fca5a5;
+}
+
+/* Unknown / wildcard tokens stay neutral. */
+.exit-token-other {
+  border-left-color: #64748b;
+}
+
+.exit-token-badge-other {
+  border-color: rgba(148, 163, 184, 0.35);
+  background: rgba(71, 85, 105, 0.22);
+  color: #cbd5e1;
+}
+
