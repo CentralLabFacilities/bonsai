@@ -42,6 +42,65 @@ const getNodeId = () => `skill-node-${crypto.randomUUID()}`;
 // Detect if running in Tauri desktop app
 const IS_DESKTOP = isTauri();
 
+
+const collectDescendantGlobals = (
+    tabList,
+    rootTabId,
+    blockedGlobalIds = []
+) => {
+    const childrenByParent = new Map();
+
+    (tabList || []).forEach((tab) => {
+        if (!tab.parentTabId) return;
+
+        if (!childrenByParent.has(tab.parentTabId)) {
+            childrenByParent.set(tab.parentTabId, []);
+        }
+
+        childrenByParent.get(tab.parentTabId).push(tab);
+    });
+
+    const result = [];
+
+    const visit = (parentTabId, blockedIds) => {
+        const children = childrenByParent.get(parentTabId) || [];
+
+        children.forEach((child) => {
+            const childGlobals = (child.globalDataModel || []).filter(
+                (parameter) =>
+                    String(parameter.id || "").startsWith("_")
+            );
+
+            childGlobals.forEach((parameter) => {
+                if (blockedIds.has(parameter.id)) {
+                    return;
+                }
+
+                result.push({
+                    ...parameter,
+                    definedIn:
+                        child.title ||
+                        child.fileName ||
+                        "Sub-state machine",
+                    sourceTabId: child.id,
+                });
+            });
+
+            const blockedForChildren = new Set(blockedIds);
+
+            childGlobals.forEach((parameter) => {
+                blockedForChildren.add(parameter.id);
+            });
+
+            visit(child.id, blockedForChildren);
+        });
+    };
+
+    visit(rootTabId, new Set(blockedGlobalIds));
+
+    return result;
+};
+
 function AppContent() {
     const [skills, setSkills] = useState({ skills: [] });
     const [selectedPackage, setSelectedPackage] = useState(null);
@@ -61,6 +120,7 @@ function AppContent() {
             edges: [],
             slotNodes: [],
             slotEdges: [],
+            parentTabId: null,
             globalDataModel: [
                 { id: "#_STATE_PREFIX", expr: "'de.unibi.citec.clf.bonsai.skills.'" },
             ],
@@ -85,8 +145,31 @@ function AppContent() {
         { id: "#_STATE_PREFIX", expr: "'de.unibi.citec.clf.bonsai.skills.'" },
         { id: "Test: globales Datamodel", expr: "testen" },
     ]);
+    const [inheritedGlobalDataModel, setInheritedGlobalDataModel] = useState([]);
     const [newParamId, setNewParamId] = useState("");
     const [newParamExpr, setNewParamExpr] = useState("");
+
+    const descendantGlobalDataModel = useMemo(() => {
+        const blockedIds = [
+            ...(inheritedGlobalDataModel || []),
+            ...(globalDataModel || []),
+        ]
+            .filter((parameter) =>
+                String(parameter.id || "").startsWith("_")
+            )
+            .map((parameter) => parameter.id);
+
+        return collectDescendantGlobals(
+            tabs,
+            activeTabId,
+            blockedIds
+        );
+    }, [
+        tabs,
+        activeTabId,
+        globalDataModel,
+        inheritedGlobalDataModel,
+    ]);
 
     // Condition Drawer State
     const [drawerData, setDrawerData] = useState({
@@ -106,42 +189,89 @@ function AppContent() {
 
     const { screenToFlowPosition, fitView } = useReactFlow();
 
+    const buildInheritedGlobalsForChild = (
+        inheritedGlobals,
+        parentDataModel,
+        parentName
+    ) => {
+        const inherited = [];
+        const seen = new Set();
+
+        (inheritedGlobals || []).forEach((parameter) => {
+            if (!String(parameter.id || "").startsWith("_")) return;
+            if (seen.has(parameter.id)) return;
+
+            seen.add(parameter.id);
+            inherited.push(parameter);
+        });
+
+        (parentDataModel || []).forEach((parameter) => {
+            if (!String(parameter.id || "").startsWith("_")) return;
+            if (seen.has(parameter.id)) return;
+
+            seen.add(parameter.id);
+            inherited.push({
+                ...parameter,
+                inheritedFrom: parentName || "Parent",
+            });
+        });
+
+        return inherited;
+    };
+
     // Aktuellen Tab synchronisieren beim Tabwechsel
     const switchTab = (targetTabId) => {
         if (targetTabId === activeTabId) return;
 
-        setTabs((prevTabs) =>
-            prevTabs.map((t) =>
-                t.id === activeTabId
-                    ? {
-                        ...t,
-                        nodes,
-                        edges,
-                        slotNodes,
-                        slotEdges,
-                        globalDataModel,
-                    }
-                    : t
-            )
+        const updatedTabs = tabs.map((t) =>
+            t.id === activeTabId
+                ? {
+                    ...t,
+                    nodes,
+                    edges,
+                    slotNodes,
+                    slotEdges,
+                    globalDataModel,
+                    inheritedGlobalDataModel,
+                }
+                : t
         );
 
-        const targetTab = tabs.find((t) => t.id === targetTabId);
+        const targetTab = updatedTabs.find(
+            (t) => t.id === targetTabId
+        );
+
         if (targetTab) {
+            setTabs(updatedTabs);
             setActiveTabId(targetTabId);
             setNodes(targetTab.nodes || []);
             setEdges(targetTab.edges || []);
             setSlotNodes(targetTab.slotNodes || []);
             setSlotEdges(targetTab.slotEdges || []);
             setGlobalDataModel(targetTab.globalDataModel || []);
+            setInheritedGlobalDataModel(
+                targetTab.inheritedGlobalDataModel || []
+            );
             setSelectedNodeId(null);
-            setTimeout(() => fitView({ padding: 0.2, duration: 250 }), 50);
+            setTimeout(
+                () => fitView({ padding: 0.2, duration: 250 }),
+                50
+            );
         }
     };
 
     const handleAddNewTab = () => {
         const updatedCurrent = tabs.map((t) =>
             t.id === activeTabId
-                ? { ...t, nodes, edges, slotNodes, slotEdges, globalDataModel }
+                ? {
+                    ...t,
+                    nodes,
+                    edges,
+                    slotNodes,
+                    slotEdges,
+                    globalDataModel,
+                    inheritedGlobalDataModel,
+                }
                 : t
         );
 
@@ -155,6 +285,8 @@ function AppContent() {
             edges: [],
             slotNodes: [],
             slotEdges: [],
+            parentTabId: null,
+            inheritedGlobalDataModel: [],
             globalDataModel: [
                 { id: "#_STATE_PREFIX", expr: "'de.unibi.citec.clf.bonsai.skills.'" },
             ],
@@ -167,6 +299,7 @@ function AppContent() {
         setSlotNodes([]);
         setSlotEdges([]);
         setGlobalDataModel(newTabObj.globalDataModel);
+        setInheritedGlobalDataModel([]);
         setSelectedNodeId(null);
     };
 
@@ -185,6 +318,9 @@ function AppContent() {
             setSlotNodes(fallbackTab.slotNodes || []);
             setSlotEdges(fallbackTab.slotEdges || []);
             setGlobalDataModel(fallbackTab.globalDataModel || []);
+            setInheritedGlobalDataModel(
+                fallbackTab.inheritedGlobalDataModel || []
+            );
             setSelectedNodeId(null);
         }
     };
@@ -216,6 +352,13 @@ function AppContent() {
 
             const parsed = await parseScxmlFile(xmlText, fetchSkillData, getNodeId);
 
+            const currentTab = tabs.find((tab) => tab.id === activeTabId);
+            const inheritedForChild = buildInheritedGlobalsForChild(
+                inheritedGlobalDataModel,
+                globalDataModel,
+                currentTab?.title || currentTab?.fileName || "Parent"
+            );
+
             const newTabObj = {
                 id: tabId,
                 title: label || baseName,
@@ -225,13 +368,23 @@ function AppContent() {
                 edges: parsed.edges,
                 slotNodes: [],
                 slotEdges: [],
+                parentTabId: activeTabId,
+                inheritedGlobalDataModel: inheritedForChild,
                 globalDataModel: parsed.globalDataModel,
             };
 
             setTabs((prev) => [
                 ...prev.map((t) =>
                     t.id === activeTabId
-                        ? { ...t, nodes, edges, slotNodes, slotEdges, globalDataModel }
+                        ? {
+                            ...t,
+                            nodes,
+                            edges,
+                            slotNodes,
+                            slotEdges,
+                            globalDataModel,
+                            inheritedGlobalDataModel,
+                        }
                         : t
                 ),
                 newTabObj,
@@ -241,6 +394,7 @@ function AppContent() {
             setNodes(parsed.nodes);
             setEdges(parsed.edges);
             setGlobalDataModel(parsed.globalDataModel);
+            setInheritedGlobalDataModel(inheritedForChild);
             setSelectedNodeId(null);
             checkSlotConnection(parsed.nodes);
             setTimeout(() => fitView({ padding: 0.2, duration: 300 }), 100);
@@ -457,6 +611,13 @@ function AppContent() {
         );
 
 // 5. Neues Tab-Objekt anlegen
+        const parentTab = tabs.find((tab) => tab.id === activeTabId);
+        const inheritedForChild = buildInheritedGlobalsForChild(
+            inheritedGlobalDataModel,
+            globalDataModel,
+            parentTab?.title || parentTab?.fileName || "Parent"
+        );
+
         const newTabId = `tab-sub-${crypto.randomUUID().slice(0, 6)}`;
         const newTabObj = {
             id: newTabId,
@@ -468,6 +629,8 @@ function AppContent() {
             edges: subTabEdges,
             slotNodes: [],
             slotEdges: [],
+            parentTabId: activeTabId,
+            inheritedGlobalDataModel: inheritedForChild,
             globalDataModel: [
                 { id: "#_STATE_PREFIX", expr: "'de.unibi.citec.clf.bonsai.skills.'" },
             ],
@@ -484,6 +647,7 @@ function AppContent() {
                         slotNodes,
                         slotEdges,
                         globalDataModel,
+                        inheritedGlobalDataModel,
                     }
                     : t
             ),
@@ -497,6 +661,7 @@ function AppContent() {
         setSlotNodes([]);
         setSlotEdges([]);
         setGlobalDataModel(newTabObj.globalDataModel);
+        setInheritedGlobalDataModel(inheritedForChild);
         setSelectedNodeId(null);
 
 // Slot-Verbindungen des neuen Tabs berechnen & View zentrieren
@@ -1453,6 +1618,8 @@ function AppContent() {
                         {rightPanelTab === "datamodel" && (
                             <WorkflowPanel
                                 globalDataModel={globalDataModel}
+                                inheritedGlobalDataModel={inheritedGlobalDataModel}
+                                descendantGlobalDataModel={descendantGlobalDataModel}
                                 newParamId={newParamId}
                                 setNewParamId={setNewParamId}
                                 newParamExpr={newParamExpr}
@@ -1466,11 +1633,36 @@ function AppContent() {
                                         )
                                     );
                                 }}
-                                onAddGlobalParam={() => {
-                                    if (!newParamId.trim()) return;
-                                    setGlobalDataModel((prev) => [...prev, { id: newParamId, expr: newParamExpr }]);
+                                onAddParameter={(parameterId, parameterExpr) => {
+                                    const normalizedId = parameterId.trim();
+                                    if (!normalizedId) return;
+
+                                    setGlobalDataModel((prev) => {
+                                        if (
+                                            prev.some(
+                                                (parameter) =>
+                                                    parameter.id === normalizedId
+                                            )
+                                        ) {
+                                            return prev;
+                                        }
+
+                                        return [
+                                            ...prev,
+                                            {
+                                                id: normalizedId,
+                                                expr: parameterExpr,
+                                            },
+                                        ];
+                                    });
+
                                     setNewParamId("");
                                     setNewParamExpr("");
+                                }}
+                                onDeleteParameter={(index) => {
+                                    setGlobalDataModel((prev) =>
+                                        prev.filter((_, i) => i !== index)
+                                    );
                                 }}
                             />
                         )}
