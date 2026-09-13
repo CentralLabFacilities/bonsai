@@ -76,6 +76,7 @@ function AppContent() {
     const [activeMode, setActiveMode] = useState("event");
     const [selectedNodeId, setSelectedNodeId] = useState(null);
     const [activeTab, setActiveTab] = useState("allgemein");
+    const [rightPanelTab, setRightPanelTab] = useState("datamodel");
 
     const [isDraggingNode, setIsDraggingNode] = useState(false);
     const [isOverTrash, setIsOverTrash] = useState(false);
@@ -96,6 +97,12 @@ function AppContent() {
         initialTargetId: null,
         candidateTransitions: [],
     });
+
+    useEffect(() => {
+        if (!selectedNodeId) {
+            setRightPanelTab("datamodel");
+        }
+    }, [selectedNodeId]);
 
     const { screenToFlowPosition, fitView } = useReactFlow();
 
@@ -1393,8 +1400,14 @@ function AppContent() {
                                     onConnect={onConnect}
                                     onEdgeDoubleClick={onEdgeDoubleClick}
                                     nodeTypes={nodeTypes}
-                                    onNodeClick={(_, n) => setSelectedNodeId(n.id)}
-                                    onPaneClick={() => setSelectedNodeId(null)}
+                                    onNodeClick={(_, n) => {
+                                        setSelectedNodeId(n.id);
+                                        setRightPanelTab("details");
+                                    }}
+                                    onPaneClick={() => {
+                                        setSelectedNodeId(null);
+                                        setRightPanelTab("datamodel");
+                                    }}
                                     multiSelectionKeyCode={["Control", "Meta"]}
                                     selectionKeyCode={["Control", "Meta"]}
                                     deleteKeyCode={["Delete"]}
@@ -1415,96 +1428,122 @@ function AppContent() {
                     </div>
                 </main>
 
-                {selectedNode === null ? (
-                    <WorkflowPanel
-                        globalDataModel={globalDataModel}
-                        newParamId={newParamId}
-                        setNewParamId={setNewParamId}
-                        newParamExpr={newParamExpr}
-                        setNewParamExpr={setNewParamExpr}
-                        onUpdateGlobalParam={(index, value) => {
-                            setGlobalDataModel((prev) =>
-                                prev.map((param, i) =>
-                                    i === index
-                                        ? { ...param, expr: value }
-                                        : param
-                                )
-                            );
-                        }}
-                        onAddGlobalParam={() => {
-                            if (!newParamId.trim()) return;
-                            setGlobalDataModel((prev) => [...prev, { id: newParamId, expr: newParamExpr }]);
-                            setNewParamId("");
-                            setNewParamExpr("");
-                        }}
-                    />
-                ) : (
-                    <DetailsPanel
-                        selectedNode={selectedNode}
-                        hasInitialNode={hasInitialNode}
-                        activeTab={activeTab}
-                        setActiveTab={setActiveTab}
-                        packages={packages}
-                        getPackageSkillEvent={getPackageSkillEvent}
-                        onSetInitial={() =>
-                            setNodes((nds) =>
-                                nds.map((n) => ({
-                                    ...n,
-                                    data: {
-                                        ...n.data,
-                                        isInitial: n.id === selectedNode.id,
-                                    },
-                                }))
-                            )
-                        }
-                        onUpdateName={(name) =>
-                            setNodes((nds) =>
-                                nds.map((n) => (n.id === selectedNode.id ? { ...n, data: { ...n.data, fullSkillName: `${n.data.fullSkillName.split("#")[0]}#${name}` } } : n))
-                            )
-                        }
-                        onUpdateSrc={(nodeId, newSrc) =>
-                            setNodes((nds) =>
-                                nds.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, src: newSrc } } : n))
-                            )
-                        }
-                        onUpdateEvent={updateNodeEvent}
-                        onCreateNodeForEvent={createNodeforEvent}
-                        onUpdateParameter={(idx, val) =>
-                            setNodes((nds) =>
-                                nds.map((n) => (n.id === selectedNode.id ? { ...n, data: { ...n.data, params: n.data.params.map((p, i) => (i === idx ? { ...p, expr: val } : p)) } } : n))
-                            )
-                        }
+                <div className="right-panel-shell">
+                    <div className="right-panel-tabs">
+                        <button
+                            type="button"
+                            className={`right-panel-tab ${rightPanelTab === "datamodel" ? "active" : ""}`}
+                            onClick={() => setRightPanelTab("datamodel")}
+                        >
+                            Datamodel
+                        </button>
 
-                        onUpdateParameterBlur={updateEventsFromParameters}
-                        globalDataModel={globalDataModel}
-                        onUpdateStateActions={(nodeId, actionType, assignments) =>
-                            setNodes((nds) =>
-                                nds.map((node) =>
-                                    node.id === nodeId
-                                        ? {
-                                            ...node,
+                        {selectedNode && (
+                            <button
+                                type="button"
+                                className={`right-panel-tab ${rightPanelTab === "details" ? "active" : ""}`}
+                                onClick={() => setRightPanelTab("details")}
+                            >
+                                Details
+                            </button>
+                        )}
+                    </div>
+
+                    <div className="right-panel-content">
+                        {rightPanelTab === "datamodel" && (
+                            <WorkflowPanel
+                                globalDataModel={globalDataModel}
+                                newParamId={newParamId}
+                                setNewParamId={setNewParamId}
+                                newParamExpr={newParamExpr}
+                                setNewParamExpr={setNewParamExpr}
+                                onUpdateGlobalParam={(index, value) => {
+                                    setGlobalDataModel((prev) =>
+                                        prev.map((param, i) =>
+                                            i === index
+                                                ? { ...param, expr: value }
+                                                : param
+                                        )
+                                    );
+                                }}
+                                onAddGlobalParam={() => {
+                                    if (!newParamId.trim()) return;
+                                    setGlobalDataModel((prev) => [...prev, { id: newParamId, expr: newParamExpr }]);
+                                    setNewParamId("");
+                                    setNewParamExpr("");
+                                }}
+                            />
+                        )}
+
+                        {rightPanelTab === "details" && selectedNode && (
+                            <DetailsPanel
+                                selectedNode={selectedNode}
+                                hasInitialNode={hasInitialNode}
+                                activeTab={activeTab}
+                                setActiveTab={setActiveTab}
+                                packages={packages}
+                                getPackageSkillEvent={getPackageSkillEvent}
+                                onSetInitial={() =>
+                                    setNodes((nds) =>
+                                        nds.map((n) => ({
+                                            ...n,
                                             data: {
-                                                ...node.data,
-                                                [actionType]: assignments,
+                                                ...n.data,
+                                                isInitial: n.id === selectedNode.id,
                                             },
-                                        }
-                                        : node
-                                )
-                            )
-                        }
-                        onUpdateInSlotPath={(idx, val) =>
-                            setNodes((nds) =>
-                                nds.map((n) => (n.id === selectedNode.id ? { ...n, data: { ...n.data, inSlots: n.data.inSlots.map((s, i) => (i === idx ? { ...s, path: val } : s)) } } : n))
-                            )
-                        }
-                        onUpdateOutSlotPath={(idx, val) =>
-                            setNodes((nds) =>
-                                nds.map((n) => (n.id === selectedNode.id ? { ...n, data: { ...n.data, outSlots: n.data.outSlots.map((s, i) => (i === idx ? { ...s, path: val } : s)) } } : n))
-                            )
-                        }
-                        onCheckSlots={checkSlotConnection}
-                    />
-                )}
+                                        }))
+                                    )
+                                }
+                                onUpdateName={(name) =>
+                                    setNodes((nds) =>
+                                        nds.map((n) => (n.id === selectedNode.id ? { ...n, data: { ...n.data, fullSkillName: `${n.data.fullSkillName.split("#")[0]}#${name}` } } : n))
+                                    )
+                                }
+                                onUpdateSrc={(nodeId, newSrc) =>
+                                    setNodes((nds) =>
+                                        nds.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, src: newSrc } } : n))
+                                    )
+                                }
+                                onUpdateEvent={updateNodeEvent}
+                                onCreateNodeForEvent={createNodeforEvent}
+                                onUpdateParameter={(idx, val) =>
+                                    setNodes((nds) =>
+                                        nds.map((n) => (n.id === selectedNode.id ? { ...n, data: { ...n.data, params: n.data.params.map((p, i) => (i === idx ? { ...p, expr: val } : p)) } } : n))
+                                    )
+                                }
+
+                                onUpdateParameterBlur={updateEventsFromParameters}
+                                globalDataModel={globalDataModel}
+                                onUpdateStateActions={(nodeId, actionType, assignments) =>
+                                    setNodes((nds) =>
+                                        nds.map((node) =>
+                                            node.id === nodeId
+                                                ? {
+                                                    ...node,
+                                                    data: {
+                                                        ...node.data,
+                                                        [actionType]: assignments,
+                                                    },
+                                                }
+                                                : node
+                                        )
+                                    )
+                                }
+                                onUpdateInSlotPath={(idx, val) =>
+                                    setNodes((nds) =>
+                                        nds.map((n) => (n.id === selectedNode.id ? { ...n, data: { ...n.data, inSlots: n.data.inSlots.map((s, i) => (i === idx ? { ...s, path: val } : s)) } } : n))
+                                    )
+                                }
+                                onUpdateOutSlotPath={(idx, val) =>
+                                    setNodes((nds) =>
+                                        nds.map((n) => (n.id === selectedNode.id ? { ...n, data: { ...n.data, outSlots: n.data.outSlots.map((s, i) => (i === idx ? { ...s, path: val } : s)) } } : n))
+                                    )
+                                }
+                                onCheckSlots={checkSlotConnection}
+                            />
+                        )}
+                    </div>
+                </div>
             </div>
 
             <ConditionModal

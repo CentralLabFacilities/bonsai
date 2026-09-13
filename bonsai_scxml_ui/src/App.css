@@ -1592,3 +1592,84 @@
   background-color: #7e22ce;
   border-color: #c084fc;
 }
+
+
+/* ==========================================================================
+   RIGHT SIDEBAR: DATAMODEL / DETAILS TOP-LEVEL TABS
+   ========================================================================== */
+
+.right-panel-shell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background-color: var(--sidebar-background);
+  border: 1px solid var(--secondary-color);
+  border-radius: 8px;
+}
+
+.right-panel-tabs {
+  display: flex;
+  flex-shrink: 0;
+  height: 40px;
+  min-height: 40px;
+  background-color: #0b1120;
+  border-bottom: 1px solid var(--secondary-color);
+  overflow: hidden;
+}
+
+.right-panel-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  border: none;
+  border-right: 1px solid var(--secondary-color);
+  background-color: transparent;
+  color: #94a3b8;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+          background-color 0.15s ease,
+          color 0.15s ease;
+}
+
+.right-panel-tab:hover {
+  background-color: #1e293b;
+  color: #ffffff;
+}
+
+.right-panel-tab.active {
+  background-color: #0f172a;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.right-panel-tab.active::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background-color: #38bdf8;
+}
+
+.right-panel-content {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.right-panel-content > .workflow-panel,
+.right-panel-content > .details-panel {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+  border: none;
+  border-radius: 0;
+  background-color: transparent;
+}
