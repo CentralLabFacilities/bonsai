@@ -31,6 +31,45 @@ function formatResourceKeys(items) {
     return keys.length > 0 ? keys.join(", ") : "—";
 }
 
+
+function getExitTokenType(eventId) {
+    const mainType = String(eventId || "")
+        .trim()
+        .toLowerCase()
+        .split(".")[0];
+
+    if (mainType === "success") return "success";
+    if (mainType === "error") return "error";
+    if (mainType === "fatal") return "fatal";
+
+    return "other";
+}
+
+
+function sortExitTokens(events) {
+    const priority = {
+        success: 0,
+        error: 1,
+        fatal: 2,
+        other: 3,
+    };
+
+    return (events || [])
+        .map((event, index) => ({
+            event,
+            index,
+            priority:
+                priority[getExitTokenType(event.id)] ??
+                priority.other,
+        }))
+        .sort(
+            (a, b) =>
+                a.priority - b.priority ||
+                a.index - b.index
+        )
+        .map(({ event }) => event);
+}
+
 function DetailsPanel({
                           selectedNode,
                           hasInitialNode,
@@ -409,10 +448,13 @@ function DetailsPanel({
                                 <h3>Exit Tokens</h3>
 
                                 <div className="event-list">
-                                    {(selectedNode.data.events || []).map(
-                                        (event, index) => (
+                                    {sortExitTokens(
+                                        selectedNode.data.events
+                                    ).map((event, index) => (
                                             <div
-                                                className="slot-text-field"
+                                                className={`slot-text-field exit-token-card exit-token-${getExitTokenType(
+                                                    event.id
+                                                )}`}
                                                 key={`${event.id}-${index}`}
                                             >
                                                 <div className="detail-card-header">
@@ -420,7 +462,11 @@ function DetailsPanel({
                                                         {event.id}
                                                     </span>
 
-                                                    <span className="detail-badge">
+                                                    <span
+                                                        className={`detail-badge exit-token-badge exit-token-badge-${getExitTokenType(
+                                                            event.id
+                                                        )}`}
+                                                    >
                                                         Exit Token
                                                     </span>
                                                 </div>
@@ -824,7 +870,7 @@ function DetailsPanel({
                 {activeTab === "actions" && (
                     <div className="state-actions-container">
                         <StateActionsEditor
-                            actionName="onentry"
+                            actionName="OnEntry"
                             actions={selectedNode.data.onEntry}
                             availableLocations={availableActionLocations}
                             listId={`onentry-locations-${selectedNode.id}`}
@@ -838,7 +884,7 @@ function DetailsPanel({
                         />
 
                         <StateActionsEditor
-                            actionName="onexit"
+                            actionName="OnExit"
                             actions={selectedNode.data.onExit}
                             availableLocations={availableActionLocations}
                             listId={`onexit-locations-${selectedNode.id}`}
