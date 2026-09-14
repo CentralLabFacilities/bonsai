@@ -1681,6 +1681,32 @@
     z-index: 20;
 }
 
+.skill-drag-preview {
+    position: absolute;
+    top: -10000px;
+    left: -10000px;
+
+    width: 180px;
+    min-height: 70px;
+
+    box-sizing: border-box;
+
+    background: white;
+    border: 1px solid #666;
+    border-radius: 6px;
+
+    padding: 12px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    font-size: 12px;
+    font-weight: 500;
+
+    white-space: nowrap;
+}
+
 
 /* ==========================================================================
    RIGHT SIDEBAR: DATAMODEL / DETAILS TOP-LEVEL TABS
