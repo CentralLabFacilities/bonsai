@@ -2596,3 +2596,81 @@
   color: #cbd5e1;
 }
 
+
+/* ==========================================================================
+   COMPACT SLOT CARDS
+   Matches Parameter / Exit Token visual language
+   ========================================================================== */
+
+.compact-slot-card {
+  position: relative;
+  overflow: hidden;
+  padding: 9px 10px;
+  margin-bottom: 7px;
+  border-left-width: 4px;
+  border-left-style: solid;
+}
+
+.compact-slot-read {
+  border-left-color: #38bdf8;
+}
+
+.compact-slot-write {
+  border-left-color: #a78bfa;
+}
+
+.compact-slot-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+.compact-slot-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.compact-slot-badges {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.slot-access-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.slot-access-read {
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  background: rgba(56, 189, 248, 0.12);
+  color: #7dd3fc;
+}
+
+.slot-access-write {
+  border: 1px solid rgba(167, 139, 250, 0.5);
+  background: rgba(139, 92, 246, 0.13);
+  color: #c4b5fd;
+}
+
+.compact-slot-path-input {
+  margin-top: 0;
+}
+
