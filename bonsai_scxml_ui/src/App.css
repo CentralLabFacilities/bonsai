@@ -687,13 +687,59 @@
 }
 
 .slot-node-inherited {
-   color: #5a3a24;
+   color: #b45309;
    background-color: white;
    border: 1px dashed #555;
    border-radius: 6px;
    padding: 12px 15px;
    font-size: 13px;
    font-weight: bold;
+}
+
+.compact-slot-inherited {
+  border-left-color: #b45309;
+  background: rgba(180, 83, 9, 0.08);
+}
+
+/* Badge neben Read/Write, wenn der Slot geerbt ist */
+.slot-access-inherited {
+  border: 1px solid rgba(180, 83, 9, 0.55);
+  background: rgba(180, 83, 9, 0.16);
+  color: #fcd9a8;
+}
+
+/* Kleiner Hinweistext "Inherited from ..." unter der Beschreibung */
+.compact-slot-inherited-from {
+  margin: 0 0 7px;
+  color: #d99a53;
+  font-size: 10.5px;
+  font-style: italic;
+  line-height: 1.3;
+}
+
+/* Deaktiviertes Path-Eingabefeld bei geerbten Slots (read-only) */
+.compact-slot-path-input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+/* Gruppentitel "Inherited Slots" / "Own Slots" */
+.slot-group {
+  margin-bottom: 10px;
+}
+
+.slot-group-title {
+  margin: 4px 0 6px;
+  color: #94a3b8;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.slot-group-title-inherited {
+  color: #d99a53;
 }
 
 .slot-write-handle,
