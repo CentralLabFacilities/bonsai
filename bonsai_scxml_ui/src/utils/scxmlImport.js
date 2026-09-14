@@ -38,6 +38,83 @@ const parseTransitionAssignments = (transitionElement) =>
         }))
         .filter((assignment) => assignment.location);
 
+
+const getBaseStateName = (fullSkillName) =>
+    String(fullSkillName || "")
+        .split("#")[0]
+        .split(".")
+        .pop()
+        .trim();
+
+const isNamedFinalState = (fullSkillName) => {
+    const name = getBaseStateName(fullSkillName).toLowerCase();
+    return name === "end" || name === "fatal";
+};
+
+const parseBehaviorExitForwarding = (stateElem, fullSkillName) => {
+    if (getBaseStateName(fullSkillName).toLowerCase() !== "nop") {
+        return null;
+    }
+
+    const forwardingTransitions = Array.from(stateElem?.children || [])
+        .filter((child) => child.localName === "transition")
+        .map((transitionElement) => {
+            const target = transitionElement.getAttribute("target");
+
+            // A behavior exit sends an event outward instead of transitioning
+            // to another state inside the current state machine.
+            if (target) return null;
+
+            const triggerEvent =
+                transitionElement.getAttribute("event")?.trim() ||
+                "Nop.fatal";
+
+            const fatalTrigger =
+                triggerEvent === "fatal" ||
+                triggerEvent.toLowerCase().endsWith(".fatal");
+
+            if (!fatalTrigger) return null;
+
+            const sendEvents = Array.from(
+                transitionElement.children || []
+            )
+                .filter((child) => child.localName === "send")
+                .map((sendElement) =>
+                    sendElement.getAttribute("event")?.trim()
+                )
+                .filter(Boolean);
+
+            if (sendEvents.length === 0) return null;
+
+            return {
+                triggerEvent,
+                sendEvents,
+            };
+        })
+        .filter(Boolean);
+
+    if (forwardingTransitions.length === 0) {
+        return null;
+    }
+
+    const sentEvents = Array.from(
+        new Set(
+            forwardingTransitions.flatMap(
+                (transition) => transition.sendEvents
+            )
+        )
+    );
+
+    return {
+        transitions: forwardingTransitions,
+        sentEvents,
+        displayLabel:
+            sentEvents.length === 1
+                ? sentEvents[0]
+                : sentEvents.join(", "),
+    };
+};
+
 export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(xmlText, "application/xml");
@@ -118,7 +195,13 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
     // Hilfsfunktion: Vollständiges NodeData-Objekt erzeugen
     const buildSkillNodeData = async (fullSkillName, isInitial, isFinal, srcAttr, stateElem) => {
         const baseSkillName = fullSkillName.split("#")[0];
-        const skillApiData = (await fetchSkillData(baseSkillName)) || {};
+        const behaviorExit = parseBehaviorExitForwarding(
+            stateElem,
+            fullSkillName
+        );
+        const skillApiData = behaviorExit
+            ? {}
+            : (await fetchSkillData(baseSkillName)) || {};
 
         const localParams = {};
         const stateDataModel = Array.from(stateElem.children).find((c) => c.localName === "datamodel");
@@ -166,23 +249,33 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             expr: localParams[param.key] !== undefined ? localParams[param.key] : "",
         }));
 
-        const events = (skillApiData.events || []).map((event) => ({
-            id: event.event,
-            description: event.description || "",
-            selectedPackage: "",
-            selectedSkill: "",
-            target: null,
-            cond: "",
-            assignments: [],
-            assignLocation: "",
-            assignExpr: "",
-        }));
+        const events = behaviorExit
+            ? []
+            : (skillApiData.events || []).map((event) => ({
+                id: event.event,
+                description: event.description || "",
+                selectedPackage: "",
+                selectedSkill: "",
+                target: null,
+                cond: "",
+                assignments: [],
+                assignLocation: "",
+                assignExpr: "",
+            }));
 
         return {
-            label: fullSkillName.split(".").pop().split("#")[0],
+            // Keep fullSkillName unchanged so saving still produces Nop#...
+            // while the editor can display the event that is sent outward.
+            label:
+                behaviorExit?.displayLabel ||
+                fullSkillName.split(".").pop().split("#")[0],
             fullSkillName: fullSkillName,
             isInitial: isInitial,
-            isFinal: isFinal,
+            isFinal: isFinal || isNamedFinalState(fullSkillName),
+            isBehaviorExit: Boolean(behaviorExit),
+            behaviorExitEvents: behaviorExit?.sentEvents || [],
+            behaviorExitTransitions:
+                behaviorExit?.transitions || [],
             src: srcAttr || "",
             events: events,
             inSlots: inSlots,
@@ -204,7 +297,10 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
         if (!fullSkillName) continue;
 
         const isParallel = stateElem.localName === "parallel";
-        const isFinal = stateElem.localName === "final" || stateElem.getAttribute("final") === "true";
+        const isFinal =
+            stateElem.localName === "final" ||
+            stateElem.getAttribute("final") === "true" ||
+            isNamedFinalState(fullSkillName);
         const srcAttr = stateElem.getAttribute("src");
         const isInitial = fullSkillName === initialAttr;
 
@@ -340,7 +436,7 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                     const targetState = tr.getAttribute("target");
                     const cond = tr.getAttribute("cond") || "";
                     const assignments = parseTransitionAssignments(tr);
-                        const firstAssignment = assignments[0] || null;
+                    const firstAssignment = assignments[0] || null;
 
                     if (targetState) {
                         rawTransitions.push({
@@ -350,7 +446,7 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                             targetStateName: targetState,
                             cond: cond.trim(),
                             assignments,
-                                assignLocation: firstAssignment?.location || "",
+                            assignLocation: firstAssignment?.location || "",
                             assignExpr: firstAssignment?.expr || "",
                         });
                     }

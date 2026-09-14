@@ -131,7 +131,8 @@ const buildEditorProblems = (
     nodes,
     edges,
     globalDataModel,
-    behaviorDirectories
+    behaviorDirectories,
+    isBehaviorWorkflow = false
 ) => {
     const problems = [];
     const nodeMap = new Map((nodes || []).map((node) => [node.id, node]));
@@ -141,6 +142,28 @@ const buildEditorProblems = (
         node?.data?.fullSkillName ||
         node?.id ||
         "Unknown state";
+
+    const baseNodeName = (node) =>
+        String(
+            node?.data?.fullSkillName ||
+            node?.data?.label ||
+            ""
+        )
+            .split("#")[0]
+            .split(".")
+            .pop()
+            .toLowerCase();
+
+    const isValidBehaviorTerminal = (node) => {
+        const name = baseNodeName(node);
+
+        return (
+            Boolean(node?.data?.isFinal) ||
+            Boolean(node?.data?.isBehaviorExit) ||
+            name === "end" ||
+            name === "fatal"
+        );
+    };
 
     const addProblem = (problem) => {
         problems.push({
@@ -314,6 +337,69 @@ const buildEditorProblems = (
             });
         }
     });
+
+    // A sourced behavior must have a way to leave the state machine.
+    // Valid terminals are End, Fatal, or a Nop forwarding node that sends
+    // an event outside the sub-state-machine.
+    if (isBehaviorWorkflow) {
+        const stateNodes = (nodes || []).filter(
+            (node) =>
+                node.type !== "slot" &&
+                node.type !== "parallelLane"
+        );
+
+        const hasValidTerminal = stateNodes.some(
+            isValidBehaviorTerminal
+        );
+
+        if (stateNodes.length > 0 && !hasValidTerminal) {
+            addProblem({
+                id: "behavior-exit-missing",
+                severity: "warning",
+                category: "Behavior exits",
+                title: "State machine has no exit",
+                message:
+                    "A sourced state machine must end in End/Fatal or send an event outward through Nop.",
+            });
+        }
+
+        const childrenByParent = new Map();
+        stateNodes.forEach((node) => {
+            if (!node.parentId) return;
+            if (!childrenByParent.has(node.parentId)) {
+                childrenByParent.set(node.parentId, []);
+            }
+            childrenByParent.get(node.parentId).push(node.id);
+        });
+
+        stateNodes.forEach((node) => {
+            // Containers terminate through their children.
+            if ((childrenByParent.get(node.id) || []).length > 0) {
+                return;
+            }
+
+            if (isValidBehaviorTerminal(node)) {
+                return;
+            }
+
+            const hasOutgoingTransition = (edges || []).some(
+                (edge) => edge.source === node.id
+            );
+
+            if (!hasOutgoingTransition) {
+                addProblem({
+                    id: `behavior-dead-end-${node.id}`,
+                    severity: "warning",
+                    category: "Behavior exits",
+                    title: "State machine can stop without an exit",
+                    message: `${nodeLabel(node)} has no outgoing transition. Use End/Fatal or a Nop forwarding exit if this path should leave the state machine.`,
+                    nodeId: node.id,
+                    detailTab: "allgemein",
+                    mode: "event",
+                });
+            }
+        });
+    }
 
     // Slots
     const readers = new Map();
@@ -1061,7 +1147,7 @@ function AppContent() {
             data: {
                 label: subMachineLabel,
                 fullSkillName: subMachineLabel,
-                src: `\${EXERCISE}/${subMachineLabel}.xml`,
+                src: `\${${behaviorDirectories[0]?.key || "ROBOCUP"}}/${subMachineLabel}.xml`,
                 isInitial: nodes.length === 0,
                 events: [{ id: "success" }, { id: "failure" }],
                 onOpenSubMachine: handleOpenSubMachine,
@@ -1618,7 +1704,7 @@ function AppContent() {
             data: {
                 label: subMachineLabel,
                 fullSkillName: subMachineLabel,
-                src: `\${EXERCISE}/${subMachineLabel}.xml`,
+                src: `\${${behaviorDirectories[0]?.key || "ROBOCUP"}}/${subMachineLabel}.xml`,
                 isInitial: selectedNodes.some((n) => n.data?.isInitial),
                 events: externalEvents.length > 0 ? externalEvents : [{ id: "success" }, { id: "failure" }],
                 onEntry: [],
@@ -1930,19 +2016,31 @@ function AppContent() {
     const selectedNode = nodes.find((node) => node.id === selectedNodeId) || null;
     const hasInitialNode = nodes.some((node) => node.data?.isInitial);
 
+    const activeWorkflowTab = useMemo(
+        () => tabs.find((tab) => tab.id === activeTabId) || null,
+        [tabs, activeTabId]
+    );
+
+    const isBehaviorWorkflow = Boolean(
+        activeWorkflowTab?.sourcePath ||
+        activeWorkflowTab?.parentTabId
+    );
+
     const editorProblems = useMemo(
         () =>
             buildEditorProblems(
                 nodes,
                 edges,
                 globalDataModel,
-                behaviorDirectories
+                behaviorDirectories,
+                isBehaviorWorkflow
             ),
         [
             nodes,
             edges,
             globalDataModel,
             behaviorDirectories,
+            isBehaviorWorkflow,
         ]
     );
 
@@ -2108,15 +2206,22 @@ function AppContent() {
 
     const createNode = async (selectedSkill, nodeid, position) => {
         const data = (await fetchSkillData(selectedSkill)) || {};
+        const baseSkillLabel =
+            selectedSkill.split(".").pop() || selectedSkill;
+        const isFinalSkill =
+            baseSkillLabel.toLowerCase() === "end" ||
+            baseSkillLabel.toLowerCase() === "fatal";
+
         return {
             id: nodeid,
             position,
             type: "custom",
             data: {
-                label: selectedSkill.split(".").pop(),
+                label: baseSkillLabel,
                 fullSkillName: createNameforSkill(selectedSkill),
                 description: data.description || "",
                 isInitial: false,
+                isFinal: isFinalSkill,
                 src: "",
                 onEntry: [],
                 onExit: [],
