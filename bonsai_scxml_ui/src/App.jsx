@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { FiTrash2, FiPlus, FiX } from "react-icons/fi";
 import {
@@ -107,6 +107,51 @@ const highlightSelectedTransitions = (transitionEdges, selectedNodeIds) =>
     });
 
 const getNodeId = () => `skill-node-${crypto.randomUUID()}`;
+
+// Deep-clone editor state while keeping callback functions (e.g. node data
+// handlers) intact. structuredClone cannot clone functions.
+const cloneEditorValue = (value, seen = new WeakMap()) => {
+    if (value === null || typeof value !== "object") return value;
+
+    if (seen.has(value)) return seen.get(value);
+
+    if (Array.isArray(value)) {
+        const copy = [];
+        seen.set(value, copy);
+        value.forEach((entry) => copy.push(cloneEditorValue(entry, seen)));
+        return copy;
+    }
+
+    const copy = {};
+    seen.set(value, copy);
+    Object.entries(value).forEach(([key, entry]) => {
+        copy[key] = cloneEditorValue(entry, seen);
+    });
+    return copy;
+};
+
+const sanitizeNodeForHistory = (node) => {
+    const copy = cloneEditorValue(node);
+    delete copy.selected;
+    delete copy.dragging;
+    delete copy.measured;
+    return copy;
+};
+
+const sanitizeEdgeForHistory = (edge) => {
+    const copy = cloneEditorValue(edge);
+    delete copy.selected;
+    return copy;
+};
+
+const isEditableKeyboardTarget = (target) => {
+    if (!(target instanceof Element)) return false;
+    return Boolean(
+        target.closest(
+            'input, textarea, select, [contenteditable="true"], [role="textbox"]'
+        )
+    );
+};
 
 // Detect if running in Tauri desktop app
 const IS_DESKTOP = isTauri();
@@ -275,6 +320,16 @@ function AppContent() {
     const [inheritedGlobalDataModel, setInheritedGlobalDataModel] = useState([]);
     const [newParamId, setNewParamId] = useState("");
     const [newParamExpr, setNewParamExpr] = useState("");
+
+    // Keyboard editing state: clipboard + undo/redo history. History is kept
+    // per active tab session and intentionally ignores transient selection.
+    const clipboardRef = useRef(null);
+    const historyRef = useRef([]);
+    const historyIndexRef = useRef(-1);
+    const historyTimerRef = useRef(null);
+    const historyTabRef = useRef(activeTabId);
+    const applyingHistoryRef = useRef(false);
+    const currentHistorySnapshotRef = useRef(null);
 
     const descendantGlobalDataModel = useMemo(() => {
         const blockedIds = [
@@ -786,6 +841,326 @@ function AppContent() {
             alert(`Error automatically loading the sub-machine:\n${err.message}\n\nURL retrieved: ${resolvedUrl}`);
         }
     };
+
+    const createHistorySnapshot = useCallback(() => ({
+        nodes: nodes.map(sanitizeNodeForHistory),
+        edges: edges.map(sanitizeEdgeForHistory),
+        slotNodes: slotNodes.map(sanitizeNodeForHistory),
+        slotEdges: slotEdges.map(sanitizeEdgeForHistory),
+        globalDataModel: cloneEditorValue(globalDataModel),
+    }), [nodes, edges, slotNodes, slotEdges, globalDataModel]);
+
+    const getHistoryHash = useCallback((snapshot) => JSON.stringify(snapshot), []);
+
+    const commitHistorySnapshot = useCallback((snapshot) => {
+        if (!snapshot) return false;
+
+        const hash = getHistoryHash(snapshot);
+        const currentEntry = historyRef.current[historyIndexRef.current];
+        if (currentEntry?.hash === hash) return false;
+
+        const nextHistory = historyRef.current.slice(
+            0,
+            historyIndexRef.current + 1
+        );
+        nextHistory.push({
+            hash,
+            snapshot: cloneEditorValue(snapshot),
+        });
+
+        // Keep memory bounded while still providing a useful undo stack.
+        if (nextHistory.length > 100) {
+            nextHistory.splice(0, nextHistory.length - 100);
+        }
+
+        historyRef.current = nextHistory;
+        historyIndexRef.current = nextHistory.length - 1;
+        return true;
+    }, [getHistoryHash]);
+
+    useEffect(() => {
+        const snapshot = createHistorySnapshot();
+        currentHistorySnapshotRef.current = snapshot;
+
+        // Switching workflow tabs starts a fresh local undo stack so undo never
+        // accidentally jumps back into another tab.
+        if (historyTabRef.current !== activeTabId) {
+            historyTabRef.current = activeTabId;
+            historyRef.current = [];
+            historyIndexRef.current = -1;
+            applyingHistoryRef.current = false;
+            if (historyTimerRef.current) {
+                clearTimeout(historyTimerRef.current);
+            }
+            commitHistorySnapshot(snapshot);
+            return;
+        }
+
+        if (applyingHistoryRef.current) {
+            applyingHistoryRef.current = false;
+            return;
+        }
+
+        // Record structural/data changes after they settle. This collapses a
+        // node drag or control-point drag into one useful undo step.
+        if (historyRef.current.length === 0) {
+            commitHistorySnapshot(snapshot);
+            return;
+        }
+
+        if (historyTimerRef.current) {
+            clearTimeout(historyTimerRef.current);
+        }
+
+        historyTimerRef.current = setTimeout(() => {
+            commitHistorySnapshot(currentHistorySnapshotRef.current);
+        }, 180);
+
+        return () => {
+            if (historyTimerRef.current) {
+                clearTimeout(historyTimerRef.current);
+            }
+        };
+    }, [
+        activeTabId,
+        createHistorySnapshot,
+        commitHistorySnapshot,
+    ]);
+
+    const applyHistorySnapshot = useCallback((snapshot) => {
+        if (!snapshot) return;
+
+        if (historyTimerRef.current) {
+            clearTimeout(historyTimerRef.current);
+            historyTimerRef.current = null;
+        }
+
+        applyingHistoryRef.current = true;
+        setNodes(
+            cloneEditorValue(snapshot.nodes || []).map((node) => ({
+                ...node,
+                selected: false,
+            }))
+        );
+        setEdges(
+            cloneEditorValue(snapshot.edges || []).map((edge) => ({
+                ...edge,
+                selected: false,
+            }))
+        );
+        setSlotNodes(
+            cloneEditorValue(snapshot.slotNodes || []).map((node) => ({
+                ...node,
+                selected: false,
+            }))
+        );
+        setSlotEdges(
+            cloneEditorValue(snapshot.slotEdges || []).map((edge) => ({
+                ...edge,
+                selected: false,
+            }))
+        );
+        setGlobalDataModel(cloneEditorValue(snapshot.globalDataModel || []));
+        setSelectedNodeId(null);
+        setRightPanelTab("datamodel");
+    }, [setNodes, setEdges, setSlotNodes, setSlotEdges]);
+
+    const undo = useCallback(() => {
+        // Make sure the newest edit is in history even when Ctrl/Cmd+Z is
+        // pressed immediately after an operation.
+        commitHistorySnapshot(currentHistorySnapshotRef.current);
+
+        if (historyIndexRef.current <= 0) return false;
+
+        historyIndexRef.current -= 1;
+        applyHistorySnapshot(
+            historyRef.current[historyIndexRef.current]?.snapshot
+        );
+        return true;
+    }, [applyHistorySnapshot, commitHistorySnapshot]);
+
+    const redo = useCallback(() => {
+        if (historyIndexRef.current >= historyRef.current.length - 1) {
+            return false;
+        }
+
+        historyIndexRef.current += 1;
+        applyHistorySnapshot(
+            historyRef.current[historyIndexRef.current]?.snapshot
+        );
+        return true;
+    }, [applyHistorySnapshot]);
+
+    const copySelectedNodes = useCallback(() => {
+        let rootSelection = nodes.filter((node) => node.selected);
+
+        // The details panel selection is also considered a copy selection in
+        // case React Flow has already cleared its transient selected flag.
+        if (rootSelection.length === 0 && selectedNodeId) {
+            const selected = nodes.find((node) => node.id === selectedNodeId);
+            if (selected) rootSelection = [selected];
+        }
+
+        if (rootSelection.length === 0) return false;
+
+        const copiedIds = new Set(rootSelection.map((node) => node.id));
+        let foundChild = true;
+        while (foundChild) {
+            foundChild = false;
+            nodes.forEach((node) => {
+                if (
+                    node.parentId &&
+                    copiedIds.has(node.parentId) &&
+                    !copiedIds.has(node.id)
+                ) {
+                    copiedIds.add(node.id);
+                    foundChild = true;
+                }
+            });
+        }
+
+        const copiedNodes = nodes
+            .filter((node) => copiedIds.has(node.id))
+            .map((node) => cloneEditorValue(node));
+        const copiedEdges = edges
+            .filter(
+                (edge) =>
+                    copiedIds.has(edge.source) && copiedIds.has(edge.target)
+            )
+            .map((edge) => cloneEditorValue(edge));
+
+        clipboardRef.current = {
+            nodes: copiedNodes,
+            edges: copiedEdges,
+            rootIds: rootSelection.map((node) => node.id),
+            pasteCount: 0,
+        };
+        return true;
+    }, [nodes, edges, selectedNodeId]);
+
+    const pasteCopiedNodes = useCallback(() => {
+        const clipboard = clipboardRef.current;
+        if (!clipboard?.nodes?.length) return false;
+
+        clipboard.pasteCount = (clipboard.pasteCount || 0) + 1;
+        const offset = 36 * clipboard.pasteCount;
+        const idMap = new Map();
+        clipboard.nodes.forEach((node) => idMap.set(node.id, getNodeId()));
+
+        const rootIds = new Set(clipboard.rootIds || []);
+        const copiedIds = new Set(clipboard.nodes.map((node) => node.id));
+
+        const pastedNodes = clipboard.nodes.map((sourceNode) => {
+            const node = cloneEditorValue(sourceNode);
+            const originalId = sourceNode.id;
+            const newId = idMap.get(originalId);
+            const copiedParent = sourceNode.parentId
+                ? idMap.get(sourceNode.parentId)
+                : null;
+
+            const events = Array.isArray(node.data?.events)
+                ? node.data.events.map((event) => {
+                    if (!event?.target) return event;
+
+                    if (idMap.has(event.target)) {
+                        return {
+                            ...event,
+                            target: idMap.get(event.target),
+                        };
+                    }
+
+                    // External transitions are intentionally not copied.
+                    return {
+                        ...event,
+                        target: null,
+                        selectedPackage: "",
+                        selectedSkill: "",
+                    };
+                })
+                : node.data?.events;
+
+            return {
+                ...node,
+                id: newId,
+                parentId: copiedParent || undefined,
+                selected: rootIds.has(originalId),
+                dragging: false,
+                position:
+                    rootIds.has(originalId) ||
+                    !sourceNode.parentId ||
+                    !copiedIds.has(sourceNode.parentId)
+                        ? {
+                            x: Number(sourceNode.position?.x || 0) + offset,
+                            y: Number(sourceNode.position?.y || 0) + offset,
+                        }
+                        : { ...sourceNode.position },
+                data: {
+                    ...(node.data || {}),
+                    events,
+                    // Pasting a top-level initial state must not create a second
+                    // initial state in the same workflow.
+                    isInitial: rootIds.has(originalId)
+                        ? false
+                        : node.data?.isInitial,
+                },
+            };
+        });
+
+        const pastedEdges = clipboard.edges.map((sourceEdge) => {
+            const edge = cloneEditorValue(sourceEdge);
+            return {
+                ...edge,
+                id: `edge-${crypto.randomUUID()}`,
+                source: idMap.get(sourceEdge.source),
+                target: idMap.get(sourceEdge.target),
+                selected: false,
+            };
+        });
+
+        setNodes((currentNodes) => [
+            ...currentNodes.map((node) => ({ ...node, selected: false })),
+            ...pastedNodes,
+        ]);
+        setEdges((currentEdges) => [
+            ...currentEdges.map((edge) => ({ ...edge, selected: false })),
+            ...pastedEdges,
+        ]);
+
+        const firstPastedRoot = clipboard.rootIds?.[0]
+            ? idMap.get(clipboard.rootIds[0])
+            : pastedNodes[0]?.id;
+        setSelectedNodeId(firstPastedRoot || null);
+        if (firstPastedRoot) setRightPanelTab("details");
+        return true;
+    }, [setNodes, setEdges]);
+
+    useEffect(() => {
+        const handleEditorShortcut = (event) => {
+            if (isEditableKeyboardTarget(event.target)) return;
+            if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+
+            const key = event.key.toLowerCase();
+            let handled = false;
+
+            if (key === "c" && !event.shiftKey) {
+                handled = copySelectedNodes();
+            } else if (key === "v" && !event.shiftKey) {
+                handled = pasteCopiedNodes();
+            } else if (key === "z") {
+                handled = event.shiftKey ? redo() : undo();
+            } else if (key === "y" && !event.shiftKey) {
+                handled = redo();
+            }
+
+            if (handled) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+        };
+
+        window.addEventListener("keydown", handleEditorShortcut);
+        return () => window.removeEventListener("keydown", handleEditorShortcut);
+    }, [copySelectedNodes, pasteCopiedNodes, undo, redo]);
 
     const selectedNodes = useMemo(() => {
         return nodes.filter((n) => n.selected && !n.parentId);
