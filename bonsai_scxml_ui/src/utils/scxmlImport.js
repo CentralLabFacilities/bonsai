@@ -59,21 +59,17 @@ const parseBehaviorExitForwarding = (stateElem, fullSkillName) => {
     const forwardingTransitions = Array.from(stateElem?.children || [])
         .filter((child) => child.localName === "transition")
         .map((transitionElement) => {
-            const target = transitionElement.getAttribute("target");
+            const target = transitionElement.getAttribute("target")?.trim();
 
-            // A behavior exit sends an event outward instead of transitioning
-            // to another state inside the current state machine.
+            // A behavior-exit Nop stays inside no local target. Instead it
+            // forwards one or more events to the parent state machine. Any
+            // targetless Nop transition containing <send event="..."/> is
+            // therefore an outward exit, regardless of its trigger event.
             if (target) return null;
 
             const triggerEvent =
                 transitionElement.getAttribute("event")?.trim() ||
                 "Nop.fatal";
-
-            const fatalTrigger =
-                triggerEvent === "fatal" ||
-                triggerEvent.toLowerCase().endsWith(".fatal");
-
-            if (!fatalTrigger) return null;
 
             const sendEvents = Array.from(
                 transitionElement.children || []
@@ -113,6 +109,34 @@ const parseBehaviorExitForwarding = (stateElem, fullSkillName) => {
                 ? sentEvents[0]
                 : sentEvents.join(", "),
     };
+};
+
+export const extractBehaviorExitEventsFromScxml = (xmlText) => {
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(xmlText, "application/xml");
+    const parserError = xmlDoc.getElementsByTagName("parsererror")[0];
+
+    if (parserError) {
+        return [];
+    }
+
+    const sentEvents = [];
+
+    Array.from(xmlDoc.getElementsByTagName("state")).forEach((stateElem) => {
+        const stateId = stateElem.getAttribute("id") || "";
+        const behaviorExit = parseBehaviorExitForwarding(
+            stateElem,
+            stateId
+        );
+
+        (behaviorExit?.sentEvents || []).forEach((eventName) => {
+            if (eventName && !sentEvents.includes(eventName)) {
+                sentEvents.push(eventName);
+            }
+        });
+    });
+
+    return sentEvents;
 };
 
 export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
@@ -155,17 +179,17 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                     });
                 });
                 const inheritSlotTags = dataTag.getElementsByTagName("inheritSlot");
-                    Array.from(inheritSlotTags).forEach((sn) => {
-                        parsedSlots.push({
-                            key: sn.getAttribute("key"),
+                Array.from(inheritSlotTags).forEach((sn) => {
+                    parsedSlots.push({
+                        key: sn.getAttribute("key"),
+                        state: sn.getAttribute("state"),
+                        xpath: sn.getAttribute("xpath"),
+                        inherited: {
                             state: sn.getAttribute("state"),
                             xpath: sn.getAttribute("xpath"),
-                            inherited: {
-                                state: sn.getAttribute("state"),
-                                xpath: sn.getAttribute("xpath"),
-                            },
-                        });
+                        },
                     });
+                });
             } else if (id) {
                 globalDataEntries.push({
                     id: id,
