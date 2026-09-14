@@ -263,7 +263,44 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
         const activeContainerId = isContainer ? node.id : currentContainerId;
         let transitionsXml = "";
 
-        if (isContainer) {
+        if (node.data?.isBehaviorExit && !isLane) {
+            const configuredTransitions =
+                Array.isArray(node.data?.behaviorExitTransitions) &&
+                node.data.behaviorExitTransitions.length > 0
+                    ? node.data.behaviorExitTransitions
+                    : [
+                        {
+                            triggerEvent: "Nop.fatal",
+                            sendEvents:
+                                node.data?.behaviorExitEvents || [],
+                        },
+                    ];
+
+            transitionsXml = configuredTransitions
+                .map((transition) => {
+                    const triggerEvent =
+                        transition.triggerEvent || "Nop.fatal";
+                    const sendEvents = Array.isArray(
+                        transition.sendEvents
+                    )
+                        ? transition.sendEvents
+                        : [];
+
+                    const sendLines = sendEvents
+                        .filter(Boolean)
+                        .map(
+                            (eventName) =>
+                                `${indent}        <send event="${escapeXmlAttribute(eventName)}"/>`
+                        )
+                        .join("\n");
+
+                    if (!sendLines) return "";
+
+                    return `${indent}    <transition event="${escapeXmlAttribute(triggerEvent)}">\n${sendLines}\n${indent}    </transition>`;
+                })
+                .filter(Boolean)
+                .join("\n");
+        } else if (isContainer) {
             const leavingTransitions = [];
 
             // 1. Eigene Parent-Transitions erfassen (z. B. Fallback 'Succeeder.*')

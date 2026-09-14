@@ -10,6 +10,21 @@ function CustomNode({ id, data, selected }) {
         ? `#${data.fullSkillName.split("#")[1]}`
         : "";
 
+    const baseStateName = String(
+        data.fullSkillName || data.label || ""
+    )
+        .split("#")[0]
+        .split(".")
+        .pop()
+        .toLowerCase();
+
+    const isFinalState =
+        Boolean(data.isFinal) ||
+        baseStateName === "end" ||
+        baseStateName === "fatal";
+
+    const isBehaviorExit = Boolean(data.isBehaviorExit);
+
     const validation = useMemo(() => {
         const allSlots = [...(data.inSlots || []), ...(data.outSlots || [])];
         const missingSlots = allSlots.some(
@@ -50,6 +65,8 @@ function CustomNode({ id, data, selected }) {
         <div
             className={`costum-node ${data.isInitial ? "initial-node" : ""} ${
                 selected ? "selected-node" : ""
+            } ${isFinalState ? "terminal-final-node" : ""} ${
+                isBehaviorExit ? "behavior-exit-node" : ""
             }`}
         >
             <StateActionBadges
@@ -100,28 +117,30 @@ function CustomNode({ id, data, selected }) {
             {/* Label */}
             <div className="custom-node-label">
                 {data.label}
-                {instanceId && (
+                {instanceId && !isBehaviorExit && (
                     <span style={{ marginLeft: "4px", color: "#64748b", fontWeight: 600 }}>
             {instanceId}
           </span>
                 )}
             </div>
 
-            {/* Event outputs */}
-            <div className="event-list">
-                {[...new Set((data.events || []).map((event) => event.id))].map((eventId) => (
-                    <div className="event-row" key={eventId}>
-                        <span className="event-name">{eventId}</span>
+            {/* Final states and behavior exits terminate the local behavior. */}
+            {!isFinalState && !isBehaviorExit && (
+                <div className="event-list">
+                    {[...new Set((data.events || []).map((event) => event.id))].map((eventId) => (
+                        <div className="event-row" key={eventId}>
+                            <span className="event-name">{eventId}</span>
 
-                        <Handle
-                            id={eventId}
-                            type="source"
-                            position={Position.Right}
-                            className="source-handle"
-                        />
-                    </div>
-                ))}
-            </div>
+                            <Handle
+                                id={eventId}
+                                type="source"
+                                position={Position.Right}
+                                className="source-handle"
+                            />
+                        </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }

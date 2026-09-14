@@ -4083,3 +4083,60 @@
   font-size: 9px;
   line-height: 1.35;
 }
+
+
+/* ==========================================================================
+   BEHAVIOR TERMINALS / OUTWARD EVENTS
+   ========================================================================== */
+
+.state-action-badge {
+  pointer-events: auto;
+  cursor: pointer;
+  appearance: none;
+  font-family: inherit;
+}
+
+.terminal-final-node {
+  background: #fff7ed !important;
+  border: 1.5px solid #fdba74 !important;
+  border-top: 3.5px solid #f97316 !important;
+  color: #7c2d12 !important;
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.12),
+  0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+.terminal-final-node:hover {
+  border-color: #f97316 !important;
+  box-shadow: 0 6px 16px rgba(249, 115, 22, 0.18) !important;
+}
+
+.terminal-final-node .custom-node-label {
+  color: #7c2d12 !important;
+  font-weight: 700;
+}
+
+.behavior-exit-node {
+  background: #fefce8 !important;
+  border: 1.5px solid #fde68a !important;
+  border-top: 3.5px solid #eab308 !important;
+  color: #713f12 !important;
+  box-shadow: 0 4px 12px rgba(234, 179, 8, 0.12),
+  0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+.behavior-exit-node:hover {
+  border-color: #eab308 !important;
+  box-shadow: 0 6px 16px rgba(234, 179, 8, 0.18) !important;
+}
+
+.behavior-exit-node .custom-node-label {
+  color: #713f12 !important;
+  font-weight: 700;
+}
+
+/* Selection remains visually dominant without losing the soft terminal fill. */
+.costum-node.terminal-final-node.selected-node,
+.costum-node.behavior-exit-node.selected-node {
+  border-color: #38bdf8 !important;
+  border-top-color: #38bdf8 !important;
+}
