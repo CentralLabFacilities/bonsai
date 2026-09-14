@@ -27,6 +27,8 @@ function SkillLibrary({
                           setSelectedSubPackage,
                           directSkills,
                           fetchSkillData,
+                          activeLibraryTab = "skills",
+                          onLibraryTabChange,
                       }) {
     const [skillDescriptions, setSkillDescriptions] = useState({});
     const [loadingDescription, setLoadingDescription] = useState(null);
@@ -158,6 +160,35 @@ function SkillLibrary({
     return (
         <>
             <aside className="skill-library">
+                <div className="library-mode-tabs">
+                    <button
+                        type="button"
+                        className={`library-mode-tab ${
+                            activeLibraryTab === "skills"
+                                ? "active"
+                                : ""
+                        }`}
+                        onClick={() =>
+                            onLibraryTabChange?.("skills")
+                        }
+                    >
+                        Skills
+                    </button>
+                    <button
+                        type="button"
+                        className={`library-mode-tab ${
+                            activeLibraryTab === "behaviors"
+                                ? "active"
+                                : ""
+                        }`}
+                        onClick={() =>
+                            onLibraryTabChange?.("behaviors")
+                        }
+                    >
+                        Behaviors
+                    </button>
+                </div>
+
                 <h3>Skill Library</h3>
 
                 <div className="search-container">

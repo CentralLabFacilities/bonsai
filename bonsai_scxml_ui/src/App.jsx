@@ -22,6 +22,7 @@ import ParallelNode from "./components/ParallelNode";
 import SubMachineNode from "./components/SubMachineNode";
 import Header from "./components/Header";
 import SkillLibrary from "./components/SkillLibrary";
+import BehaviorLibrary from "./components/BehaviorLibrary";
 import DetailsPanel from "./components/DetailsPanel";
 import WorkflowPanel from "./components/WorkflowPanel";
 import CodeView from "./components/CodeView";
@@ -35,7 +36,11 @@ import ProblemsPanel from "./components/ProblemsPanel";
 import { generateXmlString, saveScxmlFile, saveScxmlFileTauri, openScxmlFileTauri, readScxmlFileContent } from "./utils/scxmlExport";
 import { parseScxmlFile } from "./utils/scxmlImport";
 import { DEFAULT_PREFIX_CONFIG, resolveSrcPath } from "./config/prefixMapping";
-import { isTauri, initApiProxy } from "./tauri-client.js";
+import {
+    isTauri,
+    initApiProxy,
+    readWorkflowSource,
+} from "./tauri-client.js";
 import "./App.css";
 
 // Initialize API proxy for Tauri desktop mode (intercepts /api/* fetch calls)
@@ -112,7 +117,22 @@ const normalizeSlotPath = (path) =>
 const normalizeSlotType = (type) =>
     String(type || "").trim().toLowerCase();
 
-const buildEditorProblems = (nodes, edges, globalDataModel) => {
+const getBehaviorSourceKey = (src) => {
+    const match = String(src || "")
+        .trim()
+        .match(/^\$\{([^}]+)\}(?:[\\/]|$)/);
+
+    return match
+        ? match[1].trim().toUpperCase()
+        : null;
+};
+
+const buildEditorProblems = (
+    nodes,
+    edges,
+    globalDataModel,
+    behaviorDirectories
+) => {
     const problems = [];
     const nodeMap = new Map((nodes || []).map((node) => [node.id, node]));
 
@@ -261,6 +281,40 @@ const buildEditorProblems = (nodes, edges, globalDataModel) => {
         });
     });
 
+    // Behavior Library source validation.
+    const configuredBehaviorKeys = new Set(
+        (behaviorDirectories || [])
+            .map((directory) =>
+                String(directory?.key || "")
+                    .trim()
+                    .toUpperCase()
+            )
+            .filter(Boolean)
+    );
+
+    (nodes || []).forEach((node) => {
+        if (node.type !== "submachine") return;
+
+        const src = String(node.data?.src || "").trim();
+        if (!src) return;
+
+        const sourceKey = getBehaviorSourceKey(src);
+        if (!sourceKey) return;
+
+        if (!configuredBehaviorKeys.has(sourceKey)) {
+            addProblem({
+                id: `behavior-library-key-${node.id}-${sourceKey}`,
+                severity: "warning",
+                category: "Behavior Library",
+                title: "Behavior Library key is not configured",
+                message: `${nodeLabel(node)} sources ${src}, but ${sourceKey} is not defined in the Behavior Library.`,
+                nodeId: node.id,
+                detailTab: "allgemein",
+                mode: "event",
+            });
+        }
+    });
+
     // Slots
     const readers = new Map();
     const writers = new Map();
@@ -391,6 +445,62 @@ const getNodeId = () => `skill-node-${crypto.randomUUID()}`;
 const IS_DESKTOP = isTauri();
 
 
+const DEFAULT_BEHAVIOR_DIRECTORIES = [
+    {
+        key: "ROBOCUP",
+        path: "/robocup_ws/robocup",
+        isDefault: true,
+    },
+];
+
+const loadBehaviorDirectories = () => {
+    try {
+        const raw = window.localStorage.getItem(
+            "bonsai.behaviorDirectories"
+        );
+
+        if (!raw) {
+            return DEFAULT_BEHAVIOR_DIRECTORIES;
+        }
+
+        const parsed = JSON.parse(raw);
+
+        if (!Array.isArray(parsed)) {
+            return DEFAULT_BEHAVIOR_DIRECTORIES;
+        }
+
+        return parsed
+            .filter(
+                (entry) =>
+                    entry &&
+                    typeof entry.key === "string" &&
+                    typeof entry.path === "string"
+            )
+            .map((entry) => ({
+                ...entry,
+                key: entry.key.trim().toUpperCase(),
+            }))
+            // Remove only the old built-in defaults. If the user added an
+            // EXERCISE or CHALLENGE mapping themselves, keep it.
+            .filter(
+                (entry) =>
+                    !(
+                        entry.isDefault === true &&
+                        (entry.key === "EXERCISE" ||
+                            entry.key === "CHALLENGE")
+                    )
+            );
+    } catch (error) {
+        console.warn(
+            "Could not load behavior directories:",
+            error
+        );
+        return DEFAULT_BEHAVIOR_DIRECTORIES;
+    }
+};
+
+
+
 const getSkillPackageName = (fullSkillName) => {
     let baseName = String(fullSkillName || "").split("#")[0];
 
@@ -512,6 +622,17 @@ function AppContent() {
     const [activeFilter, setActiveFilter] = useState("Everything");
     const [searchText, setSearchText] = useState("");
     const [contextMenu, setContextMenu] = useState(null);
+    const [leftLibraryTab, setLeftLibraryTab] = useState("skills");
+    const [behaviorDirectories, setBehaviorDirectories] = useState(
+        loadBehaviorDirectories
+    );
+
+    useEffect(() => {
+        window.localStorage.setItem(
+            "bonsai.behaviorDirectories",
+            JSON.stringify(behaviorDirectories)
+        );
+    }, [behaviorDirectories]);
 
     //---- TAB MANAGEMENT ----
     const [tabs, setTabs] = useState([
@@ -989,42 +1110,79 @@ function AppContent() {
     const handleOpenSubMachine = async (srcPath, label) => {
         if (!srcPath) return;
 
-        const resolvedUrl = resolveSrcPath(srcPath, DEFAULT_PREFIX_CONFIG);
-        const fileName = srcPath.split("/").pop();
+        const fileName = srcPath.split(/[\\/]/).pop();
         const baseName = fileName.replace(/\.(xml|scxml)$/i, "");
-        const tabId = `tab-sub-${baseName}`;
+        const currentTab = tabs.find((tab) => tab.id === activeTabId);
 
-        const existingTab = tabs.find((t) => t.id === tabId);
-        if (existingTab) {
-            switchTab(tabId);
-            return;
-        }
+        let tabId = `tab-sub-${baseName}`;
+        let resolvedFilePath = null;
+        let xmlText = "";
 
         try {
-            const response = await fetch(resolvedUrl);
-            if (!response.ok) {
-                throw new Error(`Server returned status ${response.status} (${response.statusText})`);
+            if (IS_DESKTOP) {
+                // Keep srcPath symbolic in SCXML, but resolve ${KEY} to the
+                // configured local directory before reading from disk.
+                const loaded = await readWorkflowSource(
+                    srcPath,
+                    behaviorDirectories,
+                    currentTab?.filePath || null
+                );
+
+                xmlText = loaded.content;
+                resolvedFilePath = loaded.path;
+                tabId = `tab-sub-${resolvedFilePath}`;
+            } else {
+                // Browser compatibility only. The desktop app resolves
+                // ${KEY}/... directly from the Behavior Library.
+                const resolvedUrl = resolveSrcPath(
+                    srcPath,
+                    DEFAULT_PREFIX_CONFIG
+                );
+                const response = await fetch(resolvedUrl);
+
+                if (!response.ok) {
+                    throw new Error(
+                        `Server returned status ${response.status} (${response.statusText})`
+                    );
+                }
+
+                xmlText = await response.text();
             }
 
-            const xmlText = await response.text();
+            const existingTab = tabs.find((tab) => tab.id === tabId);
+            if (existingTab) {
+                switchTab(tabId);
+                return;
+            }
+
             if (!xmlText || !xmlText.includes("<scxml")) {
-                throw new Error("Response does not contain a valid <scxml> document.");
+                throw new Error(
+                    "The selected file does not contain a valid <scxml> document."
+                );
             }
 
-            const parsed = await parseScxmlFile(xmlText, fetchSkillData, getNodeId);
+            const parsed = await parseScxmlFile(
+                xmlText,
+                fetchSkillData,
+                getNodeId
+            );
 
-            const currentTab = tabs.find((tab) => tab.id === activeTabId);
             const inheritedForChild = buildInheritedGlobalsForChild(
                 inheritedGlobalDataModel,
                 globalDataModel,
-                currentTab?.title || currentTab?.fileName || "Parent"
+                currentTab?.title ||
+                currentTab?.fileName ||
+                "Parent"
             );
 
             const newTabObj = {
                 id: tabId,
                 title: label || baseName,
-                fileName: fileName,
+                fileName:
+                    resolvedFilePath?.split(/[\\/]/).pop() ||
+                    fileName,
                 fileHandle: null,
+                filePath: resolvedFilePath,
                 sourcePath: srcPath,
                 nodes: parsed.nodes,
                 edges: parsed.edges,
@@ -1036,10 +1194,10 @@ function AppContent() {
             };
 
             setTabs((prev) => [
-                ...prev.map((t) =>
-                    t.id === activeTabId
+                ...prev.map((tab) =>
+                    tab.id === activeTabId
                         ? {
-                            ...t,
+                            ...tab,
                             nodes,
                             edges,
                             slotNodes,
@@ -1047,7 +1205,7 @@ function AppContent() {
                             globalDataModel,
                             inheritedGlobalDataModel,
                         }
-                        : t
+                        : tab
                 ),
                 newTabObj,
             ]);
@@ -1055,14 +1213,22 @@ function AppContent() {
             setActiveTabId(tabId);
             setNodes(parsed.nodes);
             setEdges(parsed.edges);
+            setSlotNodes([]);
+            setSlotEdges([]);
             setGlobalDataModel(parsed.globalDataModel);
             setInheritedGlobalDataModel(inheritedForChild);
             setSelectedNodeId(null);
             checkSlotConnection(parsed.nodes);
-            setTimeout(() => fitView({ padding: 0.2, duration: 300 }), 100);
+
+            setTimeout(
+                () => fitView({ padding: 0.2, duration: 300 }),
+                100
+            );
         } catch (err) {
             console.error("Sub-Machine loading error:", err);
-            alert(`Error automatically loading the sub-machine:\n${err.message}\n\nURL retrieved: ${resolvedUrl}`);
+            alert(
+                `Error loading the sub-state machine:\n${err.message}\n\nSource: ${srcPath}`
+            );
         }
     };
 
@@ -1624,12 +1790,160 @@ function AppContent() {
         }
     };
 
+
+    const handleOpenBehaviorFile = useCallback(
+        async (behavior) => {
+            if (!behavior?.source) return;
+
+            try {
+                // behavior.source remains ${KEY}/... for SCXML portability.
+                // readWorkflowSource expands it only for local file access.
+                const loaded = await readWorkflowSource(
+                    behavior.source,
+                    behaviorDirectories,
+                    null
+                );
+
+                const tabId = `tab-behavior-${loaded.path}`;
+                const existingTab = tabs.find(
+                    (tab) => tab.id === tabId
+                );
+
+                if (existingTab) {
+                    switchTab(tabId);
+                    return;
+                }
+
+                const parsed = await parseScxmlFile(
+                    loaded.content,
+                    fetchSkillData,
+                    getNodeId
+                );
+
+                const newTabObj = {
+                    id: tabId,
+                    title:
+                        behavior.name?.replace(
+                            /\.(xml|scxml)$/i,
+                            ""
+                        ) || loaded.file_name,
+                    fileName: loaded.file_name,
+                    fileHandle: null,
+                    filePath: loaded.path,
+                    sourcePath: behavior.source,
+                    nodes: parsed.nodes,
+                    edges: parsed.edges,
+                    slotNodes: [],
+                    slotEdges: [],
+                    parentTabId: null,
+                    inheritedGlobalDataModel: [],
+                    globalDataModel: parsed.globalDataModel,
+                };
+
+                setTabs((previousTabs) => [
+                    ...previousTabs.map((tab) =>
+                        tab.id === activeTabId
+                            ? {
+                                ...tab,
+                                nodes,
+                                edges,
+                                slotNodes,
+                                slotEdges,
+                                globalDataModel,
+                                inheritedGlobalDataModel,
+                            }
+                            : tab
+                    ),
+                    newTabObj,
+                ]);
+
+                setActiveTabId(tabId);
+                setNodes(parsed.nodes);
+                setEdges(parsed.edges);
+                setSlotNodes([]);
+                setSlotEdges([]);
+                setGlobalDataModel(parsed.globalDataModel);
+                setInheritedGlobalDataModel([]);
+                setSelectedNodeId(null);
+                checkSlotConnection(parsed.nodes);
+
+                setTimeout(
+                    () =>
+                        fitView({
+                            padding: 0.2,
+                            duration: 300,
+                        }),
+                    100
+                );
+            } catch (error) {
+                console.error(
+                    "Could not open behavior:",
+                    error
+                );
+                alert(
+                    `Could not open behavior:\n${error.message}`
+                );
+            }
+        },
+        [
+            behaviorDirectories,
+            tabs,
+            activeTabId,
+            nodes,
+            edges,
+            slotNodes,
+            slotEdges,
+            globalDataModel,
+            inheritedGlobalDataModel,
+            fitView,
+        ]
+    );
+
+    const createBehaviorNode = useCallback(
+        (behavior, position) => {
+            const baseName = String(
+                behavior?.name || "Behavior"
+            ).replace(/\.(xml|scxml)$/i, "");
+
+            return {
+                id: getNodeId(),
+                position,
+                type: "submachine",
+                data: {
+                    label: baseName,
+                    fullSkillName: baseName,
+                    src: behavior.source,
+                    isInitial: false,
+                    events: [
+                        { id: "success" },
+                        { id: "failure" },
+                    ],
+                    onEntry: [],
+                    onExit: [],
+                    onOpenSubMachine: handleOpenSubMachine,
+                },
+            };
+        },
+        [handleOpenSubMachine]
+    );
+
     const selectedNode = nodes.find((node) => node.id === selectedNodeId) || null;
     const hasInitialNode = nodes.some((node) => node.data?.isInitial);
 
     const editorProblems = useMemo(
-        () => buildEditorProblems(nodes, edges, globalDataModel),
-        [nodes, edges, globalDataModel]
+        () =>
+            buildEditorProblems(
+                nodes,
+                edges,
+                globalDataModel,
+                behaviorDirectories
+            ),
+        [
+            nodes,
+            edges,
+            globalDataModel,
+            behaviorDirectories,
+        ]
     );
 
     const errorProblemCount = useMemo(
@@ -2528,7 +2842,13 @@ function AppContent() {
                 setTabs((prev) =>
                     prev.map((t) =>
                         t.id === activeTabId
-                            ? { ...t, title: cleanTitle, fileName: filePath.split('/').pop(), fileHandle: null, filePath }
+                            ? {
+                                ...t,
+                                title: cleanTitle,
+                                fileName: filePath.split(/[\\/]/).pop(),
+                                fileHandle: null,
+                                filePath,
+                            }
                             : t
                     )
                 );
@@ -2596,7 +2916,12 @@ function AppContent() {
                 setTabs((prev) =>
                     prev.map((t) =>
                         t.id === activeTabId
-                            ? { ...t, title: cleanTitle, fileName: result.fileName, filePath: result.filePath }
+                            ? {
+                                ...t,
+                                title: cleanTitle,
+                                fileName: result.fileName,
+                                filePath: result.filePath,
+                            }
                             : t
                     )
                 );
@@ -2637,7 +2962,12 @@ function AppContent() {
                 setTabs((prev) =>
                     prev.map((t) =>
                         t.id === activeTabId
-                            ? { ...t, title: cleanTitle, fileName: result.fileName, filePath: result.filePath }
+                            ? {
+                                ...t,
+                                title: cleanTitle,
+                                fileName: result.fileName,
+                                filePath: result.filePath,
+                            }
                             : t
                     )
                 );
@@ -2744,25 +3074,37 @@ function AppContent() {
             <Header onImportFile={handleImportFile} onSaveFile={handleSaveCurrentTab} onSaveAsFile={handleSaveAsCurrentTab} hasFilePath={IS_DESKTOP && tabs.find(t => t.id === activeTabId)?.filePath !== null} />
 
             <div className="app">
-                <SkillLibrary
-                    searchText={searchText}
-                    setSearchText={setSearchText}
-                    activeFilter={activeFilter}
-                    setActiveFilter={setActiveFilter}
-                    packages={packages}
-                    selectedPackage={selectedPackage}
-                    setSelectedPackage={(pkg) => {
-                        setSelectedPackage(pkg);
-                        setSelectedSubPackage(null);
-                    }}
-                    searchedSkills={searchedSkills}
-                    packageSkills={packageSkills}
-                    filteredSkills={filteredSkills}
-                    subPackages={subPackages}
-                    selectedSubPackage={selectedSubPackage}
-                    setSelectedSubPackage={setSelectedSubPackage}
-                    directSkills={directSkills}
-                />
+                {leftLibraryTab === "skills" ? (
+                    <SkillLibrary
+                        searchText={searchText}
+                        setSearchText={setSearchText}
+                        activeFilter={activeFilter}
+                        setActiveFilter={setActiveFilter}
+                        packages={packages}
+                        selectedPackage={selectedPackage}
+                        setSelectedPackage={(pkg) => {
+                            setSelectedPackage(pkg);
+                            setSelectedSubPackage(null);
+                        }}
+                        searchedSkills={searchedSkills}
+                        packageSkills={packageSkills}
+                        filteredSkills={filteredSkills}
+                        subPackages={subPackages}
+                        selectedSubPackage={selectedSubPackage}
+                        setSelectedSubPackage={setSelectedSubPackage}
+                        directSkills={directSkills}
+                        activeLibraryTab={leftLibraryTab}
+                        onLibraryTabChange={setLeftLibraryTab}
+                    />
+                ) : (
+                    <BehaviorLibrary
+                        directories={behaviorDirectories}
+                        onDirectoriesChange={setBehaviorDirectories}
+                        onOpenBehavior={handleOpenBehaviorFile}
+                        activeLibraryTab={leftLibraryTab}
+                        onLibraryTabChange={setLeftLibraryTab}
+                    />
+                )}
 
                 <main className="editor-area">
                     {/* IntelliJ-Style Tab Bar */}
@@ -2811,11 +3153,48 @@ function AppContent() {
                         onDrop={async (e) => {
                             e.preventDefault();
                             if (activeMode === "code") return;
-                            const skill = e.dataTransfer.getData("skill");
+
+                            const position = screenToFlowPosition({
+                                x: e.clientX,
+                                y: e.clientY,
+                            });
+
+                            const behaviorPayload =
+                                e.dataTransfer.getData("behavior");
+
+                            if (behaviorPayload) {
+                                try {
+                                    const behavior =
+                                        JSON.parse(behaviorPayload);
+                                    const newNode =
+                                        createBehaviorNode(
+                                            behavior,
+                                            position
+                                        );
+                                    setNodes((nds) =>
+                                        nds.concat(newNode)
+                                    );
+                                } catch (error) {
+                                    console.error(
+                                        "Invalid behavior drag payload:",
+                                        error
+                                    );
+                                }
+                                return;
+                            }
+
+                            const skill =
+                                e.dataTransfer.getData("skill");
                             if (!skill) return;
-                            const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
-                            const newNode = await createNode(skill.split("skills.")[1], getNodeId(), position);
-                            setNodes((nds) => nds.concat(newNode));
+
+                            const newNode = await createNode(
+                                skill.split("skills.")[1],
+                                getNodeId(),
+                                position
+                            );
+                            setNodes((nds) =>
+                                nds.concat(newNode)
+                            );
                         }}
                     >
                         {activeMode === "code" ? (
