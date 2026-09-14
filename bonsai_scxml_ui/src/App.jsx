@@ -82,19 +82,18 @@ const highlightSelectedTransitions = (transitionEdges, selectedNodeIds) =>
     transitionEdges.map((edge) => {
         const isConnectedToSelection =
             selectedNodeIds.has(edge.source) || selectedNodeIds.has(edge.target);
+        const isEdgeSelected = Boolean(edge.selected);
 
-        if (!isConnectedToSelection) {
+        if (!isConnectedToSelection && !isEdgeSelected) {
             return edge;
         }
 
         const color = getTransitionHighlightColor(edge.sourceHandle || edge.label);
 
-        // Only change the colour. Keep the exact same edge type, path, width,
-        // marker shape and routing so selecting a skill never changes geometry.
+        // Node-connected transitions and explicitly selected transitions use
+        // the same semantic success/error/fatal colour without changing path geometry.
         return {
             ...edge,
-            // Selected skills now make all connected incoming/outgoing
-            // transitions flow, not just change colour.
             animated: true,
             style: {
                 ...(edge.style || {}),
