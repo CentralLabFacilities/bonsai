@@ -771,60 +771,54 @@ function DetailsPanel({
                             {(selectedNode.data.inSlots || []).map(
                                 (slot, index) => (
                                     <div
-                                        className="slot-text-field"
+                                        className="slot-text-field compact-slot-card compact-slot-read"
                                         key={`in-${slot.key}`}
                                     >
-                                        <div className="detail-card-header">
-                                            <span className="detail-card-title">
+                                        <div className="compact-slot-header">
+                                            <div className="compact-slot-name">
                                                 {slot.key}
-                                            </span>
+                                            </div>
 
-                                            <span className="detail-badge">
-                                                Input Slot
-                                            </span>
+                                            <div className="compact-slot-badges">
+                                                <span
+                                                    className={`parameter-type-badge parameter-type-${String(
+                                                        slot.type || "other"
+                                                    )
+                                                        .toLowerCase()
+                                                        .replace(
+                                                            /[^a-z0-9]+/g,
+                                                            "-"
+                                                        )}`}
+                                                >
+                                                    {slot.type || "Unknown"}
+                                                </span>
+
+                                                <span className="slot-access-badge slot-access-read">
+                                                    Read
+                                                </span>
+                                            </div>
                                         </div>
 
                                         {slot.description && (
-                                            <div className="detail-description">
+                                            <div className="parameter-description">
                                                 {slot.description}
                                             </div>
                                         )}
 
-                                        <div className="metadata-container">
-                                            <MetadataRow
-                                                label="Type"
-                                                value={slot.type}
-                                            />
-
-                                            <MetadataRow
-                                                label="Access"
-                                                value="Read"
-                                            />
-                                        </div>
-
-                                        <div className="editable-field">
-                                            <label
-                                                className="editable-field-label"
-                                                htmlFor={`in-slot-${selectedNode.id}-${index}`}
-                                            >
-                                                Path
-                                            </label>
-
-                                            <input
-                                                id={`in-slot-${selectedNode.id}-${index}`}
-                                                className="slot-field-edit"
-                                                type="text"
-                                                value={slot.path || ""}
-                                                placeholder="Enter path"
-                                                onChange={(e) =>
-                                                    onUpdateInSlotPath(
-                                                        index,
-                                                        e.target.value
-                                                    )
-                                                }
-                                                onBlur={onCheckSlots}
-                                            />
-                                        </div>
+                                        <input
+                                            id={`in-slot-${selectedNode.id}-${index}`}
+                                            className="parameter-value-input compact-slot-path-input"
+                                            type="text"
+                                            value={slot.path || ""}
+                                            placeholder="Enter path"
+                                            onChange={(e) =>
+                                                onUpdateInSlotPath(
+                                                    index,
+                                                    e.target.value
+                                                )
+                                            }
+                                            onBlur={onCheckSlots}
+                                        />
                                     </div>
                                 )
                             )}
@@ -832,60 +826,54 @@ function DetailsPanel({
                             {(selectedNode.data.outSlots || []).map(
                                 (slot, index) => (
                                     <div
-                                        className="slot-text-field"
+                                        className="slot-text-field compact-slot-card compact-slot-write"
                                         key={`out-${slot.key}`}
                                     >
-                                        <div className="detail-card-header">
-                                            <span className="detail-card-title">
+                                        <div className="compact-slot-header">
+                                            <div className="compact-slot-name">
                                                 {slot.key}
-                                            </span>
+                                            </div>
 
-                                            <span className="detail-badge">
-                                                Output Slot
-                                            </span>
+                                            <div className="compact-slot-badges">
+                                                <span
+                                                    className={`parameter-type-badge parameter-type-${String(
+                                                        slot.type || "other"
+                                                    )
+                                                        .toLowerCase()
+                                                        .replace(
+                                                            /[^a-z0-9]+/g,
+                                                            "-"
+                                                        )}`}
+                                                >
+                                                    {slot.type || "Unknown"}
+                                                </span>
+
+                                                <span className="slot-access-badge slot-access-write">
+                                                    Write
+                                                </span>
+                                            </div>
                                         </div>
 
                                         {slot.description && (
-                                            <div className="detail-description">
+                                            <div className="parameter-description">
                                                 {slot.description}
                                             </div>
                                         )}
 
-                                        <div className="metadata-container">
-                                            <MetadataRow
-                                                label="Type"
-                                                value={slot.type}
-                                            />
-
-                                            <MetadataRow
-                                                label="Access"
-                                                value="Write"
-                                            />
-                                        </div>
-
-                                        <div className="editable-field">
-                                            <label
-                                                className="editable-field-label"
-                                                htmlFor={`out-slot-${selectedNode.id}-${index}`}
-                                            >
-                                                Path
-                                            </label>
-
-                                            <input
-                                                id={`out-slot-${selectedNode.id}-${index}`}
-                                                className="slot-field-edit"
-                                                type="text"
-                                                value={slot.path || ""}
-                                                placeholder="Enter path"
-                                                onChange={(e) =>
-                                                    onUpdateOutSlotPath(
-                                                        index,
-                                                        e.target.value
-                                                    )
-                                                }
-                                                onBlur={onCheckSlots}
-                                            />
-                                        </div>
+                                        <input
+                                            id={`out-slot-${selectedNode.id}-${index}`}
+                                            className="parameter-value-input compact-slot-path-input"
+                                            type="text"
+                                            value={slot.path || ""}
+                                            placeholder="Enter path"
+                                            onChange={(e) =>
+                                                onUpdateOutSlotPath(
+                                                    index,
+                                                    e.target.value
+                                                )
+                                            }
+                                            onBlur={onCheckSlots}
+                                        />
                                     </div>
                                 )
                             )}
