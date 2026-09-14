@@ -818,50 +818,101 @@ function DetailsPanel({
                     <div className="slots-container">
                         <h3>Slots</h3>
 
-                        <div className="slot-list">
-                            {(selectedNode.data?.inSlots || []).map(
-                                (slot, index) => (
+                        {(() => {
+                            const inSlotsWithIndex = (selectedNode.data?.inSlots || []).map(
+                                (slot, index) => ({ slot, index })
+                            );
+                            const outSlotsWithIndex = (selectedNode.data?.outSlots || []).map(
+                                (slot, index) => ({ slot, index })
+                            );
+
+                            const inheritedInSlots = inSlotsWithIndex.filter(
+                                ({ slot }) => Boolean(slot.inherited)
+                            );
+                            const normalInSlots = inSlotsWithIndex.filter(
+                                ({ slot }) => !slot.inherited
+                            );
+                            const inheritedOutSlots = outSlotsWithIndex.filter(
+                                ({ slot }) => Boolean(slot.inherited)
+                            );
+                            const normalOutSlots = outSlotsWithIndex.filter(
+                                ({ slot }) => !slot.inherited
+                            );
+
+                            const renderSlotCard = ({ slot, index }, direction) => {
+                                const isIn = direction === "in";
+                                const isInherited = Boolean(slot.inherited);
+
+                                const cardClass = [
+                                    "slot-text-field",
+                                    "compact-slot-card",
+                                    isIn ? "compact-slot-read" : "compact-slot-write",
+                                    isInherited ? "compact-slot-inherited" : "",
+                                ]
+                                    .filter(Boolean)
+                                    .join(" ");
+
+                                return (
                                     <div
-                                        className="slot-text-field compact-slot-card compact-slot-read"
-                                        key={`in-${slot.key}`}
+                                        className={cardClass}
+                                        key={`${direction}-${slot.key}-${index}`}
                                     >
                                         <div className="compact-slot-header">
                                             <div className="compact-slot-name">
                                                 {slot.key}
-                                    </div>
-                                    <div className="compact-slot-badges">
+                                            </div>
+                                            <div className="compact-slot-badges">
                                                 <span
                                                     className={`parameter-type-badge parameter-type-${String(
                                                         slot.type || "other"
                                                     )
                                                         .toLowerCase()
-                                                        .replace(
-                                                            /[^a-z0-9]+/g,
-                                                            "-"
-                                                        )}`}
+                                                        .replace(/[^a-z0-9]+/g, "-")}`}
                                                 >
                                                     {slot.type || "Unknown"}
                                                 </span>
 
-                                                <span className="slot-access-badge slot-access-read">
-                                                    Read
+                                                <span
+                                                    className={`slot-access-badge ${
+                                                        isIn
+                                                            ? "slot-access-read"
+                                                            : "slot-access-write"
+                                                    }`}
+                                                >
+                                                    {isIn ? "Read" : "Write"}
                                                 </span>
-                                    </div>
-                                    </div>
+
+                                                {isInherited && (
+                                                    <span className="slot-access-badge slot-access-inherited">
+                                                        Inherited
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
 
                                         {slot.description && (
                                             <div className="parameter-description">
                                                 {slot.description}
                                             </div>
                                         )}
+
+                                        {isInherited && slot.inherited?.state && (
+                                            <div className="compact-slot-inherited-from">
+                                                Inherited from {slot.inherited.state}
+                                            </div>
+                                        )}
+
                                         <input
-                                            id={`in-slot-${selectedNode.id}-${index}`}
+                                            id={`${direction}-slot-${selectedNode.id}-${index}`}
                                             className="parameter-value-input compact-slot-path-input"
                                             type="text"
                                             value={slot.path || ""}
                                             placeholder="Enter path"
+                                            disabled={isInherited}
                                             onChange={(e) =>
-                                                onUpdateInSlotPath(
+                                                (isIn
+                                                    ? onUpdateInSlotPath
+                                                    : onUpdateOutSlotPath)(
                                                     index,
                                                     e.target.value
                                                 )
@@ -869,61 +920,56 @@ function DetailsPanel({
                                             onBlur={onCheckSlots}
                                         />
                                     </div>
-                                )
-                            )}
+                                );
+                            };
 
-                            {(selectedNode.data?.outSlots || []).map(
-                                (slot, index) => (
-                                    <div
-                                        className="slot-text-field compact-slot-card compact-slot-write"
-                                        key={`out-${slot.key}`}
-                                    >
-                                        <div className="compact-slot-header">
-                                            <div className="compact-slot-name">
-                                                {slot.key}
-                                    </div>
-                                    <div className="compact-slot-badges">
-                                                <span
-                                                    className={`parameter-type-badge parameter-type-${String(
-                                                        slot.type || "other"
-                                                    )
-                                                        .toLowerCase()
-                                                        .replace(
-                                                            /[^a-z0-9]+/g,
-                                                            "-"
-                                                        )}`}
-                                                >
-                                                    {slot.type || "Unknown"}
-                                                </span>
+                            return (
+                                <>
+                                    {(inheritedInSlots.length > 0 ||
+                                        inheritedOutSlots.length > 0) && (
+                                        <div className="slot-group">
+                                            <h4 className="slot-group-title slot-group-title-inherited">
+                                                Inherited Slots
+                                            </h4>
+                                            <div className="slot-list">
+                                                {inheritedInSlots.map((entry) =>
+                                                    renderSlotCard(entry, "in")
+                                                )}
+                                                {inheritedOutSlots.map((entry) =>
+                                                    renderSlotCard(entry, "out")
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
 
-                                                <span className="slot-access-badge slot-access-write">
-                                                    Write
-                                                </span>
-                                    </div></div>
+                                    {(normalInSlots.length > 0 ||
+                                        normalOutSlots.length > 0) && (
+                                        <div className="slot-group">
+                                            <h4 className="slot-group-title">
+                                                Own Slots
+                                            </h4>
+                                            <div className="slot-list">
+                                                {normalInSlots.map((entry) =>
+                                                    renderSlotCard(entry, "in")
+                                                )}
+                                                {normalOutSlots.map((entry) =>
+                                                    renderSlotCard(entry, "out")
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
 
-                                        {slot.description && (
+                                    {inheritedInSlots.length === 0 &&
+                                        inheritedOutSlots.length === 0 &&
+                                        normalInSlots.length === 0 &&
+                                        normalOutSlots.length === 0 && (
                                             <div className="parameter-description">
-                                                {slot.description}
+                                                No slots for this skill.
                                             </div>
                                         )}
-                                        <input
-                                            id={`out-slot-${selectedNode.id}-${index}`}
-                                            className="parameter-value-input compact-slot-path-input"
-                                            type="text"
-                                            value={slot.path || ""}
-                                            placeholder="Enter path"
-                                            onChange={(e) =>
-                                                onUpdateOutSlotPath(
-                                                    index,
-                                                    e.target.value
-                                                )
-                                            }
-                                            onBlur={onCheckSlots}
-                                        />
-                                    </div>
-                                )
-                            )}
-                        </div>
+                                </>
+                            );
+                        })()}
                     </div>
                 )}
 
