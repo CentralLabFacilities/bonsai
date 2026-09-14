@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { FiTrash2, FiPlus, FiX } from "react-icons/fi";
 import {
@@ -29,6 +29,7 @@ import ConditionModal from "./components/ConditionModal";
 import CompoundNode from "./components/CompoundNode";
 import ParallelLaneNode from "./components/ParallelLaneNode";
 import EditableTransitionEdge from "./components/EditableTransitionEdge";
+import ProblemsPanel from "./components/ProblemsPanel";
 
 // Ausgelagerte Utils (saveScxmlFile statt exportScxmlFile)
 import { generateXmlString, saveScxmlFile, saveScxmlFileTauri, openScxmlFileTauri, readScxmlFileContent } from "./utils/scxmlExport";
@@ -53,8 +54,6 @@ const withSmartTransitionRouting = (transitionEdges) =>
     transitionEdges.map((edge) => ({
         ...edge,
         type: "smartTransition",
-        // Keep the same flowing animation when the edge itself is selected.
-        animated: Boolean(edge.selected || edge.animated),
     }));
 
 const TRANSITION_HIGHLIGHT_COLORS = {
@@ -90,11 +89,12 @@ const highlightSelectedTransitions = (transitionEdges, selectedNodeIds) =>
 
         const color = getTransitionHighlightColor(edge.sourceHandle || edge.label);
 
-        // Node-connected transitions and explicitly selected transitions use
-        // the same semantic success/error/fatal colour without changing path geometry.
+        // Keep the same geometry. Connected transitions animate while a skill
+        // is selected, and directly selected transitions use the same semantic
+        // success/error/fatal colour.
         return {
             ...edge,
-            animated: true,
+            animated: isConnectedToSelection ? true : edge.animated,
             style: {
                 ...(edge.style || {}),
                 stroke: color,
@@ -105,52 +105,287 @@ const highlightSelectedTransitions = (transitionEdges, selectedNodeIds) =>
         };
     });
 
-const getNodeId = () => `skill-node-${crypto.randomUUID()}`;
 
-// Deep-clone editor state while keeping callback functions (e.g. node data
-// handlers) intact. structuredClone cannot clone functions.
-const cloneEditorValue = (value, seen = new WeakMap()) => {
-    if (value === null || typeof value !== "object") return value;
+const normalizeSlotPath = (path) =>
+    String(path || "").trim().replace(/^\/+/, "");
 
-    if (seen.has(value)) return seen.get(value);
+const normalizeSlotType = (type) =>
+    String(type || "").trim().toLowerCase();
 
-    if (Array.isArray(value)) {
-        const copy = [];
-        seen.set(value, copy);
-        value.forEach((entry) => copy.push(cloneEditorValue(entry, seen)));
-        return copy;
+const buildEditorProblems = (nodes, edges, globalDataModel) => {
+    const problems = [];
+    const nodeMap = new Map((nodes || []).map((node) => [node.id, node]));
+
+    const nodeLabel = (node) =>
+        node?.data?.label ||
+        node?.data?.fullSkillName ||
+        node?.id ||
+        "Unknown state";
+
+    const addProblem = (problem) => {
+        problems.push({
+            severity: "error",
+            category: "Workflow",
+            focusNodeIds: problem.nodeId ? [problem.nodeId] : [],
+            ...problem,
+        });
+    };
+
+    // Workflow
+    const rootNodes = (nodes || []).filter(
+        (node) =>
+            !node.parentId &&
+            node.type !== "slot" &&
+            node.type !== "parallelLane"
+    );
+
+    if (rootNodes.length > 0) {
+        const initialNodes = rootNodes.filter((node) => node.data?.isInitial);
+
+        if (initialNodes.length === 0) {
+            addProblem({
+                id: "workflow-no-initial",
+                severity: "warning",
+                category: "Workflow",
+                title: "No initial state",
+                message: "No root state is marked as initial.",
+            });
+        } else if (initialNodes.length > 1) {
+            initialNodes.forEach((node) => {
+                addProblem({
+                    id: `workflow-multiple-initial-${node.id}`,
+                    category: "Workflow",
+                    title: "Multiple initial states",
+                    message: `${nodeLabel(node)} is one of multiple initial states.`,
+                    nodeId: node.id,
+                    detailTab: "allgemein",
+                    mode: "event",
+                });
+            });
+        }
     }
 
-    const copy = {};
-    seen.set(value, copy);
-    Object.entries(value).forEach(([key, entry]) => {
-        copy[key] = cloneEditorValue(entry, seen);
+    // Datamodel
+    const ids = new Map();
+    (globalDataModel || []).forEach((entry) => {
+        const id = String(entry?.id || "").trim();
+        if (!id) return;
+        ids.set(id, (ids.get(id) || 0) + 1);
     });
-    return copy;
-};
 
-const sanitizeNodeForHistory = (node) => {
-    const copy = cloneEditorValue(node);
-    delete copy.selected;
-    delete copy.dragging;
-    delete copy.measured;
-    return copy;
-};
+    ids.forEach((count, id) => {
+        if (count > 1) {
+            addProblem({
+                id: `datamodel-duplicate-${id}`,
+                category: "Datamodel",
+                title: "Duplicate datamodel ID",
+                message: `${id} is defined ${count} times.`,
+            });
+        }
+    });
 
-const sanitizeEdgeForHistory = (edge) => {
-    const copy = cloneEditorValue(edge);
-    delete copy.selected;
-    return copy;
-};
+    // Transitions
+    (edges || []).forEach((edge) => {
+        const source = nodeMap.get(edge.source);
+        const target = nodeMap.get(edge.target);
+        const eventName = edge.sourceHandle || edge.label || "transition";
 
-const isEditableKeyboardTarget = (target) => {
-    if (!(target instanceof Element)) return false;
-    return Boolean(
-        target.closest(
-            'input, textarea, select, [contenteditable="true"], [role="textbox"]'
-        )
+        if (!source) {
+            addProblem({
+                id: `transition-missing-source-${edge.id}`,
+                category: "Transitions",
+                title: "Missing transition source",
+                message: `${eventName} starts from a state that no longer exists.`,
+                edgeId: edge.id,
+                mode: "event",
+                focusNodeIds: target ? [target.id] : [],
+            });
+            return;
+        }
+
+        if (!target) {
+            addProblem({
+                id: `transition-missing-target-${edge.id}`,
+                category: "Transitions",
+                title: "Missing transition target",
+                message: `${nodeLabel(source)}.${eventName} points to a state that no longer exists.`,
+                nodeId: source.id,
+                edgeId: edge.id,
+                detailTab: "allgemein",
+                mode: "event",
+            });
+        }
+
+        if (
+            edge.sourceHandle &&
+            !(source.data?.events || []).some(
+                (event) => event?.id === edge.sourceHandle
+            )
+        ) {
+            addProblem({
+                id: `transition-unknown-event-${edge.id}`,
+                severity: "warning",
+                category: "Transitions",
+                title: "Unknown exit token",
+                message: `${nodeLabel(source)} does not expose ${edge.sourceHandle}.`,
+                nodeId: source.id,
+                edgeId: edge.id,
+                detailTab: "allgemein",
+                mode: "event",
+                focusNodeIds: target
+                    ? [source.id, target.id]
+                    : [source.id],
+            });
+        }
+    });
+
+    // Required parameters
+    (nodes || []).forEach((node) => {
+        (node.data?.params || []).forEach((parameter, index) => {
+            if (!parameter?.required) return;
+
+            const value = String(parameter.expr ?? "").trim();
+            const defaultValue = String(parameter.default ?? "").trim();
+
+            if (!value && !defaultValue) {
+                addProblem({
+                    id: `parameter-required-${node.id}-${index}`,
+                    category: "Parameters",
+                    title: "Required parameter is missing",
+                    message: `${nodeLabel(node)}.${parameter.key || `parameter ${index + 1}`} needs a value.`,
+                    nodeId: node.id,
+                    detailTab: "parameter",
+                    mode: "event",
+                });
+            }
+        });
+    });
+
+    // Slots
+    const readers = new Map();
+    const writers = new Map();
+
+    const registerSlot = (map, path, value) => {
+        if (!map.has(path)) map.set(path, []);
+        map.get(path).push(value);
+    };
+
+    (nodes || []).forEach((node) => {
+        (node.data?.inSlots || []).forEach((slot, index) => {
+            const path = normalizeSlotPath(slot.path);
+
+            if (!path) {
+                addProblem({
+                    id: `slot-input-empty-${node.id}-${index}`,
+                    severity: "warning",
+                    category: "Slots",
+                    title: "Input slot is not connected",
+                    message: `${nodeLabel(node)}.${slot.key || `input ${index + 1}`} has no slot path.`,
+                    nodeId: node.id,
+                    detailTab: "slots",
+                    mode: "both",
+                });
+                return;
+            }
+
+            registerSlot(readers, path, { node, slot, index });
+        });
+
+        (node.data?.outSlots || []).forEach((slot, index) => {
+            const path = normalizeSlotPath(slot.path);
+
+            if (!path) {
+                addProblem({
+                    id: `slot-output-empty-${node.id}-${index}`,
+                    severity: "warning",
+                    category: "Slots",
+                    title: "Output slot is not connected",
+                    message: `${nodeLabel(node)}.${slot.key || `output ${index + 1}`} has no slot path.`,
+                    nodeId: node.id,
+                    detailTab: "slots",
+                    mode: "both",
+                });
+                return;
+            }
+
+            registerSlot(writers, path, { node, slot, index });
+        });
+    });
+
+    const paths = new Set([...readers.keys(), ...writers.keys()]);
+
+    paths.forEach((path) => {
+        const pathReaders = readers.get(path) || [];
+        const pathWriters = writers.get(path) || [];
+
+        pathReaders.forEach((reader) => {
+            pathWriters.forEach((writer) => {
+                const inputType = normalizeSlotType(reader.slot?.type);
+                const outputType = normalizeSlotType(writer.slot?.type);
+
+                if (
+                    inputType &&
+                    outputType &&
+                    inputType !== outputType
+                ) {
+                    addProblem({
+                        id: `slot-type-${path}-${reader.node.id}-${reader.index}-${writer.node.id}-${writer.index}`,
+                        category: "Slots",
+                        title: "Slot type mismatch",
+                        message: `/${path}: ${nodeLabel(writer.node)}.${writer.slot?.key} (${writer.slot?.type}) → ${nodeLabel(reader.node)}.${reader.slot?.key} (${reader.slot?.type}).`,
+                        nodeId: reader.node.id,
+                        detailTab: "slots",
+                        mode: "both",
+                        focusNodeIds: [writer.node.id, reader.node.id],
+                    });
+                }
+            });
+        });
+
+        if (pathReaders.length > 0 && pathWriters.length === 0) {
+            pathReaders.forEach((reader) => {
+                addProblem({
+                    id: `slot-no-writer-${path}-${reader.node.id}-${reader.index}`,
+                    severity: "warning",
+                    category: "Slots",
+                    title: "Slot has no writer",
+                    message: `/${path} is read by ${nodeLabel(reader.node)}, but no skill writes to it.`,
+                    nodeId: reader.node.id,
+                    detailTab: "slots",
+                    mode: "both",
+                });
+            });
+        }
+
+        if (pathWriters.length > 1) {
+            pathWriters.forEach((writer, index) => {
+                addProblem({
+                    id: `slot-multiple-writers-${path}-${writer.node.id}-${index}`,
+                    severity: "warning",
+                    category: "Slots",
+                    title: "Multiple slot writers",
+                    message: `/${path} is written by ${pathWriters.length} skills.`,
+                    nodeId: writer.node.id,
+                    detailTab: "slots",
+                    mode: "both",
+                    focusNodeIds: pathWriters.map((entry) => entry.node.id),
+                });
+            });
+        }
+    });
+
+    const severityOrder = { error: 0, warning: 1, info: 2 };
+
+    return problems.sort(
+        (a, b) =>
+            (severityOrder[a.severity] ?? 99) -
+            (severityOrder[b.severity] ?? 99) ||
+            String(a.category).localeCompare(String(b.category)) ||
+            String(a.title).localeCompare(String(b.title))
     );
 };
+
+const getNodeId = () => `skill-node-${crypto.randomUUID()}`;
 
 // Detect if running in Tauri desktop app
 const IS_DESKTOP = isTauri();
@@ -319,16 +554,6 @@ function AppContent() {
     const [inheritedGlobalDataModel, setInheritedGlobalDataModel] = useState([]);
     const [newParamId, setNewParamId] = useState("");
     const [newParamExpr, setNewParamExpr] = useState("");
-
-    // Keyboard editing state: clipboard + undo/redo history. History is kept
-    // per active tab session and intentionally ignores transient selection.
-    const clipboardRef = useRef(null);
-    const historyRef = useRef([]);
-    const historyIndexRef = useRef(-1);
-    const historyTimerRef = useRef(null);
-    const historyTabRef = useRef(activeTabId);
-    const applyingHistoryRef = useRef(false);
-    const currentHistorySnapshotRef = useRef(null);
 
     const descendantGlobalDataModel = useMemo(() => {
         const blockedIds = [
@@ -840,326 +1065,6 @@ function AppContent() {
             alert(`Error automatically loading the sub-machine:\n${err.message}\n\nURL retrieved: ${resolvedUrl}`);
         }
     };
-
-    const createHistorySnapshot = useCallback(() => ({
-        nodes: nodes.map(sanitizeNodeForHistory),
-        edges: edges.map(sanitizeEdgeForHistory),
-        slotNodes: slotNodes.map(sanitizeNodeForHistory),
-        slotEdges: slotEdges.map(sanitizeEdgeForHistory),
-        globalDataModel: cloneEditorValue(globalDataModel),
-    }), [nodes, edges, slotNodes, slotEdges, globalDataModel]);
-
-    const getHistoryHash = useCallback((snapshot) => JSON.stringify(snapshot), []);
-
-    const commitHistorySnapshot = useCallback((snapshot) => {
-        if (!snapshot) return false;
-
-        const hash = getHistoryHash(snapshot);
-        const currentEntry = historyRef.current[historyIndexRef.current];
-        if (currentEntry?.hash === hash) return false;
-
-        const nextHistory = historyRef.current.slice(
-            0,
-            historyIndexRef.current + 1
-        );
-        nextHistory.push({
-            hash,
-            snapshot: cloneEditorValue(snapshot),
-        });
-
-        // Keep memory bounded while still providing a useful undo stack.
-        if (nextHistory.length > 100) {
-            nextHistory.splice(0, nextHistory.length - 100);
-        }
-
-        historyRef.current = nextHistory;
-        historyIndexRef.current = nextHistory.length - 1;
-        return true;
-    }, [getHistoryHash]);
-
-    useEffect(() => {
-        const snapshot = createHistorySnapshot();
-        currentHistorySnapshotRef.current = snapshot;
-
-        // Switching workflow tabs starts a fresh local undo stack so undo never
-        // accidentally jumps back into another tab.
-        if (historyTabRef.current !== activeTabId) {
-            historyTabRef.current = activeTabId;
-            historyRef.current = [];
-            historyIndexRef.current = -1;
-            applyingHistoryRef.current = false;
-            if (historyTimerRef.current) {
-                clearTimeout(historyTimerRef.current);
-            }
-            commitHistorySnapshot(snapshot);
-            return;
-        }
-
-        if (applyingHistoryRef.current) {
-            applyingHistoryRef.current = false;
-            return;
-        }
-
-        // Record structural/data changes after they settle. This collapses a
-        // node drag or control-point drag into one useful undo step.
-        if (historyRef.current.length === 0) {
-            commitHistorySnapshot(snapshot);
-            return;
-        }
-
-        if (historyTimerRef.current) {
-            clearTimeout(historyTimerRef.current);
-        }
-
-        historyTimerRef.current = setTimeout(() => {
-            commitHistorySnapshot(currentHistorySnapshotRef.current);
-        }, 180);
-
-        return () => {
-            if (historyTimerRef.current) {
-                clearTimeout(historyTimerRef.current);
-            }
-        };
-    }, [
-        activeTabId,
-        createHistorySnapshot,
-        commitHistorySnapshot,
-    ]);
-
-    const applyHistorySnapshot = useCallback((snapshot) => {
-        if (!snapshot) return;
-
-        if (historyTimerRef.current) {
-            clearTimeout(historyTimerRef.current);
-            historyTimerRef.current = null;
-        }
-
-        applyingHistoryRef.current = true;
-        setNodes(
-            cloneEditorValue(snapshot.nodes || []).map((node) => ({
-                ...node,
-                selected: false,
-            }))
-        );
-        setEdges(
-            cloneEditorValue(snapshot.edges || []).map((edge) => ({
-                ...edge,
-                selected: false,
-            }))
-        );
-        setSlotNodes(
-            cloneEditorValue(snapshot.slotNodes || []).map((node) => ({
-                ...node,
-                selected: false,
-            }))
-        );
-        setSlotEdges(
-            cloneEditorValue(snapshot.slotEdges || []).map((edge) => ({
-                ...edge,
-                selected: false,
-            }))
-        );
-        setGlobalDataModel(cloneEditorValue(snapshot.globalDataModel || []));
-        setSelectedNodeId(null);
-        setRightPanelTab("datamodel");
-    }, [setNodes, setEdges, setSlotNodes, setSlotEdges]);
-
-    const undo = useCallback(() => {
-        // Make sure the newest edit is in history even when Ctrl/Cmd+Z is
-        // pressed immediately after an operation.
-        commitHistorySnapshot(currentHistorySnapshotRef.current);
-
-        if (historyIndexRef.current <= 0) return false;
-
-        historyIndexRef.current -= 1;
-        applyHistorySnapshot(
-            historyRef.current[historyIndexRef.current]?.snapshot
-        );
-        return true;
-    }, [applyHistorySnapshot, commitHistorySnapshot]);
-
-    const redo = useCallback(() => {
-        if (historyIndexRef.current >= historyRef.current.length - 1) {
-            return false;
-        }
-
-        historyIndexRef.current += 1;
-        applyHistorySnapshot(
-            historyRef.current[historyIndexRef.current]?.snapshot
-        );
-        return true;
-    }, [applyHistorySnapshot]);
-
-    const copySelectedNodes = useCallback(() => {
-        let rootSelection = nodes.filter((node) => node.selected);
-
-        // The details panel selection is also considered a copy selection in
-        // case React Flow has already cleared its transient selected flag.
-        if (rootSelection.length === 0 && selectedNodeId) {
-            const selected = nodes.find((node) => node.id === selectedNodeId);
-            if (selected) rootSelection = [selected];
-        }
-
-        if (rootSelection.length === 0) return false;
-
-        const copiedIds = new Set(rootSelection.map((node) => node.id));
-        let foundChild = true;
-        while (foundChild) {
-            foundChild = false;
-            nodes.forEach((node) => {
-                if (
-                    node.parentId &&
-                    copiedIds.has(node.parentId) &&
-                    !copiedIds.has(node.id)
-                ) {
-                    copiedIds.add(node.id);
-                    foundChild = true;
-                }
-            });
-        }
-
-        const copiedNodes = nodes
-            .filter((node) => copiedIds.has(node.id))
-            .map((node) => cloneEditorValue(node));
-        const copiedEdges = edges
-            .filter(
-                (edge) =>
-                    copiedIds.has(edge.source) && copiedIds.has(edge.target)
-            )
-            .map((edge) => cloneEditorValue(edge));
-
-        clipboardRef.current = {
-            nodes: copiedNodes,
-            edges: copiedEdges,
-            rootIds: rootSelection.map((node) => node.id),
-            pasteCount: 0,
-        };
-        return true;
-    }, [nodes, edges, selectedNodeId]);
-
-    const pasteCopiedNodes = useCallback(() => {
-        const clipboard = clipboardRef.current;
-        if (!clipboard?.nodes?.length) return false;
-
-        clipboard.pasteCount = (clipboard.pasteCount || 0) + 1;
-        const offset = 36 * clipboard.pasteCount;
-        const idMap = new Map();
-        clipboard.nodes.forEach((node) => idMap.set(node.id, getNodeId()));
-
-        const rootIds = new Set(clipboard.rootIds || []);
-        const copiedIds = new Set(clipboard.nodes.map((node) => node.id));
-
-        const pastedNodes = clipboard.nodes.map((sourceNode) => {
-            const node = cloneEditorValue(sourceNode);
-            const originalId = sourceNode.id;
-            const newId = idMap.get(originalId);
-            const copiedParent = sourceNode.parentId
-                ? idMap.get(sourceNode.parentId)
-                : null;
-
-            const events = Array.isArray(node.data?.events)
-                ? node.data.events.map((event) => {
-                    if (!event?.target) return event;
-
-                    if (idMap.has(event.target)) {
-                        return {
-                            ...event,
-                            target: idMap.get(event.target),
-                        };
-                    }
-
-                    // External transitions are intentionally not copied.
-                    return {
-                        ...event,
-                        target: null,
-                        selectedPackage: "",
-                        selectedSkill: "",
-                    };
-                })
-                : node.data?.events;
-
-            return {
-                ...node,
-                id: newId,
-                parentId: copiedParent || undefined,
-                selected: rootIds.has(originalId),
-                dragging: false,
-                position:
-                    rootIds.has(originalId) ||
-                    !sourceNode.parentId ||
-                    !copiedIds.has(sourceNode.parentId)
-                        ? {
-                            x: Number(sourceNode.position?.x || 0) + offset,
-                            y: Number(sourceNode.position?.y || 0) + offset,
-                        }
-                        : { ...sourceNode.position },
-                data: {
-                    ...(node.data || {}),
-                    events,
-                    // Pasting a top-level initial state must not create a second
-                    // initial state in the same workflow.
-                    isInitial: rootIds.has(originalId)
-                        ? false
-                        : node.data?.isInitial,
-                },
-            };
-        });
-
-        const pastedEdges = clipboard.edges.map((sourceEdge) => {
-            const edge = cloneEditorValue(sourceEdge);
-            return {
-                ...edge,
-                id: `edge-${crypto.randomUUID()}`,
-                source: idMap.get(sourceEdge.source),
-                target: idMap.get(sourceEdge.target),
-                selected: false,
-            };
-        });
-
-        setNodes((currentNodes) => [
-            ...currentNodes.map((node) => ({ ...node, selected: false })),
-            ...pastedNodes,
-        ]);
-        setEdges((currentEdges) => [
-            ...currentEdges.map((edge) => ({ ...edge, selected: false })),
-            ...pastedEdges,
-        ]);
-
-        const firstPastedRoot = clipboard.rootIds?.[0]
-            ? idMap.get(clipboard.rootIds[0])
-            : pastedNodes[0]?.id;
-        setSelectedNodeId(firstPastedRoot || null);
-        if (firstPastedRoot) setRightPanelTab("details");
-        return true;
-    }, [setNodes, setEdges]);
-
-    useEffect(() => {
-        const handleEditorShortcut = (event) => {
-            if (isEditableKeyboardTarget(event.target)) return;
-            if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
-
-            const key = event.key.toLowerCase();
-            let handled = false;
-
-            if (key === "c" && !event.shiftKey) {
-                handled = copySelectedNodes();
-            } else if (key === "v" && !event.shiftKey) {
-                handled = pasteCopiedNodes();
-            } else if (key === "z") {
-                handled = event.shiftKey ? redo() : undo();
-            } else if (key === "y" && !event.shiftKey) {
-                handled = redo();
-            }
-
-            if (handled) {
-                event.preventDefault();
-                event.stopPropagation();
-            }
-        };
-
-        window.addEventListener("keydown", handleEditorShortcut);
-        return () => window.removeEventListener("keydown", handleEditorShortcut);
-    }, [copySelectedNodes, pasteCopiedNodes, undo, redo]);
 
     const selectedNodes = useMemo(() => {
         return nodes.filter((n) => n.selected && !n.parentId);
@@ -1701,6 +1606,76 @@ function AppContent() {
 
     const selectedNode = nodes.find((node) => node.id === selectedNodeId) || null;
     const hasInitialNode = nodes.some((node) => node.data?.isInitial);
+
+    const editorProblems = useMemo(
+        () => buildEditorProblems(nodes, edges, globalDataModel),
+        [nodes, edges, globalDataModel]
+    );
+
+    const errorProblemCount = useMemo(
+        () =>
+            editorProblems.filter(
+                (problem) => problem.severity === "error"
+            ).length,
+        [editorProblems]
+    );
+
+    const handleProblemClick = useCallback(
+        (problem) => {
+            if (!problem) return;
+
+            if (problem.mode) {
+                setActiveMode(problem.mode);
+            }
+
+            setEdges((currentEdges) =>
+                currentEdges.map((edge) => ({
+                    ...edge,
+                    selected: Boolean(
+                        problem.edgeId &&
+                        edge.id === problem.edgeId
+                    ),
+                }))
+            );
+
+            if (problem.nodeId) {
+                setNodes((currentNodes) =>
+                    currentNodes.map((node) => ({
+                        ...node,
+                        selected: node.id === problem.nodeId,
+                    }))
+                );
+                setSelectedNodeId(problem.nodeId);
+                setActiveTab(problem.detailTab || "allgemein");
+                setRightPanelTab("details");
+            } else if (problem.category === "Datamodel") {
+                setSelectedNodeId(null);
+                setRightPanelTab("datamodel");
+            }
+
+            const focusIds = (
+                problem.focusNodeIds?.length
+                    ? problem.focusNodeIds
+                    : problem.nodeId
+                        ? [problem.nodeId]
+                        : []
+            ).filter((id) =>
+                nodes.some((node) => node.id === id)
+            );
+
+            if (focusIds.length > 0) {
+                window.setTimeout(() => {
+                    fitView({
+                        nodes: focusIds.map((id) => ({ id })),
+                        padding: 0.55,
+                        maxZoom: 1.25,
+                        duration: 300,
+                    });
+                }, 0);
+            }
+        },
+        [nodes, setNodes, setEdges, fitView]
+    );
 
 // Multi-level package/subpackage parser
     let packages = [];
@@ -2912,9 +2887,28 @@ function AppContent() {
                                 className={`right-panel-tab ${rightPanelTab === "details" ? "active" : ""}`}
                                 onClick={() => setRightPanelTab("details")}
                             >
-                                Details
+                                Skill Detail
                             </button>
                         )}
+
+                        <button
+                            type="button"
+                            className={`right-panel-tab ${rightPanelTab === "problems" ? "active" : ""}`}
+                            onClick={() => setRightPanelTab("problems")}
+                        >
+                            <span>Problems</span>
+                            {editorProblems.length > 0 && (
+                                <span
+                                    className={`right-panel-problem-count ${
+                                        errorProblemCount > 0
+                                            ? "has-errors"
+                                            : "warnings-only"
+                                    }`}
+                                >
+                                    {editorProblems.length}
+                                </span>
+                            )}
+                        </button>
                     </div>
 
                     <div className="right-panel-content">
@@ -2967,6 +2961,13 @@ function AppContent() {
                                         prev.filter((_, i) => i !== index)
                                     );
                                 }}
+                            />
+                        )}
+
+                        {rightPanelTab === "problems" && (
+                            <ProblemsPanel
+                                problems={editorProblems}
+                                onProblemClick={handleProblemClick}
                             />
                         )}
 

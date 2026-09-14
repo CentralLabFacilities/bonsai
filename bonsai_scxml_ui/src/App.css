@@ -3537,3 +3537,220 @@
   color: #0f172a;
   font-weight: 600;
 }
+
+/* ==========================================================================
+   PROBLEMS PANEL
+   ========================================================================== */
+
+.right-panel-problem-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 7px;
+  padding: 0 5px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.right-panel-problem-count.has-errors {
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.42);
+}
+
+.right-panel-problem-count.warnings-only {
+  background: rgba(245, 158, 11, 0.16);
+  color: #fcd34d;
+  border: 1px solid rgba(245, 158, 11, 0.38);
+}
+
+.right-panel-content > .problems-panel {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+.problems-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  background: transparent;
+  color: #e2e8f0;
+}
+
+.problems-panel-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 14px 12px;
+  border-bottom: 1px solid var(--secondary-color);
+  background: rgba(15, 23, 42, 0.35);
+}
+
+.problems-panel-title {
+  color: #f8fafc;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.problems-panel-summary {
+  margin-top: 3px;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.problems-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px;
+}
+
+.problem-category + .problem-category {
+  margin-top: 14px;
+}
+
+.problem-category-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px 6px;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.problem-category-count {
+  min-width: 18px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #1e293b;
+  color: #cbd5e1;
+  text-align: center;
+  letter-spacing: normal;
+}
+
+.problem-category-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.problem-item {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) 16px;
+  gap: 8px;
+  align-items: start;
+  padding: 9px 9px 9px 8px;
+  border: 1px solid #243247;
+  border-radius: 7px;
+  background: #111827;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+          border-color 0.15s ease,
+          background-color 0.15s ease,
+          transform 0.15s ease;
+}
+
+.problem-item:hover {
+  background: #172033;
+  border-color: #475569;
+}
+
+.problem-item:active {
+  transform: translateY(1px);
+}
+
+.problem-item-error {
+  border-left: 3px solid #ef4444;
+}
+
+.problem-item-warning {
+  border-left: 3px solid #f59e0b;
+}
+
+.problem-severity-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1px;
+  font-size: 15px;
+}
+
+.problem-severity-error {
+  color: #f87171;
+}
+
+.problem-severity-warning {
+  color: #fbbf24;
+}
+
+.problem-item-content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.problem-item-title {
+  color: #f1f5f9;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.3;
+}
+
+.problem-item-message {
+  color: #94a3b8;
+  font-size: 11px;
+  line-height: 1.38;
+  overflow-wrap: anywhere;
+}
+
+.problem-item-chevron {
+  align-self: center;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.problems-empty-state {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  text-align: center;
+}
+
+.problems-empty-icon {
+  margin-bottom: 10px;
+  color: #22c55e;
+  font-size: 30px;
+}
+
+.problems-empty-title {
+  color: #f8fafc;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.problems-empty-copy {
+  max-width: 250px;
+  margin-top: 6px;
+  color: #94a3b8;
+  font-size: 11px;
+  line-height: 1.45;
+}
