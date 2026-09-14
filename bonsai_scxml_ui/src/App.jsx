@@ -1218,6 +1218,7 @@ function AppContent() {
                     data: {
                         ...n.data,
                         onOpenSubMachine: handleOpenSubMachine,
+                        mode: activeMode,
                     },
                 };
             }
@@ -1228,13 +1229,14 @@ function AppContent() {
                     data: {
                         ...n.data,
                         onAddLane: handleAddLaneToParallel,
+                        mode: activeMode,
                     },
                 };
             }
 
-            return n;
+            return { ...n, data: { ...n.data, mode: activeMode } };
         });
-    }, [nodes, tabs, activeTabId, handleAddLaneToParallel]);
+    }, [nodes, tabs, activeTabId, handleAddLaneToParallel, activeMode]);
 
     useEffect(() => {
         const fetchSkills = async () => {
