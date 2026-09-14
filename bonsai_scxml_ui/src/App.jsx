@@ -11,6 +11,7 @@ import {
     useEdgesState,
     addEdge,
     useReactFlow,
+    useUpdateNodeInternals,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { SmartEdgeProvider } from "@tisoap/react-flow-smart-edge";
@@ -107,6 +108,9 @@ const highlightSelectedTransitions = (transitionEdges, selectedNodeIds) =>
     });
 
 const getNodeId = () => `skill-node-${crypto.randomUUID()}`;
+
+const PARALLEL_EXIT_GUTTER = 150;
+const PARALLEL_NODE_GAP = 30;
 
 const getAbsoluteNodePosition = (node, allNodes) => {
     let x = node?.position?.x || 0;
@@ -311,6 +315,7 @@ function AppContent() {
     const [contextMenu, setContextMenu] = useState(null);
     const [parallelDropTargetId, setParallelDropTargetId] =
         useState(null);
+    const updateNodeInternals = useUpdateNodeInternals();
 
     //---- TAB MANAGEMENT ----
     const [tabs, setTabs] = useState([
@@ -1081,24 +1086,53 @@ function AppContent() {
         const totalLanesHeight = laneHeights.reduce((sum, h) => sum + h, 0);
         const containerHeight = headerHeight + totalLanesHeight + buttonReserve;
 
-        const { minX, minY } = getSelectionBoundingBox(selectedNodes);
-        const parallelId = getNodeId();
-        const parallelName = `Parallel_${nodes.filter((n) => n.type === "parallel").length + 1}`;
+        const {
+            minX,
+            minY,
+            maxX,
+            maxY,
+        } = getSelectionBoundingBox(selectedNodes);
 
-        const branchNames = groups.map((g, idx) => {
-            if (g.length > 1) return `Group_${idx + 1}`;
-            return g[0].data?.label || `Lane_${idx + 1}`;
+        const parallelId = getNodeId();
+
+        const parallelName =
+            `Parallel_${
+                nodes.filter((n) => n.type === "parallel").length + 1
+            }`;
+
+        const branchNames = groups.map((group, idx) => {
+            if (group.length > 1) {
+                return `Group_${idx + 1}`;
+            }
+
+            return (
+                group[0].data?.label ||
+                `Lane_${idx + 1}`
+            );
         });
 
         const parallelNode = {
             id: parallelId,
             type: "parallel",
-            position: { x: minX - 30, y: minY - 30 - headerHeight },
-            style: { width: containerWidth, height: containerHeight },
+
+            position: {
+                x: minX - 30,
+                y: minY - 30 - headerHeight,
+            },
+
+            style: {
+                width: containerWidth,
+                height: containerHeight,
+            },
+
             data: {
                 label: parallelName,
                 fullSkillName: parallelName,
-                isInitial: selectedNodes.some((n) => n.data?.isInitial),
+
+                isInitial: selectedNodes.some(
+                    (n) => n.data?.isInitial
+                ),
+
                 lanes: branchNames,
                 events: [],
                 onAddLane: handleAddLaneToParallel,
@@ -1106,6 +1140,24 @@ function AppContent() {
                 onExit: [],
             },
         };
+
+        const oldSelectionRight = maxX;
+
+        const newParallelRight =
+            parallelNode.position.x +
+            containerWidth;
+
+        const horizontalGrowth = Math.max(
+            0,
+            newParallelRight - oldSelectionRight
+        );
+
+        const parallelGap = 50;
+
+        const shiftX =
+            horizontalGrowth > 0
+                ? horizontalGrowth + parallelGap
+                : 0;
 
         const newLanes = [];
         const newCompounds = [];
@@ -1118,79 +1170,63 @@ function AppContent() {
             const laneId = getNodeId();
             const laneName = branchNames[idx];
             const laneHeight = laneHeights[idx];
-            const isCompound = group.length > 1;
 
-            group.forEach((n) => nodeToLaneMap.set(n.id, laneId));
+            // Für spätere Transition-Umbiegung merken,
+            // welcher State zu welcher Lane gehört.
+            group.forEach((node) => {
+                nodeToLaneMap.set(node.id, laneId);
+            });
 
+            // Lane erstellen
             newLanes.push({
                 id: laneId,
-                position: { x: 0, y: currentLaneY },
+                position: {
+                    x: 0,
+                    y: currentLaneY,
+                },
                 parentId: parallelId,
                 extent: "parent",
-                draggable: false,
-                selectable: false,
                 type: "parallelLane",
                 draggable: false,
+                selectable: false,
+
                 style: {
                     width: containerWidth,
                     height: laneHeight,
-                    borderBottom: idx < groups.length - 1 ? "1.5px solid #0284c7" : "none",
+                    borderBottom:
+                        idx < groups.length - 1
+                            ? "1.5px solid #0284c7"
+                            : "none",
                 },
+
                 data: {
                     label: laneName,
                     events: [],
                 },
             });
 
-            if (isCompound) {
-                const compoundId = getNodeId();
-                const compoundName = `${laneName}_Part`;
-                const compoundWidth = containerWidth - 130;
-                const compoundHeight = laneHeight - 10;
+            // States DIREKT in die Lane.
+            // Kein Group_X_Part Compound mehr.
+            let currentX = 25;
 
-                newCompounds.push({
-                    id: compoundId,
-                    position: { x: 15, y: 5 },
+            group.forEach((node) => {
+                const nodeWidth = getNodeWidth(node);
+
+                movedNodes.push({
+                    ...node,
                     parentId: laneId,
                     extent: "parent",
-                    type: "compound",
-                    className: "compound-in-lane", // <-- Macht den Rahmen unsichtbar
-                    style: { width: compoundWidth, height: compoundHeight },
-                    data: {
-                        label: compoundName,
-                        fullSkillName: compoundName,
-                        isInitial: group.some((n) => n.data?.isInitial),
-                        events: [],
+
+                    position: {
+                        x: currentX,
+                        y: 20,
                     },
+
+                    selected: false,
                 });
 
-                // Nodes horizontal nacheinander platzieren
-                let currentX = 15;
-                group.forEach((node) => {
-                    const w = getNodeWidth(node);
-                    movedNodes.push({
-                        ...node,
-                        parentId: compoundId,
-                        extent: "parent",
-                        position: { x: currentX, y: 15 }, // <-- Weiter oben, da kein Header stört
-                        selected: false,
-                    });
-                    currentX += w + 35;
-                });
-            } else {
-                group.forEach((node, nodeIndex) => {
-                    movedNodes.push({
-                        ...node,
-                        parentId: laneId,
-                        extent: "parent",
-                        position: {
-                            x: 25 + nodeIndex * 190,
-                            y: 20,
-                        },
-                        selected: false,
-                    });
-                });
-            }
+                currentX += nodeWidth + PARALLEL_NODE_GAP;
+            });
 
             currentLaneY += laneHeight;
         });
@@ -1260,21 +1296,64 @@ function AppContent() {
         let insertIndex = nodes.findIndex((n) => selectedIds.has(n.id));
         if (insertIndex === -1) insertIndex = 0;
 
-        const remainingNodes = nodes.filter((n) => {
-            if (selectedIds.has(n.id)) return false;
-            if (n.type === "compound") {
-                const hasRemainingChildren = nodes.some(
-                    (child) => child.parentId === n.id && !selectedIds.has(child.id)
-                );
-                return hasRemainingChildren;
-            }
-            return true;
-        });
+        const remainingNodes = nodes
+            .filter((n) => {
+                if (selectedIds.has(n.id)) {
+                    return false;
+                }
+
+                if (n.type === "compound") {
+                    const hasRemainingChildren = nodes.some(
+                        (child) =>
+                            child.parentId === n.id &&
+                            !selectedIds.has(child.id)
+                    );
+
+                    return hasRemainingChildren;
+                }
+
+                return true;
+            })
+            .map((node) => {
+                /*
+                 * Nur Root-Nodes verschieben.
+                 *
+                 * Kinder eines Compound-/Parallel-/Submachine-Nodes
+                 * werden automatisch mit ihrem Parent verschoben.
+                 */
+                if (node.parentId) {
+                    return node;
+                }
+
+                const nodeX =
+                    Number(node.position?.x) || 0;
+
+                /*
+                 * Alles, was vorher rechts hinter der ausgewählten
+                 * Gruppe lag, gemeinsam nach rechts verschieben.
+                 *
+                 * Dadurch bleibt die vorhandene Anordnung erhalten.
+                 */
+                if (
+                    shiftX > 0 &&
+                    nodeX >= oldSelectionRight
+                ) {
+                    return {
+                        ...node,
+                        position: {
+                            ...node.position,
+                            x: nodeX + shiftX,
+                        },
+                    };
+                }
+
+                return node;
+            });
 
         const newRootNodes = [...remainingNodes];
         newRootNodes.splice(insertIndex, 0, parallelNode);
 
-        setNodes([...newRootNodes, ...newLanes, ...newCompounds, ...movedNodes]);
+        setNodes([...newRootNodes, ...newLanes, ...movedNodes]);
         setEdges([...updatedEdges, ...newEdgesToAdd]);
         setSelectedNodeId(parallelId);
         setActiveTab("allgemein");
@@ -1808,40 +1887,370 @@ function AppContent() {
 
     const onConnect = useCallback(
         (params) => {
-            const alreadyExists = edges.some(
-                (e) => e.source === params.source && e.sourceHandle === params.sourceHandle && e.target === params.target
+            const sourceNode = nodes.find(
+                (n) => n.id === params.source
             );
 
-            if (alreadyExists) {
-                openConditionDrawer(params.source, params.sourceHandle, params.target);
+            const targetNode = nodes.find(
+                (n) => n.id === params.target
+            );
+
+            if (!sourceNode || !targetNode) {
                 return;
             }
 
-            const targetNode = nodes.find((n) => n.id === params.target);
+            // Prüfen, ob Source / Target innerhalb einer Parallel-Lane liegen
+            const sourceLane = getLaneForNode(
+                sourceNode,
+                nodes
+            );
+
+            const targetLane = getLaneForNode(
+                targetNode,
+                nodes
+            );
+
+            /*
+             * Die Transition verlässt einen Parallel-State, wenn:
+             *
+             * - die Source in einer Lane liegt
+             * - und das Target nicht im selben Parallel-State liegt
+             */
+            const leavesParallel =
+                sourceLane &&
+                (
+                    !targetLane ||
+                    targetLane.parentId !== sourceLane.parentId
+                );
+
+            /*
+             * Prüfen, ob diese logische Transition bereits existiert.
+             *
+             * Wichtig:
+             * Bei einer Parallel-Transition ist edge.source nicht mehr
+             * der eigentliche State, sondern die Lane.
+             * Deshalb parallelOriginalSource ebenfalls prüfen.
+             */
+            const alreadyExists = edges.some((edge) => {
+                const logicalSource =
+                    edge.data?.parallelOriginalSource ||
+                    edge.source;
+
+                return (
+                    logicalSource === params.source &&
+                    edge.sourceHandle === params.sourceHandle &&
+                    edge.target === params.target
+                );
+            });
+
+            if (alreadyExists) {
+                openConditionDrawer(
+                    params.source,
+                    params.sourceHandle,
+                    params.target
+                );
+                return;
+            }
+
+            /*
+             * =========================================================
+             * TRANSITION VERLÄSST PARALLEL
+             * =========================================================
+             */
+            if (leavesParallel) {
+                const handleId =
+                    params.sourceHandle || "success";
+
+                /*
+                 * Sichtbare äußere Transition:
+                 *
+                 * Nicht:
+                 * State A -> State B
+                 *
+                 * sondern:
+                 * Lane -> State B
+                 *
+                 * parallelOriginalSource merkt sich,
+                 * welcher State eigentlich die Source ist.
+                 */
+                const externalEdge = {
+                    id:
+                        `edge-${params.source}-` +
+                        `${handleId}-${params.target}-` +
+                        crypto.randomUUID(),
+
+                    source: sourceLane.id,
+                    target: params.target,
+
+                    sourceHandle: handleId,
+                    targetHandle: params.targetHandle,
+
+                    label: handleId,
+
+                    markerEnd: {
+                        type: MarkerType.ArrowClosed,
+                    },
+
+                    data: {
+                        cond: "",
+                        assignments: [],
+                        assign: null,
+
+                        // Der tatsächliche State bleibt hier gespeichert
+                        parallelOriginalSource:
+                            params.source,
+                    },
+                };
+
+                /*
+                 * Interne gestrichelte Verbindung:
+                 *
+                 * State A -> Lane-Rand
+                 */
+                const internalEdge = {
+                    id:
+                        `edge-internal-${params.source}-` +
+                        `${handleId}-${sourceLane.id}-` +
+                        crypto.randomUUID(),
+
+                    source: params.source,
+                    target: sourceLane.id,
+
+                    sourceHandle: handleId,
+                    targetHandle: `target-${handleId}`,
+
+                    type: "smoothstep",
+
+                    style: {
+                        strokeDasharray: "4 4",
+                        stroke: "#0284c7",
+                        strokeWidth: 1.5,
+                    },
+                };
+
+                setEdges((currentEdges) => [
+                    ...currentEdges,
+                    externalEdge,
+                    internalEdge,
+                ]);
+
+                /*
+                 * Die Lane braucht den Event/Handle ebenfalls,
+                 * damit die äußere Transition sauber am Rand
+                 * angezeigt werden kann.
+                 */
+                setNodes((currentNodes) =>
+                    currentNodes.map((node) => {
+                        /*
+                         * Event am ursprünglichen State ergänzen
+                         */
+                        if (node.id === params.source) {
+                            const events =
+                                node.data?.events || [];
+
+                            const existingEvent =
+                                events.find(
+                                    (event) =>
+                                        event.id === handleId
+                                );
+
+                            if (existingEvent) {
+                                return node;
+                            }
+
+                            return {
+                                ...node,
+                                data: {
+                                    ...node.data,
+                                    events: [
+                                        ...events,
+                                        {
+                                            id: handleId,
+
+                                            selectedPackage:
+                                                getSkillPackageName(
+                                                    targetNode
+                                                        ?.data
+                                                        ?.fullSkillName
+                                                ),
+
+                                            selectedSkill:
+                                                targetNode
+                                                    ?.data
+                                                    ?.fullSkillName
+                                                    ?.split("#")[0] ||
+                                                "",
+
+                                            target:
+                                                params.target,
+
+                                            cond: "",
+
+                                            assignments: [],
+
+                                            assignLocation: "",
+                                            assignExpr: "",
+                                        },
+                                    ],
+                                },
+                            };
+                        }
+
+                        /*
+                         * Passenden Handle/Event an der Lane erzeugen
+                         */
+                        if (node.id === sourceLane.id) {
+                            const laneEvents =
+                                node.data?.events || [];
+
+                            const alreadyHasEvent =
+                                laneEvents.some(
+                                    (event) =>
+                                        event.id === handleId
+                                );
+
+                            if (alreadyHasEvent) {
+                                return node;
+                            }
+
+                            const baseName =
+                                sourceNode.data?.label ||
+                                sourceNode.data
+                                    ?.fullSkillName ||
+                                "state";
+
+                            return {
+                                ...node,
+                                data: {
+                                    ...node.data,
+
+                                    events: [
+                                        ...laneEvents,
+                                        {
+                                            id: handleId,
+
+                                            name:
+                                                `${baseName}.` +
+                                                handleId,
+
+                                            rawEvent:
+                                                `${baseName}.` +
+                                                handleId,
+
+                                            target:
+                                                params.target,
+                                        },
+                                    ],
+                                },
+                            };
+                        }
+
+                        return node;
+                    })
+                );
+
+                requestAnimationFrame(() => {
+                    updateNodeInternals(sourceLane.id);
+                });
+
+                /*
+                 * Falls mehrere Transitions vom selben Event ausgehen,
+                 * Condition Drawer öffnen.
+                 */
+                const outgoingFromHandle = [
+                    ...edges,
+                    externalEdge,
+                ].filter((edge) => {
+                    const logicalSource =
+                        edge.data?.parallelOriginalSource ||
+                        edge.source;
+
+                    return (
+                        logicalSource === params.source &&
+                        edge.sourceHandle === handleId
+                    );
+                });
+
+                if (outgoingFromHandle.length >= 2) {
+                    openConditionDrawer(
+                        params.source,
+                        handleId,
+                        params.target,
+                        [
+                            ...edges,
+                            externalEdge,
+                            internalEdge,
+                        ]
+                    );
+                }
+
+                return;
+            }
+
+            /*
+             * =========================================================
+             * NORMALE TRANSITION
+             * =========================================================
+             *
+             * Source liegt nicht im Parallel oder Target befindet
+             * sich im selben Parallel-State.
+             */
             const newEdge = {
-                id: `edge-${params.source}-${params.sourceHandle}-${params.target}-${crypto.randomUUID()}`,
+                id:
+                    `edge-${params.source}-` +
+                    `${params.sourceHandle}-` +
+                    `${params.target}-` +
+                    crypto.randomUUID(),
+
                 source: params.source,
                 target: params.target,
-                sourceHandle: params.sourceHandle,
-                targetHandle: params.targetHandle,
-                label: params.sourceHandle,
+
+                sourceHandle:
+                    params.sourceHandle,
+
+                targetHandle:
+                    params.targetHandle,
+
+                label:
+                    params.sourceHandle,
+
                 type: "smartTransition",
-                markerEnd: { type: MarkerType.ArrowClosed },
-                data: { cond: "", assignments: [], assign: null },
+                markerEnd: {
+                    type: MarkerType.ArrowClosed,
+                },
+
+                data: {
+                    cond: "",
+                    assignments: [],
+                    assign: null,
+                },
             };
 
-            const updatedEdges = [...edges, newEdge];
+            const updatedEdges = [
+                ...edges,
+                newEdge,
+            ];
+
             setEdges(updatedEdges);
 
-            setNodes((nds) =>
-                nds.map((node) => {
-                    if (node.id !== params.source) return node;
+            /*
+             * Event am Source-State aktualisieren
+             */
+            setNodes((currentNodes) =>
+                currentNodes.map((node) => {
+                    if (node.id !== params.source) {
+                        return node;
+                    }
 
-                    const events = node.data.events || [];
+                    const events =
+                        node.data?.events || [];
 
-                    const existingEvent = events.find(
-                        (event) => event.id === params.sourceHandle
-                    );
+                    const existingEvent =
+                        events.find(
+                            (event) =>
+                                event.id ===
+                                params.sourceHandle
+                        );
 
                     if (existingEvent) {
                         return node;
@@ -1851,17 +2260,30 @@ function AppContent() {
                         ...node,
                         data: {
                             ...node.data,
+
                             events: [
                                 ...events,
                                 {
-                                    id: params.sourceHandle,
+                                    id:
+                                        params.sourceHandle,
+
                                     selectedPackage:
                                         getSkillPackageName(
-                                            targetNode?.data.fullSkillName
+                                            targetNode
+                                                ?.data
+                                                ?.fullSkillName
                                         ),
+
                                     selectedSkill:
-                                        targetNode?.data.fullSkillName?.split("#")[0] || "",
-                                    target: params.target,
+                                        targetNode
+                                            ?.data
+                                            ?.fullSkillName
+                                            ?.split("#")[0] ||
+                                        "",
+
+                                    target:
+                                        params.target,
+
                                     cond: "",
                                     assignments: [],
                                     assignLocation: "",
@@ -1873,12 +2295,22 @@ function AppContent() {
                 })
             );
 
-            const outgoingFromHandle = updatedEdges.filter(
-                (e) => e.source === params.source && e.sourceHandle === params.sourceHandle
-            );
+            const outgoingFromHandle =
+                updatedEdges.filter(
+                    (edge) =>
+                        edge.source ===
+                            params.source &&
+                        edge.sourceHandle ===
+                            params.sourceHandle
+                );
 
             if (outgoingFromHandle.length >= 2) {
-                openConditionDrawer(params.source, params.sourceHandle, params.target, updatedEdges);
+                openConditionDrawer(
+                    params.source,
+                    params.sourceHandle,
+                    params.target,
+                    updatedEdges
+                );
             }
         },
         [edges, nodes]
@@ -2095,7 +2527,6 @@ function AppContent() {
                     target: targetNodeId,
                     sourceHandle: event.id,
                     label: event.id,
-                    type: "smartTransition",
                     markerEnd: { type: MarkerType.ArrowClosed },
                     data: { cond: "", assignments: [], assign: null },
                 },
@@ -2781,7 +3212,9 @@ function AppContent() {
                     // 15px Wrapper-Abstand links
                     // + 25px Reserve rechts
                     const laneRequiredWidth =
-                        15 + maxRight + 25;
+                        15 +
+                        maxRight +
+                        PARALLEL_EXIT_GUTTER;
 
                     requiredParallelWidth = Math.max(
                         requiredParallelWidth,

@@ -328,27 +328,136 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
             nodes.forEach((n) => {
                 if (isDescendantOf(n.id, node.id)) {
                     const outgoing = edges.filter(
-                        (e) => e.source === n.id && !e.id.startsWith("edge-internal-") && !isDescendantOf(e.target, node.id)
+                        (e) =>
+                            e.source === n.id &&
+                            !e.id.startsWith("edge-internal-") &&
+                            !isDescendantOf(e.target, node.id)
                     );
 
                     outgoing.forEach((e) => {
-                        const targetNode = nodes.find((tn) => tn.id === e.target);
+                        const targetNode = nodes.find(
+                            (tn) => tn.id === e.target
+                        );
+
                         const targetId = targetNode
-                            ? targetNode.data.fullSkillName || targetNode.data.label
+                            ? targetNode.data.fullSkillName ||
+                              targetNode.data.label
                             : e.target;
 
-                        const rawHandle = e.sourceHandle || e.label || "success";
-                        const baseSkill = n.data?.label || n.data?.fullSkillName?.split("#")[0]?.split(".")?.pop() || "";
-                        const fullEvent = rawHandle.includes(".") ? rawHandle : `${baseSkill}.${rawHandle}`;
-                        const condAttr = e.data?.cond ? ` cond="${e.data.cond}"` : "";
+                        /*
+                         * Bei einer Parallel-Transition ist e.source
+                         * möglicherweise die Lane.
+                         *
+                         * Die tatsächliche Source steckt dann in
+                         * parallelOriginalSource.
+                         */
+                        const actualSourceId =
+                            e.data?.parallelOriginalSource ||
+                            e.source;
 
-                        if (e.data?.assign?.location && e.data?.assign?.expr) {
-                            leavingTransitions.push(
-                                `${indent}    <transition event="${fullEvent}" target="${targetId}"${condAttr}>\n${indent}        <assign location="${e.data.assign.location}" expr="${e.data.assign.expr}"/>\n${indent}    </transition>`
+                        const actualSourceNode = nodes.find(
+                            (candidate) =>
+                                candidate.id === actualSourceId
+                        );
+
+                        const rawHandle =
+                            e.sourceHandle ||
+                            e.label ||
+                            "success";
+
+                        /*
+                         * Wichtig:
+                         * Den tatsächlichen Skillnamen verwenden,
+                         * NICHT Lane_1.
+                         */
+                        const sourceSkillName =
+                            actualSourceNode?.data?.fullSkillName ||
+                            actualSourceNode?.data?.label ||
+                            "";
+
+                        const fullEvent =
+                            getScxmlTransitionEvent(
+                                rawHandle,
+                                sourceSkillName
                             );
+
+                        const condAttr =
+                            e.data?.cond
+                                ? ` cond="${escapeXmlAttribute(
+                                      e.data.cond
+                                  )}"`
+                                : "";
+
+                        const assignments =
+                            Array.isArray(
+                                e.data?.assignments
+                            )
+                                ? e.data.assignments
+                                : e.data?.assign?.location
+                                  ? [e.data.assign]
+                                  : [];
+
+                        if (assignments.length > 0) {
+                            const assignmentLines =
+                                assignments
+                                    .filter(
+                                        (assignment) =>
+                                            assignment?.location &&
+                                            assignment?.expr !==
+                                                undefined
+                                    )
+                                    .map((assignment) => {
+                                        const location =
+                                            String(
+                                                assignment.location
+                                            )
+                                                .trim()
+                                                .replace(/^@/, "");
+
+                                        const expr =
+                                            serializeEditorValueForScxml(
+                                                assignment.expr
+                                            );
+
+                                        return (
+                                            `${indent}        ` +
+                                            `<assign location="${escapeXmlAttribute(
+                                                location
+                                            )}" ` +
+                                            `expr="${escapeXmlAttribute(
+                                                expr
+                                            )}"/>`
+                                        );
+                                    });
+
+                            if (assignmentLines.length > 0) {
+                                leavingTransitions.push(
+                                    `${indent}    <transition event="${escapeXmlAttribute(
+                                        fullEvent
+                                    )}" target="${escapeXmlAttribute(
+                                        targetId
+                                    )}"${condAttr}>\n` +
+                                    `${assignmentLines.join(
+                                        "\n"
+                                    )}\n` +
+                                    `${indent}    </transition>`
+                                );
+                            } else {
+                                leavingTransitions.push(
+                                    `${indent}    <transition event="${escapeXmlAttribute(
+                                        fullEvent
+                                    )}" target="${escapeXmlAttribute(
+                                        targetId
+                                    )}"${condAttr}/>`
+                                );
+                            }
                         } else {
                             leavingTransitions.push(
-                                `${indent}    <transition event="${fullEvent}" target="${targetId}"${condAttr}/>`
+                                `${indent}    <transition event="${escapeXmlAttribute(
+                                    fullEvent
+                                )}" target="${escapeXmlAttribute(
+                                    targetId
+                                )}"${condAttr}/>`
                             );
                         }
                     });
