@@ -2598,41 +2598,371 @@
 
 
 /* ==========================================================================
-   COMPACT SLOT CARDS
-   Matches Parameter / Exit Token visual language
+   DATAMODEL VALUE TYPES & TYPE-SAFE VALUE EDITORS
    ========================================================================== */
 
-.compact-slot-card {
+.datamodel-compact-id-cell,
+.datamodel-sourced-id-group {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+}
+
+.datamodel-sourced-id-group h4 {
+  margin: 0;
+}
+
+.datamodel-value-type-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 16px;
+  padding: 2px 6px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 999px;
+  background: rgba(71, 85, 105, 0.3);
+  color: #cbd5e1;
+  font-size: 8.5px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.datamodel-value-type-string {
+  border-color: rgba(56, 189, 248, 0.45);
+  background: rgba(56, 189, 248, 0.13);
+  color: #7dd3fc;
+}
+
+.datamodel-value-type-boolean {
+  border-color: rgba(192, 132, 252, 0.45);
+  background: rgba(168, 85, 247, 0.13);
+  color: #d8b4fe;
+}
+
+.datamodel-value-type-integer {
+  border-color: rgba(45, 212, 191, 0.45);
+  background: rgba(20, 184, 166, 0.13);
+  color: #5eead4;
+}
+
+.datamodel-value-type-double {
+  border-color: rgba(251, 191, 36, 0.5);
+  background: rgba(245, 158, 11, 0.13);
+  color: #fcd34d;
+}
+
+.typed-value-editor {
   position: relative;
+  min-width: 0;
+  width: 100%;
+}
+
+.typed-value-editor-row {
+  position: relative;
+  min-width: 0;
+  width: 100%;
+}
+
+.typed-value-editor-row > input {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.typed-value-autocomplete {
+  position: absolute;
+  z-index: 1200;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  background: #0f172a;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.38);
+}
+
+.typed-value-autocomplete-option {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 9px;
+  border: 0;
+  border-bottom: 1px solid rgba(71, 85, 105, 0.55);
+  background: transparent;
+  color: #e2e8f0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.typed-value-autocomplete-option:last-child {
+  border-bottom: 0;
+}
+
+.typed-value-autocomplete-option:hover,
+.typed-value-autocomplete-option.active {
+  background: rgba(56, 189, 248, 0.15);
+}
+
+.typed-value-autocomplete-value {
+  min-width: 0;
   overflow: hidden;
+  color: #f8fafc;
+  font-size: 11px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.typed-value-autocomplete-type {
+  flex-shrink: 0;
+  color: #94a3b8;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.typed-value-editor-invalid input {
+  border-color: #ef4444 !important;
+}
+
+.typed-value-error {
+  margin-top: 3px;
+  color: #fca5a5;
+  font-size: 9.5px;
+  line-height: 1.25;
+}
+
+.state-action-field-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+  min-width: 0;
+}
+
+.state-action-field-label-row .datamodel-value-type-badge {
+  font-size: 7.5px;
+}
+
+
+.transition-typed-assignment {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+
+.condition-expression-row {
+  display: grid;
+  grid-template-columns: auto minmax(72px, 0.8fr) 74px minmax(120px, 1.4fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  width: 100%;
+}
+
+.condition-expression-variable {
+  min-width: 0;
+  overflow: hidden;
+  color: #38bdf8;
+  font-size: 12px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.condition-expression-operator {
+  width: 74px;
+  min-width: 74px;
+}
+
+.condition-expression-value {
+  min-width: 0;
+}
+
+@media (max-width: 1150px) {
+  .condition-expression-row {
+    grid-template-columns: auto minmax(60px, 1fr) 68px minmax(100px, 1.3fr);
+    gap: 6px;
+  }
+
+  .condition-expression-operator {
+    width: 68px;
+    min-width: 68px;
+  }
+}
+
+/* ==========================================================================
+   DATAMODEL LOCAL PARAMETER STACKED LAYOUT
+   Keep the parameter id/type on the first row and the value field below it.
+   ========================================================================== */
+.datamodel-compact-row:not(.datamodel-sourced-row) {
+  grid-template-columns: minmax(0, 1fr) 28px;
+  align-items: start;
+}
+
+.datamodel-compact-row:not(.datamodel-sourced-row) .datamodel-compact-id-cell {
+  grid-column: 1;
+  grid-row: 1;
+  width: 100%;
+}
+
+.datamodel-compact-row:not(.datamodel-sourced-row) .datamodel-delete-button {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: center;
+}
+
+.datamodel-compact-row:not(.datamodel-sourced-row) .datamodel-compact-value-input {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  width: 100%;
+}
+
+.datamodel-compact-row:not(.datamodel-sourced-row) .datamodel-row-message {
+  grid-column: 1 / -1;
+  grid-row: 3;
+}
+
+/* Type badge and parameter id share the header row; value remains below. */
+.datamodel-compact-row:not(.datamodel-sourced-row) .datamodel-compact-id-cell {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ==========================================================================
+   PARAMETER TYPE ACCENTS
+   Datamodel and skill parameters share the same ID -> type -> value hierarchy.
+   ========================================================================== */
+.datamodel-compact-id-cell,
+.datamodel-sourced-id-group {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+.datamodel-sourced-id-group h4 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.datamodel-type-accent,
+.parameter-card {
+  border-left-width: 4px;
+  border-left-style: solid;
+}
+
+.datamodel-type-accent-string,
+.parameter-card-type-string {
+  border-left-color: #38bdf8;
+}
+
+.datamodel-type-accent-boolean,
+.parameter-card-type-boolean {
+  border-left-color: #a855f7;
+}
+
+.datamodel-type-accent-integer,
+.parameter-card-type-integer {
+  border-left-color: #14b8a6;
+}
+
+.datamodel-type-accent-double,
+.parameter-card-type-double {
+  border-left-color: #f59e0b;
+}
+
+.datamodel-type-accent-other,
+.parameter-card-type-other {
+  border-left-color: #64748b;
+}
+
+.parameter-card-header {
+  align-items: center;
+}
+
+.parameter-identity {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.parameter-identity .parameter-name {
+  min-width: 0;
+}
+
+.parameter-identity .parameter-type-badge {
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+   PARAMETER / SLOT HEADER ALIGNMENT
+   IDs stay left; type/access badges align to the far right.
+   ========================================================================== */
+.datamodel-compact-id-cell {
+  width: 100%;
+}
+
+.datamodel-compact-id-cell .datamodel-value-type-badge {
+  margin-left: auto;
+}
+
+.parameter-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.parameter-card-header .parameter-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.parameter-card-header .parameter-badges {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+   COMPACT SLOT CARDS
+   Match parameter cards: name left, badges right, description/path below.
+   Slot accent color represents access direction: Read or Write.
+   ========================================================================== */
+.compact-slot-card {
   padding: 9px 10px;
   margin-bottom: 7px;
   border-left-width: 4px;
   border-left-style: solid;
 }
 
-.compact-slot-read {
-  border-left-color: #38bdf8;
-}
-
-.compact-slot-write {
-  border-left-color: #a78bfa;
-}
-
 .compact-slot-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 10px;
   margin-bottom: 5px;
 }
 
 .compact-slot-name {
+  flex: 1;
   min-width: 0;
-  overflow-wrap: anywhere;
   color: #ffffff;
   font-size: 13px;
   font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
 .compact-slot-badges {
@@ -2642,6 +2972,7 @@
   gap: 5px;
   flex-wrap: wrap;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 .slot-access-badge {
@@ -2653,24 +2984,39 @@
   font-size: 10px;
   font-weight: 700;
   line-height: 1;
+  white-space: nowrap;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  white-space: nowrap;
 }
 
 .slot-access-read {
-  border: 1px solid rgba(56, 189, 248, 0.45);
-  background: rgba(56, 189, 248, 0.12);
-  color: #7dd3fc;
+  border: 1px solid rgba(96, 165, 250, 0.5);
+  background: rgba(59, 130, 246, 0.13);
+  color: #93c5fd;
 }
 
 .slot-access-write {
-  border: 1px solid rgba(167, 139, 250, 0.5);
-  background: rgba(139, 92, 246, 0.13);
-  color: #c4b5fd;
+  border: 1px solid rgba(52, 211, 153, 0.5);
+  background: rgba(16, 185, 129, 0.13);
+  color: #6ee7b7;
+}
+
+.compact-slot-read {
+  border-left-color: #3b82f6;
+}
+
+.compact-slot-write {
+  border-left-color: #10b981;
 }
 
 .compact-slot-path-input {
-  margin-top: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
+/* Keep the Double type badge consistent with its orange type accent. */
+.parameter-type-double {
+  border-color: rgba(251, 191, 36, 0.5);
+  background: rgba(245, 158, 11, 0.13);
+  color: #fcd34d;
+}

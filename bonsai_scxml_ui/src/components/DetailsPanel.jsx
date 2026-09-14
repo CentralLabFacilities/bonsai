@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { FiChevronDown, FiExternalLink, FiLayers } from "react-icons/fi";
 import StateActionsEditor from "./StateActionsEditor";
+import TypedValueEditor from "./TypedValueEditor";
+import { getVariableType, normalizeValueType } from "../utils/valueTypes";
 
 function MetadataRow({ label, value }) {
     return (
@@ -252,11 +254,20 @@ function DetailsPanel({
     };
 
     const availableActionLocations = [
-        ...(globalDataModel || []).map((parameter) => parameter.id),
-        ...(selectedNode.data.params || []).map((parameter) => parameter.key),
+        ...(globalDataModel || []).map((parameter) => ({
+            id: parameter.id,
+            type: getVariableType(parameter),
+            source: "Datamodel",
+        })),
+        ...(selectedNode.data.params || []).map((parameter) => ({
+            id: parameter.key,
+            type: normalizeValueType(parameter.type),
+            source: "Skill parameter",
+        })),
     ].filter(
         (location, index, locations) =>
-            location && locations.indexOf(location) === index
+            location.id &&
+            locations.findIndex((candidate) => candidate.id === location.id) === index
     );
 
     return (
@@ -684,7 +695,7 @@ function DetailsPanel({
                             {(selectedNode.data.params || []).map(
                                 (param, index) => (
                                     <div
-                                        className="slot-text-field parameter-card"
+                                        className={`slot-text-field parameter-card parameter-card-type-${(normalizeValueType(param.type) || "other").toLowerCase()}`}
                                         key={param.key}
                                     >
                                         <div className="parameter-card-header">
@@ -701,6 +712,12 @@ function DetailsPanel({
                                             </div>
 
                                             <div className="parameter-badges">
+                                                {param.required && (
+                                                    <span className="parameter-required-badge">
+                                                        Required
+                                                    </span>
+                                                )}
+
                                                 <span
                                                     className={`parameter-type-badge parameter-type-${String(
                                                         param.type || "other"
@@ -713,12 +730,6 @@ function DetailsPanel({
                                                 >
                                                     {param.type || "Unknown"}
                                                 </span>
-
-                                                {param.required && (
-                                                    <span className="parameter-required-badge">
-                                                        Required
-                                                    </span>
-                                                )}
                                             </div>
                                         </div>
 
@@ -728,33 +739,22 @@ function DetailsPanel({
                                             </div>
                                         )}
 
-                                        <input
-                                            id={`param-${selectedNode.id}-${index}`}
-                                            className="parameter-value-input"
-                                            type="text"
+                                        <TypedValueEditor
                                             value={param.expr || ""}
+                                            expectedType={param.type}
+                                            variables={globalDataModel || []}
+                                            inputClassName="parameter-value-input"
                                             placeholder={
                                                 param.default != null
                                                     ? String(param.default)
-                                                    : "Enter value"
+                                                    : `Enter ${normalizeValueType(param.type) || "value"}`
                                             }
-                                            onChange={(e) =>
-                                                onUpdateParameter(
-                                                    index,
-                                                    e.target.value
-                                                )
-                                            }
-                                            onKeyDown={(e) => {
-                                                if (e.key === "Enter") {
-                                                    e.preventDefault();
-                                                    e.currentTarget.blur();
-                                                }
-                                            }}
-                                            onBlur={() =>
+                                            onCommit={(value) => {
+                                                onUpdateParameter(index, value);
                                                 onUpdateParameterBlur?.(
                                                     selectedNode.id
-                                                )
-                                            }
+                                                );
+                                            }}
                                         />
                                     </div>
                                 )
@@ -887,6 +887,7 @@ function DetailsPanel({
                             actionName="OnEntry"
                             actions={selectedNode.data.onEntry}
                             availableLocations={availableActionLocations}
+                            valueVariables={globalDataModel || []}
                             listId={`onentry-locations-${selectedNode.id}`}
                             onChange={(assignments) =>
                                 onUpdateStateActions(
@@ -901,6 +902,7 @@ function DetailsPanel({
                             actionName="OnExit"
                             actions={selectedNode.data.onExit}
                             availableLocations={availableActionLocations}
+                            valueVariables={globalDataModel || []}
                             listId={`onexit-locations-${selectedNode.id}`}
                             onChange={(assignments) =>
                                 onUpdateStateActions(
@@ -918,3 +920,4 @@ function DetailsPanel({
 }
 
 export default DetailsPanel;
+

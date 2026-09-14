@@ -1,16 +1,18 @@
 import { useState, useEffect, useRef } from "react";
 import { FiX, FiPlus, FiCheck, FiArrowRight, FiAlertTriangle, FiInfo, FiChevronUp, FiChevronDown } from "react-icons/fi";
+import TypedValueEditor from "./TypedValueEditor";
+import { VALUE_TYPES, getVariableType, normalizeDatamodelValue, normalizeTypedValue } from "../utils/valueTypes";
 
 function ConditionModal({
-    isOpen,
-    onClose,
-    onConfirm,
-    globalVariables = [],
-    sourceEventName,
-    sourceNodeName,
-    candidateTransitions = [],
-    initialTargetId = null,
-}) {
+                            isOpen,
+                            onClose,
+                            onConfirm,
+                            globalVariables = [],
+                            sourceEventName,
+                            sourceNodeName,
+                            candidateTransitions = [],
+                            initialTargetId = null,
+                        }) {
     const drawerRef = useRef(null);
 
     const usableVars = globalVariables.filter((v) => !v.id.startsWith("#"));
@@ -134,9 +136,21 @@ function ConditionModal({
         });
     };
 
-    if (!isOpen) return null;
-
     const activeVarName = isCustomVar ? newVarName.trim() : selectedVar;
+    const activeVariable = isCustomVar
+        ? { id: activeVarName, expr: newVarExpr }
+        : usableVars.find((variable) => variable.id === selectedVar);
+    const activeVariableType = getVariableType(activeVariable);
+    const isBooleanCondition = activeVariableType === VALUE_TYPES.BOOLEAN;
+
+    useEffect(() => {
+        if (!isBooleanCondition) return;
+        if (operator !== "==" && operator !== "!=") {
+            setOperator("==");
+        }
+    }, [isBooleanCondition, operator]);
+
+    if (!isOpen) return null;
 
     const handleSave = () => {
         setErrorMessage("");
@@ -168,14 +182,47 @@ function ConditionModal({
                 setErrorMessage("Please provide a comparative value in step 3.");
                 return;
             }
-            if (enableAssign && (!assignExpr || assignExpr.trim() === "")) {
-                setErrorMessage("If <assign> is enabled, an expression must be specified.");
+
+            const comparisonResult = normalizeTypedValue(
+                compareValue,
+                activeVariableType,
+                usableVars,
+                { allowEmpty: false }
+            );
+
+            if (!comparisonResult.valid) {
+                setErrorMessage(
+                    comparisonResult.error ||
+                    `The condition value must be ${activeVariableType || "type-compatible"}.`
+                );
                 return;
             }
 
-            const conditionString = `${activeVarName} ${operator} ${compareValue.trim()}`;
+            const normalizedCompareValue = comparisonResult.value;
+            let normalizedAssignExpr = "";
+
+            if (enableAssign) {
+                const assignmentResult = normalizeTypedValue(
+                    assignExpr,
+                    activeVariableType,
+                    usableVars,
+                    { allowEmpty: false }
+                );
+
+                if (!assignmentResult.valid) {
+                    setErrorMessage(
+                        assignmentResult.error ||
+                        `The transition assignment must be ${activeVariableType || "type-compatible"}.`
+                    );
+                    return;
+                }
+
+                normalizedAssignExpr = assignmentResult.value;
+            }
+
+            const conditionString = `${activeVarName} ${operator} ${normalizedCompareValue}`;
             const assignLocation = enableAssign ? activeVarName : "";
-            const assignVal = enableAssign ? assignExpr.trim() : "";
+            const assignVal = enableAssign ? normalizedAssignExpr : "";
 
             const hasOtherFallback = otherTransitions.some((t) => !t.cond || t.cond.trim() === "");
 
@@ -214,7 +261,10 @@ function ConditionModal({
         const finalSortedList = [...withCond, ...withoutCond];
 
         const newGlobalVar = isCustomVar && newVarName.trim()
-            ? { id: newVarName.trim(), expr: newVarExpr.trim() }
+            ? {
+                id: newVarName.trim(),
+                expr: normalizeDatamodelValue(newVarExpr),
+            }
             : null;
 
         onConfirm({
@@ -383,31 +433,45 @@ function ConditionModal({
                         </div>
                         <div className="step-card-body">
                             {!isFallbackMode ? (
-                                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                                    <span style={{ fontWeight: "bold", color: "#38bdf8", flex: 1, overflow: "hidden", textOverflow: "ellipsis" }}>
+                                <div className="condition-expression-row">
+                                    {activeVariableType && (
+                                        <span className={`datamodel-value-type-badge datamodel-value-type-${activeVariableType.toLowerCase()}`}>
+                                            {activeVariableType}
+                                        </span>
+                                    )}
+
+                                    <span className="condition-expression-variable" title={activeVarName || "Variable"}>
                                         {activeVarName || "Variable"}
                                     </span>
+
                                     <select
-                                        className="skill-select"
-                                        style={{ width: "70px" }}
+                                        className="skill-select condition-expression-operator"
                                         value={operator}
                                         onChange={(e) => setOperator(e.target.value)}
                                     >
-                                        <option value=">">&gt;</option>
-                                        <option value="<">&lt;</option>
+                                        {!isBooleanCondition && <option value=">">&gt;</option>}
+                                        {!isBooleanCondition && <option value="<">&lt;</option>}
                                         <option value="==">==</option>
-                                        <option value=">=">&gt;=</option>
-                                        <option value="<=">&lt;=</option>
+                                        {!isBooleanCondition && <option value=">=">&gt;=</option>}
+                                        {!isBooleanCondition && <option value="<=">&lt;=</option>}
                                         <option value="!=">!=</option>
                                     </select>
-                                    <input
-                                        className="slot-field-edit"
-                                        type="text"
-                                        style={{ width: "70px" }}
-                                        placeholder="Value"
-                                        value={compareValue}
-                                        onChange={(e) => setCompareValue(e.target.value)}
-                                    />
+
+                                    <div className="condition-expression-value">
+                                        <TypedValueEditor
+                                            value={compareValue}
+                                            expectedType={activeVariableType}
+                                            variables={usableVars}
+                                            allowEmpty={false}
+                                            placeholder={
+                                                activeVariableType
+                                                    ? `${activeVariableType} value`
+                                                    : "Value"
+                                            }
+                                            onDraftChange={setCompareValue}
+                                            onCommit={setCompareValue}
+                                        />
+                                    </div>
                                 </div>
                             ) : (
                                 <span style={{ fontSize: "12px", color: "#94a3b8" }}>
@@ -435,14 +499,27 @@ function ConditionModal({
                                         <span>Change variable</span>
                                     </label>
                                     {enableAssign ? (
-                                        <input
-                                            className="slot-field-edit"
-                                            type="text"
-                                            style={{ marginTop: "8px" }}
-                                            placeholder={`z. B. ${activeVarName || "x"} - 1`}
-                                            value={assignExpr}
-                                            onChange={(e) => setAssignExpr(e.target.value)}
-                                        />
+                                        <div className="transition-typed-assignment">
+                                            {activeVariableType && (
+                                                <span className={`datamodel-value-type-badge datamodel-value-type-${activeVariableType.toLowerCase()}`}>
+                                                    {activeVariableType}
+                                                </span>
+                                            )}
+
+                                            <TypedValueEditor
+                                                value={assignExpr}
+                                                expectedType={activeVariableType}
+                                                variables={usableVars}
+                                                allowEmpty={false}
+                                                placeholder={
+                                                    activeVariableType
+                                                        ? `${activeVariableType} value`
+                                                        : "Value"
+                                                }
+                                                onDraftChange={setAssignExpr}
+                                                onCommit={setAssignExpr}
+                                            />
+                                        </div>
                                     ) : (
                                         <span style={{ fontSize: "12px", color: "#64748b", marginTop: "8px" }}>
                                             No automatic change

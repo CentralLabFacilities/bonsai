@@ -1,3 +1,5 @@
+import { deserializeScxmlValueForEditor } from "./valueTypes.js";
+
 const hasValue = (value) =>
     value !== undefined && value !== null && String(value).trim() !== "";
 
@@ -14,6 +16,8 @@ export const parseStateAssignments = (stateElement, actionName) =>
                 .filter((child) => child.localName === "assign")
                 .map((assignElement) => ({
                     location: assignElement.getAttribute("location")?.trim() || "",
-                    expr: assignElement.getAttribute("expr")?.trim() || "",
+                    expr: deserializeScxmlValueForEditor(
+                        assignElement.getAttribute("expr")?.trim() || ""
+                    ),
                 }))
         );

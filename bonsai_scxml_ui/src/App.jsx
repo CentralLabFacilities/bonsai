@@ -194,6 +194,23 @@ function AppContent() {
         inheritedGlobalDataModel,
     ]);
 
+
+    const availableDataModelParameters = useMemo(() => {
+        const parameters = [];
+        const seen = new Set();
+
+        // Parent globals take precedence when a child defines the same global.
+        [...(inheritedGlobalDataModel || []), ...(globalDataModel || [])].forEach(
+            (parameter) => {
+                if (!parameter?.id || seen.has(parameter.id)) return;
+                seen.add(parameter.id);
+                parameters.push(parameter);
+            }
+        );
+
+        return parameters;
+    }, [inheritedGlobalDataModel, globalDataModel]);
+
     // Condition Drawer State
     const [drawerData, setDrawerData] = useState({
         isOpen: false,
@@ -1815,7 +1832,7 @@ function AppContent() {
                                 }
 
                                 onUpdateParameterBlur={updateEventsFromParameters}
-                                globalDataModel={globalDataModel}
+                                globalDataModel={availableDataModelParameters}
                                 onUpdateStateActions={(nodeId, actionType, assignments) =>
                                     setNodes((nds) =>
                                         nds.map((node) =>
@@ -1866,7 +1883,7 @@ function AppContent() {
                 isOpen={drawerData.isOpen}
                 onClose={() => setDrawerData((prev) => ({ ...prev, isOpen: false }))}
                 onConfirm={handleConfirmDrawer}
-                globalVariables={globalDataModel}
+                globalVariables={availableDataModelParameters}
                 sourceNodeName={drawerData.sourceNodeName}
                 sourceEventName={drawerData.sourceEventName}
                 candidateTransitions={drawerData.candidateTransitions}
