@@ -1049,11 +1049,27 @@ function AppContent() {
             return edge;
         });
 
-        const remainingNodes = nodes.filter((n) => !selectedIds.has(n.id));
-        setNodes([parallelNode, ...newLanes, ...newCompounds, ...movedNodes, ...remainingNodes]);
+        let insertIndex = nodes.findIndex((n) => selectedIds.has(n.id));
+        if (insertIndex === -1) insertIndex = 0;
+
+        const remainingNodes = nodes.filter((n) => {
+            if (selectedIds.has(n.id)) return false;
+            if (n.type === "compound") {
+                const hasRemainingChildren = nodes.some(
+                    (child) => child.parentId === n.id && !selectedIds.has(child.id)
+                );
+                return hasRemainingChildren;
+            }
+            return true;
+        });
+
+        const newRootNodes = [...remainingNodes];
+        newRootNodes.splice(insertIndex, 0, parallelNode);
+
+        setNodes([...newRootNodes, ...newLanes, ...newCompounds, ...movedNodes]);
+        setEdges([...updatedEdges, ...newEdgesToAdd]);
         setSelectedNodeId(parallelId);
         setActiveTab("allgemein");
-        setEdges([...updatedEdges, ...newEdgesToAdd]);
     };
 
     // 3. Sub-State-Machine erstellen & direkt in neuem Tab öffnen
@@ -1150,7 +1166,6 @@ function AppContent() {
             fileName: `${subMachineLabel}.xml`,
             fileHandle: null,
             filePath: null,
-            sourcePath: `\${EXERCISE}/${subMachineLabel}.xml`,
             nodes: subTabNodes,
             edges: subTabEdges,
             slotNodes: [],
@@ -2391,6 +2406,11 @@ function AppContent() {
                                     onEdgeDoubleClick={onEdgeDoubleClick}
                                     nodeTypes={nodeTypes}
                                     onNodeClick={(_, n) => {
+                                        if (n.type === "parallelLane" && n.parentId) {
+                                            setSelectedNodeId(n.parentId);
+                                            setActiveTab("allgemein");
+                                            return;
+                                        }
                                         setSelectedNodeId(n.id);
                                         setRightPanelTab("details");
                                     }}
