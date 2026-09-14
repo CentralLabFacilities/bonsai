@@ -1411,6 +1411,7 @@ function AppContent() {
                     type: s.type,
                     description: s.description || "",
                     path: "",
+                    inherited: null,
                 })),
 
                 outSlots: (data.outSlots || []).map((s) => ({
@@ -1418,6 +1419,7 @@ function AppContent() {
                     type: s.type,
                     description: s.description || "",
                     path: "",
+                    inherited: null,
                 })),
 
                 params: (data.params || []).map((p) => ({
@@ -1890,49 +1892,48 @@ function AppContent() {
 
         const usedPaths = new Map();
 
-        targetNodes.forEach((node) => {
-            (node.data.inSlots || []).forEach((s) => {
-                if (s.path && s.path.trim()) {
-                    const cleanPath = s.path.trim().replace(/^\//, "");
+        const registerSlotUsage = (s) => {
+                if (!s.path || !s.path.trim()) return;
+                const cleanPath = s.path.trim().replace(/^\//, "");
+                const existing = usedPaths.get(cleanPath);
 
-                    usedPaths.set(cleanPath, s.type || "Unknown");
-                }
+                usedPaths.set(cleanPath, {
+                    type: s.type || existing?.type || "Unknown",
+                    inherited: s.inherited || existing?.inherited || null,
+                });
+            };
+
+            targetNodes.forEach((node) => {
+                (node.data.inSlots || []).forEach(registerSlotUsage);
+                (node.data.outSlots || []).forEach(registerSlotUsage);
             });
 
-            (node.data.outSlots || []).forEach((s) => {
-                if (s.path && s.path.trim()) {
-                    const cleanPath = s.path.trim().replace(/^\//, "");
+            const generatedSlotNodes = [];
+            let index = 0;
 
-                    usedPaths.set(cleanPath, s.type || "Unknown");
-                }
-            });
-        });
+            usedPaths.forEach(({ type, inherited }, path) => {
+                const slotNodeId = `slot-${path}`;
 
-        const generatedSlotNodes = [];
-        let index = 0;
+                generatedSlotNodes.push({
+                    id: slotNodeId,
+                    position: {
+                        x: 380 + (index % 3) * 200,
+                        y: 120 + Math.floor(index / 3) * 140
+                    },
+                    type: "slot",
+                    data: {
+                        path: `/${path}`,
+                        label: `/${path}`,
+                        slotType: type,
+                        inherited: Boolean(inherited),
+                        inheritedFrom: inherited?.state || "",
+                    },
+                });
 
-        usedPaths.forEach((slotType, path) => {
-            const slotNodeId = `slot-${path}`;
-
-            generatedSlotNodes.push({
-                id: slotNodeId,
-                position: {
-                    x: 380 + (index % 3) * 200,
-                    y: 120 + Math.floor(index / 3) * 140
-                },
-                type: "slot",
-                data: {
-                    path: `/${path}`,
-                    label: `/${path}`,
-                    slotType: slotType,
-                },
+                index++;
             });
 
-            index++;
-        });
-
-
-        setSlotNodes(generatedSlotNodes);
+            setSlotNodes(generatedSlotNodes);
 
         const newSlotEdges = [];
         targetNodes.forEach((node) => {
