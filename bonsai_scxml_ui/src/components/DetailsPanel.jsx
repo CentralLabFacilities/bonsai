@@ -32,6 +32,28 @@ function formatResourceKeys(items) {
 }
 
 
+function getSkillPackageName(fullSkillName) {
+    let baseName = String(fullSkillName || "").split("#")[0];
+
+    const skillsMarker = ".skills.";
+    const skillsIndex = baseName.indexOf(skillsMarker);
+
+    if (skillsIndex !== -1) {
+        baseName = baseName.slice(
+            skillsIndex + skillsMarker.length
+        );
+    }
+
+    const parts = baseName.split(".").filter(Boolean);
+
+    if (parts.length <= 1) {
+        return "";
+    }
+
+    return parts.slice(0, -1).join(".");
+}
+
+
 function getExitTokenType(eventId) {
     const mainType = String(eventId || "")
         .trim()
@@ -120,6 +142,7 @@ function DetailsPanel({
             skillName,
             stateName,
             fullSkillName,
+            packageName: getSkillPackageName(fullSkillName),
         };
     });
 
@@ -164,6 +187,7 @@ function DetailsPanel({
                 option.skillName,
                 option.stateName,
                 option.fullSkillName,
+                option.packageName,
                 option.id,
             ].some((value) =>
                 String(value || "")
@@ -206,6 +230,7 @@ function DetailsPanel({
                 option.skillName,
                 option.stateName,
                 option.fullSkillName,
+                option.packageName,
                 option.id,
             ].some(
                 (value) =>
@@ -388,8 +413,9 @@ function DetailsPanel({
                                     </span>
 
                                     <span className="field-value">
-                                        {selectedNode.data.fullSkillName
-                                            ?.split(".")[0] || "—"}
+                                        {getSkillPackageName(
+                                            selectedNode.data.fullSkillName
+                                        ) || "—"}
                                     </span>
                                 </div>
 
@@ -623,9 +649,9 @@ function DetailsPanel({
                                                                                         </span>
 
                                                                                         <span className="exit-target-suggestion-path">
-                                                                                            {
-                                                                                                option.fullSkillName
-                                                                                            }
+                                                                                            {option.packageName
+                                                                                                ? `${option.packageName}.${option.skillName}`
+                                                                                                : option.fullSkillName}
                                                                                         </span>
                                                                                     </button>
                                                                                 )
