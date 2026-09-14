@@ -34,7 +34,7 @@ import ProblemsPanel from "./components/ProblemsPanel";
 
 // Ausgelagerte Utils (saveScxmlFile statt exportScxmlFile)
 import { generateXmlString, saveScxmlFile, saveScxmlFileTauri, openScxmlFileTauri, readScxmlFileContent } from "./utils/scxmlExport";
-import { parseScxmlFile } from "./utils/scxmlImport";
+import { parseScxmlFile, extractBehaviorExitEventsFromScxml } from "./utils/scxmlImport";
 import { DEFAULT_PREFIX_CONFIG, resolveSrcPath } from "./config/prefixMapping";
 import {
     isTauri,
@@ -82,8 +82,50 @@ const getTransitionHighlightColor = (sourceHandle) => {
     return TRANSITION_HIGHLIGHT_COLORS[mainType || "other"];
 };
 
+const TRANSITION_HIGHLIGHT_COLOR_VALUES = new Set(
+    Object.values(TRANSITION_HIGHLIGHT_COLORS)
+);
+
+const clearTransientTransitionHighlight = (edge) => {
+    const style = { ...(edge.style || {}) };
+    const markerEnd = edge.markerEnd
+        ? { ...edge.markerEnd }
+        : edge.markerEnd;
+
+    const hadTransientStroke = TRANSITION_HIGHLIGHT_COLOR_VALUES.has(
+        style.stroke
+    );
+    const hadTransientMarker = Boolean(
+        markerEnd &&
+        TRANSITION_HIGHLIGHT_COLOR_VALUES.has(markerEnd.color)
+    );
+
+    if (hadTransientStroke) {
+        delete style.stroke;
+    }
+
+    if (hadTransientMarker) {
+        delete markerEnd.color;
+    }
+
+    return {
+        ...edge,
+        animated:
+            hadTransientStroke || hadTransientMarker
+                ? false
+                : edge.animated,
+        style,
+        markerEnd,
+    };
+};
+
 const highlightSelectedTransitions = (transitionEdges, selectedNodeIds) =>
-    transitionEdges.map((edge) => {
+    transitionEdges.map((rawEdge) => {
+        // Selection/highlight styling is display-only. Strip a previously
+        // persisted semantic highlight before deciding whether this edge is
+        // currently selected. This prevents edited edges from staying coloured
+        // after React Flow has deselected them.
+        const edge = clearTransientTransitionHighlight(rawEdge);
         const isConnectedToSelection =
             selectedNodeIds.has(edge.source) || selectedNodeIds.has(edge.target);
         const isEdgeSelected = Boolean(edge.selected);
@@ -282,6 +324,51 @@ const buildEditorProblems = (
         }
     });
 
+    // Missing transitions / exit-token coverage.
+    // Every exposed event must have an outgoing transition. A connected "*"
+    // handle is a catch-all and therefore covers every possible event.
+    (nodes || []).forEach((node) => {
+        if (isValidBehaviorTerminal(node)) return;
+
+        const exposedEventIds = [
+            ...new Set(
+                (node.data?.events || [])
+                    .map((event) => String(event?.id || "").trim())
+                    .filter(Boolean)
+            ),
+        ];
+
+        if (exposedEventIds.length === 0) return;
+
+        const outgoingEventIds = new Set(
+            (edges || [])
+                .filter((edge) => edge.source === node.id)
+                .map((edge) =>
+                    String(edge.sourceHandle || edge.label || "").trim()
+                )
+                .filter(Boolean)
+        );
+
+        // A wildcard transition handles every event emitted by this state.
+        if (outgoingEventIds.has("*")) return;
+
+        exposedEventIds
+            .filter((eventId) => eventId !== "*")
+            .forEach((eventId) => {
+                if (outgoingEventIds.has(eventId)) return;
+
+                addProblem({
+                    id: `transition-missing-${node.id}-${eventId}`,
+                    category: "Transitions",
+                    title: "Missing transition",
+                    message: `${nodeLabel(node)}.${eventId} has no transition.`,
+                    nodeId: node.id,
+                    detailTab: "allgemein",
+                    mode: "event",
+                });
+            });
+    });
+
     // Required parameters
     (nodes || []).forEach((node) => {
         (node.data?.params || []).forEach((parameter, index) => {
@@ -359,7 +446,7 @@ const buildEditorProblems = (
                 category: "Behavior exits",
                 title: "State machine has no exit",
                 message:
-                    "A sourced state machine must end in End/Fatal or send an event outward through Nop.",
+                    "A sourced state machine must send an event outward through Nop or end in End/Fatal.",
             });
         }
 
@@ -392,7 +479,7 @@ const buildEditorProblems = (
                     severity: "warning",
                     category: "Behavior exits",
                     title: "State machine can stop without an exit",
-                    message: `${nodeLabel(node)} has no outgoing transition. Use End/Fatal or a Nop forwarding exit if this path should leave the state machine.`,
+                    message: `${nodeLabel(node)} has no outgoing transition. Use a Nop forwarding exit or End/Fatal if this path should leave the state machine.`,
                     nodeId: node.id,
                     detailTab: "allgemein",
                     mode: "event",
@@ -497,21 +584,6 @@ const buildEditorProblems = (
             });
         }
 
-        if (pathWriters.length > 1) {
-            pathWriters.forEach((writer, index) => {
-                addProblem({
-                    id: `slot-multiple-writers-${path}-${writer.node.id}-${index}`,
-                    severity: "warning",
-                    category: "Slots",
-                    title: "Multiple slot writers",
-                    message: `/${path} is written by ${pathWriters.length} skills.`,
-                    nodeId: writer.node.id,
-                    detailTab: "slots",
-                    mode: "both",
-                    focusNodeIds: pathWriters.map((entry) => entry.node.id),
-                });
-            });
-        }
     });
 
     const severityOrder = { error: 0, warning: 1, info: 2 };
@@ -1247,6 +1319,41 @@ function AppContent() {
                 );
             }
 
+            const discoveredBehaviorExitEvents =
+                extractBehaviorExitEventsFromScxml(xmlText);
+
+            const syncedParentNodes =
+                discoveredBehaviorExitEvents.length > 0
+                    ? nodes.map((node) => {
+                        if (
+                            node.type !== "submachine" ||
+                            String(node.data?.src || "") !== String(srcPath)
+                        ) {
+                            return node;
+                        }
+
+                        const existingEventsById = new Map(
+                            (node.data?.events || []).map((event) => [
+                                event.id,
+                                event,
+                            ])
+                        );
+
+                        return {
+                            ...node,
+                            data: {
+                                ...node.data,
+                                events: discoveredBehaviorExitEvents.map(
+                                    (eventId) => ({
+                                        ...(existingEventsById.get(eventId) || {}),
+                                        id: eventId,
+                                    })
+                                ),
+                            },
+                        };
+                    })
+                    : nodes;
+
             const parsed = await parseScxmlFile(
                 xmlText,
                 fetchSkillData,
@@ -1284,7 +1391,7 @@ function AppContent() {
                     tab.id === activeTabId
                         ? {
                             ...tab,
-                            nodes,
+                            nodes: syncedParentNodes,
                             edges,
                             slotNodes,
                             slotEdges,
@@ -1988,10 +2095,40 @@ function AppContent() {
     );
 
     const createBehaviorNode = useCallback(
-        (behavior, position) => {
+        async (behavior, position) => {
             const baseName = String(
                 behavior?.name || "Behavior"
             ).replace(/\.(xml|scxml)$/i, "");
+
+            let behaviorEvents = [];
+
+            try {
+                if (IS_DESKTOP && behavior?.source) {
+                    const loaded = await readWorkflowSource(
+                        behavior.source,
+                        behaviorDirectories,
+                        null
+                    );
+
+                    behaviorEvents = extractBehaviorExitEventsFromScxml(
+                        loaded.content
+                    );
+                }
+            } catch (error) {
+                console.warn(
+                    `Could not inspect behavior exits for ${behavior?.source || baseName}:`,
+                    error
+                );
+            }
+
+            // Prefer the real outward events emitted by Nop nodes. Keep the
+            // legacy fallback only when the source cannot be inspected or
+            // does not expose an outward Nop event.
+            const events = (
+                behaviorEvents.length > 0
+                    ? behaviorEvents
+                    : ["success", "failure"]
+            ).map((eventId) => ({ id: eventId }));
 
             return {
                 id: getNodeId(),
@@ -2002,17 +2139,14 @@ function AppContent() {
                     fullSkillName: baseName,
                     src: behavior.source,
                     isInitial: false,
-                    events: [
-                        { id: "success" },
-                        { id: "failure" },
-                    ],
+                    events,
                     onEntry: [],
                     onExit: [],
                     onOpenSubMachine: handleOpenSubMachine,
                 },
             };
         },
-        [handleOpenSubMachine]
+        [behaviorDirectories, handleOpenSubMachine]
     );
 
     const selectedNode = nodes.find((node) => node.id === selectedNodeId) || null;
@@ -2520,11 +2654,33 @@ function AppContent() {
         [edges, nodes]
     );
 
+    const clearTransitionSelection = useCallback(() => {
+        setEdges((currentEdges) =>
+            currentEdges.map((edge) => ({
+                ...clearTransientTransitionHighlight(edge),
+                selected: false,
+            }))
+        );
+    }, [setEdges]);
+
+    const selectTransitionEdge = useCallback(
+        (edgeId) => {
+            setEdges((currentEdges) =>
+                currentEdges.map((edge) => ({
+                    ...clearTransientTransitionHighlight(edge),
+                    selected: edge.id === edgeId,
+                }))
+            );
+        },
+        [setEdges]
+    );
+
     const onEdgeDoubleClick = useCallback(
         (event, edge) => {
+            selectTransitionEdge(edge.id);
             openConditionDrawer(edge.source, edge.sourceHandle, edge.target);
         },
-        [edges, nodes]
+        [edges, nodes, selectTransitionEdge]
     );
 
     const handleConfirmDrawer = ({ updatedTransitions, newGlobalVars = [], newGlobalVar = null }) => {
@@ -2564,23 +2720,28 @@ function AppContent() {
                     transition.cond && transition.cond.trim()
                 );
 
+                const cleanedExisting = existing
+                    ? clearTransientTransitionHighlight(existing)
+                    : null;
+
                 return {
-                    ...(existing || {}),
+                    ...(cleanedExisting || {}),
                     id:
-                        existing?.id ||
+                        cleanedExisting?.id ||
                         `edge-${sourceId}-${eventId}-${transition.target}-${crypto.randomUUID()}`,
                     source: sourceId,
                     target: transition.target,
                     sourceHandle: eventId,
-                    targetHandle: existing?.targetHandle || null,
+                    targetHandle: cleanedExisting?.targetHandle || null,
                     type: "smartTransition",
+                    selected: false,
                     label: hasCondition
                         ? `${eventId} [${transition.cond}]`
                         : eventId,
                     markerEnd:
-                        existing?.markerEnd || { type: MarkerType.ArrowClosed },
+                        cleanedExisting?.markerEnd || { type: MarkerType.ArrowClosed },
                     data: {
-                        ...(existing?.data || {}),
+                        ...(cleanedExisting?.data || {}),
                         cond: transition.cond || "",
                         assignments: Array.isArray(transition.assignments)
                             ? transition.assignments.map((assignment) => ({
@@ -3273,7 +3434,7 @@ function AppContent() {
                                     const behavior =
                                         JSON.parse(behaviorPayload);
                                     const newNode =
-                                        createBehaviorNode(
+                                        await createBehaviorNode(
                                             behavior,
                                             position
                                         );
@@ -3362,10 +3523,14 @@ function AppContent() {
                                         onNodesChange={handleNodesChange}
                                         onEdgesChange={onEdgesChange}
                                         onConnect={onConnect}
+                                        onEdgeClick={(_, edge) =>
+                                            selectTransitionEdge(edge.id)
+                                        }
                                         onEdgeDoubleClick={onEdgeDoubleClick}
                                         nodeTypes={nodeTypes}
                                         edgeTypes={edgeTypes}
                                         onNodeClick={(_, n) => {
+                                            clearTransitionSelection();
                                             if (n.type === "parallelLane" && n.parentId) {
                                                 setSelectedNodeId(n.parentId);
                                                 setActiveTab("allgemein");
@@ -3375,6 +3540,7 @@ function AppContent() {
                                             setRightPanelTab("details");
                                         }}
                                         onPaneClick={() => {
+                                            clearTransitionSelection();
                                             setSelectedNodeId(null);
                                             setRightPanelTab("datamodel");
                                         }}
@@ -3602,7 +3768,10 @@ function AppContent() {
 
             <ConditionModal
                 isOpen={drawerData.isOpen}
-                onClose={() => setDrawerData((prev) => ({ ...prev, isOpen: false }))}
+                onClose={() => {
+                    setDrawerData((prev) => ({ ...prev, isOpen: false }));
+                    clearTransitionSelection();
+                }}
                 onConfirm={handleConfirmDrawer}
                 globalVariables={availableDataModelParameters}
                 sourceNodeName={drawerData.sourceNodeName}
