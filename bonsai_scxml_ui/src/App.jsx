@@ -1556,31 +1556,49 @@ function AppContent() {
         setTimeout(() => fitView({ padding: 0.2, duration: 300 }), 80);
     };
 
+    const handleOpenStateActions = useCallback(
+        (nodeId) => {
+            setNodes((currentNodes) =>
+                currentNodes.map((node) => ({
+                    ...node,
+                    selected: node.id === nodeId,
+                }))
+            );
+
+            setSelectedNodeId(nodeId);
+            setRightPanelTab("details");
+            setActiveTab("actions");
+        },
+        [setNodes]
+    );
+
     const injectedNodes = useMemo(() => {
         return nodes.map((n) => {
+            const injectedData = {
+                ...n.data,
+                onOpenStateActions: handleOpenStateActions,
+            };
+
             if (n.type === "submachine") {
-                return {
-                    ...n,
-                    data: {
-                        ...n.data,
-                        onOpenSubMachine: handleOpenSubMachine,
-                    },
-                };
+                injectedData.onOpenSubMachine = handleOpenSubMachine;
             }
 
             if (n.type === "parallel") {
-                return {
-                    ...n,
-                    data: {
-                        ...n.data,
-                        onAddLane: handleAddLaneToParallel,
-                    },
-                };
+                injectedData.onAddLane = handleAddLaneToParallel;
             }
 
-            return n;
+            return {
+                ...n,
+                data: injectedData,
+            };
         });
-    }, [nodes, tabs, activeTabId, handleAddLaneToParallel]);
+    }, [
+        nodes,
+        tabs,
+        activeTabId,
+        handleAddLaneToParallel,
+        handleOpenStateActions,
+    ]);
 
     useEffect(() => {
         const fetchSkills = async () => {

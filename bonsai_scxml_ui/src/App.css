@@ -587,6 +587,10 @@
 
 .state-action-badge {
   position: absolute;
+  appearance: none;
+  font-family: inherit;
+  cursor: pointer;
+  pointer-events: auto;
   top: 0;
   padding: 1px 5px;
   border: 1px solid #94a3b8;
@@ -607,6 +611,17 @@
 
 .state-action-badge-exit {
   right: 0;
+}
+
+.state-action-badge:hover {
+  background: #f8fafc;
+  border-color: #64748b;
+  color: #0f172a;
+  transform: translateY(-1px);
+}
+
+.state-action-badge:active {
+  transform: translateY(0);
 }
 
 /* Warnungs-Icon oben rechts an der Node */
@@ -3539,8 +3554,37 @@
 }
 
 /* ==========================================================================
-   PROBLEMS PANEL
+   RIGHT PANEL: THREE TOP-LEVEL TABS + PROBLEMS
    ========================================================================== */
+
+.right-panel-tabs {
+  display: flex;
+  flex-shrink: 0;
+  width: 100%;
+  height: 42px;
+  min-height: 42px;
+  overflow: visible;
+}
+
+.right-panel-tab {
+  flex: 1 1 0;
+  min-width: 0;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 8px;
+  white-space: nowrap;
+}
+
+.right-panel-tab:disabled {
+  color: #475569;
+  cursor: default;
+  background: transparent;
+}
+
+.right-panel-tab:disabled:hover {
+  color: #475569;
+  background: transparent;
+}
 
 .right-panel-problem-count {
   display: inline-flex;
@@ -3548,7 +3592,6 @@
   justify-content: center;
   min-width: 18px;
   height: 18px;
-  margin-left: 7px;
   padding: 0 5px;
   border-radius: 999px;
   font-size: 10px;
@@ -3557,14 +3600,14 @@
 }
 
 .right-panel-problem-count.has-errors {
+  color: #fecaca;
   background: rgba(239, 68, 68, 0.18);
-  color: #fca5a5;
   border: 1px solid rgba(239, 68, 68, 0.42);
 }
 
 .right-panel-problem-count.warnings-only {
+  color: #fde68a;
   background: rgba(245, 158, 11, 0.16);
-  color: #fcd34d;
   border: 1px solid rgba(245, 158, 11, 0.38);
 }
 
@@ -3572,7 +3615,6 @@
   width: 100%;
   height: 100%;
   min-height: 0;
-  box-sizing: border-box;
 }
 
 .problems-panel {
@@ -3580,16 +3622,12 @@
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
-  background: transparent;
   color: #e2e8f0;
 }
 
 .problems-panel-header {
   flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 14px 12px;
+  padding: 14px;
   border-bottom: 1px solid var(--secondary-color);
   background: rgba(15, 23, 42, 0.35);
 }
@@ -3633,8 +3671,8 @@
   min-width: 18px;
   padding: 1px 6px;
   border-radius: 999px;
-  background: #1e293b;
   color: #cbd5e1;
+  background: #1e293b;
   text-align: center;
   letter-spacing: normal;
 }
@@ -3658,19 +3696,11 @@
   color: inherit;
   text-align: left;
   cursor: pointer;
-  transition:
-          border-color 0.15s ease,
-          background-color 0.15s ease,
-          transform 0.15s ease;
 }
 
 .problem-item:hover {
   background: #172033;
   border-color: #475569;
-}
-
-.problem-item:active {
-  transform: translateY(1px);
 }
 
 .problem-item-error {
