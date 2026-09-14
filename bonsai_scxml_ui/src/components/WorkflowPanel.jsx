@@ -1,6 +1,11 @@
 import { useMemo, useState } from "react";
 import { FaPlus } from "react-icons/fa6";
 import { FiX } from "react-icons/fi";
+import { inferLiteralValueType, normalizeDatamodelValue } from "../utils/valueTypes";
+
+function getDatamodelType(parameter) {
+    return inferLiteralValueType(parameter?.expr).toLowerCase();
+}
 
 function WorkflowPanel({
                            globalDataModel,
@@ -69,7 +74,7 @@ function WorkflowPanel({
             return;
         }
 
-        onAddParameter(normalizedParameterId, newParamExpr);
+        onAddParameter(normalizedParameterId, normalizeDatamodelValue(newParamExpr));
         setCreateGlobal(false);
     };
 
@@ -98,18 +103,26 @@ function WorkflowPanel({
 
                     return (
                         <div
-                            className={`datamodel-compact-row ${
+                            className={`datamodel-compact-row datamodel-type-accent datamodel-type-accent-${getDatamodelType(parameter)} ${
                                 overwrittenByParent
                                     ? "datamodel-overwritten-parameter"
                                     : ""
                             }`}
                             key={`${parameter.id}-${index}`}
                         >
-                            <div
-                                className="datamodel-compact-id"
-                                title={parameter.id}
-                            >
-                                {parameter.id}
+                            <div className="datamodel-compact-id-cell">
+                                <div
+                                    className="datamodel-compact-id"
+                                    title={parameter.id}
+                                >
+                                    {parameter.id}
+                                </div>
+
+                                <span
+                                    className={`datamodel-value-type-badge datamodel-value-type-${getDatamodelType(parameter)}`}
+                                >
+                                    {inferLiteralValueType(parameter.expr)}
+                                </span>
                             </div>
 
                             <input
@@ -122,6 +135,18 @@ function WorkflowPanel({
                                         event.target.value
                                     )
                                 }
+                                onBlur={(event) =>
+                                    onUpdateGlobalParam(
+                                        index,
+                                        normalizeDatamodelValue(event.target.value)
+                                    )
+                                }
+                                onKeyDown={(event) => {
+                                    if (event.key === "Enter") {
+                                        event.preventDefault();
+                                        event.currentTarget.blur();
+                                    }
+                                }}
                             />
 
                             <button
@@ -165,11 +190,18 @@ function WorkflowPanel({
                         {inheritedGlobalDataModel.map(
                             (parameter, index) => (
                                 <div
-                                    className="slot-text-field datamodel-inherited-parameter"
+                                    className={`slot-text-field datamodel-inherited-parameter datamodel-type-accent datamodel-type-accent-${getDatamodelType(parameter)}`}
                                     key={`inherited-${parameter.id}-${index}`}
                                 >
                                     <div className="datamodel-parameter-header">
-                                        <h4>{parameter.id}</h4>
+                                        <div className="datamodel-sourced-id-group">
+                                            <h4>{parameter.id}</h4>
+                                            <span
+                                                className={`datamodel-value-type-badge datamodel-value-type-${getDatamodelType(parameter)}`}
+                                            >
+                                                {inferLiteralValueType(parameter.expr)}
+                                            </span>
+                                        </div>
 
                                         <span className="datamodel-parent-badge">
                                             {parameter.inheritedFrom ||
@@ -196,11 +228,18 @@ function WorkflowPanel({
                             {descendantGlobalDataModel.map(
                                 (parameter, index) => (
                                     <div
-                                        className="slot-text-field datamodel-descendant-parameter"
+                                        className={`slot-text-field datamodel-descendant-parameter datamodel-type-accent datamodel-type-accent-${getDatamodelType(parameter)}`}
                                         key={`descendant-${parameter.sourceTabId || "sub"}-${parameter.id}-${index}`}
                                     >
                                         <div className="datamodel-parameter-header">
-                                            <h4>{parameter.id}</h4>
+                                            <div className="datamodel-sourced-id-group">
+                                                <h4>{parameter.id}</h4>
+                                                <span
+                                                    className={`datamodel-value-type-badge datamodel-value-type-${getDatamodelType(parameter)}`}
+                                                >
+                                                    {inferLiteralValueType(parameter.expr)}
+                                                </span>
+                                            </div>
 
                                             <span className="datamodel-child-badge">
                                                 {parameter.definedIn ||

@@ -1,5 +1,9 @@
 import { getConfiguredAssignments } from "./stateActions.js";
 import { getScxmlTransitionEvent } from "./transitionEvents.js";
+import {
+    serializeEditorConditionForScxml,
+    serializeEditorValueForScxml,
+} from "./valueTypes.js";
 
 const escapeXmlAttribute = (value) => String(value)
     .replaceAll("&", "&amp;")
@@ -48,7 +52,10 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
         : "";
 
     // 3. Globales Datamodel
-    const globalDataLines = (globalDataModel || []).map((d) => `        <data id="${d.id}" expr="${d.expr}"/>`);
+    const globalDataLines = (globalDataModel || []).map((d) => {
+        const expr = serializeEditorValueForScxml(d.expr);
+        return `        <data id="${escapeXmlAttribute(d.id)}" expr="${escapeXmlAttribute(expr)}"/>`;
+    });
     if (slotsXml) {
         globalDataLines.splice(1, 0, slotsXml);
     }
@@ -58,9 +65,12 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
         const configuredAssignments = getConfiguredAssignments(assignments);
         if (configuredAssignments.length === 0) return "";
 
-        const assignmentLines = configuredAssignments.map((assignment) =>
-            `${indent}    <assign location="${escapeXmlAttribute(String(assignment.location).trim())}" expr="${escapeXmlAttribute(String(assignment.expr).trim())}"/>`
-        );
+        const assignmentLines = configuredAssignments.map((assignment) => {
+            const location = String(assignment.location).trim().replace(/^@/, "");
+            const expr = serializeEditorValueForScxml(assignment.expr);
+
+            return `${indent}    <assign location="${escapeXmlAttribute(location)}" expr="${escapeXmlAttribute(expr)}"/>`;
+        });
 
         return `${indent}<${actionName}>\n${assignmentLines.join("\n")}\n${indent}</${actionName}>`;
     };
@@ -125,10 +135,16 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
                     skillBaseName
                 );
 
-                const condAttr = tr.cond && tr.cond.trim() !== "" ? ` cond="${tr.cond}"` : "";
+                const scxmlCondition = serializeEditorConditionForScxml(tr.cond);
+                const condAttr = scxmlCondition
+                    ? ` cond="${escapeXmlAttribute(scxmlCondition)}"`
+                    : "";
 
                 if (tr.assignLocation && tr.assignExpr) {
-                    return `${indent}<transition event="${eventName}" target="${tr.targetId}"${condAttr}>\n${indent}    <assign location="${tr.assignLocation}" expr="${tr.assignExpr}"/>\n${indent}</transition>`;
+                    const assignLocation = String(tr.assignLocation).trim().replace(/^@/, "");
+                    const assignExpr = serializeEditorValueForScxml(tr.assignExpr);
+
+                    return `${indent}<transition event="${eventName}" target="${tr.targetId}"${condAttr}>\n${indent}    <assign location="${escapeXmlAttribute(assignLocation)}" expr="${escapeXmlAttribute(assignExpr)}"/>\n${indent}</transition>`;
                 }
                 return `${indent}<transition event="${eventName}" target="${tr.targetId}"${condAttr}/>`;
             })
@@ -188,9 +204,13 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
         const localParams = (node.data.params || []).filter(
             (p) => (p.expr && p.expr.trim() !== "") || (p.default && p.default.trim() !== "")
         );
-        const paramsLines = localParams.map(
-            (p) => `${indent}        <data id="${p.key}" expr="${p.expr || p.default}"/>`
-        );
+        const paramsLines = localParams.map((p) => {
+            const expr = serializeEditorValueForScxml(
+                p.expr || p.default,
+                { preserveReferenceMarker: true }
+            );
+            return `${indent}        <data id="${escapeXmlAttribute(p.key)}" expr="${escapeXmlAttribute(expr)}"/>`;
+        });
         const datamodelBlock = paramsLines.length > 0 && !isSubMachine
             ? `${indent}    <datamodel>\n${paramsLines.join("\n")}\n${indent}    </datamodel>`
             : "";

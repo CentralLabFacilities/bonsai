@@ -1,6 +1,12 @@
 import { MarkerType } from "@xyflow/react";
 import { getLayoutedElements } from "./layoutUtils";
 import { parseStateAssignments } from "./stateActions.js";
+import { getTransitionExitToken } from "./transitionEvents.js";
+import {
+    deserializeScxmlConditionForEditor,
+    deserializeScxmlValueForEditor,
+    deserializeStateDatamodelValueForEditor,
+} from "./valueTypes.js";
 
 const getSkillPackageName = (fullSkillName) => {
     let baseName = String(fullSkillName || "").split("#")[0];
@@ -65,7 +71,7 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             } else if (id) {
                 globalDataEntries.push({
                     id: id,
-                    expr: expr || "",
+                    expr: deserializeScxmlValueForEditor(expr || ""),
                 });
             }
         });
@@ -94,7 +100,11 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             sDataTags.forEach((dt) => {
                 const pid = dt.getAttribute("id");
                 const pexpr = dt.getAttribute("expr");
-                if (pid) localParams[pid] = pexpr;
+                if (pid) {
+                    localParams[pid] = deserializeStateDatamodelValueForEditor(
+                        pexpr || ""
+                    );
+                }
             });
         }
 
@@ -267,9 +277,7 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
 
                     const parentEvents = branchTransElems.map((tr) => {
                         const rawEvent = tr.getAttribute("event") || "";
-                        const handleId = rawEvent.includes('.*')
-                            ? (rawEvent.split('.*')[0].split('.').pop() || 'success')
-                            : (rawEvent.split('.').pop() || rawEvent);
+                        const handleId = getTransitionExitToken(rawEvent, branchId);
                         return {
                             id: handleId,
                             name: rawEvent,
@@ -418,9 +426,7 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             const parentTransitionElems = Array.from(stateElem.children).filter((c) => c.localName === "transition");
             const parentEvents = parentTransitionElems.map((tr) => {
                 const rawEvent = tr.getAttribute("event") || "";
-                const handleId = rawEvent.includes('.*')
-                    ? (rawEvent.split('.*')[0].split('.').pop() || 'success')
-                    : (rawEvent.split('.').pop() || rawEvent);
+                const handleId = getTransitionExitToken(rawEvent, fullSkillName);
 
                 return {
                     id: handleId,
@@ -560,6 +566,21 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
         });
     }
 
+    // Editor representation: @ is a visual marker for variable references.
+    // SCXML omits it in conditions and <assign> expressions, so restore it
+    // after parsing and before the transition data is copied into the UI.
+    rawTransitions.forEach((transition) => {
+        transition.cond = deserializeScxmlConditionForEditor(transition.cond);
+        transition.assignExpr = deserializeScxmlValueForEditor(transition.assignExpr);
+    });
+
+    newNodes.forEach((node) => {
+        (node.data?.events || []).forEach((event) => {
+            event.cond = deserializeScxmlConditionForEditor(event.cond);
+            event.assignExpr = deserializeScxmlValueForEditor(event.assignExpr);
+        });
+    });
+
     // 4. Edges und Node-Events mit exakter Struktur aufbauen
     const newEdges = [];
 
@@ -584,10 +605,10 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
 
         if (!targetNode || !sourceNode) return;
 
-        const isWildcard = trans.eventId === "*" || trans.eventId.endsWith(".*");
-        const eventHandleId = isWildcard
-            ? (trans.eventId.split(".*")[0].split(".").pop() || "success")
-            : (trans.eventId.split(".").pop() || trans.eventId);
+        const eventHandleId = getTransitionExitToken(
+            trans.eventId,
+            sourceNode.data.fullSkillName || trans.sourceSkillName
+        );
 
         const isFromCompound = sourceNode.type === "compound";
         const hasCond = Boolean(trans.cond && trans.cond.trim() !== "");
