@@ -44,6 +44,27 @@ const getNodeId = () => `skill-node-${crypto.randomUUID()}`;
 const IS_DESKTOP = isTauri();
 
 
+const getSkillPackageName = (fullSkillName) => {
+    let baseName = String(fullSkillName || "").split("#")[0];
+
+    const skillsMarker = ".skills.";
+    const skillsIndex = baseName.indexOf(skillsMarker);
+
+    if (skillsIndex !== -1) {
+        baseName = baseName.slice(
+            skillsIndex + skillsMarker.length
+        );
+    }
+
+    const parts = baseName.split(".").filter(Boolean);
+
+    if (parts.length <= 1) {
+        return "";
+    }
+
+    return parts.slice(0, -1).join(".");
+};
+
 const collectDescendantGlobals = (
     tabList,
     rootTabId,
@@ -986,7 +1007,9 @@ function AppContent() {
                                 {
                                     id: params.sourceHandle,
                                     selectedPackage:
-                                        targetNode?.data.fullSkillName?.split(".")[0] || "",
+                                        getSkillPackageName(
+                                            targetNode?.data.fullSkillName
+                                        ),
                                     selectedSkill:
                                         targetNode?.data.fullSkillName?.split("#")[0] || "",
                                     target: params.target,
@@ -1150,7 +1173,9 @@ function AppContent() {
         });
 
         updateNodeEvent(selectedNode.id, event.id, {
-            selectedPackage: "",
+            selectedPackage: getSkillPackageName(
+                targetNode.data?.fullSkillName
+            ),
             selectedSkill:
                 targetNode.data?.fullSkillName?.split("#")[0] ||
                 targetNode.data?.label ||

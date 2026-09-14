@@ -2,6 +2,27 @@ import { MarkerType } from "@xyflow/react";
 import { getLayoutedElements } from "./layoutUtils";
 import { parseStateAssignments } from "./stateActions.js";
 
+const getSkillPackageName = (fullSkillName) => {
+    let baseName = String(fullSkillName || "").split("#")[0];
+
+    const skillsMarker = ".skills.";
+    const skillsIndex = baseName.indexOf(skillsMarker);
+
+    if (skillsIndex !== -1) {
+        baseName = baseName.slice(
+            skillsIndex + skillsMarker.length
+        );
+    }
+
+    const parts = baseName.split(".").filter(Boolean);
+
+    if (parts.length <= 1) {
+        return "";
+    }
+
+    return parts.slice(0, -1).join(".");
+};
+
 export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(xmlText, "application/xml");
@@ -125,8 +146,6 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             isFinal: isFinal,
             src: srcAttr || "",
             events: events,
-            sensors: skillApiData.sensors || [],
-            actuators: skillApiData.actuator || skillApiData.actuators || [],
             inSlots: inSlots,
             outSlots: outSlots,
             params: params,
@@ -601,9 +620,9 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
         const transitionData = {
             name: trans.eventId,
             rawEvent: trans.eventId,
-            selectedPackage: targetNode.data.fullSkillName
-                ? targetNode.data.fullSkillName.split(".")[0]
-                : "",
+            selectedPackage: getSkillPackageName(
+                targetNode.data.fullSkillName
+            ),
             selectedSkill: targetNode.data.fullSkillName
                 ? targetNode.data.fullSkillName.split("#")[0]
                 : "",
