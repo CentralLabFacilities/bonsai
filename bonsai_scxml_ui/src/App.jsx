@@ -13,6 +13,7 @@ import {
     useReactFlow,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import { SmartEdgeProvider } from "@tisoap/react-flow-smart-edge";
 
 // Ausgelagerte Komponenten
 import CustomNode from "./components/CustomNode";
@@ -27,6 +28,7 @@ import CodeView from "./components/CodeView";
 import ConditionModal from "./components/ConditionModal";
 import CompoundNode from "./components/CompoundNode";
 import ParallelLaneNode from "./components/ParallelLaneNode";
+import EditableTransitionEdge from "./components/EditableTransitionEdge";
 
 // Ausgelagerte Utils (saveScxmlFile statt exportScxmlFile)
 import { generateXmlString, saveScxmlFile, saveScxmlFileTauri, openScxmlFileTauri, readScxmlFileContent } from "./utils/scxmlExport";
@@ -39,6 +41,71 @@ import "./App.css";
 initApiProxy();
 
 const nodeTypes = { custom: CustomNode, slot: SlotNode, submachine: SubMachineNode, parallel: ParallelNode, compound: CompoundNode, parallelLane: ParallelLaneNode, };
+
+// Transition edges stay smart-routed, but selected edges can also be shaped
+// with persistent, draggable control points. Keep this mapping at module scope
+// so React Flow receives a stable edge component reference between renders.
+const edgeTypes = {
+    smartTransition: EditableTransitionEdge,
+};
+
+const withSmartTransitionRouting = (transitionEdges) =>
+    transitionEdges.map((edge) => ({
+        ...edge,
+        type: "smartTransition",
+        // Keep the same flowing animation when the edge itself is selected.
+        animated: Boolean(edge.selected || edge.animated),
+    }));
+
+const TRANSITION_HIGHLIGHT_COLORS = {
+    success: "#22c55e",
+    error: "#f59e0b",
+    fatal: "#ef4444",
+    other: "#38bdf8",
+};
+
+const getTransitionHighlightColor = (sourceHandle) => {
+    const parts = String(sourceHandle || "")
+        .trim()
+        .toLowerCase()
+        .split(".")
+        .filter(Boolean);
+
+    const mainType = parts.find((part) =>
+        part === "success" || part === "error" || part === "fatal"
+    );
+
+    return TRANSITION_HIGHLIGHT_COLORS[mainType || "other"];
+};
+
+const highlightSelectedTransitions = (transitionEdges, selectedNodeIds) =>
+    transitionEdges.map((edge) => {
+        const isConnectedToSelection =
+            selectedNodeIds.has(edge.source) || selectedNodeIds.has(edge.target);
+
+        if (!isConnectedToSelection) {
+            return edge;
+        }
+
+        const color = getTransitionHighlightColor(edge.sourceHandle || edge.label);
+
+        // Only change the colour. Keep the exact same edge type, path, width,
+        // marker shape and routing so selecting a skill never changes geometry.
+        return {
+            ...edge,
+            // Selected skills now make all connected incoming/outgoing
+            // transitions flow, not just change colour.
+            animated: true,
+            style: {
+                ...(edge.style || {}),
+                stroke: color,
+            },
+            markerEnd: edge.markerEnd
+                ? { ...edge.markerEnd, color }
+                : edge.markerEnd,
+        };
+    });
+
 const getNodeId = () => `skill-node-${crypto.randomUUID()}`;
 
 // Detect if running in Tauri desktop app
@@ -1036,7 +1103,7 @@ function AppContent() {
                     sourceHandle: handleId,
                     targetHandle: `target-${handleId}`,
                     style: { strokeDasharray: "4 4", stroke: "#0284c7", strokeWidth: 1.5 },
-                    type: "smoothstep",
+                    type: "smartTransition",
                 });
 
                 return {
@@ -1324,14 +1391,27 @@ function AppContent() {
         .filter((s) => s.toLowerCase().includes(searchText.toLowerCase()));
 
 
+    const selectedTransitionNodeIds = new Set([
+        ...selectedNodes.map((node) => node.id),
+        ...(selectedNodeId ? [selectedNodeId] : []),
+    ]);
+
+    const highlightedTransitionEdges = highlightSelectedTransitions(
+        withSmartTransitionRouting(edges),
+        selectedTransitionNodeIds
+    );
+
     let visibleNodes = injectedNodes;
-    let visibleEdges = edges;
+    let visibleEdges = highlightedTransitionEdges;
     if (activeMode === "slots") {
         visibleNodes = [...injectedNodes, ...slotNodes];
         visibleEdges = slotEdges;
     } else if (activeMode === "both") {
         visibleNodes = [...injectedNodes, ...slotNodes];
-        visibleEdges = [...edges, ...slotEdges];
+        visibleEdges = [
+            ...highlightedTransitionEdges,
+            ...slotEdges,
+        ];
     }
 
     const createNameforSkill = (fullSkillName) => {
@@ -1593,6 +1673,7 @@ function AppContent() {
                 sourceHandle: params.sourceHandle,
                 targetHandle: params.targetHandle,
                 label: params.sourceHandle,
+                type: "smartTransition",
                 markerEnd: { type: MarkerType.ArrowClosed },
                 data: { cond: "", assignments: [], assign: null },
             };
@@ -1704,10 +1785,7 @@ function AppContent() {
                     target: transition.target,
                     sourceHandle: eventId,
                     targetHandle: existing?.targetHandle || null,
-                    type:
-                        sourceId === transition.target
-                            ? "smoothstep"
-                            : existing?.type || "default",
+                    type: "smartTransition",
                     label: hasCondition
                         ? `${eventId} [${transition.cond}]`
                         : eventId,
@@ -1865,6 +1943,7 @@ function AppContent() {
                     target: targetNodeId,
                     sourceHandle: event.id,
                     label: event.id,
+                    type: "smartTransition",
                     markerEnd: { type: MarkerType.ArrowClosed },
                     data: { cond: "", assignments: [], assign: null },
                 },
@@ -2422,44 +2501,47 @@ function AppContent() {
                                 )}
 
                                 {/* ReactFlow mit Strg-Support */}
-                                <ReactFlow
-                                    nodes={visibleNodes}
-                                    edges={visibleEdges}
-                                    onNodesChange={handleNodesChange}
-                                    onEdgesChange={onEdgesChange}
-                                    onConnect={onConnect}
-                                    onEdgeDoubleClick={onEdgeDoubleClick}
-                                    nodeTypes={nodeTypes}
-                                    onNodeClick={(_, n) => {
-                                        if (n.type === "parallelLane" && n.parentId) {
-                                            setSelectedNodeId(n.parentId);
-                                            setActiveTab("allgemein");
-                                            return;
-                                        }
-                                        setSelectedNodeId(n.id);
-                                        setRightPanelTab("details");
-                                    }}
-                                    onPaneClick={() => {
-                                        setSelectedNodeId(null);
-                                        setRightPanelTab("datamodel");
-                                    }}
-                                    onPaneContextMenu={(e) => handleContextMenuOpen(e)}
-                                    onNodeContextMenu={(e, node) => handleContextMenuOpen(e, node)}
-                                    multiSelectionKeyCode={["Control", "Meta"]}
-                                    selectionKeyCode={["Control", "Meta"]}
-                                    deleteKeyCode={["Delete"]}
-                                    onNodeDoubleClick={(_, n) => {
-                                        if (n.type === "submachine" && n.data?.src) {
-                                            handleOpenSubMachine(n.data.src, n.data.label);
-                                        }
-                                    }}
-                                    onNodeDragStart={() => setIsDraggingNode(true)}
-                                    onNodeDrag={(e) => setIsOverTrash(Boolean(document.elementFromPoint(e.clientX, e.clientY)?.closest(".trash-bin-dropzone")))}
-                                    onNodeDragStop={handleNodeDragStop}
-                                >
-                                    <Background />
-                                    <Controls />
-                                </ReactFlow>
+                                <SmartEdgeProvider nodes={visibleNodes}>
+                                    <ReactFlow
+                                        nodes={visibleNodes}
+                                        edges={visibleEdges}
+                                        onNodesChange={handleNodesChange}
+                                        onEdgesChange={onEdgesChange}
+                                        onConnect={onConnect}
+                                        onEdgeDoubleClick={onEdgeDoubleClick}
+                                        nodeTypes={nodeTypes}
+                                        edgeTypes={edgeTypes}
+                                        onNodeClick={(_, n) => {
+                                            if (n.type === "parallelLane" && n.parentId) {
+                                                setSelectedNodeId(n.parentId);
+                                                setActiveTab("allgemein");
+                                                return;
+                                            }
+                                            setSelectedNodeId(n.id);
+                                            setRightPanelTab("details");
+                                        }}
+                                        onPaneClick={() => {
+                                            setSelectedNodeId(null);
+                                            setRightPanelTab("datamodel");
+                                        }}
+                                        onPaneContextMenu={(e) => handleContextMenuOpen(e)}
+                                        onNodeContextMenu={(e, node) => handleContextMenuOpen(e, node)}
+                                        multiSelectionKeyCode={["Control", "Meta"]}
+                                        selectionKeyCode={["Control", "Meta"]}
+                                        deleteKeyCode={["Delete"]}
+                                        onNodeDoubleClick={(_, n) => {
+                                            if (n.type === "submachine" && n.data?.src) {
+                                                handleOpenSubMachine(n.data.src, n.data.label);
+                                            }
+                                        }}
+                                        onNodeDragStart={() => setIsDraggingNode(true)}
+                                        onNodeDrag={(e) => setIsOverTrash(Boolean(document.elementFromPoint(e.clientX, e.clientY)?.closest(".trash-bin-dropzone")))}
+                                        onNodeDragStop={handleNodeDragStop}
+                                    >
+                                        <Background />
+                                        <Controls />
+                                    </ReactFlow>
+                                </SmartEdgeProvider>
                             </>
                         )}
                     </div>
@@ -2561,19 +2643,19 @@ function AppContent() {
                                 onUpdateName={(name) =>
                                     setNodes((nds) =>
                                         nds.map((n) => {
-                                    if (n.id !== selectedNode.id) return n;
-                                    const isContainerOrSub = n.type === "compound" || n.type === "parallel" || n.type === "submachine";
-                                    return {
-                                        ...n,
-                                        data: {
-                                            ...n.data,
-                                            label: name,
-                                            fullSkillName: isContainerOrSub
-                                                ? name
-                                                : `${n.data.fullSkillName?.split("#")[0]}#${name}`,
-                                        },
-                                    };
-                                })
+                                            if (n.id !== selectedNode.id) return n;
+                                            const isContainerOrSub = n.type === "compound" || n.type === "parallel" || n.type === "submachine";
+                                            return {
+                                                ...n,
+                                                data: {
+                                                    ...n.data,
+                                                    label: name,
+                                                    fullSkillName: isContainerOrSub
+                                                        ? name
+                                                        : `${n.data.fullSkillName?.split("#")[0]}#${name}`,
+                                                },
+                                            };
+                                        })
                                     )
                                 }
                                 onUpdateSrc={(nodeId, newSrc) =>
@@ -2662,3 +2744,4 @@ export default function App() {
         </ReactFlowProvider>
     );
 }
+
