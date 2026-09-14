@@ -143,9 +143,29 @@ function SkillLibrary({
             key={key}
             className="skill-item"
             draggable
-            onDragStart={(event) =>
-                event.dataTransfer.setData("skill", skill)
-            }
+            onDragStart={(e) => {
+                e.dataTransfer.setData("skill", skill);
+
+                const preview = document.createElement("div");
+
+                preview.className = "skill-drag-preview";
+                preview.innerText = skill.split(".").pop();
+
+                document.body.appendChild(preview);
+
+                const rect = preview.getBoundingClientRect();
+
+                // Maus sitzt exakt in der Mitte der Preview
+                e.dataTransfer.setDragImage(
+                    preview,
+                    rect.width / 2,
+                    rect.height / 2
+                );
+
+                requestAnimationFrame(() => {
+                    document.body.removeChild(preview);
+                });
+            }}
             onMouseEnter={(event) =>
                 handleSkillMouseEnter(event, skill)
             }

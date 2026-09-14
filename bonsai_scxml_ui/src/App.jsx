@@ -3704,15 +3704,365 @@ function AppContent() {
 
                     <div
                         className="flow-container"
-                        onDragOver={(e) => e.preventDefault()}
+                        onDragOver={(e) => {
+                            e.preventDefault();
+
+                            const skill = e.dataTransfer.getData("skill");
+
+                            // Nur Library-Drag behandeln
+                            if (!skill) return;
+
+                            const pointerPosition = screenToFlowPosition({
+                                x: e.clientX,
+                                y: e.clientY,
+                            });
+
+                            const hoveredLane = nodes
+                                .filter(
+                                    (node) => node.type === "parallelLane"
+                                )
+                                .find((lane) => {
+                                    const lanePosition =
+                                        getAbsoluteNodePosition(
+                                            lane,
+                                            nodes
+                                        );
+
+                                    const width =
+                                        Number(lane.style?.width) || 420;
+
+                                    const height =
+                                        Number(lane.style?.height) || 110;
+
+                                    return (
+                                        pointerPosition.x >= lanePosition.x &&
+                                        pointerPosition.x <=
+                                            lanePosition.x + width &&
+                                        pointerPosition.y >= lanePosition.y &&
+                                        pointerPosition.y <=
+                                            lanePosition.y + height
+                                    );
+                                });
+
+                            setParallelDropTargetId(
+                                hoveredLane?.parentId || null
+                            );
+                        }}
+                        onDragLeave={(e) => {
+                            const rect =
+                                e.currentTarget.getBoundingClientRect();
+
+                            const actuallyLeft =
+                                e.clientX <= rect.left ||
+                                e.clientX >= rect.right ||
+                                e.clientY <= rect.top ||
+                                e.clientY >= rect.bottom;
+
+                            if (actuallyLeft) {
+                                setParallelDropTargetId(null);
+                            }
+                        }}
                         onDrop={async (e) => {
                             e.preventDefault();
+
+                            setParallelDropTargetId(null);
                             if (activeMode === "code") return;
+
                             const skill = e.dataTransfer.getData("skill");
                             if (!skill) return;
-                            const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
-                            const newNode = await createNode(skill.split("skills.")[1], getNodeId(), position);
-                            setNodes((nds) => nds.concat(newNode));
+
+                            const mousePosition = screenToFlowPosition({
+                                x: e.clientX,
+                                y: e.clientY,
+                            });
+
+                            // Prüfen, ob die neue Node in eine Parallel-Lane gedroppt wurde
+                            const targetLane = nodes
+                                .filter((node) => node.type === "parallelLane")
+                                .find((lane) => {
+                                    const lanePosition = getAbsoluteNodePosition(
+                                        lane,
+                                        nodes
+                                    );
+
+                                    const width =
+                                        Number(lane.style?.width) || 420;
+
+                                    const height =
+                                        Number(lane.style?.height) || 110;
+
+                                    return (
+                                        mousePosition.x >= lanePosition.x &&
+                                        mousePosition.x <= lanePosition.x + width &&
+                                        mousePosition.y >= lanePosition.y &&
+                                        mousePosition.y <= lanePosition.y + height
+                                    );
+                                });
+
+                            const newNode = await createNode(
+                                skill.split("skills.")[1],
+                                getNodeId(),
+                                { x: 0, y: 0 }
+                            );
+
+                            // Ungefähre Größe der neuen Node schon vor dem ersten Rendern.
+                            // Entspricht derselben Idee wie bei Create Parallel from Selected.
+                            const labelLen =
+                                (newNode.data?.label || "").length +
+                                (newNode.data?.fullSkillName || "").length;
+
+                            const estimatedNodeWidth = Math.max(
+                                210,
+                                Math.min(300, 160 + labelLen * 3)
+                            );
+
+                            const eventCount =
+                                newNode.data?.events?.length || 0;
+
+                            const estimatedNodeHeight = Math.max(
+                                70,
+                                50 + eventCount * 18
+                            );
+
+                            // =========================================================
+                            // DROP IN PARALLEL-LANE
+                            // =========================================================
+                            if (targetLane) {
+                                const existingMembers = nodes.filter(
+                                    (node) => node.parentId === targetLane.id
+                                );
+
+                                // Neue Node rechts hinter die vorhandenen Nodes setzen
+                                let newX = 25;
+
+                                existingMembers.forEach((member) => {
+                                    const memberWidth =
+                                        Number(member.measured?.width) ||
+                                        Number(member.width) ||
+                                        Number(member.style?.width) ||
+                                        210;
+
+                                    const right =
+                                        Number(member.position?.x || 0) +
+                                        memberWidth +
+                                        PARALLEL_NODE_GAP;
+
+                                    newX = Math.max(newX, right);
+                                });
+
+                                newNode.parentId = targetLane.id;
+                                newNode.extent = "parent";
+
+                                newNode.position = {
+                                    x: newX,
+                                    y: 20,
+                                };
+
+                                const parallelId = targetLane.parentId;
+
+                                setNodes((currentNodes) => {
+                                    let nextNodes = [
+                                        ...currentNodes,
+                                        newNode,
+                                    ];
+
+                                    const parallel = nextNodes.find(
+                                        (node) => node.id === parallelId
+                                    );
+
+                                    if (!parallel) {
+                                        return orderNodesParentsFirst(nextNodes);
+                                    }
+
+                                    const lanes = nextNodes
+                                        .filter(
+                                            (node) =>
+                                                node.type === "parallelLane" &&
+                                                node.parentId === parallelId
+                                        )
+                                        .sort(
+                                            (a, b) =>
+                                                Number(a.position?.y || 0) -
+                                                Number(b.position?.y || 0)
+                                        );
+
+                                    // =================================================
+                                    // 1. BREITE über ALLE Lanes berechnen
+                                    // =================================================
+
+                                    let requiredParallelWidth = 420;
+
+                                    lanes.forEach((lane) => {
+                                        const members = nextNodes.filter(
+                                            (node) => node.parentId === lane.id
+                                        );
+
+                                        let maxRight = 0;
+
+                                        members.forEach((member) => {
+                                            const memberWidth =
+                                                member.id === newNode.id
+                                                    ? estimatedNodeWidth
+                                                    : (
+                                                        Number(member.measured?.width) ||
+                                                        Number(member.width) ||
+                                                        Number(member.style?.width) ||
+                                                        210
+                                                    );
+
+                                            const right =
+                                                Number(member.position?.x || 0) +
+                                                memberWidth;
+
+                                            maxRight = Math.max(
+                                                maxRight,
+                                                right
+                                            );
+                                        });
+
+                                        const requiredWidth =
+                                            maxRight +
+                                            PARALLEL_EXIT_GUTTER;
+
+                                        requiredParallelWidth = Math.max(
+                                            requiredParallelWidth,
+                                            requiredWidth
+                                        );
+                                    });
+
+                                    // =================================================
+                                    // 2. HÖHE jeder Lane berechnen
+                                    // =================================================
+
+                                    const laneLayouts = new Map();
+
+                                    // Erste Lane bestimmt gleichzeitig die Header-Höhe.
+                                    const headerHeight =
+                                        lanes.length > 0
+                                            ? Number(lanes[0].position?.y || 40)
+                                            : 40;
+
+                                    let currentY = headerHeight;
+
+                                    lanes.forEach((lane) => {
+                                        const members = nextNodes.filter(
+                                            (node) => node.parentId === lane.id
+                                        );
+
+                                        let maxBottom = 0;
+
+                                        members.forEach((member) => {
+                                            const memberHeight =
+                                                member.id === newNode.id
+                                                    ? estimatedNodeHeight
+                                                    : (
+                                                        Number(member.measured?.height) ||
+                                                        Number(member.height) ||
+                                                        Number(member.style?.height) ||
+                                                        70
+                                                    );
+
+                                            const bottom =
+                                                Number(member.position?.y || 0) +
+                                                memberHeight;
+
+                                            maxBottom = Math.max(
+                                                maxBottom,
+                                                bottom
+                                            );
+                                        });
+
+                                        // 20px oben + Node + 20px unten
+                                        const requiredHeight =
+                                            Math.max(
+                                                110,
+                                                maxBottom + 20
+                                            );
+
+                                        laneLayouts.set(lane.id, {
+                                            y: currentY,
+                                            height: requiredHeight,
+                                        });
+
+                                        currentY += requiredHeight;
+                                    });
+
+                                    // Platz für Add-Lane-Button unten
+                                    const buttonReserve = 35;
+
+                                    const requiredParallelHeight =
+                                        currentY + buttonReserve;
+
+                                    // =================================================
+                                    // 3. Parallel + alle Lanes aktualisieren
+                                    // =================================================
+
+                                    nextNodes = nextNodes.map((node) => {
+                                        // Parallel-Container
+                                        if (node.id === parallelId) {
+                                            return {
+                                                ...node,
+                                                style: {
+                                                    ...node.style,
+                                                    width: requiredParallelWidth,
+                                                    height: requiredParallelHeight,
+                                                },
+                                            };
+                                        }
+
+                                        // Lanes
+                                        if (
+                                            node.type === "parallelLane" &&
+                                            node.parentId === parallelId
+                                        ) {
+                                            const layout =
+                                                laneLayouts.get(node.id);
+
+                                            if (!layout) return node;
+
+                                            return {
+                                                ...node,
+
+                                                position: {
+                                                    ...node.position,
+                                                    y: layout.y,
+                                                },
+
+                                                style: {
+                                                    ...node.style,
+                                                    width: requiredParallelWidth,
+                                                    height: layout.height,
+                                                },
+                                            };
+                                        }
+
+                                        return node;
+                                    });
+
+                                    return orderNodesParentsFirst(nextNodes);
+                                });
+
+                                return;
+                            }
+
+                            // =========================================================
+                            // NORMALER DROP AUSSERHALB EINES PARALLELS
+                            // =========================================================
+
+                            newNode.position = {
+                                x:
+                                    mousePosition.x -
+                                    estimatedNodeWidth / 2,
+
+                                y:
+                                    mousePosition.y -
+                                    estimatedNodeHeight / 2,
+                            };
+
+                            setNodes((currentNodes) => [
+                                ...currentNodes,
+                                newNode,
+                            ]);
                         }}
                     >
                         {activeMode === "code" ? (
