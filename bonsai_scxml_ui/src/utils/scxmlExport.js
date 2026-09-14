@@ -91,14 +91,17 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
 
             const rawHandle = edge.sourceHandle || edge.label || "success";
             const cond = edge.data?.cond || "";
-            const assign = edge.data?.assign || null;
+            const assignments = Array.isArray(edge.data?.assignments)
+                ? edge.data.assignments
+                : edge.data?.assign?.location
+                    ? [edge.data.assign]
+                    : [];
 
             combinedTransitions.push({
                 rawEvent: rawHandle,
                 targetId,
                 cond,
-                assignLocation: assign?.location || "",
-                assignExpr: assign?.expr || "",
+                assignments,
             });
         });
 
@@ -118,8 +121,16 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
                     rawEvent: ev.rawEvent || ev.name || ev.id,
                     targetId,
                     cond: ev.cond || "",
-                    assignLocation: ev.assignLocation || "",
-                    assignExpr: ev.assignExpr || "",
+                    assignments: Array.isArray(ev.assignments)
+                        ? ev.assignments
+                        : ev.assignLocation
+                            ? [
+                                {
+                                    location: ev.assignLocation,
+                                    expr: ev.assignExpr || "",
+                                },
+                            ]
+                            : [],
                 });
             }
         });
@@ -140,11 +151,23 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
                     ? ` cond="${escapeXmlAttribute(scxmlCondition)}"`
                     : "";
 
-                if (tr.assignLocation && tr.assignExpr) {
-                    const assignLocation = String(tr.assignLocation).trim().replace(/^@/, "");
-                    const assignExpr = serializeEditorValueForScxml(tr.assignExpr);
+                const assignments = (tr.assignments || []).filter(
+                    (assignment) => assignment?.location && assignment?.expr !== undefined
+                );
 
-                    return `${indent}<transition event="${eventName}" target="${tr.targetId}"${condAttr}>\n${indent}    <assign location="${escapeXmlAttribute(assignLocation)}" expr="${escapeXmlAttribute(assignExpr)}"/>\n${indent}</transition>`;
+                if (assignments.length > 0) {
+                    const assignmentLines = assignments.map((assignment) => {
+                        const assignLocation = String(assignment.location)
+                            .trim()
+                            .replace(/^@/, "");
+                        const assignExpr = serializeEditorValueForScxml(
+                            assignment.expr
+                        );
+
+                        return `${indent}    <assign location="${escapeXmlAttribute(assignLocation)}" expr="${escapeXmlAttribute(assignExpr)}"/>`;
+                    });
+
+                    return `${indent}<transition event="${eventName}" target="${tr.targetId}"${condAttr}>\n${assignmentLines.join("\n")}\n${indent}</transition>`;
                 }
                 return `${indent}<transition event="${eventName}" target="${tr.targetId}"${condAttr}/>`;
             })

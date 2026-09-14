@@ -24,13 +24,28 @@ function TypedValueEditor({
     const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false);
     const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
     const inputRef = useRef(null);
+    const lastEmittedValueRef = useRef(null);
 
     useEffect(() => {
-        setDraft(value ?? "");
+        const nextValue = String(value ?? "");
+
+        // Parent components mirror drafts back through `value`. Do not treat
+        // that echo as an external reset, otherwise the autocomplete closes
+        // after every keystroke and appears to flicker.
+        if (lastEmittedValueRef.current === nextValue) {
+            lastEmittedValueRef.current = null;
+            return;
+        }
+
+        setDraft(nextValue);
         setError("");
         setIsAutocompleteOpen(false);
         setActiveSuggestionIndex(-1);
-    }, [value, expectedType]);
+    }, [value]);
+
+    useEffect(() => {
+        setError("");
+    }, [expectedType]);
 
     const normalizedType = normalizeValueType(expectedType) || expectedType || null;
 
@@ -116,6 +131,7 @@ function TypedValueEditor({
         setError("");
         setIsAutocompleteOpen(false);
         setActiveSuggestionIndex(-1);
+        lastEmittedValueRef.current = result.value;
         onDraftChange?.(result.value);
         onCommit?.(result.value);
         return true;
@@ -128,6 +144,7 @@ function TypedValueEditor({
         setError("");
         setIsAutocompleteOpen(false);
         setActiveSuggestionIndex(-1);
+        lastEmittedValueRef.current = suggestion.value;
         onDraftChange?.(suggestion.value);
         onCommit?.(suggestion.value);
 
@@ -207,6 +224,7 @@ function TypedValueEditor({
                         const nextValue = event.target.value;
                         setDraft(nextValue);
                         setError("");
+                        lastEmittedValueRef.current = nextValue;
                         onDraftChange?.(nextValue);
 
                         const hasText = nextValue.trim().length > 0;

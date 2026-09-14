@@ -9,10 +9,11 @@ function StateActionsEditor({
                                 availableLocations,
                                 valueVariables = [],
                                 onChange,
-                                listId,
                             }) {
     const assignments = Array.isArray(actions) ? actions : [];
     const [pendingFocusIndex, setPendingFocusIndex] = useState(null);
+    const [openLocationIndex, setOpenLocationIndex] = useState(null);
+    const [activeLocationSuggestionIndex, setActiveLocationSuggestionIndex] = useState(-1);
     const locationInputRefs = useRef([]);
 
     const locationOptions = useMemo(
@@ -41,9 +42,11 @@ function StateActionsEditor({
         if (input) {
             input.focus();
             input.select();
+            setOpenLocationIndex(pendingFocusIndex);
+            setActiveLocationSuggestionIndex(locationOptions.length > 0 ? 0 : -1);
             setPendingFocusIndex(null);
         }
-    }, [assignments.length, pendingFocusIndex]);
+    }, [assignments.length, locationOptions.length, pendingFocusIndex]);
 
     const updateAssignment = (index, changes) => {
         onChange(
@@ -57,6 +60,12 @@ function StateActionsEditor({
 
     const removeAssignment = (index) => {
         onChange(assignments.filter((_, i) => i !== index));
+        setOpenLocationIndex((current) => {
+            if (current === index) return null;
+            if (current !== null && current > index) return current - 1;
+            return current;
+        });
+        setActiveLocationSuggestionIndex(-1);
     };
 
     const addAssignment = () => {
@@ -71,15 +80,6 @@ function StateActionsEditor({
                 expr: "",
             },
         ]);
-    };
-
-    const handleCommitKeyDown = (event) => {
-        if (event.key !== "Enter") {
-            return;
-        }
-
-        event.preventDefault();
-        event.currentTarget.blur();
     };
 
     const updateLocation = (index, nextLocation) => {
@@ -101,6 +101,90 @@ function StateActionsEditor({
         }
 
         updateAssignment(index, changes);
+    };
+
+    const getMatchingLocationOptions = (query) => {
+        const normalizedQuery = String(query || "").trim().toLowerCase();
+
+        if (!normalizedQuery) {
+            return locationOptions;
+        }
+
+        return locationOptions
+            .filter((location) =>
+                String(location.id || "")
+                    .toLowerCase()
+                    .includes(normalizedQuery)
+            )
+            .sort((a, b) => {
+                const aId = String(a.id || "").toLowerCase();
+                const bId = String(b.id || "").toLowerCase();
+                const aStarts = aId.startsWith(normalizedQuery) ? 0 : 1;
+                const bStarts = bId.startsWith(normalizedQuery) ? 0 : 1;
+
+                return aStarts - bStarts || aId.localeCompare(bId);
+            })
+            .slice(0, 8);
+    };
+
+    const selectLocationSuggestion = (index, location) => {
+        if (!location) return;
+
+        updateLocation(index, location.id);
+        setOpenLocationIndex(null);
+        setActiveLocationSuggestionIndex(-1);
+
+        requestAnimationFrame(() => {
+            locationInputRefs.current[index]?.focus();
+        });
+    };
+
+    const handleLocationKeyDown = (event, index, matchingLocations) => {
+        if (event.key === "ArrowDown" && matchingLocations.length > 0) {
+            event.preventDefault();
+            setOpenLocationIndex(index);
+            setActiveLocationSuggestionIndex((current) =>
+                current < matchingLocations.length - 1 ? current + 1 : 0
+            );
+            return;
+        }
+
+        if (event.key === "ArrowUp" && matchingLocations.length > 0) {
+            event.preventDefault();
+            setOpenLocationIndex(index);
+            setActiveLocationSuggestionIndex((current) =>
+                current > 0 ? current - 1 : matchingLocations.length - 1
+            );
+            return;
+        }
+
+        if (event.key === "Escape") {
+            setOpenLocationIndex(null);
+            setActiveLocationSuggestionIndex(-1);
+            return;
+        }
+
+        if (event.key !== "Enter") {
+            return;
+        }
+
+        event.preventDefault();
+
+        if (matchingLocations.length > 0) {
+            const suggestionIndex =
+                activeLocationSuggestionIndex >= 0 &&
+                activeLocationSuggestionIndex < matchingLocations.length
+                    ? activeLocationSuggestionIndex
+                    : 0;
+
+            selectLocationSuggestion(
+                index,
+                matchingLocations[suggestionIndex]
+            );
+            return;
+        }
+
+        event.currentTarget.blur();
     };
 
     return (
@@ -154,6 +238,12 @@ function StateActionsEditor({
                         const targetLocation = locationOptions.find(
                             (location) => location.id === assignment.location
                         );
+                        const matchingLocations = getMatchingLocationOptions(
+                            assignment.location
+                        );
+                        const isLocationAutocompleteOpen =
+                            openLocationIndex === index &&
+                            matchingLocations.length > 0;
 
                         return (
                             <div
@@ -175,28 +265,98 @@ function StateActionsEditor({
                                             )}
                                         </span>
 
-                                        <input
-                                            ref={(element) => {
-                                                locationInputRefs.current[index] =
-                                                    element;
-                                            }}
-                                            className="slot-field-edit"
-                                            type="text"
-                                            list={listId}
-                                            value={
-                                                assignment.location || ""
-                                            }
-                                            placeholder="Select target"
-                                            onChange={(event) =>
-                                                updateLocation(
-                                                    index,
-                                                    event.target.value
-                                                )
-                                            }
-                                            onKeyDown={
-                                                handleCommitKeyDown
-                                            }
-                                        />
+                                        <div className="typed-value-editor-row">
+                                            <input
+                                                ref={(element) => {
+                                                    locationInputRefs.current[index] =
+                                                        element;
+                                                }}
+                                                className="slot-field-edit"
+                                                type="text"
+                                                value={
+                                                    assignment.location || ""
+                                                }
+                                                placeholder="Select target"
+                                                autoComplete="off"
+                                                onFocus={() => {
+                                                    const matches =
+                                                        getMatchingLocationOptions(
+                                                            assignment.location
+                                                        );
+                                                    setOpenLocationIndex(index);
+                                                    setActiveLocationSuggestionIndex(
+                                                        matches.length > 0 ? 0 : -1
+                                                    );
+                                                }}
+                                                onChange={(event) => {
+                                                    const nextLocation =
+                                                        event.target.value;
+                                                    updateLocation(
+                                                        index,
+                                                        nextLocation
+                                                    );
+                                                    const matches =
+                                                        getMatchingLocationOptions(
+                                                            nextLocation
+                                                        );
+                                                    setOpenLocationIndex(index);
+                                                    setActiveLocationSuggestionIndex(
+                                                        matches.length > 0 ? 0 : -1
+                                                    );
+                                                }}
+                                                onBlur={() => {
+                                                    window.setTimeout(() => {
+                                                        setOpenLocationIndex(
+                                                            (current) =>
+                                                                current === index
+                                                                    ? null
+                                                                    : current
+                                                        );
+                                                        setActiveLocationSuggestionIndex(-1);
+                                                    }, 120);
+                                                }}
+                                                onKeyDown={(event) =>
+                                                    handleLocationKeyDown(
+                                                        event,
+                                                        index,
+                                                        matchingLocations
+                                                    )
+                                                }
+                                            />
+
+                                            {isLocationAutocompleteOpen && (
+                                                <div
+                                                    className="typed-value-autocomplete"
+                                                    role="listbox"
+                                                >
+                                                    {matchingLocations.map(
+                                                        (location, suggestionIndex) => (
+                                                            <button
+                                                                type="button"
+                                                                className={`typed-value-autocomplete-option ${
+                                                                    suggestionIndex ===
+                                                                    activeLocationSuggestionIndex
+                                                                        ? "active"
+                                                                        : ""
+                                                                }`}
+                                                                key={location.id}
+                                                                onMouseDown={(event) => {
+                                                                    event.preventDefault();
+                                                                    selectLocationSuggestion(
+                                                                        index,
+                                                                        location
+                                                                    );
+                                                                }}
+                                                            >
+                                                                <span className="typed-value-autocomplete-value">
+                                                                    {location.id}
+                                                                </span>
+                                                            </button>
+                                                        )
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
                                     </label>
 
                                     <div className="state-action-arrow">
@@ -241,19 +401,6 @@ function StateActionsEditor({
                     })}
                 </div>
             )}
-
-            <datalist id={listId}>
-                {locationOptions.map((location) => (
-                    <option
-                        value={location.id}
-                        key={location.id}
-                    >
-                        {location.type
-                            ? `${location.type} · ${location.source || ""}`
-                            : location.source || ""}
-                    </option>
-                ))}
-            </datalist>
         </section>
     );
 }

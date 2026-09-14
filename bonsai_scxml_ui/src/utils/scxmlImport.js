@@ -29,6 +29,15 @@ const getSkillPackageName = (fullSkillName) => {
     return parts.slice(0, -1).join(".");
 };
 
+const parseTransitionAssignments = (transitionElement) =>
+    Array.from(transitionElement?.children || [])
+        .filter((child) => child.localName === "assign")
+        .map((assignElement) => ({
+            location: assignElement.getAttribute("location")?.trim() || "",
+            expr: assignElement.getAttribute("expr")?.trim() || "",
+        }))
+        .filter((assignment) => assignment.location);
+
 export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(xmlText, "application/xml");
@@ -144,6 +153,7 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             selectedSkill: "",
             target: null,
             cond: "",
+            assignments: [],
             assignLocation: "",
             assignExpr: "",
         }));
@@ -247,7 +257,8 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                     const eventName = tr.getAttribute("event") || "";
                     const targetState = tr.getAttribute("target");
                     const cond = tr.getAttribute("cond") || "";
-                    const assignElem = Array.from(tr.children).find((c) => c.localName === "assign");
+                    const assignments = parseTransitionAssignments(tr);
+                    const firstAssignment = assignments[0] || null;
 
                     const sourcePrefix = eventName.includes(".") ? eventName.split(".")[0] : fullSkillName;
 
@@ -258,8 +269,9 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                             eventId: eventName,
                             targetStateName: targetState,
                             cond: cond.trim(),
-                            assignLocation: assignElem?.getAttribute("location")?.trim() || "",
-                            assignExpr: assignElem?.getAttribute("expr")?.trim() || "",
+                            assignments,
+                            assignLocation: firstAssignment?.location || "",
+                            assignExpr: firstAssignment?.expr || "",
                         });
                     }
                 });
@@ -291,7 +303,8 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                         const eventName = tr.getAttribute("event") || "";
                         const targetState = tr.getAttribute("target");
                         const cond = tr.getAttribute("cond") || "";
-                        const assignElem = Array.from(tr.children).find((c) => c.localName === "assign");
+                        const assignments = parseTransitionAssignments(tr);
+                        const firstAssignment = assignments[0] || null;
 
                         if (targetState) {
                             rawTransitions.push({
@@ -300,8 +313,9 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                                 eventId: eventName,
                                 targetStateName: targetState,
                                 cond: cond.trim(),
-                                assignLocation: assignElem?.getAttribute("location")?.trim() || "",
-                                assignExpr: assignElem?.getAttribute("expr")?.trim() || "",
+                                assignments,
+                                assignLocation: firstAssignment?.location || "",
+                                assignExpr: firstAssignment?.expr || "",
                             });
                         }
                     });
@@ -339,7 +353,8 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                                 const eventName = tr.getAttribute("event") || "";
                                 const targetState = tr.getAttribute("target");
                                 const cond = tr.getAttribute("cond") || "";
-                                const assignElem = Array.from(tr.children).find((c) => c.localName === "assign");
+                                const assignments = parseTransitionAssignments(tr);
+                                const firstAssignment = assignments[0] || null;
 
                                 if (targetState) {
                                     rawTransitions.push({
@@ -348,8 +363,9 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                                         eventId: eventName,
                                         targetStateName: targetState,
                                         cond: cond.trim(),
-                                        assignLocation: assignElem?.getAttribute("location")?.trim() || "",
-                                        assignExpr: assignElem?.getAttribute("expr")?.trim() || "",
+                                        assignments,
+                                        assignLocation: firstAssignment?.location || "",
+                                        assignExpr: firstAssignment?.expr || "",
                                     });
                                 }
                             });
@@ -378,7 +394,8 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                             const eventName = tr.getAttribute("event") || "";
                             const targetState = tr.getAttribute("target");
                             const cond = tr.getAttribute("cond") || "";
-                            const assignElem = Array.from(tr.children).find((c) => c.localName === "assign");
+                            const assignments = parseTransitionAssignments(tr);
+                            const firstAssignment = assignments[0] || null;
 
                             if (targetState) {
                                 rawTransitions.push({
@@ -387,8 +404,9 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                                     eventId: eventName,
                                     targetStateName: targetState,
                                     cond: cond.trim(),
-                                    assignLocation: assignElem?.getAttribute("location")?.trim() || "",
-                                    assignExpr: assignElem?.getAttribute("expr")?.trim() || "",
+                                    assignments,
+                                    assignLocation: firstAssignment?.location || "",
+                                    assignExpr: firstAssignment?.expr || "",
                                 });
                             }
                         });
@@ -460,7 +478,8 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                     const eventName = tr.getAttribute("event") || "";
                     const targetState = tr.getAttribute("target");
                     const cond = tr.getAttribute("cond") || "";
-                    const assignElem = Array.from(tr.children).find((c) => c.localName === "assign");
+                    const assignments = parseTransitionAssignments(tr);
+                    const firstAssignment = assignments[0] || null;
 
                     if (targetState) {
                         rawTransitions.push({
@@ -469,8 +488,9 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                             eventId: eventName,
                             targetStateName: targetState,
                             cond: cond.trim(),
-                            assignLocation: assignElem?.getAttribute("location")?.trim() || "",
-                            assignExpr: assignElem?.getAttribute("expr")?.trim() || "",
+                            assignments,
+                            assignLocation: firstAssignment?.location || "",
+                            assignExpr: firstAssignment?.expr || "",
                         });
                     }
                 });
@@ -489,7 +509,8 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                         const eventName = tr.getAttribute("event") || "";
                         const targetState = tr.getAttribute("target");
                         const cond = tr.getAttribute("cond") || "";
-                        const assignElem = Array.from(tr.children).find((c) => c.localName === "assign");
+                        const assignments = parseTransitionAssignments(tr);
+                        const firstAssignment = assignments[0] || null;
 
                         if (targetState) {
                             rawTransitions.push({
@@ -498,8 +519,9 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                                 eventId: eventName,
                                 targetStateName: targetState,
                                 cond: cond.trim(),
-                                assignLocation: assignElem?.getAttribute("location")?.trim() || "",
-                                assignExpr: assignElem?.getAttribute("expr")?.trim() || "",
+                                assignments,
+                                assignLocation: firstAssignment?.location || "",
+                                assignExpr: firstAssignment?.expr || "",
                             });
                         }
                     });
@@ -535,7 +557,8 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             const eventName = tr.getAttribute("event") || "";
             const targetState = tr.getAttribute("target");
             const cond = tr.getAttribute("cond") || "";
-            const assignElem = Array.from(tr.children).find((c) => c.localName === "assign");
+            const assignments = parseTransitionAssignments(tr);
+            const firstAssignment = assignments[0] || null;
 
             if (targetState) {
                 rawTransitions.push({
@@ -544,8 +567,9 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                     eventId: eventName,
                     targetStateName: targetState,
                     cond: cond.trim(),
-                    assignLocation: assignElem?.getAttribute("location")?.trim() || "",
-                    assignExpr: assignElem?.getAttribute("expr")?.trim() || "",
+                    assignments,
+                    assignLocation: firstAssignment?.location || "",
+                    assignExpr: firstAssignment?.expr || "",
                 });
             }
         });
@@ -571,7 +595,23 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
     // after parsing and before the transition data is copied into the UI.
     rawTransitions.forEach((transition) => {
         transition.cond = deserializeScxmlConditionForEditor(transition.cond);
-        transition.assignExpr = deserializeScxmlValueForEditor(transition.assignExpr);
+        const assignments = Array.isArray(transition.assignments)
+            ? transition.assignments
+            : transition.assignLocation
+                ? [
+                    {
+                        location: transition.assignLocation,
+                        expr: transition.assignExpr || "",
+                    },
+                ]
+                : [];
+
+        transition.assignments = assignments.map((assignment) => ({
+            location: assignment.location,
+            expr: deserializeScxmlValueForEditor(assignment.expr),
+        }));
+        transition.assignLocation = transition.assignments[0]?.location || "";
+        transition.assignExpr = transition.assignments[0]?.expr || "";
     });
 
     newNodes.forEach((node) => {
@@ -630,8 +670,17 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             markerEnd: { type: MarkerType.ArrowClosed },
             data: {
                 cond: trans.cond || "",
-                assign: trans.assignLocation
-                    ? { location: trans.assignLocation, expr: trans.assignExpr }
+                assignments: Array.isArray(trans.assignments)
+                    ? trans.assignments.map((assignment) => ({
+                        location: assignment.location,
+                        expr: assignment.expr,
+                    }))
+                    : [],
+                assign: trans.assignments?.[0]
+                    ? {
+                        location: trans.assignments[0].location,
+                        expr: trans.assignments[0].expr,
+                    }
                     : null,
             },
         });
@@ -649,8 +698,14 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                 : "",
             target: targetNode.id,
             cond: trans.cond || "",
-            assignLocation: trans.assignLocation || "",
-            assignExpr: trans.assignExpr || "",
+            assignments: Array.isArray(trans.assignments)
+                ? trans.assignments.map((assignment) => ({
+                    location: assignment.location,
+                    expr: assignment.expr,
+                }))
+                : [],
+            assignLocation: trans.assignments?.[0]?.location || "",
+            assignExpr: trans.assignments?.[0]?.expr || "",
         };
 
         // Reuse an API event which has not been assigned to a transition yet.

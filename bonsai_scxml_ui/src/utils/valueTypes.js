@@ -159,7 +159,21 @@ export function normalizeTypedValue(
         };
     }
 
+    // An explicit @ is an editor-only marker for a variable reference.
+    // Never let an attempted reference fall through to String handling,
+    // otherwise values such as @foo (or a partial @ while typing) can be
+    // normalized into quoted string literals.
+    const hasReferenceMarker = trimmed.startsWith("@");
     const referenceName = getReferenceName(trimmed);
+
+    if (hasReferenceMarker && !referenceName) {
+        return {
+            valid: false,
+            value: trimmed,
+            type: normalizedExpectedType,
+            error: "Select or enter a valid variable reference after @.",
+        };
+    }
 
     if (referenceName) {
         const referencedVariable = (Array.isArray(variables) ? variables : []).find(
