@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import {
     BaseEdge,
     EdgeLabelRenderer,
@@ -164,11 +164,6 @@ export default function EditableTransitionEdge(props) {
     const storedControlPoints = Array.isArray(data?.controlPoints)
         ? data.controlPoints
         : [];
-    const controlPointsRef = useRef(storedControlPoints);
-
-    useEffect(() => {
-        controlPointsRef.current = storedControlPoints;
-    }, [storedControlPoints]);
 
     const controlPoints = useMemo(
         () =>
@@ -180,29 +175,26 @@ export default function EditableTransitionEdge(props) {
 
     const updateControlPoints = useCallback(
         (updater) => {
-            const nextPoints = updater(controlPointsRef.current);
-            controlPointsRef.current = nextPoints;
-
-            // Persist edits back into the owning React state. App.jsx injects
-            // this callback for both transition edges and slot edges.
-            data?.onControlPointsChange?.(nextPoints);
-
-            // Also update React Flow immediately so dragging stays responsive.
             setEdges((currentEdges) =>
-                currentEdges.map((edge) =>
-                    edge.id === id
-                        ? {
-                            ...edge,
-                            data: {
-                                ...(edge.data || {}),
-                                controlPoints: nextPoints,
-                            },
-                        }
-                        : edge
-                )
+                currentEdges.map((edge) => {
+                    if (edge.id !== id) return edge;
+
+                    const currentPoints = Array.isArray(edge.data?.controlPoints)
+                        ? edge.data.controlPoints
+                        : [];
+                    const nextPoints = updater(currentPoints);
+
+                    return {
+                        ...edge,
+                        data: {
+                            ...(edge.data || {}),
+                            controlPoints: nextPoints,
+                        },
+                    };
+                })
             );
         },
-        [data, id, setEdges]
+        [id, setEdges]
     );
 
     const addControlPoint = useCallback(
