@@ -33,17 +33,32 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
 
     // 2. Slots sammeln
     const slotEntries = [];
+    const seenSlotKeys = new Set();
     nodes.forEach((node) => {
         const skillName = node.data.fullSkillName || node.data.label;
         const allSlots = [...(node.data.inSlots || []), ...(node.data.outSlots || [])];
 
         allSlots.forEach((slot) => {
-            if (slot.path && slot.path.trim() !== "") {
-                const formattedPath = slot.path.startsWith("/") ? slot.path : `/${slot.path}`;
-                slotEntries.push(
-                    `                <slot key="${slot.key}" state="${skillName}" xpath="${formattedPath}"/>`
-                );
-            }
+            if (!slot.path || slot.path.trim() === "") return;
+
+                    const formattedPath = slot.path.startsWith("/") ? slot.path : `/${slot.path}`;
+                    const tagName = slot.inherited ? "inheritSlot" : "slot";
+
+                    // Bei inheritSlot referenziert `state`/`xpath` die ursprüngliche
+                    // Deklaration (kann von der aktuellen Node abweichen), sonst geht
+                    // beim nächsten Import/Export-Zyklus die Herkunft verloren.
+                    const declaredState = slot.inherited?.state || skillName;
+                    const declaredPath = slot.inherited?.xpath
+                        ? (slot.inherited.xpath.startsWith("/") ? slot.inherited.xpath : `/${slot.inherited.xpath}`)
+                        : formattedPath;
+
+                    const dedupeKey = `${tagName}|${slot.key}|${declaredState}|${declaredPath}`;
+                    if (seenSlotKeys.has(dedupeKey)) return;
+                    seenSlotKeys.add(dedupeKey);
+
+                    slotEntries.push(
+                        `                <${tagName} key="${slot.key}" state="${declaredState}" xpath="${declaredPath}"/>`
+                    );
         });
     });
 
