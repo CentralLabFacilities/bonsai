@@ -1,292 +1,710 @@
-import { useState, useEffect, useRef } from "react";
-import { FiX, FiPlus, FiCheck, FiArrowRight, FiAlertTriangle, FiInfo, FiChevronUp, FiChevronDown } from "react-icons/fi";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+    FiArrowRight,
+    FiCheck,
+    FiChevronDown,
+    FiChevronUp,
+    FiPlus,
+    FiTrash2,
+    FiX,
+    FiAlertTriangle,
+} from "react-icons/fi";
 import TypedValueEditor from "./TypedValueEditor";
-import { VALUE_TYPES, getVariableType, normalizeDatamodelValue, normalizeTypedValue } from "../utils/valueTypes";
+import {
+    VALUE_TYPES,
+    getVariableType,
+    normalizeDatamodelValue,
+    normalizeTypedValue,
+} from "../utils/valueTypes";
+
+const CONDITION_PATTERN = /^([^\s]+)\s*(==|!=|>=|<=|>|<)\s*(.+)$/;
+
+function createTransitionId(prefix = "transition") {
+    if (globalThis.crypto?.randomUUID) {
+        return `${prefix}-${globalThis.crypto.randomUUID()}`;
+    }
+
+    return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function createAssignmentId(prefix = "assignment") {
+    return createTransitionId(prefix);
+}
+
+function getTransitionAssignments(transition, variables) {
+    const fallbackLocation = variables[0]?.id || "";
+    const rawAssignments = Array.isArray(transition.assignments)
+        ? transition.assignments
+        : transition.assignLocation
+            ? [
+                {
+                    location: transition.assignLocation,
+                    expr: transition.assignExpr || "",
+                },
+            ]
+            : [];
+
+    return rawAssignments.map((assignment, index) => ({
+        assignmentId:
+            assignment.assignmentId ||
+            assignment.id ||
+            createAssignmentId(`existing-assignment-${index}`),
+        location: assignment.location || fallbackLocation,
+        expr: assignment.expr || "",
+    }));
+}
+
+function parseCondition(condition) {
+    const text = String(condition || "").trim();
+    if (!text) return null;
+
+    const match = text.match(CONDITION_PATTERN);
+    if (!match) {
+        return {
+            variable: "",
+            operator: "==",
+            value: text,
+        };
+    }
+
+    return {
+        variable: match[1],
+        operator: match[2],
+        value: match[3],
+    };
+}
+
+function hydrateTransition(transition, index, variables, fallbackEvent = "") {
+    const parsedCondition = parseCondition(transition.cond);
+    const conditionVariable = parsedCondition?.variable || variables[0]?.id || "";
+    const conditionVariableExists = variables.some(
+        (variable) => variable.id === conditionVariable
+    );
+
+    return {
+        transitionId:
+            transition.transitionId ||
+            transition.edgeId ||
+            createTransitionId(`existing-${index}`),
+        edgeId: transition.edgeId || null,
+        event:
+            transition.event ||
+            transition.eventId ||
+            transition.sourceHandle ||
+            fallbackEvent ||
+            "",
+        target: transition.target || "",
+        targetLabel: transition.targetLabel || transition.target || "",
+
+        conditionEnabled: Boolean(parsedCondition),
+        conditionVariable,
+        conditionOperator: parsedCondition?.operator || "==",
+        conditionValue: parsedCondition?.value || "",
+        conditionVariableIsNew:
+            Boolean(parsedCondition?.variable) && !conditionVariableExists,
+        conditionVariableInitialValue: "",
+
+        assignments: getTransitionAssignments(transition, variables),
+    };
+}
+
+function getTargetDisplayName(targetId, availableTargets) {
+    if (!targetId) return "";
+
+    const target = availableTargets.find((option) => option.id === targetId);
+    return target?.displayName || target?.label || targetId;
+}
 
 function ConditionModal({
                             isOpen,
                             onClose,
                             onConfirm,
                             globalVariables = [],
-                            sourceEventName,
+                            sourceEventName = "",
                             sourceNodeName,
                             candidateTransitions = [],
+                            availableEvents = [],
+                            availableTargets = [],
+                            initialTransitionId = null,
                             initialTargetId = null,
                         }) {
     const drawerRef = useRef(null);
 
-    const usableVars = globalVariables.filter((v) => !v.id.startsWith("#"));
+    const usableVars = useMemo(
+        () => (globalVariables || []).filter((variable) => !String(variable.id || "").startsWith("#")),
+        [globalVariables]
+    );
+
+    const normalizedEvents = useMemo(() => {
+        const seen = new Set();
+        const result = [];
+
+        (availableEvents || []).forEach((event) => {
+            const eventId = typeof event === "string" ? event : event?.id;
+            if (!eventId || seen.has(eventId)) return;
+            seen.add(eventId);
+            result.push({
+                id: eventId,
+                description: typeof event === "string" ? "" : event?.description || "",
+            });
+        });
+
+        if (sourceEventName && !seen.has(sourceEventName)) {
+            result.push({ id: sourceEventName, description: "" });
+        }
+
+        return result;
+    }, [availableEvents, sourceEventName]);
 
     const [transitionsState, setTransitionsState] = useState([]);
-    const [selectedTargetId, setSelectedTargetId] = useState("");
-
-    const [isFallbackMode, setIsFallbackMode] = useState(false);
-    const [selectedVar, setSelectedVar] = useState(usableVars[0]?.id || "");
-    const [isCustomVar, setIsCustomVar] = useState(false);
-    const [newVarName, setNewVarName] = useState("");
-    const [newVarExpr, setNewVarExpr] = useState("");
-    const [operator, setOperator] = useState(">");
-    const [compareValue, setCompareValue] = useState("1");
-    const [enableAssign, setEnableAssign] = useState(false);
-    const [assignExpr, setAssignExpr] = useState("");
-
+    const [selectedTransitionId, setSelectedTransitionId] = useState("");
+    const [newTransitionEvent, setNewTransitionEvent] = useState("");
     const [errorMessage, setErrorMessage] = useState("");
-    const [warningNotice, setWarningNotice] = useState("");
+
+    const [targetQuery, setTargetQuery] = useState("");
+    const [targetAutocompleteOpen, setTargetAutocompleteOpen] = useState(false);
+    const [activeTargetSuggestionIndex, setActiveTargetSuggestionIndex] = useState(-1);
 
     useEffect(() => {
         if (!isOpen) return;
+
+        const hydrated = candidateTransitions.map((transition, index) =>
+            hydrateTransition(transition, index, usableVars, sourceEventName)
+        );
+
+        setTransitionsState(hydrated);
         setErrorMessage("");
-        setWarningNotice("");
 
-        const initialList = candidateTransitions.map((t) => ({ ...t }));
-        setTransitionsState(initialList);
+        let selectedId = initialTransitionId;
 
-        const targetToSelect = initialTargetId || initialList[0]?.target || "";
-        setSelectedTargetId(targetToSelect);
-        loadTargetIntoForm(targetToSelect, initialList);
-    }, [isOpen, initialTargetId, candidateTransitions]);
+        if (!selectedId && initialTargetId) {
+            selectedId = hydrated.find(
+                (transition) =>
+                    transition.target === initialTargetId &&
+                    (!sourceEventName || transition.event === sourceEventName)
+            )?.transitionId;
+        }
+
+        if (!selectedId || !hydrated.some((transition) => transition.transitionId === selectedId)) {
+            selectedId = hydrated[0]?.transitionId || "";
+        }
+
+        setSelectedTransitionId(selectedId || "");
+        setNewTransitionEvent(
+            sourceEventName || normalizedEvents[0]?.id || ""
+        );
+    }, [
+        isOpen,
+        candidateTransitions,
+        usableVars,
+        sourceEventName,
+        normalizedEvents,
+        initialTransitionId,
+        initialTargetId,
+    ]);
 
     useEffect(() => {
-        if (!isOpen) return;
+        if (!isOpen) return undefined;
+
         const handleOutsideClick = (event) => {
-            if (
-                drawerRef.current &&
-                !drawerRef.current.contains(event.target)
-            ) {
+            if (drawerRef.current && !drawerRef.current.contains(event.target)) {
                 onClose();
             }
         };
+
         document.addEventListener("mousedown", handleOutsideClick);
-        return () => {
-            document.removeEventListener("mousedown", handleOutsideClick);
-        };
+        return () => document.removeEventListener("mousedown", handleOutsideClick);
     }, [isOpen, onClose]);
 
+    const selectedTransition = transitionsState.find(
+        (transition) => transition.transitionId === selectedTransitionId
+    );
 
-    const loadTargetIntoForm = (targetId, list = transitionsState) => {
-        const item = list.find((t) => t.target === targetId);
-        if (!item) return;
+    const customVariables = useMemo(() => {
+        const seen = new Set(usableVars.map((variable) => variable.id));
+        const result = [];
 
-        setErrorMessage("");
-        setWarningNotice("");
+        transitionsState.forEach((transition) => {
+            if (!transition.conditionVariableIsNew) return;
 
-        if (item.cond && item.cond.trim() !== "") {
-            setIsFallbackMode(false);
-            const parts = item.cond.trim().split(" ");
-            if (parts.length >= 3) {
-                const varName = parts[0];
-                const op = parts[1];
-                const val = parts.slice(2).join(" ");
+            const id = String(transition.conditionVariable || "").trim();
+            if (!id || seen.has(id)) return;
 
-                if (usableVars.some((v) => v.id === varName)) {
-                    setSelectedVar(varName);
-                    setIsCustomVar(false);
-                } else {
-                    setIsCustomVar(true);
-                    setNewVarName(varName);
-                }
-                setOperator(op);
-                setCompareValue(val);
+            seen.add(id);
+            result.push({
+                id,
+                expr: transition.conditionVariableInitialValue || "",
+            });
+        });
+
+        return result;
+    }, [transitionsState, usableVars]);
+
+    const editorVariables = useMemo(
+        () => [...usableVars, ...customVariables],
+        [usableVars, customVariables]
+    );
+
+    const selectedConditionVariable = selectedTransition
+        ? editorVariables.find(
+            (variable) => variable.id === selectedTransition.conditionVariable
+        ) ||
+        (selectedTransition.conditionVariable
+            ? {
+                id: selectedTransition.conditionVariable,
+                expr: selectedTransition.conditionVariableInitialValue || "",
             }
-        } else {
-            setIsFallbackMode(true);
-            setSelectedVar(usableVars[0]?.id || "");
-            setIsCustomVar(usableVars.length === 0);
-            setOperator(">");
-            setCompareValue("1");
-        }
+            : null)
+        : null;
 
-        if (item.assignLocation) {
-            setEnableAssign(true);
-            setAssignExpr(item.assignExpr || "");
-        } else {
-            setEnableAssign(false);
-            setAssignExpr("");
-        }
-    };
-
-    const handleSelectTarget = (targetId) => {
-        setSelectedTargetId(targetId);
-        loadTargetIntoForm(targetId);
-    };
-
-    // Reihenfolge ändern (Nach oben verschieben)
-    const handleMoveUp = (index, e) => {
-        e.stopPropagation();
-        if (index <= 0) return;
-        setTransitionsState((prev) => {
-            const copy = [...prev];
-            const temp = copy[index - 1];
-            copy[index - 1] = copy[index];
-            copy[index] = temp;
-            return copy;
-        });
-    };
-
-    // Reihenfolge ändern (Nach unten verschieben)
-    const handleMoveDown = (index, e) => {
-        e.stopPropagation();
-        if (index >= transitionsState.length - 1) return;
-        setTransitionsState((prev) => {
-            const copy = [...prev];
-            const temp = copy[index + 1];
-            copy[index + 1] = copy[index];
-            copy[index] = temp;
-            return copy;
-        });
-    };
-
-    const activeVarName = isCustomVar ? newVarName.trim() : selectedVar;
-    const activeVariable = isCustomVar
-        ? { id: activeVarName, expr: newVarExpr }
-        : usableVars.find((variable) => variable.id === selectedVar);
-    const activeVariableType = getVariableType(activeVariable);
-    const isBooleanCondition = activeVariableType === VALUE_TYPES.BOOLEAN;
+    const conditionVariableType = getVariableType(selectedConditionVariable);
+    const conditionIsBoolean = conditionVariableType === VALUE_TYPES.BOOLEAN;
 
     useEffect(() => {
-        if (!isBooleanCondition) return;
-        if (operator !== "==" && operator !== "!=") {
-            setOperator("==");
+        if (!selectedTransition) {
+            setTargetQuery("");
+            return;
         }
-    }, [isBooleanCondition, operator]);
+
+        setTargetQuery(
+            getTargetDisplayName(selectedTransition.target, availableTargets)
+        );
+        setTargetAutocompleteOpen(false);
+        setActiveTargetSuggestionIndex(-1);
+    }, [selectedTransitionId, selectedTransition?.target, availableTargets]);
+
+    useEffect(() => {
+        if (!selectedTransition || !conditionIsBoolean) return;
+        if (
+            selectedTransition.conditionOperator !== "==" &&
+            selectedTransition.conditionOperator !== "!="
+        ) {
+            setTransitionsState((current) =>
+                current.map((transition) =>
+                    transition.transitionId === selectedTransitionId
+                        ? { ...transition, conditionOperator: "==" }
+                        : transition
+                )
+            );
+        }
+    }, [
+        conditionIsBoolean,
+        selectedTransition,
+        selectedTransitionId,
+    ]);
+
+    const matchingTargets = useMemo(() => {
+        const query = String(targetQuery || "").trim().toLowerCase();
+        if (!query) return [];
+
+        return (availableTargets || [])
+            .filter((target) =>
+                [
+                    target.displayName,
+                    target.label,
+                    target.fullSkillName,
+                    target.packageName,
+                    target.id,
+                ].some((value) =>
+                    String(value || "").toLowerCase().includes(query)
+                )
+            )
+            .sort((a, b) => {
+                const aName = String(a.displayName || a.label || a.id).toLowerCase();
+                const bName = String(b.displayName || b.label || b.id).toLowerCase();
+                const aStarts = aName.startsWith(query) ? 0 : 1;
+                const bStarts = bName.startsWith(query) ? 0 : 1;
+                return aStarts - bStarts || aName.localeCompare(bName);
+            })
+            .slice(0, 8);
+    }, [targetQuery, availableTargets]);
+
+    useEffect(() => {
+        if (activeTargetSuggestionIndex >= matchingTargets.length) {
+            setActiveTargetSuggestionIndex(matchingTargets.length > 0 ? 0 : -1);
+        }
+    }, [matchingTargets, activeTargetSuggestionIndex]);
 
     if (!isOpen) return null;
+
+    const updateSelectedTransition = (changes) => {
+        if (!selectedTransitionId) return;
+
+        setTransitionsState((current) =>
+            current.map((transition) =>
+                transition.transitionId === selectedTransitionId
+                    ? { ...transition, ...changes }
+                    : transition
+            )
+        );
+        setErrorMessage("");
+    };
+
+    const handleAddAssignment = () => {
+        if (!selectedTransitionId || editorVariables.length === 0) return;
+
+        const assignment = {
+            assignmentId: createAssignmentId("new-assignment"),
+            location: editorVariables[0]?.id || "",
+            expr: "",
+        };
+
+        setTransitionsState((current) =>
+            current.map((transition) =>
+                transition.transitionId === selectedTransitionId
+                    ? {
+                        ...transition,
+                        assignments: [
+                            ...(Array.isArray(transition.assignments)
+                                ? transition.assignments
+                                : []),
+                            assignment,
+                        ],
+                    }
+                    : transition
+            )
+        );
+        setErrorMessage("");
+    };
+
+    const updateAssignment = (assignmentId, changes) => {
+        if (!selectedTransitionId) return;
+
+        setTransitionsState((current) =>
+            current.map((transition) =>
+                transition.transitionId === selectedTransitionId
+                    ? {
+                        ...transition,
+                        assignments: (transition.assignments || []).map(
+                            (assignment) =>
+                                assignment.assignmentId === assignmentId
+                                    ? { ...assignment, ...changes }
+                                    : assignment
+                        ),
+                    }
+                    : transition
+            )
+        );
+        setErrorMessage("");
+    };
+
+    const deleteAssignment = (assignmentId) => {
+        if (!selectedTransitionId) return;
+
+        setTransitionsState((current) =>
+            current.map((transition) =>
+                transition.transitionId === selectedTransitionId
+                    ? {
+                        ...transition,
+                        assignments: (transition.assignments || []).filter(
+                            (assignment) =>
+                                assignment.assignmentId !== assignmentId
+                        ),
+                    }
+                    : transition
+            )
+        );
+        setErrorMessage("");
+    };
+
+    const handleMove = (index, direction, event) => {
+        event.stopPropagation();
+
+        const nextIndex = index + direction;
+        if (nextIndex < 0 || nextIndex >= transitionsState.length) return;
+
+        setTransitionsState((current) => {
+            const copy = [...current];
+            [copy[index], copy[nextIndex]] = [copy[nextIndex], copy[index]];
+            return copy;
+        });
+    };
+
+    const handleAddTransition = () => {
+        const eventId = newTransitionEvent || normalizedEvents[0]?.id || "";
+        if (!eventId) {
+            setErrorMessage("No possible event is available for a new transition.");
+            return;
+        }
+
+        const transitionId = createTransitionId("new");
+        const newTransition = {
+            transitionId,
+            edgeId: null,
+            event: eventId,
+            target: "",
+            targetLabel: "",
+            conditionEnabled: false,
+            conditionVariable: usableVars[0]?.id || "",
+            conditionOperator: "==",
+            conditionValue: "",
+            conditionVariableIsNew: false,
+            conditionVariableInitialValue: "",
+            assignments: [],
+        };
+
+        setTransitionsState((current) => [...current, newTransition]);
+        setSelectedTransitionId(transitionId);
+        setTargetQuery("");
+        setErrorMessage("");
+    };
+
+    const handleDeleteTransition = (transitionId, event) => {
+        event.stopPropagation();
+
+        setTransitionsState((current) => {
+            const index = current.findIndex(
+                (transition) => transition.transitionId === transitionId
+            );
+            const next = current.filter(
+                (transition) => transition.transitionId !== transitionId
+            );
+
+            if (selectedTransitionId === transitionId) {
+                const replacement = next[Math.min(index, next.length - 1)];
+                setSelectedTransitionId(replacement?.transitionId || "");
+            }
+
+            return next;
+        });
+    };
+
+    const selectTarget = (target) => {
+        if (!target) return;
+
+        updateSelectedTransition({
+            target: target.id,
+            targetLabel: target.displayName || target.label || target.id,
+        });
+        setTargetQuery(target.displayName || target.label || target.id);
+        setTargetAutocompleteOpen(false);
+        setActiveTargetSuggestionIndex(-1);
+    };
+
+    const handleTargetKeyDown = (event) => {
+        if (
+            targetAutocompleteOpen &&
+            matchingTargets.length > 0 &&
+            event.key === "ArrowDown"
+        ) {
+            event.preventDefault();
+            setActiveTargetSuggestionIndex((current) =>
+                current < matchingTargets.length - 1 ? current + 1 : 0
+            );
+            return;
+        }
+
+        if (
+            targetAutocompleteOpen &&
+            matchingTargets.length > 0 &&
+            event.key === "ArrowUp"
+        ) {
+            event.preventDefault();
+            setActiveTargetSuggestionIndex((current) =>
+                current > 0 ? current - 1 : matchingTargets.length - 1
+            );
+            return;
+        }
+
+        if (event.key === "Escape") {
+            setTargetAutocompleteOpen(false);
+            setActiveTargetSuggestionIndex(-1);
+            return;
+        }
+
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+
+        if (
+            targetAutocompleteOpen &&
+            matchingTargets.length > 0 &&
+            activeTargetSuggestionIndex >= 0
+        ) {
+            selectTarget(matchingTargets[activeTargetSuggestionIndex]);
+        }
+    };
 
     const handleSave = () => {
         setErrorMessage("");
 
-        if (!selectedTargetId) {
-            setErrorMessage("Please select a destination path in step 1.");
-            return;
-        }
+        const newVariablesById = new Map();
+        const allVariables = [...usableVars];
 
-        let updatedList = [...transitionsState];
-        const otherTransitions = updatedList.filter((t) => t.target !== selectedTargetId);
-
-        if (isFallbackMode) {
-            updatedList = updatedList.map((t) =>
-                t.target === selectedTargetId
-                    ? { ...t, cond: "", assignLocation: "", assignExpr: "" }
-                    : t
-            );
-        } else {
-            if (isCustomVar && (!newVarName.trim() || !newVarExpr.trim())) {
-                setErrorMessage("Please specify the name and initial value for the new variable.");
-                return;
-            }
-            if (!activeVarName) {
-                setErrorMessage("Please select a variable.");
-                return;
-            }
-            if (!compareValue || compareValue.trim() === "") {
-                setErrorMessage("Please provide a comparative value in step 3.");
-                return;
+        for (const transition of transitionsState) {
+            if (!transition.conditionEnabled || !transition.conditionVariableIsNew) {
+                continue;
             }
 
-            const comparisonResult = normalizeTypedValue(
-                compareValue,
-                activeVariableType,
-                usableVars,
-                { allowEmpty: false }
-            );
+            const variableId = String(transition.conditionVariable || "").trim();
+            const initialValue = String(
+                transition.conditionVariableInitialValue || ""
+            ).trim();
 
-            if (!comparisonResult.valid) {
+            if (!variableId || !initialValue) {
+                setSelectedTransitionId(transition.transitionId);
                 setErrorMessage(
-                    comparisonResult.error ||
-                    `The condition value must be ${activeVariableType || "type-compatible"}.`
+                    "A new condition variable needs both an ID and an initial value."
                 );
                 return;
             }
 
-            const normalizedCompareValue = comparisonResult.value;
-            let normalizedAssignExpr = "";
+            if (!newVariablesById.has(variableId)) {
+                const variable = {
+                    id: variableId,
+                    expr: normalizeDatamodelValue(initialValue),
+                };
+                newVariablesById.set(variableId, variable);
+                allVariables.push(variable);
+            }
+        }
 
-            if (enableAssign) {
+        const normalizedTransitions = [];
+
+        for (let index = 0; index < transitionsState.length; index += 1) {
+            const transition = transitionsState[index];
+
+            if (!transition.event) {
+                setSelectedTransitionId(transition.transitionId);
+                setErrorMessage(`Transition #${index + 1} needs an event.`);
+                return;
+            }
+
+            if (!transition.target) {
+                setSelectedTransitionId(transition.transitionId);
+                setErrorMessage(
+                    `Transition #${index + 1} needs a target in step 4.`
+                );
+                return;
+            }
+
+            let condition = "";
+
+            if (transition.conditionEnabled) {
+                const variableName = String(
+                    transition.conditionVariable || ""
+                ).trim();
+                const variable = allVariables.find(
+                    (candidate) => candidate.id === variableName
+                );
+
+                if (!variableName || !variable) {
+                    setSelectedTransitionId(transition.transitionId);
+                    setErrorMessage(
+                        `Transition #${index + 1} needs a valid condition variable.`
+                    );
+                    return;
+                }
+
+                const variableType = getVariableType(variable);
+                const conditionValue = normalizeTypedValue(
+                    transition.conditionValue,
+                    variableType,
+                    allVariables,
+                    { allowEmpty: false }
+                );
+
+                if (!conditionValue.valid) {
+                    setSelectedTransitionId(transition.transitionId);
+                    setErrorMessage(
+                        conditionValue.error ||
+                        `Transition #${index + 1} has an invalid condition value.`
+                    );
+                    return;
+                }
+
+                const operator =
+                    variableType === VALUE_TYPES.BOOLEAN &&
+                    transition.conditionOperator !== "==" &&
+                    transition.conditionOperator !== "!="
+                        ? "=="
+                        : transition.conditionOperator;
+
+                condition = `${variableName} ${operator} ${conditionValue.value}`;
+            }
+
+            const assignments = [];
+
+            for (let assignmentIndex = 0; assignmentIndex < (transition.assignments || []).length; assignmentIndex += 1) {
+                const assignment = transition.assignments[assignmentIndex];
+                const assignLocation = String(assignment.location || "").trim();
+                const assignmentVariable = allVariables.find(
+                    (variable) => variable.id === assignLocation
+                );
+
+                if (!assignLocation || !assignmentVariable) {
+                    setSelectedTransitionId(transition.transitionId);
+                    setErrorMessage(
+                        `Transition #${index + 1}, assignment #${assignmentIndex + 1} needs a valid variable.`
+                    );
+                    return;
+                }
+
                 const assignmentResult = normalizeTypedValue(
-                    assignExpr,
-                    activeVariableType,
-                    usableVars,
+                    assignment.expr,
+                    getVariableType(assignmentVariable),
+                    allVariables,
                     { allowEmpty: false }
                 );
 
                 if (!assignmentResult.valid) {
+                    setSelectedTransitionId(transition.transitionId);
                     setErrorMessage(
                         assignmentResult.error ||
-                        `The transition assignment must be ${activeVariableType || "type-compatible"}.`
+                        `Transition #${index + 1}, assignment #${assignmentIndex + 1} has an invalid value.`
                     );
                     return;
                 }
 
-                normalizedAssignExpr = assignmentResult.value;
+                assignments.push({
+                    assignmentId: assignment.assignmentId,
+                    location: assignLocation,
+                    expr: assignmentResult.value,
+                });
             }
 
-            const conditionString = `${activeVarName} ${operator} ${normalizedCompareValue}`;
-            const assignLocation = enableAssign ? activeVarName : "";
-            const assignVal = enableAssign ? normalizedAssignExpr : "";
+            const firstAssignment = assignments[0] || null;
 
-            const hasOtherFallback = otherTransitions.some((t) => !t.cond || t.cond.trim() === "");
-
-            if (!hasOtherFallback) {
-                if (otherTransitions.length > 0) {
-                    const fallbackTarget = otherTransitions[0];
-                    updatedList = updatedList.map((t) => {
-                        if (t.target === selectedTargetId) {
-                            return { ...t, cond: conditionString, assignLocation, assignExpr: assignVal };
-                        }
-                        if (t.target === fallbackTarget.target) {
-                            return { ...t, cond: "", assignLocation: "", assignExpr: "" };
-                        }
-                        return t;
-                    });
-
-                    setWarningNotice(
-                        `Note: Since at least one transition must always remain without a condition, the condition was removed from "${fallbackTarget.targetLabel || fallbackTarget.target}".`
-                    );
-                } else {
-                    setErrorMessage("There is only a single path from this exit. This path must remain without a condition!");
-                    return;
-                }
-            } else {
-                updatedList = updatedList.map((t) =>
-                    t.target === selectedTargetId
-                        ? { ...t, cond: conditionString, assignLocation, assignExpr: assignVal }
-                        : t
-                );
-            }
+            normalizedTransitions.push({
+                transitionId: transition.transitionId,
+                edgeId: transition.edgeId,
+                event: transition.event,
+                target: transition.target,
+                targetLabel:
+                    transition.targetLabel ||
+                    getTargetDisplayName(transition.target, availableTargets),
+                cond: condition,
+                assignments,
+                // Legacy fields stay populated for older code paths.
+                assignLocation: firstAssignment?.location || "",
+                assignExpr: firstAssignment?.expr || "",
+            });
         }
 
-        // Stabile Sortierung: Alle mit Condition bleiben in ihrer relativen Reihenfolge oben, Fallbacks nach unten
-        const withCond = updatedList.filter((t) => t.cond && t.cond.trim() !== "");
-        const withoutCond = updatedList.filter((t) => !t.cond || t.cond.trim() === "");
-        const finalSortedList = [...withCond, ...withoutCond];
-
-        const newGlobalVar = isCustomVar && newVarName.trim()
-            ? {
-                id: newVarName.trim(),
-                expr: normalizeDatamodelValue(newVarExpr),
-            }
-            : null;
-
         onConfirm({
-            updatedTransitions: finalSortedList,
-            newGlobalVar,
+            updatedTransitions: normalizedTransitions,
+            newGlobalVars: [...newVariablesById.values()],
         });
     };
 
+    const selectedEventDescription = normalizedEvents.find(
+        (event) => event.id === selectedTransition?.event
+    )?.description;
+
     return (
-        <div className="bottom-drawer-container" >
+        <div className="bottom-drawer-container">
             <div ref={drawerRef} className="bottom-drawer-content full-width">
-                {/* Header */}
                 <div className="bottom-drawer-header">
-                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                        <span style={{ fontWeight: "bold", fontSize: "15px", color: "#ffffff" }}>
-                            Condition Configuration: <span style={{ color: "#38bdf8" }}>{sourceNodeName} ({sourceEventName})</span>
+                    <div className="transition-drawer-heading">
+                        <span className="transition-drawer-title">
+                            Transitions: <span>{sourceNodeName}</span>
                         </span>
-                        <span style={{ fontSize: "12px", color: "#94a3b8" }}>
-                            (The order from top to bottom determines the evaluation.)
+                        <span className="transition-drawer-subtitle">
+                            Order is evaluated from top to bottom.
                         </span>
                     </div>
-                    <button className="modal-close-button" onClick={onClose}><FiX /></button>
+                    <button className="modal-close-button" onClick={onClose}>
+                        <FiX />
+                    </button>
                 </div>
 
                 {errorMessage && (
@@ -296,251 +714,614 @@ function ConditionModal({
                     </div>
                 )}
 
-                {warningNotice && (
-                    <div className="drawer-warning-box">
-                        <FiInfo style={{ fontSize: "18px", flexShrink: 0 }} />
-                        <span>{warningNotice}</span>
-                    </div>
-                )}
-
-                {/* 4 Spalten Layout */}
-                <div className="bottom-drawer-grid-layout">
-                    {/* Schritt 1: Ziel-Pfad & Reordering */}
-                    <div className="step-card">
+                <div className="bottom-drawer-grid-layout transition-editor-grid">
+                    <div className="step-card transition-list-step">
                         <div className="step-card-header">
                             <span className="step-number">1</span>
-                            <span className="step-title">Order & Destination Path</span>
+                            <span className="step-title">Transitions</span>
                         </div>
-                        <div className="step-card-body">
-                            <div className="target-list-vertical">
-                                {transitionsState.map((t, idx) => {
-                                    const isSelected = t.target === selectedTargetId;
-                                    const hasCond = t.cond && t.cond.trim() !== "";
-                                    return (
-                                        <div
-                                            key={t.target}
-                                            className={`target-card-full ${isSelected ? "selected" : ""}`}
-                                            onClick={() => handleSelectTarget(t.target)}
-                                            style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
-                                        >
-                                            <div style={{ display: "flex", flexDirection: "column", gap: "2px", overflow: "hidden" }}>
-                                                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                                                    <span style={{ fontSize: "11px", color: "#64748b", fontWeight: "bold" }}>#{idx + 1}</span>
-                                                    <FiArrowRight color={isSelected ? "#38bdf8" : "#94a3b8"} />
-                                                    <span style={{ fontWeight: "bold", fontSize: "13px", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
-                                                        {t.targetLabel || t.target}
-                                                    </span>
-                                                </div>
-                                                <span className="target-card-status">
-                                                    {hasCond ? `Cond: [${t.cond}]` : "Mandatory fallback"}
-                                                </span>
-                                            </div>
 
-                                            {/* Pfeiltasten zum Verschieben */}
-                                            <div style={{ display: "flex", flexDirection: "column", gap: "2px" }} onClick={(e) => e.stopPropagation()}>
-                                                <button
-                                                    className="order-btn"
-                                                    disabled={idx === 0}
-                                                    onClick={(e) => handleMoveUp(idx, e)}
-                                                    title="Increase priority (move further up)"
+                        <div className="step-card-body transition-step-body">
+                            <div className="transition-order-list">
+                                {transitionsState.length > 0 ? (
+                                    transitionsState.map((transition, index) => {
+                                        const isSelected =
+                                            transition.transitionId === selectedTransitionId;
+                                        const targetName =
+                                            transition.targetLabel ||
+                                            getTargetDisplayName(
+                                                transition.target,
+                                                availableTargets
+                                            );
+
+                                        return (
+                                            <div
+                                                key={transition.transitionId}
+                                                className={`transition-order-card ${
+                                                    isSelected ? "selected" : ""
+                                                }`}
+                                                onClick={() =>
+                                                    setSelectedTransitionId(
+                                                        transition.transitionId
+                                                    )
+                                                }
+                                            >
+                                                <div className="transition-order-main">
+                                                    <div className="transition-order-title-row">
+                                                        <span className="transition-priority">
+                                                            #{index + 1}
+                                                        </span>
+                                                        <span className="transition-event-name">
+                                                            {transition.event || "No event"}
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="transition-order-summary">
+                                                        <span>
+                                                            {transition.conditionEnabled
+                                                                ? transition.conditionVariable &&
+                                                                transition.conditionValue
+                                                                    ? `${transition.conditionVariable} ${transition.conditionOperator} ${transition.conditionValue}`
+                                                                    : "Condition configured"
+                                                                : "No condition"}
+                                                        </span>
+                                                        <FiArrowRight />
+                                                        <span>
+                                                            {targetName || "No target"}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                <div
+                                                    className="transition-order-actions"
+                                                    onClick={(event) => event.stopPropagation()}
                                                 >
-                                                    <FiChevronUp />
-                                                </button>
-                                                <button
-                                                    className="order-btn"
-                                                    disabled={idx === transitionsState.length - 1}
-                                                    onClick={(e) => handleMoveDown(idx, e)}
-                                                    title="Lower priority (move further down)"
-                                                >
-                                                    <FiChevronDown />
-                                                </button>
+                                                    <button
+                                                        className="order-btn"
+                                                        disabled={index === 0}
+                                                        onClick={(event) =>
+                                                            handleMove(index, -1, event)
+                                                        }
+                                                        title="Move up"
+                                                    >
+                                                        <FiChevronUp />
+                                                    </button>
+                                                    <button
+                                                        className="order-btn"
+                                                        disabled={
+                                                            index ===
+                                                            transitionsState.length - 1
+                                                        }
+                                                        onClick={(event) =>
+                                                            handleMove(index, 1, event)
+                                                        }
+                                                        title="Move down"
+                                                    >
+                                                        <FiChevronDown />
+                                                    </button>
+                                                    <button
+                                                        className="transition-delete-button"
+                                                        onClick={(event) =>
+                                                            handleDeleteTransition(
+                                                                transition.transitionId,
+                                                                event
+                                                            )
+                                                        }
+                                                        title="Delete transition"
+                                                    >
+                                                        <FiTrash2 />
+                                                    </button>
+                                                </div>
                                             </div>
-                                        </div>
-                                    );
-                                })}
+                                        );
+                                    })
+                                ) : (
+                                    <div className="transition-empty-state">
+                                        No transitions yet.
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="transition-add-row">
+                                <select
+                                    className="skill-select"
+                                    value={newTransitionEvent}
+                                    onChange={(event) =>
+                                        setNewTransitionEvent(event.target.value)
+                                    }
+                                >
+                                    {normalizedEvents.map((event) => (
+                                        <option key={event.id} value={event.id}>
+                                            {event.id}
+                                        </option>
+                                    ))}
+                                </select>
+                                <button
+                                    className="filter-button transition-primary-button transition-add-button"
+                                    type="button"
+                                    onClick={handleAddTransition}
+                                >
+                                    <FiPlus /> Add
+                                </button>
                             </div>
                         </div>
                     </div>
 
-                    {/* Schritt 2: Typ & Variable */}
                     <div className="step-card">
                         <div className="step-card-header">
                             <span className="step-number">2</span>
-                            <span className="step-title">Type & Variable</span>
+                            <span className="step-title">Condition</span>
                         </div>
-                        <div className="step-card-body" style={{ gap: "10px" }}>
-                            <div>
-                                <label className="drawer-label" style={{ marginBottom: "4px", display: "block" }}>Status of this path:</label>
-                                <select
-                                    className="skill-select"
-                                    value={isFallbackMode ? "fallback" : "cond"}
-                                    onChange={(e) => {
-                                        setIsFallbackMode(e.target.value === "fallback");
-                                        setErrorMessage("");
-                                    }}
-                                >
-                                    <option value="cond">Define condition (&lt;cond&gt;)</option>
-                                    <option value="fallback">Unconditional fallback (without cond)</option>
-                                </select>
-                            </div>
 
-                            {!isFallbackMode && (
-                                !isCustomVar ? (
-                                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                                        <select
-                                            className="skill-select"
-                                            value={selectedVar}
-                                            onChange={(e) => setSelectedVar(e.target.value)}
-                                        >
-                                            {usableVars.map((v) => (
-                                                <option key={v.id} value={v.id}>{v.id} ({v.expr})</option>
-                                            ))}
-                                        </select>
-                                        <button className="filter-button" style={{ margin: 0, justifyContent: "center" }} onClick={() => setIsCustomVar(true)}>
-                                            <FiPlus /> New Variable
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                                        <input
-                                            className="slot-field-edit"
-                                            type="text"
-                                            placeholder="Name (e.g. count)"
-                                            value={newVarName}
-                                            onChange={(e) => setNewVarName(e.target.value)}
-                                        />
-                                        <input
-                                            className="slot-field-edit"
-                                            type="text"
-                                            placeholder="Initial value"
-                                            value={newVarExpr}
-                                            onChange={(e) => setNewVarExpr(e.target.value)}
-                                        />
-                                        <button className="back-button" style={{ margin: 0, justifyContent: "center" }} onClick={() => setIsCustomVar(false)}>
-                                            Select from list
-                                        </button>
-                                    </div>
-                                )
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Schritt 3: Bedingung */}
-                    <div className="step-card">
-                        <div className="step-card-header">
-                            <span className="step-number">3</span>
-                            <span className="step-title">Define condition</span>
-                        </div>
-                        <div className="step-card-body">
-                            {!isFallbackMode ? (
-                                <div className="condition-expression-row">
-                                    {activeVariableType && (
-                                        <span className={`datamodel-value-type-badge datamodel-value-type-${activeVariableType.toLowerCase()}`}>
-                                            {activeVariableType}
-                                        </span>
-                                    )}
-
-                                    <span className="condition-expression-variable" title={activeVarName || "Variable"}>
-                                        {activeVarName || "Variable"}
-                                    </span>
-
-                                    <select
-                                        className="skill-select condition-expression-operator"
-                                        value={operator}
-                                        onChange={(e) => setOperator(e.target.value)}
-                                    >
-                                        {!isBooleanCondition && <option value=">">&gt;</option>}
-                                        {!isBooleanCondition && <option value="<">&lt;</option>}
-                                        <option value="==">==</option>
-                                        {!isBooleanCondition && <option value=">=">&gt;=</option>}
-                                        {!isBooleanCondition && <option value="<=">&lt;=</option>}
-                                        <option value="!=">!=</option>
-                                    </select>
-
-                                    <div className="condition-expression-value">
-                                        <TypedValueEditor
-                                            value={compareValue}
-                                            expectedType={activeVariableType}
-                                            variables={usableVars}
-                                            allowEmpty={false}
-                                            placeholder={
-                                                activeVariableType
-                                                    ? `${activeVariableType} value`
-                                                    : "Value"
-                                            }
-                                            onDraftChange={setCompareValue}
-                                            onCommit={setCompareValue}
-                                        />
-                                    </div>
-                                </div>
-                            ) : (
-                                <span style={{ fontSize: "12px", color: "#94a3b8" }}>
-                                    This path is executed if no previous condition applies.
-                                </span>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Schritt 4: Assign */}
-                    <div className="step-card">
-                        <div className="step-card-header">
-                            <span className="step-number">4</span>
-                            <span className="step-title">Action (&lt;assign&gt;)</span>
-                        </div>
-                        <div className="step-card-body">
-                            {!isFallbackMode ? (
+                        <div className="step-card-body transition-step-body">
+                            {selectedTransition ? (
                                 <>
-                                    <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "13px" }}>
+                                    <label className="transition-enable-row">
                                         <input
                                             type="checkbox"
-                                            checked={enableAssign}
-                                            onChange={(e) => setEnableAssign(e.target.checked)}
+                                            checked={selectedTransition.conditionEnabled}
+                                            onChange={(event) =>
+                                                updateSelectedTransition({
+                                                    conditionEnabled:
+                                                    event.target.checked,
+                                                })
+                                            }
                                         />
-                                        <span>Change variable</span>
+                                        <span>Add condition</span>
                                     </label>
-                                    {enableAssign ? (
-                                        <div className="transition-typed-assignment">
-                                            {activeVariableType && (
-                                                <span className={`datamodel-value-type-badge datamodel-value-type-${activeVariableType.toLowerCase()}`}>
-                                                    {activeVariableType}
-                                                </span>
+
+                                    {selectedTransition.conditionEnabled && (
+                                        <>
+                                            <div className="transition-variable-mode-row">
+                                                {!selectedTransition.conditionVariableIsNew ? (
+                                                    <>
+                                                        <select
+                                                            className="skill-select transition-variable-select"
+                                                            value={
+                                                                selectedTransition.conditionVariable
+                                                            }
+                                                            onChange={(event) =>
+                                                                updateSelectedTransition({
+                                                                    conditionVariable:
+                                                                    event.target.value,
+                                                                })
+                                                            }
+                                                        >
+                                                            {usableVars.map((variable) => (
+                                                                <option
+                                                                    key={variable.id}
+                                                                    value={variable.id}
+                                                                >
+                                                                    {variable.id}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                        <button
+                                                            className="transition-secondary-button"
+                                                            type="button"
+                                                            onClick={() =>
+                                                                updateSelectedTransition({
+                                                                    conditionVariableIsNew: true,
+                                                                    conditionVariable: "",
+                                                                    conditionVariableInitialValue:
+                                                                        "",
+                                                                })
+                                                            }
+                                                        >
+                                                            <FiPlus /> New variable
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <button
+                                                        className="transition-secondary-button"
+                                                        type="button"
+                                                        onClick={() =>
+                                                            updateSelectedTransition({
+                                                                conditionVariableIsNew: false,
+                                                                conditionVariable:
+                                                                    usableVars[0]?.id || "",
+                                                                conditionVariableInitialValue:
+                                                                    "",
+                                                            })
+                                                        }
+                                                    >
+                                                        Use existing variable
+                                                    </button>
+                                                )}
+                                            </div>
+
+                                            {selectedTransition.conditionVariableIsNew && (
+                                                <div className="transition-new-variable-row">
+                                                    <input
+                                                        className="slot-field-edit"
+                                                        type="text"
+                                                        value={
+                                                            selectedTransition.conditionVariable
+                                                        }
+                                                        placeholder="Variable ID"
+                                                        onChange={(event) =>
+                                                            updateSelectedTransition({
+                                                                conditionVariable:
+                                                                event.target.value,
+                                                            })
+                                                        }
+                                                    />
+                                                    <input
+                                                        className="slot-field-edit"
+                                                        type="text"
+                                                        value={
+                                                            selectedTransition.conditionVariableInitialValue
+                                                        }
+                                                        placeholder="Initial value"
+                                                        onChange={(event) =>
+                                                            updateSelectedTransition({
+                                                                conditionVariableInitialValue:
+                                                                event.target.value,
+                                                            })
+                                                        }
+                                                    />
+                                                </div>
                                             )}
 
-                                            <TypedValueEditor
-                                                value={assignExpr}
-                                                expectedType={activeVariableType}
-                                                variables={usableVars}
-                                                allowEmpty={false}
-                                                placeholder={
-                                                    activeVariableType
-                                                        ? `${activeVariableType} value`
-                                                        : "Value"
-                                                }
-                                                onDraftChange={setAssignExpr}
-                                                onCommit={setAssignExpr}
-                                            />
-                                        </div>
-                                    ) : (
-                                        <span style={{ fontSize: "12px", color: "#64748b", marginTop: "8px" }}>
-                                            No automatic change
-                                        </span>
+                                            <div className="condition-expression-row">
+                                                {conditionVariableType ? (
+                                                    <span
+                                                        className={`datamodel-value-type-badge datamodel-value-type-${conditionVariableType.toLowerCase()}`}
+                                                    >
+                                                        {conditionVariableType}
+                                                    </span>
+                                                ) : (
+                                                    <span className="datamodel-value-type-badge datamodel-value-type-unknown">
+                                                        Type
+                                                    </span>
+                                                )}
+
+                                                <span
+                                                    className="condition-expression-variable"
+                                                    title={
+                                                        selectedTransition.conditionVariable ||
+                                                        "Variable"
+                                                    }
+                                                >
+                                                    {selectedTransition.conditionVariable ||
+                                                        "Variable"}
+                                                </span>
+
+                                                <select
+                                                    className="skill-select condition-expression-operator"
+                                                    value={
+                                                        selectedTransition.conditionOperator
+                                                    }
+                                                    onChange={(event) =>
+                                                        updateSelectedTransition({
+                                                            conditionOperator:
+                                                            event.target.value,
+                                                        })
+                                                    }
+                                                >
+                                                    {!conditionIsBoolean && (
+                                                        <option value=">">&gt;</option>
+                                                    )}
+                                                    {!conditionIsBoolean && (
+                                                        <option value="<">&lt;</option>
+                                                    )}
+                                                    <option value="==">==</option>
+                                                    {!conditionIsBoolean && (
+                                                        <option value=">=">&gt;=</option>
+                                                    )}
+                                                    {!conditionIsBoolean && (
+                                                        <option value="<=">&lt;=</option>
+                                                    )}
+                                                    <option value="!=">!=</option>
+                                                </select>
+
+                                                <div className="condition-expression-value">
+                                                    <TypedValueEditor
+                                                        key={`${selectedTransition.transitionId}:${selectedTransition.conditionVariable}`}
+                                                        value={
+                                                            selectedTransition.conditionValue
+                                                        }
+                                                        expectedType={
+                                                            conditionVariableType
+                                                        }
+                                                        variables={editorVariables}
+                                                        allowEmpty={false}
+                                                        placeholder={
+                                                            conditionVariableType
+                                                                ? `${conditionVariableType} value or @variable`
+                                                                : "Value or @variable"
+                                                        }
+                                                        onDraftChange={(value) =>
+                                                            updateSelectedTransition({
+                                                                conditionValue: value,
+                                                            })
+                                                        }
+                                                        onCommit={(value) =>
+                                                            updateSelectedTransition({
+                                                                conditionValue: value,
+                                                            })
+                                                        }
+                                                    />
+                                                </div>
+                                            </div>
+                                        </>
                                     )}
                                 </>
                             ) : (
-                                <span style={{ fontSize: "12px", color: "#64748b" }}>
-                                    Promotions available subject to conditions only.
-                                </span>
+                                <div className="transition-empty-state">
+                                    Select a transition in step 1.
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="step-card">
+                        <div className="step-card-header transition-assignment-header">
+                            <span className="step-number">3</span>
+                            <span className="step-title">Assignments</span>
+                            {selectedTransition && editorVariables.length > 0 && (
+                                <button
+                                    className="transition-secondary-button transition-primary-button transition-add-assignment-button"
+                                    type="button"
+                                    onClick={handleAddAssignment}
+                                >
+                                    <FiPlus /> Add
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="step-card-body transition-step-body">
+                            {selectedTransition ? (
+                                <>
+                                    {editorVariables.length === 0 ? (
+                                        <div className="transition-help-text">
+                                            Create a datamodel variable before adding an assignment.
+                                        </div>
+                                    ) : (selectedTransition.assignments || []).length === 0 ? (
+                                        <div className="transition-empty-state">
+                                            No assignments yet. Use + Add to create one.
+                                        </div>
+                                    ) : (
+                                        <div className="transition-assignment-list">
+                                            {(selectedTransition.assignments || []).map(
+                                                (assignment, assignmentIndex) => {
+                                                    const assignmentVariable =
+                                                        editorVariables.find(
+                                                            (variable) =>
+                                                                variable.id === assignment.location
+                                                        );
+                                                    const assignmentVariableType =
+                                                        getVariableType(assignmentVariable);
+
+                                                    return (
+                                                        <div
+                                                            className="transition-assignment-editor"
+                                                            key={assignment.assignmentId}
+                                                        >
+                                                            <div className="transition-assignment-target-row">
+                                                                {assignmentVariableType ? (
+                                                                    <span
+                                                                        className={`datamodel-value-type-badge datamodel-value-type-${assignmentVariableType.toLowerCase()}`}
+                                                                    >
+                                                                        {assignmentVariableType}
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="datamodel-value-type-badge datamodel-value-type-unknown">
+                                                                        Type
+                                                                    </span>
+                                                                )}
+
+                                                                <select
+                                                                    className="skill-select transition-assignment-location"
+                                                                    value={assignment.location}
+                                                                    onChange={(event) =>
+                                                                        updateAssignment(
+                                                                            assignment.assignmentId,
+                                                                            {
+                                                                                location:
+                                                                                event.target.value,
+                                                                                expr: "",
+                                                                            }
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    {editorVariables.map(
+                                                                        (variable) => (
+                                                                            <option
+                                                                                key={variable.id}
+                                                                                value={variable.id}
+                                                                            >
+                                                                                {variable.id}
+                                                                            </option>
+                                                                        )
+                                                                    )}
+                                                                </select>
+
+                                                                <button
+                                                                    className="transition-assignment-delete-button"
+                                                                    type="button"
+                                                                    title={`Delete assignment #${assignmentIndex + 1}`}
+                                                                    onClick={() =>
+                                                                        deleteAssignment(
+                                                                            assignment.assignmentId
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <FiTrash2 />
+                                                                </button>
+                                                            </div>
+
+                                                            <TypedValueEditor
+                                                                key={`${selectedTransition.transitionId}:${assignment.assignmentId}:${assignment.location}`}
+                                                                value={assignment.expr}
+                                                                expectedType={
+                                                                    assignmentVariableType
+                                                                }
+                                                                variables={editorVariables}
+                                                                allowEmpty={false}
+                                                                placeholder={
+                                                                    assignmentVariableType
+                                                                        ? `${assignmentVariableType} value or @variable`
+                                                                        : "Value or @variable"
+                                                                }
+                                                                onDraftChange={(value) =>
+                                                                    updateAssignment(
+                                                                        assignment.assignmentId,
+                                                                        { expr: value }
+                                                                    )
+                                                                }
+                                                                onCommit={(value) =>
+                                                                    updateAssignment(
+                                                                        assignment.assignmentId,
+                                                                        { expr: value }
+                                                                    )
+                                                                }
+                                                            />
+                                                        </div>
+                                                    );
+                                                }
+                                            )}
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <div className="transition-empty-state">
+                                    Select a transition in step 1.
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="step-card">
+                        <div className="step-card-header">
+                            <span className="step-number">4</span>
+                            <span className="step-title">Target</span>
+                        </div>
+
+                        <div className="step-card-body transition-step-body">
+                            {selectedTransition ? (
+                                <>
+                                    <div className="transition-target-autocomplete">
+                                        <input
+                                            className="slot-field-edit transition-target-input"
+                                            type="text"
+                                            value={targetQuery}
+                                            placeholder="Type a target node..."
+                                            autoComplete="off"
+                                            onChange={(event) => {
+                                                const next = event.target.value;
+                                                setTargetQuery(next);
+                                                setTargetAutocompleteOpen(
+                                                    next.trim().length > 0
+                                                );
+                                                setActiveTargetSuggestionIndex(
+                                                    next.trim().length > 0 ? 0 : -1
+                                                );
+                                            }}
+                                            onFocus={() => {
+                                                if (
+                                                    targetQuery.trim() &&
+                                                    matchingTargets.length > 0
+                                                ) {
+                                                    setTargetAutocompleteOpen(true);
+                                                    setActiveTargetSuggestionIndex(0);
+                                                }
+                                            }}
+                                            onBlur={() =>
+                                                window.setTimeout(() => {
+                                                    setTargetAutocompleteOpen(false);
+                                                    setActiveTargetSuggestionIndex(-1);
+                                                }, 120)
+                                            }
+                                            onKeyDown={handleTargetKeyDown}
+                                        />
+
+                                        {targetAutocompleteOpen &&
+                                            matchingTargets.length > 0 && (
+                                                <div className="transition-target-suggestions">
+                                                    {matchingTargets.map(
+                                                        (target, index) => (
+                                                            <button
+                                                                type="button"
+                                                                key={target.id}
+                                                                className={`transition-target-suggestion ${
+                                                                    index ===
+                                                                    activeTargetSuggestionIndex
+                                                                        ? "active"
+                                                                        : ""
+                                                                }`}
+                                                                onMouseDown={(event) => {
+                                                                    event.preventDefault();
+                                                                    selectTarget(target);
+                                                                }}
+                                                            >
+                                                                <span className="transition-target-suggestion-name">
+                                                                    {target.displayName ||
+                                                                        target.label ||
+                                                                        target.id}
+                                                                </span>
+                                                                <span className="transition-target-suggestion-path">
+                                                                    {target.packageName
+                                                                        ? `${target.packageName}.${
+                                                                            target.skillName ||
+                                                                            target.label ||
+                                                                            ""
+                                                                        }`
+                                                                        : target.fullSkillName ||
+                                                                        target.id}
+                                                                </span>
+                                                            </button>
+                                                        )
+                                                    )}
+                                                </div>
+                                            )}
+                                    </div>
+
+                                    {selectedTransition.target ? (
+                                        <div className="transition-selected-target">
+                                            <FiArrowRight />
+                                            <span>
+                                                {getTargetDisplayName(
+                                                    selectedTransition.target,
+                                                    availableTargets
+                                                )}
+                                            </span>
+                                        </div>
+                                    ) : (
+                                        <div className="transition-help-text">
+                                            Start typing and choose a target from the
+                                            autocomplete results.
+                                        </div>
+                                    )}
+
+                                    {selectedEventDescription && (
+                                        <div className="transition-help-text">
+                                            Event: {selectedEventDescription}
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <div className="transition-empty-state">
+                                    Select a transition in step 1.
+                                </div>
                             )}
                         </div>
                     </div>
                 </div>
 
-                {/* Footer Toolbar */}
                 <div className="bottom-drawer-footer">
-                    <button className="back-button" style={{ margin: 0, height: "38px" }} onClick={onClose}>
+                    <button
+                        className="back-button"
+                        style={{ margin: 0, height: "38px" }}
+                        onClick={onClose}
+                    >
                         Cancel
                     </button>
-                    <button className="filter-button" style={{ margin: 0, height: "38px", padding: "0 24px" }} onClick={handleSave}>
+                    <button
+                        className="filter-button transition-primary-button"
+                        style={{ margin: 0, height: "38px", padding: "0 24px" }}
+                        onClick={handleSave}
+                    >
                         <FiCheck /> Save & Apply
                     </button>
                 </div>

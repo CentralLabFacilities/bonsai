@@ -933,11 +933,22 @@
 
 .skill-select {
   width: 100%;
-  background: var(--background);
-  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: #0f172a;
+  border: 1px solid #475569;
   border-radius: 6px;
-  color: #ffffff;
+  color: #f8fafc;
   padding: 6px;
+  color-scheme: dark;
+}
+
+.skill-select option {
+  background: #0f172a;
+  color: #f8fafc;
+}
+
+.skill-select:focus {
+  outline: none;
+  border-color: #38bdf8;
 }
 
 .slot-row {
@@ -2675,7 +2686,7 @@
 
 .typed-value-autocomplete {
   position: absolute;
-  z-index: 1200;
+  z-index: 1600;
   top: calc(100% + 4px);
   left: 0;
   right: 0;
@@ -3019,4 +3030,412 @@
   border-color: rgba(251, 191, 36, 0.5);
   background: rgba(245, 158, 11, 0.13);
   color: #fcd34d;
+}
+
+/* ==========================================================================
+   TRANSITION EDITOR - 4 STEP FLOW
+   ========================================================================== */
+.transition-drawer-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  min-width: 0;
+}
+
+.transition-drawer-title {
+  color: #f8fafc;
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.transition-drawer-title > span {
+  color: #38bdf8;
+}
+
+.transition-drawer-subtitle {
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.transition-editor-grid {
+  grid-template-columns: minmax(300px, 1.25fr) repeat(3, minmax(230px, 1fr));
+  align-items: stretch;
+}
+
+.transition-step-body {
+  justify-content: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.transition-list-step .transition-step-body {
+  min-height: 245px;
+}
+
+.transition-order-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  max-height: 225px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.transition-order-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 9px;
+  border: 1px solid #334155;
+  border-left: 3px solid #64748b;
+  border-radius: 6px;
+  background: #0f172a;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.transition-order-card:hover {
+  border-color: #475569;
+  border-left-color: #38bdf8;
+  background: #111c30;
+}
+
+.transition-order-card.selected {
+  border-color: #38bdf8;
+  border-left-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.08);
+}
+
+.transition-order-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.transition-order-title-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.transition-priority {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+  flex: 0 0 auto;
+}
+
+.transition-event-name {
+  color: #f1f5f9;
+  font-size: 12px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.transition-order-card.selected .transition-event-name {
+  color: #38bdf8;
+}
+
+.transition-order-summary {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  color: #94a3b8;
+  font-size: 9.5px;
+}
+
+.transition-order-summary > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.transition-order-summary svg {
+  flex: 0 0 auto;
+}
+
+.transition-order-actions {
+  display: grid;
+  grid-template-columns: 22px 22px;
+  gap: 3px;
+  flex: 0 0 auto;
+}
+
+.transition-order-actions .order-btn {
+  width: 22px;
+  height: 20px;
+  padding: 0;
+}
+
+.transition-delete-button {
+  grid-column: 1 / -1;
+  height: 20px;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 3px;
+  background: rgba(239, 68, 68, 0.08);
+  color: #fca5a5;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.transition-delete-button:hover {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.18);
+  color: #fecaca;
+}
+
+.transition-add-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px;
+  margin-top: auto;
+  padding-top: 9px;
+  border-top: 1px solid #334155;
+}
+
+.transition-add-button {
+  margin: 0 !important;
+  white-space: nowrap;
+}
+
+.transition-primary-button {
+  background: #0284c7 !important;
+  border-color: #38bdf8 !important;
+  color: #ffffff !important;
+  font-weight: 700;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08) inset;
+}
+
+.transition-primary-button:hover {
+  background: #0369a1 !important;
+  border-color: #7dd3fc !important;
+  color: #ffffff !important;
+}
+
+.transition-primary-button:disabled {
+  opacity: 1;
+  background: #075985 !important;
+  border-color: #0ea5e9 !important;
+  color: #e0f2fe !important;
+}
+
+.transition-empty-state,
+.transition-help-text {
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.transition-enable-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #e2e8f0;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.transition-enable-row input {
+  accent-color: #38bdf8;
+}
+
+.transition-variable-mode-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.transition-variable-select {
+  flex: 1;
+  min-width: 0;
+}
+
+.transition-secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 30px;
+  padding: 0 8px;
+  border: 1px solid #475569;
+  border-radius: 5px;
+  background: #1e293b;
+  color: #cbd5e1;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.transition-secondary-button:hover {
+  border-color: #38bdf8;
+  color: #e0f2fe;
+}
+
+.transition-new-variable-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.transition-assignment-header {
+  min-width: 0;
+}
+
+.transition-add-assignment-button {
+  margin-left: auto;
+  min-height: 26px;
+  padding: 0 8px;
+  border-color: #0ea5e9;
+  background: rgba(2, 132, 199, 0.18);
+  color: #e0f2fe;
+}
+
+.transition-assignment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: visible;
+  padding-right: 2px;
+}
+
+.transition-assignment-editor {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  background: #0f172a;
+}
+
+.transition-assignment-target-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 28px;
+  gap: 7px;
+  align-items: center;
+}
+
+.transition-assignment-location {
+  min-width: 0;
+}
+
+.transition-assignment-delete-button {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 5px;
+  background: rgba(239, 68, 68, 0.08);
+  color: #fca5a5;
+  cursor: pointer;
+}
+
+.transition-assignment-delete-button:hover {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.18);
+  color: #fecaca;
+}
+
+.transition-target-autocomplete {
+  position: relative;
+  min-width: 0;
+}
+
+.transition-target-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.transition-target-suggestions {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 190px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  background: #0b1120;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.42);
+}
+
+.transition-target-suggestion {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #e2e8f0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.transition-target-suggestion:hover,
+.transition-target-suggestion.active {
+  background: rgba(56, 189, 248, 0.12);
+}
+
+.transition-target-suggestion-name {
+  color: #f1f5f9;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.transition-target-suggestion-path {
+  color: #64748b;
+  font-size: 9px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.transition-selected-target {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 9px;
+  border-left: 3px solid #38bdf8;
+  border-radius: 4px;
+  background: rgba(56, 189, 248, 0.07);
+  color: #bae6fd;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.datamodel-value-type-unknown {
+  border-color: #475569 !important;
+  background: rgba(71, 85, 105, 0.16) !important;
+  color: #94a3b8 !important;
+}
+
+@media (max-width: 1280px) {
+  .transition-editor-grid {
+    grid-template-columns: repeat(2, minmax(280px, 1fr));
+    max-height: 62vh;
+    overflow-y: auto;
+  }
 }

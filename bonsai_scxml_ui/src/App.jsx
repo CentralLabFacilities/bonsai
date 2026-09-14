@@ -65,6 +65,41 @@ const getSkillPackageName = (fullSkillName) => {
     return parts.slice(0, -1).join(".");
 };
 
+const getStoredTransitionAssignments = (...sources) => {
+    for (const source of sources) {
+        if (!source) continue;
+
+        if (Array.isArray(source.assignments)) {
+            return source.assignments
+                .filter((assignment) => assignment?.location)
+                .map((assignment) => ({
+                    location: assignment.location,
+                    expr: assignment.expr || "",
+                }));
+        }
+
+        if (source.assign?.location) {
+            return [
+                {
+                    location: source.assign.location,
+                    expr: source.assign.expr || "",
+                },
+            ];
+        }
+
+        if (source.assignLocation) {
+            return [
+                {
+                    location: source.assignLocation,
+                    expr: source.assignExpr || "",
+                },
+            ];
+        }
+    }
+
+    return [];
+};
+
 const collectDescendantGlobals = (
     tabList,
     rootTabId,
@@ -211,14 +246,17 @@ function AppContent() {
         return parameters;
     }, [inheritedGlobalDataModel, globalDataModel]);
 
-    // Condition Drawer State
+    // Transition Drawer State
     const [drawerData, setDrawerData] = useState({
         isOpen: false,
         sourceNodeId: null,
         sourceNodeName: "",
         sourceEventName: "",
         initialTargetId: null,
+        initialTransitionId: null,
         candidateTransitions: [],
+        availableEvents: [],
+        availableTargets: [],
     });
 
     useEffect(() => {
@@ -855,6 +893,7 @@ function AppContent() {
                         selectedSkill: "",
                         target: null,
                         cond: "",
+                        assignments: [],
                         assignLocation: "",
                         assignExpr: "",
                     })),
@@ -868,6 +907,7 @@ function AppContent() {
                                 selectedSkill: "",
                                 target: null,
                                 cond: "",
+                                assignments: [],
                                 assignLocation: "",
                                 assignExpr: "",
                             },
@@ -883,6 +923,7 @@ function AppContent() {
                                 selectedSkill: "",
                                 target: null,
                                 cond: "",
+                                assignments: [],
                                 assignLocation: "",
                                 assignExpr: "",
                             },
@@ -923,55 +964,137 @@ function AppContent() {
         onSlotNodesChange(changes);
     };
 
-    const openConditionDrawer = (sourceId, sourceHandle, initialTargetId = null, customEdges = null) => {
-        const sourceNode = nodes.find((n) => n.id === sourceId);
+    const openConditionDrawer = (sourceId, sourceHandle = "", initialTargetId = null, customEdges = null) => {
+        const sourceNode = nodes.find((node) => node.id === sourceId);
         if (!sourceNode) return;
 
         const currentEdges = customEdges || edges;
-        const matchingEdges = currentEdges.filter(
-            (e) => e.source === sourceId && e.sourceHandle === sourceHandle
-        );
+        const outgoingEdges = currentEdges.filter((edge) => edge.source === sourceId);
+        const sourceEvents = sourceNode.data.events || [];
 
-        const nodeEventsForHandle = (sourceNode.data.events || []).filter(
-            (ev) => ev.id === sourceHandle && ev.target
-        );
+        // Edges preserve the SCXML transition order, so they are the primary
+        // source for the ordered transition list shown in step 1.
+        const transitions = outgoingEdges.map((edge) => {
+            const matchingEvent = sourceEvents.find(
+                (event) =>
+                    event.id === edge.sourceHandle &&
+                    event.target === edge.target &&
+                    String(event.cond || "") === String(edge.data?.cond || "")
+            ) || sourceEvents.find(
+                (event) =>
+                    event.id === edge.sourceHandle &&
+                    event.target === edge.target
+            );
 
-        const transitions = [];
+            const targetNode = nodes.find((node) => node.id === edge.target);
 
-        nodeEventsForHandle.forEach((ev) => {
-            const edge = matchingEdges.find((e) => e.target === ev.target);
-            if (edge || ev.target === initialTargetId) {
-                const targetNode = nodes.find((n) => n.id === ev.target);
-                transitions.push({
-                    target: ev.target,
-                    targetLabel: targetNode ? targetNode.data.label : (edge?.label || ev.target),
-                    cond: ev.cond || edge?.data?.cond || "",
-                    assignLocation: ev.assignLocation || edge?.data?.assign?.location || "",
-                    assignExpr: ev.assignExpr || edge?.data?.assign?.expr || "",
-                });
-            }
+            return {
+                transitionId: edge.id,
+                edgeId: edge.id,
+                event: edge.sourceHandle || matchingEvent?.id || edge.label || "success",
+                target: edge.target,
+                targetLabel:
+                    targetNode?.data?.label ||
+                    matchingEvent?.targetLabel ||
+                    edge.target,
+                cond: edge.data?.cond || matchingEvent?.cond || "",
+                assignments: getStoredTransitionAssignments(
+                    edge.data,
+                    matchingEvent
+                ),
+            };
         });
 
-        matchingEdges.forEach((edge) => {
-            if (!transitions.some((t) => t.target === edge.target)) {
-                const targetNode = nodes.find((n) => n.id === edge.target);
-                transitions.push({
-                    target: edge.target,
-                    targetLabel: targetNode ? targetNode.data.label : (edge.label || edge.target),
-                    cond: edge.data?.cond || "",
-                    assignLocation: edge.data?.assign?.location || "",
-                    assignExpr: edge.data?.assign?.expr || "",
-                });
-            }
+        // Keep transition data that may exist on the node even when an edge is
+        // currently missing, without collapsing duplicate conditional paths.
+        const representedCounts = new Map();
+        transitions.forEach((transition) => {
+            const key = `${transition.event}::${transition.target}`;
+            representedCounts.set(key, (representedCounts.get(key) || 0) + 1);
         });
+
+        const consumedCounts = new Map();
+        sourceEvents
+            .filter((event) => event.target)
+            .forEach((event, index) => {
+                const key = `${event.id}::${event.target}`;
+                const consumed = consumedCounts.get(key) || 0;
+                const represented = representedCounts.get(key) || 0;
+
+                if (consumed < represented) {
+                    consumedCounts.set(key, consumed + 1);
+                    return;
+                }
+
+                const targetNode = nodes.find((node) => node.id === event.target);
+                transitions.push({
+                    transitionId: `node-transition-${sourceId}-${index}`,
+                    edgeId: null,
+                    event: event.id,
+                    target: event.target,
+                    targetLabel: targetNode?.data?.label || event.target,
+                    cond: event.cond || "",
+                    assignments: getStoredTransitionAssignments(event),
+                });
+            });
+
+        const eventMap = new Map();
+        sourceEvents.forEach((event) => {
+            if (!event?.id || eventMap.has(event.id)) return;
+            eventMap.set(event.id, {
+                id: event.id,
+                description: event.description || "",
+            });
+        });
+        outgoingEdges.forEach((edge) => {
+            const eventId = edge.sourceHandle || edge.label;
+            if (!eventId || eventMap.has(eventId)) return;
+            eventMap.set(eventId, { id: eventId, description: "" });
+        });
+
+        const availableTargets = nodes.map((node) => {
+            const fullSkillName = node.data?.fullSkillName || "";
+            const stateName = fullSkillName.includes("#")
+                ? fullSkillName.split("#").pop()
+                : "";
+            const skillName =
+                node.data?.label ||
+                fullSkillName.split(".").pop()?.split("#")[0] ||
+                node.id;
+            const displayName =
+                stateName && stateName !== skillName
+                    ? `${skillName} (${stateName})`
+                    : skillName;
+
+            return {
+                id: node.id,
+                label: node.data?.label || node.id,
+                displayName,
+                skillName,
+                stateName,
+                fullSkillName,
+                packageName: getSkillPackageName(fullSkillName),
+            };
+        });
+
+        const initialTransition = transitions.find(
+            (transition) =>
+                (!sourceHandle || transition.event === sourceHandle) &&
+                (!initialTargetId || transition.target === initialTargetId)
+        ) || transitions.find(
+            (transition) => transition.event === sourceHandle
+        ) || transitions[0];
 
         setDrawerData({
             isOpen: true,
             sourceNodeId: sourceId,
             sourceNodeName: sourceNode.data.label,
             sourceEventName: sourceHandle,
-            initialTargetId: initialTargetId || transitions[0]?.target || "",
+            initialTargetId: initialTargetId || initialTransition?.target || "",
+            initialTransitionId: initialTransition?.transitionId || null,
             candidateTransitions: transitions,
+            availableEvents: [...eventMap.values()],
+            availableTargets,
         });
     };
 
@@ -995,7 +1118,7 @@ function AppContent() {
                 targetHandle: params.targetHandle,
                 label: params.sourceHandle,
                 markerEnd: { type: MarkerType.ArrowClosed },
-                data: { cond: "", assign: null },
+                data: { cond: "", assignments: [], assign: null },
             };
 
             const updatedEdges = [...edges, newEdge];
@@ -1031,6 +1154,7 @@ function AppContent() {
                                         targetNode?.data.fullSkillName?.split("#")[0] || "",
                                     target: params.target,
                                     cond: "",
+                                    assignments: [],
                                     assignLocation: "",
                                     assignExpr: "",
                                 },
@@ -1058,78 +1182,161 @@ function AppContent() {
         [edges, nodes]
     );
 
-    const handleConfirmDrawer = ({ updatedTransitions, newGlobalVar }) => {
-        if (newGlobalVar) {
-            setGlobalDataModel((prev) => [...prev, newGlobalVar]);
+    const handleConfirmDrawer = ({ updatedTransitions, newGlobalVars = [], newGlobalVar = null }) => {
+        const varsToAdd = [
+            ...(Array.isArray(newGlobalVars) ? newGlobalVars : []),
+            ...(newGlobalVar ? [newGlobalVar] : []),
+        ];
+
+        if (varsToAdd.length > 0) {
+            setGlobalDataModel((previous) => {
+                const existingIds = new Set(previous.map((variable) => variable.id));
+                const additions = varsToAdd.filter(
+                    (variable) => variable?.id && !existingIds.has(variable.id)
+                );
+                return [...previous, ...additions];
+            });
         }
 
         const sourceId = drawerData.sourceNodeId;
-        const sourceHandle = drawerData.sourceEventName;
+        if (!sourceId || !Array.isArray(updatedTransitions)) return;
 
-        if (!sourceId || !sourceHandle || !updatedTransitions) return;
+        // Rebuild this state's edges in exactly the order selected in step 1.
+        setEdges((currentEdges) => {
+            const untouchedEdges = currentEdges.filter(
+                (edge) => edge.source !== sourceId
+            );
+            const existingById = new Map(
+                currentEdges.map((edge) => [edge.id, edge])
+            );
 
-        setEdges((eds) =>
-            eds.map((edge) => {
-                if (edge.source === sourceId && edge.sourceHandle === sourceHandle) {
-                    const matched = updatedTransitions.find((t) => t.target === edge.target);
-                    if (matched) {
-                        const hasCond = matched.cond && matched.cond.trim() !== "";
-                        return {
-                            ...edge,
-                            label: hasCond ? `${sourceHandle} [${matched.cond}]` : sourceHandle,
-                            data: {
-                                cond: matched.cond || "",
-                                assign: matched.assignLocation
-                                    ? { location: matched.assignLocation, expr: matched.assignExpr }
-                                    : null,
-                            },
-                        };
-                    }
-                }
-                return edge;
-            })
-        );
+            const rebuiltEdges = updatedTransitions.map((transition) => {
+                const existing = transition.edgeId
+                    ? existingById.get(transition.edgeId)
+                    : null;
+                const eventId = transition.event || "success";
+                const hasCondition = Boolean(
+                    transition.cond && transition.cond.trim()
+                );
 
-        setNodes((nds) =>
-            nds.map((node) => {
+                return {
+                    ...(existing || {}),
+                    id:
+                        existing?.id ||
+                        `edge-${sourceId}-${eventId}-${transition.target}-${crypto.randomUUID()}`,
+                    source: sourceId,
+                    target: transition.target,
+                    sourceHandle: eventId,
+                    targetHandle: existing?.targetHandle || null,
+                    type:
+                        sourceId === transition.target
+                            ? "smoothstep"
+                            : existing?.type || "default",
+                    label: hasCondition
+                        ? `${eventId} [${transition.cond}]`
+                        : eventId,
+                    markerEnd:
+                        existing?.markerEnd || { type: MarkerType.ArrowClosed },
+                    data: {
+                        ...(existing?.data || {}),
+                        cond: transition.cond || "",
+                        assignments: Array.isArray(transition.assignments)
+                            ? transition.assignments.map((assignment) => ({
+                                location: assignment.location,
+                                expr: assignment.expr,
+                            }))
+                            : [],
+                        // Keep the first assignment in the legacy field for
+                        // compatibility with older saved UI state.
+                        assign: transition.assignments?.[0]
+                            ? {
+                                location: transition.assignments[0].location,
+                                expr: transition.assignments[0].expr,
+                            }
+                            : null,
+                    },
+                };
+            });
+
+            return [...untouchedEdges, ...rebuiltEdges];
+        });
+
+        setNodes((currentNodes) =>
+            currentNodes.map((node) => {
                 if (node.id !== sourceId) return node;
 
-                const otherHandleEvents = (node.data.events || []).filter((ev) => ev.id !== sourceHandle);
+                const originalEvents = node.data.events || [];
+                const baseEventById = new Map();
 
-                const reorderedHandleEvents = updatedTransitions.map((t) => {
-                    const existingEv = (node.data.events || []).find(
-                        (ev) =>
-                            ev.id === sourceHandle &&
-                            ev.target === t.target
-                    );
+                originalEvents.forEach((event) => {
+                    if (!event?.id || baseEventById.has(event.id)) return;
+                    baseEventById.set(event.id, {
+                        ...event,
+                        target: null,
+                        cond: "",
+                        assignments: [],
+                        assignLocation: "",
+                        assignExpr: "",
+                        selectedPackage: "",
+                        selectedSkill: "",
+                    });
+                });
 
-                    const baseEvent = existingEv ||
-                        (node.data.events || []).find(
-                            (ev) => ev.id === sourceHandle
+                const usedEventIds = new Set();
+                const orderedTransitionEvents = updatedTransitions.map(
+                    (transition) => {
+                        usedEventIds.add(transition.event);
+                        const baseEvent = baseEventById.get(transition.event) || {
+                            id: transition.event,
+                            description: "",
+                        };
+                        const targetNode = currentNodes.find(
+                            (candidate) => candidate.id === transition.target
                         );
 
-                    return {
-                        ...baseEvent,
+                        return {
+                            ...baseEvent,
+                            id: transition.event,
+                            selectedPackage: getSkillPackageName(
+                                targetNode?.data?.fullSkillName
+                            ),
+                            selectedSkill:
+                                targetNode?.data?.fullSkillName?.split("#")[0] ||
+                                targetNode?.data?.label ||
+                                "",
+                            target: transition.target,
+                            cond: transition.cond || "",
+                            assignments: Array.isArray(transition.assignments)
+                                ? transition.assignments.map((assignment) => ({
+                                    location: assignment.location,
+                                    expr: assignment.expr,
+                                }))
+                                : [],
+                            assignLocation:
+                                transition.assignments?.[0]?.location || "",
+                            assignExpr:
+                                transition.assignments?.[0]?.expr || "",
+                        };
+                    }
+                );
 
-                        id: sourceHandle,
-                        target: t.target,
-                        cond: t.cond || "",
-                        assignLocation: t.assignLocation || "",
-                        assignExpr: t.assignExpr || "",
-                    };
-                });
+                // Exit tokens without a transition must stay available as handles
+                // and as choices for creating a new transition later.
+                const unusedEvents = [...baseEventById.entries()]
+                    .filter(([eventId]) => !usedEventIds.has(eventId))
+                    .map(([, event]) => event);
 
                 return {
                     ...node,
                     data: {
                         ...node.data,
-                        events: [...otherHandleEvents, ...reorderedHandleEvents],
+                        events: [...orderedTransitionEvents, ...unusedEvents],
                     },
                 };
             })
         );
 
-        setDrawerData((prev) => ({ ...prev, isOpen: false }));
+        setDrawerData((previous) => ({ ...previous, isOpen: false }));
     };
 
     const updateNodeEvent = (nodeId, eventId, changes) => {
@@ -1183,7 +1390,7 @@ function AppContent() {
                     sourceHandle: event.id,
                     label: event.id,
                     markerEnd: { type: MarkerType.ArrowClosed },
-                    data: { cond: "", assign: null },
+                    data: { cond: "", assignments: [], assign: null },
                 },
                 withoutPreviousDirectTarget
             );
@@ -1301,6 +1508,7 @@ function AppContent() {
                 selectedSkill: "",
                 target: null,
                 cond: "",
+                assignments: [],
                 assignLocation: "",
                 assignExpr: "",
             }));
@@ -1311,6 +1519,7 @@ function AppContent() {
                 selectedSkill: "",
                 target: null,
                 cond: "",
+                assignments: [],
                 assignLocation: "",
                 assignExpr: "",
             });
@@ -1321,6 +1530,7 @@ function AppContent() {
                 selectedSkill: "",
                 target: null,
                 cond: "",
+                assignments: [],
                 assignLocation: "",
                 assignExpr: "",
             });
@@ -1887,6 +2097,9 @@ function AppContent() {
                 sourceNodeName={drawerData.sourceNodeName}
                 sourceEventName={drawerData.sourceEventName}
                 candidateTransitions={drawerData.candidateTransitions}
+                availableEvents={drawerData.availableEvents}
+                availableTargets={drawerData.availableTargets}
+                initialTransitionId={drawerData.initialTransitionId}
                 initialTargetId={drawerData.initialTargetId}
             />
         </div>
