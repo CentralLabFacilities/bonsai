@@ -15,7 +15,7 @@ export function initApiProxy() {
     let url = '';
     let method = 'GET';
     let body = null;
-    
+
 
     if (typeof input === 'string') {
       url = input;
@@ -89,6 +89,109 @@ export async function readFile(path) {
     console.error('Failed to read file:', err);
     return null;
   }
+}
+
+
+
+/**
+ * Pick a local directory and return its path.
+ */
+export async function selectDirectory(title = 'Select Directory') {
+  try {
+    const result = await invoke('pick_directory', { title });
+    return result || null;
+  } catch (err) {
+    console.error('Failed to select directory:', err);
+    return null;
+  }
+}
+
+/**
+ * Recursively list nested directories and XML/SCXML files for one
+ * Behavior Library root.
+ */
+export async function listBehaviorDirectory(key, path) {
+  return await invoke('list_behavior_directory', {
+    key,
+    path,
+  });
+}
+
+/**
+ * Resolve a symbolic Behavior Library source to the real local path.
+ *
+ * Example:
+ *   src: ${ROBOCUP}/planning/SetupPlanning.xml
+ *   ROBOCUP: /home/user/robocup_ws/robocup
+ *
+ * becomes:
+ *   /home/user/robocup_ws/robocup/planning/SetupPlanning.xml
+ *
+ * The symbolic source itself is NOT changed in the workflow. This resolver
+ * is only used when accessing the file on disk.
+ */
+export function resolveBehaviorSourcePath(src, directories = []) {
+  const value = String(src || '').trim();
+
+  const match = value.match(/^\$\{([^}]+)\}(?:[\\/](.*))?$/);
+
+  if (!match) {
+    return {
+      path: value,
+      key: null,
+    };
+  }
+
+  const key = match[1].trim().toUpperCase();
+  const relativePath = String(match[2] || '')
+      .replace(/^[\\/]+/, '');
+
+  const mapping = directories.find(
+      (directory) =>
+          String(directory?.key || '').trim().toUpperCase() === key,
+  );
+
+  if (!mapping) {
+    throw new Error(
+        `Behavior Library key ${key} is not configured.`,
+    );
+  }
+
+  const root = String(mapping.path || '')
+      .trim()
+      .replace(/[\\/]+$/, '');
+
+  if (!root) {
+    throw new Error(
+        `Behavior Library key ${key} does not have a directory path.`,
+    );
+  }
+
+  return {
+    path: relativePath ? `${root}/${relativePath}` : root,
+    key,
+  };
+}
+
+/**
+ * Read a workflow directly from disk.
+ *
+ * ${KEY}/... is expanded to the configured Behavior Library path before
+ * anything is sent to the Tauri filesystem command.
+ */
+export async function readWorkflowSource(
+    src,
+    directories = [],
+    currentFilePath = null,
+) {
+  const resolved = resolveBehaviorSourcePath(src, directories);
+
+  return await invoke('read_workflow_source', {
+    // The Rust side receives the real local path, never the symbolic ${KEY}.
+    src: resolved.path,
+    directories: [],
+    currentFilePath,
+  });
 }
 
 /**
