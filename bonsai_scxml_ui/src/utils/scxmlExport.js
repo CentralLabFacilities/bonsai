@@ -1,4 +1,5 @@
 import { getConfiguredAssignments } from "./stateActions.js";
+import { getScxmlTransitionEvent } from "./transitionEvents.js";
 
 const escapeXmlAttribute = (value) => String(value)
     .replaceAll("&", "&amp;")
@@ -119,16 +120,10 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
 
         return combinedTransitions
             .map((tr) => {
-                let eventName = tr.rawEvent;
-
-                // Präfix anhängen, falls noch kein Namespace vorhanden ist
-                if (!eventName.includes(".")) {
-                    if (eventName === "*") {
-                        eventName = `${skillBaseName}.*`;
-                    } else {
-                        eventName = `${skillBaseName}.${eventName}`;
-                    }
-                }
+                const eventName = getScxmlTransitionEvent(
+                    tr.rawEvent,
+                    skillBaseName
+                );
 
                 const condAttr = tr.cond && tr.cond.trim() !== "" ? ` cond="${tr.cond}"` : "";
 

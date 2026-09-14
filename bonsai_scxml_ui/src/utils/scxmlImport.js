@@ -1,6 +1,7 @@
 import { MarkerType } from "@xyflow/react";
 import { getLayoutedElements } from "./layoutUtils";
 import { parseStateAssignments } from "./stateActions.js";
+import { getTransitionExitToken } from "./transitionEvents.js";
 
 const getSkillPackageName = (fullSkillName) => {
     let baseName = String(fullSkillName || "").split("#")[0];
@@ -267,9 +268,7 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
 
                     const parentEvents = branchTransElems.map((tr) => {
                         const rawEvent = tr.getAttribute("event") || "";
-                        const handleId = rawEvent.includes('.*')
-                            ? (rawEvent.split('.*')[0].split('.').pop() || 'success')
-                            : (rawEvent.split('.').pop() || rawEvent);
+                        const handleId = getTransitionExitToken(rawEvent, branchId);
                         return {
                             id: handleId,
                             name: rawEvent,
@@ -418,9 +417,7 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             const parentTransitionElems = Array.from(stateElem.children).filter((c) => c.localName === "transition");
             const parentEvents = parentTransitionElems.map((tr) => {
                 const rawEvent = tr.getAttribute("event") || "";
-                const handleId = rawEvent.includes('.*')
-                    ? (rawEvent.split('.*')[0].split('.').pop() || 'success')
-                    : (rawEvent.split('.').pop() || rawEvent);
+                const handleId = getTransitionExitToken(rawEvent, fullSkillName);
 
                 return {
                     id: handleId,
@@ -584,10 +581,10 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
 
         if (!targetNode || !sourceNode) return;
 
-        const isWildcard = trans.eventId === "*" || trans.eventId.endsWith(".*");
-        const eventHandleId = isWildcard
-            ? (trans.eventId.split(".*")[0].split(".").pop() || "success")
-            : (trans.eventId.split(".").pop() || trans.eventId);
+        const eventHandleId = getTransitionExitToken(
+            trans.eventId,
+            sourceNode.data.fullSkillName || trans.sourceSkillName
+        );
 
         const isFromCompound = sourceNode.type === "compound";
         const hasCond = Boolean(trans.cond && trans.cond.trim() !== "");
