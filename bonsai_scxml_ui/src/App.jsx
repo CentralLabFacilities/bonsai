@@ -1830,6 +1830,7 @@ function AppContent() {
                 ...n.data,
                 mode: activeMode,
                 onOpenStateActions: handleOpenStateActions,
+                mode: activeMode,
             };
 
             if (n.type === "submachine") {
@@ -1852,6 +1853,7 @@ function AppContent() {
         activeMode,
         handleAddLaneToParallel,
         handleOpenStateActions,
+        activeMode,
     ]);
 
     useEffect(() => {
@@ -2814,8 +2816,7 @@ function AppContent() {
                         target: node.id,
                         sourceHandle: "read-source",
                         targetHandle: `read-target-${inIndex}`,
-                        label: inslot.key,
-                        style: { stroke: "#38bdf8", strokeWidth: 1.5, strokeDasharray: "5 5" },
+                        label: inslot.key,style: { stroke: "#38bdf8", strokeWidth: 1.5, strokeDasharray: "5 5" },
                         markerEnd: { type: MarkerType.ArrowClosed },
                     });
                 }
@@ -3623,5 +3624,4 @@ export default function App() {
         </ReactFlowProvider>
     );
 }
-
 

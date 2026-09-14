@@ -90,7 +90,9 @@ function CustomNode({ id, data, selected }) {
             );
         }
 
+        // Slot validation only matters when slots are visible.
         const hasMissingSlots = showSlots ? missingSlots : false;
+
         const hasError =
             hasMissingSlots ||
             missingParams ||
@@ -150,7 +152,9 @@ function CustomNode({ id, data, selected }) {
     const eventIds = useMemo(
         () => [
             ...new Set(
-                (data.events || []).map((event) => event.id)
+                (data.events || [])
+                    .map((event) => event.id)
+                    .filter(Boolean)
             ),
         ],
         [data.events]
@@ -186,7 +190,7 @@ function CustomNode({ id, data, selected }) {
                 </div>
             )}
 
-            {/* Incoming transition target stays available in every mode,
+            {/* Incoming transitions remain possible for all nodes,
                 including End/Fatal and behavior exits. */}
             <Handle
                 type="target"
@@ -194,7 +198,6 @@ function CustomNode({ id, data, selected }) {
                 className="target-handle"
             />
 
-            {/* Slot handles */}
             {showSlots && (
                 <>
                     {(data.outSlots || []).map(
@@ -255,7 +258,6 @@ function CustomNode({ id, data, selected }) {
                 )}
             </div>
 
-            {/* End/Fatal and behavior exits do not expose outgoing events. */}
             {showEvents &&
                 !isFinalState &&
                 !isBehaviorExit &&
@@ -285,7 +287,8 @@ function CustomNode({ id, data, selected }) {
                 <>
                     {showEvents &&
                         !isFinalState &&
-                        !isBehaviorExit && (
+                        !isBehaviorExit &&
+                        eventIds.length > 0 && (
                             <div className="node-slot-divider" />
                         )}
 
