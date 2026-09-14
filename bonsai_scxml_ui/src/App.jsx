@@ -1556,33 +1556,51 @@ function AppContent() {
         setTimeout(() => fitView({ padding: 0.2, duration: 300 }), 80);
     };
 
+    const handleOpenStateActions = useCallback(
+        (nodeId) => {
+            setNodes((currentNodes) =>
+                currentNodes.map((node) => ({
+                    ...node,
+                    selected: node.id === nodeId,
+                }))
+            );
+
+            setSelectedNodeId(nodeId);
+            setRightPanelTab("details");
+            setActiveTab("actions");
+        },
+        [setNodes]
+    );
+
     const injectedNodes = useMemo(() => {
         return nodes.map((n) => {
+            const injectedData = {
+                ...n.data,
+                mode: activeMode,
+                onOpenStateActions: handleOpenStateActions,
+            };
+
             if (n.type === "submachine") {
-                return {
-                    ...n,
-                    data: {
-                        ...n.data,
-                        onOpenSubMachine: handleOpenSubMachine,
-                        mode: activeMode,
-                    },
-                };
+                injectedData.onOpenSubMachine = handleOpenSubMachine;
             }
 
             if (n.type === "parallel") {
-                return {
-                    ...n,
-                    data: {
-                        ...n.data,
-                        onAddLane: handleAddLaneToParallel,
-                        mode: activeMode,
-                    },
-                };
+                injectedData.onAddLane = handleAddLaneToParallel;
             }
 
-            return { ...n, data: { ...n.data, mode: activeMode } };
+            return {
+                ...n,
+                data: injectedData,
+            };
         });
-    }, [nodes, tabs, activeTabId, handleAddLaneToParallel, activeMode]);
+    }, [
+        nodes,
+        tabs,
+        activeTabId,
+        activeMode,
+        handleAddLaneToParallel,
+        handleOpenStateActions,
+    ]);
 
     useEffect(() => {
         const fetchSkills = async () => {
@@ -2323,47 +2341,47 @@ function AppContent() {
         const usedPaths = new Map();
 
         const registerSlotUsage = (s) => {
-                if (!s.path || !s.path.trim()) return;
-                const cleanPath = s.path.trim().replace(/^\//, "");
-                const existing = usedPaths.get(cleanPath);
+            if (!s.path || !s.path.trim()) return;
+            const cleanPath = s.path.trim().replace(/^\//, "");
+            const existing = usedPaths.get(cleanPath);
 
-                usedPaths.set(cleanPath, {
-                    type: s.type || existing?.type || "Unknown",
-                    inherited: s.inherited || existing?.inherited || null,
-                });
-            };
+            usedPaths.set(cleanPath, {
+                type: s.type || existing?.type || "Unknown",
+                inherited: s.inherited || existing?.inherited || null,
+            });
+        };
 
-            targetNodes.forEach((node) => {
-                (node.data.inSlots || []).forEach(registerSlotUsage);
-                (node.data.outSlots || []).forEach(registerSlotUsage);
+        targetNodes.forEach((node) => {
+            (node.data.inSlots || []).forEach(registerSlotUsage);
+            (node.data.outSlots || []).forEach(registerSlotUsage);
+        });
+
+        const generatedSlotNodes = [];
+        let index = 0;
+
+        usedPaths.forEach(({ type, inherited }, path) => {
+            const slotNodeId = `slot-${path}`;
+
+            generatedSlotNodes.push({
+                id: slotNodeId,
+                position: {
+                    x: 380 + (index % 3) * 200,
+                    y: 120 + Math.floor(index / 3) * 140
+                },
+                type: "slot",
+                data: {
+                    path: `/${path}`,
+                    label: `/${path}`,
+                    slotType: type,
+                    inherited: Boolean(inherited),
+                    inheritedFrom: inherited?.state || "",
+                },
             });
 
-            const generatedSlotNodes = [];
-            let index = 0;
+            index++;
+        });
 
-            usedPaths.forEach(({ type, inherited }, path) => {
-                const slotNodeId = `slot-${path}`;
-
-                generatedSlotNodes.push({
-                    id: slotNodeId,
-                    position: {
-                        x: 380 + (index % 3) * 200,
-                        y: 120 + Math.floor(index / 3) * 140
-                    },
-                    type: "slot",
-                    data: {
-                        path: `/${path}`,
-                        label: `/${path}`,
-                        slotType: type,
-                        inherited: Boolean(inherited),
-                        inheritedFrom: inherited?.state || "",
-                    },
-                });
-
-                index++;
-            });
-
-            setSlotNodes(generatedSlotNodes);
+        setSlotNodes(generatedSlotNodes);
 
         const newSlotEdges = [];
         targetNodes.forEach((node) => {
@@ -2373,12 +2391,13 @@ function AppContent() {
                     const slotNodeId = `slot-${cleanPath}`;
                     newSlotEdges.push({
                         id: `edge-read-${slotNodeId}-${node.id}-${inIndex}`,
-                            source: slotNodeId,
-                            target: node.id,
-                            sourceHandle: "read-source",
-                            targetHandle: `read-target-${inIndex}`,
-                            style: { stroke: "#38bdf8", strokeWidth: 1.5, strokeDasharray: "5 5" },
-                            markerEnd: { type: MarkerType.ArrowClosed },
+                        source: slotNodeId,
+                        target: node.id,
+                        sourceHandle: "read-source",
+                        targetHandle: `read-target-${inIndex}`,
+                        label: inslot.key,
+                        style: { stroke: "#38bdf8", strokeWidth: 1.5, strokeDasharray: "5 5" },
+                        markerEnd: { type: MarkerType.ArrowClosed },
                     });
                 }
             });
@@ -2393,6 +2412,7 @@ function AppContent() {
                         target: slotNodeId,
                         sourceHandle: `write-source-${outIndex}`,
                         targetHandle: "write-target",
+                        label: outslot.key,
                         style: { stroke: "#22c55e", strokeWidth: 1.5, strokeDasharray: "5 5" },
                         markerEnd: { type: MarkerType.ArrowClosed },
                     });
@@ -3119,4 +3139,5 @@ export default function App() {
         </ReactFlowProvider>
     );
 }
+
 

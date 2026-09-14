@@ -24,7 +24,12 @@ export default function CompoundNode({ id, data }) {
 
     return (
         <div className={`compound-frame-node ${data.isInitial ? 'initial-compound' : ''}`}>
-            <StateActionBadges onEntry={data.onEntry} onExit={data.onExit} />
+            <StateActionBadges
+                onEntry={data.onEntry}
+                onExit={data.onExit}
+                onEntryClick={() => data.onOpenStateActions?.(id)}
+                onExitClick={() => data.onOpenStateActions?.(id)}
+            />
 
             {/* Target-Handle für Transitions auf den Compound-State */}
             <Handle
