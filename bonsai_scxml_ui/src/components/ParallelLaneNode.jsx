@@ -27,7 +27,8 @@ export default function ParallelLaneNode({ id, data }) {
         height: '100%',
         position: 'relative',
         boxSizing: 'border-box',
-        pointerEvents: 'none', /* WICHTIG: Erlaubt das Durchgreifen auf innenliegende Nodes */
+        pointerEvents: 'all',
+        pointerEvents: 'none',
       }}
     >
       {/* Exits genau am rechten Rand dieser Lane */}
