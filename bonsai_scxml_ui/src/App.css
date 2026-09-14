@@ -1645,6 +1645,42 @@
   border-color: #c084fc;
 }
 
+.parallel-group-container {
+    transition:
+        border-color 140ms ease,
+        box-shadow 140ms ease,
+        background-color 140ms ease;
+}
+
+.react-flow__node-parallel.parallel-drop-target,
+.react-flow__node-parallel:has(.parallel-drop-target) {
+    border-color: #38bdf8 !important;
+    box-shadow:
+        0 0 0 3px rgba(56, 189, 248, 0.3),
+        0 8px 28px rgba(2, 132, 199, 0.22);
+}
+
+.parallel-drop-target {
+    background-color: rgba(56, 189, 248, 0.1);
+}
+
+.parallel-drop-target::after {
+    content: "Node hier ablegen";
+    position: absolute;
+    inset: 44px 10px 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px dashed #38bdf8;
+    border-radius: 8px;
+    color: #0369a1;
+    background: rgba(224, 242, 254, 0.42);
+    font-size: 13px;
+    font-weight: 600;
+    pointer-events: none;
+    z-index: 20;
+}
+
 
 /* ==========================================================================
    RIGHT SIDEBAR: DATAMODEL / DETAILS TOP-LEVEL TABS

@@ -108,6 +108,82 @@ const highlightSelectedTransitions = (transitionEdges, selectedNodeIds) =>
 
 const getNodeId = () => `skill-node-${crypto.randomUUID()}`;
 
+const getAbsoluteNodePosition = (node, allNodes) => {
+    let x = node?.position?.x || 0;
+    let y = node?.position?.y || 0;
+    let parentId = node?.parentId;
+    const visited = new Set();
+
+    while (parentId && !visited.has(parentId)) {
+        visited.add(parentId);
+
+        const parent = allNodes.find(
+            (candidate) => candidate.id === parentId
+        );
+
+        if (!parent) break;
+
+        x += parent.position?.x || 0;
+        y += parent.position?.y || 0;
+        parentId = parent.parentId;
+    }
+
+    return { x, y };
+};
+
+const getLaneForNode = (node, allNodes) => {
+    let current = node;
+    const visited = new Set();
+
+    while (current?.parentId && !visited.has(current.parentId)) {
+        visited.add(current.parentId);
+
+        const parent = allNodes.find(
+            (candidate) => candidate.id === current.parentId
+        );
+
+        if (!parent) return null;
+        if (parent.type === "parallelLane") return parent;
+
+        current = parent;
+    }
+
+    return null;
+};
+
+const orderNodesParentsFirst = (allNodes) => {
+    const byId = new Map(
+        allNodes.map((node) => [node.id, node])
+    );
+
+    const getDepth = (node) => {
+        let depth = 0;
+        let parentId = node.parentId;
+        const visited = new Set();
+
+        while (
+            parentId &&
+            byId.has(parentId) &&
+            !visited.has(parentId)
+        ) {
+            visited.add(parentId);
+            depth += 1;
+            parentId = byId.get(parentId).parentId;
+        }
+
+        return depth;
+    };
+
+    return allNodes
+        .map((node, index) => ({
+            node,
+            index,
+            depth: getDepth(node),
+        }))
+        .sort((a, b) => a.depth - b.depth || a.index - b.index)
+        .map(({ node }) => node);
+};
+
 // Detect if running in Tauri desktop app
 const IS_DESKTOP = isTauri();
 
@@ -233,6 +309,8 @@ function AppContent() {
     const [activeFilter, setActiveFilter] = useState("Everything");
     const [searchText, setSearchText] = useState("");
     const [contextMenu, setContextMenu] = useState(null);
+    const [parallelDropTargetId, setParallelDropTargetId] =
+        useState(null);
 
     //---- TAB MANAGEMENT ----
     const [tabs, setTabs] = useState([
@@ -556,26 +634,46 @@ function AppContent() {
             const parallelNode = nds.find((n) => n.id === parallelId);
             if (!parallelNode) return nds;
 
-            const existingLanes = nds.filter((n) => n.parentId === parallelId && n.type === "parallelLane");
+            const existingLanes = nds
+                .filter(
+                    (n) =>
+                        n.parentId === parallelId &&
+                        n.type === "parallelLane"
+                )
+                .sort((a, b) => a.position.y - b.position.y);
+
             const laneIndex = existingLanes.length;
-            const laneHeight = 140; // <-- auf 140px erhöht
+            const laneHeight = 140;
             const headerHeight = 45;
             const buttonReserve = 35;
 
             const newLaneId = getNodeId();
             const newLaneName = `Lane_${laneIndex + 1}`;
-            const containerWidth = parallelNode.style?.width || 420;
+            const containerWidth =
+                Number(parallelNode.style?.width) || 420;
+
+            // Ende der bisher letzten Lane bestimmen
+            const lastLane = existingLanes[existingLanes.length - 1];
+
+            const newLaneY = lastLane
+                ? Number(lastLane.position?.y || 0) +
+                  Number(lastLane.style?.height || 140)
+                : headerHeight;
 
             const newLaneNode = {
                 id: newLaneId,
-                position: { x: 0, y: headerHeight + laneIndex * laneHeight },
+                position: {
+                    x: 0,
+                    y: newLaneY,
+                },
                 parentId: parallelId,
                 extent: "parent",
                 type: "parallelLane",
+                draggable: false,
                 style: {
                     width: containerWidth,
                     height: laneHeight,
-                    borderBottom: "1.5px solid #0284c7",
+                    borderBottom: "none",
                 },
                 data: {
                     label: newLaneName,
@@ -583,21 +681,44 @@ function AppContent() {
                 },
             };
 
-            const newTotalHeight = headerHeight + (laneIndex + 1) * laneHeight + buttonReserve;
+            const newTotalHeight =
+                newLaneY + laneHeight + buttonReserve;
 
-            return nds.map((n) => {
+            const updatedNodes = nds.map((n) => {
                 if (n.id === parallelId) {
                     return {
                         ...n,
-                        style: { ...n.style, height: newTotalHeight },
+                        style: {
+                            ...n.style,
+                            height: newTotalHeight,
+                        },
                         data: {
                             ...n.data,
-                            lanes: [...(n.data.lanes || []), newLaneName],
+                            lanes: [
+                                ...(n.data.lanes || []),
+                                newLaneName,
+                            ],
                         },
                     };
                 }
+
+                // Die bisher letzte Lane bekommt jetzt die Trennlinie,
+                // weil danach die neue Lane kommt.
+                if (lastLane && n.id === lastLane.id) {
+                    return {
+                        ...n,
+                        style: {
+                            ...n.style,
+                            borderBottom:
+                                "1.5px solid #0284c7",
+                        },
+                    };
+                }
+
                 return n;
-            }).concat(newLaneNode);
+            });
+
+            return [...updatedNodes, newLaneNode];
         });
     }, [setNodes]);
 
@@ -630,6 +751,7 @@ function AppContent() {
             parentId: parallelId,
             extent: "parent",
             type: "parallelLane",
+            draggable: false,
             style: { width: containerWidth, height: laneHeight, borderBottom: "1.5px solid #0284c7" },
             data: { label: "Lane_1", events: [] },
         };
@@ -640,6 +762,7 @@ function AppContent() {
             parentId: parallelId,
             extent: "parent",
             type: "parallelLane",
+            draggable: false,
             style: { width: containerWidth, height: laneHeight, borderBottom: "none" },
             data: { label: "Lane_2", events: [] },
         };
@@ -945,7 +1068,11 @@ function AppContent() {
                 groupWidths.push(totalW + 160);
             } else {
                 laneHeights.push(Math.max(130, maxH + 40));
-                groupWidths.push(getNodeWidth(group[0]) + 160); // Platz für Exit-Labels
+                groupWidths.push(
+                    group.length > 1
+                        ? totalW + 80
+                        : getNodeWidth(group[0]) + 160
+                );
             }
         });
 
@@ -1003,6 +1130,7 @@ function AppContent() {
                 draggable: false,
                 selectable: false,
                 type: "parallelLane",
+                draggable: false,
                 style: {
                     width: containerWidth,
                     height: laneHeight,
@@ -1050,12 +1178,17 @@ function AppContent() {
                     currentX += w + 35;
                 });
             } else {
-                movedNodes.push({
-                    ...group[0],
-                    parentId: laneId,
-                    extent: "parent",
-                    position: { x: 25, y: 20 },
-                    selected: false,
+                group.forEach((node, nodeIndex) => {
+                    movedNodes.push({
+                        ...node,
+                        parentId: laneId,
+                        extent: "parent",
+                        position: {
+                            x: 25 + nodeIndex * 190,
+                            y: 20,
+                        },
+                        selected: false,
+                    });
                 });
             }
 
@@ -1074,6 +1207,10 @@ function AppContent() {
                     ...edge,
                     target: parallelId,
                     targetHandle: "target",
+                    data: {
+                        ...edge.data,
+                        parallelOriginalTarget: edge.target,
+                    },
                 };
             }
 
@@ -1110,6 +1247,10 @@ function AppContent() {
                     ...edge,
                     source: laneId,
                     sourceHandle: handleId,
+                    data: {
+                        ...edge.data,
+                        parallelOriginalSource: edge.source,
+                    },
                 };
             }
 
@@ -1411,6 +1552,21 @@ function AppContent() {
             ...slotEdges,
         ];
     }
+
+    visibleNodes = visibleNodes.map((visibleNode) => {
+        if (visibleNode.type !== "parallel") {
+            return visibleNode;
+        }
+
+        return {
+            ...visibleNode,
+            data: {
+                ...visibleNode.data,
+                isDropTarget:
+                    visibleNode.id === parallelDropTargetId,
+            },
+        };
+    });
 
     const createNameforSkill = (fullSkillName) => {
         const label = fullSkillName.split(".").pop();
@@ -2264,47 +2420,749 @@ function AppContent() {
         }
     };
 
+    const handleNodeDragStart = useCallback((event, node) => {
+        setIsDraggingNode(true);
+
+        // Nodes innerhalb einer Lane dürfen vorübergehend den
+        // bisherigen Parent verlassen.
+        if (getLaneForNode(node, nodes)) {
+            setNodes((currentNodes) =>
+                currentNodes.map((candidate) =>
+                    candidate.id === node.id
+                        ? { ...candidate, extent: undefined }
+                        : candidate
+                )
+            );
+        }
+    }, [nodes, setNodes]);
+
+    const handleNodeDrag = useCallback((event, draggedNode) => {
+        const isOverTrash = Boolean(
+            document
+                .elementFromPoint(event.clientX, event.clientY)
+                ?.closest(".trash-bin-dropzone")
+        );
+
+        setIsOverTrash(isOverTrash);
+
+        if (
+            isOverTrash ||
+            ["parallel", "parallelLane", "compound"].includes(
+                draggedNode.type
+            )
+        ) {
+            setParallelDropTargetId(null);
+            return;
+        }
+
+        const pointerPosition = screenToFlowPosition({
+            x: event.clientX,
+            y: event.clientY,
+        });
+
+        const hoveredLane = nodes
+            .filter((candidate) => candidate.type === "parallelLane")
+            .find((lane) => {
+                const lanePosition = getAbsoluteNodePosition(
+                    lane,
+                    nodes
+                );
+
+                const width = Number(lane.style?.width) || 420;
+                const height = Number(lane.style?.height) || 110;
+
+                return (
+                    pointerPosition.x >= lanePosition.x &&
+                    pointerPosition.x <= lanePosition.x + width &&
+                    pointerPosition.y >= lanePosition.y &&
+                    pointerPosition.y <= lanePosition.y + height
+                );
+            });
+
+        setParallelDropTargetId(
+            hoveredLane?.parentId || null
+        );
+    }, [nodes, screenToFlowPosition]);
+
     const handleNodeDragStop = useCallback((event, node) => {
-        const elem = document.elementFromPoint(event.clientX, event.clientY);
-        if (elem && elem.closest(".trash-bin-dropzone")) {
+        const element = document.elementFromPoint(
+            event.clientX,
+            event.clientY
+        );
+
+        if (element?.closest(".trash-bin-dropzone")) {
             setNodes((currentNodes) => {
-                // 1. Alle Kind-IDs rekursiv ermitteln
                 const idsToDelete = new Set([node.id]);
                 let foundNew = true;
 
                 while (foundNew) {
                     foundNew = false;
-                    currentNodes.forEach((n) => {
-                        if (n.parentId && idsToDelete.has(n.parentId) && !idsToDelete.has(n.id)) {
-                            idsToDelete.add(n.id);
+
+                    currentNodes.forEach((candidate) => {
+                        if (
+                            candidate.parentId &&
+                            idsToDelete.has(candidate.parentId) &&
+                            !idsToDelete.has(candidate.id)
+                        ) {
+                            idsToDelete.add(candidate.id);
                             foundNew = true;
                         }
                     });
                 }
 
-                // 2. Kanten aufräumen, die an gelöschten Knoten hängen
-                setEdges((eds) =>
-                    eds.filter((e) => !idsToDelete.has(e.source) && !idsToDelete.has(e.target))
+                setEdges((currentEdges) =>
+                    currentEdges.filter(
+                        (edge) =>
+                            !idsToDelete.has(edge.source) &&
+                            !idsToDelete.has(edge.target)
+                    )
                 );
 
-                setSlotEdges((eds) => {
-                    const updated = eds.filter((e) => !idsToDelete.has(e.source) && !idsToDelete.has(e.target));
-                    setSlotNodes((sNodes) =>
-                        sNodes.filter((sn) => updated.some((e) => e.source === sn.id || e.target === sn.id))
+                setSlotEdges((currentEdges) => {
+                    const updatedEdges = currentEdges.filter(
+                        (edge) =>
+                            !idsToDelete.has(edge.source) &&
+                            !idsToDelete.has(edge.target)
                     );
-                    return updated;
+
+                    setSlotNodes((currentSlotNodes) =>
+                        currentSlotNodes.filter((slotNode) =>
+                            updatedEdges.some(
+                                (edge) =>
+                                    edge.source === slotNode.id ||
+                                    edge.target === slotNode.id
+                            )
+                        )
+                    );
+
+                    return updatedEdges;
                 });
 
-                setSelectedNodeId((id) => (idsToDelete.has(id) ? null : id));
+                setSelectedNodeId((id) =>
+                    idsToDelete.has(id) ? null : id
+                );
 
-                // 3. Alle identifizierten Knoten auf einmal entfernen
-                return currentNodes.filter((n) => !idsToDelete.has(n.id));
+                return currentNodes.filter(
+                    (candidate) => !idsToDelete.has(candidate.id)
+                );
             });
-            setSelectedNodeId((id) => (id === node.id ? null : id));
+
+            setIsDraggingNode(false);
+            setIsOverTrash(false);
+            setParallelDropTargetId(null);
+            return;
         }
+
+        // Container selbst werden nicht in Lanes verschoben.
+        if (
+            node.type === "parallel" ||
+            node.type === "parallelLane" ||
+            node.type === "compound"
+        ) {
+            setIsDraggingNode(false);
+            setIsOverTrash(false);
+            return;
+        }
+
+        const dropPoint = screenToFlowPosition({
+            x: event.clientX,
+            y: event.clientY,
+        });
+
+        setNodes((currentNodes) => {
+            const draggedNode = currentNodes.find(
+                (candidate) => candidate.id === node.id
+            );
+
+            if (!draggedNode) {
+                return currentNodes;
+            }
+
+            const sourceLane = getLaneForNode(
+                draggedNode,
+                currentNodes
+            );
+
+            const targetLane = currentNodes
+                .filter(
+                    (candidate) =>
+                        candidate.type === "parallelLane"
+                )
+                .find((lane) => {
+                    const position = getAbsoluteNodePosition(
+                        lane,
+                        currentNodes
+                    );
+
+                    const width =
+                        Number(lane.style?.width) || 420;
+                    const height =
+                        Number(lane.style?.height) || 110;
+
+                    return (
+                        dropPoint.x >= position.x &&
+                        dropPoint.x <= position.x + width &&
+                        dropPoint.y >= position.y &&
+                        dropPoint.y <= position.y + height
+                    );
+                });
+
+            // Die Node wurde lediglich innerhalb derselben Lane bewegt.
+            if (targetLane?.id === sourceLane?.id) {
+                return currentNodes.map((candidate) =>
+                    candidate.id === draggedNode.id
+                        ? {
+                            ...candidate,
+                            extent: "parent",
+                        }
+                        : candidate
+                );
+            }
+
+            const sourceParallel = sourceLane
+                ? currentNodes.find(
+                    (candidate) =>
+                        candidate.id === sourceLane.parentId
+                )
+                : null;
+
+            const targetParallel = targetLane
+                ? currentNodes.find(
+                    (candidate) =>
+                        candidate.id === targetLane.parentId
+                )
+                : null;
+
+            const absolutePosition = getAbsoluteNodePosition(
+                draggedNode,
+                currentNodes
+            );
+
+            let nextNodes = currentNodes.filter(
+                (candidate) => candidate.id !== draggedNode.id
+            );
+
+            const normalizeLane = (lane, nodeToArrangeId = null) => {
+                if (!lane) return;
+
+                const directChildren = nextNodes.filter(
+                    (candidate) => candidate.parentId === lane.id
+                );
+
+                // Der Compound existiert bereits automatisch in jeder Lane.
+                const wrapper = directChildren.find(
+                    (candidate) =>
+                        candidate.type === "compound" &&
+                        candidate.className === "compound-in-lane"
+                );
+
+                const parentId = wrapper?.id || lane.id;
+
+                // Alle States innerhalb der Lane / des Compounds
+                const members = wrapper
+                    ? nextNodes.filter(
+                          (candidate) =>
+                              candidate.parentId === wrapper.id
+                      )
+                    : directChildren.filter(
+                          (candidate) =>
+                              candidate.type !== "compound"
+                      );
+
+                /*
+                 * NUR die neu hinzugekommene Node automatisch einordnen.
+                 *
+                 * Bereits vorhandene Nodes werden NICHT verändert.
+                 */
+                if (nodeToArrangeId) {
+                    const newNode = members.find(
+                        (member) => member.id === nodeToArrangeId
+                    );
+
+                    if (newNode) {
+                        const existingMembers = members.filter(
+                            (member) => member.id !== nodeToArrangeId
+                        );
+
+                        // Neue Node rechts hinter den vorhandenen Nodes platzieren.
+                        //
+                        // 1. Node: x = 25
+                        // 2. Node: x = 215
+                        // 3. Node: x = 405
+                        // usw.
+                        const newX =
+                            25 + existingMembers.length * 190;
+
+                        nextNodes = nextNodes.map((candidate) => {
+                            if (candidate.id !== nodeToArrangeId) {
+                                return candidate;
+                            }
+
+                            return {
+                                ...candidate,
+                                parentId,
+                                extent: "parent",
+                                position: {
+                                    x: newX,
+                                    y: 20,
+                                },
+                            };
+                        });
+                    }
+                }
+
+                /*
+                 * Parallel-State verbreitern, falls durch die neue
+                 * Node mehr horizontaler Platz benötigt wird.
+                 */
+                const requiredWidth = Math.max(
+                    420,
+                    members.length * 190 + 80
+                );
+
+                const parallel = nextNodes.find(
+                    (candidate) => candidate.id === lane.parentId
+                );
+
+                if (!parallel) return;
+
+                // Alle Lanes dieses Parallel-States
+                const parallelLanes = nextNodes.filter(
+                    (candidate) =>
+                        candidate.type === "parallelLane" &&
+                        candidate.parentId === parallel.id
+                );
+
+                // WICHTIG:
+                // Nicht nur die aktuelle Lane betrachten.
+                // Für JEDE Lane berechnen, wie viel Platz ihre States brauchen.
+                let requiredParallelWidth = 420;
+
+                parallelLanes.forEach((parallelLane) => {
+                    const directChildren = nextNodes.filter(
+                        (candidate) =>
+                            candidate.parentId === parallelLane.id
+                    );
+
+                    const laneWrapper = directChildren.find(
+                        (candidate) =>
+                            candidate.type === "compound" &&
+                            candidate.className === "compound-in-lane"
+                    );
+
+                    // States dieser Lane
+                    const laneMembers = laneWrapper
+                        ? nextNodes.filter(
+                              (candidate) =>
+                                  candidate.parentId === laneWrapper.id
+                          )
+                        : directChildren.filter(
+                              (candidate) =>
+                                  candidate.type !== "compound"
+                          );
+
+                    // Rechte Kante der am weitesten rechts liegenden Node
+                    let maxRight = 0;
+
+                    laneMembers.forEach((member) => {
+                        const nodeWidth =
+                            Number(member.measured?.width) ||
+                            Number(member.width) ||
+                            Number(member.style?.width) ||
+                            160;
+
+                        const right =
+                            Number(member.position?.x || 0) +
+                            nodeWidth;
+
+                        maxRight = Math.max(maxRight, right);
+                    });
+
+                    // 15px Wrapper-Abstand links
+                    // + 25px Reserve rechts
+                    const laneRequiredWidth =
+                        15 + maxRight + 25;
+
+                    requiredParallelWidth = Math.max(
+                        requiredParallelWidth,
+                        laneRequiredWidth
+                    );
+                });
+
+                const parallelWidth = requiredParallelWidth;
+
+                // Parallel, Lanes und Compounds auf dieselbe
+                // benötigte Breite bringen.
+                nextNodes = nextNodes.map((candidate) => {
+                    // Parallel-State
+                    if (candidate.id === parallel.id) {
+                        return {
+                            ...candidate,
+                            style: {
+                                ...candidate.style,
+                                width: parallelWidth,
+                            },
+                        };
+                    }
+
+                    // Alle Lanes des Parallel-States
+                    if (
+                        candidate.type === "parallelLane" &&
+                        candidate.parentId === parallel.id
+                    ) {
+                        return {
+                            ...candidate,
+                            style: {
+                                ...candidate.style,
+                                width: parallelWidth,
+                            },
+                        };
+                    }
+
+                    // Compounds aller Lanes dieses Parallel-States
+                    const belongsToParallelLane =
+                        parallelLanes.some(
+                            (parallelLane) =>
+                                parallelLane.id === candidate.parentId
+                        );
+
+                    if (
+                        candidate.type === "compound" &&
+                        candidate.className === "compound-in-lane" &&
+                        belongsToParallelLane
+                    ) {
+                        return {
+                            ...candidate,
+                            style: {
+                                ...candidate.style,
+                                width: Math.max(
+                                    390,
+                                    parallelWidth - 30
+                                ),
+                            },
+                        };
+                    }
+
+                    return candidate;
+                });
+            };
+
+            if (targetLane) {
+                // Vorhandenen Compound der Lane suchen
+                const wrapper = nextNodes.find(
+                    (candidate) =>
+                        candidate.parentId === targetLane.id &&
+                        candidate.type === "compound" &&
+                        candidate.className === "compound-in-lane"
+                );
+
+                // Parent ist normalerweise der bereits vorhandene Compound.
+                // Falls keiner vorhanden ist, direkt die Lane verwenden.
+                const targetParent = wrapper || targetLane;
+
+                // Absolute Position des Parents bestimmen
+                const parentAbsolutePosition =
+                    getAbsoluteNodePosition(
+                        targetParent,
+                        nextNodes
+                    );
+
+                nextNodes.push({
+                    ...draggedNode,
+
+                    parentId: targetParent.id,
+                    extent: "parent",
+
+                    // Die aktuelle visuelle Position der Node beibehalten,
+                    // aber in Koordinaten relativ zum neuen Parent umrechnen.
+                    position: {
+                        x:
+                            absolutePosition.x -
+                            parentAbsolutePosition.x,
+
+                        y:
+                            absolutePosition.y -
+                            parentAbsolutePosition.y,
+                    },
+
+                    selected: false,
+                });
+            } else if (sourceLane) {
+                // Node wurde aus einem Parallel State gezogen.
+                const hasTransition = edges.some(
+                    (edge) =>
+                        !edge.id.startsWith("edge-internal-") &&
+                        (
+                            edge.source === draggedNode.id ||
+                            edge.target === draggedNode.id ||
+                            edge.data?.parallelOriginalSource ===
+                                draggedNode.id ||
+                            edge.data?.parallelOriginalTarget ===
+                                draggedNode.id
+                        )
+                );
+
+                const parallelPosition = sourceParallel
+                    ? getAbsoluteNodePosition(
+                        sourceParallel,
+                        currentNodes
+                    )
+                    : absolutePosition;
+
+                nextNodes.push({
+                    ...draggedNode,
+                    parentId: undefined,
+                    extent: undefined,
+                    position: hasTransition
+                        ? absolutePosition
+                        : {
+                              x: dropPoint.x,
+                              y: dropPoint.y,
+                          },
+                    selected: false,
+                });
+            } else {
+                nextNodes.push({
+                    ...draggedNode,
+                    extent: undefined,
+                });
+            }
+
+            normalizeLane(sourceLane);
+
+            // In der neuen Lane NUR die gerade gedroppte Node einordnen.
+            if (
+                targetLane &&
+                targetLane.id !== sourceLane?.id
+            ) {
+                normalizeLane(
+                    targetLane,
+                    draggedNode.id
+                );
+            }
+
+            let nextEdges = edges;
+
+            if (sourceLane) {
+                const internalHandles = nextEdges
+                    .filter(
+                        (edge) =>
+                            edge.source === draggedNode.id &&
+                            edge.target === sourceLane.id &&
+                            edge.id.startsWith("edge-internal-")
+                    )
+                    .map((edge) => edge.sourceHandle);
+
+                // Interne Verbindungen zum alten Lane-Rand entfernen.
+                nextEdges = nextEdges
+                    .filter(
+                        (edge) =>
+                            !(
+                                edge.source === draggedNode.id &&
+                                edge.target === sourceLane.id &&
+                                edge.id.startsWith(
+                                    "edge-internal-"
+                                )
+                            )
+                    )
+                    .map((edge) => {
+                        if (
+                            edge.data?.parallelOriginalSource ===
+                            draggedNode.id
+                        ) {
+                            return {
+                                ...edge,
+                                source: draggedNode.id,
+                                data: {
+                                    ...edge.data,
+                                    parallelOriginalSource:
+                                        undefined,
+                                },
+                            };
+                        }
+
+                        if (
+                            edge.data?.parallelOriginalTarget ===
+                            draggedNode.id
+                        ) {
+                            return {
+                                ...edge,
+                                target: draggedNode.id,
+                                targetHandle: null,
+                                data: {
+                                    ...edge.data,
+                                    parallelOriginalTarget:
+                                        undefined,
+                                },
+                            };
+                        }
+
+                        return edge;
+                    });
+
+                const stillUsedHandles = new Set(
+                    nextEdges
+                        .filter(
+                            (edge) =>
+                                edge.target === sourceLane.id &&
+                                edge.id.startsWith(
+                                    "edge-internal-"
+                                )
+                        )
+                        .map((edge) => edge.sourceHandle)
+                );
+
+                nextNodes = nextNodes.map((candidate) =>
+                    candidate.id === sourceLane.id
+                        ? {
+                            ...candidate,
+                            data: {
+                                ...candidate.data,
+                                events: (
+                                    candidate.data?.events || []
+                                ).filter(
+                                    (item) =>
+                                        !internalHandles.includes(
+                                            item.id
+                                        ) ||
+                                        stillUsedHandles.has(
+                                            item.id
+                                        )
+                                ),
+                            },
+                        }
+                        : candidate
+                );
+            }
+
+            if (targetLane && targetParallel) {
+                const outgoingIds = new Set(
+                    nextEdges
+                        .filter(
+                            (edge) =>
+                                edge.source === draggedNode.id &&
+                                edge.target !== targetLane.id
+                        )
+                        .map((edge) => edge.id)
+                );
+
+                const incomingIds = new Set(
+                    nextEdges
+                        .filter(
+                            (edge) =>
+                                edge.target === draggedNode.id &&
+                                edge.source !== draggedNode.id
+                        )
+                        .map((edge) => edge.id)
+                );
+
+                const internalEdges = [];
+                const laneEvents = [
+                    ...(targetLane.data?.events || []),
+                ];
+
+                nextEdges = nextEdges.map((edge) => {
+                    if (outgoingIds.has(edge.id)) {
+                        const handleId =
+                            edge.sourceHandle || "success";
+
+                        if (
+                            !laneEvents.some(
+                                (item) => item.id === handleId
+                            )
+                        ) {
+                            const baseName =
+                                draggedNode.data?.label ||
+                                draggedNode.data
+                                    ?.fullSkillName ||
+                                "state";
+
+                            laneEvents.push({
+                                id: handleId,
+                                name: `${baseName}.${handleId}`,
+                                rawEvent: `${baseName}.${handleId}`,
+                                target: edge.target,
+                            });
+                        }
+
+                        internalEdges.push({
+                            id:
+                                `edge-internal-${draggedNode.id}-` +
+                                `${handleId}-${targetLane.id}`,
+                            source: draggedNode.id,
+                            target: targetLane.id,
+                            sourceHandle: handleId,
+                            targetHandle: `target-${handleId}`,
+                            style: {
+                                strokeDasharray: "4 4",
+                                stroke: "#0284c7",
+                                strokeWidth: 1.5,
+                            },
+                            type: "smoothstep",
+                        });
+
+                        return {
+                            ...edge,
+                            source: targetLane.id,
+                            data: {
+                                ...edge.data,
+                                parallelOriginalSource:
+                                    draggedNode.id,
+                            },
+                        };
+                    }
+
+                    if (incomingIds.has(edge.id)) {
+                        return {
+                            ...edge,
+                            target: targetParallel.id,
+                            targetHandle: "target",
+                            data: {
+                                ...edge.data,
+                                parallelOriginalTarget:
+                                    draggedNode.id,
+                            },
+                        };
+                    }
+
+                    return edge;
+                });
+
+                nextEdges = [
+                    ...nextEdges,
+                    ...internalEdges,
+                ];
+
+                nextNodes = nextNodes.map((candidate) =>
+                    candidate.id === targetLane.id
+                        ? {
+                            ...candidate,
+                            data: {
+                                ...candidate.data,
+                                events: laneEvents,
+                            },
+                        }
+                        : candidate
+                );
+            }
+
+            setEdges(nextEdges);
+
+            // React Flow benötigt Parent-Nodes vor ihren Children.
+            return orderNodesParentsFirst(nextNodes);
+        });
+
         setIsDraggingNode(false);
         setIsOverTrash(false);
-    }, [setNodes, setEdges, setSlotEdges, setSlotNodes]);
+        setParallelDropTargetId(null);
+    }, [
+        edges,
+        screenToFlowPosition,
+        setNodes,
+        setEdges,
+        setSlotEdges,
+        setSlotNodes,
+    ]);
 
 
     const getTabDisplayPath = (tab) => {
@@ -2509,8 +3367,8 @@ function AppContent() {
                                                 handleOpenSubMachine(n.data.src, n.data.label);
                                             }
                                         }}
-                                        onNodeDragStart={() => setIsDraggingNode(true)}
-                                        onNodeDrag={(e) => setIsOverTrash(Boolean(document.elementFromPoint(e.clientX, e.clientY)?.closest(".trash-bin-dropzone")))}
+                                        onNodeDragStart={handleNodeDragStart}
+                                        onNodeDrag={handleNodeDrag}
                                         onNodeDragStop={handleNodeDragStop}
                                     >
                                         <Background />
