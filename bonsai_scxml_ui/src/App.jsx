@@ -111,6 +111,22 @@ const getNodeId = () => `skill-node-${crypto.randomUUID()}`;
 
 const PARALLEL_EXIT_GUTTER = 150;
 const PARALLEL_NODE_GAP = 30;
+const COMPOUND_NODE_GAP = 30;
+const COMPOUND_PADDING_X = 30;
+const COMPOUND_HEADER_HEIGHT = 45;
+const COMPOUND_BOTTOM_PADDING = 30;
+const COMPOUND_LABEL_SPACE = 160;
+
+const getNodeSize = (node) => ({
+    width: Number(node?.measured?.width) || Number(node?.width) || Number(node?.style?.width) || 210,
+    height: Number(node?.measured?.height) || Number(node?.height) || Number(node?.style?.height) || 80,
+});
+
+const getDirectCompoundForNode = (node, allNodes) => {
+    if (!node?.parentId) return null;
+    const parent = allNodes.find((candidate) => candidate.id === node.parentId);
+    return parent?.type === "compound" && parent.className !== "compound-in-lane" ? parent : null;
+};
 
 const getAbsoluteNodePosition = (node, allNodes) => {
     let x = node?.position?.x || 0;
@@ -315,6 +331,7 @@ function AppContent() {
     const [contextMenu, setContextMenu] = useState(null);
     const [parallelDropTargetId, setParallelDropTargetId] =
         useState(null);
+    const [compoundDropTargetId, setCompoundDropTargetId] = useState(null);
     const updateNodeInternals = useUpdateNodeInternals();
 
     //---- TAB MANAGEMENT ----
@@ -1633,18 +1650,19 @@ function AppContent() {
     }
 
     visibleNodes = visibleNodes.map((visibleNode) => {
-        if (visibleNode.type !== "parallel") {
-            return visibleNode;
+        if (visibleNode.type === "parallel") {
+            return {
+                ...visibleNode,
+                data: { ...visibleNode.data, isDropTarget: visibleNode.id === parallelDropTargetId },
+            };
         }
-
-        return {
-            ...visibleNode,
-            data: {
-                ...visibleNode.data,
-                isDropTarget:
-                    visibleNode.id === parallelDropTargetId,
-            },
-        };
+        if (visibleNode.type === "compound" && visibleNode.className !== "compound-in-lane") {
+            return {
+                ...visibleNode,
+                data: { ...visibleNode.data, isDropTarget: visibleNode.id === compoundDropTargetId },
+            };
+        }
+        return visibleNode;
     });
 
     const createNameforSkill = (fullSkillName) => {
@@ -1944,11 +1962,32 @@ function AppContent() {
             });
 
             if (alreadyExists) {
-                openConditionDrawer(
-                    params.source,
-                    params.sourceHandle,
-                    params.target
-                );
+                openConditionDrawer(params.source, params.sourceHandle, params.target);
+                return;
+            }
+
+            const sourceCompound = getDirectCompoundForNode(sourceNode, nodes);
+            const wasAlreadyInsideTargetCompound =
+                sourceCompound &&
+                targetCompound &&
+                sourceCompound.id === targetCompound.id;
+            const targetCompound = getDirectCompoundForNode(targetNode, nodes);
+            const leavesCompound = sourceCompound && targetCompound?.id !== sourceCompound.id;
+            if (leavesCompound) {
+                const handleId = params.sourceHandle || "success";
+                setNodes((current) => current.map((candidate) => candidate.id === sourceCompound.id ? {
+                    ...candidate, data: {
+                        ...candidate.data,
+                        events: (candidate.data?.events || []).some((evt) => String(evt.id) === String(handleId))
+                            ? candidate.data.events
+                            : [...(candidate.data?.events || []), { id: handleId, name: handleId, rawEvent: handleId, target: params.target }]
+                    }
+                } : candidate));
+                setEdges((current) => addEdge({
+                    ...params, source: sourceCompound.id, sourceHandle: handleId, label: handleId,
+                    markerEnd: { type: MarkerType.ArrowClosed },
+                    data: { cond: "", assignments: [], assign: null, compoundOriginalSource: params.source }
+                }, current));
                 return;
             }
 
@@ -2856,7 +2895,7 @@ function AppContent() {
 
         // Nodes innerhalb einer Lane dürfen vorübergehend den
         // bisherigen Parent verlassen.
-        if (getLaneForNode(node, nodes)) {
+        if (getLaneForNode(node, nodes) || getDirectCompoundForNode(node, nodes)) {
             setNodes((currentNodes) =>
                 currentNodes.map((candidate) =>
                     candidate.id === node.id
@@ -2883,6 +2922,7 @@ function AppContent() {
             )
         ) {
             setParallelDropTargetId(null);
+            setCompoundDropTargetId(null);
             return;
         }
 
@@ -2910,9 +2950,17 @@ function AppContent() {
                 );
             });
 
-        setParallelDropTargetId(
-            hoveredLane?.parentId || null
-        );
+        const hoveredCompound = nodes
+            .filter((candidate) => candidate.type === "compound" && candidate.className !== "compound-in-lane" && candidate.id !== draggedNode.id)
+            .find((compound) => {
+                const pos = getAbsoluteNodePosition(compound, nodes);
+                const { width, height } = getNodeSize(compound);
+                return pointerPosition.x >= pos.x && pointerPosition.x <= pos.x + width &&
+                    pointerPosition.y >= pos.y && pointerPosition.y <= pos.y + height;
+            });
+
+        setCompoundDropTargetId(hoveredCompound?.id || null);
+        setParallelDropTargetId(hoveredCompound ? null : (hoveredLane?.parentId || null));
     }, [nodes, screenToFlowPosition]);
 
     const handleNodeDragStop = useCallback((event, node) => {
@@ -2992,6 +3040,8 @@ function AppContent() {
         ) {
             setIsDraggingNode(false);
             setIsOverTrash(false);
+            setParallelDropTargetId(null);
+            setCompoundDropTargetId(null);
             return;
         }
 
@@ -3007,6 +3057,319 @@ function AppContent() {
 
             if (!draggedNode) {
                 return currentNodes;
+            }
+
+            const sourceCompound = getDirectCompoundForNode(
+                draggedNode,
+                currentNodes
+            );
+
+            const targetCompound = currentNodes
+                .filter(
+                    (c) =>
+                        c.type === "compound" &&
+                        c.className !== "compound-in-lane" &&
+                        c.id !== draggedNode.id
+                )
+                .find((compound) => {
+                    const p = getAbsoluteNodePosition(
+                        compound,
+                        currentNodes
+                    );
+
+                    const z = getNodeSize(compound);
+
+                    return (
+                        dropPoint.x >= p.x &&
+                        dropPoint.x <= p.x + z.width &&
+                        dropPoint.y >= p.y &&
+                        dropPoint.y <= p.y + z.height
+                    );
+                });
+
+
+            // ---------------------------------------------------------
+            // Node befindet sich bereits im selben Compound
+            // -> Position NICHT automatisch verändern
+            // -> Node darf frei innerhalb des Compounds bewegt werden
+            // ---------------------------------------------------------
+
+            if (
+                draggedNode.type !== "compound" &&
+                sourceCompound &&
+                targetCompound &&
+                sourceCompound.id === targetCompound.id
+            ) {
+                let next = [...currentNodes];
+
+                // Compound an neue Node-Position anpassen
+                const members = next.filter(
+                    (c) => c.parentId === sourceCompound.id
+                );
+
+                let right = 0;
+                let bottom = 0;
+
+                members.forEach((member) => {
+                    const size = getNodeSize(member);
+
+                    right = Math.max(
+                        right,
+                        Number(member.position?.x || 0) + size.width
+                    );
+
+                    bottom = Math.max(
+                        bottom,
+                        Number(member.position?.y || 0) + size.height
+                    );
+                });
+
+                next = next.map((c) =>
+                    c.id === sourceCompound.id
+                        ? {
+                              ...c,
+                              style: {
+                                  ...c.style,
+                                  width: Math.max(
+                                      320,
+                                      right + COMPOUND_LABEL_SPACE
+                                  ),
+                                  height: Math.max(
+                                      180,
+                                      bottom + COMPOUND_BOTTOM_PADDING
+                                  ),
+                              },
+                          }
+                        : c
+                );
+
+                return orderNodesParentsFirst(next);
+            }
+
+            if (
+                draggedNode.type !== "compound" &&
+                !getLaneForNode(draggedNode, currentNodes) &&
+                (sourceCompound || targetCompound)
+            ) {
+                const absolute = getAbsoluteNodePosition(
+                    draggedNode,
+                    currentNodes
+                );
+
+                // Zunächst aus aktuellem Parent lösen
+                let next = currentNodes.map((c) =>
+                    c.id === draggedNode.id
+                        ? {
+                              ...c,
+                              parentId: undefined,
+                              extent: undefined,
+                              position: absolute,
+                          }
+                        : c
+                );
+
+                if (targetCompound) {
+                    const compoundPosition =
+                        getAbsoluteNodePosition(
+                            targetCompound,
+                            currentNodes
+                        );
+
+                    // Absolute Position der Node in eine
+                    // relative Compound-Position umrechnen
+                    const relativePosition = {
+                        x: absolute.x - compoundPosition.x,
+                        y: absolute.y - compoundPosition.y,
+                    };
+
+                    next = next.map((c) =>
+                        c.id === draggedNode.id
+                            ? {
+                                  ...c,
+                                  parentId: targetCompound.id,
+                                  extent: "parent",
+
+                                  // Drop-Position beibehalten
+                                  position: {
+                                      x: Math.max(
+                                          COMPOUND_PADDING_X,
+                                          relativePosition.x
+                                      ),
+                                      y: Math.max(
+                                          COMPOUND_HEADER_HEIGHT,
+                                          relativePosition.y
+                                      ),
+                                  },
+                              }
+                            : c
+                    );
+                }
+
+                else {
+                    next = next.map((c) =>
+                        c.id === draggedNode.id
+                            ? {
+                                  ...c,
+                                  position: {
+                                      x: dropPoint.x,
+                                      y: dropPoint.y,
+                                  },
+                              }
+                            : c
+                    );
+                }
+
+                const resize = (id) => {
+                    if (!id) return;
+
+                    const members = next.filter(
+                        (c) => c.parentId === id
+                    );
+
+                    let right = 0;
+                    let bottom = 0;
+
+                    members.forEach((member) => {
+                        const size = getNodeSize(member);
+
+                        right = Math.max(
+                            right,
+                            Number(member.position?.x || 0) +
+                                size.width
+                        );
+
+                        bottom = Math.max(
+                            bottom,
+                            Number(member.position?.y || 0) +
+                                size.height
+                        );
+                    });
+
+                    next = next.map((c) =>
+                        c.id === id
+                            ? {
+                                  ...c,
+                                  style: {
+                                      ...c.style,
+                                      width: Math.max(
+                                          320,
+                                          right + 160
+                                      ),
+                                      height: Math.max(
+                                          180,
+                                          bottom + 30
+                                      ),
+                                  },
+                              }
+                            : c
+                    );
+                };
+
+                resize(sourceCompound?.id);
+                resize(targetCompound?.id);
+
+
+                if (targetCompound) {
+                    const handles = edges
+                        .filter(
+                            (edge) =>
+                                edge.source === draggedNode.id &&
+                                edge.target !== targetCompound.id
+                        )
+                        .map(
+                            (edge) =>
+                                edge.sourceHandle || "success"
+                        );
+
+                    next = next.map((c) =>
+                        c.id === targetCompound.id
+                            ? {
+                                  ...c,
+                                  data: {
+                                      ...c.data,
+
+                                      events: [
+                                          ...(c.data?.events || []),
+
+                                          ...handles
+                                              .filter(
+                                                  (handle) =>
+                                                      !(
+                                                          c.data?.events ||
+                                                          []
+                                                      ).some(
+                                                          (event) =>
+                                                              String(
+                                                                  event.id
+                                                              ) ===
+                                                              String(
+                                                                  handle
+                                                              )
+                                                      )
+                                              )
+                                              .map((handle) => ({
+                                                  id: handle,
+                                                  name: handle,
+                                                  rawEvent: handle,
+                                              })),
+                                      ],
+                                  },
+                              }
+                            : c
+                    );
+                }
+
+
+                setEdges(
+                    edges.map((edge) => {
+                        // Node wurde AUS einem Compound gezogen.
+                        // Edge wieder direkt mit Node verbinden.
+                        if (
+                            sourceCompound &&
+                            edge.data?.compoundOriginalSource ===
+                                draggedNode.id
+                        ) {
+                            return {
+                                ...edge,
+
+                                source: draggedNode.id,
+
+                                data: {
+                                    ...edge.data,
+                                    compoundOriginalSource:
+                                        undefined,
+                                },
+                            };
+                        }
+
+
+                        if (
+                            targetCompound &&
+                            edge.source === draggedNode.id &&
+                            edge.target !== targetCompound.id
+                        ) {
+                            return {
+                                ...edge,
+
+                                source: targetCompound.id,
+
+                                sourceHandle:
+                                    edge.sourceHandle || "success",
+
+                                data: {
+                                    ...edge.data,
+
+                                    compoundOriginalSource:
+                                        draggedNode.id,
+                                },
+                            };
+                        }
+
+                        return edge;
+                    })
+                );
+
+                return orderNodesParentsFirst(next);
             }
 
             const sourceLane = getLaneForNode(
@@ -3100,11 +3463,7 @@ function AppContent() {
                               candidate.type !== "compound"
                       );
 
-                /*
-                 * NUR die neu hinzugekommene Node automatisch einordnen.
-                 *
-                 * Bereits vorhandene Nodes werden NICHT verändert.
-                 */
+
                 if (nodeToArrangeId) {
                     const newNode = members.find(
                         (member) => member.id === nodeToArrangeId
@@ -3115,12 +3474,6 @@ function AppContent() {
                             (member) => member.id !== nodeToArrangeId
                         );
 
-                        // Neue Node rechts hinter den vorhandenen Nodes platzieren.
-                        //
-                        // 1. Node: x = 25
-                        // 2. Node: x = 215
-                        // 3. Node: x = 405
-                        // usw.
                         const newX =
                             25 + existingMembers.length * 190;
 
@@ -3142,10 +3495,6 @@ function AppContent() {
                     }
                 }
 
-                /*
-                 * Parallel-State verbreitern, falls durch die neue
-                 * Node mehr horizontaler Platz benötigt wird.
-                 */
                 const requiredWidth = Math.max(
                     420,
                     members.length * 190 + 80
@@ -3157,16 +3506,12 @@ function AppContent() {
 
                 if (!parallel) return;
 
-                // Alle Lanes dieses Parallel-States
                 const parallelLanes = nextNodes.filter(
                     (candidate) =>
                         candidate.type === "parallelLane" &&
                         candidate.parentId === parallel.id
                 );
 
-                // WICHTIG:
-                // Nicht nur die aktuelle Lane betrachten.
-                // Für JEDE Lane berechnen, wie viel Platz ihre States brauchen.
                 let requiredParallelWidth = 420;
 
                 parallelLanes.forEach((parallelLane) => {
@@ -3192,7 +3537,6 @@ function AppContent() {
                                   candidate.type !== "compound"
                           );
 
-                    // Rechte Kante der am weitesten rechts liegenden Node
                     let maxRight = 0;
 
                     laneMembers.forEach((member) => {
@@ -3209,8 +3553,6 @@ function AppContent() {
                         maxRight = Math.max(maxRight, right);
                     });
 
-                    // 15px Wrapper-Abstand links
-                    // + 25px Reserve rechts
                     const laneRequiredWidth =
                         15 +
                         maxRight +
@@ -3289,8 +3631,7 @@ function AppContent() {
                         candidate.className === "compound-in-lane"
                 );
 
-                // Parent ist normalerweise der bereits vorhandene Compound.
-                // Falls keiner vorhanden ist, direkt die Lane verwenden.
+
                 const targetParent = wrapper || targetLane;
 
                 // Absolute Position des Parents bestimmen
@@ -3306,8 +3647,6 @@ function AppContent() {
                     parentId: targetParent.id,
                     extent: "parent",
 
-                    // Die aktuelle visuelle Position der Node beibehalten,
-                    // aber in Koordinaten relativ zum neuen Parent umrechnen.
                     position: {
                         x:
                             absolutePosition.x -
@@ -3588,6 +3927,7 @@ function AppContent() {
         setIsDraggingNode(false);
         setIsOverTrash(false);
         setParallelDropTargetId(null);
+        setCompoundDropTargetId(null);
     }, [
         edges,
         screenToFlowPosition,
@@ -3799,6 +4139,10 @@ function AppContent() {
                                     );
                                 });
 
+                            const targetCompound = nodes
+                                .filter((node) => node.type === "compound" && node.className !== "compound-in-lane")
+                                .find((compound) => { const p = getAbsoluteNodePosition(compound, nodes); const z = getNodeSize(compound); return mousePosition.x >= p.x && mousePosition.x <= p.x + z.width && mousePosition.y >= p.y && mousePosition.y <= p.y + z.height; });
+
                             const newNode = await createNode(
                                 skill.split("skills.")[1],
                                 getNodeId(),
@@ -3823,6 +4167,19 @@ function AppContent() {
                                 70,
                                 50 + eventCount * 18
                             );
+
+                            // Compound behaves like one auto-layout lane.
+                            if (targetCompound) {
+                                let newX = 30;
+                                nodes.filter((member) => member.parentId === targetCompound.id).forEach((member) => { const z=getNodeSize(member); newX=Math.max(newX, Number(member.position?.x||0)+z.width+COMPOUND_NODE_GAP); });
+                                newNode.parentId = targetCompound.id; newNode.extent = "parent"; newNode.position = { x: newX, y: COMPOUND_HEADER_HEIGHT };
+                                setNodes((current) => {
+                                    const right = newX + estimatedNodeWidth; const bottom = COMPOUND_HEADER_HEIGHT + estimatedNodeHeight;
+                                    return orderNodesParentsFirst([...current.map((candidate) => candidate.id === targetCompound.id ? { ...candidate, style: { ...candidate.style, width: Math.max(Number(candidate.style?.width)||320, right+160), height: Math.max(Number(candidate.style?.height)||180, bottom+30) } } : candidate), newNode]);
+                                });
+                                setSelectedNodeId(newNode.id);
+                                return;
+                            }
 
                             // =========================================================
                             // DROP IN PARALLEL-LANE

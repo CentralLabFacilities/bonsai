@@ -1,4 +1,8 @@
-import { Handle, Position } from '@xyflow/react';
+import {
+    Handle,
+    Position,
+    useUpdateNodeInternals,
+} from "@xyflow/react";
 import StateActionBadges from './StateActionBadges';
 import { getTransitionExitToken } from '../utils/transitionEvents.js';
 
@@ -23,7 +27,16 @@ export default function CompoundNode({ id, data }) {
     );
 
     return (
-        <div className={`compound-frame-node ${data.isInitial ? 'initial-compound' : ''}`}>
+        <div
+            className={`compound-frame-node ${
+                data.isInitial ? "initial-compound" : ""
+            } ${
+                data.isDropTarget
+                    ? "compound-drop-target"
+                    : ""
+            }`}
+        >
+
             <StateActionBadges onEntry={data.onEntry} onExit={data.onExit} />
 
             {/* Target-Handle für Transitions auf den Compound-State */}
