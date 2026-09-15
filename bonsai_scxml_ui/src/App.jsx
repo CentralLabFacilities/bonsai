@@ -1250,7 +1250,9 @@ function AppContent() {
             } else {
                 handleCreateEmptySubMachine(contextMenu.flowPosition);
             }
-        }
+        } else if (type === "slot") {
+             setIsCreateSlotModalOpen(true);;
+             }
 
         setContextMenu(null);
     };
@@ -4626,6 +4628,9 @@ function AppContent() {
                                         </button>
                                         <button className="context-menu-item" onClick={() => handleSelectAction("submachine")}>
                                             Sub-State-Machine
+                                        </button>
+                                        <button className="context-menu-item" onClick={() => handleSelectAction("slot")}>
+                                            Slot
                                         </button>
                                     </div>
                                 )}
