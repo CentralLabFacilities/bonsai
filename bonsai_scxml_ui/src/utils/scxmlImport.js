@@ -215,6 +215,8 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             const branchElements = Array.from(stateElem.children).filter((c) => c.localName === "state");
             const branchNames = branchElements.map((b) => b.getAttribute("id"));
 
+            const parallelTransElems = Array.from(stateElem.children).filter((c) => c.localName === "transition");
+
             let maxStatesInAnyLane = 1;
             branchElements.forEach((branchElem) => {
                 const innerStates = Array.from(branchElem.children).filter((c) => c.localName === "state");
@@ -230,7 +232,7 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             const containerWidth = Math.max(300, maxStatesInAnyLane * 220 + 60);
             const containerHeight = headerHeight + branchElements.length * laneHeight + 10;
 
-            // 1. Parallel Container-Knoten (reiner Rahmen, keine eigenen Exits)
+            // 1. Parallel Container-Knoten
             newNodes.push({
                 id: parallelNodeId,
                 position: { x, y },
@@ -247,31 +249,29 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                 },
             });
 
-            // 4. Transitions auf Parallel-Ebene erfassen
-            Array.from(stateElem.children)
-                .filter((c) => c.localName === "transition")
-                .forEach((tr) => {
-                    const eventName = tr.getAttribute("event") || "";
-                    const targetState = tr.getAttribute("target");
-                    const cond = tr.getAttribute("cond") || "";
-                    const assignments = parseTransitionAssignments(tr);
-                    const firstAssignment = assignments[0] || null;
+            // 2. Transitions auf Parallel-Ebene erfassen
+            parallelTransElems.forEach((tr) => {
+                const eventName = tr.getAttribute("event") || "";
+                const targetState = tr.getAttribute("target");
+                const cond = tr.getAttribute("cond") || "";
+                const assignments = parseTransitionAssignments(tr);
+                const firstAssignment = assignments[0] || null;
 
-                    const sourcePrefix = eventName.includes(".") ? eventName.split(".")[0] : fullSkillName;
+                const sourcePrefix = eventName.includes(".") ? eventName.split(".")[0] : fullSkillName;
 
-                    if (targetState) {
-                        rawTransitions.push({
-                            sourceNodeId: null,
-                            sourceSkillName: sourcePrefix,
-                            eventId: eventName,
-                            targetStateName: targetState,
-                            cond: cond.trim(),
-                            assignments,
-                            assignLocation: firstAssignment?.location || "",
-                            assignExpr: firstAssignment?.expr || "",
-                        });
-                    }
-                });
+                if (targetState) {
+                    rawTransitions.push({
+                        sourceNodeId: null,
+                        sourceSkillName: sourcePrefix,
+                        eventId: eventName,
+                        targetStateName: targetState,
+                        cond: cond.trim(),
+                        assignments,
+                        assignLocation: firstAssignment?.location || "",
+                        assignExpr: firstAssignment?.expr || "",
+                    });
+                }
+            });
 
             // 3. Jede Lane als Container anlegen
             for (let laneIdx = 0; laneIdx < branchElements.length; laneIdx++) {
@@ -280,7 +280,7 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                 const innerStates = Array.from(branchElem.children).filter((c) => c.localName === "state");
                 const laneNodeId = getNodeId();
 
-                // Nur Transitions filtern, die zu dieser Lane gehören (z. B. "Wait.fatal")
+                // Jetzt existiert parallelTransElems
                 const matchingTrans = parallelTransElems.filter((tr) =>
                     (tr.getAttribute("event") || "").startsWith(`${branchId}.`)
                 );
@@ -366,6 +366,7 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                         Array.from(stElem.children)
                             .filter((c) => c.localName === "transition")
                             .forEach((tr) => {
+                                const eventName = tr.getAttribute("event") || ""; // <-- Hat gefehlt!
                                 const targetState = tr.getAttribute("target");
                                 const cond = tr.getAttribute("cond") || "";
                                 const assignments = parseTransitionAssignments(tr);
@@ -377,10 +378,10 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                                         sourceSkillName: stId,
                                         eventId: eventName,
                                         targetStateName: targetState,
-                                        cond: (tr.getAttribute("cond") || "").trim(),
+                                        cond: cond.trim(),
                                         assignments,
-                                        assignLocation: "",
-                                        assignExpr: "",
+                                        assignLocation: firstAssignment?.location || "",
+                                        assignExpr: firstAssignment?.expr || "",
                                     });
                                 }
                             });
