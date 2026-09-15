@@ -1966,28 +1966,200 @@ function AppContent() {
                 return;
             }
 
-            const sourceCompound = getDirectCompoundForNode(sourceNode, nodes);
-            const wasAlreadyInsideTargetCompound =
+            const sourceCompound =
+                getDirectCompoundForNode(
+                    sourceNode,
+                    nodes
+                );
+
+            const targetCompound =
+                getDirectCompoundForNode(
+                    targetNode,
+                    nodes
+                );
+
+            const leavesCompound =
                 sourceCompound &&
-                targetCompound &&
-                sourceCompound.id === targetCompound.id;
-            const targetCompound = getDirectCompoundForNode(targetNode, nodes);
-            const leavesCompound = sourceCompound && targetCompound?.id !== sourceCompound.id;
+                (
+                    !targetCompound ||
+                    targetCompound.id !== sourceCompound.id
+                );
+
             if (leavesCompound) {
-                const handleId = params.sourceHandle || "success";
-                setNodes((current) => current.map((candidate) => candidate.id === sourceCompound.id ? {
-                    ...candidate, data: {
-                        ...candidate.data,
-                        events: (candidate.data?.events || []).some((evt) => String(evt.id) === String(handleId))
-                            ? candidate.data.events
-                            : [...(candidate.data?.events || []), { id: handleId, name: handleId, rawEvent: handleId, target: params.target }]
-                    }
-                } : candidate));
-                setEdges((current) => addEdge({
-                    ...params, source: sourceCompound.id, sourceHandle: handleId, label: handleId,
-                    markerEnd: { type: MarkerType.ArrowClosed },
-                    data: { cond: "", assignments: [], assign: null, compoundOriginalSource: params.source }
-                }, current));
+                const handleId =
+                    params.sourceHandle || "success";
+
+                const baseName =
+                    sourceNode.data?.label ||
+                    sourceNode.data?.fullSkillName ||
+                    "state";
+
+                const exitLabel =
+                    `${baseName}.${handleId}`;
+
+
+                /*
+                 * =====================================================
+                 * 1. ÄUSSERE TRANSITION
+                 *
+                 * Compound-Rand -> externe Node
+                 * =====================================================
+                 */
+
+                const externalEdge = {
+                    id:
+                        `edge-compound-${params.source}-` +
+                        `${handleId}-${params.target}-` +
+                        crypto.randomUUID(),
+
+                    source: sourceCompound.id,
+                    target: params.target,
+
+                    sourceHandle: handleId,
+                    targetHandle: params.targetHandle,
+
+                    label: handleId,
+
+                    type: "smartTransition",
+
+                    markerEnd: {
+                        type: MarkerType.ArrowClosed,
+                    },
+
+                    data: {
+                        cond: "",
+                        assignments: [],
+                        assign: null,
+
+                        // eigentliche interne Source merken
+                        compoundOriginalSource:
+                            params.source,
+
+                        compoundOriginalSourceHandle:
+                            handleId,
+                    },
+                };
+
+
+                /*
+                 * =====================================================
+                 * 2. INTERNE TRANSITION
+                 *
+                 * Node -> Compound-Rand
+                 *
+                 * EXAKT dasselbe Prinzip wie bei Parallel/Lane.
+                 * =====================================================
+                 */
+
+                const internalEdge = {
+                    id:
+                        `edge-internal-compound-${params.source}-` +
+                        `${handleId}-${sourceCompound.id}-` +
+                        crypto.randomUUID(),
+
+                    source: params.source,
+                    target: sourceCompound.id,
+
+                    sourceHandle: handleId,
+
+                    // CompoundNode muss genau diesen
+                    // Target-Handle rendern
+                    targetHandle: `target-${handleId}`,
+
+                    type: "smoothstep",
+
+                    style: {
+                        strokeDasharray: "4 4",
+                        stroke: "#0284c7",
+                        strokeWidth: 1.5,
+                    },
+
+                    data: {
+                        compoundInternalEdge: true,
+                    },
+                };
+
+
+                /*
+                 * =====================================================
+                 * 3. Beide Edges hinzufügen
+                 * =====================================================
+                 */
+
+                setEdges((currentEdges) => [
+                    ...currentEdges,
+                    externalEdge,
+                    internalEdge,
+                ]);
+
+
+                /*
+                 * =====================================================
+                 * 4. Compound bekommt Event + Handles
+                 * =====================================================
+                 */
+
+                setNodes((currentNodes) =>
+                    currentNodes.map((node) => {
+                        if (node.id !== sourceCompound.id) {
+                            return node;
+                        }
+
+                        const compoundEvents =
+                            node.data?.events || [];
+
+                        const alreadyExists =
+                            compoundEvents.some(
+                                (event) =>
+                                    String(event.id) ===
+                                    String(handleId)
+                            );
+
+                        if (alreadyExists) {
+                            return node;
+                        }
+
+                        return {
+                            ...node,
+
+                            data: {
+                                ...node.data,
+
+                                events: [
+                                    ...compoundEvents,
+
+                                    {
+                                        id: handleId,
+
+                                        // genauso wie Parallel:
+                                        // SkillName.event
+                                        name: exitLabel,
+                                        rawEvent: exitLabel,
+
+                                        target:
+                                            params.target,
+
+                                        sourceNodeId:
+                                            params.source,
+                                    },
+                                ],
+                            },
+                        };
+                    })
+                );
+
+
+                /*
+                 * React Flow mitteilen:
+                 * Compound hat neue Handles bekommen.
+                 */
+
+                requestAnimationFrame(() => {
+                    updateNodeInternals(
+                        sourceCompound.id
+                    );
+                });
+
                 return;
             }
 

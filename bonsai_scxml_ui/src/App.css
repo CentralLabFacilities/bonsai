@@ -1468,6 +1468,42 @@
   transform: translateX(-50%) scale(1.15);
 }
 /* ================= COMPOUND FRAME CONTAINER ================= */
+.compound-frame-node {
+    position: relative;
+    width: 100%;
+    height: 100%;
+
+    /* WICHTIG:
+       Compound-Fläche fängt keine Mausinteraktion ab */
+    pointer-events: none;
+}
+
+/* Header soll weiterhin bedienbar/selektierbar sein */
+.compound-frame-header {
+    pointer-events: auto;
+}
+
+/* Exit-Bereich */
+.compound-frame-exits {
+    pointer-events: none;
+}
+
+/* Source Handles müssen anklick-/ziehbar bleiben */
+.compound-frame-source-handle {
+    pointer-events: auto;
+}
+
+/* Interner Target Handle ist nur für React Flow */
+.compound-frame-internal-target-handle {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Normaler Target Handle links */
+.compound-frame-node > .target-handle {
+    pointer-events: auto;
+}
+
 .compound-in-lane {
   background: transparent !important;
   border: none !important;
