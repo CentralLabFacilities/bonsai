@@ -32,7 +32,7 @@ import CompoundNode from "./components/CompoundNode";
 import ParallelLaneNode from "./components/ParallelLaneNode";
 import EditableTransitionEdge from "./components/EditableTransitionEdge";
 import ProblemsPanel from "./components/ProblemsPanel";
-
+import CreateSlotModal from "./components/CreateSlotModal";
 // Ausgelagerte Utils (saveScxmlFile statt exportScxmlFile)
 import { generateXmlString, saveScxmlFile, saveScxmlFileTauri, openScxmlFileTauri, readScxmlFileContent } from "./utils/scxmlExport";
 import { parseScxmlFile, extractBehaviorExitEventsFromScxml } from "./utils/scxmlImport";
@@ -950,6 +950,7 @@ function AppContent() {
             edges: [],
             slotNodes: [],
             slotEdges: [],
+            manualSlots: [],
             parentTabId: null,
             globalDataModel: [
                 { id: "#_STATE_PREFIX", expr: "'de.unibi.citec.clf.bonsai.skills.'" },
@@ -966,6 +967,8 @@ function AppContent() {
 
     const [activeMode, setActiveMode] = useState("event");
     const [slotConnectionDrag, setSlotConnectionDrag] = useState(null);
+    const [manualSlots, setManualSlots] = useState([]);
+    const [isCreateSlotModalOpen, setIsCreateSlotModalOpen] = useState(false);
     const [selectedNodeId, setSelectedNodeId] = useState(null);
     const [activeTab, setActiveTab] = useState("allgemein");
     const [rightPanelTab, setRightPanelTab] = useState("datamodel");
@@ -1016,10 +1019,31 @@ function AppContent() {
                 parameters.push(parameter);
             }
         );
-
         return parameters;
     }, [inheritedGlobalDataModel, globalDataModel]);
 
+    const availableSlotStates = useMemo(() => {
+        const paths = new Set();
+        slotNodes.forEach((node) => {
+            const path = normalizeSlotPath(node.data?.path || node.data?.label);
+             if (path) paths.add(path);
+        });
+
+        nodes.forEach((node) => {
+             [...(node.data?.inSlots || []), ...(node.data?.outSlots || [])].forEach(
+                 (slot) => {
+                     const path = normalizeSlotPath(slot.path);
+                     if (path) paths.add(path);
+                 }
+             );
+         });
+         manualSlots.forEach((slot) => {
+             const path = normalizeSlotPath(slot.path);
+             if (path) paths.add(path);
+         });
+
+         return [...paths].sort();
+    }, [slotNodes, nodes, manualSlots]);
     // Transition Drawer State
     const [drawerData, setDrawerData] = useState({
         isOpen: false,
@@ -1083,6 +1107,7 @@ function AppContent() {
                     edges,
                     slotNodes,
                     slotEdges,
+                    manualSlots,
                     globalDataModel,
                     inheritedGlobalDataModel,
                 }
@@ -1100,6 +1125,7 @@ function AppContent() {
             setEdges(targetTab.edges || []);
             setSlotNodes(targetTab.slotNodes || []);
             setSlotEdges(targetTab.slotEdges || []);
+            setManualSlots(targetTab.manualSlots || []);
             setGlobalDataModel(targetTab.globalDataModel || []);
             setInheritedGlobalDataModel(
                 targetTab.inheritedGlobalDataModel || []
@@ -1121,6 +1147,7 @@ function AppContent() {
                     edges,
                     slotNodes,
                     slotEdges,
+                    manualSlots,
                     globalDataModel,
                     inheritedGlobalDataModel,
                 }
@@ -1137,6 +1164,7 @@ function AppContent() {
             edges: [],
             slotNodes: [],
             slotEdges: [],
+            manualSlots: [],
             parentTabId: null,
             inheritedGlobalDataModel: [],
             globalDataModel: [
@@ -1150,6 +1178,7 @@ function AppContent() {
         setEdges([]);
         setSlotNodes([]);
         setSlotEdges([]);
+        setManualSlots([]);
         setGlobalDataModel(newTabObj.globalDataModel);
         setInheritedGlobalDataModel([]);
         setSelectedNodeId(null);
@@ -1169,6 +1198,7 @@ function AppContent() {
             setEdges(fallbackTab.edges || []);
             setSlotNodes(fallbackTab.slotNodes || []);
             setSlotEdges(fallbackTab.slotEdges || []);
+            setManualSlots(fallbackTab.manualSlots || []);
             setGlobalDataModel(fallbackTab.globalDataModel || []);
             setInheritedGlobalDataModel(
                 fallbackTab.inheritedGlobalDataModel || []
@@ -1384,6 +1414,7 @@ function AppContent() {
             edges: [],
             slotNodes: [],
             slotEdges: [],
+            manualSlots: [],
             globalDataModel: [
                 { id: "#_STATE_PREFIX", expr: "'de.unibi.citec.clf.bonsai.skills.'" },
             ],
@@ -1600,6 +1631,7 @@ function AppContent() {
                 edges: parsed.edges,
                 slotNodes: [],
                 slotEdges: [],
+                manualSlots: [],
                 parentTabId: activeTabId,
                 inheritedGlobalDataModel: inheritedForChild,
                 globalDataModel: parsed.globalDataModel,
@@ -1614,6 +1646,7 @@ function AppContent() {
                             edges,
                             slotNodes,
                             slotEdges,
+                            manualSlots,
                             globalDataModel,
                             inheritedGlobalDataModel,
                         }
@@ -1627,6 +1660,7 @@ function AppContent() {
             setEdges(parsed.edges);
             setSlotNodes([]);
             setSlotEdges([]);
+            setManualSlots([]);
             setGlobalDataModel(parsed.globalDataModel);
             setInheritedGlobalDataModel(inheritedForChild);
             setSelectedNodeId(null);
@@ -2094,6 +2128,7 @@ function AppContent() {
             edges: subTabEdges,
             slotNodes: [],
             slotEdges: [],
+            manualSlots: [],
             parentTabId: activeTabId,
             inheritedGlobalDataModel: inheritedForChild,
             globalDataModel: [
@@ -2111,6 +2146,7 @@ function AppContent() {
                         edges: updatedParentEdges,
                         slotNodes,
                         slotEdges,
+                        manualSlots,
                         globalDataModel,
                         inheritedGlobalDataModel,
                     }
@@ -2125,6 +2161,7 @@ function AppContent() {
         setEdges(subTabEdges);
         setSlotNodes([]);
         setSlotEdges([]);
+        setManualSlots([]);
         setGlobalDataModel(newTabObj.globalDataModel);
         setInheritedGlobalDataModel(inheritedForChild);
         setSelectedNodeId(null);
@@ -2267,6 +2304,7 @@ function AppContent() {
                     edges: parsed.edges,
                     slotNodes: [],
                     slotEdges: [],
+                    manualSlots: [],
                     parentTabId: null,
                     inheritedGlobalDataModel: [],
                     globalDataModel: parsed.globalDataModel,
@@ -2281,6 +2319,7 @@ function AppContent() {
                                 edges,
                                 slotNodes,
                                 slotEdges,
+                                manualSlots,
                                 globalDataModel,
                                 inheritedGlobalDataModel,
                             }
@@ -2294,6 +2333,7 @@ function AppContent() {
                 setEdges(parsed.edges);
                 setSlotNodes([]);
                 setSlotEdges([]);
+                setManualSlots([]);
                 setGlobalDataModel(parsed.globalDataModel);
                 setInheritedGlobalDataModel([]);
                 setSelectedNodeId(null);
@@ -2325,6 +2365,7 @@ function AppContent() {
             edges,
             slotNodes,
             slotEdges,
+            manualSlots,
             globalDataModel,
             inheritedGlobalDataModel,
             fitView,
@@ -2420,6 +2461,49 @@ function AppContent() {
     }, [selectedRawNode, nodes]);
 
     const hasInitialNode = nodes.some((node) => node.data?.isInitial);
+
+    const canvasSkillSlotOptions = useMemo(() => {
+        const options = [];
+
+            nodes.forEach((node) => {
+                if (node.type === "slot" || node.type === "parallelLane") return;
+
+                const nodeLabel =
+                    node.data?.fullSkillName ||
+                    node.data?.label ||
+                    node.id;
+
+                (node.data?.inSlots || []).forEach((slot, index) => {
+                    if (!slot?.key) return;
+                    if (slot.path && slot.path.trim()) return;
+                    options.push({
+                        id: `${node.id}-read-${index}`,
+                        nodeId: node.id,
+                        nodeLabel,
+                        access: "read",
+                        slotIndex: index,
+                        key: slot.key,
+                        type: slot.type,
+                    });
+                });
+
+                (node.data?.outSlots || []).forEach((slot, index) => {
+                    if (!slot?.key) return;
+                    if (slot.path && slot.path.trim()) return;
+                       options.push({
+                        id: `${node.id}-write-${index}`,
+                        nodeId: node.id,
+                        nodeLabel,
+                        access: "write",
+                        slotIndex: index,
+                        key: slot.key,
+                        type: slot.type,
+                    });
+                });
+            });
+
+            return options;
+        }, [nodes]);
 
     const activeWorkflowTab = useMemo(
         () => tabs.find((tab) => tab.id === activeTabId) || null,
@@ -3737,8 +3821,10 @@ function AppContent() {
         });
     };
 
-    const checkSlotConnection = (customNodes = null) => {
+    const checkSlotConnection = (customNodes = null, customManualSlots = null) => {
         const targetNodes = Array.isArray(customNodes) ? customNodes : nodes;
+        const activeManualSlots =
+                customManualSlots !== null ? customManualSlots : manualSlots;
         if (!targetNodes || targetNodes.length === 0) {
             setSlotNodes([]);
             setSlotEdges([]);
@@ -3777,6 +3863,8 @@ function AppContent() {
                 });
             }
         });
+
+        (activeManualSlots || []).forEach(registerSlotUsage);
 
         const generatedSlotNodes = [];
         let index = 0;
@@ -3966,6 +4054,48 @@ function AppContent() {
         setSlotEdges(newSlotEdges);
     };
 
+    const handleCreateManualSlot = (slotData) => {
+        const newSlot = {
+            id: `manual-${crypto.randomUUID()}`,
+            path: slotData.path,
+            type: slotData.type,
+            inherited: slotData.isInherited
+                ? { state: slotData.inheritedFrom || "" }
+                : null,
+        };
+
+        const updatedManualSlots = [...manualSlots, newSlot];
+        setManualSlots(updatedManualSlots);
+
+        let updatedNodes = nodes;
+
+                if (slotData.linkedSkillSlot) {
+                    const { nodeId, access, slotIndex } = slotData.linkedSkillSlot;
+                    const cleanPath = `/${normalizeSlotPath(slotData.path)}`;
+
+                    updatedNodes = nodes.map((node) => {
+                        if (node.id !== nodeId) return node;
+
+                        const key = access === "read" ? "inSlots" : "outSlots";
+                        return {
+                            ...node,
+                            data: {
+                                ...node.data,
+                                [key]: node.data[key].map((slot, index) =>
+                                    index === slotIndex
+                                        ? { ...slot, path: cleanPath }
+                                        : slot
+                                ),
+                            },
+                        };
+                    });
+
+                    setNodes(updatedNodes);
+                }
+
+        checkSlotConnection(updatedNodes, updatedManualSlots);
+    };
+
 // Dynamische Aktualisierung der Events basierend auf neuen Parameterwerten
     const updateEventsFromParameters = async (nodeId) => {
         const node = nodes.find((n) => n.id === nodeId);
@@ -4069,6 +4199,7 @@ function AppContent() {
                 setGlobalDataModel(parsed.globalDataModel);
                 setNodes(parsedNodes);
                 setEdges(parsed.edges);
+                setManualSlots([]);
                 setSelectedNodeId(null);
 
                 const cleanTitle = filePath.split('/').pop().replace(/\.(xml|scxml)$/i, "");
@@ -4113,6 +4244,7 @@ function AppContent() {
                 setGlobalDataModel(parsed.globalDataModel);
                 setNodes(parsedNodes);
                 setEdges(parsed.edges);
+                setManualSlots([]);
                 setSelectedNodeId(null);
 
                 const cleanTitle = file.name.replace(/\.(xml|scxml)$/i, "");
@@ -4457,6 +4589,16 @@ function AppContent() {
                                     ))}
                                 </div>
 
+                                {(activeMode === "slots" || activeMode === "both") && (
+                                    <button
+                                        type="button"
+                                        className="create-slot-button-floating"
+                                        onClick={() => setIsCreateSlotModalOpen(true)}
+                                    >
+                                        <FiPlus /> New Slot
+                                    </button>
+                                )}
+
                                 {isDraggingNode && (
                                     <div className={`trash-bin-dropzone ${isOverTrash ? "drag-over" : ""}`}>
                                         <FiTrash2 className="trash-icon" />
@@ -4789,6 +4931,14 @@ function AppContent() {
                 availableTargets={drawerData.availableTargets}
                 initialTransitionId={drawerData.initialTransitionId}
                 initialTargetId={drawerData.initialTargetId}
+            />
+
+            <CreateSlotModal
+                isOpen={isCreateSlotModalOpen}
+                onClose={() => setIsCreateSlotModalOpen(false)}
+                onCreate={handleCreateManualSlot}
+                availableStates={availableSlotStates}
+                skillSlotOptions={canvasSkillSlotOptions}
             />
         </div>
     );
