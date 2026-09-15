@@ -839,7 +839,12 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             source: sourceNode.id,
             target: targetNode.id,
             sourceHandle: eventHandleId,
-            targetHandle: null,
+            targetHandle:
+                targetNode.type === "compound" ||
+                targetNode.type === "parallel" ||
+                targetNode.type === "parallelLane"
+                    ? null
+                    : "transition-target",
             type: sourceNode.id === targetNode.id ? "smoothstep" : "default",
             label: labelText,
             markerEnd: { type: MarkerType.ArrowClosed },

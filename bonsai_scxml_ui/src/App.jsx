@@ -7,6 +7,7 @@ import {
     Background,
     Controls,
     MarkerType,
+    ConnectionMode,
     useNodesState,
     useEdgesState,
     addEdge,
@@ -66,6 +67,13 @@ const TRANSITION_HIGHLIGHT_COLORS = {
     error: "#f59e0b",
     fatal: "#ef4444",
     other: "#38bdf8",
+};
+
+// Slot connections intentionally use a separate palette from transition
+// semantics so Read/Write stay visually distinct from success/error/fatal.
+const SLOT_CONNECTION_COLORS = {
+    read: "#6366f1",
+    write: "#d946ef",
 };
 
 const getTransitionHighlightColor = (sourceHandle) => {
@@ -158,6 +166,144 @@ const normalizeSlotPath = (path) =>
 
 const normalizeSlotType = (type) =>
     String(type || "").trim().toLowerCase();
+
+const extractInheritedSlotsFromScxml = (xmlText) => {
+    if (!xmlText) return [];
+
+    try {
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(xmlText, "application/xml");
+
+        if (xmlDoc.getElementsByTagName("parsererror")[0]) {
+            return [];
+        }
+
+        const slotData = Array.from(
+            xmlDoc.getElementsByTagName("*")
+        ).find(
+            (element) =>
+                element.localName === "data" &&
+                element.getAttribute("id") === "#_SLOTS"
+        );
+
+        if (!slotData) return [];
+
+        const seenPaths = new Set();
+
+        return Array.from(slotData.getElementsByTagName("*"))
+            .filter((element) => element.localName === "inheritSlot")
+            .map((element) => ({
+                key: element.getAttribute("key") || "",
+                state: element.getAttribute("state") || "",
+                path: normalizeSlotPath(element.getAttribute("xpath") || ""),
+            }))
+            .filter((slot) => {
+                if (!slot.path || seenPaths.has(slot.path)) return false;
+                seenPaths.add(slot.path);
+                return true;
+            });
+    } catch (error) {
+        console.warn("Could not parse inheritSlot declarations:", error);
+        return [];
+    }
+};
+
+const collectInheritedSlotUsages = (parsedNodes, declaredSlots = []) => {
+    const usages = [];
+    const seen = new Set();
+
+    const addUsage = (slot, access, node) => {
+        const path = normalizeSlotPath(slot?.path);
+        if (!path) return;
+
+        const key = [access || "inherit", path, slot?.key || "", slot?.type || "Unknown"].join("|");
+        if (seen.has(key)) return;
+        seen.add(key);
+
+        usages.push({
+            key: slot?.key || "",
+            state:
+                slot?.inherited?.state ||
+                node?.data?.fullSkillName ||
+                node?.data?.label ||
+                "",
+            path,
+            access,
+            type: slot?.type || "Unknown",
+        });
+    };
+
+    (parsedNodes || []).forEach((node) => {
+        (node.data?.inSlots || []).forEach((slot) => {
+            if (slot?.inherited) addUsage(slot, "read", node);
+        });
+
+        (node.data?.outSlots || []).forEach((slot) => {
+            if (slot?.inherited) addUsage(slot, "write", node);
+        });
+    });
+
+    // Keep an inherited slot visible even when its concrete read/write usage
+    // cannot be resolved (for example because skill metadata is unavailable).
+    (declaredSlots || []).forEach((slot) => {
+        const path = normalizeSlotPath(slot?.path);
+        if (!path) return;
+
+        const alreadyRepresented = usages.some(
+            (usage) => usage.path === path
+        );
+        if (alreadyRepresented) return;
+
+        usages.push({
+            ...slot,
+            path,
+            access: null,
+            type: "Unknown",
+        });
+    });
+
+    return usages;
+};
+
+const isSlotEdge = (edge) =>
+    edge?.data?.edgeKind === "slot" ||
+    String(edge?.id || "").startsWith("edge-read-") ||
+    String(edge?.id || "").startsWith("edge-write-");
+
+const getSlotPathFromNode = (slotNode) =>
+    normalizeSlotPath(slotNode?.data?.path || slotNode?.data?.label || "");
+
+const parseSlotConnectionHandle = (handleId) => {
+    const value = String(handleId || "");
+
+    const skillRead = value.match(/^slot-skill-read-(\d+)$/);
+    if (skillRead) {
+        return {
+            origin: "skill",
+            access: "read",
+            slotIndex: Number(skillRead[1]),
+        };
+    }
+
+    const skillWrite = value.match(/^slot-skill-write-(\d+)$/);
+    if (skillWrite) {
+        return {
+            origin: "skill",
+            access: "write",
+            slotIndex: Number(skillWrite[1]),
+        };
+    }
+
+    if (value === "slot-node-read") {
+        return { origin: "slot", access: "read", slotIndex: null };
+    }
+
+    if (value === "slot-node-write") {
+        return { origin: "slot", access: "write", slotIndex: null };
+    }
+
+    return null;
+};
 
 const getBehaviorSourceKey = (src) => {
     const match = String(src || "")
@@ -819,6 +965,7 @@ function AppContent() {
     const [slotEdges, setSlotEdges, onSlotEdgesChange] = useEdgesState([]);
 
     const [activeMode, setActiveMode] = useState("event");
+    const [slotConnectionDrag, setSlotConnectionDrag] = useState(null);
     const [selectedNodeId, setSelectedNodeId] = useState(null);
     const [activeTab, setActiveTab] = useState("allgemein");
     const [rightPanelTab, setRightPanelTab] = useState("datamodel");
@@ -1265,6 +1412,66 @@ function AppContent() {
         setTimeout(() => fitView({ padding: 0.2, duration: 300 }), 80);
     };
 
+    const hydrateSubMachineInheritedSlots = async (
+        targetNodes,
+        parentFilePath = null
+    ) => {
+        return Promise.all(
+            (targetNodes || []).map(async (node) => {
+                if (node.type !== "submachine" || !node.data?.src) {
+                    return node;
+                }
+
+                try {
+                    let xmlText = "";
+
+                    if (IS_DESKTOP) {
+                        const loaded = await readWorkflowSource(
+                            node.data.src,
+                            behaviorDirectories,
+                            parentFilePath
+                        );
+                        xmlText = loaded.content || "";
+                    } else {
+                        const resolvedUrl = resolveSrcPath(
+                            node.data.src,
+                            DEFAULT_PREFIX_CONFIG
+                        );
+                        const response = await fetch(resolvedUrl);
+                        if (!response.ok) return node;
+                        xmlText = await response.text();
+                    }
+
+                    const declaredInheritedSlots =
+                        extractInheritedSlotsFromScxml(xmlText);
+                    const parsedChild = await parseScxmlFile(
+                        xmlText,
+                        fetchSkillData,
+                        getNodeId
+                    );
+                    const inheritedSlots = collectInheritedSlotUsages(
+                        parsedChild.nodes,
+                        declaredInheritedSlots
+                    );
+
+                    return {
+                        ...node,
+                        data: {
+                            ...node.data,
+                            inheritedSlots,
+                        },
+                    };
+                } catch (error) {
+                    console.warn(
+                        `Could not inspect inheritSlot declarations for ${node.data.src}:`,
+                        error
+                    );
+                    return node;
+                }
+            })
+        );
+    };
+
     const handleOpenSubMachine = async (srcPath, label) => {
         if (!srcPath) return;
 
@@ -1321,43 +1528,55 @@ function AppContent() {
 
             const discoveredBehaviorExitEvents =
                 extractBehaviorExitEventsFromScxml(xmlText);
-
-            const syncedParentNodes =
-                discoveredBehaviorExitEvents.length > 0
-                    ? nodes.map((node) => {
-                        if (
-                            node.type !== "submachine" ||
-                            String(node.data?.src || "") !== String(srcPath)
-                        ) {
-                            return node;
-                        }
-
-                        const existingEventsById = new Map(
-                            (node.data?.events || []).map((event) => [
-                                event.id,
-                                event,
-                            ])
-                        );
-
-                        return {
-                            ...node,
-                            data: {
-                                ...node.data,
-                                events: discoveredBehaviorExitEvents.map(
-                                    (eventId) => ({
-                                        ...(existingEventsById.get(eventId) || {}),
-                                        id: eventId,
-                                    })
-                                ),
-                            },
-                        };
-                    })
-                    : nodes;
+            const declaredInheritedSlots =
+                extractInheritedSlotsFromScxml(xmlText);
 
             const parsed = await parseScxmlFile(
                 xmlText,
                 fetchSkillData,
                 getNodeId
+            );
+            const discoveredInheritedSlots =
+                collectInheritedSlotUsages(
+                    parsed.nodes,
+                    declaredInheritedSlots
+                );
+
+            const syncedParentNodes = nodes.map((node) => {
+                if (
+                    node.type !== "submachine" ||
+                    String(node.data?.src || "") !== String(srcPath)
+                ) {
+                    return node;
+                }
+
+                const existingEventsById = new Map(
+                    (node.data?.events || []).map((event) => [
+                        event.id,
+                        event,
+                    ])
+                );
+
+                return {
+                    ...node,
+                    data: {
+                        ...node.data,
+                        events:
+                            discoveredBehaviorExitEvents.length > 0
+                                ? discoveredBehaviorExitEvents.map(
+                                    (eventId) => ({
+                                        ...(existingEventsById.get(eventId) || {}),
+                                        id: eventId,
+                                    })
+                                )
+                                : node.data?.events || [],
+                        inheritedSlots: discoveredInheritedSlots,
+                    },
+                };
+            });
+            const parsedNodes = await hydrateSubMachineInheritedSlots(
+                parsed.nodes,
+                resolvedFilePath
             );
 
             const inheritedForChild = buildInheritedGlobalsForChild(
@@ -1377,7 +1596,7 @@ function AppContent() {
                 fileHandle: null,
                 filePath: resolvedFilePath,
                 sourcePath: srcPath,
-                nodes: parsed.nodes,
+                nodes: parsedNodes,
                 edges: parsed.edges,
                 slotNodes: [],
                 slotEdges: [],
@@ -1404,14 +1623,14 @@ function AppContent() {
             ]);
 
             setActiveTabId(tabId);
-            setNodes(parsed.nodes);
+            setNodes(parsedNodes);
             setEdges(parsed.edges);
             setSlotNodes([]);
             setSlotEdges([]);
             setGlobalDataModel(parsed.globalDataModel);
             setInheritedGlobalDataModel(inheritedForChild);
             setSelectedNodeId(null);
-            checkSlotConnection(parsed.nodes);
+            checkSlotConnection(parsedNodes);
 
             setTimeout(
                 () => fitView({ padding: 0.2, duration: 300 }),
@@ -1938,6 +2157,7 @@ function AppContent() {
                 mode: activeMode,
                 onOpenStateActions: handleOpenStateActions,
                 mode: activeMode,
+                slotConnectionDrag,
             };
 
             if (n.type === "submachine") {
@@ -1961,7 +2181,20 @@ function AppContent() {
         handleAddLaneToParallel,
         handleOpenStateActions,
         activeMode,
+        slotConnectionDrag,
     ]);
+
+    const injectedSlotNodes = useMemo(
+        () =>
+            slotNodes.map((node) => ({
+                ...node,
+                data: {
+                    ...node.data,
+                    slotConnectionDrag,
+                },
+            })),
+        [slotNodes, slotConnectionDrag]
+    );
 
     useEffect(() => {
         const fetchSkills = async () => {
@@ -2014,6 +2247,10 @@ function AppContent() {
                     fetchSkillData,
                     getNodeId
                 );
+                const parsedNodes = await hydrateSubMachineInheritedSlots(
+                    parsed.nodes,
+                    loaded.path
+                );
 
                 const newTabObj = {
                     id: tabId,
@@ -2026,7 +2263,7 @@ function AppContent() {
                     fileHandle: null,
                     filePath: loaded.path,
                     sourcePath: behavior.source,
-                    nodes: parsed.nodes,
+                    nodes: parsedNodes,
                     edges: parsed.edges,
                     slotNodes: [],
                     slotEdges: [],
@@ -2053,14 +2290,14 @@ function AppContent() {
                 ]);
 
                 setActiveTabId(tabId);
-                setNodes(parsed.nodes);
+                setNodes(parsedNodes);
                 setEdges(parsed.edges);
                 setSlotNodes([]);
                 setSlotEdges([]);
                 setGlobalDataModel(parsed.globalDataModel);
                 setInheritedGlobalDataModel([]);
                 setSelectedNodeId(null);
-                checkSlotConnection(parsed.nodes);
+                checkSlotConnection(parsedNodes);
 
                 setTimeout(
                     () =>
@@ -2101,6 +2338,7 @@ function AppContent() {
             ).replace(/\.(xml|scxml)$/i, "");
 
             let behaviorEvents = [];
+            let inheritedSlots = [];
 
             try {
                 if (IS_DESKTOP && behavior?.source) {
@@ -2112,6 +2350,17 @@ function AppContent() {
 
                     behaviorEvents = extractBehaviorExitEventsFromScxml(
                         loaded.content
+                    );
+                    const declaredInheritedSlots =
+                        extractInheritedSlotsFromScxml(loaded.content);
+                    const parsedBehavior = await parseScxmlFile(
+                        loaded.content,
+                        fetchSkillData,
+                        getNodeId
+                    );
+                    inheritedSlots = collectInheritedSlotUsages(
+                        parsedBehavior.nodes,
+                        declaredInheritedSlots
                     );
                 }
             } catch (error) {
@@ -2140,6 +2389,7 @@ function AppContent() {
                     src: behavior.source,
                     isInitial: false,
                     events,
+                    inheritedSlots,
                     onEntry: [],
                     onExit: [],
                     onOpenSubMachine: handleOpenSubMachine,
@@ -2306,26 +2556,153 @@ function AppContent() {
         .filter((s) => s.toLowerCase().includes(searchText.toLowerCase()));
 
 
+    const updatePersistentEdgeControlPoints = useCallback(
+        (edgeId, controlPoints, edgeKind = "transition") => {
+            const setter =
+                edgeKind === "slot" ? setSlotEdges : setEdges;
+
+            setter((currentEdges) =>
+                currentEdges.map((edge) =>
+                    edge.id === edgeId
+                        ? {
+                            ...edge,
+                            data: {
+                                ...(edge.data || {}),
+                                controlPoints,
+                            },
+                        }
+                        : edge
+                )
+            );
+        },
+        [setEdges, setSlotEdges]
+    );
+
     const selectedTransitionNodeIds = new Set([
         ...selectedNodes.map((node) => node.id),
         ...(selectedNodeId ? [selectedNodeId] : []),
     ]);
 
+    const normalizedTransitionEdges = useMemo(
+        () =>
+            edges.map((edge) => {
+                if (edge.targetHandle) {
+                    return edge;
+                }
+
+                const targetNode = nodes.find(
+                    (node) => node.id === edge.target
+                );
+
+                if (!targetNode) {
+                    return edge;
+                }
+
+                // Containers use their own dedicated target handles.
+                if (
+                    targetNode.type === "compound" ||
+                    targetNode.type === "parallel" ||
+                    targetNode.type === "parallelLane"
+                ) {
+                    return edge;
+                }
+
+                return {
+                    ...edge,
+                    targetHandle: "transition-target",
+                };
+            }),
+        [edges, nodes]
+    );
+
     const highlightedTransitionEdges = highlightSelectedTransitions(
-        withSmartTransitionRouting(edges),
+        withSmartTransitionRouting(normalizedTransitionEdges).map((edge) => ({
+            ...edge,
+            data: {
+                ...(edge.data || {}),
+                onControlPointsChange: (controlPoints) =>
+                    updatePersistentEdgeControlPoints(
+                        edge.id,
+                        controlPoints,
+                        "transition"
+                    ),
+            },
+        })),
         selectedTransitionNodeIds
     );
+
+    const selectedSlotContextId = selectedNodeId;
+    const hasSelectedSlotContext = Boolean(
+        selectedSlotContextId &&
+        (
+            nodes.some((node) => node.id === selectedSlotContextId) ||
+            slotNodes.some((node) => node.id === selectedSlotContextId)
+        )
+    );
+
+    const SLOT_EDGE_INACTIVE_COLOR = "#64748b";
+
+    const editableSlotEdges = slotEdges.map((edge) => {
+        const access =
+            edge.data?.access === "write" ? "write" : "read";
+        const semanticColor = SLOT_CONNECTION_COLORS[access];
+
+        const skillNodeId = edge.data?.skillNodeId || edge.source;
+        const slotNodeId = edge.data?.slotNodeId || edge.target;
+        const isConnectedToSelection =
+            !hasSelectedSlotContext ||
+            skillNodeId === selectedSlotContextId ||
+            slotNodeId === selectedSlotContextId ||
+            edge.source === selectedSlotContextId ||
+            edge.target === selectedSlotContextId;
+
+        const color = isConnectedToSelection
+            ? semanticColor
+            : SLOT_EDGE_INACTIVE_COLOR;
+
+        return {
+            ...edge,
+            type: "smartTransition",
+            // Slot edge colours are display-only. With no selected skill/slot
+            // all edges use their Read/Write colour. When a skill or slot is
+            // selected, unrelated slot edges are greyed out.
+            style: {
+                ...(edge.style || {}),
+                stroke: color,
+                strokeWidth: isConnectedToSelection
+                    ? edge.style?.strokeWidth || 1.7
+                    : 1.35,
+                strokeDasharray: edge.style?.strokeDasharray || "5 5",
+                opacity: isConnectedToSelection ? 1 : 0.42,
+            },
+            markerEnd: {
+                ...(edge.markerEnd || {}),
+                type: edge.markerEnd?.type || MarkerType.ArrowClosed,
+                color,
+            },
+            data: {
+                ...(edge.data || {}),
+                access,
+                onControlPointsChange: (controlPoints) =>
+                    updatePersistentEdgeControlPoints(
+                        edge.id,
+                        controlPoints,
+                        "slot"
+                    ),
+            },
+        };
+    });
 
     let visibleNodes = injectedNodes;
     let visibleEdges = highlightedTransitionEdges;
     if (activeMode === "slots") {
-        visibleNodes = [...injectedNodes, ...slotNodes];
-        visibleEdges = slotEdges;
+        visibleNodes = [...injectedNodes, ...injectedSlotNodes];
+        visibleEdges = editableSlotEdges;
     } else if (activeMode === "both") {
-        visibleNodes = [...injectedNodes, ...slotNodes];
+        visibleNodes = [...injectedNodes, ...injectedSlotNodes];
         visibleEdges = [
             ...highlightedTransitionEdges,
-            ...slotEdges,
+            ...editableSlotEdges,
         ];
     }
 
@@ -2441,6 +2818,102 @@ function AppContent() {
         onNodesChange(changes);
         onSlotNodesChange(changes);
     };
+
+    const handleVisibleEdgesChange = useCallback(
+        (changes) => {
+            const slotEdgeIds = new Set(
+                (slotEdges || []).map((edge) => edge.id)
+            );
+
+            const slotChanges = changes.filter((change) =>
+                slotEdgeIds.has(change.id)
+            );
+            const transitionChanges = changes.filter(
+                (change) => !slotEdgeIds.has(change.id)
+            );
+
+            if (transitionChanges.length > 0) {
+                onEdgesChange(transitionChanges);
+            }
+
+            if (slotChanges.length === 0) {
+                return;
+            }
+
+            const removedIds = new Set(
+                slotChanges
+                    .filter((change) => change.type === "remove")
+                    .map((change) => change.id)
+            );
+
+            if (removedIds.size > 0) {
+                const removedEdges = (slotEdges || []).filter((edge) =>
+                    removedIds.has(edge.id)
+                );
+
+                setNodes((currentNodes) =>
+                    currentNodes.map((node) => {
+                        let nextNode = node;
+
+                        removedEdges.forEach((edge) => {
+                            const access = edge.data?.access;
+                            const slotIndex = Number(edge.data?.slotIndex);
+
+                            if (
+                                access === "read" &&
+                                (edge.data?.skillNodeId || edge.source) === node.id &&
+                                Number.isInteger(slotIndex) &&
+                                node.data?.inSlots?.[slotIndex]
+                            ) {
+                                nextNode = {
+                                    ...nextNode,
+                                    data: {
+                                        ...nextNode.data,
+                                        inSlots: nextNode.data.inSlots.map(
+                                            (slot, index) =>
+                                                index === slotIndex
+                                                    ? { ...slot, path: "" }
+                                                    : slot
+                                        ),
+                                    },
+                                };
+                            }
+
+                            if (
+                                access === "write" &&
+                                (edge.data?.skillNodeId || edge.source) === node.id &&
+                                Number.isInteger(slotIndex) &&
+                                node.data?.outSlots?.[slotIndex]
+                            ) {
+                                nextNode = {
+                                    ...nextNode,
+                                    data: {
+                                        ...nextNode.data,
+                                        outSlots: nextNode.data.outSlots.map(
+                                            (slot, index) =>
+                                                index === slotIndex
+                                                    ? { ...slot, path: "" }
+                                                    : slot
+                                        ),
+                                    },
+                                };
+                            }
+                        });
+
+                        return nextNode;
+                    })
+                );
+            }
+
+            onSlotEdgesChange(slotChanges);
+        },
+        [
+            slotEdges,
+            onEdgesChange,
+            onSlotEdgesChange,
+            setNodes,
+        ]
+    );
 
     const openConditionDrawer = (sourceId, sourceHandle = "", initialTargetId = null, customEdges = null) => {
         const sourceNode = nodes.find((node) => node.id === sourceId);
@@ -2576,24 +3049,311 @@ function AppContent() {
         });
     };
 
-    const onConnect = useCallback(
-        (params) => {
-            const alreadyExists = edges.some(
-                (e) => e.source === params.source && e.sourceHandle === params.sourceHandle && e.target === params.target
+    const isValidConnection = useCallback((connection) => {
+        const sourceSlotHandle = parseSlotConnectionHandle(
+            connection.sourceHandle
+        );
+        const targetSlotHandle = parseSlotConnectionHandle(
+            connection.targetHandle
+        );
+
+        // Slot connections require all three dimensions to match:
+        // skill <-> slot node, Read/Write access, and the declared slot type.
+        if (sourceSlotHandle || targetSlotHandle) {
+            if (
+                !sourceSlotHandle ||
+                !targetSlotHandle ||
+                sourceSlotHandle.access !== targetSlotHandle.access ||
+                sourceSlotHandle.origin === targetSlotHandle.origin
+            ) {
+                return false;
+            }
+
+            const sourceIsSkill = sourceSlotHandle.origin === "skill";
+            const skillHandle = sourceIsSkill
+                ? sourceSlotHandle
+                : targetSlotHandle;
+            const skillNodeId = sourceIsSkill
+                ? connection.source
+                : connection.target;
+            const slotNodeId = sourceIsSkill
+                ? connection.target
+                : connection.source;
+
+            const skillNode = nodes.find(
+                (node) => node.id === skillNodeId
+            );
+            const slotNode = slotNodes.find(
+                (node) => node.id === slotNodeId
             );
 
-            if (alreadyExists) {
-                openConditionDrawer(params.source, params.sourceHandle, params.target);
+            if (!skillNode || !slotNode) {
+                return false;
+            }
+
+            const skillSlot =
+                skillHandle.access === "read"
+                    ? skillNode.data?.inSlots?.[skillHandle.slotIndex]
+                    : skillNode.data?.outSlots?.[skillHandle.slotIndex];
+
+            const skillType = normalizeSlotType(skillSlot?.type);
+            const slotType = normalizeSlotType(slotNode.data?.slotType);
+
+            return Boolean(
+                skillType &&
+                slotType &&
+                skillType === slotType
+            );
+        }
+
+        // Normal transitions stay directional: they must start from an event
+        // handle. This prevents loose slot connection mode from making normal
+        // transition target handles behave as sources.
+        return Boolean(connection.sourceHandle);
+    }, [nodes, slotNodes]);
+
+    const handleConnectStart = useCallback((_, params) => {
+        const slotHandle = parseSlotConnectionHandle(params?.handleId);
+
+        if (!slotHandle) {
+            setSlotConnectionDrag(null);
+            return;
+        }
+
+        let slotType = "";
+
+        if (slotHandle.origin === "skill") {
+            const skillNode = nodes.find(
+                (node) => node.id === params.nodeId
+            );
+            const skillSlot =
+                slotHandle.access === "read"
+                    ? skillNode?.data?.inSlots?.[slotHandle.slotIndex]
+                    : skillNode?.data?.outSlots?.[slotHandle.slotIndex];
+
+            slotType = normalizeSlotType(skillSlot?.type);
+        } else {
+            const slotNode = slotNodes.find(
+                (node) => node.id === params.nodeId
+            );
+            slotType = normalizeSlotType(slotNode?.data?.slotType);
+        }
+
+        setSlotConnectionDrag({
+            active: true,
+            nodeId: params.nodeId,
+            handleId: params.handleId,
+            origin: slotHandle.origin,
+            access: slotHandle.access,
+            slotType,
+        });
+    }, [nodes, slotNodes]);
+
+    const handleConnectEnd = useCallback(() => {
+        setSlotConnectionDrag(null);
+    }, []);
+
+    const onConnect = useCallback(
+        (params) => {
+            const sourceSlotHandle = parseSlotConnectionHandle(
+                params.sourceHandle
+            );
+            const targetSlotHandle = parseSlotConnectionHandle(
+                params.targetHandle
+            );
+
+            if (sourceSlotHandle || targetSlotHandle) {
+                if (
+                    !sourceSlotHandle ||
+                    !targetSlotHandle ||
+                    sourceSlotHandle.access !== targetSlotHandle.access ||
+                    sourceSlotHandle.origin === targetSlotHandle.origin
+                ) {
+                    return;
+                }
+
+                const sourceIsSkill = sourceSlotHandle.origin === "skill";
+                const skillHandle = sourceIsSkill
+                    ? sourceSlotHandle
+                    : targetSlotHandle;
+                const slotHandle = sourceIsSkill
+                    ? targetSlotHandle
+                    : sourceSlotHandle;
+                const skillNodeId = sourceIsSkill
+                    ? params.source
+                    : params.target;
+                const slotNodeId = sourceIsSkill
+                    ? params.target
+                    : params.source;
+
+                const skillNode = nodes.find(
+                    (node) => node.id === skillNodeId
+                );
+                const slotNode = slotNodes.find(
+                    (node) => node.id === slotNodeId
+                );
+                const slotIndex = skillHandle.slotIndex;
+                const access = skillHandle.access;
+                const path = getSlotPathFromNode(slotNode);
+
+                if (!skillNode || !slotNode || !path) {
+                    return;
+                }
+
+                const skillSlot =
+                    access === "read"
+                        ? skillNode.data?.inSlots?.[slotIndex]
+                        : skillNode.data?.outSlots?.[slotIndex];
+
+                if (!skillSlot) {
+                    return;
+                }
+
+                const skillType = normalizeSlotType(skillSlot.type);
+                const slotType = normalizeSlotType(slotNode.data?.slotType);
+
+                // Never allow a Read/Write endpoint to be connected to a slot
+                // node of another datatype, even if onConnect is called
+                // programmatically or React Flow's loose mode accepts a drag.
+                if (
+                    !skillType ||
+                    !slotType ||
+                    skillType !== slotType
+                ) {
+                    return;
+                }
+
+                setNodes((currentNodes) =>
+                    currentNodes.map((node) => {
+                        if (node.id !== skillNodeId) return node;
+
+                        if (access === "read") {
+                            return {
+                                ...node,
+                                data: {
+                                    ...node.data,
+                                    inSlots: (node.data.inSlots || []).map(
+                                        (slot, index) =>
+                                            index === slotIndex
+                                                ? {
+                                                    ...slot,
+                                                    path: `/${path}`,
+                                                }
+                                                : slot
+                                    ),
+                                },
+                            };
+                        }
+
+                        return {
+                            ...node,
+                            data: {
+                                ...node.data,
+                                outSlots: (node.data.outSlots || []).map(
+                                    (slot, index) =>
+                                        index === slotIndex
+                                            ? {
+                                                ...slot,
+                                                path: `/${path}`,
+                                            }
+                                            : slot
+                                ),
+                            },
+                        };
+                    })
+                );
+
+                setSlotEdges((currentEdges) => {
+                    // Every skill slot has exactly one slot edge. Reconnecting
+                    // the handle replaces its previous slot connection.
+                    const remainingEdges = currentEdges.filter((edge) => {
+                        if (edge.data?.edgeKind !== "slot") return true;
+                        if (edge.data?.access !== access) return true;
+
+                        const storedSkillNodeId =
+                            edge.data?.skillNodeId || edge.source;
+
+                        return !(
+                            storedSkillNodeId === skillNodeId &&
+                            Number(edge.data?.slotIndex) === slotIndex
+                        );
+                    });
+
+                    const skillHandleId =
+                        access === "read"
+                            ? `slot-skill-read-${slotIndex}`
+                            : `slot-skill-write-${slotIndex}`;
+                    const slotHandleId =
+                        access === "read"
+                            ? "slot-node-read"
+                            : "slot-node-write";
+
+                    // Slot connections are always drawn from the skill slot
+                    // handle to the corresponding endpoint on the slot node.
+                    const normalizedEdge = {
+                        source: skillNodeId,
+                        target: slotNodeId,
+                        sourceHandle: skillHandleId,
+                        targetHandle: slotHandleId,
+                    };
+
+                    return [
+                        ...remainingEdges,
+                        {
+                            id: `edge-slot-${access}-${skillNodeId}-${slotIndex}-${crypto.randomUUID()}`,
+                            ...normalizedEdge,
+                            type: "smartTransition",
+                            style: {
+                                stroke: SLOT_CONNECTION_COLORS[access],
+                                strokeWidth: 1.7,
+                                strokeDasharray: "5 5",
+                            },
+                            markerEnd: {
+                                type: MarkerType.ArrowClosed,
+                                color: SLOT_CONNECTION_COLORS[access],
+                            },
+                            data: {
+                                edgeKind: "slot",
+                                access,
+                                slotIndex,
+                                path,
+                                skillNodeId,
+                                slotNodeId,
+                            },
+                        },
+                    ];
+                });
+
                 return;
             }
 
-            const targetNode = nodes.find((n) => n.id === params.target);
+            // Normal event transition.
+            const alreadyExists = edges.some(
+                (edge) =>
+                    edge.source === params.source &&
+                    edge.sourceHandle === params.sourceHandle &&
+                    edge.target === params.target
+            );
+
+            if (alreadyExists) {
+                openConditionDrawer(
+                    params.source,
+                    params.sourceHandle,
+                    params.target
+                );
+                return;
+            }
+
+            const targetNode = nodes.find(
+                (node) => node.id === params.target
+            );
             const newEdge = {
                 id: `edge-${params.source}-${params.sourceHandle}-${params.target}-${crypto.randomUUID()}`,
                 source: params.source,
                 target: params.target,
                 sourceHandle: params.sourceHandle,
-                targetHandle: params.targetHandle,
+                targetHandle:
+                    params.targetHandle || "transition-target",
                 label: params.sourceHandle,
                 type: "smartTransition",
                 markerEnd: { type: MarkerType.ArrowClosed },
@@ -2603,12 +3363,11 @@ function AppContent() {
             const updatedEdges = [...edges, newEdge];
             setEdges(updatedEdges);
 
-            setNodes((nds) =>
-                nds.map((node) => {
+            setNodes((currentNodes) =>
+                currentNodes.map((node) => {
                     if (node.id !== params.source) return node;
 
                     const events = node.data.events || [];
-
                     const existingEvent = events.find(
                         (event) => event.id === params.sourceHandle
                     );
@@ -2630,7 +3389,9 @@ function AppContent() {
                                             targetNode?.data.fullSkillName
                                         ),
                                     selectedSkill:
-                                        targetNode?.data.fullSkillName?.split("#")[0] || "",
+                                        targetNode?.data.fullSkillName?.split(
+                                            "#"
+                                        )[0] || "",
                                     target: params.target,
                                     cond: "",
                                     assignments: [],
@@ -2644,14 +3405,28 @@ function AppContent() {
             );
 
             const outgoingFromHandle = updatedEdges.filter(
-                (e) => e.source === params.source && e.sourceHandle === params.sourceHandle
+                (edge) =>
+                    edge.source === params.source &&
+                    edge.sourceHandle === params.sourceHandle
             );
 
             if (outgoingFromHandle.length >= 2) {
-                openConditionDrawer(params.source, params.sourceHandle, params.target, updatedEdges);
+                openConditionDrawer(
+                    params.source,
+                    params.sourceHandle,
+                    params.target,
+                    updatedEdges
+                );
             }
         },
-        [edges, nodes]
+        [
+            edges,
+            nodes,
+            slotNodes,
+            setEdges,
+            setNodes,
+            setSlotEdges,
+        ]
     );
 
     const clearTransitionSelection = useCallback(() => {
@@ -2663,8 +3438,23 @@ function AppContent() {
         );
     }, [setEdges]);
 
+    const clearSlotEdgeSelection = useCallback(() => {
+        setSlotEdges((currentEdges) =>
+            currentEdges.map((edge) => ({
+                ...edge,
+                selected: false,
+            }))
+        );
+    }, [setSlotEdges]);
+
+    const clearAllEdgeSelection = useCallback(() => {
+        clearTransitionSelection();
+        clearSlotEdgeSelection();
+    }, [clearTransitionSelection, clearSlotEdgeSelection]);
+
     const selectTransitionEdge = useCallback(
         (edgeId) => {
+            clearSlotEdgeSelection();
             setEdges((currentEdges) =>
                 currentEdges.map((edge) => ({
                     ...clearTransientTransitionHighlight(edge),
@@ -2672,7 +3462,20 @@ function AppContent() {
                 }))
             );
         },
-        [setEdges]
+        [setEdges, clearSlotEdgeSelection]
+    );
+
+    const selectSlotEdge = useCallback(
+        (edgeId) => {
+            clearTransitionSelection();
+            setSlotEdges((currentEdges) =>
+                currentEdges.map((edge) => ({
+                    ...edge,
+                    selected: edge.id === edgeId,
+                }))
+            );
+        },
+        [setSlotEdges, clearTransitionSelection]
     );
 
     const onEdgeDoubleClick = useCallback(
@@ -2732,7 +3535,9 @@ function AppContent() {
                     source: sourceId,
                     target: transition.target,
                     sourceHandle: eventId,
-                    targetHandle: cleanedExisting?.targetHandle || null,
+                    targetHandle:
+                        cleanedExisting?.targetHandle ||
+                        "transition-target",
                     type: "smartTransition",
                     selected: false,
                     label: hasCondition
@@ -2891,6 +3696,7 @@ function AppContent() {
                     source: selectedNode.id,
                     target: targetNodeId,
                     sourceHandle: event.id,
+                    targetHandle: "transition-target",
                     label: event.id,
                     type: "smartTransition",
                     markerEnd: { type: MarkerType.ArrowClosed },
@@ -2936,6 +3742,21 @@ function AppContent() {
         targetNodes.forEach((node) => {
             (node.data.inSlots || []).forEach(registerSlotUsage);
             (node.data.outSlots || []).forEach(registerSlotUsage);
+
+            if (node.type === "submachine") {
+                (node.data.inheritedSlots || []).forEach((slot) => {
+                    registerSlotUsage({
+                        path: slot.path,
+                        type: slot.type || "Unknown",
+                        inherited: {
+                            state:
+                                node.data?.label ||
+                                node.data?.fullSkillName ||
+                                "Sub-state machine",
+                        },
+                    });
+                });
+            }
         });
 
         const generatedSlotNodes = [];
@@ -2943,13 +3764,17 @@ function AppContent() {
 
         usedPaths.forEach(({ type, inherited }, path) => {
             const slotNodeId = `slot-${path}`;
+            const existingSlotNode = slotNodes.find(
+                (node) => node.id === slotNodeId
+            );
 
             generatedSlotNodes.push({
                 id: slotNodeId,
-                position: {
-                    x: 380 + (index % 3) * 200,
-                    y: 120 + Math.floor(index / 3) * 140
-                },
+                position:
+                    existingSlotNode?.position || {
+                        x: 380 + (index % 3) * 200,
+                        y: 120 + Math.floor(index / 3) * 140,
+                    },
                 type: "slot",
                 data: {
                     path: `/${path}`,
@@ -2971,14 +3796,43 @@ function AppContent() {
                 if (inslot.path && inslot.path.trim() !== "") {
                     const cleanPath = inslot.path.trim().replace(/^\//, "");
                     const slotNodeId = `slot-${cleanPath}`;
+                    const existingReadEdge = (slotEdges || []).find(
+                        (edge) =>
+                            edge.data?.edgeKind === "slot" &&
+                            edge.data?.access === "read" &&
+                            (edge.data?.skillNodeId || edge.source) === node.id &&
+                            Number(edge.data?.slotIndex) === inIndex
+                    );
+
                     newSlotEdges.push({
-                        id: `edge-read-${slotNodeId}-${node.id}-${inIndex}`,
-                        source: slotNodeId,
-                        target: node.id,
-                        sourceHandle: "read-source",
-                        targetHandle: `read-target-${inIndex}`,
-                        label: inslot.key,style: { stroke: "#38bdf8", strokeWidth: 1.5, strokeDasharray: "5 5" },
-                        markerEnd: { type: MarkerType.ArrowClosed },
+                        id:
+                            existingReadEdge?.id ||
+                            `edge-read-${slotNodeId}-${node.id}-${inIndex}`,
+                        source: node.id,
+                        target: slotNodeId,
+                        sourceHandle: `slot-skill-read-${inIndex}`,
+                        targetHandle: "slot-node-read",
+                        type: "smartTransition",
+                        selected: Boolean(existingReadEdge?.selected),
+                        label: inslot.key,style: {
+                            stroke: SLOT_CONNECTION_COLORS.read,
+                            strokeWidth: 1.7,
+                            strokeDasharray: "5 5",
+                        },
+                        markerEnd: {
+                            type: MarkerType.ArrowClosed,
+                            color: SLOT_CONNECTION_COLORS.read,
+                        },
+                        data: {
+                            edgeKind: "slot",
+                            access: "read",
+                            slotIndex: inIndex,
+                            path: cleanPath,
+                            skillNodeId: node.id,
+                            slotNodeId,
+                            controlPoints:
+                                existingReadEdge?.data?.controlPoints || [],
+                        },
                     });
                 }
             });
@@ -2987,18 +3841,108 @@ function AppContent() {
                 if (outslot.path && outslot.path.trim() !== "") {
                     const cleanPath = outslot.path.trim().replace(/^\//, "");
                     const slotNodeId = `slot-${cleanPath}`;
+                    const existingWriteEdge = (slotEdges || []).find(
+                        (edge) =>
+                            edge.data?.edgeKind === "slot" &&
+                            edge.data?.access === "write" &&
+                            (edge.data?.skillNodeId || edge.source) === node.id &&
+                            Number(edge.data?.slotIndex) === outIndex
+                    );
+
                     newSlotEdges.push({
-                        id: `edge-write-${node.id}-${slotNodeId}-${outIndex}`,
+                        id:
+                            existingWriteEdge?.id ||
+                            `edge-write-${node.id}-${slotNodeId}-${outIndex}`,
                         source: node.id,
                         target: slotNodeId,
-                        sourceHandle: `write-source-${outIndex}`,
-                        targetHandle: "write-target",
+                        sourceHandle: `slot-skill-write-${outIndex}`,
+                        targetHandle: "slot-node-write",
+                        type: "smartTransition",
+                        selected: Boolean(existingWriteEdge?.selected),
                         label: outslot.key,
-                        style: { stroke: "#22c55e", strokeWidth: 1.5, strokeDasharray: "5 5" },
-                        markerEnd: { type: MarkerType.ArrowClosed },
+                        style: {
+                            stroke: SLOT_CONNECTION_COLORS.write,
+                            strokeWidth: 1.7,
+                            strokeDasharray: "5 5",
+                        },
+                        markerEnd: {
+                            type: MarkerType.ArrowClosed,
+                            color: SLOT_CONNECTION_COLORS.write,
+                        },
+                        data: {
+                            edgeKind: "slot",
+                            access: "write",
+                            slotIndex: outIndex,
+                            path: cleanPath,
+                            skillNodeId: node.id,
+                            slotNodeId,
+                            controlPoints:
+                                existingWriteEdge?.data?.controlPoints || [],
+                        },
                     });
                 }
             });
+
+            if (node.type === "submachine") {
+                (node.data.inheritedSlots || []).forEach((slot, inheritIndex) => {
+                    if (
+                        !slot?.access ||
+                        !slot?.path ||
+                        !String(slot.path).trim()
+                    ) {
+                        return;
+                    }
+
+                    const access = slot.access;
+                    const cleanPath = normalizeSlotPath(slot.path);
+                    const slotNodeId = `slot-${cleanPath}`;
+                    const handleId =
+                        `slot-submachine-${access}-${inheritIndex}`;
+                    const existingInheritedEdge = (slotEdges || []).find(
+                        (edge) =>
+                            edge.data?.edgeKind === "slot" &&
+                            edge.data?.subMachineInherited === true &&
+                            edge.data?.subMachineNodeId === node.id &&
+                            edge.data?.access === access &&
+                            Number(edge.data?.inheritIndex) === inheritIndex
+                    );
+
+                    newSlotEdges.push({
+                        id:
+                            existingInheritedEdge?.id ||
+                            `edge-inherited-${access}-${node.id}-${inheritIndex}-${slotNodeId}`,
+                        source: node.id,
+                        target: slotNodeId,
+                        sourceHandle: handleId,
+                        targetHandle:
+                            access === "read"
+                                ? "slot-node-read"
+                                : "slot-node-write",
+                        type: "smartTransition",
+                        selected: Boolean(existingInheritedEdge?.selected),
+                        style: {
+                            stroke: SLOT_CONNECTION_COLORS[access],
+                            strokeWidth: 1.7,
+                            strokeDasharray: "5 5",
+                        },
+                        markerEnd: {
+                            type: MarkerType.ArrowClosed,
+                            color: SLOT_CONNECTION_COLORS[access],
+                        },
+                        data: {
+                            edgeKind: "slot",
+                            access,
+                            path: cleanPath,
+                            slotNodeId,
+                            subMachineInherited: true,
+                            subMachineNodeId: node.id,
+                            inheritIndex,
+                            controlPoints:
+                                existingInheritedEdge?.data?.controlPoints || [],
+                        },
+                    });
+                });
+            }
         });
 
         setSlotEdges(newSlotEdges);
@@ -3099,9 +4043,13 @@ function AppContent() {
                 if (!content) return;
 
                 const parsed = await parseScxmlFile(content, fetchSkillData, getNodeId);
+                const parsedNodes = await hydrateSubMachineInheritedSlots(
+                    parsed.nodes,
+                    filePath
+                );
 
                 setGlobalDataModel(parsed.globalDataModel);
-                setNodes(parsed.nodes);
+                setNodes(parsedNodes);
                 setEdges(parsed.edges);
                 setSelectedNodeId(null);
 
@@ -3120,7 +4068,7 @@ function AppContent() {
                     )
                 );
 
-                checkSlotConnection(parsed.nodes);
+                checkSlotConnection(parsedNodes);
                 setTimeout(() => fitView({ padding: 0.2, duration: 400 }), 150);
             } catch (err) {
                 console.error("Import error:", err);
@@ -3139,9 +4087,13 @@ function AppContent() {
         reader.onload = async (e) => {
             try {
                 const parsed = await parseScxmlFile(e.target.result, fetchSkillData, getNodeId);
+                const parsedNodes = await hydrateSubMachineInheritedSlots(
+                    parsed.nodes,
+                    null
+                );
 
                 setGlobalDataModel(parsed.globalDataModel);
-                setNodes(parsed.nodes);
+                setNodes(parsedNodes);
                 setEdges(parsed.edges);
                 setSelectedNodeId(null);
 
@@ -3154,7 +4106,7 @@ function AppContent() {
                     )
                 );
 
-                checkSlotConnection(parsed.nodes);
+                checkSlotConnection(parsedNodes);
                 setTimeout(() => fitView({ padding: 0.2, duration: 400 }), 150);
             } catch (err) {
                 alert("Import error:\n" + err.message);
@@ -3438,9 +4390,12 @@ function AppContent() {
                                             behavior,
                                             position
                                         );
-                                    setNodes((nds) =>
-                                        nds.concat(newNode)
-                                    );
+                                    const updatedNodes = [
+                                        ...nodes,
+                                        newNode,
+                                    ];
+                                    setNodes(updatedNodes);
+                                    checkSlotConnection(updatedNodes);
                                 } catch (error) {
                                     console.error(
                                         "Invalid behavior drag payload:",
@@ -3521,26 +4476,46 @@ function AppContent() {
                                         nodes={visibleNodes}
                                         edges={visibleEdges}
                                         onNodesChange={handleNodesChange}
-                                        onEdgesChange={onEdgesChange}
+                                        onEdgesChange={handleVisibleEdgesChange}
                                         onConnect={onConnect}
-                                        onEdgeClick={(_, edge) =>
-                                            selectTransitionEdge(edge.id)
-                                        }
-                                        onEdgeDoubleClick={onEdgeDoubleClick}
+                                        onConnectStart={handleConnectStart}
+                                        onConnectEnd={handleConnectEnd}
+                                        isValidConnection={isValidConnection}
+                                        connectionMode={ConnectionMode.Loose}
+                                        onEdgeClick={(_, edge) => {
+                                            if (isSlotEdge(edge)) {
+                                                selectSlotEdge(edge.id);
+                                                return;
+                                            }
+                                            selectTransitionEdge(edge.id);
+                                        }}
+                                        onEdgeDoubleClick={(event, edge) => {
+                                            if (isSlotEdge(edge)) {
+                                                selectSlotEdge(edge.id);
+                                                return;
+                                            }
+                                            onEdgeDoubleClick(event, edge);
+                                        }}
                                         nodeTypes={nodeTypes}
                                         edgeTypes={edgeTypes}
                                         onNodeClick={(_, n) => {
-                                            clearTransitionSelection();
+                                            clearAllEdgeSelection();
                                             if (n.type === "parallelLane" && n.parentId) {
                                                 setSelectedNodeId(n.parentId);
                                                 setActiveTab("allgemein");
                                                 return;
                                             }
+
                                             setSelectedNodeId(n.id);
-                                            setRightPanelTab("details");
+
+                                            // Slot nodes participate in slot-edge highlighting,
+                                            // but they do not have a skill detail panel.
+                                            if (n.type !== "slot") {
+                                                setRightPanelTab("details");
+                                            }
                                         }}
                                         onPaneClick={() => {
-                                            clearTransitionSelection();
+                                            clearAllEdgeSelection();
                                             setSelectedNodeId(null);
                                             setRightPanelTab("datamodel");
                                         }}
