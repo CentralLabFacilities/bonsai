@@ -3,6 +3,39 @@ import { Handle, Position, useEdges } from "@xyflow/react";
 import { FiAlertCircle } from "react-icons/fi";
 import StateActionBadges from "./StateActionBadges";
 
+const normalizeSlotType = (type) =>
+    String(type || "").trim().toLowerCase();
+
+const getSlotHandleDragClass = ({
+                                    drag,
+                                    nodeId,
+                                    handleId,
+                                    access,
+                                    origin,
+                                    slotType,
+                                }) => {
+    if (!drag?.active) return "";
+
+    const isActiveHandle =
+        drag.nodeId === nodeId && drag.handleId === handleId;
+
+    if (isActiveHandle) {
+        return "slot-handle-compatible slot-handle-active";
+    }
+
+    const isDestinationSide = drag.origin !== origin;
+    const accessMatches = drag.access === access;
+    const typeMatches =
+        Boolean(drag.slotType) &&
+        normalizeSlotType(slotType) === drag.slotType;
+    const isCompatible =
+        isDestinationSide && accessMatches && typeMatches;
+
+    return isCompatible
+        ? "slot-handle-compatible"
+        : "slot-handle-incompatible";
+};
+
 function CustomNode({ id, data, selected }) {
     const edges = useEdges();
 
@@ -29,7 +62,7 @@ function CustomNode({ id, data, selected }) {
     // Supported modes:
     // "event" -> show events only
     // "slots" -> show slots only
-    // "both"  -> show events and slots
+    // "both"  -> show events followed by slots
     const mode = data.mode || "both";
 
     const showEvents = mode === "event" || mode === "both";
@@ -42,9 +75,7 @@ function CustomNode({ id, data, selected }) {
         ];
 
         const missingSlots = allSlots.some(
-            (slot) =>
-                !slot.path ||
-                String(slot.path).trim() === ""
+            (slot) => !slot.path || String(slot.path).trim() === ""
         );
 
         const missingParams = (data.params || []).some((param) => {
@@ -73,8 +104,6 @@ function CustomNode({ id, data, selected }) {
 
         let missingTransitions = false;
 
-        // Final states and outward behavior exits terminate the local behavior,
-        // so they do not need outgoing transitions.
         if (
             showEvents &&
             !isFinalState &&
@@ -90,13 +119,9 @@ function CustomNode({ id, data, selected }) {
             );
         }
 
-        // Slot validation only matters when slots are visible.
         const hasMissingSlots = showSlots ? missingSlots : false;
-
         const hasError =
-            hasMissingSlots ||
-            missingParams ||
-            missingTransitions;
+            hasMissingSlots || missingParams || missingTransitions;
 
         const reasons = [];
 
@@ -126,28 +151,29 @@ function CustomNode({ id, data, selected }) {
         isBehaviorExit,
     ]);
 
-    const slotSummary = useMemo(() => {
-        const seen = new Set();
-
-        return [
-            ...(data.inSlots || []),
-            ...(data.outSlots || []),
-        ]
-            .filter((slot) => {
-                const key = String(slot.key || "").trim();
-
-                if (!key || seen.has(key)) {
-                    return false;
-                }
-
-                seen.add(key);
-                return true;
-            })
-            .map((slot) => ({
+    // Keep every slot as its own row. A slot is either read or write, so each
+    // row gets exactly one connection point on the right side of the skill.
+    const slotEntries = useMemo(
+        () => [
+            ...(data.inSlots || []).map((slot, index) => ({
                 key: slot.key,
+                type: slot.type,
                 inherited: Boolean(slot.inherited),
-            }));
-    }, [data.inSlots, data.outSlots]);
+                access: "read",
+                index,
+                handleId: `slot-skill-read-${index}`,
+            })),
+            ...(data.outSlots || []).map((slot, index) => ({
+                key: slot.key,
+                type: slot.type,
+                inherited: Boolean(slot.inherited),
+                access: "write",
+                index,
+                handleId: `slot-skill-write-${index}`,
+            })),
+        ].filter((entry) => String(entry.key || "").trim()),
+        [data.inSlots, data.outSlots]
+    );
 
     const eventIds = useMemo(
         () => [
@@ -166,19 +192,13 @@ function CustomNode({ id, data, selected }) {
                 data.isInitial ? "initial-node" : ""
             } ${selected ? "selected-node" : ""} ${
                 isFinalState ? "terminal-final-node" : ""
-            } ${
-                isBehaviorExit ? "behavior-exit-node" : ""
-            } mode-${mode}`}
+            } ${isBehaviorExit ? "behavior-exit-node" : ""} mode-${mode}`}
         >
             <StateActionBadges
                 onEntry={data.onEntry}
                 onExit={data.onExit}
-                onEntryClick={() =>
-                    data.onOpenStateActions?.(id)
-                }
-                onExitClick={() =>
-                    data.onOpenStateActions?.(id)
-                }
+                onEntryClick={() => data.onOpenStateActions?.(id)}
+                onExitClick={() => data.onOpenStateActions?.(id)}
             />
 
             {validation.hasError && (
@@ -190,56 +210,14 @@ function CustomNode({ id, data, selected }) {
                 </div>
             )}
 
-            {/* Incoming transitions remain possible for all nodes,
-                including End/Fatal and behavior exits. */}
-            <Handle
-                type="target"
-                position={Position.Left}
-                className="target-handle"
-            />
-
-            {showSlots && (
-                <>
-                    {(data.outSlots || []).map(
-                        (slot, index) => (
-                            <Handle
-                                key={
-                                    slot.key ||
-                                    `out-${index}`
-                                }
-                                id={`write-source-${index}`}
-                                type="source"
-                                position={Position.Bottom}
-                                className="slot-write-handle"
-                                style={{
-                                    left: `${
-                                        10 + index * 40
-                                    }%`,
-                                }}
-                            />
-                        )
-                    )}
-
-                    {(data.inSlots || []).map(
-                        (slot, index) => (
-                            <Handle
-                                key={
-                                    slot.key ||
-                                    `in-${index}`
-                                }
-                                id={`read-target-${index}`}
-                                type="target"
-                                position={Position.Top}
-                                className="slot-read-handle"
-                                style={{
-                                    left: `${
-                                        10 + index * 40
-                                    }%`,
-                                }}
-                            />
-                        )
-                    )}
-                </>
+            {/* Transition input is only visible when transitions are shown. */}
+            {showEvents && (
+                <Handle
+                    id="transition-target"
+                    type="target"
+                    position={Position.Left}
+                    className="target-handle"
+                />
             )}
 
             <div className="custom-node-label">
@@ -258,19 +236,15 @@ function CustomNode({ id, data, selected }) {
                 )}
             </div>
 
+            {/* Event outputs */}
             {showEvents &&
                 !isFinalState &&
                 !isBehaviorExit &&
                 eventIds.length > 0 && (
                     <div className="event-list">
                         {eventIds.map((eventId) => (
-                            <div
-                                className="event-row"
-                                key={eventId}
-                            >
-                                <span className="event-name">
-                                    {eventId}
-                                </span>
+                            <div className="event-row" key={eventId}>
+                                <span className="event-name">{eventId}</span>
 
                                 <Handle
                                     id={eventId}
@@ -283,7 +257,8 @@ function CustomNode({ id, data, selected }) {
                     </div>
                 )}
 
-            {showSlots && slotSummary.length > 0 && (
+            {/* Slot keys */}
+            {showSlots && slotEntries.length > 0 && (
                 <>
                     {showEvents &&
                         !isFinalState &&
@@ -293,23 +268,53 @@ function CustomNode({ id, data, selected }) {
                         )}
 
                     <div className="node-slot-summary">
-                        {slotSummary.map((entry) => (
-                            <span
-                                key={entry.key}
-                                className={`node-slot-chip ${
-                                    entry.inherited
-                                        ? "node-slot-chip-inherited"
-                                        : ""
-                                }`}
-                                title={`Slot${
-                                    entry.inherited
-                                        ? " (inherited)"
-                                        : ""
-                                }`}
-                            >
-                                {entry.key}
-                            </span>
-                        ))}
+                        {slotEntries.map((entry) => {
+                            const dragClass = getSlotHandleDragClass({
+                                drag: data.slotConnectionDrag,
+                                nodeId: id,
+                                handleId: entry.handleId,
+                                access: entry.access,
+                                origin: "skill",
+                                slotType: entry.type,
+                            });
+
+                            return (
+                                <div
+                                    key={`${entry.access}-${entry.index}-${entry.key}`}
+                                    className={`node-slot-row node-slot-row-${entry.access}`}
+                                >
+                                    <span
+                                        className={`node-slot-entry ${
+                                            entry.inherited
+                                                ? "node-slot-entry-inherited"
+                                                : ""
+                                        }`}
+                                        title={`${
+                                            entry.access === "read"
+                                                ? "Read"
+                                                : "Write"
+                                        } slot ${entry.key}`}
+                                    >
+                                        <span className={`node-slot-access node-slot-access-${entry.access}`}>
+                                            {entry.access === "read" ? "Read" : "Write"}
+                                        </span>
+                                        <span className="node-slot-key">{entry.key}</span>
+                                    </span>
+
+                                    <Handle
+                                        id={entry.handleId}
+                                        type="source"
+                                        position={Position.Right}
+                                        className={`source-handle skill-slot-handle slot-skill-${entry.access}-handle ${dragClass}`}
+                                        title={`${
+                                            entry.access === "read"
+                                                ? "Read"
+                                                : "Write"
+                                        } ${entry.key}`}
+                                    />
+                                </div>
+                            );
+                        })}
                     </div>
                 </>
             )}
