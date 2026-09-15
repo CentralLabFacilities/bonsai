@@ -1504,6 +1504,98 @@
     pointer-events: auto;
 }
 
+.compound-frame-exits {
+    position: absolute;
+
+    right: 8px;
+    top: 42px;
+
+    width: 150px;
+
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+
+    gap: 6px;
+
+    z-index: 5;
+
+    pointer-events: none;
+}
+
+.compound-frame-exit-item {
+    position: relative;
+
+    min-width: 80px;
+    max-width: 145px;
+
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+
+    pointer-events: none;
+}
+
+.compound-frame-exit-label {
+    position: relative;
+
+    padding: 2px 5px;
+
+    font-size: 10px;
+    line-height: 14px;
+
+    white-space: nowrap;
+
+    background: white;
+    border: 1px solid #94a3b8;
+    border-radius: 2px;
+
+    z-index: 2;
+}
+
+
+/*
+ * Interne Transition endet LINKS am Label.
+ */
+.compound-frame-exit-target {
+    position: absolute !important;
+
+    left: -4px !important;
+    right: auto !important;
+
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+
+    width: 7px !important;
+    height: 7px !important;
+
+    opacity: 0;
+
+    pointer-events: none;
+
+    z-index: 3;
+}
+
+
+/*
+ * Äußere Transition startet RECHTS am Label.
+ */
+.compound-frame-source-handle {
+    position: absolute !important;
+
+    right: -4px !important;
+    left: auto !important;
+
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+
+    width: 7px !important;
+    height: 7px !important;
+
+    pointer-events: auto;
+
+    z-index: 4;
+}
 .compound-in-lane {
   background: transparent !important;
   border: none !important;
