@@ -962,51 +962,340 @@ function AppContent() {
     const handleCreateCompoundFromSelected = () => {
         if (selectedNodes.length < 1) return;
 
-        const { minX, minY, maxX, maxY } = getSelectionBoundingBox(selectedNodes);
+        const {
+            minX,
+            minY,
+            maxX,
+            maxY,
+        } = getSelectionBoundingBox(selectedNodes);
+
         const padding = 40;
         const headerOffset = 50;
 
-        const containerWidth = Math.max(260, maxX - minX + padding * 2);
-        const containerHeight = Math.max(160, maxY - minY + padding * 2 + headerOffset);
+        const contentWidth =
+            maxX - minX + padding * 2;
+
+        const containerWidth = Math.max(
+            320,
+            contentWidth + COMPOUND_LABEL_SPACE
+        );
+
+        const containerHeight = Math.max(
+            180,
+            maxY -
+                minY +
+                padding * 2 +
+                headerOffset
+        );
 
         const compoundId = getNodeId();
-        const compoundName = `Compound_${nodes.filter((n) => n.type === "compound").length + 1}`;
+
+        const compoundName =
+            `Compound_${
+                nodes.filter(
+                    (node) => node.type === "compound"
+                ).length + 1
+            }`;
+
+        const selectedIds = new Set(
+            selectedNodes.map((node) => node.id)
+        );
+
+        const compoundEvents = [];
+        const internalExitEdges = [];
+
+
+        const updatedEdges = edges.map((edge) => {
+            const sourceIsInside =
+                selectedIds.has(edge.source);
+
+            const targetIsInside =
+                selectedIds.has(edge.target);
+
+
+            if (
+                !sourceIsInside &&
+                targetIsInside
+            ) {
+                return {
+                    ...edge,
+
+                    target: compoundId,
+                    targetHandle: "target",
+
+                    data: {
+                        ...edge.data,
+
+                        /*
+                         * Merken, welche interne Node
+                         * ursprünglich das Ziel war.
+                         */
+                        compoundOriginalTarget:
+                            edge.target,
+                    },
+                };
+            }
+
+            if (
+                sourceIsInside &&
+                !targetIsInside
+            ) {
+                const originalSource =
+                    edge.source;
+
+                const originalHandleId =
+                    String(
+                        edge.sourceHandle ||
+                            "success"
+                    );
+
+                const sourceNode =
+                    selectedNodes.find(
+                        (node) =>
+                            node.id ===
+                            originalSource
+                    );
+
+                const baseName =
+                    sourceNode?.data?.label ||
+                    sourceNode?.data
+                        ?.fullSkillName
+                        ?.split("#")[0]
+                        ?.split(".")
+                        ?.pop() ||
+                    "state";
+
+                const exitLabel =
+                    `${baseName}.${originalHandleId}`;
+
+
+                const compoundExitId =
+                    `${originalSource}-${originalHandleId}`;
+
+
+                const eventAlreadyExists =
+                    compoundEvents.some(
+                        (event) =>
+                            String(event.id) ===
+                            compoundExitId
+                    );
+
+                if (!eventAlreadyExists) {
+                    compoundEvents.push({
+                        id: compoundExitId,
+
+                        /*
+                         * Was der User am Rand sieht:
+                         *
+                         * PrintMessage.success
+                         */
+                        name: exitLabel,
+                        rawEvent: exitLabel,
+
+                        target: edge.target,
+
+                        /*
+                         * tatsächliche interne Source
+                         */
+                        sourceNodeId:
+                            originalSource,
+
+                        /*
+                         * tatsächlicher Handle der
+                         * internen Node
+                         */
+                        transitionHandleId:
+                            originalHandleId,
+                    });
+                }
+
+                internalExitEdges.push({
+                    id:
+                        `edge-internal-compound-` +
+                        `${originalSource}-` +
+                        `${originalHandleId}-` +
+                        `${compoundId}-` +
+                        `${crypto.randomUUID()}`,
+
+                    source:
+                        originalSource,
+
+                    target:
+                        compoundId,
+
+                    /*
+                     * echter Source-Handle der
+                     * internen Node
+                     */
+                    sourceHandle:
+                        originalHandleId,
+
+                    /*
+                     * LINKER Handle des Labels
+                     * in CompoundNode.jsx
+                     */
+                    targetHandle:
+                        `target-${compoundExitId}`,
+
+                    type: "smoothstep",
+
+                    style: {
+                        strokeDasharray: "4 4",
+                        stroke: "#0284c7",
+                        strokeWidth: 1.5,
+                    },
+
+                    data: {
+                        compoundInternalEdge: true,
+
+                        compoundExitId:
+                            compoundExitId,
+                    },
+                });
+
+                return {
+                    ...edge,
+
+                    source:
+                        compoundId,
+
+                    /*
+                     * RECHTER Handle des Labels
+                     * in CompoundNode.jsx
+                     */
+                    sourceHandle:
+                        compoundExitId,
+
+                    data: {
+                        ...edge.data,
+
+                        /*
+                         * Ursprüngliche interne Node merken.
+                         */
+                        compoundOriginalSource:
+                            originalSource,
+
+                        /*
+                         * Ursprünglichen Handle merken.
+                         */
+                        compoundOriginalSourceHandle:
+                            originalHandleId,
+
+                        compoundExitId:
+                            compoundExitId,
+                    },
+                };
+            }
+
+            return edge;
+        });
 
         const compoundNode = {
             id: compoundId,
+
             type: "compound",
-            position: { x: minX - padding, y: minY - padding - headerOffset },
-            style: { width: containerWidth, height: containerHeight },
+
+            position: {
+                x: minX - padding,
+                y:
+                    minY -
+                    padding -
+                    headerOffset,
+            },
+
+            style: {
+                width: containerWidth,
+                height: containerHeight,
+            },
+
             data: {
                 label: compoundName,
-                fullSkillName: compoundName,
-                isInitial: selectedNodes.some((n) => n.data?.isInitial),
-                events: [],
+                fullSkillName:
+                    compoundName,
+
+                isInitial:
+                    selectedNodes.some(
+                        (node) =>
+                            node.data?.isInitial
+                    ),
+
+                /*
+                 * Hier landen die gerade ermittelten
+                 * Exit-Labels.
+                 */
+                events:
+                    compoundEvents,
+
                 onEntry: [],
                 onExit: [],
             },
         };
 
-        const selectedIds = new Set(selectedNodes.map((n) => n.id));
-        const updatedNodes = nodes.map((node) => {
-            if (selectedIds.has(node.id)) {
+        const updatedNodes = nodes.map(
+            (node) => {
+                if (
+                    !selectedIds.has(node.id)
+                ) {
+                    return node;
+                }
+
                 return {
                     ...node,
-                    parentId: compoundId,
-                    extent: "parent",
+
+                    parentId:
+                        compoundId,
+
+                    extent:
+                        "parent",
+
                     position: {
-                        x: node.position.x - (minX - padding),
-                        y: node.position.y - (minY - padding - headerOffset),
+                        x:
+                            node.position.x -
+                            (
+                                minX -
+                                padding
+                            ),
+
+                        y:
+                            node.position.y -
+                            (
+                                minY -
+                                padding -
+                                headerOffset
+                            ),
                     },
+
                     selected: false,
                 };
             }
-            return node;
+        );
+
+        const nextNodes =
+            orderNodesParentsFirst([
+                compoundNode,
+                ...updatedNodes,
+            ]);
+
+        setNodes(nextNodes);
+
+        setEdges([
+            ...updatedEdges,
+            ...internalExitEdges,
+        ]);
+
+        requestAnimationFrame(() => {
+            updateNodeInternals(
+                compoundId
+            );
         });
 
-        setNodes([compoundNode, ...updatedNodes]);
-        setSelectedNodeId(compoundId);
-        setActiveTab("allgemein");
+        setSelectedNodeId(
+            compoundId
+        );
+
+        setActiveTab(
+            "allgemein"
+        );
     };
 
     // 2. Parallel State erstellen
@@ -1928,12 +2217,6 @@ function AppContent() {
                 nodes
             );
 
-            /*
-             * Die Transition verlässt einen Parallel-State, wenn:
-             *
-             * - die Source in einer Lane liegt
-             * - und das Target nicht im selben Parallel-State liegt
-             */
             const leavesParallel =
                 sourceLane &&
                 (
@@ -1941,14 +2224,6 @@ function AppContent() {
                     targetLane.parentId !== sourceLane.parentId
                 );
 
-            /*
-             * Prüfen, ob diese logische Transition bereits existiert.
-             *
-             * Wichtig:
-             * Bei einer Parallel-Transition ist edge.source nicht mehr
-             * der eigentliche State, sondern die Lane.
-             * Deshalb parallelOriginalSource ebenfalls prüfen.
-             */
             const alreadyExists = edges.some((edge) => {
                 const logicalSource =
                     edge.data?.parallelOriginalSource ||
@@ -1998,14 +2273,6 @@ function AppContent() {
                     `${baseName}.${handleId}`;
 
 
-                /*
-                 * =====================================================
-                 * 1. ÄUSSERE TRANSITION
-                 *
-                 * Compound-Rand -> externe Node
-                 * =====================================================
-                 */
-
                 const externalEdge = {
                     id:
                         `edge-compound-${params.source}-` +
@@ -2040,17 +2307,6 @@ function AppContent() {
                     },
                 };
 
-
-                /*
-                 * =====================================================
-                 * 2. INTERNE TRANSITION
-                 *
-                 * Node -> Compound-Rand
-                 *
-                 * EXAKT dasselbe Prinzip wie bei Parallel/Lane.
-                 * =====================================================
-                 */
-
                 const internalEdge = {
                     id:
                         `edge-internal-compound-${params.source}-` +
@@ -2062,8 +2318,7 @@ function AppContent() {
 
                     sourceHandle: handleId,
 
-                    // CompoundNode muss genau diesen
-                    // Target-Handle rendern
+                    // GENAU der unsichtbare Handle LINKS am Label
                     targetHandle: `target-${handleId}`,
 
                     type: "smoothstep",
@@ -2078,13 +2333,6 @@ function AppContent() {
                         compoundInternalEdge: true,
                     },
                 };
-
-
-                /*
-                 * =====================================================
-                 * 3. Beide Edges hinzufügen
-                 * =====================================================
-                 */
 
                 setEdges((currentEdges) => [
                     ...currentEdges,

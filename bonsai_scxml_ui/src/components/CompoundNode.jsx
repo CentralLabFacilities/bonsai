@@ -13,28 +13,6 @@ export default function CompoundNode({ id, data }) {
 
     const events = data.events || [];
 
-    /*
-     * =========================================================
-     * EXIT EVENTS
-     * =========================================================
-     *
-     * Genau wie bei einer Parallel-Lane:
-     *
-     * interne Node
-     *      |
-     *      | gestrichelte interne Edge
-     *      v
-     * target-${handleId}
-     *      |
-     *      | Compound-Rand
-     *      |
-     * ${handleId}
-     *      |
-     *      | äußere Edge
-     *      v
-     * externe Node
-     */
-
     const uniqueEvents = Array.from(
         new Map(
             events.map((evt) => {
@@ -66,17 +44,6 @@ export default function CompoundNode({ id, data }) {
         ).values()
     );
 
-
-    /*
-     * =========================================================
-     * REACT FLOW HANDLES NEU BERECHNEN
-     * =========================================================
-     *
-     * Die Exit-Handles entstehen dynamisch.
-     * Deshalb muss React Flow informiert werden,
-     * sobald sich die Events ändern.
-     */
-
     useEffect(() => {
         requestAnimationFrame(() => {
             updateNodeInternals(id);
@@ -101,21 +68,10 @@ export default function CompoundNode({ id, data }) {
             }`}
         >
 
-            {/* =========================================
-                ON ENTRY / ON EXIT BADGES
-               ========================================= */}
-
             <StateActionBadges
                 onEntry={data.onEntry}
                 onExit={data.onExit}
             />
-
-
-            {/* =========================================
-                NORMALER EINGANG DES COMPOUNDS
-
-                Externe Transition -> Compound
-               ========================================= */}
 
             <Handle
                 type="target"
@@ -124,23 +80,11 @@ export default function CompoundNode({ id, data }) {
                 className="target-handle"
             />
 
-
-            {/* =========================================
-                HEADER
-               ========================================= */}
-
             <div className="compound-frame-header">
                 <span className="compound-frame-title">
                     {data.label || id}
                 </span>
             </div>
-
-
-            {/* =========================================
-                EXITS AM RECHTEN RAND
-
-                Wie bei Parallel mit einer Lane.
-               ========================================= */}
 
             {uniqueEvents.length > 0 && (
                 <div className="compound-frame-exits">
@@ -151,28 +95,9 @@ export default function CompoundNode({ id, data }) {
                             className="compound-frame-exit-item"
                         >
 
-                            {/* =============================
-                                LABEL
-                               ============================= */}
-
                             <span className="compound-frame-exit-label">
                                 {evt.displayLabel}
                             </span>
-
-
-                            {/* =============================
-                                INTERNER TARGET-HANDLE
-
-                                interne Node
-                                     |
-                                     +---------->
-                                              X
-
-                                Die interne Edge benutzt:
-
-                                targetHandle:
-                                    `target-${handleId}`
-                               ============================= */}
 
                             <Handle
                                 type="target"
@@ -184,26 +109,11 @@ export default function CompoundNode({ id, data }) {
                                 "
                             />
 
-
-                            {/* =============================
-                                EXTERNER SOURCE-HANDLE
-
-                                X -----------------> externe Node
-
-                                Die äußere Edge benutzt:
-
-                                sourceHandle:
-                                    handleId
-                               ============================= */}
-
                             <Handle
                                 type="source"
                                 position={Position.Right}
                                 id={evt.handleId}
-                                className="
-                                    source-handle
-                                    compound-frame-source-handle
-                                "
+                                className="source-handle compound-frame-source-handle"
                             />
 
                         </div>
