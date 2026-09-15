@@ -2399,7 +2399,26 @@ function AppContent() {
         [behaviorDirectories, handleOpenSubMachine]
     );
 
-    const selectedNode = nodes.find((node) => node.id === selectedNodeId) || null;
+    const selectedRawNode =
+        [...nodes, ...slotNodes].find((node) => node.id === selectedNodeId) || null;
+
+    const selectedNode = useMemo(() => {
+        if (!selectedRawNode) return null;
+        if (selectedRawNode.type !== "slot") return selectedRawNode;
+        const cleanPath = getSlotPathFromNode(selectedRawNode);
+
+        return (
+            nodes.find((node) =>
+                [
+                    ...(node.data?.inSlots || []),
+                    ...(node.data?.outSlots || []),
+                ].some(
+                    (slot) => normalizeSlotPath(slot.path) === cleanPath
+                )
+            ) || null
+        );
+    }, [selectedRawNode, nodes]);
+
     const hasInitialNode = nodes.some((node) => node.data?.isInitial);
 
     const activeWorkflowTab = useMemo(
@@ -3814,10 +3833,10 @@ function AppContent() {
                         targetHandle: "slot-node-read",
                         type: "smartTransition",
                         selected: Boolean(existingReadEdge?.selected),
-                        label: inslot.key,style: {
-                            stroke: SLOT_CONNECTION_COLORS.read,
-                            strokeWidth: 1.7,
-                            strokeDasharray: "5 5",
+                        style: {
+                                stroke: SLOT_CONNECTION_COLORS.read,
+                                strokeWidth: 1.7,
+                                strokeDasharray: "5 5",
                         },
                         markerEnd: {
                             type: MarkerType.ArrowClosed,
@@ -3859,7 +3878,6 @@ function AppContent() {
                         targetHandle: "slot-node-write",
                         type: "smartTransition",
                         selected: Boolean(existingWriteEdge?.selected),
-                        label: outslot.key,
                         style: {
                             stroke: SLOT_CONNECTION_COLORS.write,
                             strokeWidth: 1.7,
@@ -4510,9 +4528,24 @@ function AppContent() {
 
                                             // Slot nodes participate in slot-edge highlighting,
                                             // but they do not have a skill detail panel.
-                                            if (n.type !== "slot") {
+                                            if (n.type === "slot") {
+                                                    const cleanPath = getSlotPathFromNode(n);
+                                                    const hasOwningSkill = nodes.some((node) =>
+                                                        [
+                                                            ...(node.data?.inSlots || []),
+                                                            ...(node.data?.outSlots || []),
+                                                        ].some(
+                                                            (slot) => normalizeSlotPath(slot.path) === cleanPath
+                                                        )
+                                                    );
+                                            if (hasOwningSkill) {
+                                                        setActiveTab("slots");
+                                                        setRightPanelTab("details");
+                                                    }
+                                                    return;
+                                                }
+
                                                 setRightPanelTab("details");
-                                            }
                                         }}
                                         onPaneClick={() => {
                                             clearAllEdgeSelection();
