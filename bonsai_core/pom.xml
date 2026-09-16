@@ -24,6 +24,9 @@
         <maven.compiler.target>17</maven.compiler.target>
         <dir>target</dir>
         <kotlin.version>2.2.0</kotlin.version>
+        <dokka.version>2.2.0</dokka.version>
+        <auto-service.version>1.1.1</auto-service.version>
+        <asm.version>9.7.1</asm.version>
     </properties>
 
     <dependencies>
@@ -32,6 +35,26 @@
             <groupId>log4j</groupId>
             <artifactId>log4j</artifactId>
             <version>1.2.17</version>
+        </dependency>
+
+
+        <dependency>
+            <groupId>org.jetbrains.dokka</groupId>
+            <artifactId>dokka-core</artifactId>
+            <version>${dokka.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>com.google.auto.service</groupId>
+            <artifactId>auto-service-annotations</artifactId>
+            <version>${auto-service.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.ow2.asm</groupId>
+            <artifactId>asm</artifactId>
+            <version>${asm.version}</version>
         </dependency>
 
         <dependency>
@@ -138,6 +161,26 @@
                         <goals>
                             <goal>test-compile</goal>
                         </goals>
+                    </execution>
+                    <execution>
+                        <id>kapt</id>
+                        <goals>
+                            <goal>kapt</goal>
+                        </goals>
+
+                        <configuration>
+                            <sourceDirs>
+                                <sourceDir>${project.basedir}/src/main/java</sourceDir>
+                            </sourceDirs>
+
+                            <annotationProcessorPaths>
+                                <annotationProcessorPath>
+                                    <groupId>com.google.auto.service</groupId>
+                                    <artifactId>auto-service</artifactId>
+                                    <version>${auto-service.version}</version>
+                                </annotationProcessorPath>
+                            </annotationProcessorPaths>
+                        </configuration>
                     </execution>
                 </executions>
                 <configuration>
