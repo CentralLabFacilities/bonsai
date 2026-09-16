@@ -12,6 +12,7 @@ import {
     useEdgesState,
     addEdge,
     useReactFlow,
+    useUpdateNodeInternals,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { SmartEdgeProvider } from "@tisoap/react-flow-smart-edge";
@@ -745,6 +746,101 @@ const buildEditorProblems = (
 
 const getNodeId = () => `skill-node-${crypto.randomUUID()}`;
 
+const PARALLEL_EXIT_GUTTER = 150;
+const PARALLEL_NODE_GAP = 30;
+const COMPOUND_NODE_GAP = 30;
+const COMPOUND_PADDING_X = 30;
+const COMPOUND_HEADER_HEIGHT = 45;
+const COMPOUND_BOTTOM_PADDING = 30;
+const COMPOUND_LABEL_SPACE = 160;
+
+const getNodeSize = (node) => ({
+    width: Number(node?.measured?.width) || Number(node?.width) || Number(node?.style?.width) || 210,
+    height: Number(node?.measured?.height) || Number(node?.height) || Number(node?.style?.height) || 80,
+});
+
+const getDirectCompoundForNode = (node, allNodes) => {
+    if (!node?.parentId) return null;
+    const parent = allNodes.find((candidate) => candidate.id === node.parentId);
+    return parent?.type === "compound" && parent.className !== "compound-in-lane" ? parent : null;
+};
+
+const getAbsoluteNodePosition = (node, allNodes) => {
+    let x = node?.position?.x || 0;
+    let y = node?.position?.y || 0;
+    let parentId = node?.parentId;
+    const visited = new Set();
+
+    while (parentId && !visited.has(parentId)) {
+        visited.add(parentId);
+
+        const parent = allNodes.find(
+            (candidate) => candidate.id === parentId
+        );
+
+        if (!parent) break;
+
+        x += parent.position?.x || 0;
+        y += parent.position?.y || 0;
+        parentId = parent.parentId;
+    }
+
+    return { x, y };
+};
+
+const getLaneForNode = (node, allNodes) => {
+    let current = node;
+    const visited = new Set();
+
+    while (current?.parentId && !visited.has(current.parentId)) {
+        visited.add(current.parentId);
+
+        const parent = allNodes.find(
+            (candidate) => candidate.id === current.parentId
+        );
+
+        if (!parent) return null;
+        if (parent.type === "parallelLane") return parent;
+
+        current = parent;
+    }
+
+    return null;
+};
+
+const orderNodesParentsFirst = (allNodes) => {
+    const byId = new Map(
+        allNodes.map((node) => [node.id, node])
+    );
+
+    const getDepth = (node) => {
+        let depth = 0;
+        let parentId = node.parentId;
+        const visited = new Set();
+
+        while (
+            parentId &&
+            byId.has(parentId) &&
+            !visited.has(parentId)
+            ) {
+            visited.add(parentId);
+            depth += 1;
+            parentId = byId.get(parentId).parentId;
+        }
+
+        return depth;
+    };
+
+    return allNodes
+        .map((node, index) => ({
+            node,
+            index,
+            depth: getDepth(node),
+        }))
+        .sort((a, b) => a.depth - b.depth || a.index - b.index)
+        .map(({ node }) => node);
+};
+
 // Detect if running in Tauri desktop app
 const IS_DESKTOP = isTauri();
 
@@ -926,6 +1022,9 @@ function AppContent() {
     const [activeFilter, setActiveFilter] = useState("Everything");
     const [searchText, setSearchText] = useState("");
     const [contextMenu, setContextMenu] = useState(null);
+    const [parallelDropTargetId, setParallelDropTargetId] = useState(null);
+    const [compoundDropTargetId, setCompoundDropTargetId] = useState(null);
+    const updateNodeInternals = useUpdateNodeInternals();
     const [leftLibraryTab, setLeftLibraryTab] = useState("skills");
     const [behaviorDirectories, setBehaviorDirectories] = useState(
         loadBehaviorDirectories
@@ -1026,23 +1125,23 @@ function AppContent() {
         const paths = new Set();
         slotNodes.forEach((node) => {
             const path = normalizeSlotPath(node.data?.path || node.data?.label);
-             if (path) paths.add(path);
+            if (path) paths.add(path);
         });
 
         nodes.forEach((node) => {
-             [...(node.data?.inSlots || []), ...(node.data?.outSlots || [])].forEach(
-                 (slot) => {
-                     const path = normalizeSlotPath(slot.path);
-                     if (path) paths.add(path);
-                 }
-             );
-         });
-         manualSlots.forEach((slot) => {
-             const path = normalizeSlotPath(slot.path);
-             if (path) paths.add(path);
-         });
+            [...(node.data?.inSlots || []), ...(node.data?.outSlots || [])].forEach(
+                (slot) => {
+                    const path = normalizeSlotPath(slot.path);
+                    if (path) paths.add(path);
+                }
+            );
+        });
+        manualSlots.forEach((slot) => {
+            const path = normalizeSlotPath(slot.path);
+            if (path) paths.add(path);
+        });
 
-         return [...paths].sort();
+        return [...paths].sort();
     }, [slotNodes, nodes, manualSlots]);
     // Transition Drawer State
     const [drawerData, setDrawerData] = useState({
@@ -1251,8 +1350,8 @@ function AppContent() {
                 handleCreateEmptySubMachine(contextMenu.flowPosition);
             }
         } else if (type === "slot") {
-             setIsCreateSlotModalOpen(true);;
-             }
+            setIsCreateSlotModalOpen(true);;
+        }
 
         setContextMenu(null);
     };
@@ -1293,26 +1392,46 @@ function AppContent() {
             const parallelNode = nds.find((n) => n.id === parallelId);
             if (!parallelNode) return nds;
 
-            const existingLanes = nds.filter((n) => n.parentId === parallelId && n.type === "parallelLane");
+            const existingLanes = nds
+                .filter(
+                    (n) =>
+                        n.parentId === parallelId &&
+                        n.type === "parallelLane"
+                )
+                .sort((a, b) => a.position.y - b.position.y);
+
             const laneIndex = existingLanes.length;
-            const laneHeight = 140; // <-- auf 140px erhöht
+            const laneHeight = 140;
             const headerHeight = 45;
             const buttonReserve = 35;
 
             const newLaneId = getNodeId();
             const newLaneName = `Lane_${laneIndex + 1}`;
-            const containerWidth = parallelNode.style?.width || 420;
+            const containerWidth =
+                Number(parallelNode.style?.width) || 420;
+
+            // Ende der bisher letzten Lane bestimmen
+            const lastLane = existingLanes[existingLanes.length - 1];
+
+            const newLaneY = lastLane
+                ? Number(lastLane.position?.y || 0) +
+                Number(lastLane.style?.height || 140)
+                : headerHeight;
 
             const newLaneNode = {
                 id: newLaneId,
-                position: { x: 0, y: headerHeight + laneIndex * laneHeight },
+                position: {
+                    x: 0,
+                    y: newLaneY,
+                },
                 parentId: parallelId,
                 extent: "parent",
                 type: "parallelLane",
+                draggable: false,
                 style: {
                     width: containerWidth,
                     height: laneHeight,
-                    borderBottom: "1.5px solid #0284c7",
+                    borderBottom: "none",
                 },
                 data: {
                     label: newLaneName,
@@ -1320,21 +1439,44 @@ function AppContent() {
                 },
             };
 
-            const newTotalHeight = headerHeight + (laneIndex + 1) * laneHeight + buttonReserve;
+            const newTotalHeight =
+                newLaneY + laneHeight + buttonReserve;
 
-            return nds.map((n) => {
+            const updatedNodes = nds.map((n) => {
                 if (n.id === parallelId) {
                     return {
                         ...n,
-                        style: { ...n.style, height: newTotalHeight },
+                        style: {
+                            ...n.style,
+                            height: newTotalHeight,
+                        },
                         data: {
                             ...n.data,
-                            lanes: [...(n.data.lanes || []), newLaneName],
+                            lanes: [
+                                ...(n.data.lanes || []),
+                                newLaneName,
+                            ],
                         },
                     };
                 }
+
+                // Die bisher letzte Lane bekommt jetzt die Trennlinie,
+                // weil danach die neue Lane kommt.
+                if (lastLane && n.id === lastLane.id) {
+                    return {
+                        ...n,
+                        style: {
+                            ...n.style,
+                            borderBottom:
+                                "1.5px solid #0284c7",
+                        },
+                    };
+                }
+
                 return n;
-            }).concat(newLaneNode);
+            });
+
+            return [...updatedNodes, newLaneNode];
         });
     }, [setNodes]);
 
@@ -1367,6 +1509,7 @@ function AppContent() {
             parentId: parallelId,
             extent: "parent",
             type: "parallelLane",
+            draggable: false,
             style: { width: containerWidth, height: laneHeight, borderBottom: "1.5px solid #0284c7" },
             data: { label: "Lane_1", events: [] },
         };
@@ -1377,6 +1520,7 @@ function AppContent() {
             parentId: parallelId,
             extent: "parent",
             type: "parallelLane",
+            draggable: false,
             style: { width: containerWidth, height: laneHeight, borderBottom: "none" },
             data: { label: "Lane_2", events: [] },
         };
@@ -1710,51 +1854,340 @@ function AppContent() {
     const handleCreateCompoundFromSelected = () => {
         if (selectedNodes.length < 1) return;
 
-        const { minX, minY, maxX, maxY } = getSelectionBoundingBox(selectedNodes);
+        const {
+            minX,
+            minY,
+            maxX,
+            maxY,
+        } = getSelectionBoundingBox(selectedNodes);
+
         const padding = 40;
         const headerOffset = 50;
 
-        const containerWidth = Math.max(260, maxX - minX + padding * 2);
-        const containerHeight = Math.max(160, maxY - minY + padding * 2 + headerOffset);
+        const contentWidth =
+            maxX - minX + padding * 2;
+
+        const containerWidth = Math.max(
+            320,
+            contentWidth + COMPOUND_LABEL_SPACE
+        );
+
+        const containerHeight = Math.max(
+            180,
+            maxY -
+            minY +
+            padding * 2 +
+            headerOffset
+        );
 
         const compoundId = getNodeId();
-        const compoundName = `Compound_${nodes.filter((n) => n.type === "compound").length + 1}`;
+
+        const compoundName =
+            `Compound_${
+                nodes.filter(
+                    (node) => node.type === "compound"
+                ).length + 1
+            }`;
+
+        const selectedIds = new Set(
+            selectedNodes.map((node) => node.id)
+        );
+
+        const compoundEvents = [];
+        const internalExitEdges = [];
+
+
+        const updatedEdges = edges.map((edge) => {
+            const sourceIsInside =
+                selectedIds.has(edge.source);
+
+            const targetIsInside =
+                selectedIds.has(edge.target);
+
+
+            if (
+                !sourceIsInside &&
+                targetIsInside
+            ) {
+                return {
+                    ...edge,
+
+                    target: compoundId,
+                    targetHandle: "target",
+
+                    data: {
+                        ...edge.data,
+
+                        /*
+                         * Merken, welche interne Node
+                         * ursprünglich das Ziel war.
+                         */
+                        compoundOriginalTarget:
+                        edge.target,
+                    },
+                };
+            }
+
+            if (
+                sourceIsInside &&
+                !targetIsInside
+            ) {
+                const originalSource =
+                    edge.source;
+
+                const originalHandleId =
+                    String(
+                        edge.sourceHandle ||
+                        "success"
+                    );
+
+                const sourceNode =
+                    selectedNodes.find(
+                        (node) =>
+                            node.id ===
+                            originalSource
+                    );
+
+                const baseName =
+                    sourceNode?.data?.label ||
+                    sourceNode?.data
+                        ?.fullSkillName
+                        ?.split("#")[0]
+                        ?.split(".")
+                        ?.pop() ||
+                    "state";
+
+                const exitLabel =
+                    `${baseName}.${originalHandleId}`;
+
+
+                const compoundExitId =
+                    `${originalSource}-${originalHandleId}`;
+
+
+                const eventAlreadyExists =
+                    compoundEvents.some(
+                        (event) =>
+                            String(event.id) ===
+                            compoundExitId
+                    );
+
+                if (!eventAlreadyExists) {
+                    compoundEvents.push({
+                        id: compoundExitId,
+
+                        /*
+                         * Was der User am Rand sieht:
+                         *
+                         * PrintMessage.success
+                         */
+                        name: exitLabel,
+                        rawEvent: exitLabel,
+
+                        target: edge.target,
+
+                        /*
+                         * tatsächliche interne Source
+                         */
+                        sourceNodeId:
+                        originalSource,
+
+                        /*
+                         * tatsächlicher Handle der
+                         * internen Node
+                         */
+                        transitionHandleId:
+                        originalHandleId,
+                    });
+                }
+
+                internalExitEdges.push({
+                    id:
+                        `edge-internal-compound-` +
+                        `${originalSource}-` +
+                        `${originalHandleId}-` +
+                        `${compoundId}-` +
+                        `${crypto.randomUUID()}`,
+
+                    source:
+                    originalSource,
+
+                    target:
+                    compoundId,
+
+                    /*
+                     * echter Source-Handle der
+                     * internen Node
+                     */
+                    sourceHandle:
+                    originalHandleId,
+
+                    /*
+                     * LINKER Handle des Labels
+                     * in CompoundNode.jsx
+                     */
+                    targetHandle:
+                        `target-${compoundExitId}`,
+
+                    type: "smoothstep",
+
+                    style: {
+                        strokeDasharray: "4 4",
+                        stroke: "#0284c7",
+                        strokeWidth: 1.5,
+                    },
+
+                    data: {
+                        compoundInternalEdge: true,
+
+                        compoundExitId:
+                        compoundExitId,
+                    },
+                });
+
+                return {
+                    ...edge,
+
+                    source:
+                    compoundId,
+
+                    /*
+                     * RECHTER Handle des Labels
+                     * in CompoundNode.jsx
+                     */
+                    sourceHandle:
+                    compoundExitId,
+
+                    data: {
+                        ...edge.data,
+
+                        /*
+                         * Ursprüngliche interne Node merken.
+                         */
+                        compoundOriginalSource:
+                        originalSource,
+
+                        /*
+                         * Ursprünglichen Handle merken.
+                         */
+                        compoundOriginalSourceHandle:
+                        originalHandleId,
+
+                        compoundExitId:
+                        compoundExitId,
+                    },
+                };
+            }
+
+            return edge;
+        });
 
         const compoundNode = {
             id: compoundId,
+
             type: "compound",
-            position: { x: minX - padding, y: minY - padding - headerOffset },
-            style: { width: containerWidth, height: containerHeight },
+
+            position: {
+                x: minX - padding,
+                y:
+                    minY -
+                    padding -
+                    headerOffset,
+            },
+
+            style: {
+                width: containerWidth,
+                height: containerHeight,
+            },
+
             data: {
                 label: compoundName,
-                fullSkillName: compoundName,
-                isInitial: selectedNodes.some((n) => n.data?.isInitial),
-                events: [],
+                fullSkillName:
+                compoundName,
+
+                isInitial:
+                    selectedNodes.some(
+                        (node) =>
+                            node.data?.isInitial
+                    ),
+
+                /*
+                 * Hier landen die gerade ermittelten
+                 * Exit-Labels.
+                 */
+                events:
+                compoundEvents,
+
                 onEntry: [],
                 onExit: [],
             },
         };
 
-        const selectedIds = new Set(selectedNodes.map((n) => n.id));
-        const updatedNodes = nodes.map((node) => {
-            if (selectedIds.has(node.id)) {
+        const updatedNodes = nodes.map(
+            (node) => {
+                if (
+                    !selectedIds.has(node.id)
+                ) {
+                    return node;
+                }
+
                 return {
                     ...node,
-                    parentId: compoundId,
-                    extent: "parent",
+
+                    parentId:
+                    compoundId,
+
+                    extent:
+                        "parent",
+
                     position: {
-                        x: node.position.x - (minX - padding),
-                        y: node.position.y - (minY - padding - headerOffset),
+                        x:
+                            node.position.x -
+                            (
+                                minX -
+                                padding
+                            ),
+
+                        y:
+                            node.position.y -
+                            (
+                                minY -
+                                padding -
+                                headerOffset
+                            ),
                     },
+
                     selected: false,
                 };
             }
-            return node;
+        );
+
+        const nextNodes =
+            orderNodesParentsFirst([
+                compoundNode,
+                ...updatedNodes,
+            ]);
+
+        setNodes(nextNodes);
+
+        setEdges([
+            ...updatedEdges,
+            ...internalExitEdges,
+        ]);
+
+        requestAnimationFrame(() => {
+            updateNodeInternals(
+                compoundId
+            );
         });
 
-        setNodes([compoundNode, ...updatedNodes]);
-        setSelectedNodeId(compoundId);
-        setActiveTab("allgemein");
+        setSelectedNodeId(
+            compoundId
+        );
+
+        setActiveTab(
+            "allgemein"
+        );
     };
 
     // 2. Parallel State erstellen
@@ -1838,7 +2271,11 @@ function AppContent() {
                 groupWidths.push(totalW + 160);
             } else {
                 laneHeights.push(Math.max(130, maxH + 40));
-                groupWidths.push(getNodeWidth(group[0]) + 160); // Platz für Exit-Labels
+                groupWidths.push(
+                    group.length > 1
+                        ? totalW + 80
+                        : getNodeWidth(group[0]) + 160
+                );
             }
         });
 
@@ -1847,24 +2284,53 @@ function AppContent() {
         const totalLanesHeight = laneHeights.reduce((sum, h) => sum + h, 0);
         const containerHeight = headerHeight + totalLanesHeight + buttonReserve;
 
-        const { minX, minY } = getSelectionBoundingBox(selectedNodes);
-        const parallelId = getNodeId();
-        const parallelName = `Parallel_${nodes.filter((n) => n.type === "parallel").length + 1}`;
+        const {
+            minX,
+            minY,
+            maxX,
+            maxY,
+        } = getSelectionBoundingBox(selectedNodes);
 
-        const branchNames = groups.map((g, idx) => {
-            if (g.length > 1) return `Group_${idx + 1}`;
-            return g[0].data?.label || `Lane_${idx + 1}`;
+        const parallelId = getNodeId();
+
+        const parallelName =
+            `Parallel_${
+                nodes.filter((n) => n.type === "parallel").length + 1
+            }`;
+
+        const branchNames = groups.map((group, idx) => {
+            if (group.length > 1) {
+                return `Group_${idx + 1}`;
+            }
+
+            return (
+                group[0].data?.label ||
+                `Lane_${idx + 1}`
+            );
         });
 
         const parallelNode = {
             id: parallelId,
             type: "parallel",
-            position: { x: minX - 30, y: minY - 30 - headerHeight },
-            style: { width: containerWidth, height: containerHeight },
+
+            position: {
+                x: minX - 30,
+                y: minY - 30 - headerHeight,
+            },
+
+            style: {
+                width: containerWidth,
+                height: containerHeight,
+            },
+
             data: {
                 label: parallelName,
                 fullSkillName: parallelName,
-                isInitial: selectedNodes.some((n) => n.data?.isInitial),
+
+                isInitial: selectedNodes.some(
+                    (n) => n.data?.isInitial
+                ),
+
                 lanes: branchNames,
                 events: [],
                 onAddLane: handleAddLaneToParallel,
@@ -1872,6 +2338,24 @@ function AppContent() {
                 onExit: [],
             },
         };
+
+        const oldSelectionRight = maxX;
+
+        const newParallelRight =
+            parallelNode.position.x +
+            containerWidth;
+
+        const horizontalGrowth = Math.max(
+            0,
+            newParallelRight - oldSelectionRight
+        );
+
+        const parallelGap = 50;
+
+        const shiftX =
+            horizontalGrowth > 0
+                ? horizontalGrowth + parallelGap
+                : 0;
 
         const newLanes = [];
         const newCompounds = [];
@@ -1884,73 +2368,63 @@ function AppContent() {
             const laneId = getNodeId();
             const laneName = branchNames[idx];
             const laneHeight = laneHeights[idx];
-            const isCompound = group.length > 1;
 
-            group.forEach((n) => nodeToLaneMap.set(n.id, laneId));
+            // Für spätere Transition-Umbiegung merken,
+            // welcher State zu welcher Lane gehört.
+            group.forEach((node) => {
+                nodeToLaneMap.set(node.id, laneId);
+            });
 
+            // Lane erstellen
             newLanes.push({
                 id: laneId,
-                position: { x: 0, y: currentLaneY },
+                position: {
+                    x: 0,
+                    y: currentLaneY,
+                },
                 parentId: parallelId,
                 extent: "parent",
+                type: "parallelLane",
                 draggable: false,
                 selectable: false,
-                type: "parallelLane",
+
                 style: {
                     width: containerWidth,
                     height: laneHeight,
-                    borderBottom: idx < groups.length - 1 ? "1.5px solid #0284c7" : "none",
+                    borderBottom:
+                        idx < groups.length - 1
+                            ? "1.5px solid #0284c7"
+                            : "none",
                 },
+
                 data: {
                     label: laneName,
                     events: [],
                 },
             });
 
-            if (isCompound) {
-                const compoundId = getNodeId();
-                const compoundName = `${laneName}_Part`;
-                const compoundWidth = containerWidth - 130;
-                const compoundHeight = laneHeight - 10;
+            // States DIREKT in die Lane.
+            // Kein Group_X_Part Compound mehr.
+            let currentX = 25;
 
-                newCompounds.push({
-                    id: compoundId,
-                    position: { x: 15, y: 5 },
-                    parentId: laneId,
-                    extent: "parent",
-                    type: "compound",
-                    className: "compound-in-lane", // <-- Macht den Rahmen unsichtbar
-                    style: { width: compoundWidth, height: compoundHeight },
-                    data: {
-                        label: compoundName,
-                        fullSkillName: compoundName,
-                        isInitial: group.some((n) => n.data?.isInitial),
-                        events: [],
-                    },
-                });
+            group.forEach((node) => {
+                const nodeWidth = getNodeWidth(node);
 
-                // Nodes horizontal nacheinander platzieren
-                let currentX = 15;
-                group.forEach((node) => {
-                    const w = getNodeWidth(node);
-                    movedNodes.push({
-                        ...node,
-                        parentId: compoundId,
-                        extent: "parent",
-                        position: { x: currentX, y: 15 }, // <-- Weiter oben, da kein Header stört
-                        selected: false,
-                    });
-                    currentX += w + 35;
-                });
-            } else {
                 movedNodes.push({
-                    ...group[0],
+                    ...node,
                     parentId: laneId,
                     extent: "parent",
-                    position: { x: 25, y: 20 },
+
+                    position: {
+                        x: currentX,
+                        y: 20,
+                    },
+
                     selected: false,
                 });
-            }
+
+                currentX += nodeWidth + PARALLEL_NODE_GAP;
+            });
 
             currentLaneY += laneHeight;
         });
@@ -1967,6 +2441,10 @@ function AppContent() {
                     ...edge,
                     target: parallelId,
                     targetHandle: "target",
+                    data: {
+                        ...edge.data,
+                        parallelOriginalTarget: edge.target,
+                    },
                 };
             }
 
@@ -2003,6 +2481,10 @@ function AppContent() {
                     ...edge,
                     source: laneId,
                     sourceHandle: handleId,
+                    data: {
+                        ...edge.data,
+                        parallelOriginalSource: edge.source,
+                    },
                 };
             }
 
@@ -2012,21 +2494,64 @@ function AppContent() {
         let insertIndex = nodes.findIndex((n) => selectedIds.has(n.id));
         if (insertIndex === -1) insertIndex = 0;
 
-        const remainingNodes = nodes.filter((n) => {
-            if (selectedIds.has(n.id)) return false;
-            if (n.type === "compound") {
-                const hasRemainingChildren = nodes.some(
-                    (child) => child.parentId === n.id && !selectedIds.has(child.id)
-                );
-                return hasRemainingChildren;
-            }
-            return true;
-        });
+        const remainingNodes = nodes
+            .filter((n) => {
+                if (selectedIds.has(n.id)) {
+                    return false;
+                }
+
+                if (n.type === "compound") {
+                    const hasRemainingChildren = nodes.some(
+                        (child) =>
+                            child.parentId === n.id &&
+                            !selectedIds.has(child.id)
+                    );
+
+                    return hasRemainingChildren;
+                }
+
+                return true;
+            })
+            .map((node) => {
+                /*
+                 * Nur Root-Nodes verschieben.
+                 *
+                 * Kinder eines Compound-/Parallel-/Submachine-Nodes
+                 * werden automatisch mit ihrem Parent verschoben.
+                 */
+                if (node.parentId) {
+                    return node;
+                }
+
+                const nodeX =
+                    Number(node.position?.x) || 0;
+
+                /*
+                 * Alles, was vorher rechts hinter der ausgewählten
+                 * Gruppe lag, gemeinsam nach rechts verschieben.
+                 *
+                 * Dadurch bleibt die vorhandene Anordnung erhalten.
+                 */
+                if (
+                    shiftX > 0 &&
+                    nodeX >= oldSelectionRight
+                ) {
+                    return {
+                        ...node,
+                        position: {
+                            ...node.position,
+                            x: nodeX + shiftX,
+                        },
+                    };
+                }
+
+                return node;
+            });
 
         const newRootNodes = [...remainingNodes];
         newRootNodes.splice(insertIndex, 0, parallelNode);
 
-        setNodes([...newRootNodes, ...newLanes, ...newCompounds, ...movedNodes]);
+        setNodes([...newRootNodes, ...newLanes, ...movedNodes]);
         setEdges([...updatedEdges, ...newEdgesToAdd]);
         setSelectedNodeId(parallelId);
         setActiveTab("allgemein");
@@ -2467,45 +2992,45 @@ function AppContent() {
     const canvasSkillSlotOptions = useMemo(() => {
         const options = [];
 
-            nodes.forEach((node) => {
-                if (node.type === "slot" || node.type === "parallelLane") return;
+        nodes.forEach((node) => {
+            if (node.type === "slot" || node.type === "parallelLane") return;
 
-                const nodeLabel =
-                    node.data?.fullSkillName ||
-                    node.data?.label ||
-                    node.id;
+            const nodeLabel =
+                node.data?.fullSkillName ||
+                node.data?.label ||
+                node.id;
 
-                (node.data?.inSlots || []).forEach((slot, index) => {
-                    if (!slot?.key) return;
-                    if (slot.path && slot.path.trim()) return;
-                    options.push({
-                        id: `${node.id}-read-${index}`,
-                        nodeId: node.id,
-                        nodeLabel,
-                        access: "read",
-                        slotIndex: index,
-                        key: slot.key,
-                        type: slot.type,
-                    });
-                });
-
-                (node.data?.outSlots || []).forEach((slot, index) => {
-                    if (!slot?.key) return;
-                    if (slot.path && slot.path.trim()) return;
-                       options.push({
-                        id: `${node.id}-write-${index}`,
-                        nodeId: node.id,
-                        nodeLabel,
-                        access: "write",
-                        slotIndex: index,
-                        key: slot.key,
-                        type: slot.type,
-                    });
+            (node.data?.inSlots || []).forEach((slot, index) => {
+                if (!slot?.key) return;
+                if (slot.path && slot.path.trim()) return;
+                options.push({
+                    id: `${node.id}-read-${index}`,
+                    nodeId: node.id,
+                    nodeLabel,
+                    access: "read",
+                    slotIndex: index,
+                    key: slot.key,
+                    type: slot.type,
                 });
             });
 
-            return options;
-        }, [nodes]);
+            (node.data?.outSlots || []).forEach((slot, index) => {
+                if (!slot?.key) return;
+                if (slot.path && slot.path.trim()) return;
+                options.push({
+                    id: `${node.id}-write-${index}`,
+                    nodeId: node.id,
+                    nodeLabel,
+                    access: "write",
+                    slotIndex: index,
+                    key: slot.key,
+                    type: slot.type,
+                });
+            });
+        });
+
+        return options;
+    }, [nodes]);
 
     const activeWorkflowTab = useMemo(
         () => tabs.find((tab) => tab.id === activeTabId) || null,
@@ -2810,6 +3335,33 @@ function AppContent() {
             ...editableSlotEdges,
         ];
     }
+
+    visibleNodes = visibleNodes.map((visibleNode) => {
+        if (visibleNode.type === "parallel") {
+            return {
+                ...visibleNode,
+                data: {
+                    ...visibleNode.data,
+                    isDropTarget: visibleNode.id === parallelDropTargetId,
+                },
+            };
+        }
+
+        if (
+            visibleNode.type === "compound" &&
+            visibleNode.className !== "compound-in-lane"
+        ) {
+            return {
+                ...visibleNode,
+                data: {
+                    ...visibleNode.data,
+                    isDropTarget: visibleNode.id === compoundDropTargetId,
+                },
+            };
+        }
+
+        return visibleNode;
+    });
 
     const createNameforSkill = (fullSkillName) => {
         const label = fullSkillName.split(".").pop();
@@ -3432,50 +3984,522 @@ function AppContent() {
                 return;
             }
 
-            // Normal event transition.
-            const alreadyExists = edges.some(
-                (edge) =>
-                    edge.source === params.source &&
-                    edge.sourceHandle === params.sourceHandle &&
-                    edge.target === params.target
+            const sourceNode = nodes.find(
+                (n) => n.id === params.source
             );
 
-            if (alreadyExists) {
-                openConditionDrawer(
-                    params.source,
-                    params.sourceHandle,
-                    params.target
-                );
+            const targetNode = nodes.find(
+                (n) => n.id === params.target
+            );
+
+            if (!sourceNode || !targetNode) {
                 return;
             }
 
-            const targetNode = nodes.find(
-                (node) => node.id === params.target
+            // Prüfen, ob Source / Target innerhalb einer Parallel-Lane liegen
+            const sourceLane = getLaneForNode(
+                sourceNode,
+                nodes
             );
+
+            const targetLane = getLaneForNode(
+                targetNode,
+                nodes
+            );
+
+            const leavesParallel =
+                sourceLane &&
+                (
+                    !targetLane ||
+                    targetLane.parentId !== sourceLane.parentId
+                );
+
+            const alreadyExists = edges.some((edge) => {
+                const logicalSource =
+                    edge.data?.parallelOriginalSource ||
+                    edge.source;
+
+                return (
+                    logicalSource === params.source &&
+                    edge.sourceHandle === params.sourceHandle &&
+                    edge.target === params.target
+                );
+            });
+
+            if (alreadyExists) {
+                openConditionDrawer(params.source, params.sourceHandle, params.target);
+                return;
+            }
+
+            const sourceCompound =
+                getDirectCompoundForNode(
+                    sourceNode,
+                    nodes
+                );
+
+            const targetCompound =
+                getDirectCompoundForNode(
+                    targetNode,
+                    nodes
+                );
+
+            const leavesCompound =
+                sourceCompound &&
+                (
+                    !targetCompound ||
+                    targetCompound.id !== sourceCompound.id
+                );
+
+            if (leavesCompound) {
+                const handleId =
+                    params.sourceHandle || "success";
+
+                const baseName =
+                    sourceNode.data?.label ||
+                    sourceNode.data?.fullSkillName ||
+                    "state";
+
+                const exitLabel =
+                    `${baseName}.${handleId}`;
+
+
+                const externalEdge = {
+                    id:
+                        `edge-compound-${params.source}-` +
+                        `${handleId}-${params.target}-` +
+                        crypto.randomUUID(),
+
+                    source: sourceCompound.id,
+                    target: params.target,
+
+                    sourceHandle: handleId,
+                    targetHandle: params.targetHandle,
+
+                    label: handleId,
+
+                    type: "smartTransition",
+
+                    markerEnd: {
+                        type: MarkerType.ArrowClosed,
+                    },
+
+                    data: {
+                        cond: "",
+                        assignments: [],
+                        assign: null,
+
+                        // eigentliche interne Source merken
+                        compoundOriginalSource:
+                        params.source,
+
+                        compoundOriginalSourceHandle:
+                        handleId,
+                    },
+                };
+
+                const internalEdge = {
+                    id:
+                        `edge-internal-compound-${params.source}-` +
+                        `${handleId}-${sourceCompound.id}-` +
+                        crypto.randomUUID(),
+
+                    source: params.source,
+                    target: sourceCompound.id,
+
+                    sourceHandle: handleId,
+
+                    // GENAU der unsichtbare Handle LINKS am Label
+                    targetHandle: `target-${handleId}`,
+
+                    type: "smoothstep",
+
+                    style: {
+                        strokeDasharray: "4 4",
+                        stroke: "#0284c7",
+                        strokeWidth: 1.5,
+                    },
+
+                    data: {
+                        compoundInternalEdge: true,
+                    },
+                };
+
+                setEdges((currentEdges) => [
+                    ...currentEdges,
+                    externalEdge,
+                    internalEdge,
+                ]);
+
+
+                /*
+                 * =====================================================
+                 * 4. Compound bekommt Event + Handles
+                 * =====================================================
+                 */
+
+                setNodes((currentNodes) =>
+                    currentNodes.map((node) => {
+                        if (node.id !== sourceCompound.id) {
+                            return node;
+                        }
+
+                        const compoundEvents =
+                            node.data?.events || [];
+
+                        const alreadyExists =
+                            compoundEvents.some(
+                                (event) =>
+                                    String(event.id) ===
+                                    String(handleId)
+                            );
+
+                        if (alreadyExists) {
+                            return node;
+                        }
+
+                        return {
+                            ...node,
+
+                            data: {
+                                ...node.data,
+
+                                events: [
+                                    ...compoundEvents,
+
+                                    {
+                                        id: handleId,
+
+                                        // genauso wie Parallel:
+                                        // SkillName.event
+                                        name: exitLabel,
+                                        rawEvent: exitLabel,
+
+                                        target:
+                                        params.target,
+
+                                        sourceNodeId:
+                                        params.source,
+                                    },
+                                ],
+                            },
+                        };
+                    })
+                );
+
+
+                /*
+                 * React Flow mitteilen:
+                 * Compound hat neue Handles bekommen.
+                 */
+
+                requestAnimationFrame(() => {
+                    updateNodeInternals(
+                        sourceCompound.id
+                    );
+                });
+
+                return;
+            }
+
+            /*
+             * =========================================================
+             * TRANSITION VERLÄSST PARALLEL
+             * =========================================================
+             */
+            if (leavesParallel) {
+                const handleId =
+                    params.sourceHandle || "success";
+
+                /*
+                 * Sichtbare äußere Transition:
+                 *
+                 * Nicht:
+                 * State A -> State B
+                 *
+                 * sondern:
+                 * Lane -> State B
+                 *
+                 * parallelOriginalSource merkt sich,
+                 * welcher State eigentlich die Source ist.
+                 */
+                const externalEdge = {
+                    id:
+                        `edge-${params.source}-` +
+                        `${handleId}-${params.target}-` +
+                        crypto.randomUUID(),
+
+                    source: sourceLane.id,
+                    target: params.target,
+
+                    sourceHandle: handleId,
+                    targetHandle: params.targetHandle,
+
+                    label: handleId,
+
+                    markerEnd: {
+                        type: MarkerType.ArrowClosed,
+                    },
+
+                    data: {
+                        cond: "",
+                        assignments: [],
+                        assign: null,
+
+                        // Der tatsächliche State bleibt hier gespeichert
+                        parallelOriginalSource:
+                        params.source,
+                    },
+                };
+
+                /*
+                 * Interne gestrichelte Verbindung:
+                 *
+                 * State A -> Lane-Rand
+                 */
+                const internalEdge = {
+                    id:
+                        `edge-internal-${params.source}-` +
+                        `${handleId}-${sourceLane.id}-` +
+                        crypto.randomUUID(),
+
+                    source: params.source,
+                    target: sourceLane.id,
+
+                    sourceHandle: handleId,
+                    targetHandle: `target-${handleId}`,
+
+                    type: "smoothstep",
+
+                    style: {
+                        strokeDasharray: "4 4",
+                        stroke: "#0284c7",
+                        strokeWidth: 1.5,
+                    },
+                };
+
+                setEdges((currentEdges) => [
+                    ...currentEdges,
+                    externalEdge,
+                    internalEdge,
+                ]);
+
+                /*
+                 * Die Lane braucht den Event/Handle ebenfalls,
+                 * damit die äußere Transition sauber am Rand
+                 * angezeigt werden kann.
+                 */
+                setNodes((currentNodes) =>
+                    currentNodes.map((node) => {
+                        /*
+                         * Event am ursprünglichen State ergänzen
+                         */
+                        if (node.id === params.source) {
+                            const events =
+                                node.data?.events || [];
+
+                            const existingEvent =
+                                events.find(
+                                    (event) =>
+                                        event.id === handleId
+                                );
+
+                            if (existingEvent) {
+                                return node;
+                            }
+
+                            return {
+                                ...node,
+                                data: {
+                                    ...node.data,
+                                    events: [
+                                        ...events,
+                                        {
+                                            id: handleId,
+
+                                            selectedPackage:
+                                                getSkillPackageName(
+                                                    targetNode
+                                                        ?.data
+                                                        ?.fullSkillName
+                                                ),
+
+                                            selectedSkill:
+                                                targetNode
+                                                    ?.data
+                                                    ?.fullSkillName
+                                                    ?.split("#")[0] ||
+                                                "",
+
+                                            target:
+                                            params.target,
+
+                                            cond: "",
+
+                                            assignments: [],
+
+                                            assignLocation: "",
+                                            assignExpr: "",
+                                        },
+                                    ],
+                                },
+                            };
+                        }
+
+                        /*
+                         * Passenden Handle/Event an der Lane erzeugen
+                         */
+                        if (node.id === sourceLane.id) {
+                            const laneEvents =
+                                node.data?.events || [];
+
+                            const alreadyHasEvent =
+                                laneEvents.some(
+                                    (event) =>
+                                        event.id === handleId
+                                );
+
+                            if (alreadyHasEvent) {
+                                return node;
+                            }
+
+                            const baseName =
+                                sourceNode.data?.label ||
+                                sourceNode.data
+                                    ?.fullSkillName ||
+                                "state";
+
+                            return {
+                                ...node,
+                                data: {
+                                    ...node.data,
+
+                                    events: [
+                                        ...laneEvents,
+                                        {
+                                            id: handleId,
+
+                                            name:
+                                                `${baseName}.` +
+                                                handleId,
+
+                                            rawEvent:
+                                                `${baseName}.` +
+                                                handleId,
+
+                                            target:
+                                            params.target,
+                                        },
+                                    ],
+                                },
+                            };
+                        }
+
+                        return node;
+                    })
+                );
+
+                requestAnimationFrame(() => {
+                    updateNodeInternals(sourceLane.id);
+                });
+
+                /*
+                 * Falls mehrere Transitions vom selben Event ausgehen,
+                 * Condition Drawer öffnen.
+                 */
+                const outgoingFromHandle = [
+                    ...edges,
+                    externalEdge,
+                ].filter((edge) => {
+                    const logicalSource =
+                        edge.data?.parallelOriginalSource ||
+                        edge.source;
+
+                    return (
+                        logicalSource === params.source &&
+                        edge.sourceHandle === handleId
+                    );
+                });
+
+                if (outgoingFromHandle.length >= 2) {
+                    openConditionDrawer(
+                        params.source,
+                        handleId,
+                        params.target,
+                        [
+                            ...edges,
+                            externalEdge,
+                            internalEdge,
+                        ]
+                    );
+                }
+
+                return;
+            }
+
+            /*
+             * =========================================================
+             * NORMALE TRANSITION
+             * =========================================================
+             *
+             * Source liegt nicht im Parallel oder Target befindet
+             * sich im selben Parallel-State.
+             */
             const newEdge = {
-                id: `edge-${params.source}-${params.sourceHandle}-${params.target}-${crypto.randomUUID()}`,
+                id:
+                    `edge-${params.source}-` +
+                    `${params.sourceHandle}-` +
+                    `${params.target}-` +
+                    crypto.randomUUID(),
+
                 source: params.source,
                 target: params.target,
-                sourceHandle: params.sourceHandle,
+
+                sourceHandle:
+                params.sourceHandle,
+
                 targetHandle:
-                    params.targetHandle || "transition-target",
-                label: params.sourceHandle,
+                params.targetHandle,
+
+                label:
+                params.sourceHandle,
+
                 type: "smartTransition",
-                markerEnd: { type: MarkerType.ArrowClosed },
-                data: { cond: "", assignments: [], assign: null },
+                markerEnd: {
+                    type: MarkerType.ArrowClosed,
+                },
+
+                data: {
+                    cond: "",
+                    assignments: [],
+                    assign: null,
+                },
             };
 
-            const updatedEdges = [...edges, newEdge];
+            const updatedEdges = [
+                ...edges,
+                newEdge,
+            ];
+
             setEdges(updatedEdges);
 
+            /*
+             * Event am Source-State aktualisieren
+             */
             setNodes((currentNodes) =>
                 currentNodes.map((node) => {
-                    if (node.id !== params.source) return node;
+                    if (node.id !== params.source) {
+                        return node;
+                    }
 
-                    const events = node.data.events || [];
-                    const existingEvent = events.find(
-                        (event) => event.id === params.sourceHandle
-                    );
+                    const events =
+                        node.data?.events || [];
+
+                    const existingEvent =
+                        events.find(
+                            (event) =>
+                                event.id ===
+                                params.sourceHandle
+                        );
 
                     if (existingEvent) {
                         return node;
@@ -3485,19 +4509,30 @@ function AppContent() {
                         ...node,
                         data: {
                             ...node.data,
+
                             events: [
                                 ...events,
                                 {
-                                    id: params.sourceHandle,
+                                    id:
+                                    params.sourceHandle,
+
                                     selectedPackage:
                                         getSkillPackageName(
-                                            targetNode?.data.fullSkillName
+                                            targetNode
+                                                ?.data
+                                                ?.fullSkillName
                                         ),
+
                                     selectedSkill:
-                                        targetNode?.data.fullSkillName?.split(
-                                            "#"
-                                        )[0] || "",
-                                    target: params.target,
+                                        targetNode
+                                            ?.data
+                                            ?.fullSkillName
+                                            ?.split("#")[0] ||
+                                        "",
+
+                                    target:
+                                    params.target,
+
                                     cond: "",
                                     assignments: [],
                                     assignLocation: "",
@@ -3509,11 +4544,14 @@ function AppContent() {
                 })
             );
 
-            const outgoingFromHandle = updatedEdges.filter(
-                (edge) =>
-                    edge.source === params.source &&
-                    edge.sourceHandle === params.sourceHandle
-            );
+            const outgoingFromHandle =
+                updatedEdges.filter(
+                    (edge) =>
+                        edge.source ===
+                        params.source &&
+                        edge.sourceHandle ===
+                        params.sourceHandle
+                );
 
             if (outgoingFromHandle.length >= 2) {
                 openConditionDrawer(
@@ -3531,6 +4569,7 @@ function AppContent() {
             setEdges,
             setNodes,
             setSlotEdges,
+            updateNodeInternals,
         ]
     );
 
@@ -3826,7 +4865,7 @@ function AppContent() {
     const checkSlotConnection = (customNodes = null, customManualSlots = null) => {
         const targetNodes = Array.isArray(customNodes) ? customNodes : nodes;
         const activeManualSlots =
-                customManualSlots !== null ? customManualSlots : manualSlots;
+            customManualSlots !== null ? customManualSlots : manualSlots;
         if (!targetNodes || targetNodes.length === 0) {
             setSlotNodes([]);
             setSlotEdges([]);
@@ -3924,9 +4963,9 @@ function AppContent() {
                         type: "smartTransition",
                         selected: Boolean(existingReadEdge?.selected),
                         style: {
-                                stroke: SLOT_CONNECTION_COLORS.read,
-                                strokeWidth: 1.7,
-                                strokeDasharray: "5 5",
+                            stroke: SLOT_CONNECTION_COLORS.read,
+                            strokeWidth: 1.7,
+                            strokeDasharray: "5 5",
                         },
                         markerEnd: {
                             type: MarkerType.ArrowClosed,
@@ -4071,29 +5110,29 @@ function AppContent() {
 
         let updatedNodes = nodes;
 
-                if (slotData.linkedSkillSlot) {
-                    const { nodeId, access, slotIndex } = slotData.linkedSkillSlot;
-                    const cleanPath = `/${normalizeSlotPath(slotData.path)}`;
+        if (slotData.linkedSkillSlot) {
+            const { nodeId, access, slotIndex } = slotData.linkedSkillSlot;
+            const cleanPath = `/${normalizeSlotPath(slotData.path)}`;
 
-                    updatedNodes = nodes.map((node) => {
-                        if (node.id !== nodeId) return node;
+            updatedNodes = nodes.map((node) => {
+                if (node.id !== nodeId) return node;
 
-                        const key = access === "read" ? "inSlots" : "outSlots";
-                        return {
-                            ...node,
-                            data: {
-                                ...node.data,
-                                [key]: node.data[key].map((slot, index) =>
-                                    index === slotIndex
-                                        ? { ...slot, path: cleanPath }
-                                        : slot
-                                ),
-                            },
-                        };
-                    });
+                const key = access === "read" ? "inSlots" : "outSlots";
+                return {
+                    ...node,
+                    data: {
+                        ...node.data,
+                        [key]: node.data[key].map((slot, index) =>
+                            index === slotIndex
+                                ? { ...slot, path: cleanPath }
+                                : slot
+                        ),
+                    },
+                };
+            });
 
-                    setNodes(updatedNodes);
-                }
+            setNodes(updatedNodes);
+        }
 
         checkSlotConnection(updatedNodes, updatedManualSlots);
     };
@@ -4359,47 +5398,1053 @@ function AppContent() {
         }
     };
 
+    const handleNodeDragStart = useCallback((event, node) => {
+        setIsDraggingNode(true);
+
+        // Nodes innerhalb einer Lane dürfen vorübergehend den
+        // bisherigen Parent verlassen.
+        if (getLaneForNode(node, nodes) || getDirectCompoundForNode(node, nodes)) {
+            setNodes((currentNodes) =>
+                currentNodes.map((candidate) =>
+                    candidate.id === node.id
+                        ? { ...candidate, extent: undefined }
+                        : candidate
+                )
+            );
+        }
+    }, [nodes, setNodes]);
+
+    const handleNodeDrag = useCallback((event, draggedNode) => {
+        const isOverTrash = Boolean(
+            document
+                .elementFromPoint(event.clientX, event.clientY)
+                ?.closest(".trash-bin-dropzone")
+        );
+
+        setIsOverTrash(isOverTrash);
+
+        if (
+            isOverTrash ||
+            ["parallel", "parallelLane", "compound"].includes(
+                draggedNode.type
+            )
+        ) {
+            setParallelDropTargetId(null);
+            setCompoundDropTargetId(null);
+            return;
+        }
+
+        const pointerPosition = screenToFlowPosition({
+            x: event.clientX,
+            y: event.clientY,
+        });
+
+        const hoveredLane = nodes
+            .filter((candidate) => candidate.type === "parallelLane")
+            .find((lane) => {
+                const lanePosition = getAbsoluteNodePosition(
+                    lane,
+                    nodes
+                );
+
+                const width = Number(lane.style?.width) || 420;
+                const height = Number(lane.style?.height) || 110;
+
+                return (
+                    pointerPosition.x >= lanePosition.x &&
+                    pointerPosition.x <= lanePosition.x + width &&
+                    pointerPosition.y >= lanePosition.y &&
+                    pointerPosition.y <= lanePosition.y + height
+                );
+            });
+
+        const hoveredCompound = nodes
+            .filter((candidate) => candidate.type === "compound" && candidate.className !== "compound-in-lane" && candidate.id !== draggedNode.id)
+            .find((compound) => {
+                const pos = getAbsoluteNodePosition(compound, nodes);
+                const { width, height } = getNodeSize(compound);
+                return pointerPosition.x >= pos.x && pointerPosition.x <= pos.x + width &&
+                    pointerPosition.y >= pos.y && pointerPosition.y <= pos.y + height;
+            });
+
+        setCompoundDropTargetId(hoveredCompound?.id || null);
+        setParallelDropTargetId(hoveredCompound ? null : (hoveredLane?.parentId || null));
+    }, [nodes, screenToFlowPosition]);
+
     const handleNodeDragStop = useCallback((event, node) => {
-        const elem = document.elementFromPoint(event.clientX, event.clientY);
-        if (elem && elem.closest(".trash-bin-dropzone")) {
+        const element = document.elementFromPoint(
+            event.clientX,
+            event.clientY
+        );
+
+        if (element?.closest(".trash-bin-dropzone")) {
             setNodes((currentNodes) => {
-                // 1. Alle Kind-IDs rekursiv ermitteln
                 const idsToDelete = new Set([node.id]);
                 let foundNew = true;
 
                 while (foundNew) {
                     foundNew = false;
-                    currentNodes.forEach((n) => {
-                        if (n.parentId && idsToDelete.has(n.parentId) && !idsToDelete.has(n.id)) {
-                            idsToDelete.add(n.id);
+
+                    currentNodes.forEach((candidate) => {
+                        if (
+                            candidate.parentId &&
+                            idsToDelete.has(candidate.parentId) &&
+                            !idsToDelete.has(candidate.id)
+                        ) {
+                            idsToDelete.add(candidate.id);
                             foundNew = true;
                         }
                     });
                 }
 
-                // 2. Kanten aufräumen, die an gelöschten Knoten hängen
-                setEdges((eds) =>
-                    eds.filter((e) => !idsToDelete.has(e.source) && !idsToDelete.has(e.target))
+                setEdges((currentEdges) =>
+                    currentEdges.filter(
+                        (edge) =>
+                            !idsToDelete.has(edge.source) &&
+                            !idsToDelete.has(edge.target)
+                    )
                 );
 
-                setSlotEdges((eds) => {
-                    const updated = eds.filter((e) => !idsToDelete.has(e.source) && !idsToDelete.has(e.target));
-                    setSlotNodes((sNodes) =>
-                        sNodes.filter((sn) => updated.some((e) => e.source === sn.id || e.target === sn.id))
+                setSlotEdges((currentEdges) => {
+                    const updatedEdges = currentEdges.filter(
+                        (edge) =>
+                            !idsToDelete.has(edge.source) &&
+                            !idsToDelete.has(edge.target)
                     );
-                    return updated;
+
+                    setSlotNodes((currentSlotNodes) =>
+                        currentSlotNodes.filter((slotNode) =>
+                            updatedEdges.some(
+                                (edge) =>
+                                    edge.source === slotNode.id ||
+                                    edge.target === slotNode.id
+                            )
+                        )
+                    );
+
+                    return updatedEdges;
                 });
 
-                setSelectedNodeId((id) => (idsToDelete.has(id) ? null : id));
+                setSelectedNodeId((id) =>
+                    idsToDelete.has(id) ? null : id
+                );
 
-                // 3. Alle identifizierten Knoten auf einmal entfernen
-                return currentNodes.filter((n) => !idsToDelete.has(n.id));
+                return currentNodes.filter(
+                    (candidate) => !idsToDelete.has(candidate.id)
+                );
             });
-            setSelectedNodeId((id) => (id === node.id ? null : id));
+
+            setIsDraggingNode(false);
+            setIsOverTrash(false);
+            setParallelDropTargetId(null);
+            setCompoundDropTargetId(null);
+            return;
         }
+
+        // Container selbst werden nicht in Lanes verschoben.
+        if (
+            node.type === "parallel" ||
+            node.type === "parallelLane" ||
+            node.type === "compound"
+        ) {
+            setIsDraggingNode(false);
+            setIsOverTrash(false);
+            setParallelDropTargetId(null);
+            setCompoundDropTargetId(null);
+            return;
+        }
+
+        const dropPoint = screenToFlowPosition({
+            x: event.clientX,
+            y: event.clientY,
+        });
+
+        setNodes((currentNodes) => {
+            const draggedNode = currentNodes.find(
+                (candidate) => candidate.id === node.id
+            );
+
+            if (!draggedNode) {
+                return currentNodes;
+            }
+
+            const sourceCompound = getDirectCompoundForNode(
+                draggedNode,
+                currentNodes
+            );
+
+            const targetCompound = currentNodes
+                .filter(
+                    (c) =>
+                        c.type === "compound" &&
+                        c.className !== "compound-in-lane" &&
+                        c.id !== draggedNode.id
+                )
+                .find((compound) => {
+                    const p = getAbsoluteNodePosition(
+                        compound,
+                        currentNodes
+                    );
+
+                    const z = getNodeSize(compound);
+
+                    return (
+                        dropPoint.x >= p.x &&
+                        dropPoint.x <= p.x + z.width &&
+                        dropPoint.y >= p.y &&
+                        dropPoint.y <= p.y + z.height
+                    );
+                });
+
+
+            // ---------------------------------------------------------
+            // Node befindet sich bereits im selben Compound
+            // -> Position NICHT automatisch verändern
+            // -> Node darf frei innerhalb des Compounds bewegt werden
+            // ---------------------------------------------------------
+
+            if (
+                draggedNode.type !== "compound" &&
+                sourceCompound &&
+                targetCompound &&
+                sourceCompound.id === targetCompound.id
+            ) {
+                let next = [...currentNodes];
+
+                // Compound an neue Node-Position anpassen
+                const members = next.filter(
+                    (c) => c.parentId === sourceCompound.id
+                );
+
+                let right = 0;
+                let bottom = 0;
+
+                members.forEach((member) => {
+                    const size = getNodeSize(member);
+
+                    right = Math.max(
+                        right,
+                        Number(member.position?.x || 0) + size.width
+                    );
+
+                    bottom = Math.max(
+                        bottom,
+                        Number(member.position?.y || 0) + size.height
+                    );
+                });
+
+                next = next.map((c) =>
+                    c.id === sourceCompound.id
+                        ? {
+                            ...c,
+                            style: {
+                                ...c.style,
+                                width: Math.max(
+                                    320,
+                                    right + COMPOUND_LABEL_SPACE
+                                ),
+                                height: Math.max(
+                                    180,
+                                    bottom + COMPOUND_BOTTOM_PADDING
+                                ),
+                            },
+                        }
+                        : c
+                );
+
+                return orderNodesParentsFirst(next);
+            }
+
+            if (
+                draggedNode.type !== "compound" &&
+                !getLaneForNode(draggedNode, currentNodes) &&
+                (sourceCompound || targetCompound)
+            ) {
+                const absolute = getAbsoluteNodePosition(
+                    draggedNode,
+                    currentNodes
+                );
+
+                // Zunächst aus aktuellem Parent lösen
+                let next = currentNodes.map((c) =>
+                    c.id === draggedNode.id
+                        ? {
+                            ...c,
+                            parentId: undefined,
+                            extent: undefined,
+                            position: absolute,
+                        }
+                        : c
+                );
+
+                if (targetCompound) {
+                    const compoundPosition =
+                        getAbsoluteNodePosition(
+                            targetCompound,
+                            currentNodes
+                        );
+
+                    // Absolute Position der Node in eine
+                    // relative Compound-Position umrechnen
+                    const relativePosition = {
+                        x: absolute.x - compoundPosition.x,
+                        y: absolute.y - compoundPosition.y,
+                    };
+
+                    next = next.map((c) =>
+                        c.id === draggedNode.id
+                            ? {
+                                ...c,
+                                parentId: targetCompound.id,
+                                extent: "parent",
+
+                                // Drop-Position beibehalten
+                                position: {
+                                    x: Math.max(
+                                        COMPOUND_PADDING_X,
+                                        relativePosition.x
+                                    ),
+                                    y: Math.max(
+                                        COMPOUND_HEADER_HEIGHT,
+                                        relativePosition.y
+                                    ),
+                                },
+                            }
+                            : c
+                    );
+                }
+
+                else {
+                    next = next.map((c) =>
+                        c.id === draggedNode.id
+                            ? {
+                                ...c,
+                                position: {
+                                    x: dropPoint.x,
+                                    y: dropPoint.y,
+                                },
+                            }
+                            : c
+                    );
+                }
+
+                const resize = (id) => {
+                    if (!id) return;
+
+                    const members = next.filter(
+                        (c) => c.parentId === id
+                    );
+
+                    let right = 0;
+                    let bottom = 0;
+
+                    members.forEach((member) => {
+                        const size = getNodeSize(member);
+
+                        right = Math.max(
+                            right,
+                            Number(member.position?.x || 0) +
+                            size.width
+                        );
+
+                        bottom = Math.max(
+                            bottom,
+                            Number(member.position?.y || 0) +
+                            size.height
+                        );
+                    });
+
+                    next = next.map((c) =>
+                        c.id === id
+                            ? {
+                                ...c,
+                                style: {
+                                    ...c.style,
+                                    width: Math.max(
+                                        320,
+                                        right + 160
+                                    ),
+                                    height: Math.max(
+                                        180,
+                                        bottom + 30
+                                    ),
+                                },
+                            }
+                            : c
+                    );
+                };
+
+                resize(sourceCompound?.id);
+                resize(targetCompound?.id);
+
+
+                if (targetCompound) {
+                    const handles = edges
+                        .filter(
+                            (edge) =>
+                                edge.source === draggedNode.id &&
+                                edge.target !== targetCompound.id
+                        )
+                        .map(
+                            (edge) =>
+                                edge.sourceHandle || "success"
+                        );
+
+                    next = next.map((c) =>
+                        c.id === targetCompound.id
+                            ? {
+                                ...c,
+                                data: {
+                                    ...c.data,
+
+                                    events: [
+                                        ...(c.data?.events || []),
+
+                                        ...handles
+                                            .filter(
+                                                (handle) =>
+                                                    !(
+                                                        c.data?.events ||
+                                                        []
+                                                    ).some(
+                                                        (event) =>
+                                                            String(
+                                                                event.id
+                                                            ) ===
+                                                            String(
+                                                                handle
+                                                            )
+                                                    )
+                                            )
+                                            .map((handle) => ({
+                                                id: handle,
+                                                name: handle,
+                                                rawEvent: handle,
+                                            })),
+                                    ],
+                                },
+                            }
+                            : c
+                    );
+                }
+
+
+                setEdges(
+                    edges.map((edge) => {
+                        // Node wurde AUS einem Compound gezogen.
+                        // Edge wieder direkt mit Node verbinden.
+                        if (
+                            sourceCompound &&
+                            edge.data?.compoundOriginalSource ===
+                            draggedNode.id
+                        ) {
+                            return {
+                                ...edge,
+
+                                source: draggedNode.id,
+
+                                data: {
+                                    ...edge.data,
+                                    compoundOriginalSource:
+                                    undefined,
+                                },
+                            };
+                        }
+
+
+                        if (
+                            targetCompound &&
+                            edge.source === draggedNode.id &&
+                            edge.target !== targetCompound.id
+                        ) {
+                            return {
+                                ...edge,
+
+                                source: targetCompound.id,
+
+                                sourceHandle:
+                                    edge.sourceHandle || "success",
+
+                                data: {
+                                    ...edge.data,
+
+                                    compoundOriginalSource:
+                                    draggedNode.id,
+                                },
+                            };
+                        }
+
+                        return edge;
+                    })
+                );
+
+                return orderNodesParentsFirst(next);
+            }
+
+            const sourceLane = getLaneForNode(
+                draggedNode,
+                currentNodes
+            );
+
+            const targetLane = currentNodes
+                .filter(
+                    (candidate) =>
+                        candidate.type === "parallelLane"
+                )
+                .find((lane) => {
+                    const position = getAbsoluteNodePosition(
+                        lane,
+                        currentNodes
+                    );
+
+                    const width =
+                        Number(lane.style?.width) || 420;
+                    const height =
+                        Number(lane.style?.height) || 110;
+
+                    return (
+                        dropPoint.x >= position.x &&
+                        dropPoint.x <= position.x + width &&
+                        dropPoint.y >= position.y &&
+                        dropPoint.y <= position.y + height
+                    );
+                });
+
+            // Die Node wurde lediglich innerhalb derselben Lane bewegt.
+            if (targetLane?.id === sourceLane?.id) {
+                return currentNodes.map((candidate) =>
+                    candidate.id === draggedNode.id
+                        ? {
+                            ...candidate,
+                            extent: "parent",
+                        }
+                        : candidate
+                );
+            }
+
+            const sourceParallel = sourceLane
+                ? currentNodes.find(
+                    (candidate) =>
+                        candidate.id === sourceLane.parentId
+                )
+                : null;
+
+            const targetParallel = targetLane
+                ? currentNodes.find(
+                    (candidate) =>
+                        candidate.id === targetLane.parentId
+                )
+                : null;
+
+            const absolutePosition = getAbsoluteNodePosition(
+                draggedNode,
+                currentNodes
+            );
+
+            let nextNodes = currentNodes.filter(
+                (candidate) => candidate.id !== draggedNode.id
+            );
+
+            const normalizeLane = (lane, nodeToArrangeId = null) => {
+                if (!lane) return;
+
+                const directChildren = nextNodes.filter(
+                    (candidate) => candidate.parentId === lane.id
+                );
+
+                // Der Compound existiert bereits automatisch in jeder Lane.
+                const wrapper = directChildren.find(
+                    (candidate) =>
+                        candidate.type === "compound" &&
+                        candidate.className === "compound-in-lane"
+                );
+
+                const parentId = wrapper?.id || lane.id;
+
+                // Alle States innerhalb der Lane / des Compounds
+                const members = wrapper
+                    ? nextNodes.filter(
+                        (candidate) =>
+                            candidate.parentId === wrapper.id
+                    )
+                    : directChildren.filter(
+                        (candidate) =>
+                            candidate.type !== "compound"
+                    );
+
+
+                if (nodeToArrangeId) {
+                    const newNode = members.find(
+                        (member) => member.id === nodeToArrangeId
+                    );
+
+                    if (newNode) {
+                        const existingMembers = members.filter(
+                            (member) => member.id !== nodeToArrangeId
+                        );
+
+                        const newX =
+                            25 + existingMembers.length * 190;
+
+                        nextNodes = nextNodes.map((candidate) => {
+                            if (candidate.id !== nodeToArrangeId) {
+                                return candidate;
+                            }
+
+                            return {
+                                ...candidate,
+                                parentId,
+                                extent: "parent",
+                                position: {
+                                    x: newX,
+                                    y: 20,
+                                },
+                            };
+                        });
+                    }
+                }
+
+                const requiredWidth = Math.max(
+                    420,
+                    members.length * 190 + 80
+                );
+
+                const parallel = nextNodes.find(
+                    (candidate) => candidate.id === lane.parentId
+                );
+
+                if (!parallel) return;
+
+                const parallelLanes = nextNodes.filter(
+                    (candidate) =>
+                        candidate.type === "parallelLane" &&
+                        candidate.parentId === parallel.id
+                );
+
+                let requiredParallelWidth = 420;
+
+                parallelLanes.forEach((parallelLane) => {
+                    const directChildren = nextNodes.filter(
+                        (candidate) =>
+                            candidate.parentId === parallelLane.id
+                    );
+
+                    const laneWrapper = directChildren.find(
+                        (candidate) =>
+                            candidate.type === "compound" &&
+                            candidate.className === "compound-in-lane"
+                    );
+
+                    // States dieser Lane
+                    const laneMembers = laneWrapper
+                        ? nextNodes.filter(
+                            (candidate) =>
+                                candidate.parentId === laneWrapper.id
+                        )
+                        : directChildren.filter(
+                            (candidate) =>
+                                candidate.type !== "compound"
+                        );
+
+                    let maxRight = 0;
+
+                    laneMembers.forEach((member) => {
+                        const nodeWidth =
+                            Number(member.measured?.width) ||
+                            Number(member.width) ||
+                            Number(member.style?.width) ||
+                            160;
+
+                        const right =
+                            Number(member.position?.x || 0) +
+                            nodeWidth;
+
+                        maxRight = Math.max(maxRight, right);
+                    });
+
+                    const laneRequiredWidth =
+                        15 +
+                        maxRight +
+                        PARALLEL_EXIT_GUTTER;
+
+                    requiredParallelWidth = Math.max(
+                        requiredParallelWidth,
+                        laneRequiredWidth
+                    );
+                });
+
+                const parallelWidth = requiredParallelWidth;
+
+                // Parallel, Lanes und Compounds auf dieselbe
+                // benötigte Breite bringen.
+                nextNodes = nextNodes.map((candidate) => {
+                    // Parallel-State
+                    if (candidate.id === parallel.id) {
+                        return {
+                            ...candidate,
+                            style: {
+                                ...candidate.style,
+                                width: parallelWidth,
+                            },
+                        };
+                    }
+
+                    // Alle Lanes des Parallel-States
+                    if (
+                        candidate.type === "parallelLane" &&
+                        candidate.parentId === parallel.id
+                    ) {
+                        return {
+                            ...candidate,
+                            style: {
+                                ...candidate.style,
+                                width: parallelWidth,
+                            },
+                        };
+                    }
+
+                    // Compounds aller Lanes dieses Parallel-States
+                    const belongsToParallelLane =
+                        parallelLanes.some(
+                            (parallelLane) =>
+                                parallelLane.id === candidate.parentId
+                        );
+
+                    if (
+                        candidate.type === "compound" &&
+                        candidate.className === "compound-in-lane" &&
+                        belongsToParallelLane
+                    ) {
+                        return {
+                            ...candidate,
+                            style: {
+                                ...candidate.style,
+                                width: Math.max(
+                                    390,
+                                    parallelWidth - 30
+                                ),
+                            },
+                        };
+                    }
+
+                    return candidate;
+                });
+            };
+
+            if (targetLane) {
+                // Vorhandenen Compound der Lane suchen
+                const wrapper = nextNodes.find(
+                    (candidate) =>
+                        candidate.parentId === targetLane.id &&
+                        candidate.type === "compound" &&
+                        candidate.className === "compound-in-lane"
+                );
+
+
+                const targetParent = wrapper || targetLane;
+
+                // Absolute Position des Parents bestimmen
+                const parentAbsolutePosition =
+                    getAbsoluteNodePosition(
+                        targetParent,
+                        nextNodes
+                    );
+
+                nextNodes.push({
+                    ...draggedNode,
+
+                    parentId: targetParent.id,
+                    extent: "parent",
+
+                    position: {
+                        x:
+                            absolutePosition.x -
+                            parentAbsolutePosition.x,
+
+                        y:
+                            absolutePosition.y -
+                            parentAbsolutePosition.y,
+                    },
+
+                    selected: false,
+                });
+            } else if (sourceLane) {
+                // Node wurde aus einem Parallel State gezogen.
+                const hasTransition = edges.some(
+                    (edge) =>
+                        !edge.id.startsWith("edge-internal-") &&
+                        (
+                            edge.source === draggedNode.id ||
+                            edge.target === draggedNode.id ||
+                            edge.data?.parallelOriginalSource ===
+                            draggedNode.id ||
+                            edge.data?.parallelOriginalTarget ===
+                            draggedNode.id
+                        )
+                );
+
+                const parallelPosition = sourceParallel
+                    ? getAbsoluteNodePosition(
+                        sourceParallel,
+                        currentNodes
+                    )
+                    : absolutePosition;
+
+                nextNodes.push({
+                    ...draggedNode,
+                    parentId: undefined,
+                    extent: undefined,
+                    position: hasTransition
+                        ? absolutePosition
+                        : {
+                            x: dropPoint.x,
+                            y: dropPoint.y,
+                        },
+                    selected: false,
+                });
+            } else {
+                nextNodes.push({
+                    ...draggedNode,
+                    extent: undefined,
+                });
+            }
+
+            normalizeLane(sourceLane);
+
+            // In der neuen Lane NUR die gerade gedroppte Node einordnen.
+            if (
+                targetLane &&
+                targetLane.id !== sourceLane?.id
+            ) {
+                normalizeLane(
+                    targetLane,
+                    draggedNode.id
+                );
+            }
+
+            let nextEdges = edges;
+
+            if (sourceLane) {
+                const internalHandles = nextEdges
+                    .filter(
+                        (edge) =>
+                            edge.source === draggedNode.id &&
+                            edge.target === sourceLane.id &&
+                            edge.id.startsWith("edge-internal-")
+                    )
+                    .map((edge) => edge.sourceHandle);
+
+                // Interne Verbindungen zum alten Lane-Rand entfernen.
+                nextEdges = nextEdges
+                    .filter(
+                        (edge) =>
+                            !(
+                                edge.source === draggedNode.id &&
+                                edge.target === sourceLane.id &&
+                                edge.id.startsWith(
+                                    "edge-internal-"
+                                )
+                            )
+                    )
+                    .map((edge) => {
+                        if (
+                            edge.data?.parallelOriginalSource ===
+                            draggedNode.id
+                        ) {
+                            return {
+                                ...edge,
+                                source: draggedNode.id,
+                                data: {
+                                    ...edge.data,
+                                    parallelOriginalSource:
+                                    undefined,
+                                },
+                            };
+                        }
+
+                        if (
+                            edge.data?.parallelOriginalTarget ===
+                            draggedNode.id
+                        ) {
+                            return {
+                                ...edge,
+                                target: draggedNode.id,
+                                targetHandle: null,
+                                data: {
+                                    ...edge.data,
+                                    parallelOriginalTarget:
+                                    undefined,
+                                },
+                            };
+                        }
+
+                        return edge;
+                    });
+
+                const stillUsedHandles = new Set(
+                    nextEdges
+                        .filter(
+                            (edge) =>
+                                edge.target === sourceLane.id &&
+                                edge.id.startsWith(
+                                    "edge-internal-"
+                                )
+                        )
+                        .map((edge) => edge.sourceHandle)
+                );
+
+                nextNodes = nextNodes.map((candidate) =>
+                    candidate.id === sourceLane.id
+                        ? {
+                            ...candidate,
+                            data: {
+                                ...candidate.data,
+                                events: (
+                                    candidate.data?.events || []
+                                ).filter(
+                                    (item) =>
+                                        !internalHandles.includes(
+                                            item.id
+                                        ) ||
+                                        stillUsedHandles.has(
+                                            item.id
+                                        )
+                                ),
+                            },
+                        }
+                        : candidate
+                );
+            }
+
+            if (targetLane && targetParallel) {
+                const outgoingIds = new Set(
+                    nextEdges
+                        .filter(
+                            (edge) =>
+                                edge.source === draggedNode.id &&
+                                edge.target !== targetLane.id
+                        )
+                        .map((edge) => edge.id)
+                );
+
+                const incomingIds = new Set(
+                    nextEdges
+                        .filter(
+                            (edge) =>
+                                edge.target === draggedNode.id &&
+                                edge.source !== draggedNode.id
+                        )
+                        .map((edge) => edge.id)
+                );
+
+                const internalEdges = [];
+                const laneEvents = [
+                    ...(targetLane.data?.events || []),
+                ];
+
+                nextEdges = nextEdges.map((edge) => {
+                    if (outgoingIds.has(edge.id)) {
+                        const handleId =
+                            edge.sourceHandle || "success";
+
+                        if (
+                            !laneEvents.some(
+                                (item) => item.id === handleId
+                            )
+                        ) {
+                            const baseName =
+                                draggedNode.data?.label ||
+                                draggedNode.data
+                                    ?.fullSkillName ||
+                                "state";
+
+                            laneEvents.push({
+                                id: handleId,
+                                name: `${baseName}.${handleId}`,
+                                rawEvent: `${baseName}.${handleId}`,
+                                target: edge.target,
+                            });
+                        }
+
+                        internalEdges.push({
+                            id:
+                                `edge-internal-${draggedNode.id}-` +
+                                `${handleId}-${targetLane.id}`,
+                            source: draggedNode.id,
+                            target: targetLane.id,
+                            sourceHandle: handleId,
+                            targetHandle: `target-${handleId}`,
+                            style: {
+                                strokeDasharray: "4 4",
+                                stroke: "#0284c7",
+                                strokeWidth: 1.5,
+                            },
+                            type: "smoothstep",
+                        });
+
+                        return {
+                            ...edge,
+                            source: targetLane.id,
+                            data: {
+                                ...edge.data,
+                                parallelOriginalSource:
+                                draggedNode.id,
+                            },
+                        };
+                    }
+
+                    if (incomingIds.has(edge.id)) {
+                        return {
+                            ...edge,
+                            target: targetParallel.id,
+                            targetHandle: "target",
+                            data: {
+                                ...edge.data,
+                                parallelOriginalTarget:
+                                draggedNode.id,
+                            },
+                        };
+                    }
+
+                    return edge;
+                });
+
+                nextEdges = [
+                    ...nextEdges,
+                    ...internalEdges,
+                ];
+
+                nextNodes = nextNodes.map((candidate) =>
+                    candidate.id === targetLane.id
+                        ? {
+                            ...candidate,
+                            data: {
+                                ...candidate.data,
+                                events: laneEvents,
+                            },
+                        }
+                        : candidate
+                );
+            }
+
+            setEdges(nextEdges);
+
+            // React Flow benötigt Parent-Nodes vor ihren Children.
+            return orderNodesParentsFirst(nextNodes);
+        });
+
         setIsDraggingNode(false);
         setIsOverTrash(false);
-    }, [setNodes, setEdges, setSlotEdges, setSlotNodes]);
+        setParallelDropTargetId(null);
+        setCompoundDropTargetId(null);
+    }, [
+        edges,
+        screenToFlowPosition,
+        setNodes,
+        setEdges,
+        setSlotEdges,
+        setSlotNodes,
+    ]);
 
 
     const getTabDisplayPath = (tab) => {
@@ -4520,12 +6565,95 @@ function AppContent() {
 
                     <div
                         className="flow-container"
-                        onDragOver={(e) => e.preventDefault()}
+                        onDragOver={(e) => {
+                            e.preventDefault();
+
+                            const skill = e.dataTransfer.getData("skill");
+                            if (!skill) return;
+
+                            const pointerPosition = screenToFlowPosition({
+                                x: e.clientX,
+                                y: e.clientY,
+                            });
+
+                            const hoveredCompound = nodes
+                                .filter(
+                                    (node) =>
+                                        node.type === "compound" &&
+                                        node.className !== "compound-in-lane"
+                                )
+                                .find((compound) => {
+                                    const position = getAbsoluteNodePosition(
+                                        compound,
+                                        nodes
+                                    );
+                                    const { width, height } = getNodeSize(compound);
+
+                                    return (
+                                        pointerPosition.x >= position.x &&
+                                        pointerPosition.x <= position.x + width &&
+                                        pointerPosition.y >= position.y &&
+                                        pointerPosition.y <= position.y + height
+                                    );
+                                });
+
+                            const hoveredLane = hoveredCompound
+                                ? null
+                                : nodes
+                                    .filter(
+                                        (node) => node.type === "parallelLane"
+                                    )
+                                    .find((lane) => {
+                                        const lanePosition =
+                                            getAbsoluteNodePosition(lane, nodes);
+                                        const width =
+                                            Number(lane.style?.width) || 420;
+                                        const height =
+                                            Number(lane.style?.height) || 110;
+
+                                        return (
+                                            pointerPosition.x >= lanePosition.x &&
+                                            pointerPosition.x <=
+                                            lanePosition.x + width &&
+                                            pointerPosition.y >= lanePosition.y &&
+                                            pointerPosition.y <=
+                                            lanePosition.y + height
+                                        );
+                                    });
+
+                            setCompoundDropTargetId(
+                                hoveredCompound?.id || null
+                            );
+                            setParallelDropTargetId(
+                                hoveredCompound
+                                    ? null
+                                    : hoveredLane?.parentId || null
+                            );
+                        }}
+                        onDragLeave={(e) => {
+                            const rect =
+                                e.currentTarget.getBoundingClientRect();
+
+                            const actuallyLeft =
+                                e.clientX <= rect.left ||
+                                e.clientX >= rect.right ||
+                                e.clientY <= rect.top ||
+                                e.clientY >= rect.bottom;
+
+                            if (actuallyLeft) {
+                                setParallelDropTargetId(null);
+                                setCompoundDropTargetId(null);
+                            }
+                        }}
                         onDrop={async (e) => {
                             e.preventDefault();
+
+                            setParallelDropTargetId(null);
+                            setCompoundDropTargetId(null);
+
                             if (activeMode === "code") return;
 
-                            const position = screenToFlowPosition({
+                            const mousePosition = screenToFlowPosition({
                                 x: e.clientX,
                                 y: e.clientY,
                             });
@@ -4535,17 +6663,12 @@ function AppContent() {
 
                             if (behaviorPayload) {
                                 try {
-                                    const behavior =
-                                        JSON.parse(behaviorPayload);
-                                    const newNode =
-                                        await createBehaviorNode(
-                                            behavior,
-                                            position
-                                        );
-                                    const updatedNodes = [
-                                        ...nodes,
-                                        newNode,
-                                    ];
+                                    const behavior = JSON.parse(behaviorPayload);
+                                    const newNode = await createBehaviorNode(
+                                        behavior,
+                                        mousePosition
+                                    );
+                                    const updatedNodes = [...nodes, newNode];
                                     setNodes(updatedNodes);
                                     checkSlotConnection(updatedNodes);
                                 } catch (error) {
@@ -4557,18 +6680,337 @@ function AppContent() {
                                 return;
                             }
 
-                            const skill =
-                                e.dataTransfer.getData("skill");
+                            const skill = e.dataTransfer.getData("skill");
                             if (!skill) return;
+
+                            const targetCompound = nodes
+                                .filter(
+                                    (node) =>
+                                        node.type === "compound" &&
+                                        node.className !== "compound-in-lane"
+                                )
+                                .find((compound) => {
+                                    const position = getAbsoluteNodePosition(
+                                        compound,
+                                        nodes
+                                    );
+                                    const { width, height } = getNodeSize(compound);
+                                    return (
+                                        mousePosition.x >= position.x &&
+                                        mousePosition.x <= position.x + width &&
+                                        mousePosition.y >= position.y &&
+                                        mousePosition.y <= position.y + height
+                                    );
+                                });
+
+                            const targetLane = targetCompound
+                                ? null
+                                : nodes
+                                    .filter(
+                                        (node) => node.type === "parallelLane"
+                                    )
+                                    .find((lane) => {
+                                        const lanePosition =
+                                            getAbsoluteNodePosition(lane, nodes);
+                                        const width =
+                                            Number(lane.style?.width) || 420;
+                                        const height =
+                                            Number(lane.style?.height) || 110;
+
+                                        return (
+                                            mousePosition.x >= lanePosition.x &&
+                                            mousePosition.x <=
+                                            lanePosition.x + width &&
+                                            mousePosition.y >= lanePosition.y &&
+                                            mousePosition.y <=
+                                            lanePosition.y + height
+                                        );
+                                    });
 
                             const newNode = await createNode(
                                 skill.split("skills.")[1],
                                 getNodeId(),
-                                position
+                                { x: 0, y: 0 }
                             );
-                            setNodes((nds) =>
-                                nds.concat(newNode)
+
+                            const labelLen =
+                                (newNode.data?.label || "").length +
+                                (newNode.data?.fullSkillName || "").length;
+                            const estimatedNodeWidth = Math.max(
+                                210,
+                                Math.min(300, 160 + labelLen * 3)
                             );
+                            const eventCount =
+                                newNode.data?.events?.length || 0;
+                            const estimatedNodeHeight = Math.max(
+                                70,
+                                50 + eventCount * 18
+                            );
+
+                            if (targetCompound) {
+                                let newX = COMPOUND_PADDING_X;
+
+                                nodes
+                                    .filter(
+                                        (member) =>
+                                            member.parentId ===
+                                            targetCompound.id
+                                    )
+                                    .forEach((member) => {
+                                        const size = getNodeSize(member);
+                                        newX = Math.max(
+                                            newX,
+                                            Number(member.position?.x || 0) +
+                                            size.width +
+                                            COMPOUND_NODE_GAP
+                                        );
+                                    });
+
+                                newNode.parentId = targetCompound.id;
+                                newNode.extent = "parent";
+                                newNode.position = {
+                                    x: newX,
+                                    y: COMPOUND_HEADER_HEIGHT,
+                                };
+
+                                setNodes((currentNodes) => {
+                                    const right =
+                                        newX + estimatedNodeWidth;
+                                    const bottom =
+                                        COMPOUND_HEADER_HEIGHT +
+                                        estimatedNodeHeight;
+
+                                    return orderNodesParentsFirst([
+                                        ...currentNodes.map((candidate) =>
+                                            candidate.id === targetCompound.id
+                                                ? {
+                                                    ...candidate,
+                                                    style: {
+                                                        ...candidate.style,
+                                                        width: Math.max(
+                                                            Number(
+                                                                candidate.style
+                                                                    ?.width
+                                                            ) || 320,
+                                                            right +
+                                                            COMPOUND_LABEL_SPACE
+                                                        ),
+                                                        height: Math.max(
+                                                            Number(
+                                                                candidate.style
+                                                                    ?.height
+                                                            ) || 180,
+                                                            bottom +
+                                                            COMPOUND_BOTTOM_PADDING
+                                                        ),
+                                                    },
+                                                }
+                                                : candidate
+                                        ),
+                                        newNode,
+                                    ]);
+                                });
+
+                                setSelectedNodeId(newNode.id);
+                                return;
+                            }
+
+                            if (targetLane) {
+                                const existingMembers = nodes.filter(
+                                    (node) => node.parentId === targetLane.id
+                                );
+
+                                let newX = 25;
+                                existingMembers.forEach((member) => {
+                                    const memberWidth =
+                                        Number(member.measured?.width) ||
+                                        Number(member.width) ||
+                                        Number(member.style?.width) ||
+                                        210;
+                                    newX = Math.max(
+                                        newX,
+                                        Number(member.position?.x || 0) +
+                                        memberWidth +
+                                        PARALLEL_NODE_GAP
+                                    );
+                                });
+
+                                newNode.parentId = targetLane.id;
+                                newNode.extent = "parent";
+                                newNode.position = { x: newX, y: 20 };
+
+                                const parallelId = targetLane.parentId;
+
+                                setNodes((currentNodes) => {
+                                    let nextNodes = [
+                                        ...currentNodes,
+                                        newNode,
+                                    ];
+
+                                    const parallel = nextNodes.find(
+                                        (node) => node.id === parallelId
+                                    );
+                                    if (!parallel) {
+                                        return orderNodesParentsFirst(
+                                            nextNodes
+                                        );
+                                    }
+
+                                    const lanes = nextNodes
+                                        .filter(
+                                            (node) =>
+                                                node.type ===
+                                                "parallelLane" &&
+                                                node.parentId === parallelId
+                                        )
+                                        .sort(
+                                            (a, b) =>
+                                                Number(a.position?.y || 0) -
+                                                Number(b.position?.y || 0)
+                                        );
+
+                                    let requiredParallelWidth = 420;
+                                    lanes.forEach((lane) => {
+                                        const members = nextNodes.filter(
+                                            (node) =>
+                                                node.parentId === lane.id
+                                        );
+                                        let maxRight = 0;
+
+                                        members.forEach((member) => {
+                                            const memberWidth =
+                                                member.id === newNode.id
+                                                    ? estimatedNodeWidth
+                                                    : Number(
+                                                        member.measured?.width
+                                                    ) ||
+                                                    Number(member.width) ||
+                                                    Number(
+                                                        member.style?.width
+                                                    ) ||
+                                                    210;
+                                            maxRight = Math.max(
+                                                maxRight,
+                                                Number(
+                                                    member.position?.x || 0
+                                                ) + memberWidth
+                                            );
+                                        });
+
+                                        requiredParallelWidth = Math.max(
+                                            requiredParallelWidth,
+                                            maxRight + PARALLEL_EXIT_GUTTER
+                                        );
+                                    });
+
+                                    const laneLayouts = new Map();
+                                    const headerHeight =
+                                        lanes.length > 0
+                                            ? Number(
+                                                lanes[0].position?.y || 40
+                                            )
+                                            : 40;
+                                    let currentY = headerHeight;
+
+                                    lanes.forEach((lane) => {
+                                        const members = nextNodes.filter(
+                                            (node) =>
+                                                node.parentId === lane.id
+                                        );
+                                        let maxBottom = 0;
+
+                                        members.forEach((member) => {
+                                            const memberHeight =
+                                                member.id === newNode.id
+                                                    ? estimatedNodeHeight
+                                                    : Number(
+                                                        member.measured?.height
+                                                    ) ||
+                                                    Number(member.height) ||
+                                                    Number(
+                                                        member.style?.height
+                                                    ) ||
+                                                    70;
+                                            maxBottom = Math.max(
+                                                maxBottom,
+                                                Number(
+                                                    member.position?.y || 0
+                                                ) + memberHeight
+                                            );
+                                        });
+
+                                        const requiredHeight = Math.max(
+                                            110,
+                                            maxBottom + 20
+                                        );
+                                        laneLayouts.set(lane.id, {
+                                            y: currentY,
+                                            height: requiredHeight,
+                                        });
+                                        currentY += requiredHeight;
+                                    });
+
+                                    const requiredParallelHeight =
+                                        currentY + 35;
+
+                                    nextNodes = nextNodes.map((node) => {
+                                        if (node.id === parallelId) {
+                                            return {
+                                                ...node,
+                                                style: {
+                                                    ...node.style,
+                                                    width: requiredParallelWidth,
+                                                    height: requiredParallelHeight,
+                                                },
+                                            };
+                                        }
+
+                                        if (
+                                            node.type === "parallelLane" &&
+                                            node.parentId === parallelId
+                                        ) {
+                                            const layout = laneLayouts.get(
+                                                node.id
+                                            );
+                                            if (!layout) return node;
+                                            return {
+                                                ...node,
+                                                position: {
+                                                    ...node.position,
+                                                    y: layout.y,
+                                                },
+                                                style: {
+                                                    ...node.style,
+                                                    width: requiredParallelWidth,
+                                                    height: layout.height,
+                                                },
+                                            };
+                                        }
+
+                                        return node;
+                                    });
+
+                                    return orderNodesParentsFirst(nextNodes);
+                                });
+
+                                setSelectedNodeId(newNode.id);
+                                return;
+                            }
+
+                            newNode.position = {
+                                x:
+                                    mousePosition.x -
+                                    estimatedNodeWidth / 2,
+                                y:
+                                    mousePosition.y -
+                                    estimatedNodeHeight / 2,
+                            };
+
+                            setNodes((currentNodes) => [
+                                ...currentNodes,
+                                newNode,
+                            ]);
+                            setSelectedNodeId(newNode.id);
                         }}
                     >
                         {activeMode === "code" ? (
@@ -4676,23 +7118,23 @@ function AppContent() {
                                             // Slot nodes participate in slot-edge highlighting,
                                             // but they do not have a skill detail panel.
                                             if (n.type === "slot") {
-                                                    const cleanPath = getSlotPathFromNode(n);
-                                                    const hasOwningSkill = nodes.some((node) =>
-                                                        [
-                                                            ...(node.data?.inSlots || []),
-                                                            ...(node.data?.outSlots || []),
-                                                        ].some(
-                                                            (slot) => normalizeSlotPath(slot.path) === cleanPath
-                                                        )
-                                                    );
-                                            if (hasOwningSkill) {
-                                                        setActiveTab("slots");
-                                                        setRightPanelTab("details");
-                                                    }
-                                                    return;
+                                                const cleanPath = getSlotPathFromNode(n);
+                                                const hasOwningSkill = nodes.some((node) =>
+                                                    [
+                                                        ...(node.data?.inSlots || []),
+                                                        ...(node.data?.outSlots || []),
+                                                    ].some(
+                                                        (slot) => normalizeSlotPath(slot.path) === cleanPath
+                                                    )
+                                                );
+                                                if (hasOwningSkill) {
+                                                    setActiveTab("slots");
+                                                    setRightPanelTab("details");
                                                 }
+                                                return;
+                                            }
 
-                                                setRightPanelTab("details");
+                                            setRightPanelTab("details");
                                         }}
                                         onPaneClick={() => {
                                             clearAllEdgeSelection();
@@ -4709,8 +7151,8 @@ function AppContent() {
                                                 handleOpenSubMachine(n.data.src, n.data.label);
                                             }
                                         }}
-                                        onNodeDragStart={() => setIsDraggingNode(true)}
-                                        onNodeDrag={(e) => setIsOverTrash(Boolean(document.elementFromPoint(e.clientX, e.clientY)?.closest(".trash-bin-dropzone")))}
+                                        onNodeDragStart={handleNodeDragStart}
+                                        onNodeDrag={handleNodeDrag}
                                         onNodeDragStop={handleNodeDragStop}
                                     >
                                         <Background />
@@ -4956,4 +7398,3 @@ export default function App() {
         </ReactFlowProvider>
     );
 }
-

@@ -4,7 +4,13 @@ import { FiPlus } from 'react-icons/fi';
 
 export default function ParallelNode({ id, data }) {
     return (
-        <div className="parallel-group-container">
+        <div
+        className={
+            data.isDropTarget
+                ? "parallel-group-container parallel-drop-target"
+                : "parallel-group-container"
+        }
+    >
             {/* Target-Handle links für Transitions auf den gesamten Parallel-State */}
             <StateActionBadges
                 onEntry={data.onEntry}
