@@ -22,6 +22,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
+        <dokka.version>2.2.0</dokka.version>
         <dir>target</dir>
         <kotlin.version>2.2.0</kotlin.version>
     </properties>
@@ -136,6 +137,35 @@
                         </goals>
                     </execution>
                 </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.jetbrains.dokka</groupId>
+                <artifactId>dokka-maven-plugin</artifactId>
+                <version>${dokka.version}</version>
+
+                <executions>
+
+                    <execution>
+                        <id>generate-skill-descriptions</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>dokka</goal>
+                        </goals>
+                    </execution>
+
+                </executions>
+
+                <configuration>
+
+                    <dokkaPlugins>
+                        <plugin>
+                            <groupId>de.unibi.citec.clf</groupId>
+                            <artifactId>bonsai_core</artifactId>
+                            <version>0.9-SNAPSHOT</version>
+                        </plugin>
+                    </dokkaPlugins>
+
+                </configuration>
             </plugin>
         </plugins>
 
