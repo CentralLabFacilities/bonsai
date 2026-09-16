@@ -1793,7 +1793,7 @@
 }
 
 .parallel-drop-target::after {
-    content: "Node hier ablegen";
+    content: "place node here";
     position: absolute;
     inset: 44px 10px 10px;
     display: flex;
