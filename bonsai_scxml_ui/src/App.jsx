@@ -5065,6 +5065,26 @@ function AppContent() {
 
     const selectTransitionEdge = useCallback(
         (edgeId) => {
+            // Edge and node selection are mutually exclusive. A previously
+            // selected skill would otherwise keep all of its connected
+            // transitions highlighted in addition to the explicitly selected
+            // transition.
+            setSelectedNodeId(null);
+            setNodes((currentNodes) =>
+                currentNodes.map((node) =>
+                    node.selected
+                        ? { ...node, selected: false }
+                        : node
+                )
+            );
+            setSlotNodes((currentNodes) =>
+                currentNodes.map((node) =>
+                    node.selected
+                        ? { ...node, selected: false }
+                        : node
+                )
+            );
+
             clearSlotEdgeSelection();
             setEdges((currentEdges) =>
                 currentEdges.map((edge) => ({
@@ -5073,7 +5093,12 @@ function AppContent() {
                 }))
             );
         },
-        [setEdges, clearSlotEdgeSelection]
+        [
+            setEdges,
+            setNodes,
+            setSlotNodes,
+            clearSlotEdgeSelection,
+        ]
     );
 
     const selectSlotEdge = useCallback(
