@@ -423,6 +423,55 @@ const buildEditorProblems = (
         }
     }
 
+    // Every compound state requires exactly one immediate initial child.
+    (nodes || [])
+        .filter(
+            (node) =>
+                node.type === "compound" &&
+                node.className !== "compound-in-lane"
+        )
+        .forEach((compound) => {
+            const children = (nodes || []).filter(
+                (node) =>
+                    node.parentId === compound.id &&
+                    isCompoundInitialChildCandidate(node)
+            );
+            const initialChildren = children.filter(
+                (node) => node.data?.isInitial
+            );
+
+            if (children.length === 0) {
+                addProblem({
+                    id: `compound-empty-${compound.id}`,
+                    category: "Workflow",
+                    title: "Compound needs an initial state",
+                    message: `${nodeLabel(compound)} does not contain a state that can be initial.`,
+                    nodeId: compound.id,
+                    detailTab: "allgemein",
+                    mode: "event",
+                });
+                return;
+            }
+
+            if (initialChildren.length !== 1) {
+                addProblem({
+                    id: `compound-initial-${compound.id}`,
+                    category: "Workflow",
+                    title: "Compound needs one initial state",
+                    message: `${nodeLabel(compound)} must have exactly one initial child state.`,
+                    nodeId: compound.id,
+                    detailTab: "allgemein",
+                    mode: "event",
+                    focusNodeIds: [
+                        compound.id,
+                        ...initialChildren.map(
+                            (node) => node.id
+                        ),
+                    ],
+                });
+            }
+        });
+
     // Datamodel
     const ids = new Map();
     (globalDataModel || []).forEach((entry) => {
@@ -778,7 +827,46 @@ const COMPOUND_NODE_GAP = 30;
 const COMPOUND_PADDING_X = 30;
 const COMPOUND_HEADER_HEIGHT = 45;
 const COMPOUND_BOTTOM_PADDING = 30;
-const COMPOUND_LABEL_SPACE = 160;
+const COMPOUND_EXIT_GUTTER_MIN = 220;
+const COMPOUND_EXIT_GUTTER_MAX = 420;
+
+const getCompoundExitLabel = (event) =>
+    String(
+        event?.name ||
+        event?.rawEvent ||
+        event?.transitionHandleId ||
+        event?.id ||
+        ""
+    ).trim();
+
+const getCompoundExitGutterWidth = (events = []) => {
+    const longestLabelLength = (events || []).reduce(
+        (maxLength, event) =>
+            Math.max(maxLength, getCompoundExitLabel(event).length),
+        0
+    );
+
+    // Roughly one character width plus label padding, both handles and some
+    // breathing room. Keep a generous minimum so child nodes never sit below
+    // the compound's exit controls.
+    const estimatedWidth = 72 + longestLabelLength * 7.2;
+
+    return Math.max(
+        COMPOUND_EXIT_GUTTER_MIN,
+        Math.min(COMPOUND_EXIT_GUTTER_MAX, estimatedWidth)
+    );
+};
+
+const getCompoundChildrenRight = (compoundId, allNodes = []) =>
+    (allNodes || [])
+        .filter((node) => node.parentId === compoundId)
+        .reduce((right, node) => {
+            const size = getNodeSize(node);
+            return Math.max(
+                right,
+                Number(node.position?.x || 0) + size.width
+            );
+        }, COMPOUND_PADDING_X);
 
 const getNodeSize = (node) => ({
     width: Number(node?.measured?.width) || Number(node?.width) || Number(node?.style?.width) || 210,
@@ -865,6 +953,109 @@ const orderNodesParentsFirst = (allNodes) => {
         }))
         .sort((a, b) => a.depth - b.depth || a.index - b.index)
         .map(({ node }) => node);
+};
+
+const isCompoundInitialChildCandidate = (node) =>
+    Boolean(
+        node &&
+        node.type !== "slot" &&
+        node.type !== "parallelLane" &&
+        node.type !== "compound" &&
+        node.type !== "parallel"
+    );
+
+const normalizeCompoundInitialStates = (allNodes) => {
+    const compounds = (allNodes || []).filter(
+        (node) => node.type === "compound"
+    );
+
+    if (compounds.length === 0) {
+        return allNodes;
+    }
+
+    const desiredInitialByCompound = new Map();
+
+    compounds.forEach((compound) => {
+        const children = (allNodes || []).filter(
+            (node) =>
+                node.parentId === compound.id &&
+                isCompoundInitialChildCandidate(node)
+        );
+
+        if (children.length === 0) {
+            desiredInitialByCompound.set(compound.id, null);
+            return;
+        }
+
+        const storedInitialId = compound.data?.initialChildId;
+        const storedInitialStillExists = children.some(
+            (child) => child.id === storedInitialId
+        );
+        const existingInitial = children.find(
+            (child) => child.data?.isInitial
+        );
+
+        desiredInitialByCompound.set(
+            compound.id,
+            storedInitialStillExists
+                ? storedInitialId
+                : existingInitial?.id || children[0].id
+        );
+    });
+
+    let changed = false;
+
+    const normalized = (allNodes || []).map((node) => {
+        if (node.type === "compound") {
+            const desiredInitialId =
+                desiredInitialByCompound.get(node.id) || null;
+            const currentInitialId =
+                node.data?.initialChildId || null;
+
+            if (currentInitialId === desiredInitialId) {
+                return node;
+            }
+
+            changed = true;
+            return {
+                ...node,
+                data: {
+                    ...node.data,
+                    initialChildId: desiredInitialId,
+                },
+            };
+        }
+
+        if (
+            node.parentId &&
+            desiredInitialByCompound.has(node.parentId)
+        ) {
+            const desiredInitialId =
+                desiredInitialByCompound.get(node.parentId);
+            const shouldBeInitial =
+                Boolean(desiredInitialId) &&
+                node.id === desiredInitialId;
+            const currentlyInitial =
+                Boolean(node.data?.isInitial);
+
+            if (currentlyInitial === shouldBeInitial) {
+                return node;
+            }
+
+            changed = true;
+            return {
+                ...node,
+                data: {
+                    ...node.data,
+                    isInitial: shouldBeInitial,
+                },
+            };
+        }
+
+        return node;
+    });
+
+    return changed ? normalized : allNodes;
 };
 
 // Detect if running in Tauri desktop app
@@ -1253,6 +1444,12 @@ function AppContent() {
     const [edges, setEdges, onEdgesChange] = useEdgesState([]);
     const [slotNodes, setSlotNodes, onSlotNodesChange] = useNodesState([]);
     const [slotEdges, setSlotEdges, onSlotEdgesChange] = useEdgesState([]);
+
+    useEffect(() => {
+        setNodes((currentNodes) =>
+            normalizeCompoundInitialStates(currentNodes)
+        );
+    }, [nodes, setNodes]);
 
     // Internal graph clipboard. This intentionally does not use the system
     // clipboard: Ctrl+C copies the current React Flow selection and
@@ -2227,7 +2424,7 @@ function AppContent() {
 
         const containerWidth = Math.max(
             320,
-            contentWidth + COMPOUND_LABEL_SPACE
+            contentWidth + COMPOUND_PADDING_X + getCompoundExitGutterWidth([])
         );
 
         const containerHeight = Math.max(
@@ -2250,6 +2447,11 @@ function AppContent() {
         const selectedIds = new Set(
             selectedNodes.map((node) => node.id)
         );
+
+        const initialChildId =
+            selectedNodes.find((node) => node.data?.isInitial)?.id ||
+            selectedNodes[0]?.id ||
+            null;
 
         const compoundEvents = [];
         const internalExitEdges = [];
@@ -2476,6 +2678,8 @@ function AppContent() {
                 events:
                 compoundEvents,
 
+                initialChildId,
+
                 onEntry: [],
                 onExit: [],
             },
@@ -2516,6 +2720,12 @@ function AppContent() {
                     },
 
                     selected: false,
+
+                    data: {
+                        ...node.data,
+                        isInitial:
+                            node.id === initialChildId,
+                    },
                 };
             }
         );
@@ -3454,7 +3664,15 @@ function AppContent() {
         return availableDataModelParameters;
     }, [availableDataModelParameters]);
 
-    const hasInitialNode = nodes.some((node) => node.data?.isInitial);
+    const selectedInitialScopeParentId =
+        selectedNode?.parentId || null;
+
+    const hasInitialNode = nodes.some(
+        (node) =>
+            Boolean(node.data?.isInitial) &&
+            (node.parentId || null) ===
+            selectedInitialScopeParentId
+    );
 
     const canvasSkillSlotOptions = useMemo(() => {
         const options = [];
@@ -3790,8 +4008,64 @@ function AppContent() {
         };
     });
 
+    const compoundInitialEdges = nodes
+        .filter(
+            (node) =>
+                node.type === "compound" &&
+                node.className !== "compound-in-lane"
+        )
+        .map((compound) => {
+            const initialChild = nodes.find(
+                (node) =>
+                    node.parentId === compound.id &&
+                    (
+                        node.id === compound.data?.initialChildId ||
+                        (
+                            !compound.data?.initialChildId &&
+                            node.data?.isInitial
+                        )
+                    )
+            );
+
+            if (!initialChild) {
+                return null;
+            }
+
+            return {
+                id: `edge-compound-initial-${compound.id}-${initialChild.id}`,
+                source: compound.id,
+                target: initialChild.id,
+                sourceHandle: "compound-entry",
+                targetHandle: "transition-target",
+                label: "",
+                // The entry point is visually on the compound's left border,
+                // but this helper edge should travel directly inward to the
+                // initial child instead of first routing outside the compound.
+                type: "straight",
+                selectable: false,
+                focusable: false,
+                deletable: false,
+                markerEnd: {
+                    type: MarkerType.ArrowClosed,
+                    color: "#111827",
+                },
+                style: {
+                    stroke: "#111827",
+                    strokeWidth: 1.6,
+                },
+                data: {
+                    compoundInitialEdge: true,
+                    displayOnly: true,
+                },
+            };
+        })
+        .filter(Boolean);
+
     let visibleNodes = injectedNodes;
-    let visibleEdges = highlightedTransitionEdges;
+    let visibleEdges = [
+        ...highlightedTransitionEdges,
+        ...compoundInitialEdges,
+    ];
     if (activeMode === "slots") {
         visibleNodes = [...injectedNodes, ...injectedSlotNodes];
         visibleEdges = editableSlotEdges;
@@ -3799,6 +4073,7 @@ function AppContent() {
         visibleNodes = [...injectedNodes, ...injectedSlotNodes];
         visibleEdges = [
             ...highlightedTransitionEdges,
+            ...compoundInitialEdges,
             ...editableSlotEdges,
         ];
     }
@@ -4174,6 +4449,37 @@ function AppContent() {
     };
 
     const isValidConnection = useCallback((connection) => {
+        const possibleInitialCompound = nodes.find(
+            (node) =>
+                node.id === connection.source &&
+                node.type === "compound"
+        );
+
+        // The compound entry handle is source-only and may only connect
+        // inward to an immediate child. It represents the compound's
+        // initial state and is never a normal transition.
+        if (
+            possibleInitialCompound &&
+            connection.sourceHandle === "compound-entry"
+        ) {
+            const targetNode = nodes.find(
+                (node) => node.id === connection.target
+            );
+
+            return Boolean(
+                targetNode &&
+                targetNode.parentId === possibleInitialCompound.id &&
+                isCompoundInitialChildCandidate(targetNode)
+            );
+        }
+
+        // The compound entry point is never an incoming endpoint. Loose
+        // connection mode would otherwise allow another event handle to use
+        // this source handle as a target.
+        if (connection.targetHandle === "compound-entry") {
+            return false;
+        }
+
         const sourceSlotHandle = parseSlotConnectionHandle(
             connection.sourceHandle
         );
@@ -4279,6 +4585,74 @@ function AppContent() {
 
     const onConnect = useCallback(
         (params) => {
+            const sourceCompoundForInitial = nodes.find(
+                (node) =>
+                    node.id === params.source &&
+                    node.type === "compound"
+            );
+
+            if (
+                sourceCompoundForInitial &&
+                params.sourceHandle === "compound-entry"
+            ) {
+                const sourceCompound = sourceCompoundForInitial;
+                const targetNode = nodes.find(
+                    (node) => node.id === params.target
+                );
+
+                if (
+                    !targetNode ||
+                    targetNode.parentId !== sourceCompound.id ||
+                    !isCompoundInitialChildCandidate(targetNode)
+                ) {
+                    return;
+                }
+
+                setNodes((currentNodes) =>
+                    currentNodes.map((node) => {
+                        if (node.id === sourceCompound.id) {
+                            return {
+                                ...node,
+                                data: {
+                                    ...node.data,
+                                    initialChildId: targetNode.id,
+                                    // The entry connector is not an exit token/event.
+                                    // Clean up stale data from older editor versions.
+                                    events: (node.data?.events || []).filter(
+                                        (event) =>
+                                            String(event?.id || "") !==
+                                            "compound-entry"
+                                    ),
+                                },
+                            };
+                        }
+
+                        if (node.parentId === sourceCompound.id) {
+                            return {
+                                ...node,
+                                data: {
+                                    ...node.data,
+                                    isInitial: node.id === targetNode.id,
+                                },
+                            };
+                        }
+
+                        return node;
+                    })
+                );
+
+                requestAnimationFrame(() => {
+                    updateNodeInternals(sourceCompound.id);
+                    updateNodeInternals(targetNode.id);
+                });
+
+                return;
+            }
+
+            if (params.targetHandle === "compound-entry") {
+                return;
+            }
+
             const sourceSlotHandle = parseSlotConnectionHandle(
                 params.sourceHandle
             );
@@ -4483,12 +4857,16 @@ function AppContent() {
 
             const alreadyExists = edges.some((edge) => {
                 const logicalSource =
+                    edge.data?.compoundOriginalSource ||
                     edge.data?.parallelOriginalSource ||
                     edge.source;
+                const logicalHandle =
+                    edge.data?.compoundOriginalSourceHandle ||
+                    edge.sourceHandle;
 
                 return (
                     logicalSource === params.source &&
-                    edge.sourceHandle === params.sourceHandle &&
+                    logicalHandle === params.sourceHandle &&
                     edge.target === params.target
                 );
             });
@@ -4529,6 +4907,10 @@ function AppContent() {
                 const exitLabel =
                     `${baseName}.${handleId}`;
 
+                // Compound exit handles must be unique per child state.
+                // Two children may both expose e.g. a "success" token.
+                const compoundExitId =
+                    `${params.source}-${handleId}`;
 
                 const externalEdge = {
                     id:
@@ -4539,7 +4921,7 @@ function AppContent() {
                     source: sourceCompound.id,
                     target: params.target,
 
-                    sourceHandle: handleId,
+                    sourceHandle: compoundExitId,
                     targetHandle: params.targetHandle,
 
                     label: handleId,
@@ -4554,13 +4936,9 @@ function AppContent() {
                         cond: "",
                         assignments: [],
                         assign: null,
-
-                        // eigentliche interne Source merken
-                        compoundOriginalSource:
-                        params.source,
-
-                        compoundOriginalSourceHandle:
-                        handleId,
+                        compoundOriginalSource: params.source,
+                        compoundOriginalSourceHandle: handleId,
+                        compoundExitId,
                     },
                 };
 
@@ -4572,13 +4950,11 @@ function AppContent() {
 
                     source: params.source,
                     target: sourceCompound.id,
-
                     sourceHandle: handleId,
-
-                    // GENAU der unsichtbare Handle LINKS am Label
-                    targetHandle: `target-${handleId}`,
-
+                    targetHandle: `target-${compoundExitId}`,
                     type: "smoothstep",
+                    selectable: false,
+                    focusable: false,
 
                     style: {
                         strokeDasharray: "4 4",
@@ -4588,6 +4964,7 @@ function AppContent() {
 
                     data: {
                         compoundInternalEdge: true,
+                        compoundExitId,
                     },
                 };
 
@@ -4597,72 +4974,65 @@ function AppContent() {
                     internalEdge,
                 ]);
 
+                setNodes((currentNodes) => {
+                    const childRight = getCompoundChildrenRight(
+                        sourceCompound.id,
+                        currentNodes
+                    );
 
-                /*
-                 * =====================================================
-                 * 4. Compound bekommt Event + Handles
-                 * =====================================================
-                 */
-
-                setNodes((currentNodes) =>
-                    currentNodes.map((node) => {
+                    return currentNodes.map((node) => {
                         if (node.id !== sourceCompound.id) {
                             return node;
                         }
 
-                        const compoundEvents =
-                            node.data?.events || [];
+                        const compoundEvents = (node.data?.events || []).filter(
+                            (event) =>
+                                String(event?.id || "") !== "compound-entry"
+                        );
 
-                        const alreadyExists =
-                            compoundEvents.some(
-                                (event) =>
-                                    String(event.id) ===
-                                    String(handleId)
-                            );
+                        const alreadyExists = compoundEvents.some(
+                            (event) =>
+                                String(event.id) === String(compoundExitId)
+                        );
 
-                        if (alreadyExists) {
-                            return node;
-                        }
+                        const nextEvents = alreadyExists
+                            ? compoundEvents
+                            : [
+                                ...compoundEvents,
+                                {
+                                    id: compoundExitId,
+                                    name: exitLabel,
+                                    rawEvent: exitLabel,
+                                    target: params.target,
+                                    sourceNodeId: params.source,
+                                    transitionHandleId: handleId,
+                                },
+                            ];
+
+                        const requiredWidth =
+                            childRight +
+                            COMPOUND_PADDING_X +
+                            getCompoundExitGutterWidth(nextEvents);
 
                         return {
                             ...node,
-
+                            style: {
+                                ...node.style,
+                                width: Math.max(
+                                    Number(node.style?.width) || 320,
+                                    requiredWidth
+                                ),
+                            },
                             data: {
                                 ...node.data,
-
-                                events: [
-                                    ...compoundEvents,
-
-                                    {
-                                        id: handleId,
-
-                                        // genauso wie Parallel:
-                                        // SkillName.event
-                                        name: exitLabel,
-                                        rawEvent: exitLabel,
-
-                                        target:
-                                        params.target,
-
-                                        sourceNodeId:
-                                        params.source,
-                                    },
-                                ],
+                                events: nextEvents,
                             },
                         };
-                    })
-                );
-
-
-                /*
-                 * React Flow mitteilen:
-                 * Compound hat neue Handles bekommen.
-                 */
+                    });
+                });
 
                 requestAnimationFrame(() => {
-                    updateNodeInternals(
-                        sourceCompound.id
-                    );
+                    updateNodeInternals(sourceCompound.id);
                 });
 
                 return;
@@ -6625,7 +6995,19 @@ function AppContent() {
                     currentEdges.filter(
                         (edge) =>
                             !idsToDelete.has(edge.source) &&
-                            !idsToDelete.has(edge.target)
+                            !idsToDelete.has(edge.target) &&
+                            !idsToDelete.has(
+                                edge.data?.compoundOriginalSource
+                            ) &&
+                            !idsToDelete.has(
+                                edge.data?.compoundOriginalTarget
+                            ) &&
+                            !idsToDelete.has(
+                                edge.data?.parallelOriginalSource
+                            ) &&
+                            !idsToDelete.has(
+                                edge.data?.parallelOriginalTarget
+                            )
                     )
                 );
 
@@ -6653,9 +7035,31 @@ function AppContent() {
                     idsToDelete.has(id) ? null : id
                 );
 
-                return currentNodes.filter(
-                    (candidate) => !idsToDelete.has(candidate.id)
-                );
+                return currentNodes
+                    .filter(
+                        (candidate) =>
+                            !idsToDelete.has(candidate.id)
+                    )
+                    .map((candidate) => {
+                        if (candidate.type !== "compound") {
+                            return candidate;
+                        }
+
+                        return {
+                            ...candidate,
+                            data: {
+                                ...candidate.data,
+                                events: (
+                                    candidate.data?.events || []
+                                ).filter(
+                                    (event) =>
+                                        !idsToDelete.has(
+                                            event.sourceNodeId
+                                        )
+                                ),
+                            },
+                        };
+                    });
             });
 
             setIsDraggingNode(false);
@@ -6765,7 +7169,11 @@ function AppContent() {
                                 ...c.style,
                                 width: Math.max(
                                     320,
-                                    right + COMPOUND_LABEL_SPACE
+                                    right +
+                                    COMPOUND_PADDING_X +
+                                    getCompoundExitGutterWidth(
+                                        sourceCompound.data?.events || []
+                                    )
                                 ),
                                 height: Math.max(
                                     180,
@@ -6902,105 +7310,267 @@ function AppContent() {
                 resize(targetCompound?.id);
 
 
-                if (targetCompound) {
-                    const handles = edges
-                        .filter(
-                            (edge) =>
+                /*
+                 * Keep outgoing compound transitions consistent when a child
+                 * state is moved into, out of, or between compounds.
+                 *
+                 * The persisted/logical transition remains the external edge.
+                 * A separate display edge connects the real child state to the
+                 * matching exit point on the compound boundary.
+                 */
+                let rewrittenEdges = [...edges];
+
+                if (sourceCompound) {
+                    const oldCompoundExitIds = new Set(
+                        rewrittenEdges
+                            .filter(
+                                (edge) =>
+                                    edge.data?.compoundOriginalSource ===
+                                    draggedNode.id
+                            )
+                            .map(
+                                (edge) =>
+                                    edge.data?.compoundExitId ||
+                                    edge.sourceHandle
+                            )
+                            .filter(Boolean)
+                    );
+
+                    // Remove the old child -> compound boundary helper edges.
+                    rewrittenEdges = rewrittenEdges.filter(
+                        (edge) =>
+                            !(
+                                edge.data?.compoundInternalEdge &&
                                 edge.source === draggedNode.id &&
-                                edge.target !== targetCompound.id
-                        )
-                        .map(
-                            (edge) =>
-                                edge.sourceHandle || "success"
+                                edge.target === sourceCompound.id
+                            )
+                    );
+
+                    // Turn the external compound edges back into ordinary
+                    // transitions from the actual child before potentially
+                    // wrapping them for the new compound below.
+                    rewrittenEdges = rewrittenEdges.map((edge) => {
+                        if (
+                            edge.data?.compoundOriginalSource !==
+                            draggedNode.id
+                        ) {
+                            return edge;
+                        }
+
+                        const restoredHandle =
+                            edge.data?.compoundOriginalSourceHandle ||
+                            edge.sourceHandle ||
+                            "success";
+
+                        const restoredData = {
+                            ...(edge.data || {}),
+                        };
+
+                        delete restoredData.compoundOriginalSource;
+                        delete restoredData.compoundOriginalSourceHandle;
+                        delete restoredData.compoundExitId;
+
+                        return {
+                            ...edge,
+                            source: draggedNode.id,
+                            sourceHandle: restoredHandle,
+                            label: edge.label || restoredHandle,
+                            data: restoredData,
+                        };
+                    });
+
+                    // Remove exit points that belonged to this child from the
+                    // old compound. Other child exits stay untouched.
+                    next = next.map((candidate) => {
+                        if (candidate.id !== sourceCompound.id) {
+                            return candidate;
+                        }
+
+                        return {
+                            ...candidate,
+                            data: {
+                                ...candidate.data,
+                                events: (
+                                    candidate.data?.events || []
+                                ).filter(
+                                    (event) =>
+                                        event.sourceNodeId !==
+                                        draggedNode.id &&
+                                        !oldCompoundExitIds.has(event.id)
+                                ),
+                            },
+                        };
+                    });
+                }
+
+                if (targetCompound) {
+                    const targetMemberIds = new Set(
+                        next
+                            .filter(
+                                (candidate) =>
+                                    candidate.parentId ===
+                                    targetCompound.id
+                            )
+                            .map((candidate) => candidate.id)
+                    );
+
+                    const baseName =
+                        draggedNode.data?.label ||
+                        draggedNode.data?.fullSkillName
+                            ?.split("#")[0]
+                            ?.split(".")
+                            ?.pop() ||
+                        "state";
+
+                    const compoundEventsById = new Map(
+                        (
+                            next.find(
+                                (candidate) =>
+                                    candidate.id === targetCompound.id
+                            )?.data?.events || []
+                        ).map((event) => [
+                            String(event.id),
+                            event,
+                        ])
+                    );
+
+                    const internalEdgesByExitId = new Map();
+
+                    rewrittenEdges = rewrittenEdges.map((edge) => {
+                        if (
+                            edge.source !== draggedNode.id ||
+                            edge.data?.compoundInternalEdge
+                        ) {
+                            return edge;
+                        }
+
+                        // A transition between two children of the same
+                        // compound remains an ordinary internal transition.
+                        if (
+                            targetMemberIds.has(edge.target) ||
+                            edge.target === targetCompound.id
+                        ) {
+                            return edge;
+                        }
+
+                        const originalHandleId = String(
+                            edge.sourceHandle || "success"
                         );
+                        const compoundExitId =
+                            `${draggedNode.id}-${originalHandleId}`;
+                        const exitLabel =
+                            `${baseName}.${originalHandleId}`;
 
-                    next = next.map((c) =>
-                        c.id === targetCompound.id
+                        if (
+                            !compoundEventsById.has(compoundExitId)
+                        ) {
+                            compoundEventsById.set(
+                                compoundExitId,
+                                {
+                                    id: compoundExitId,
+                                    name: exitLabel,
+                                    rawEvent: exitLabel,
+                                    target: edge.target,
+                                    sourceNodeId: draggedNode.id,
+                                    transitionHandleId:
+                                    originalHandleId,
+                                }
+                            );
+                        }
+
+                        if (
+                            !internalEdgesByExitId.has(
+                                compoundExitId
+                            )
+                        ) {
+                            internalEdgesByExitId.set(
+                                compoundExitId,
+                                {
+                                    id:
+                                        `edge-internal-compound-${draggedNode.id}-` +
+                                        `${originalHandleId}-${targetCompound.id}-` +
+                                        crypto.randomUUID(),
+                                    source: draggedNode.id,
+                                    target: targetCompound.id,
+                                    sourceHandle:
+                                    originalHandleId,
+                                    targetHandle:
+                                        `target-${compoundExitId}`,
+                                    type: "smoothstep",
+                                    selectable: false,
+                                    focusable: false,
+                                    style: {
+                                        strokeDasharray: "4 4",
+                                        stroke: "#0284c7",
+                                        strokeWidth: 1.5,
+                                    },
+                                    data: {
+                                        compoundInternalEdge: true,
+                                        compoundExitId,
+                                    },
+                                }
+                            );
+                        }
+
+                        return {
+                            ...edge,
+                            source: targetCompound.id,
+                            sourceHandle: compoundExitId,
+                            label:
+                                edge.label ||
+                                originalHandleId,
+                            data: {
+                                ...(edge.data || {}),
+                                compoundOriginalSource:
+                                draggedNode.id,
+                                compoundOriginalSourceHandle:
+                                originalHandleId,
+                                compoundExitId,
+                            },
+                        };
+                    });
+
+                    rewrittenEdges.push(
+                        ...internalEdgesByExitId.values()
+                    );
+
+                    const nextCompoundEvents = [
+                        ...compoundEventsById.values(),
+                    ].filter(
+                        (event) =>
+                            String(event?.id || "") !== "compound-entry"
+                    );
+
+                    const targetChildrenRight = getCompoundChildrenRight(
+                        targetCompound.id,
+                        next
+                    );
+
+                    next = next.map((candidate) =>
+                        candidate.id === targetCompound.id
                             ? {
-                                ...c,
+                                ...candidate,
+                                style: {
+                                    ...candidate.style,
+                                    width: Math.max(
+                                        Number(candidate.style?.width) || 320,
+                                        targetChildrenRight +
+                                        COMPOUND_PADDING_X +
+                                        getCompoundExitGutterWidth(
+                                            nextCompoundEvents
+                                        )
+                                    ),
+                                },
                                 data: {
-                                    ...c.data,
-
-                                    events: [
-                                        ...(c.data?.events || []),
-
-                                        ...handles
-                                            .filter(
-                                                (handle) =>
-                                                    !(
-                                                        c.data?.events ||
-                                                        []
-                                                    ).some(
-                                                        (event) =>
-                                                            String(
-                                                                event.id
-                                                            ) ===
-                                                            String(
-                                                                handle
-                                                            )
-                                                    )
-                                            )
-                                            .map((handle) => ({
-                                                id: handle,
-                                                name: handle,
-                                                rawEvent: handle,
-                                            })),
-                                    ],
+                                    ...candidate.data,
+                                    events: nextCompoundEvents,
                                 },
                             }
-                            : c
+                            : candidate
                     );
                 }
 
-
-                setEdges(
-                    edges.map((edge) => {
-                        // Node wurde AUS einem Compound gezogen.
-                        // Edge wieder direkt mit Node verbinden.
-                        if (
-                            sourceCompound &&
-                            edge.data?.compoundOriginalSource ===
-                            draggedNode.id
-                        ) {
-                            return {
-                                ...edge,
-
-                                source: draggedNode.id,
-
-                                data: {
-                                    ...edge.data,
-                                    compoundOriginalSource:
-                                    undefined,
-                                },
-                            };
-                        }
-
-
-                        if (
-                            targetCompound &&
-                            edge.source === draggedNode.id &&
-                            edge.target !== targetCompound.id
-                        ) {
-                            return {
-                                ...edge,
-
-                                source: targetCompound.id,
-
-                                sourceHandle:
-                                    edge.sourceHandle || "success",
-
-                                data: {
-                                    ...edge.data,
-
-                                    compoundOriginalSource:
-                                    draggedNode.id,
-                                },
-                            };
-                        }
-
-                        return edge;
-                    })
-                );
+                setEdges(rewrittenEdges);
 
                 return orderNodesParentsFirst(next);
             }
@@ -8129,7 +8699,10 @@ function AppContent() {
                                                                     ?.width
                                                             ) || 320,
                                                             right +
-                                                            COMPOUND_LABEL_SPACE
+                                                            COMPOUND_PADDING_X +
+                                                            getCompoundExitGutterWidth(
+                                                                targetCompound.data?.events || []
+                                                            )
                                                         ),
                                                         height: Math.max(
                                                             Number(
@@ -8433,6 +9006,9 @@ function AppContent() {
                                         isValidConnection={isValidConnection}
                                         connectionMode={ConnectionMode.Loose}
                                         onEdgeClick={(_, edge) => {
+                                            if (edge.data?.compoundInitialEdge) {
+                                                return;
+                                            }
                                             if (isSlotEdge(edge)) {
                                                 selectSlotEdge(edge.id);
                                                 return;
@@ -8440,6 +9016,9 @@ function AppContent() {
                                             selectTransitionEdge(edge.id);
                                         }}
                                         onEdgeDoubleClick={(event, edge) => {
+                                            if (edge.data?.compoundInitialEdge) {
+                                                return;
+                                            }
                                             if (isSlotEdge(edge)) {
                                                 selectSlotEdge(edge.id);
                                                 return;
@@ -8616,15 +9195,63 @@ function AppContent() {
                                 packages={packages}
                                 getPackageSkillEvent={getPackageSkillEvent}
                                 onSetInitial={() =>
-                                    setNodes((nds) =>
-                                        nds.map((n) => ({
-                                            ...n,
-                                            data: {
-                                                ...n.data,
-                                                isInitial: n.id === selectedNode.id,
-                                            },
-                                        }))
-                                    )
+                                    setNodes((nds) => {
+                                        const parentId =
+                                            selectedNode.parentId || null;
+
+                                        const parentCompound =
+                                            parentId
+                                                ? nds.find(
+                                                    (node) =>
+                                                        node.id ===
+                                                        parentId &&
+                                                        node.type ===
+                                                        "compound"
+                                                )
+                                                : null;
+
+                                        return nds.map((node) => {
+                                            if (
+                                                parentCompound &&
+                                                node.id ===
+                                                parentCompound.id
+                                            ) {
+                                                return {
+                                                    ...node,
+                                                    data: {
+                                                        ...node.data,
+                                                        initialChildId:
+                                                        selectedNode.id,
+                                                    },
+                                                };
+                                            }
+
+                                            if (
+                                                (node.parentId || null) !==
+                                                parentId
+                                            ) {
+                                                return node;
+                                            }
+
+                                            if (
+                                                node.type === "slot" ||
+                                                node.type ===
+                                                "parallelLane"
+                                            ) {
+                                                return node;
+                                            }
+
+                                            return {
+                                                ...node,
+                                                data: {
+                                                    ...node.data,
+                                                    isInitial:
+                                                        node.id ===
+                                                        selectedNode.id,
+                                                },
+                                            };
+                                        });
+                                    })
                                 }
                                 onUpdateName={(name) =>
                                     setNodes((nds) =>
