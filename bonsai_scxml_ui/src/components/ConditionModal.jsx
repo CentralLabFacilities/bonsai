@@ -16,6 +16,46 @@ import {
     normalizeDatamodelValue,
     normalizeTypedValue,
 } from "../utils/valueTypes";
+import { validateAssignmentExpression } from "../utils/assignmentExpressions";
+
+const getVariableReferenceContext = (value, caretPosition) => {
+    const text = String(value || "");
+    const caret = Number.isInteger(caretPosition)
+        ? caretPosition
+        : text.length;
+    const beforeCaret = text.slice(0, caret);
+    const match = beforeCaret.match(/@([A-Za-z0-9_:#.\-]*)$/);
+
+    if (!match) return null;
+
+    return {
+        start: match.index,
+        end: caret,
+        query: match[1] || "",
+    };
+};
+
+const getMatchingExpressionVariables = (value, caretPosition, variables) => {
+    const context = getVariableReferenceContext(value, caretPosition);
+    if (!context) return { context: null, matches: [] };
+
+    const query = context.query.toLowerCase();
+    const options = (Array.isArray(variables) ? variables : [])
+        .filter((variable) => variable?.id)
+        .filter((variable) =>
+            String(variable.id).toLowerCase().includes(query)
+        )
+        .sort((a, b) => {
+            const aId = String(a.id).toLowerCase();
+            const bId = String(b.id).toLowerCase();
+            const aStarts = aId.startsWith(query) ? 0 : 1;
+            const bStarts = bId.startsWith(query) ? 0 : 1;
+            return aStarts - bStarts || aId.localeCompare(bId);
+        })
+        .slice(0, 8);
+
+    return { context, matches: options };
+};
 
 const CONDITION_PATTERN = /^([^\s]+)\s*(==|!=|>=|<=|>|<)\s*(.+)$/;
 
@@ -164,6 +204,11 @@ function ConditionModal({
     const [targetQuery, setTargetQuery] = useState("");
     const [targetAutocompleteOpen, setTargetAutocompleteOpen] = useState(false);
     const [activeTargetSuggestionIndex, setActiveTargetSuggestionIndex] = useState(-1);
+    const [openAssignmentExpressionId, setOpenAssignmentExpressionId] = useState(null);
+    const [assignmentExpressionCaretPosition, setAssignmentExpressionCaretPosition] = useState(0);
+    const [activeAssignmentExpressionSuggestionIndex, setActiveAssignmentExpressionSuggestionIndex] = useState(-1);
+    const [assignmentExpressionErrors, setAssignmentExpressionErrors] = useState({});
+    const assignmentExpressionInputRefs = useRef({});
 
     useEffect(() => {
         if (!isOpen) return;
@@ -174,6 +219,7 @@ function ConditionModal({
 
         setTransitionsState(hydrated);
         setErrorMessage("");
+        setAssignmentExpressionErrors({});
 
         let selectedId = initialTransitionId;
 
@@ -271,6 +317,9 @@ function ConditionModal({
         );
         setTargetAutocompleteOpen(false);
         setActiveTargetSuggestionIndex(-1);
+        setOpenAssignmentExpressionId(null);
+        setActiveAssignmentExpressionSuggestionIndex(-1);
+        setAssignmentExpressionErrors({});
     }, [selectedTransitionId, selectedTransition?.target, availableTargets]);
 
     useEffect(() => {
@@ -385,6 +434,10 @@ function ConditionModal({
                     : transition
             )
         );
+        setAssignmentExpressionErrors((current) => ({
+            ...current,
+            [assignmentId]: "",
+        }));
         setErrorMessage("");
     };
 
@@ -404,7 +457,144 @@ function ConditionModal({
                     : transition
             )
         );
+        setOpenAssignmentExpressionId((current) =>
+            current === assignmentId ? null : current
+        );
+        setActiveAssignmentExpressionSuggestionIndex(-1);
+        setAssignmentExpressionErrors((current) => {
+            const next = { ...current };
+            delete next[assignmentId];
+            return next;
+        });
         setErrorMessage("");
+    };
+
+    const updateAssignmentExpressionAutocomplete = (
+        assignmentId,
+        value,
+        caretPosition
+    ) => {
+        const { context, matches } = getMatchingExpressionVariables(
+            value,
+            caretPosition,
+            editorVariables
+        );
+
+        setAssignmentExpressionCaretPosition(caretPosition);
+
+        if (!context || matches.length === 0) {
+            setOpenAssignmentExpressionId(null);
+            setActiveAssignmentExpressionSuggestionIndex(-1);
+            return;
+        }
+
+        setOpenAssignmentExpressionId(assignmentId);
+        setActiveAssignmentExpressionSuggestionIndex(0);
+    };
+
+    const selectAssignmentExpressionSuggestion = (assignment, variable) => {
+        if (!assignment?.assignmentId || !variable?.id) return;
+
+        const value = String(assignment.expr || "");
+        const { context } = getMatchingExpressionVariables(
+            value,
+            assignmentExpressionCaretPosition,
+            editorVariables
+        );
+
+        if (!context) return;
+
+        const replacement = `@${variable.id}`;
+        const nextValue =
+            value.slice(0, context.start) +
+            replacement +
+            value.slice(context.end);
+        const nextCaret = context.start + replacement.length;
+
+        updateAssignment(assignment.assignmentId, { expr: nextValue });
+        setOpenAssignmentExpressionId(null);
+        setActiveAssignmentExpressionSuggestionIndex(-1);
+
+        requestAnimationFrame(() => {
+            const input = assignmentExpressionInputRefs.current[
+                assignment.assignmentId
+                ];
+            input?.focus();
+            input?.setSelectionRange?.(nextCaret, nextCaret);
+            setAssignmentExpressionCaretPosition(nextCaret);
+        });
+    };
+
+    const handleAssignmentExpressionKeyDown = (
+        event,
+        assignment,
+        matchingVariables
+    ) => {
+        const autocompleteOpen =
+            openAssignmentExpressionId === assignment.assignmentId &&
+            matchingVariables.length > 0;
+
+        if (autocompleteOpen && event.key === "ArrowDown") {
+            event.preventDefault();
+            setActiveAssignmentExpressionSuggestionIndex((current) =>
+                current < matchingVariables.length - 1 ? current + 1 : 0
+            );
+            return;
+        }
+
+        if (autocompleteOpen && event.key === "ArrowUp") {
+            event.preventDefault();
+            setActiveAssignmentExpressionSuggestionIndex((current) =>
+                current > 0 ? current - 1 : matchingVariables.length - 1
+            );
+            return;
+        }
+
+        if (autocompleteOpen && (event.key === "Enter" || event.key === "Tab")) {
+            event.preventDefault();
+            const suggestionIndex =
+                activeAssignmentExpressionSuggestionIndex >= 0 &&
+                activeAssignmentExpressionSuggestionIndex < matchingVariables.length
+                    ? activeAssignmentExpressionSuggestionIndex
+                    : 0;
+            selectAssignmentExpressionSuggestion(
+                assignment,
+                matchingVariables[suggestionIndex]
+            );
+            return;
+        }
+
+        if (autocompleteOpen && event.key === "Escape") {
+            event.preventDefault();
+            setOpenAssignmentExpressionId(null);
+            setActiveAssignmentExpressionSuggestionIndex(-1);
+            return;
+        }
+
+        if (event.key === "Enter") {
+            event.preventDefault();
+
+            const assignmentVariable = editorVariables.find(
+                (variable) => variable.id === assignment.location
+            );
+            const result = validateAssignmentExpression(
+                assignment.expr,
+                assignmentVariable,
+                editorVariables,
+                { allowEmpty: false }
+            );
+
+            setAssignmentExpressionErrors((current) => ({
+                ...current,
+                [assignment.assignmentId]: result.valid ? "" : result.error,
+            }));
+
+            if (result.valid) {
+                setOpenAssignmentExpressionId(null);
+                setActiveAssignmentExpressionSuggestionIndex(-1);
+                event.currentTarget.blur();
+            }
+        }
     };
 
     const handleMove = (index, direction, event) => {
@@ -639,9 +829,9 @@ function ConditionModal({
                     return;
                 }
 
-                const assignmentResult = normalizeTypedValue(
+                const assignmentResult = validateAssignmentExpression(
                     assignment.expr,
-                    getVariableType(assignmentVariable),
+                    assignmentVariable,
                     allVariables,
                     { allowEmpty: false }
                 );
@@ -649,8 +839,7 @@ function ConditionModal({
                 if (!assignmentResult.valid) {
                     setSelectedTransitionId(transition.transitionId);
                     setErrorMessage(
-                        assignmentResult.error ||
-                        `Transition #${index + 1}, assignment #${assignmentIndex + 1} has an invalid value.`
+                        `Transition #${index + 1}, assignment #${assignmentIndex + 1}: ${assignmentResult.error}`
                     );
                     return;
                 }
@@ -1092,6 +1281,21 @@ function ConditionModal({
                                                         );
                                                     const assignmentVariableType =
                                                         getVariableType(assignmentVariable);
+                                                    const assignmentExpressionMatch =
+                                                        getMatchingExpressionVariables(
+                                                            assignment.expr || "",
+                                                            assignmentExpressionCaretPosition,
+                                                            editorVariables
+                                                        );
+                                                    const matchingAssignmentExpressionVariables =
+                                                        openAssignmentExpressionId ===
+                                                        assignment.assignmentId
+                                                            ? assignmentExpressionMatch.matches
+                                                            : [];
+                                                    const isAssignmentExpressionAutocompleteOpen =
+                                                        openAssignmentExpressionId ===
+                                                        assignment.assignmentId &&
+                                                        matchingAssignmentExpressionVariables.length > 0;
 
                                                     return (
                                                         <div
@@ -1120,7 +1324,6 @@ function ConditionModal({
                                                                             {
                                                                                 location:
                                                                                 event.target.value,
-                                                                                expr: "",
                                                                             }
                                                                         )
                                                                     }
@@ -1151,32 +1354,134 @@ function ConditionModal({
                                                                 </button>
                                                             </div>
 
-                                                            <TypedValueEditor
-                                                                key={`${selectedTransition.transitionId}:${assignment.assignmentId}:${assignment.location}`}
-                                                                value={assignment.expr}
-                                                                expectedType={
-                                                                    assignmentVariableType
-                                                                }
-                                                                variables={editorVariables}
-                                                                allowEmpty={false}
-                                                                placeholder={
-                                                                    assignmentVariableType
-                                                                        ? `${assignmentVariableType} value or @variable`
-                                                                        : "Value or @variable"
-                                                                }
-                                                                onDraftChange={(value) =>
-                                                                    updateAssignment(
-                                                                        assignment.assignmentId,
-                                                                        { expr: value }
-                                                                    )
-                                                                }
-                                                                onCommit={(value) =>
-                                                                    updateAssignment(
-                                                                        assignment.assignmentId,
-                                                                        { expr: value }
-                                                                    )
-                                                                }
-                                                            />
+                                                            <div className="typed-value-editor-row">
+                                                                <input
+                                                                    key={`${selectedTransition.transitionId}:${assignment.assignmentId}:${assignment.location}`}
+                                                                    ref={(element) => {
+                                                                        assignmentExpressionInputRefs.current[
+                                                                            assignment.assignmentId
+                                                                            ] = element;
+                                                                    }}
+                                                                    className="slot-field-edit"
+                                                                    type="text"
+                                                                    value={assignment.expr || ""}
+                                                                    placeholder="Expression, e.g. @test_value + 1"
+                                                                    autoComplete="off"
+                                                                    spellCheck={false}
+                                                                    onFocus={(event) =>
+                                                                        updateAssignmentExpressionAutocomplete(
+                                                                            assignment.assignmentId,
+                                                                            event.currentTarget.value,
+                                                                            event.currentTarget.selectionStart ??
+                                                                            event.currentTarget.value.length
+                                                                        )
+                                                                    }
+                                                                    onClick={(event) =>
+                                                                        updateAssignmentExpressionAutocomplete(
+                                                                            assignment.assignmentId,
+                                                                            event.currentTarget.value,
+                                                                            event.currentTarget.selectionStart ??
+                                                                            event.currentTarget.value.length
+                                                                        )
+                                                                    }
+                                                                    onChange={(event) => {
+                                                                        const value =
+                                                                            event.target.value;
+                                                                        const caretPosition =
+                                                                            event.target.selectionStart ??
+                                                                            value.length;
+                                                                        updateAssignment(
+                                                                            assignment.assignmentId,
+                                                                            { expr: value }
+                                                                        );
+                                                                        updateAssignmentExpressionAutocomplete(
+                                                                            assignment.assignmentId,
+                                                                            value,
+                                                                            caretPosition
+                                                                        );
+                                                                    }}
+                                                                    onBlur={() =>
+                                                                        window.setTimeout(() => {
+                                                                            setOpenAssignmentExpressionId(
+                                                                                (current) =>
+                                                                                    current ===
+                                                                                    assignment.assignmentId
+                                                                                        ? null
+                                                                                        : current
+                                                                            );
+                                                                            setActiveAssignmentExpressionSuggestionIndex(
+                                                                                -1
+                                                                            );
+                                                                        }, 120)
+                                                                    }
+                                                                    onKeyDown={(event) =>
+                                                                        handleAssignmentExpressionKeyDown(
+                                                                            event,
+                                                                            assignment,
+                                                                            matchingAssignmentExpressionVariables
+                                                                        )
+                                                                    }
+                                                                />
+
+                                                                {isAssignmentExpressionAutocompleteOpen && (
+                                                                    <div
+                                                                        className="typed-value-autocomplete"
+                                                                        role="listbox"
+                                                                    >
+                                                                        {matchingAssignmentExpressionVariables.map(
+                                                                            (variable, suggestionIndex) => (
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className={`typed-value-autocomplete-option ${
+                                                                                        suggestionIndex ===
+                                                                                        activeAssignmentExpressionSuggestionIndex
+                                                                                            ? "active"
+                                                                                            : ""
+                                                                                    }`}
+                                                                                    key={variable.id}
+                                                                                    onMouseDown={(event) => {
+                                                                                        event.preventDefault();
+                                                                                        selectAssignmentExpressionSuggestion(
+                                                                                            assignment,
+                                                                                            variable
+                                                                                        );
+                                                                                    }}
+                                                                                >
+                                                                                    <span className="typed-value-autocomplete-value">
+                                                                                        @{variable.id}
+                                                                                    </span>
+                                                                                    {getVariableType(variable) && (
+                                                                                        <span
+                                                                                            className={`datamodel-value-type-badge datamodel-value-type-${getVariableType(
+                                                                                                variable
+                                                                                            ).toLowerCase()}`}
+                                                                                        >
+                                                                                            {getVariableType(variable)}
+                                                                                        </span>
+                                                                                    )}
+                                                                                </button>
+                                                                            )
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+
+                                                            {assignmentExpressionErrors[
+                                                                assignment.assignmentId
+                                                                ] && (
+                                                                <div
+                                                                    style={{
+                                                                        color: "#ef4444",
+                                                                        fontSize: "12px",
+                                                                        marginTop: "6px",
+                                                                        lineHeight: 1.35,
+                                                                    }}
+                                                                >
+                                                                    {assignmentExpressionErrors[
+                                                                        assignment.assignmentId
+                                                                        ]}
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     );
                                                 }

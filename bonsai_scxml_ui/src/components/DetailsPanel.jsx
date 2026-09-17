@@ -1,8 +1,6 @@
 import { useState } from "react";
-import { FiChevronDown, FiExternalLink, FiLayers, FiGitCommit, FiFolder } from "react-icons/fi";
+import { FiChevronDown, FiExternalLink, FiLayers } from "react-icons/fi";
 import StateActionsEditor from "./StateActionsEditor";
-import TypedValueEditor from "./TypedValueEditor";
-import { getVariableType, normalizeValueType } from "../utils/valueTypes";
 
 function MetadataRow({ label, value }) {
     return (
@@ -113,18 +111,15 @@ function DetailsPanel({
                           onUpdateSrc,
                           onUpdateParameterBlur,
                           globalDataModel,
+                          actionValueVariables,
                           onUpdateStateActions,
                       }) {
     const isSubMachine =
         selectedNode.type === "submachine" ||
         Boolean(selectedNode.data.src);
 
-
     const [openTargetSelector, setOpenTargetSelector] = useState(null);
     const [targetQueries, setTargetQueries] = useState({});
-    const isCompound = selectedNode.type === "compound";
-    const isParallel = selectedNode.type === "parallel";
-    const isContainer = isCompound || isParallel;
 
     const targetNodeOptions = (availableTargetNodes || []).map((node) => {
         const fullSkillName = node.data?.fullSkillName || "";
@@ -257,44 +252,59 @@ function DetailsPanel({
         }
     };
 
+    // Assignment scopes are intentionally separate:
+    // - location: variables writable in the selected state. For a sub-state
+    //   machine these are ONLY the child machine's local datamodel entries.
+    // - valueVariables: variables readable by the assignment expression. For
+    //   a sub-state machine App.jsx supplies the parent workflow datamodel.
     const availableActionLocations = [
-        ...(globalDataModel || []).map((parameter) => ({
-            id: parameter.id,
-            type: getVariableType(parameter),
-            source: "Datamodel",
-        })),
-        ...(selectedNode.data.params || []).map((parameter) => ({
-            id: parameter.key,
-            type: normalizeValueType(parameter.type),
-            source: "Skill parameter",
-        })),
+        ...(globalDataModel || []).filter((parameter) => parameter?.id),
+        ...(!isSubMachine
+            ? (selectedNode.data.params || [])
+                .filter((parameter) => parameter?.key)
+                .map((parameter) => ({
+                    ...parameter,
+                    id: parameter.key,
+                    source: "Parameter",
+                }))
+            : []),
     ].filter(
         (location, index, locations) =>
-            location.id &&
-            locations.findIndex((candidate) => candidate.id === location.id) === index
+            location?.id &&
+            locations.findIndex(
+                (candidate) => candidate?.id === location.id
+            ) === index
     );
 
     return (
         <aside className="details-panel">
-            <h3>Details: {selectedNode.data?.label || selectedNode.id}</h3>
+            <h3>Details: {selectedNode.data.label}</h3>
+
             <div className="tabs">
                 <div
-                    className={`tab ${activeTab === "allgemein" ? "active-tab" : ""}`}
+                    className={`tab ${
+                        activeTab === "allgemein" ? "active-tab" : ""
+                    }`}
                     onClick={() => setActiveTab("allgemein")}
                 >
                     Overall
                 </div>
 
-                {!isSubMachine && !isContainer && (
+                {!isSubMachine && (
                     <>
                         <div
-                            className={`tab ${activeTab === "parameter" ? "active-tab" : ""}`}
+                            className={`tab ${
+                                activeTab === "parameter" ? "active-tab" : ""
+                            }`}
                             onClick={() => setActiveTab("parameter")}
                         >
                             Parameter
                         </div>
+
                         <div
-                            className={`tab ${activeTab === "slots" ? "active-tab" : ""}`}
+                            className={`tab ${
+                                activeTab === "slots" ? "active-tab" : ""
+                            }`}
                             onClick={() => setActiveTab("slots")}
                         >
                             Slots
@@ -315,7 +325,7 @@ function DetailsPanel({
             <div className="tab-content">
                 {activeTab === "allgemein" && (
                     <div className="allgemein-container">
-                        {selectedNode.data?.description && (
+                        {selectedNode.data.description && (
                             <div className="node-description">
                                 {selectedNode.data.description}
                             </div>
@@ -323,80 +333,24 @@ function DetailsPanel({
 
                         <div className="description-header">
                             <h3>
-                                {isParallel
-                                    ? "Parallel State View"
-                                    : isCompound
-                                    ? "Compound State View"
-                                    : isSubMachine
+                                {isSubMachine
                                     ? "Sub-Machine View"
                                     : "General View"}
                             </h3>
-                            {!isParallel && (
-                                <button
-                                    className="initial-button"
-                                    disabled={hasInitialNode && !selectedNode.data?.isInitial}
-                                    onClick={onSetInitial}
-                                >
-                                    Initial set
-                                </button>
-                            )}
+
+                            <button
+                                className="initial-button"
+                                disabled={
+                                    hasInitialNode &&
+                                    !selectedNode.data.isInitial
+                                }
+                                onClick={onSetInitial}
+                            >
+                                Initial set
+                            </button>
                         </div>
 
-                        {/* A) CONTAINER STATES: PARALLEL & COMPOUND */}
-                        {isContainer ? (
-                            <>
-                                <div className="field-row">
-                                    <label className="field-label">Typ:</label>
-                                    <div
-                                        style={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "6px",
-                                            color: isParallel ? "#38bdf8" : "#f59e0b",
-                                            fontWeight: "bold",
-                                            fontSize: "13px",
-                                        }}
-                                    >
-                                        {isParallel ? <FiGitCommit /> : <FiFolder />}
-                                        <span>{isParallel ? "Parallel State" : "Compound State"}</span>
-                                    </div>
-                                </div>
-                                <div className="field-row">
-                                    <label className="field-label">State ID:</label>
-                                    <input
-                                        className="text-field"
-                                        type="text"
-                                        value={selectedNode.data?.label || ""}
-                                        onChange={(e) => onUpdateName(e.target.value)}
-                                        placeholder="Enter name / ID"
-                                    />
-                                </div>
-
-                                {isParallel && (selectedNode.data?.lanes || []).length > 0 && (
-                                    <div className="events-container">
-                                        <h3>Lanes ({selectedNode.data.lanes.length}):</h3>
-                                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                                            {selectedNode.data.lanes.map((lane, idx) => (
-                                                <div
-                                                    key={idx}
-                                                    style={{
-                                                        background: "#1e293b",
-                                                        padding: "6px 10px",
-                                                        borderRadius: "4px",
-                                                        fontSize: "12px",
-                                                        border: "1px solid #334155",
-                                                        color: "#94a3b8",
-                                                    }}
-                                                >
-                                                    {lane}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                            </>
-                        ) : isSubMachine ? (
-                            /* B) SUB-MACHINE */
+                        {isSubMachine ? (
                             <>
                                 <div className="field-row">
                                     <span className="field-label">Type:</span>
@@ -439,7 +393,7 @@ function DetailsPanel({
                                     <input
                                         className="text-field"
                                         type="text"
-                                        value={selectedNode.data?.src || ""}
+                                        value={selectedNode.data.src || ""}
                                         placeholder="${EXERCISE}/..."
                                         onChange={(e) =>
                                             onUpdateSrc?.(
@@ -458,7 +412,6 @@ function DetailsPanel({
                                         justifyContent: "center",
                                     }}
                                     onClick={() =>
-                                        selectedNode.data?.onOpenSubMachine &&
                                         selectedNode.data.onOpenSubMachine?.(
                                             selectedNode.data.src,
                                             selectedNode.data.label
@@ -476,11 +429,9 @@ function DetailsPanel({
                                         Package:
                                     </span>
 
-                                    <span
-                                        className="field-
-                                        value">
+                                    <span className="field-value">
                                         {getSkillPackageName(
-                                            selectedNode.data?.fullSkillName
+                                            selectedNode.data.fullSkillName
                                         ) || "—"}
                                     </span>
                                 </div>
@@ -494,6 +445,7 @@ function DetailsPanel({
                                         {selectedNode.data.label || "—"}
                                     </span>
                                 </div>
+
                                 <div className="field-row">
                                     <label className="field-label">
                                         Name:
@@ -503,7 +455,7 @@ function DetailsPanel({
                                         className="text-field"
                                         type="text"
                                         value={
-                                            selectedNode.data?.fullSkillName
+                                            selectedNode.data.fullSkillName
                                                 ?.split("#")[1] || ""
                                         }
                                         onChange={(e) =>
@@ -741,15 +693,15 @@ function DetailsPanel({
                     </div>
                 )}
 
-                {activeTab === "parameter" && !isContainer && !isSubMachine && (
+                {activeTab === "parameter" && !isSubMachine && (
                     <div className="slots-container">
                         <h3>Parameters</h3>
 
                         <div className="slot-list">
-                            {(selectedNode.data?.params || []).map(
+                            {(selectedNode.data.params || []).map(
                                 (param, index) => (
                                     <div
-                                        className={`slot-text-field parameter-card parameter-card-type-${(normalizeValueType(param.type) || "other").toLowerCase()}`}
+                                        className="slot-text-field parameter-card"
                                         key={param.key}
                                     >
                                         <div className="parameter-card-header">
@@ -763,14 +715,9 @@ function DetailsPanel({
                                                         *
                                                     </span>
                                                 )}
-                                    </div>
-                                    <div className="parameter-badges">
-                                                {param.required && (
-                                                    <span className="parameter-required-badge">
-                                                        Required
-                                                    </span>
-                                                )}
+                                            </div>
 
+                                            <div className="parameter-badges">
                                                 <span
                                                     className={`parameter-type-badge parameter-type-${String(
                                                         param.type || "other"
@@ -783,29 +730,48 @@ function DetailsPanel({
                                                 >
                                                     {param.type || "Unknown"}
                                                 </span>
+
+                                                {param.required && (
+                                                    <span className="parameter-required-badge">
+                                                        Required
+                                                    </span>
+                                                )}
                                             </div>
-                                    </div>{param.description && (
+                                        </div>
+
+                                        {param.description && (
                                             <div className="parameter-description">
                                                 {param.description}
                                             </div>
                                         )}
 
-                                        <TypedValueEditor
+                                        <input
+                                            id={`param-${selectedNode.id}-${index}`}
+                                            className="parameter-value-input"
+                                            type="text"
                                             value={param.expr || ""}
-                                            expectedType={param.type}
-                                            variables={globalDataModel || []}
-                                            inputClassName="parameter-value-input"
                                             placeholder={
                                                 param.default != null
                                                     ? String(param.default)
-                                                    : `Enter ${normalizeValueType(param.type) || "value"}`
+                                                    : "Enter value"
                                             }
-                                            onCommit={(value) => {
-                                                onUpdateParameter(index, value);
+                                            onChange={(e) =>
+                                                onUpdateParameter(
+                                                    index,
+                                                    e.target.value
+                                                )
+                                            }
+                                            onKeyDown={(e) => {
+                                                if (e.key === "Enter") {
+                                                    e.preventDefault();
+                                                    e.currentTarget.blur();
+                                                }
+                                            }}
+                                            onBlur={() =>
                                                 onUpdateParameterBlur?.(
                                                     selectedNode.id
-                                                );
-                                            }}
+                                                )
+                                            }
                                         />
                                     </div>
                                 )
@@ -814,79 +780,39 @@ function DetailsPanel({
                     </div>
                 )}
 
-                {activeTab === "slots" && !isContainer && !isSubMachine && (
+                {activeTab === "slots" && !isSubMachine && (
                     <div className="slots-container">
                         <h3>Slots</h3>
 
-                        {(() => {
-                            const inSlotsWithIndex = (selectedNode.data?.inSlots || []).map(
-                                (slot, index) => ({ slot, index })
-                            );
-                            const outSlotsWithIndex = (selectedNode.data?.outSlots || []).map(
-                                (slot, index) => ({ slot, index })
-                            );
-
-                            const inheritedInSlots = inSlotsWithIndex.filter(
-                                ({ slot }) => Boolean(slot.inherited)
-                            );
-                            const normalInSlots = inSlotsWithIndex.filter(
-                                ({ slot }) => !slot.inherited
-                            );
-                            const inheritedOutSlots = outSlotsWithIndex.filter(
-                                ({ slot }) => Boolean(slot.inherited)
-                            );
-                            const normalOutSlots = outSlotsWithIndex.filter(
-                                ({ slot }) => !slot.inherited
-                            );
-
-                            const renderSlotCard = ({ slot, index }, direction) => {
-                                const isIn = direction === "in";
-                                const isInherited = Boolean(slot.inherited);
-
-                                const cardClass = [
-                                    "slot-text-field",
-                                    "compact-slot-card",
-                                    isIn ? "compact-slot-read" : "compact-slot-write",
-                                    isInherited ? "compact-slot-inherited" : "",
-                                ]
-                                    .filter(Boolean)
-                                    .join(" ");
-
-                                return (
+                        <div className="slot-list">
+                            {(selectedNode.data.inSlots || []).map(
+                                (slot, index) => (
                                     <div
-                                        className={cardClass}
-                                        key={`${direction}-${slot.key}-${index}`}
+                                        className="slot-text-field compact-slot-card compact-slot-read"
+                                        key={`in-${slot.key}`}
                                     >
                                         <div className="compact-slot-header">
                                             <div className="compact-slot-name">
                                                 {slot.key}
                                             </div>
+
                                             <div className="compact-slot-badges">
                                                 <span
                                                     className={`parameter-type-badge parameter-type-${String(
                                                         slot.type || "other"
                                                     )
                                                         .toLowerCase()
-                                                        .replace(/[^a-z0-9]+/g, "-")}`}
+                                                        .replace(
+                                                            /[^a-z0-9]+/g,
+                                                            "-"
+                                                        )}`}
                                                 >
                                                     {slot.type || "Unknown"}
                                                 </span>
 
-                                                <span
-                                                    className={`slot-access-badge ${
-                                                        isIn
-                                                            ? "slot-access-read"
-                                                            : "slot-access-write"
-                                                    }`}
-                                                >
-                                                    {isIn ? "Read" : "Write"}
+                                                <span className="slot-access-badge slot-access-read">
+                                                    Read
                                                 </span>
-
-                                                {isInherited && (
-                                                    <span className="slot-access-badge slot-access-inherited">
-                                                        Inherited
-                                                    </span>
-                                                )}
                                             </div>
                                         </div>
 
@@ -896,23 +822,14 @@ function DetailsPanel({
                                             </div>
                                         )}
 
-                                        {isInherited && slot.inherited?.state && (
-                                            <div className="compact-slot-inherited-from">
-                                                Inherited from {slot.inherited.state}
-                                            </div>
-                                        )}
-
                                         <input
-                                            id={`${direction}-slot-${selectedNode.id}-${index}`}
+                                            id={`in-slot-${selectedNode.id}-${index}`}
                                             className="parameter-value-input compact-slot-path-input"
                                             type="text"
                                             value={slot.path || ""}
                                             placeholder="Enter path"
-                                            disabled={isInherited}
                                             onChange={(e) =>
-                                                (isIn
-                                                    ? onUpdateInSlotPath
-                                                    : onUpdateOutSlotPath)(
+                                                onUpdateInSlotPath(
                                                     index,
                                                     e.target.value
                                                 )
@@ -920,56 +837,64 @@ function DetailsPanel({
                                             onBlur={onCheckSlots}
                                         />
                                     </div>
-                                );
-                            };
+                                )
+                            )}
 
-                            return (
-                                <>
-                                    {(inheritedInSlots.length > 0 ||
-                                        inheritedOutSlots.length > 0) && (
-                                        <div className="slot-group">
-                                            <h4 className="slot-group-title slot-group-title-inherited">
-                                                Inherited Slots
-                                            </h4>
-                                            <div className="slot-list">
-                                                {inheritedInSlots.map((entry) =>
-                                                    renderSlotCard(entry, "in")
-                                                )}
-                                                {inheritedOutSlots.map((entry) =>
-                                                    renderSlotCard(entry, "out")
-                                                )}
+                            {(selectedNode.data.outSlots || []).map(
+                                (slot, index) => (
+                                    <div
+                                        className="slot-text-field compact-slot-card compact-slot-write"
+                                        key={`out-${slot.key}`}
+                                    >
+                                        <div className="compact-slot-header">
+                                            <div className="compact-slot-name">
+                                                {slot.key}
+                                            </div>
+
+                                            <div className="compact-slot-badges">
+                                                <span
+                                                    className={`parameter-type-badge parameter-type-${String(
+                                                        slot.type || "other"
+                                                    )
+                                                        .toLowerCase()
+                                                        .replace(
+                                                            /[^a-z0-9]+/g,
+                                                            "-"
+                                                        )}`}
+                                                >
+                                                    {slot.type || "Unknown"}
+                                                </span>
+
+                                                <span className="slot-access-badge slot-access-write">
+                                                    Write
+                                                </span>
                                             </div>
                                         </div>
-                                    )}
 
-                                    {(normalInSlots.length > 0 ||
-                                        normalOutSlots.length > 0) && (
-                                        <div className="slot-group">
-                                            <h4 className="slot-group-title">
-                                                Own Slots
-                                            </h4>
-                                            <div className="slot-list">
-                                                {normalInSlots.map((entry) =>
-                                                    renderSlotCard(entry, "in")
-                                                )}
-                                                {normalOutSlots.map((entry) =>
-                                                    renderSlotCard(entry, "out")
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {inheritedInSlots.length === 0 &&
-                                        inheritedOutSlots.length === 0 &&
-                                        normalInSlots.length === 0 &&
-                                        normalOutSlots.length === 0 && (
+                                        {slot.description && (
                                             <div className="parameter-description">
-                                                No slots for this skill.
+                                                {slot.description}
                                             </div>
                                         )}
-                                </>
-                            );
-                        })()}
+
+                                        <input
+                                            id={`out-slot-${selectedNode.id}-${index}`}
+                                            className="parameter-value-input compact-slot-path-input"
+                                            type="text"
+                                            value={slot.path || ""}
+                                            placeholder="Enter path"
+                                            onChange={(e) =>
+                                                onUpdateOutSlotPath(
+                                                    index,
+                                                    e.target.value
+                                                )
+                                            }
+                                            onBlur={onCheckSlots}
+                                        />
+                                    </div>
+                                )
+                            )}
+                        </div>
                     </div>
                 )}
 
@@ -979,7 +904,7 @@ function DetailsPanel({
                             actionName="OnEntry"
                             actions={selectedNode.data.onEntry}
                             availableLocations={availableActionLocations}
-                            valueVariables={globalDataModel || []}
+                            valueVariables={actionValueVariables || globalDataModel || []}
                             listId={`onentry-locations-${selectedNode.id}`}
                             onChange={(assignments) =>
                                 onUpdateStateActions(
@@ -994,7 +919,7 @@ function DetailsPanel({
                             actionName="OnExit"
                             actions={selectedNode.data.onExit}
                             availableLocations={availableActionLocations}
-                            valueVariables={globalDataModel || []}
+                            valueVariables={actionValueVariables || globalDataModel || []}
                             listId={`onexit-locations-${selectedNode.id}`}
                             onChange={(assignments) =>
                                 onUpdateStateActions(
@@ -1012,4 +937,3 @@ function DetailsPanel({
 }
 
 export default DetailsPanel;
-
