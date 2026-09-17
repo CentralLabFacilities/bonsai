@@ -1576,6 +1576,7 @@ function AppContent() {
     };
 
     const handleCloseTab = (tabIdToClose, e = null) => {
+        e?.preventDefault?.();
         e?.stopPropagation?.();
         if (tabs.length === 1) return;
 
@@ -1596,6 +1597,63 @@ function AppContent() {
             );
             setSelectedNodeId(null);
         }
+    };
+
+    const [draggedTabId, setDraggedTabId] = useState(null);
+
+    const handleTabDragStart = (event, tabId) => {
+        setDraggedTabId(tabId);
+
+        if (event.dataTransfer) {
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData("text/plain", tabId);
+        }
+    };
+
+    const handleTabDragOver = (event, targetTabId) => {
+        event.preventDefault();
+
+        if (!draggedTabId || draggedTabId === targetTabId) {
+            return;
+        }
+
+        if (event.dataTransfer) {
+            event.dataTransfer.dropEffect = "move";
+        }
+
+        setTabs((currentTabs) => {
+            const sourceIndex = currentTabs.findIndex(
+                (tab) => tab.id === draggedTabId
+            );
+            const targetIndex = currentTabs.findIndex(
+                (tab) => tab.id === targetTabId
+            );
+
+            if (
+                sourceIndex < 0 ||
+                targetIndex < 0 ||
+                sourceIndex === targetIndex
+            ) {
+                return currentTabs;
+            }
+
+            const reorderedTabs = [...currentTabs];
+            const [movedTab] = reorderedTabs.splice(sourceIndex, 1);
+            reorderedTabs.splice(targetIndex, 0, movedTab);
+            return reorderedTabs;
+        });
+    };
+
+    const handleTabDragEnd = () => {
+        setDraggedTabId(null);
+    };
+
+    const handleTabMiddleMouseDown = (event, tabId) => {
+        if (event.button !== 1) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        handleCloseTab(tabId, event);
     };
 
     const handleContextMenuOpen = useCallback((event, clickedNode = null) => {
@@ -7575,16 +7633,35 @@ function AppContent() {
                                 <div
                                     key={tab.id}
                                     className={`intellij-tab ${activeTabId === tab.id ? "active" : ""}`}
+                                    draggable
+                                    onDragStart={(event) =>
+                                        handleTabDragStart(event, tab.id)
+                                    }
+                                    onDragOver={(event) =>
+                                        handleTabDragOver(event, tab.id)
+                                    }
+                                    onDragEnd={handleTabDragEnd}
+                                    onDrop={(event) => event.preventDefault()}
+                                    onMouseDown={(event) =>
+                                        handleTabMiddleMouseDown(event, tab.id)
+                                    }
                                     onClick={() => switchTab(tab.id)}
                                     onMouseEnter={(event) =>
                                         handleTabMouseEnter(event, tab)
                                     }
                                     onMouseLeave={handleTabMouseLeave}
+                                    style={{
+                                        opacity: draggedTabId === tab.id ? 0.55 : 1,
+                                    }}
                                 >
                                     <span>{tab.title}</span>
                                     {tabs.length > 1 && (
                                         <span
                                             className="intellij-tab-close"
+                                            draggable={false}
+                                            onMouseDown={(event) =>
+                                                event.stopPropagation()
+                                            }
                                             onClick={(e) => handleCloseTab(tab.id, e)}
                                             title="Close tab"
                                         >
