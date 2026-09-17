@@ -1,7 +1,45 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FiPlus, FiTrash2 } from "react-icons/fi";
-import TypedValueEditor from "./TypedValueEditor";
-import { normalizeTypedValue } from "../utils/valueTypes";
+import { normalizeAssignmentExpressionInput, validateAssignmentExpression } from "../utils/assignmentExpressions";
+
+const getVariableReferenceContext = (value, caretPosition) => {
+    const text = String(value || "");
+    const caret = Number.isInteger(caretPosition)
+        ? caretPosition
+        : text.length;
+    const beforeCaret = text.slice(0, caret);
+    const match = beforeCaret.match(/@([A-Za-z0-9_:#.\-]*)$/);
+
+    if (!match) return null;
+
+    return {
+        start: match.index,
+        end: caret,
+        query: match[1] || "",
+    };
+};
+
+const getMatchingExpressionVariables = (value, caretPosition, variables) => {
+    const context = getVariableReferenceContext(value, caretPosition);
+    if (!context) return { context: null, matches: [] };
+
+    const query = context.query.toLowerCase();
+    const options = (Array.isArray(variables) ? variables : [])
+        .filter((variable) => variable?.id)
+        .filter((variable) =>
+            String(variable.id).toLowerCase().includes(query)
+        )
+        .sort((a, b) => {
+            const aId = String(a.id).toLowerCase();
+            const bId = String(b.id).toLowerCase();
+            const aStarts = aId.startsWith(query) ? 0 : 1;
+            const bStarts = bId.startsWith(query) ? 0 : 1;
+            return aStarts - bStarts || aId.localeCompare(bId);
+        })
+        .slice(0, 8);
+
+    return { context, matches: options };
+};
 
 function StateActionsEditor({
                                 actionName,
@@ -14,7 +52,24 @@ function StateActionsEditor({
     const [pendingFocusIndex, setPendingFocusIndex] = useState(null);
     const [openLocationIndex, setOpenLocationIndex] = useState(null);
     const [activeLocationSuggestionIndex, setActiveLocationSuggestionIndex] = useState(-1);
+    const [expressionDrafts, setExpressionDrafts] = useState([]);
+    const [expressionErrors, setExpressionErrors] = useState({});
+    const [openExpressionIndex, setOpenExpressionIndex] = useState(null);
+    const [expressionCaretPosition, setExpressionCaretPosition] = useState(0);
+    const [activeExpressionSuggestionIndex, setActiveExpressionSuggestionIndex] = useState(-1);
     const locationInputRefs = useRef([]);
+    const expressionInputRefs = useRef([]);
+
+    const committedExpressionSignature = assignments
+        .map((assignment) => String(assignment?.expr || ""))
+        .join("\u0001");
+
+    useEffect(() => {
+        setExpressionDrafts(
+            assignments.map((assignment) => String(assignment?.expr || ""))
+        );
+        setExpressionErrors({});
+    }, [assignments.length, committedExpressionSignature]);
 
     const locationOptions = useMemo(
         () =>
@@ -60,18 +115,35 @@ function StateActionsEditor({
 
     const removeAssignment = (index) => {
         onChange(assignments.filter((_, i) => i !== index));
+        setExpressionDrafts((current) => current.filter((_, i) => i !== index));
+        setExpressionErrors((current) => {
+            const next = {};
+            Object.entries(current).forEach(([key, value]) => {
+                const numericKey = Number(key);
+                if (numericKey < index) next[numericKey] = value;
+                if (numericKey > index) next[numericKey - 1] = value;
+            });
+            return next;
+        });
         setOpenLocationIndex((current) => {
             if (current === index) return null;
             if (current !== null && current > index) return current - 1;
             return current;
         });
         setActiveLocationSuggestionIndex(-1);
+        setOpenExpressionIndex((current) => {
+            if (current === index) return null;
+            if (current !== null && current > index) return current - 1;
+            return current;
+        });
+        setActiveExpressionSuggestionIndex(-1);
     };
 
     const addAssignment = () => {
         const newIndex = assignments.length;
 
         setPendingFocusIndex(newIndex);
+        setExpressionDrafts((current) => [...current, ""]);
 
         onChange([
             ...assignments,
@@ -82,25 +154,79 @@ function StateActionsEditor({
         ]);
     };
 
-    const updateLocation = (index, nextLocation) => {
-        const target = locationOptions.find(
-            (location) => location.id === nextLocation
+    const validateExpression = (
+        index,
+        expression,
+        targetLocation,
+        allowEmpty = true,
+        showError = false
+    ) => {
+        const result = validateAssignmentExpression(
+            expression,
+            targetLocation,
+            valueVariables,
+            { allowEmpty }
         );
-        const currentExpression = assignments[index]?.expr || "";
-        const changes = { location: nextLocation };
 
-        if (target && currentExpression.trim()) {
-            const normalized = normalizeTypedValue(
-                currentExpression,
-                target.type,
-                valueVariables,
-                { allowEmpty: true }
-            );
+        setExpressionErrors((current) => ({
+            ...current,
+            [index]: showError && !result.valid ? result.error : "",
+        }));
 
-            changes.expr = normalized.valid ? normalized.value : "";
+        return result;
+    };
+
+    const updateLocation = (index, nextLocation) => {
+        updateAssignment(index, { location: nextLocation });
+        setExpressionErrors((current) => ({
+            ...current,
+            [index]: "",
+        }));
+    };
+
+    const updateExpressionDraft = (index, value) => {
+        setExpressionDrafts((current) => {
+            const next = [...current];
+            next[index] = value;
+            return next;
+        });
+
+        // Do not show validation errors while the user is still typing.
+        // Pressing Enter explicitly validates the current expression.
+        setExpressionErrors((current) => ({
+            ...current,
+            [index]: "",
+        }));
+    };
+
+    const commitExpression = (index, targetLocation, showError = false) => {
+        const draft = expressionDrafts[index] ?? assignments[index]?.expr ?? "";
+        const normalizedDraft = normalizeAssignmentExpressionInput(
+            draft,
+            targetLocation,
+            valueVariables
+        );
+
+        if (normalizedDraft !== draft) {
+            setExpressionDrafts((current) => {
+                const next = [...current];
+                next[index] = normalizedDraft;
+                return next;
+            });
         }
 
-        updateAssignment(index, changes);
+        const result = validateExpression(
+            index,
+            normalizedDraft,
+            targetLocation,
+            false,
+            showError
+        );
+
+        if (!result.valid) return false;
+
+        updateAssignment(index, { expr: result.value });
+        return true;
     };
 
     const getMatchingLocationOptions = (query) => {
@@ -187,6 +313,123 @@ function StateActionsEditor({
         event.currentTarget.blur();
     };
 
+    const updateExpressionAutocomplete = (index, value, caretPosition) => {
+        const { context, matches } = getMatchingExpressionVariables(
+            value,
+            caretPosition,
+            valueVariables
+        );
+
+        setExpressionCaretPosition(caretPosition);
+
+        if (!context || matches.length === 0) {
+            setOpenExpressionIndex(null);
+            setActiveExpressionSuggestionIndex(-1);
+            return;
+        }
+
+        setOpenExpressionIndex(index);
+        setActiveExpressionSuggestionIndex(0);
+    };
+
+    const selectExpressionSuggestion = (index, variable) => {
+        if (!variable?.id) return;
+
+        const value =
+            expressionDrafts[index] ??
+            assignments[index]?.expr ??
+            "";
+        const { context } = getMatchingExpressionVariables(
+            value,
+            expressionCaretPosition,
+            valueVariables
+        );
+
+        if (!context) return;
+
+        const replacement = `@${variable.id}`;
+        const nextValue =
+            value.slice(0, context.start) +
+            replacement +
+            value.slice(context.end);
+        const nextCaret = context.start + replacement.length;
+        const targetLocation = locationOptions.find(
+            (location) => location.id === assignments[index]?.location
+        );
+
+        updateExpressionDraft(index, nextValue);
+        setOpenExpressionIndex(null);
+        setActiveExpressionSuggestionIndex(-1);
+
+        requestAnimationFrame(() => {
+            const input = expressionInputRefs.current[index];
+            input?.focus();
+            input?.setSelectionRange?.(nextCaret, nextCaret);
+            setExpressionCaretPosition(nextCaret);
+        });
+    };
+
+    const handleExpressionKeyDown = (
+        event,
+        index,
+        matchingVariables,
+        targetLocation
+    ) => {
+        const autocompleteOpen =
+            openExpressionIndex === index &&
+            matchingVariables.length > 0;
+
+        if (autocompleteOpen && event.key === "ArrowDown") {
+            event.preventDefault();
+            setActiveExpressionSuggestionIndex((current) =>
+                current < matchingVariables.length - 1 ? current + 1 : 0
+            );
+            return;
+        }
+
+        if (autocompleteOpen && event.key === "ArrowUp") {
+            event.preventDefault();
+            setActiveExpressionSuggestionIndex((current) =>
+                current > 0 ? current - 1 : matchingVariables.length - 1
+            );
+            return;
+        }
+
+        if (autocompleteOpen && (event.key === "Enter" || event.key === "Tab")) {
+            event.preventDefault();
+            const suggestionIndex =
+                activeExpressionSuggestionIndex >= 0 &&
+                activeExpressionSuggestionIndex < matchingVariables.length
+                    ? activeExpressionSuggestionIndex
+                    : 0;
+            selectExpressionSuggestion(index, matchingVariables[suggestionIndex]);
+            return;
+        }
+
+        if (event.key === "Escape" && autocompleteOpen) {
+            event.preventDefault();
+            setOpenExpressionIndex(null);
+            setActiveExpressionSuggestionIndex(-1);
+            return;
+        }
+
+        if (event.key === "Enter") {
+            event.preventDefault();
+
+            const valid = commitExpression(
+                index,
+                targetLocation,
+                true
+            );
+
+            if (valid) {
+                setOpenExpressionIndex(null);
+                setActiveExpressionSuggestionIndex(-1);
+                event.currentTarget.blur();
+            }
+        }
+    };
+
     return (
         <section
             className={`state-action-editor ${
@@ -244,6 +487,23 @@ function StateActionsEditor({
                         const isLocationAutocompleteOpen =
                             openLocationIndex === index &&
                             matchingLocations.length > 0;
+                        const expressionValue =
+                            expressionDrafts[index] ??
+                            assignment.expr ??
+                            "";
+                        const expressionMatch =
+                            getMatchingExpressionVariables(
+                                expressionValue,
+                                expressionCaretPosition,
+                                valueVariables
+                            );
+                        const matchingExpressionVariables =
+                            openExpressionIndex === index
+                                ? expressionMatch.matches
+                                : [];
+                        const isExpressionAutocompleteOpen =
+                            openExpressionIndex === index &&
+                            matchingExpressionVariables.length > 0;
 
                         return (
                             <div
@@ -366,22 +626,128 @@ function StateActionsEditor({
                                     <div className="state-action-compact-field">
                                         <span>Value</span>
 
-                                        <TypedValueEditor
-                                            value={assignment.expr || ""}
-                                            expectedType={targetLocation?.type}
-                                            variables={valueVariables}
-                                            disabled={!targetLocation}
-                                            placeholder={
-                                                targetLocation?.type
-                                                    ? `${targetLocation.type} value`
-                                                    : "Select target first"
-                                            }
-                                            onCommit={(value) =>
-                                                updateAssignment(index, {
-                                                    expr: value,
-                                                })
-                                            }
-                                        />
+                                        <div className="typed-value-editor-row">
+                                            <input
+                                                ref={(element) => {
+                                                    expressionInputRefs.current[index] =
+                                                        element;
+                                                }}
+                                                className="slot-field-edit"
+                                                type="text"
+                                                value={expressionValue}
+                                                disabled={!targetLocation}
+                                                placeholder={
+                                                    targetLocation
+                                                        ? "Expression, e.g. @test_value + 1"
+                                                        : "Select target first"
+                                                }
+                                                autoComplete="off"
+                                                spellCheck={false}
+                                                onFocus={(event) =>
+                                                    updateExpressionAutocomplete(
+                                                        index,
+                                                        event.currentTarget.value,
+                                                        event.currentTarget.selectionStart ??
+                                                        event.currentTarget.value.length
+                                                    )
+                                                }
+                                                onClick={(event) =>
+                                                    updateExpressionAutocomplete(
+                                                        index,
+                                                        event.currentTarget.value,
+                                                        event.currentTarget.selectionStart ??
+                                                        event.currentTarget.value.length
+                                                    )
+                                                }
+                                                onChange={(event) => {
+                                                    const value = event.target.value;
+                                                    const caretPosition =
+                                                        event.target.selectionStart ??
+                                                        value.length;
+                                                    updateExpressionDraft(
+                                                        index,
+                                                        value
+                                                    );
+                                                    updateExpressionAutocomplete(
+                                                        index,
+                                                        value,
+                                                        caretPosition
+                                                    );
+                                                }}
+                                                onBlur={() => {
+                                                    window.setTimeout(() => {
+                                                        setOpenExpressionIndex(
+                                                            (current) =>
+                                                                current === index
+                                                                    ? null
+                                                                    : current
+                                                        );
+                                                        setActiveExpressionSuggestionIndex(
+                                                            -1
+                                                        );
+                                                    }, 120);
+                                                    commitExpression(
+                                                        index,
+                                                        targetLocation,
+                                                        false
+                                                    );
+                                                }}
+                                                onKeyDown={(event) =>
+                                                    handleExpressionKeyDown(
+                                                        event,
+                                                        index,
+                                                        matchingExpressionVariables,
+                                                        targetLocation
+                                                    )
+                                                }
+                                            />
+
+                                            {isExpressionAutocompleteOpen && (
+                                                <div
+                                                    className="typed-value-autocomplete"
+                                                    role="listbox"
+                                                >
+                                                    {matchingExpressionVariables.map(
+                                                        (variable, suggestionIndex) => (
+                                                            <button
+                                                                type="button"
+                                                                className={`typed-value-autocomplete-option ${
+                                                                    suggestionIndex ===
+                                                                    activeExpressionSuggestionIndex
+                                                                        ? "active"
+                                                                        : ""
+                                                                }`}
+                                                                key={variable.id}
+                                                                onMouseDown={(event) => {
+                                                                    event.preventDefault();
+                                                                    selectExpressionSuggestion(
+                                                                        index,
+                                                                        variable
+                                                                    );
+                                                                }}
+                                                            >
+                                                                <span className="typed-value-autocomplete-value">
+                                                                    @{variable.id}
+                                                                </span>
+                                                            </button>
+                                                        )
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {expressionErrors[index] && (
+                                            <div
+                                                style={{
+                                                    color: "#ef4444",
+                                                    fontSize: "12px",
+                                                    marginTop: "5px",
+                                                    lineHeight: 1.35,
+                                                }}
+                                            >
+                                                {expressionErrors[index]}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 

@@ -94,7 +94,7 @@ const EDITOR_SHORTCUTS = [
     { keys: "Shift + F", action: "Fit selection to view" },
     { keys: "Ctrl + 1", action: "Event mode" },
     { keys: "Ctrl + 2", action: "Slot mode" },
-    { keys: "Ctrl + 3", action: "Event + Slot mode" },
+    { keys: "Ctrl + 3", action: "Overview mode" },
 ];
 
 const FIND_SHORTCUTS = [
@@ -683,7 +683,7 @@ const buildEditorProblems = (
                     message: `${nodeLabel(node)}.${slot.key || `input ${index + 1}`} has no slot path.`,
                     nodeId: node.id,
                     detailTab: "slots",
-                    mode: "both",
+                    mode: "overview",
                 });
                 return;
             }
@@ -703,7 +703,7 @@ const buildEditorProblems = (
                     message: `${nodeLabel(node)}.${slot.key || `output ${index + 1}`} has no slot path.`,
                     nodeId: node.id,
                     detailTab: "slots",
-                    mode: "both",
+                    mode: "overview",
                 });
                 return;
             }
@@ -735,7 +735,7 @@ const buildEditorProblems = (
                         message: `/${path}: ${nodeLabel(writer.node)}.${writer.slot?.key} (${writer.slot?.type}) → ${nodeLabel(reader.node)}.${reader.slot?.key} (${reader.slot?.type}).`,
                         nodeId: reader.node.id,
                         detailTab: "slots",
-                        mode: "both",
+                        mode: "overview",
                         focusNodeIds: [writer.node.id, reader.node.id],
                     });
                 }
@@ -752,7 +752,7 @@ const buildEditorProblems = (
                     message: `/${path} is read by ${nodeLabel(reader.node)}, but no skill writes to it.`,
                     nodeId: reader.node.id,
                     detailTab: "slots",
-                    mode: "both",
+                    mode: "overview",
                 });
             });
         }
@@ -982,6 +982,152 @@ const getStoredTransitionAssignments = (...sources) => {
 
     return [];
 };
+
+// The editor uses @variable as a visual/reference convention, while Bonsai
+// SCXML assignment expressions use the datamodel identifier directly. Keep
+// the editor state untouched and normalize only the data passed to the SCXML
+// generator. Skill parameter expressions are intentionally NOT normalized.
+const normalizeAssignmentExpressionForScxml = (value) => {
+    let expression = String(value ?? "").trim();
+    if (!expression) return "";
+
+    // Older editor versions could accidentally persist a complete expression
+    // as a quoted string. Unwrap that form when it is clearly an expression
+    // containing a UI-style @variable reference and an operator. Genuine
+    // string literals remain quoted.
+    const first = expression[0];
+    const last = expression[expression.length - 1];
+    if (
+        expression.length >= 2 &&
+        (first === "\"" || first === "'") &&
+        last === first
+    ) {
+        const inner = expression.slice(1, -1).trim();
+        if (
+            /@[A-Za-z_#]/.test(inner) &&
+            /(?:==|!=|>=|<=|&&|\|\||[+\-*/%<>])/.test(inner)
+        ) {
+            expression = inner;
+        }
+    }
+
+    // Only transform unquoted portions so literal strings such as
+    // "contact@example.org" or "@literal" are not modified.
+    let result = "";
+    let unquoted = "";
+    let quote = null;
+    let escaped = false;
+
+    const flushUnquoted = () => {
+        if (!unquoted) return;
+
+        result += unquoted
+            // @test_value -> test_value
+            .replace(/@(?=[A-Za-z_#])/g, "")
+            // Normalize operator spacing for readable generated SCXML.
+            .replace(
+                /\s*(==|!=|>=|<=|&&|\|\||[+\-*/%<>])\s*/g,
+                " $1 "
+            )
+            .replace(/\s+/g, " ");
+
+        unquoted = "";
+    };
+
+    for (const character of expression) {
+        if (quote) {
+            result += character;
+
+            if (escaped) {
+                escaped = false;
+            } else if (character === "\\") {
+                escaped = true;
+            } else if (character === quote) {
+                quote = null;
+            }
+
+            continue;
+        }
+
+        if (character === "\"" || character === "'") {
+            flushUnquoted();
+            quote = character;
+            result += character;
+            continue;
+        }
+
+        unquoted += character;
+    }
+
+    flushUnquoted();
+    return result.trim();
+};
+
+const normalizeAssignmentForScxml = (assignment) =>
+    assignment
+        ? {
+            ...assignment,
+            expr: normalizeAssignmentExpressionForScxml(assignment.expr),
+        }
+        : assignment;
+
+const prepareGraphForScxml = (sourceNodes = [], sourceEdges = []) => {
+    const exportNodes = (sourceNodes || []).map((node) => ({
+        ...node,
+        data: {
+            ...(node.data || {}),
+            onEntry: Array.isArray(node.data?.onEntry)
+                ? node.data.onEntry.map(normalizeAssignmentForScxml)
+                : node.data?.onEntry,
+            onExit: Array.isArray(node.data?.onExit)
+                ? node.data.onExit.map(normalizeAssignmentForScxml)
+                : node.data?.onExit,
+            // Keep legacy/event-backed transition assignment data normalized
+            // too, in case the exporter reads it instead of edge.data.
+            events: Array.isArray(node.data?.events)
+                ? node.data.events.map((event) => ({
+                    ...event,
+                    assignments: Array.isArray(event.assignments)
+                        ? event.assignments.map(normalizeAssignmentForScxml)
+                        : event.assignments,
+                    assignExpr: event.assignExpr !== undefined
+                        ? normalizeAssignmentExpressionForScxml(event.assignExpr)
+                        : event.assignExpr,
+                }))
+                : node.data?.events,
+        },
+    }));
+
+    const exportEdges = (sourceEdges || []).map((edge) => ({
+        ...edge,
+        data: {
+            ...(edge.data || {}),
+            assignments: Array.isArray(edge.data?.assignments)
+                ? edge.data.assignments.map(normalizeAssignmentForScxml)
+                : edge.data?.assignments,
+            assign: edge.data?.assign
+                ? normalizeAssignmentForScxml(edge.data.assign)
+                : edge.data?.assign,
+            assignExpr: edge.data?.assignExpr !== undefined
+                ? normalizeAssignmentExpressionForScxml(edge.data.assignExpr)
+                : edge.data?.assignExpr,
+        },
+    }));
+
+    return { nodes: exportNodes, edges: exportEdges };
+};
+
+const getLocalDataModelEntries = (dataModel = []) =>
+    (dataModel || []).filter((parameter) => {
+        const id = String(parameter?.id || "").trim();
+
+        if (!id || id === "#_STATE_PREFIX" || id === "#_SLOTS") return false;
+
+        // IDs beginning with "_" are inherited/global variables in the
+        // Bonsai editor. Everything else belongs to this state machine's
+        // local datamodel.
+        return !id.startsWith("_");
+    });
 
 const collectDescendantGlobals = (
     tabList,
@@ -1689,6 +1835,7 @@ function AppContent() {
                 label: subMachineLabel,
                 fullSkillName: subMachineLabel,
                 src: `\${${behaviorDirectories[0]?.key || "ROBOCUP"}}/${subMachineLabel}.xml`,
+                localDataModel: [],
                 isInitial: nodes.length === 0,
                 events: [{ id: "success" }, { id: "failure" }],
                 onOpenSubMachine: handleOpenSubMachine,
@@ -1776,12 +1923,16 @@ function AppContent() {
                         parsedChild.nodes,
                         declaredInheritedSlots
                     );
+                    const localDataModel = getLocalDataModelEntries(
+                        parsedChild.globalDataModel
+                    );
 
                     return {
                         ...node,
                         data: {
                             ...node.data,
                             inheritedSlots,
+                            localDataModel,
                         },
                     };
                 } catch (error) {
@@ -1894,6 +2045,9 @@ function AppContent() {
                                 )
                                 : node.data?.events || [],
                         inheritedSlots: discoveredInheritedSlots,
+                        localDataModel: getLocalDataModelEntries(
+                            parsed.globalDataModel
+                        ),
                     },
                 };
             });
@@ -2737,6 +2891,7 @@ function AppContent() {
             data: {
                 label: subMachineLabel,
                 fullSkillName: subMachineLabel,
+                localDataModel: [],
                 src: `\${${behaviorDirectories[0]?.key || "ROBOCUP"}}/${subMachineLabel}.xml`,
                 isInitial: selectedNodes.some((n) => n.data?.isInitial),
                 events: externalEvents.length > 0 ? externalEvents : [{ id: "success" }, { id: "failure" }],
@@ -2872,6 +3027,36 @@ function AppContent() {
 
             if (n.type === "submachine") {
                 injectedData.onOpenSubMachine = handleOpenSubMachine;
+
+                // If this sub-state machine is open as a child tab, use that
+                // tab's current datamodel for the Overview card. This keeps
+                // the parent node in sync after editing the child workflow.
+                const srcFileName = String(n.data?.src || "")
+                    .split(/[\\/]/)
+                    .pop()
+                    ?.replace(/\.(xml|scxml)$/i, "");
+
+                const childTab = tabs.find((tab) => {
+                    if (tab.parentTabId !== activeTabId) return false;
+
+                    const tabFileName = String(tab.fileName || "")
+                        .split(/[\\/]/)
+                        .pop()
+                        ?.replace(/\.(xml|scxml)$/i, "");
+
+                    return (
+                        (tab.sourcePath &&
+                            String(tab.sourcePath) === String(n.data?.src || "")) ||
+                        String(tab.title || "") === String(n.data?.label || "") ||
+                        (srcFileName && tabFileName === srcFileName)
+                    );
+                });
+
+                if (childTab) {
+                    injectedData.localDataModel = getLocalDataModelEntries(
+                        childTab.globalDataModel
+                    );
+                }
             }
 
             if (n.type === "parallel") {
@@ -3053,29 +3238,49 @@ function AppContent() {
 
             let behaviorEvents = [];
             let inheritedSlots = [];
+            let localDataModel = [];
 
             try {
-                if (IS_DESKTOP && behavior?.source) {
-                    const loaded = await readWorkflowSource(
-                        behavior.source,
-                        behaviorDirectories,
-                        null
-                    );
+                if (behavior?.source) {
+                    let behaviorContent = "";
 
-                    behaviorEvents = extractBehaviorExitEventsFromScxml(
-                        loaded.content
-                    );
-                    const declaredInheritedSlots =
-                        extractInheritedSlotsFromScxml(loaded.content);
-                    const parsedBehavior = await parseScxmlFile(
-                        loaded.content,
-                        fetchSkillData,
-                        getNodeId
-                    );
-                    inheritedSlots = collectInheritedSlotUsages(
-                        parsedBehavior.nodes,
-                        declaredInheritedSlots
-                    );
+                    if (IS_DESKTOP) {
+                        const loaded = await readWorkflowSource(
+                            behavior.source,
+                            behaviorDirectories,
+                            null
+                        );
+                        behaviorContent = loaded.content || "";
+                    } else {
+                        const resolvedUrl = resolveSrcPath(
+                            behavior.source,
+                            DEFAULT_PREFIX_CONFIG
+                        );
+                        const response = await fetch(resolvedUrl);
+                        if (response.ok) {
+                            behaviorContent = await response.text();
+                        }
+                    }
+
+                    if (behaviorContent) {
+                        behaviorEvents = extractBehaviorExitEventsFromScxml(
+                            behaviorContent
+                        );
+                        const declaredInheritedSlots =
+                            extractInheritedSlotsFromScxml(behaviorContent);
+                        const parsedBehavior = await parseScxmlFile(
+                            behaviorContent,
+                            fetchSkillData,
+                            getNodeId
+                        );
+                        inheritedSlots = collectInheritedSlotUsages(
+                            parsedBehavior.nodes,
+                            declaredInheritedSlots
+                        );
+                        localDataModel = getLocalDataModelEntries(
+                            parsedBehavior.globalDataModel
+                        );
+                    }
                 }
             } catch (error) {
                 console.warn(
@@ -3104,6 +3309,7 @@ function AppContent() {
                     isInitial: false,
                     events,
                     inheritedSlots,
+                    localDataModel,
                     onEntry: [],
                     onExit: [],
                     onOpenSubMachine: handleOpenSubMachine,
@@ -3132,6 +3338,63 @@ function AppContent() {
             ) || null
         );
     }, [selectedRawNode, nodes]);
+
+    // OnEntry/OnExit has asymmetric scope for sub-state-machines:
+    // - assignment location belongs to the child machine's local datamodel
+    // - assignment expression is evaluated in the parent workflow scope
+    const selectedActionDataModel = useMemo(() => {
+        if (!selectedNode || selectedNode.type !== "submachine") {
+            return availableDataModelParameters;
+        }
+
+        const srcFileName = String(selectedNode.data?.src || "")
+            .split(/[\\/]/)
+            .pop()
+            ?.replace(/\.(xml|scxml)$/i, "");
+
+        // Prefer the live child tab when the sub-state machine is currently
+        // open. This means Entry/Exit assignment locations immediately track
+        // edits to the child machine's own datamodel.
+        const childTab = tabs.find((tab) => {
+            if (tab.parentTabId !== activeTabId) return false;
+
+            const tabFileName = String(tab.fileName || "")
+                .split(/[\\/]/)
+                .pop()
+                ?.replace(/\.(xml|scxml)$/i, "");
+
+            return (
+                (tab.sourcePath &&
+                    String(tab.sourcePath) === String(selectedNode.data?.src || "")) ||
+                String(tab.title || "") === String(selectedNode.data?.label || "") ||
+                (srcFileName && tabFileName === srcFileName)
+            );
+        });
+
+        if (childTab) {
+            return getLocalDataModelEntries(childTab.globalDataModel);
+        }
+
+        // A behavior that has not been opened yet is hydrated with its local
+        // datamodel when its source file is inspected. Never fall back to the
+        // parent's datamodel for a sub-state-machine action.
+        return getLocalDataModelEntries(
+            selectedNode.data?.localDataModel || []
+        );
+    }, [
+        selectedNode,
+        tabs,
+        activeTabId,
+        availableDataModelParameters,
+    ]);
+
+    const selectedActionExpressionVariables = useMemo(() => {
+        // The expression of an action attached to a sub-state-machine is
+        // evaluated by the parent state machine. Therefore @variable
+        // references must come from the parent/current workflow, not from the
+        // child machine whose local datamodel supplies `location`.
+        return availableDataModelParameters;
+    }, [availableDataModelParameters]);
 
     const hasInitialNode = nodes.some((node) => node.data?.isInitial);
 
@@ -3474,7 +3737,7 @@ function AppContent() {
     if (activeMode === "slots") {
         visibleNodes = [...injectedNodes, ...injectedSlotNodes];
         visibleEdges = editableSlotEdges;
-    } else if (activeMode === "both") {
+    } else if (activeMode === "overview") {
         visibleNodes = [...injectedNodes, ...injectedSlotNodes];
         visibleEdges = [
             ...highlightedTransitionEdges,
@@ -5486,7 +5749,7 @@ function AppContent() {
                     }))
                 );
 
-                if (activeMode === "slots" || activeMode === "both") {
+                if (activeMode === "slots" || activeMode === "overview") {
                     setSlotNodes((currentNodes) =>
                         currentNodes.map((node) => ({
                             ...node,
@@ -5908,7 +6171,8 @@ function AppContent() {
         }
 
         const currentActiveTab = tabs.find((t) => t.id === activeTabId);
-        const xml = generateXmlString(nodes, edges, globalDataModel);
+        const exportGraph = prepareGraphForScxml(nodes, edges);
+        const xml = generateXmlString(exportGraph.nodes, exportGraph.edges, globalDataModel);
         const defaultName = currentActiveTab?.fileName || `${currentActiveTab?.title || "workflow"}.xml`;
 
         let result;
@@ -5954,7 +6218,8 @@ function AppContent() {
         }
 
         const currentActiveTab = tabs.find((t) => t.id === activeTabId);
-        const xml = generateXmlString(nodes, edges, globalDataModel);
+        const exportGraph = prepareGraphForScxml(nodes, edges);
+        const xml = generateXmlString(exportGraph.nodes, exportGraph.edges, globalDataModel);
         const defaultName = currentActiveTab?.fileName || `${currentActiveTab?.title || "workflow"}.xml`;
 
         let result;
@@ -6108,7 +6373,7 @@ function AppContent() {
 
                 if (key === "3") {
                     event.preventDefault();
-                    setActiveMode("both");
+                    setActiveMode("overview");
                     return;
                 }
 
@@ -6126,7 +6391,7 @@ function AppContent() {
                         .filter((node) => node.selected)
                         .map((node) => node.id),
                     ...(
-                        activeMode === "slots" || activeMode === "both"
+                        activeMode === "slots" || activeMode === "overview"
                             ? slotNodes
                                 .filter((node) => node.selected)
                                 .map((node) => node.id)
@@ -7984,25 +8249,32 @@ function AppContent() {
                     >
                         {activeMode === "code" ? (
                             <CodeView
-                                codeString={generateXmlString(nodes, edges, globalDataModel)}
+                                codeString={(() => {
+                                    const exportGraph = prepareGraphForScxml(nodes, edges);
+                                    return generateXmlString(
+                                        exportGraph.nodes,
+                                        exportGraph.edges,
+                                        globalDataModel
+                                    );
+                                })()}
                                 activeMode={activeMode}
                                 setActiveMode={setActiveMode}
                             />
                         ) : (
                             <>
                                 <div className="mode-button-group-floating">
-                                    {["event", "slots", "both", "code"].map((m) => (
+                                    {["event", "slots", "overview", "code"].map((m) => (
                                         <button
                                             key={m}
                                             className={`mode-button ${activeMode === m ? "active" : ""}`}
                                             onClick={() => setActiveMode(m)}
                                         >
-                                            {m === "event" ? "Event Mode" : m === "slots" ? "Slot Mode" : m === "both" ? "Both Mode" : "Code View"}
+                                            {m === "event" ? "Event Mode" : m === "slots" ? "Slot Mode" : m === "overview" ? "Overview Mode" : "Code View"}
                                         </button>
                                     ))}
                                 </div>
 
-                                {(activeMode === "slots" || activeMode === "both") && (
+                                {(activeMode === "slots" || activeMode === "overview") && (
                                     <button
                                         type="button"
                                         className="create-slot-button-floating"
@@ -8285,7 +8557,8 @@ function AppContent() {
                                 }
 
                                 onUpdateParameterBlur={updateEventsFromParameters}
-                                globalDataModel={availableDataModelParameters}
+                                globalDataModel={selectedActionDataModel}
+                                actionValueVariables={selectedActionExpressionVariables}
                                 onUpdateStateActions={(nodeId, actionType, assignments) =>
                                     setNodes((nds) =>
                                         nds.map((node) =>
