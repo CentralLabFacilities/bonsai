@@ -1,137 +1,108 @@
-import { useEffect } from "react";
-import {
-    Handle,
-    Position,
-    useUpdateNodeInternals,
-} from "@xyflow/react";
+import { Handle, Position } from "@xyflow/react";
 
-import StateActionBadges from "./StateActionBadges";
-import { getTransitionExitToken } from "../utils/transitionEvents.js";
+function CompoundNode({ data = {}, selected = false }) {
+    const events = Array.isArray(data.events) ? data.events : [];
 
-export default function CompoundNode({ id, data }) {
-    const updateNodeInternals = useUpdateNodeInternals();
+    const uniqueEvents = [];
+    const seen = new Set();
 
-    const events = data.events || [];
-
-    const uniqueEvents = Array.from(
-        new Map(
-            events.map((evt) => {
-                const fullEventName = String(
-                    evt.rawEvent ||
-                    evt.name ||
-                    evt.id ||
-                    ""
-                );
-
-                const handleId = String(
-                    evt.id ||
-                    getTransitionExitToken(
-                        fullEventName,
-                        data.fullSkillName
-                    ) ||
-                    "success"
-                );
-
-                return [
-                    handleId,
-                    {
-                        handleId,
-                        displayLabel:
-                            fullEventName || handleId,
-                    },
-                ];
-            })
-        ).values()
-    );
-
-    const handleSignature = uniqueEvents
-        .map((evt) => evt.handleId)
-        .join("|");
-
-    useEffect(() => {
-        requestAnimationFrame(() => {
-            updateNodeInternals(id);
-        });
-    }, [
-        id,
-        handleSignature,
-        updateNodeInternals,
-    ]);
+    events.forEach((event) => {
+        const id = String(event?.id || "").trim();
+        if (!id || id === "compound-entry" || seen.has(id)) return;
+        seen.add(id);
+        uniqueEvents.push({ ...event, id });
+    });
 
     return (
         <div
             className={`compound-frame-node ${
-                data.isInitial
-                    ? "initial-compound"
-                    : ""
-            } ${
-                data.isDropTarget
-                    ? "compound-drop-target"
-                    : ""
+                data.isInitial ? "initial-compound" : ""
+            } ${selected ? "selected-compound" : ""} ${
+                data.isDropTarget ? "compound-drop-target" : ""
             }`}
         >
-            <StateActionBadges
-                onEntry={data.onEntry}
-                onExit={data.onExit}
-                onEntryClick={() =>
-                    data.onOpenStateActions?.(id)
-                }
-                onExitClick={() =>
-                    data.onOpenStateActions?.(id)
-                }
-            />
-
-            {/* Incoming transition to the Compound state itself */}
+            {/*
+             * Dedicated compound entry connector. This handle is SOURCE-ONLY:
+             * it may only point inward to exactly one immediate child state.
+             * App.jsx interprets this connection as the compound's initial state,
+             * not as a normal SCXML transition.
+             *
+             * Keep the target-handle CSS class so compounds embedded invisibly
+             * inside parallel lanes retain the existing hide behaviour.
+             */}
             <Handle
-                type="target"
-                position={Position.Left}
-                id="target"
-                className="target-handle"
+                id="compound-entry"
+                type="source"
+                // Position.Right tells React Flow that this connection travels
+                // inward. The inline left override keeps the point physically
+                // on the compound's left border.
+                position={Position.Right}
+                className="target-handle compound-frame-entry-handle"
+                style={{
+                    top: "50%",
+                    left: "-5px",
+                    right: "auto",
+                }}
+                title="Drag inward to the compound's initial child state"
             />
 
             <div className="compound-frame-header">
                 <span className="compound-frame-title">
-                    {data.label || id}
+                    {data.label || "Compound"}
                 </span>
             </div>
 
-            {/* Exits on the right side */}
             {uniqueEvents.length > 0 && (
                 <div className="compound-frame-exits">
-                    {uniqueEvents.map((evt) => (
-                        <div
-                            key={evt.handleId}
-                            className="compound-frame-exit-item"
-                        >
-                            <span className="compound-frame-exit-label">
-                                {evt.displayLabel}
-                            </span>
+                    {uniqueEvents.map((event) => {
+                        const label =
+                            event.name ||
+                            event.rawEvent ||
+                            event.id;
 
-                            {/*
-                                Internal transition:
-                                child state -> Compound exit
-                            */}
-                            <Handle
-                                type="target"
-                                position={Position.Right}
-                                id={`target-${evt.handleId}`}
-                                className="target-handle compound-frame-internal-target-handle"
-                            />
+                        return (
+                            <div
+                                className="compound-frame-exit-item"
+                                key={event.id}
+                            >
+                                {/*
+                                 * Restore the original compact exit geometry:
+                                 * the internal helper edge arrives on the left
+                                 * side of the event label, while the external
+                                 * transition leaves from the right side, which
+                                 * is anchored to the compound border.
+                                 */}
+                                <Handle
+                                    id={`target-${event.id}`}
+                                    type="target"
+                                    position={Position.Left}
+                                    className="compound-frame-exit-target-handle"
+                                    style={{
+                                        opacity: 0,
+                                        pointerEvents: "none",
+                                    }}
+                                />
 
-                            {/*
-                                External transition:
-                                Compound exit -> outside state
-                            */}
-                            <Handle
-                                type="source"
-                                position={Position.Right}
-                                id={evt.handleId}
-                                className="source-handle compound-frame-source-handle"
-                            />
-                        </div>
-                    ))}
+                                <span
+                                    className="compound-frame-exit-label"
+                                    title={label}
+                                >
+                                    {label}
+                                </span>
+
+                                <Handle
+                                    id={event.id}
+                                    type="source"
+                                    position={Position.Right}
+                                    className="compound-frame-source-handle"
+                                />
+                            </div>
+                        );
+                    })}
                 </div>
             )}
         </div>
     );
 }
+
+export default CompoundNode;
