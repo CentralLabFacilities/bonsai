@@ -38,6 +38,7 @@ import CreateSlotModal from "./components/CreateSlotModal";
 import { generateXmlString, saveScxmlFile, saveScxmlFileTauri, openScxmlFileTauri, readScxmlFileContent } from "./utils/scxmlExport";
 import { parseScxmlFile, extractBehaviorExitEventsFromScxml } from "./utils/scxmlImport";
 import { DEFAULT_PREFIX_CONFIG, resolveSrcPath } from "./config/prefixMapping";
+import { resolveCollisionScope } from "./utils/nodeCollisions";
 import {
     isTauri,
     initApiProxy,
@@ -83,6 +84,8 @@ const EDITOR_SHORTCUTS = [
     { keys: "Ctrl + Shift + S", action: "Save workflow as…" },
     { keys: "Ctrl + Tab", action: "Next workflow tab" },
     { keys: "Ctrl + Shift + Tab", action: "Previous workflow tab" },
+    { keys: "Ctrl + Z", action: "Undo" },
+    { keys: "Ctrl + Y", action: "Redo" },
     { keys: "Ctrl + C", action: "Copy selected nodes" },
     { keys: "Ctrl + V", action: "Paste copied nodes" },
     { keys: "Ctrl + D", action: "Duplicate selected nodes" },
@@ -426,9 +429,7 @@ const buildEditorProblems = (
     // Every compound state requires exactly one immediate initial child.
     (nodes || [])
         .filter(
-            (node) =>
-                node.type === "compound" &&
-                node.className !== "compound-in-lane"
+            (node) => node.type === "compound" && !node.data?.isCollapsed
         )
         .forEach((compound) => {
             const children = (nodes || []).filter(
@@ -869,14 +870,129 @@ const getCompoundChildrenRight = (compoundId, allNodes = []) =>
         }, COMPOUND_PADDING_X);
 
 const getNodeSize = (node) => ({
-    width: Number(node?.measured?.width) || Number(node?.width) || Number(node?.style?.width) || 210,
-    height: Number(node?.measured?.height) || Number(node?.height) || Number(node?.style?.height) || 80,
+    // Explicit dimensions written by NodeResizer / auto-fit must win over a
+    // possibly stale React Flow measurement from the previous render.
+    width: Number(node?.width) || Number(node?.style?.width) || Number(node?.measured?.width) || 210,
+    height: Number(node?.height) || Number(node?.style?.height) || Number(node?.measured?.height) || 80,
+});
+
+const withNodeDimensions = (node, width, height) => ({
+    ...node,
+    width,
+    height,
+    style: {
+        ...(node.style || {}),
+        width,
+        height,
+    },
 });
 
 const getDirectCompoundForNode = (node, allNodes) => {
     if (!node?.parentId) return null;
     const parent = allNodes.find((candidate) => candidate.id === node.parentId);
-    return parent?.type === "compound" && parent.className !== "compound-in-lane" ? parent : null;
+    return parent?.type === "compound" ? parent : null;
+};
+
+const fitCompoundToChildren = (allNodes, compoundId) => {
+    const compound = (allNodes || []).find((node) => node.id === compoundId);
+    if (!compound || compound.type !== "compound") return allNodes;
+
+    const members = allNodes.filter((node) => node.parentId === compoundId);
+
+    let right = COMPOUND_PADDING_X;
+    let bottom = COMPOUND_HEADER_HEIGHT;
+
+    members.forEach((member) => {
+        const size = getNodeSize(member);
+        right = Math.max(
+            right,
+            Number(member.position?.x || 0) + size.width
+        );
+        bottom = Math.max(
+            bottom,
+            Number(member.position?.y || 0) + size.height
+        );
+    });
+
+    const requiredWidth = Math.max(
+        320,
+        right +
+        COMPOUND_PADDING_X +
+        getCompoundExitGutterWidth(compound.data?.events || [])
+    );
+    const requiredHeight = Math.max(
+        180,
+        bottom + COMPOUND_BOTTOM_PADDING
+    );
+
+    return allNodes.map((node) => {
+        if (node.id !== compoundId) return node;
+
+        const currentSize = getNodeSize(node);
+
+        if (node.data?.isCollapsed) {
+            const savedExpanded = node.data?.expandedContainerSize || {};
+            const expandedWidth = Math.max(
+                Number(savedExpanded.width) || 0,
+                currentSize.width,
+                requiredWidth
+            );
+            const expandedHeight = Math.max(
+                Number(savedExpanded.height) || 0,
+                requiredHeight
+            );
+
+            // Keep the compact collapsed height on screen, but remember a
+            // large enough expanded size for all children. Manual resizing
+            // therefore becomes a minimum size rather than disabling auto-grow.
+            return {
+                ...withNodeDimensions(node, expandedWidth, currentSize.height),
+                data: {
+                    ...(node.data || {}),
+                    expandedContainerSize: {
+                        ...savedExpanded,
+                        width: expandedWidth,
+                        height: expandedHeight,
+                    },
+                },
+            };
+        }
+
+        const width = Math.max(currentSize.width, requiredWidth);
+        const height = Math.max(currentSize.height, requiredHeight);
+
+        return withNodeDimensions(node, width, height);
+    });
+};
+
+const fitCompoundAndAncestorCompounds = (allNodes, compoundId) => {
+    let nextNodes = allNodes;
+    let currentId = compoundId;
+    const visited = new Set();
+
+    while (currentId && !visited.has(currentId)) {
+        visited.add(currentId);
+        nextNodes = fitCompoundToChildren(nextNodes, currentId);
+
+        const current = nextNodes.find((node) => node.id === currentId);
+        if (!current?.parentId) break;
+
+        const parent = nextNodes.find((node) => node.id === current.parentId);
+        currentId = parent?.type === "compound" ? parent.id : null;
+    }
+
+    // A compound can itself live in a parallel lane. If it grows, the lane
+    // and enclosing parallel must grow too instead of clipping the compound.
+    const fittedCompound = nextNodes.find((node) => node.id === compoundId);
+    const lane = fittedCompound
+        ? getLaneForNode(fittedCompound, nextNodes)
+        : null;
+
+    if (lane?.parentId) {
+        nextNodes = growParallelToLaneContents(nextNodes, lane.parentId);
+    }
+
+    return nextNodes;
 };
 
 const getAbsoluteNodePosition = (node, allNodes) => {
@@ -922,6 +1038,105 @@ const getLaneForNode = (node, allNodes) => {
     return null;
 };
 
+const getEnclosingStateContainers = (node, allNodes = []) => {
+    const byId = new Map(
+        (allNodes || []).map((candidate) => [candidate.id, candidate])
+    );
+    const containers = [];
+    const visited = new Set();
+    let parentId = node?.parentId;
+
+    while (parentId && !visited.has(parentId)) {
+        visited.add(parentId);
+        const parent = byId.get(parentId);
+        if (!parent) break;
+
+        if (parent.type === "compound" || parent.type === "parallel") {
+            containers.push(parent);
+        }
+
+        parentId = parent.parentId;
+    }
+
+    return containers;
+};
+
+const isNodeInsideContainer = (node, containerId, allNodes = []) => {
+    if (!node || !containerId) return false;
+
+    const byId = new Map(
+        (allNodes || []).map((candidate) => [candidate.id, candidate])
+    );
+    const visited = new Set();
+    let parentId = node.parentId;
+
+    while (parentId && !visited.has(parentId)) {
+        if (parentId === containerId) return true;
+
+        visited.add(parentId);
+        const parent = byId.get(parentId);
+        if (!parent) break;
+        parentId = parent.parentId;
+    }
+
+    return false;
+};
+
+const getNodeNestingDepth = (node, allNodes = []) => {
+    const byId = new Map(
+        (allNodes || []).map((candidate) => [candidate.id, candidate])
+    );
+    const visited = new Set();
+    let depth = 0;
+    let parentId = node?.parentId;
+
+    while (parentId && !visited.has(parentId)) {
+        visited.add(parentId);
+        const parent = byId.get(parentId);
+        if (!parent) break;
+        depth += 1;
+        parentId = parent.parentId;
+    }
+
+    return depth;
+};
+
+// A normal transition may only target an interior state when its source is
+// already inside every compound/parallel boundary surrounding that target.
+// This prevents transitions from jumping across a state boundary directly to
+// one of its children; external transitions must target the container itself.
+const canTargetAcrossStateBoundaries = (sourceNode, targetNode, allNodes = []) =>
+    getEnclosingStateContainers(targetNode, allNodes).every((container) =>
+        isNodeInsideContainer(sourceNode, container.id, allNodes)
+    );
+
+const getTransitionTargetHandleForNode = (node) =>
+    node?.type === "parallel" ? "target" : "transition-target";
+
+const getDescendantNodeIds = (rootId, allNodes = []) => {
+    const childrenByParent = new Map();
+
+    (allNodes || []).forEach((node) => {
+        if (!node?.parentId) return;
+        if (!childrenByParent.has(node.parentId)) {
+            childrenByParent.set(node.parentId, []);
+        }
+        childrenByParent.get(node.parentId).push(node.id);
+    });
+
+    const descendants = new Set();
+    const queue = [...(childrenByParent.get(rootId) || [])];
+
+    while (queue.length > 0) {
+        const id = queue.shift();
+        if (!id || descendants.has(id)) continue;
+        descendants.add(id);
+        queue.push(...(childrenByParent.get(id) || []));
+    }
+
+    return descendants;
+};
+
 const orderNodesParentsFirst = (allNodes) => {
     const byId = new Map(
         allNodes.map((node) => [node.id, node])
@@ -959,10 +1174,731 @@ const isCompoundInitialChildCandidate = (node) =>
     Boolean(
         node &&
         node.type !== "slot" &&
-        node.type !== "parallelLane" &&
-        node.type !== "compound" &&
-        node.type !== "parallel"
+        node.type !== "parallelLane"
     );
+
+// Any real SCXML state can be a branch state in a parallel lane. Structural
+// states (compound/parallel) therefore participate exactly like skills. The
+// automatically managed lane wrapper itself is excluded so it never tries to
+// wrap itself.
+const isParallelLaneSkillCandidate = (node) =>
+    Boolean(
+        node &&
+        node.type !== "slot" &&
+        node.type !== "parallelLane" &&
+        !(
+            node.type === "compound" &&
+            (
+                node.data?.autoParallelLaneCompound ||
+                node.className === "compound-in-lane"
+            )
+        )
+    );
+
+const isAutoParallelLaneCompound = (node) =>
+    Boolean(
+        node &&
+        node.type === "compound" &&
+        (
+            node.data?.autoParallelLaneCompound ||
+            node.className === "compound-in-lane"
+        )
+    );
+
+// Children that live inside state containers should still be able to enlarge
+// their parent after that parent has been manually resized. React Flow's
+// expandParent support handles the live drag case; our explicit fit helpers
+// below handle drops/reparenting and nested containers.
+const normalizeContainerAutoExpansion = (allNodes) => {
+    if (!Array.isArray(allNodes) || allNodes.length === 0) return allNodes;
+
+    const byId = new Map(allNodes.map((node) => [node.id, node]));
+    let changed = false;
+
+    const nextNodes = allNodes.map((node) => {
+        if (!node.parentId) return node;
+
+        const parent = byId.get(node.parentId);
+        const shouldExpandParent =
+            parent?.type === "compound" ||
+            parent?.type === "parallel" ||
+            parent?.type === "parallelLane";
+
+        if (!shouldExpandParent || node.expandParent === true) {
+            return node;
+        }
+
+        changed = true;
+        return {
+            ...node,
+            expandParent: true,
+        };
+    });
+
+    return changed ? nextNodes : allNodes;
+};
+
+// Grow a parallel state (and its lanes / automatic lane compounds) just enough
+// to contain the current lane contents. Existing dimensions are floors, so a
+// user resize is preserved while automatic layout may still make the state
+// larger later.
+const growParallelToLaneContents = (allNodes, parallelId) => {
+    let nextNodes = allNodes;
+    const parallel = nextNodes.find((node) => node.id === parallelId);
+    if (!parallel || parallel.type !== "parallel") return nextNodes;
+
+    const parallelLanes = nextNodes
+        .filter(
+            (node) =>
+                node.type === "parallelLane" &&
+                node.parentId === parallel.id
+        )
+        .sort(
+            (a, b) =>
+                Number(a.position?.y || 0) -
+                Number(b.position?.y || 0)
+        );
+
+    if (parallelLanes.length === 0) return nextNodes;
+
+    // Fit automatic lane compounds first, because their required dimensions
+    // determine how large the surrounding lane and parallel must become.
+    parallelLanes.forEach((lane) => {
+        const wrapper = nextNodes.find(
+            (node) =>
+                node.parentId === lane.id &&
+                isAutoParallelLaneCompound(node)
+        );
+
+        if (wrapper) {
+            nextNodes = fitCompoundToChildren(nextNodes, wrapper.id);
+        }
+    });
+
+    const currentParallelSize = getNodeSize(
+        nextNodes.find((node) => node.id === parallel.id) || parallel
+    );
+
+    let requiredParallelWidth = Math.max(420, currentParallelSize.width);
+    const laneHeights = new Map();
+
+    parallelLanes.forEach((originalLane) => {
+        const lane =
+            nextNodes.find((node) => node.id === originalLane.id) ||
+            originalLane;
+        const currentLaneSize = getNodeSize(lane);
+        const laneChildren = nextNodes.filter(
+            (node) => node.parentId === lane.id
+        );
+        const wrapper = laneChildren.find(isAutoParallelLaneCompound);
+        const laneMembers = wrapper
+            ? [wrapper]
+            : laneChildren.filter(isParallelLaneSkillCandidate);
+
+        let maxRight = 0;
+        let maxBottom = 0;
+
+        laneMembers.forEach((member) => {
+            const size = getNodeSize(member);
+            maxRight = Math.max(
+                maxRight,
+                Number(member.position?.x || 0) + size.width
+            );
+            maxBottom = Math.max(
+                maxBottom,
+                Number(member.position?.y || 0) + size.height
+            );
+        });
+
+        const requiredLaneWidth = wrapper
+            ? Math.max(420, maxRight)
+            : Math.max(420, 15 + maxRight + PARALLEL_EXIT_GUTTER);
+        const requiredLaneHeight = wrapper
+            ? Math.max(140, maxBottom)
+            : Math.max(110, maxBottom + 20);
+
+        requiredParallelWidth = Math.max(
+            requiredParallelWidth,
+            currentLaneSize.width,
+            requiredLaneWidth
+        );
+        laneHeights.set(
+            lane.id,
+            Math.max(currentLaneSize.height, requiredLaneHeight)
+        );
+    });
+
+    const firstLaneY = Math.max(
+        40,
+        Number(parallelLanes[0]?.position?.y || 40)
+    );
+    let nextLaneY = firstLaneY;
+    const laneGeometry = new Map();
+
+    parallelLanes.forEach((lane) => {
+        const height = laneHeights.get(lane.id) || 110;
+        laneGeometry.set(lane.id, {
+            y: nextLaneY,
+            width: requiredParallelWidth,
+            height,
+        });
+        nextLaneY += height;
+    });
+
+    const requiredParallelHeight = Math.max(
+        180,
+        currentParallelSize.height,
+        nextLaneY + 35
+    );
+
+    return nextNodes.map((node) => {
+        if (node.id === parallel.id) {
+            return withNodeDimensions(
+                node,
+                requiredParallelWidth,
+                requiredParallelHeight
+            );
+        }
+
+        const geometry = laneGeometry.get(node.id);
+        if (geometry) {
+            return {
+                ...withNodeDimensions(
+                    node,
+                    geometry.width,
+                    geometry.height
+                ),
+                position: {
+                    ...node.position,
+                    x: 0,
+                    y: geometry.y,
+                },
+                expandParent: true,
+            };
+        }
+
+        if (
+            isAutoParallelLaneCompound(node) &&
+            laneGeometry.has(node.parentId)
+        ) {
+            const laneSize = laneGeometry.get(node.parentId);
+            return {
+                ...withNodeDimensions(
+                    node,
+                    laneSize.width,
+                    laneSize.height
+                ),
+                expandParent: true,
+            };
+        }
+
+        return node;
+    });
+};
+
+// Re-evaluate all nested state containers from the inside out. Because the
+// individual fit functions are grow-only, this is stable and lets a resize of
+// any child propagate through Compound -> Parallel -> Compound chains.
+const growAllStateContainersToContents = (allNodes) => {
+    let nextNodes = allNodes;
+
+    const containers = (allNodes || [])
+        .filter(
+            (node) =>
+                node.type === "compound" ||
+                node.type === "parallel"
+        )
+        .sort(
+            (a, b) =>
+                getNodeNestingDepth(b, allNodes) -
+                getNodeNestingDepth(a, allNodes)
+        );
+
+    containers.forEach((container) => {
+        if (container.type === "compound") {
+            nextNodes = fitCompoundToChildren(nextNodes, container.id);
+        } else {
+            nextNodes = growParallelToLaneContents(
+                nextNodes,
+                container.id
+            );
+        }
+    });
+
+    return nextNodes;
+};
+
+const NODE_COLLISION_OPTIONS = {
+    // Match the React Flow example: keep resolving until the scope is clear.
+    maxIterations: Infinity,
+    overlapThreshold: 0.5,
+    margin: 15,
+};
+
+const resolveNodeCollisionsAndRefit = (allNodes, focusNodeId) => {
+    let nextNodes = resolveCollisionScope(
+        allNodes,
+        focusNodeId,
+        NODE_COLLISION_OPTIONS
+    );
+
+    const focusNode = nextNodes.find((node) => node.id === focusNodeId);
+    if (!focusNode?.parentId) {
+        return orderNodesParentsFirst(nextNodes);
+    }
+
+    const parent = nextNodes.find(
+        (node) => node.id === focusNode.parentId
+    );
+
+    // The reference collision solver is intentionally unbounded. Inside our
+    // subflows that could push a sibling through the parent's left/top edge.
+    // Shift the whole resolved sibling group together so its relative spacing
+    // stays intact while respecting the container's content inset.
+    const minContentX =
+        parent?.type === "compound" ? COMPOUND_PADDING_X : 20;
+    const minContentY =
+        parent?.type === "compound" ? COMPOUND_HEADER_HEIGHT : 20;
+    const siblings = nextNodes.filter(
+        (node) =>
+            (node.parentId || null) === (focusNode.parentId || null) &&
+            node.type !== "parallelLane"
+    );
+
+    if (siblings.length > 0) {
+        const currentMinX = Math.min(
+            ...siblings.map((node) => Number(node.position?.x || 0))
+        );
+        const currentMinY = Math.min(
+            ...siblings.map((node) => Number(node.position?.y || 0))
+        );
+        const shiftX = Math.max(0, minContentX - currentMinX);
+        const shiftY = Math.max(0, minContentY - currentMinY);
+
+        if (shiftX > 0 || shiftY > 0) {
+            const siblingIds = new Set(siblings.map((node) => node.id));
+            nextNodes = nextNodes.map((node) =>
+                siblingIds.has(node.id)
+                    ? {
+                        ...node,
+                        position: {
+                            x: Number(node.position?.x || 0) + shiftX,
+                            y: Number(node.position?.y || 0) + shiftY,
+                        },
+                    }
+                    : node
+            );
+        }
+    }
+
+    // Collision resolution can move a child farther than the container's
+    // previous bounds. Re-run the existing grow logic afterwards so compound
+    // and parallel layouts remain valid instead of clipping the moved nodes.
+    if (parent?.type === "compound") {
+        nextNodes = fitCompoundAndAncestorCompounds(
+            nextNodes,
+            parent.id
+        );
+    } else if (parent?.type === "parallelLane" && parent.parentId) {
+        nextNodes = growParallelToLaneContents(
+            nextNodes,
+            parent.parentId
+        );
+    }
+
+    return orderNodesParentsFirst(nextNodes);
+};
+
+/*
+ * Parallel lanes use an automatically managed compound whenever they contain
+ * more than one executable state. It is a normal compound from the editor's
+ * point of view (visible, selectable, with an initial child and entry edge);
+ * the autoParallelLaneCompound flag is only used for lane bookkeeping.
+ *
+ * 0 states -> no wrapper unless a compound already exists
+ * 1 state  -> direct child unless a compound already exists
+ * 2+       -> all states live inside one normal compound
+ * Existing compounds are never auto-dissolved.
+ */
+const getNextParallelLaneCompoundName = (allNodes) => {
+    const usedNames = new Set(
+        (allNodes || [])
+            .flatMap((node) => [node.data?.label, node.data?.fullSkillName])
+            .filter(Boolean)
+            .map(String)
+    );
+
+    let index = 1;
+    while (usedNames.has(`lane_${index}`)) {
+        index += 1;
+    }
+
+    return `lane_${index}`;
+};
+
+const normalizeParallelLaneCompounds = (allNodes) => {
+    if (!Array.isArray(allNodes) || allNodes.length === 0) {
+        return allNodes;
+    }
+
+    let nextNodes = allNodes;
+    let changed = false;
+
+    const lanes = allNodes.filter((node) => node.type === "parallelLane");
+
+    lanes.forEach((lane) => {
+        const currentById = new Map(nextNodes.map((node) => [node.id, node]));
+        const currentLane = currentById.get(lane.id);
+        if (!currentLane) return;
+
+        const directChildren = nextNodes.filter(
+            (node) => node.parentId === currentLane.id
+        );
+
+        const wrappers = directChildren.filter(
+            (node) => isAutoParallelLaneCompound(node)
+        );
+
+        // There should only ever be one automatic lane compound. If an old
+        // file contains more than one, the first is kept and the others are
+        // merged into it below.
+        let wrapper = wrappers[0] || null;
+        const extraWrapperIds = new Set(wrappers.slice(1).map((node) => node.id));
+
+        const directSkills = directChildren.filter(isParallelLaneSkillCandidate);
+        const wrappedSkills = wrapper
+            ? nextNodes.filter(
+                (node) =>
+                    node.parentId === wrapper.id &&
+                    isParallelLaneSkillCandidate(node)
+            )
+            : [];
+        const extraWrappedSkills = nextNodes.filter(
+            (node) =>
+                extraWrapperIds.has(node.parentId) &&
+                isParallelLaneSkillCandidate(node)
+        );
+
+        const allSkills = [
+            ...wrappedSkills,
+            ...extraWrappedSkills,
+            ...directSkills,
+        ].filter(
+            (node, index, values) =>
+                values.findIndex((candidate) => candidate.id === node.id) === index
+        );
+
+        // A lane with zero/one direct state does not need an automatically
+        // managed compound. Existing lane compounds are deliberately kept.
+        if (!wrapper && allSkills.length <= 1) {
+            return;
+        }
+
+        const laneWidth = Number(currentLane.style?.width) || 420;
+        const laneHeight = Number(currentLane.style?.height) || 140;
+
+        /*
+         * If the lane already contains a normal compound and another sibling
+         * state is added, that existing compound becomes the lane compound.
+         * Do NOT create another compound around it. This keeps the region
+         * structure flat:
+         *
+         *   lane -> compound -> states
+         *
+         * instead of:
+         *
+         *   lane -> auto compound -> existing compound -> states
+         */
+        if (!wrapper && allSkills.length > 1) {
+            const existingDirectCompound = directSkills.find(
+                (node) => node.type === "compound"
+            );
+
+            if (existingDirectCompound) {
+                const oldWrapperPosition = existingDirectCompound.position || {
+                    x: 0,
+                    y: 0,
+                };
+                const existingChildren = nextNodes.filter(
+                    (node) =>
+                        node.parentId === existingDirectCompound.id &&
+                        isCompoundInitialChildCandidate(node)
+                );
+                const siblingsToAbsorb = directSkills.filter(
+                    (node) => node.id !== existingDirectCompound.id
+                );
+                const compoundChildren = [
+                    ...existingChildren,
+                    ...siblingsToAbsorb,
+                ].filter(
+                    (node, index, values) =>
+                        values.findIndex(
+                            (candidate) => candidate.id === node.id
+                        ) === index
+                );
+
+                const storedInitialId =
+                    existingDirectCompound.data?.initialChildId;
+                const initialChild =
+                    compoundChildren.find(
+                        (node) => node.id === storedInitialId
+                    ) ||
+                    compoundChildren.find((node) => node.data?.isInitial) ||
+                    compoundChildren[0] ||
+                    null;
+                const desiredInitialId = initialChild?.id || null;
+                const siblingIds = new Set(
+                    siblingsToAbsorb.map((node) => node.id)
+                );
+
+                const existingCompoundSize = getNodeSize(existingDirectCompound);
+                const promotedWidth = Math.max(laneWidth, existingCompoundSize.width);
+                const promotedHeight = Math.max(laneHeight, existingCompoundSize.height);
+
+                nextNodes = nextNodes.map((node) => {
+                    if (node.id === existingDirectCompound.id) {
+                        return {
+                            ...node,
+                            position: { x: 0, y: 0 },
+                            parentId: currentLane.id,
+                            extent: "parent",
+                            expandParent: true,
+                            draggable: true,
+                            selectable: true,
+                            width: promotedWidth,
+                            height: promotedHeight,
+                            style: {
+                                ...node.style,
+                                width: promotedWidth,
+                                height: promotedHeight,
+                            },
+                            data: {
+                                ...node.data,
+                                initialChildId: desiredInitialId,
+                                autoParallelLaneCompound: true,
+                            },
+                        };
+                    }
+
+                    // Moving the compound itself to the lane origin must not
+                    // visually move children it already contained.
+                    if (node.parentId === existingDirectCompound.id) {
+                        return {
+                            ...node,
+                            position: {
+                                x:
+                                    Number(oldWrapperPosition.x || 0) +
+                                    Number(node.position?.x || 0),
+                                y:
+                                    Number(oldWrapperPosition.y || 0) +
+                                    Number(node.position?.y || 0),
+                            },
+                            data: {
+                                ...node.data,
+                                isInitial: node.id === desiredInitialId,
+                            },
+                        };
+                    }
+
+                    if (siblingIds.has(node.id)) {
+                        return {
+                            ...node,
+                            parentId: existingDirectCompound.id,
+                            extent: "parent",
+                            expandParent: true,
+                            data: {
+                                ...node.data,
+                                isInitial: node.id === desiredInitialId,
+                            },
+                        };
+                    }
+
+                    return node;
+                });
+
+                changed = true;
+                return;
+            }
+        }
+
+        if (!wrapper) {
+            const wrapperId = getNodeId();
+            const initialSkill =
+                allSkills.find((node) => node.data?.isInitial) || allSkills[0];
+
+            // This is the compound that represents the parallel region/lane,
+            // so its default name should make that role explicit.
+            const compoundName = getNextParallelLaneCompoundName(nextNodes);
+
+            const autoWrapper = {
+                id: wrapperId,
+                type: "compound",
+                position: { x: 0, y: 0 },
+                parentId: currentLane.id,
+                extent: "parent",
+                expandParent: true,
+                draggable: true,
+                selectable: true,
+                width: laneWidth,
+                height: laneHeight,
+                style: {
+                    width: laneWidth,
+                    height: laneHeight,
+                },
+                data: {
+                    label: compoundName,
+                    fullSkillName: compoundName,
+                    isInitial: false,
+                    initialChildId: initialSkill.id,
+                    events: [],
+                    onEntry: [],
+                    onExit: [],
+                    autoParallelLaneCompound: true,
+                },
+            };
+
+            nextNodes = [
+                ...nextNodes,
+                autoWrapper,
+            ].map((node) => {
+                if (!allSkills.some((skill) => skill.id === node.id)) {
+                    return node;
+                }
+
+                return {
+                    ...node,
+                    parentId: wrapperId,
+                    extent: "parent",
+                    expandParent: true,
+                    // Wrapper starts at the lane origin, so the visual position
+                    // stays exactly where the skill was before wrapping.
+                    position: {
+                        x: Number(node.position?.x || 0),
+                        y: Number(node.position?.y || 0),
+                    },
+                    data: {
+                        ...node.data,
+                        isInitial: node.id === initialSkill.id,
+                    },
+                };
+            });
+
+            changed = true;
+            return;
+        }
+
+        // Existing lane compound: keep it as the single region compound and
+        // absorb direct lane states or children of duplicate wrappers into it.
+        const wrapperPosition = wrapper.position || { x: 0, y: 0 };
+        const currentInitialId = wrapper.data?.initialChildId;
+        const initialSkill =
+            allSkills.find((node) => node.id === currentInitialId) ||
+            allSkills.find((node) => node.data?.isInitial) ||
+            allSkills[0] ||
+            null;
+
+        const needsMerge =
+            directSkills.length > 0 ||
+            extraWrappedSkills.length > 0 ||
+            extraWrapperIds.size > 0;
+        const wrapperSize = getNodeSize(wrapper);
+        const desiredWrapperWidth = Math.max(laneWidth, wrapperSize.width);
+        const desiredWrapperHeight = Math.max(laneHeight, wrapperSize.height);
+        const needsResize =
+            Number(wrapper.width) !== desiredWrapperWidth ||
+            Number(wrapper.height) !== desiredWrapperHeight ||
+            Number(wrapper.style?.width) !== desiredWrapperWidth ||
+            Number(wrapper.style?.height) !== desiredWrapperHeight;
+        const desiredInitialId = initialSkill?.id || null;
+        const needsInitialUpdate =
+            (wrapper.data?.initialChildId || null) !== desiredInitialId;
+        const needsPresentationUpgrade =
+            wrapper.className === "compound-in-lane" ||
+            wrapper.draggable === false ||
+            wrapper.selectable === false;
+
+        if (
+            !needsMerge &&
+            !needsResize &&
+            !needsInitialUpdate &&
+            !needsPresentationUpgrade
+        ) {
+            return;
+        }
+
+        nextNodes = nextNodes
+            .filter((node) => !extraWrapperIds.has(node.id))
+            .map((node) => {
+                if (node.id === wrapper.id) {
+                    const { className: _legacyClassName, ...normalCompound } = node;
+
+                    return {
+                        ...normalCompound,
+                        draggable: true,
+                        selectable: true,
+                        width: desiredWrapperWidth,
+                        height: desiredWrapperHeight,
+                        style: {
+                            ...node.style,
+                            width: desiredWrapperWidth,
+                            height: desiredWrapperHeight,
+                        },
+                        data: {
+                            ...node.data,
+                            initialChildId: desiredInitialId,
+                            autoParallelLaneCompound: true,
+                        },
+                    };
+                }
+
+                if (!allSkills.some((skill) => skill.id === node.id)) {
+                    return node;
+                }
+
+                if (node.parentId === wrapper.id) {
+                    return {
+                        ...node,
+                        data: {
+                            ...node.data,
+                            isInitial: node.id === desiredInitialId,
+                        },
+                    };
+                }
+
+                const oldParent = currentById.get(node.parentId);
+                const oldParentPosition =
+                    isAutoParallelLaneCompound(oldParent)
+                        ? oldParent.position || { x: 0, y: 0 }
+                        : { x: 0, y: 0 };
+
+                const laneX =
+                    Number(oldParentPosition.x || 0) +
+                    Number(node.position?.x || 0);
+                const laneY =
+                    Number(oldParentPosition.y || 0) +
+                    Number(node.position?.y || 0);
+
+                return {
+                    ...node,
+                    parentId: wrapper.id,
+                    extent: "parent",
+                    expandParent: true,
+                    position: {
+                        x: laneX - Number(wrapperPosition.x || 0),
+                        y: laneY - Number(wrapperPosition.y || 0),
+                    },
+                    data: {
+                        ...node.data,
+                        isInitial: node.id === desiredInitialId,
+                    },
+                };
+            });
+
+        changed = true;
+    });
+
+    return changed ? orderNodesParentsFirst(nextNodes) : allNodes;
+};
 
 const normalizeCompoundInitialStates = (allNodes) => {
     const compounds = (allNodes || []).filter(
@@ -1182,6 +2118,13 @@ const normalizeAssignmentExpressionForScxml = (value) => {
     let expression = String(value ?? "").trim();
     if (!expression) return "";
 
+    // Keep a direct editor variable reference marked until scxmlExport serializes
+    // it. The exporter knows that @foo is a reference and emits foo without
+    // turning it into the string literal 'foo'.
+    if (/^@[A-Za-z_#][A-Za-z0-9_:#.\-]*$/.test(expression)) {
+        return expression;
+    }
+
     // Older editor versions could accidentally persist a complete expression
     // as a quoted string. Unwrap that form when it is clearly an expression
     // containing a UI-style @variable reference and an operator. Genuine
@@ -1396,6 +2339,33 @@ const cloneGraphValue = (value) => {
     return value;
 };
 
+// Undo/redo stores only persistent editor state. React Flow selection, drag,
+// and measured-layout fields are transient UI state and must not create
+// history entries of their own.
+const sanitizeNodeForHistory = (node) => {
+    const copy = cloneGraphValue(node);
+    delete copy.selected;
+    delete copy.dragging;
+    delete copy.measured;
+    return copy;
+};
+
+const sanitizeEdgeForHistory = (edge) => {
+    const copy = cloneGraphValue(edge);
+    delete copy.selected;
+    return copy;
+};
+
+const isUndoRedoEditableTarget = (target) => {
+    if (!(target instanceof Element)) return false;
+
+    return Boolean(
+        target.closest(
+            'input, textarea, select, [contenteditable="true"], [role="textbox"], .monaco-editor, .cm-editor'
+        )
+    );
+};
+
 function AppContent() {
     const [skills, setSkills] = useState({ skills: [] });
     const [selectedPackage, setSelectedPackage] = useState(null);
@@ -1446,9 +2416,25 @@ function AppContent() {
     const [slotEdges, setSlotEdges, onSlotEdgesChange] = useEdgesState([]);
 
     useEffect(() => {
-        setNodes((currentNodes) =>
-            normalizeCompoundInitialStates(currentNodes)
-        );
+        setNodes((currentNodes) => {
+            // Keep structural normalization here, but do not run the grow-all
+            // pass from a nodes-dependent effect. The grow helpers intentionally
+            // create updated node objects when fitting containers; doing that
+            // here caused an endless nodes -> effect -> nodes loop as soon as a
+            // parallel/compound existed (visible as a black screen).
+            //
+            // Automatic growth is still handled by expandParent during live
+            // dragging and by the explicit fit/grow calls in the drop/reparent
+            // paths below.
+            const withAutoExpansion =
+                normalizeContainerAutoExpansion(currentNodes);
+            const withParallelLaneCompounds =
+                normalizeParallelLaneCompounds(withAutoExpansion);
+
+            return normalizeCompoundInitialStates(
+                withParallelLaneCompounds
+            );
+        });
     }, [nodes, setNodes]);
 
     // Internal graph clipboard. This intentionally does not use the system
@@ -1471,6 +2457,19 @@ function AppContent() {
     const [manualSlots, setManualSlots] = useState([]);
     const [isCreateSlotModalOpen, setIsCreateSlotModalOpen] = useState(false);
     const [selectedNodeId, setSelectedNodeId] = useState(null);
+    // Hover coming from Slot Details is intentionally separate from hovering
+    // a node directly on the canvas. The former previews only that one
+    // skill-to-slot connection; canvas hover mirrors normal node highlighting.
+    const [hoveredSlotAccessNodeId, setHoveredSlotAccessNodeId] = useState(null);
+    const [hoveredEditorNodeId, setHoveredEditorNodeId] = useState(null);
+
+    // Slot creation belongs to the slot-centric views only. If the user switches
+    // to Event or Code mode while the dialog is open, close it immediately.
+    useEffect(() => {
+        if (activeMode !== "slots" && activeMode !== "overview") {
+            setIsCreateSlotModalOpen(false);
+        }
+    }, [activeMode]);
     const [activeTab, setActiveTab] = useState("allgemein");
     const [rightPanelTab, setRightPanelTab] = useState("datamodel");
 
@@ -1484,6 +2483,15 @@ function AppContent() {
     const [inheritedGlobalDataModel, setInheritedGlobalDataModel] = useState([]);
     const [newParamId, setNewParamId] = useState("");
     const [newParamExpr, setNewParamExpr] = useState("");
+
+    // Undo/redo history is local to the currently active workflow tab.
+    // Selection is intentionally excluded from snapshots.
+    const historyRef = useRef([]);
+    const historyIndexRef = useRef(-1);
+    const historyTimerRef = useRef(null);
+    const historyTabRef = useRef(activeTabId);
+    const applyingHistoryRef = useRef(false);
+    const currentHistorySnapshotRef = useRef(null);
 
     const descendantGlobalDataModel = useMemo(() => {
         const blockedIds = [
@@ -1523,28 +2531,226 @@ function AppContent() {
         return parameters;
     }, [inheritedGlobalDataModel, globalDataModel]);
 
-    const availableSlotStates = useMemo(() => {
-        const paths = new Set();
-        slotNodes.forEach((node) => {
-            const path = normalizeSlotPath(node.data?.path || node.data?.label);
-            if (path) paths.add(path);
+    const createHistorySnapshot = useCallback(() => ({
+        nodes: nodes.map(sanitizeNodeForHistory),
+        edges: edges.map(sanitizeEdgeForHistory),
+        slotNodes: slotNodes.map(sanitizeNodeForHistory),
+        slotEdges: slotEdges.map(sanitizeEdgeForHistory),
+        manualSlots: cloneGraphValue(manualSlots),
+        globalDataModel: cloneGraphValue(globalDataModel),
+    }), [
+        nodes,
+        edges,
+        slotNodes,
+        slotEdges,
+        manualSlots,
+        globalDataModel,
+    ]);
+
+    const getHistoryHash = useCallback(
+        (snapshot) => JSON.stringify(snapshot),
+        []
+    );
+
+    const commitHistorySnapshot = useCallback((snapshot) => {
+        if (!snapshot) return false;
+
+        const hash = getHistoryHash(snapshot);
+        const currentEntry = historyRef.current[historyIndexRef.current];
+        if (currentEntry?.hash === hash) return false;
+
+        // A new edit after Undo discards the old Redo branch.
+        const nextHistory = historyRef.current.slice(
+            0,
+            historyIndexRef.current + 1
+        );
+
+        nextHistory.push({
+            hash,
+            snapshot: cloneGraphValue(snapshot),
         });
 
-        nodes.forEach((node) => {
-            [...(node.data?.inSlots || []), ...(node.data?.outSlots || [])].forEach(
-                (slot) => {
-                    const path = normalizeSlotPath(slot.path);
-                    if (path) paths.add(path);
-                }
+        // Bound memory usage while still keeping a useful editing history.
+        if (nextHistory.length > 100) {
+            nextHistory.splice(0, nextHistory.length - 100);
+        }
+
+        historyRef.current = nextHistory;
+        historyIndexRef.current = nextHistory.length - 1;
+        return true;
+    }, [getHistoryHash]);
+
+    useEffect(() => {
+        const snapshot = createHistorySnapshot();
+        currentHistorySnapshotRef.current = snapshot;
+
+        // Never let Ctrl+Z cross workflow-tab boundaries. Each tab starts its
+        // own undo stack from the state visible when it becomes active.
+        if (historyTabRef.current !== activeTabId) {
+            historyTabRef.current = activeTabId;
+            historyRef.current = [];
+            historyIndexRef.current = -1;
+            applyingHistoryRef.current = false;
+
+            if (historyTimerRef.current) {
+                clearTimeout(historyTimerRef.current);
+                historyTimerRef.current = null;
+            }
+
+            commitHistorySnapshot(snapshot);
+            return;
+        }
+
+        // Applying Undo/Redo itself must not immediately become a new edit.
+        if (applyingHistoryRef.current) {
+            applyingHistoryRef.current = false;
+            return;
+        }
+
+        if (historyRef.current.length === 0) {
+            commitHistorySnapshot(snapshot);
+            return;
+        }
+
+        // Debounce state changes so a node drag/control-point drag is one undo
+        // step instead of dozens of intermediate positions.
+        if (historyTimerRef.current) {
+            clearTimeout(historyTimerRef.current);
+        }
+
+        historyTimerRef.current = setTimeout(() => {
+            historyTimerRef.current = null;
+            commitHistorySnapshot(currentHistorySnapshotRef.current);
+        }, 180);
+
+        return () => {
+            if (historyTimerRef.current) {
+                clearTimeout(historyTimerRef.current);
+                historyTimerRef.current = null;
+            }
+        };
+    }, [
+        activeTabId,
+        createHistorySnapshot,
+        commitHistorySnapshot,
+    ]);
+
+    const applyHistorySnapshot = useCallback((snapshot) => {
+        if (!snapshot) return;
+
+        if (historyTimerRef.current) {
+            clearTimeout(historyTimerRef.current);
+            historyTimerRef.current = null;
+        }
+
+        applyingHistoryRef.current = true;
+
+        const restoredNodes = normalizeCompoundInitialStates(
+            growAllStateContainersToContents(
+                normalizeParallelLaneCompounds(
+                    normalizeContainerAutoExpansion(
+                        cloneGraphValue(snapshot.nodes || []).map((node) => ({
+                            ...node,
+                            selected: false,
+                        }))
+                    )
+                )
+            )
+        );
+
+        setNodes(restoredNodes);
+        setEdges(
+            cloneGraphValue(snapshot.edges || []).map((edge) => ({
+                ...edge,
+                selected: false,
+            }))
+        );
+        setSlotNodes(
+            cloneGraphValue(snapshot.slotNodes || []).map((node) => ({
+                ...node,
+                selected: false,
+            }))
+        );
+        setSlotEdges(
+            cloneGraphValue(snapshot.slotEdges || []).map((edge) => ({
+                ...edge,
+                selected: false,
+            }))
+        );
+        setManualSlots(cloneGraphValue(snapshot.manualSlots || []));
+        setGlobalDataModel(cloneGraphValue(snapshot.globalDataModel || []));
+        setSelectedNodeId(null);
+        setRightPanelTab("datamodel");
+
+        requestAnimationFrame(() => {
+            restoredNodes.forEach((node) => updateNodeInternals(node.id));
+        });
+    }, [
+        setNodes,
+        setEdges,
+        setSlotNodes,
+        setSlotEdges,
+        updateNodeInternals,
+    ]);
+
+    const undo = useCallback(() => {
+        // Capture the newest edit even if Ctrl+Z is pressed before the 180 ms
+        // debounce has committed it.
+        commitHistorySnapshot(currentHistorySnapshotRef.current);
+
+        if (historyIndexRef.current <= 0) return false;
+
+        historyIndexRef.current -= 1;
+        applyHistorySnapshot(
+            historyRef.current[historyIndexRef.current]?.snapshot
+        );
+        return true;
+    }, [applyHistorySnapshot, commitHistorySnapshot]);
+
+    const redo = useCallback(() => {
+        if (historyIndexRef.current >= historyRef.current.length - 1) {
+            return false;
+        }
+
+        historyIndexRef.current += 1;
+        applyHistorySnapshot(
+            historyRef.current[historyIndexRef.current]?.snapshot
+        );
+        return true;
+    }, [applyHistorySnapshot]);
+
+    useEffect(() => {
+        const handleUndoRedoShortcut = (event) => {
+            if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+            if (activeMode === "code") return;
+            if (isUndoRedoEditableTarget(event.target)) return;
+
+            const key = String(event.key || "").toLowerCase();
+            let handled = false;
+
+            if (key === "z") {
+                handled = event.shiftKey ? redo() : undo();
+            } else if (key === "y" && !event.shiftKey) {
+                handled = redo();
+            }
+
+            if (!handled) return;
+
+            event.preventDefault();
+            event.stopPropagation();
+        };
+
+        // Capture phase prevents the browser/React Flow from consuming the
+        // shortcut first, while text/code editors still retain native undo.
+        window.addEventListener("keydown", handleUndoRedoShortcut, true);
+        return () =>
+            window.removeEventListener(
+                "keydown",
+                handleUndoRedoShortcut,
+                true
             );
-        });
-        manualSlots.forEach((slot) => {
-            const path = normalizeSlotPath(slot.path);
-            if (path) paths.add(path);
-        });
+    }, [activeMode, undo, redo]);
 
-        return [...paths].sort();
-    }, [slotNodes, nodes, manualSlots]);
     // Transition Drawer State
     const [drawerData, setDrawerData] = useState({
         isOpen: false,
@@ -1564,7 +2770,7 @@ function AppContent() {
         }
     }, [selectedNodeId]);
 
-    const { screenToFlowPosition, fitView } = useReactFlow();
+    const { screenToFlowPosition, fitView, getNodes } = useReactFlow();
 
     const buildInheritedGlobalsForChild = (
         inheritedGlobals,
@@ -1897,7 +3103,9 @@ function AppContent() {
                 handleCreateEmptySubMachine(contextMenu.flowPosition);
             }
         } else if (type === "slot") {
-            setIsCreateSlotModalOpen(true);;
+            if (activeMode === "slots" || activeMode === "overview") {
+                setIsCreateSlotModalOpen(true);
+            }
         }
 
         setContextMenu(null);
@@ -1913,7 +3121,7 @@ function AppContent() {
 
     const handleCreateEmptyCompound = (pos) => {
         const compoundId = getNodeId();
-        const compoundName = `Compound_${nodes.filter((n) => n.type === "compound").length + 1}`;
+        const compoundName = `compound_${nodes.filter((n) => n.type === "compound").length + 1}`;
 
         const newNode = {
             id: compoundId,
@@ -1928,7 +3136,12 @@ function AppContent() {
             },
         };
 
-        setNodes((nds) => [...nds, newNode]);
+        setNodes((nds) =>
+            resolveNodeCollisionsAndRefit(
+                [...nds, newNode],
+                compoundId
+            )
+        );
         setSelectedNodeId(compoundId); // <-- Details-Panel direkt öffnen
         setActiveTab("allgemein");
         setContextMenu(null);
@@ -1973,6 +3186,7 @@ function AppContent() {
                 },
                 parentId: parallelId,
                 extent: "parent",
+                expandParent: true,
                 type: "parallelLane",
                 draggable: false,
                 style: {
@@ -2029,7 +3243,7 @@ function AppContent() {
 
     const handleCreateEmptyParallel = (pos) => {
         const parallelId = getNodeId();
-        const parallelName = `Parallel_${nodes.filter((n) => n.type === "parallel").length + 1}`;
+        const parallelName = `parallel_${nodes.filter((n) => n.type === "parallel").length + 1}`;
         const laneHeight = 110;
         const headerHeight = 40;
         const containerWidth = 420;
@@ -2055,6 +3269,7 @@ function AppContent() {
             position: { x: 0, y: headerHeight },
             parentId: parallelId,
             extent: "parent",
+            expandParent: true,
             type: "parallelLane",
             draggable: false,
             style: { width: containerWidth, height: laneHeight, borderBottom: "1.5px solid #0284c7" },
@@ -2066,13 +3281,19 @@ function AppContent() {
             position: { x: 0, y: headerHeight + laneHeight },
             parentId: parallelId,
             extent: "parent",
+            expandParent: true,
             type: "parallelLane",
             draggable: false,
             style: { width: containerWidth, height: laneHeight, borderBottom: "none" },
             data: { label: "Lane_2", events: [] },
         };
 
-        setNodes((nds) => [...nds, parallelNode, lane1, lane2]);
+        setNodes((nds) =>
+            resolveNodeCollisionsAndRefit(
+                [...nds, parallelNode, lane1, lane2],
+                parallelId
+            )
+        );
         setSelectedNodeId(parallelId);
         setActiveTab("allgemein");
         setContextMenu(null);
@@ -2438,7 +3659,7 @@ function AppContent() {
         const compoundId = getNodeId();
 
         const compoundName =
-            `Compound_${
+            `compound_${
                 nodes.filter(
                     (node) => node.type === "compound"
                 ).length + 1
@@ -2862,7 +4083,7 @@ function AppContent() {
         const parallelId = getNodeId();
 
         const parallelName =
-            `Parallel_${
+            `parallel_${
                 nodes.filter((n) => n.type === "parallel").length + 1
             }`;
 
@@ -2952,6 +4173,7 @@ function AppContent() {
                 },
                 parentId: parallelId,
                 extent: "parent",
+                expandParent: true,
                 type: "parallelLane",
                 draggable: false,
                 selectable: false,
@@ -2982,6 +4204,7 @@ function AppContent() {
                     ...node,
                     parentId: laneId,
                     extent: "parent",
+                    expandParent: true,
 
                     position: {
                         x: currentX,
@@ -3283,6 +4506,144 @@ function AppContent() {
         [setNodes]
     );
 
+    const handleToggleContainerCollapse = useCallback(
+        (containerId) => {
+            setNodes((currentNodes) =>
+                currentNodes.map((node) => {
+                    if (node.id !== containerId) return node;
+                    if (node.type !== "compound" && node.type !== "parallel") {
+                        return node;
+                    }
+
+                    const isCollapsed = Boolean(node.data?.isCollapsed);
+
+                    if (!isCollapsed) {
+                        // NodeResizer writes the resized dimensions onto the real
+                        // React Flow node. Remember those dimensions before
+                        // replacing the height with the compact collapsed height.
+                        const expandedWidth =
+                            Number(node.width) ||
+                            Number(node.measured?.width) ||
+                            Number(node.style?.width) ||
+                            (node.type === "compound" ? 320 : 420);
+                        const expandedHeight =
+                            Number(node.height) ||
+                            Number(node.measured?.height) ||
+                            Number(node.style?.height) ||
+                            (node.type === "compound" ? 220 : 295);
+                        const collapsedHeight =
+                            node.type === "compound"
+                                ? Math.max(
+                                    48,
+                                    28 +
+                                    (Array.isArray(node.data?.events)
+                                        ? node.data.events.length
+                                        : 0) *
+                                    22
+                                )
+                                : 44;
+
+                        return {
+                            ...node,
+                            // NodeResizer stores the current size on the node's
+                            // top-level width/height fields. Those values take
+                            // precedence over style.width/style.height in React
+                            // Flow, so collapse has to update both places.
+                            width: expandedWidth,
+                            height: collapsedHeight,
+                            style: {
+                                ...(node.style || {}),
+                                width: expandedWidth,
+                                height: collapsedHeight,
+                                minHeight: collapsedHeight,
+                            },
+                            data: {
+                                ...(node.data || {}),
+                                isCollapsed: true,
+                                expandedContainerSize: {
+                                    width: expandedWidth,
+                                    height: expandedHeight,
+                                    minHeight: node.style?.minHeight ?? null,
+                                },
+                            },
+                        };
+                    }
+
+                    const savedSize = node.data?.expandedContainerSize || {};
+                    const restoredStyle = {
+                        ...(node.style || {}),
+                        width:
+                            Number(savedSize.width) ||
+                            Number(node.style?.width) ||
+                            (node.type === "compound" ? 320 : 420),
+                        height:
+                            Number(savedSize.height) ||
+                            (node.type === "compound" ? 220 : 295),
+                    };
+
+                    if (savedSize.minHeight == null) {
+                        delete restoredStyle.minHeight;
+                    } else {
+                        restoredStyle.minHeight = savedSize.minHeight;
+                    }
+
+                    const restoredWidth =
+                        Number(savedSize.width) ||
+                        Number(node.width) ||
+                        Number(restoredStyle.width) ||
+                        (node.type === "compound" ? 320 : 420);
+                    const restoredHeight =
+                        Number(savedSize.height) ||
+                        (node.type === "compound" ? 220 : 295);
+
+                    restoredStyle.width = restoredWidth;
+                    restoredStyle.height = restoredHeight;
+
+                    return {
+                        ...node,
+                        // Restore the actual React Flow dimensions as well as
+                        // the CSS dimensions so an expanded, previously resized
+                        // container returns to exactly its saved size.
+                        width: restoredWidth,
+                        height: restoredHeight,
+                        style: restoredStyle,
+                        data: {
+                            ...(node.data || {}),
+                            isCollapsed: false,
+                        },
+                    };
+                })
+            );
+
+            // Force React Flow to re-measure the node after changing its actual
+            // dimensions. This is important after the node has been resized.
+            requestAnimationFrame(() => updateNodeInternals(containerId));
+
+            // Keep the visible container selected rather than leaving a hidden
+            // child selected in the details panel after collapsing it.
+            setSelectedNodeId(containerId);
+        },
+        [setNodes, updateNodeInternals]
+    );
+
+    const hiddenNodeIds = useMemo(() => {
+        const hidden = new Set();
+
+        nodes
+            .filter(
+                (node) =>
+                    (node.type === "compound" || node.type === "parallel") &&
+                    Boolean(node.data?.isCollapsed)
+            )
+            .forEach((container) => {
+                getDescendantNodeIds(container.id, nodes).forEach((id) =>
+                    hidden.add(id)
+                );
+            });
+
+        return hidden;
+    }, [nodes]);
+
     const injectedNodes = useMemo(() => {
         return nodes.map((n) => {
             const injectedData = {
@@ -3291,6 +4652,7 @@ function AppContent() {
                 onOpenStateActions: handleOpenStateActions,
                 mode: activeMode,
                 slotConnectionDrag,
+                onToggleCollapse: handleToggleContainerCollapse,
             };
 
             if (n.type === "submachine") {
@@ -3333,6 +4695,7 @@ function AppContent() {
 
             return {
                 ...n,
+                hidden: hiddenNodeIds.has(n.id),
                 data: injectedData,
             };
         });
@@ -3343,6 +4706,8 @@ function AppContent() {
         activeMode,
         handleAddLaneToParallel,
         handleOpenStateActions,
+        handleToggleContainerCollapse,
+        hiddenNodeIds,
         activeMode,
         slotConnectionDrag,
     ]);
@@ -3590,21 +4955,84 @@ function AppContent() {
     const selectedRawNode =
         [...nodes, ...slotNodes].find((node) => node.id === selectedNodeId) || null;
 
-    const selectedNode = useMemo(() => {
-        if (!selectedRawNode) return null;
-        if (selectedRawNode.type !== "slot") return selectedRawNode;
-        const cleanPath = getSlotPathFromNode(selectedRawNode);
+    // Keep a clicked slot selected as the slot itself. Previously slot nodes
+    // were converted to the first skill that used the path, which prevented a
+    // dedicated slot detail view and made multi-skill slots ambiguous.
+    const selectedNode = selectedRawNode;
 
-        return (
-            nodes.find((node) =>
-                [
-                    ...(node.data?.inSlots || []),
-                    ...(node.data?.outSlots || []),
-                ].some(
-                    (slot) => normalizeSlotPath(slot.path) === cleanPath
-                )
-            ) || null
-        );
+    const selectedSlotDetails = useMemo(() => {
+        if (!selectedRawNode || selectedRawNode.type !== "slot") {
+            return null;
+        }
+
+        const cleanPath = getSlotPathFromNode(selectedRawNode);
+        const skillAccesses = [];
+        const accessTypes = new Set();
+        const dataTypes = new Set();
+
+        nodes.forEach((node) => {
+            const skillName =
+                node.data?.fullSkillName ||
+                node.data?.label ||
+                node.id;
+
+            (node.data?.inSlots || []).forEach((slot, slotIndex) => {
+                if (normalizeSlotPath(slot?.path) !== cleanPath) return;
+                accessTypes.add("read");
+                if (slot?.type) dataTypes.add(String(slot.type));
+                skillAccesses.push({
+                    nodeId: node.id,
+                    skillName,
+                    key: slot?.key || `input ${slotIndex + 1}`,
+                    type: slot?.type || "Unknown",
+                    description: slot?.description || "",
+                    access: "read",
+                    slotIndex,
+                });
+            });
+
+            (node.data?.outSlots || []).forEach((slot, slotIndex) => {
+                if (normalizeSlotPath(slot?.path) !== cleanPath) return;
+                accessTypes.add("write");
+                if (slot?.type) dataTypes.add(String(slot.type));
+                skillAccesses.push({
+                    nodeId: node.id,
+                    skillName,
+                    key: slot?.key || `output ${slotIndex + 1}`,
+                    type: slot?.type || "Unknown",
+                    description: slot?.description || "",
+                    access: "write",
+                    slotIndex,
+                });
+            });
+        });
+
+        (selectedRawNode.data?.requiredByChildren || []).forEach((entry) => {
+            if (entry?.access === "read" || entry?.access === "write") {
+                accessTypes.add(entry.access);
+            }
+        });
+
+        const nodeType = String(selectedRawNode.data?.slotType || "").trim();
+        const dataType =
+            dataTypes.size === 1
+                ? [...dataTypes][0]
+                : nodeType ||
+                (dataTypes.size > 1
+                    ? [...dataTypes].join(" / ")
+                    : "Unknown");
+
+        return {
+            path: cleanPath ? `/${cleanPath}` : "",
+            dataType,
+            accessTypes: ["read", "write"].filter((access) =>
+                accessTypes.has(access)
+            ),
+            isInherited: Boolean(
+                selectedRawNode.data?.currentMachineInherited
+            ),
+            skillAccesses,
+        };
     }, [selectedRawNode, nodes]);
 
     // OnEntry/OnExit has asymmetric scope for sub-state-machines:
@@ -3674,11 +5102,39 @@ function AppContent() {
             selectedInitialScopeParentId
     );
 
+    const canvasSlotPathOptions = useMemo(() => {
+        const options = new Map();
+
+        const addOption = (slot) => {
+            const cleanPath = normalizeSlotPath(slot?.path);
+            const type = String(slot?.type || "").trim();
+            if (!cleanPath || !type) return;
+
+            const key = `${cleanPath}|${normalizeSlotType(type)}`;
+            if (!options.has(key)) {
+                options.set(key, {
+                    path: `/${cleanPath}`,
+                    type,
+                });
+            }
+        };
+
+        nodes.forEach((node) => {
+            (node.data?.inSlots || []).forEach(addOption);
+            (node.data?.outSlots || []).forEach(addOption);
+        });
+        (manualSlots || []).forEach(addOption);
+
+        return [...options.values()].sort((a, b) =>
+            a.path.localeCompare(b.path)
+        );
+    }, [nodes, manualSlots]);
+
     const canvasSkillSlotOptions = useMemo(() => {
         const options = [];
 
         nodes.forEach((node) => {
-            if (node.type === "slot" || node.type === "parallelLane") return;
+            if (node.type !== "custom") return;
 
             const nodeLabel =
                 node.data?.fullSkillName ||
@@ -3686,7 +5142,7 @@ function AppContent() {
                 node.id;
 
             (node.data?.inSlots || []).forEach((slot, index) => {
-                if (!slot?.key) return;
+                if (!slot?.key || !String(slot?.type || "").trim()) return;
                 if (slot.path && slot.path.trim()) return;
                 options.push({
                     id: `${node.id}-read-${index}`,
@@ -3700,7 +5156,7 @@ function AppContent() {
             });
 
             (node.data?.outSlots || []).forEach((slot, index) => {
-                if (!slot?.key) return;
+                if (!slot?.key || !String(slot?.type || "").trim()) return;
                 if (slot.path && slot.path.trim()) return;
                 options.push({
                     id: `${node.id}-write-${index}`,
@@ -3896,6 +5352,7 @@ function AppContent() {
     const selectedTransitionNodeIds = new Set([
         ...selectedNodes.map((node) => node.id),
         ...(selectedNodeId ? [selectedNodeId] : []),
+        ...(hoveredEditorNodeId ? [hoveredEditorNodeId] : []),
     ]);
 
     const normalizedTransitionEdges = useMemo(
@@ -3946,13 +5403,22 @@ function AppContent() {
         selectedTransitionNodeIds
     );
 
-    const selectedSlotContextId = selectedNodeId;
+    // Hovering a supported node directly in the editor acts like a temporary
+    // selection for connection highlighting. Slot Details hover is different:
+    // it previews only the exact connection from the hovered skill to the
+    // currently selected slot.
+    const selectedSlotContextId = hoveredEditorNodeId || selectedNodeId;
     const hasSelectedSlotContext = Boolean(
         selectedSlotContextId &&
         (
             nodes.some((node) => node.id === selectedSlotContextId) ||
             slotNodes.some((node) => node.id === selectedSlotContextId)
         )
+    );
+    const isSlotDetailsConnectionPreview = Boolean(
+        hoveredSlotAccessNodeId &&
+        selectedNodeId &&
+        slotNodes.some((node) => node.id === selectedNodeId)
     );
 
     const SLOT_EDGE_INACTIVE_COLOR = "#64748b";
@@ -3964,12 +5430,28 @@ function AppContent() {
 
         const skillNodeId = edge.data?.skillNodeId || edge.source;
         const slotNodeId = edge.data?.slotNodeId || edge.target;
-        const isConnectedToSelection =
-            !hasSelectedSlotContext ||
-            skillNodeId === selectedSlotContextId ||
-            slotNodeId === selectedSlotContextId ||
-            edge.source === selectedSlotContextId ||
-            edge.target === selectedSlotContextId;
+        const isHoveredSlotDetailsConnection =
+            isSlotDetailsConnectionPreview &&
+            (
+                skillNodeId === hoveredSlotAccessNodeId ||
+                edge.source === hoveredSlotAccessNodeId ||
+                edge.target === hoveredSlotAccessNodeId
+            ) &&
+            (
+                slotNodeId === selectedNodeId ||
+                edge.source === selectedNodeId ||
+                edge.target === selectedNodeId
+            );
+
+        const isConnectedToSelection = isSlotDetailsConnectionPreview
+            ? isHoveredSlotDetailsConnection
+            : (
+                !hasSelectedSlotContext ||
+                skillNodeId === selectedSlotContextId ||
+                slotNodeId === selectedSlotContextId ||
+                edge.source === selectedSlotContextId ||
+                edge.target === selectedSlotContextId
+            );
 
         const color = isConnectedToSelection
             ? semanticColor
@@ -3978,17 +5460,19 @@ function AppContent() {
         return {
             ...edge,
             type: "smartTransition",
-            // Slot edge colours are display-only. With no selected skill/slot
-            // all edges use their Read/Write colour. When a skill or slot is
-            // selected, unrelated slot edges are greyed out.
+            // Slot edge colours are display-only. A canvas skill hover mirrors
+            // selection. A Slot Details hover highlights only the exact edge
+            // between that skill and the selected slot.
             style: {
                 ...(edge.style || {}),
                 stroke: color,
-                strokeWidth: isConnectedToSelection
-                    ? edge.style?.strokeWidth || 1.7
-                    : 1.35,
+                strokeWidth: isHoveredSlotDetailsConnection
+                    ? 3
+                    : isConnectedToSelection
+                        ? edge.style?.strokeWidth || 1.7
+                        : 1.35,
                 strokeDasharray: edge.style?.strokeDasharray || "5 5",
-                opacity: isConnectedToSelection ? 1 : 0.42,
+                opacity: isConnectedToSelection ? 1 : 0.3,
             },
             markerEnd: {
                 ...(edge.markerEnd || {}),
@@ -4010,9 +5494,7 @@ function AppContent() {
 
     const compoundInitialEdges = nodes
         .filter(
-            (node) =>
-                node.type === "compound" &&
-                node.className !== "compound-in-lane"
+            (node) => node.type === "compound" && !node.data?.isCollapsed
         )
         .map((compound) => {
             const initialChild = nodes.find(
@@ -4031,12 +5513,19 @@ function AppContent() {
                 return null;
             }
 
+            const initialTargetHandle =
+                initialChild.type === "parallel"
+                    ? "target"
+                    : initialChild.type === "compound"
+                        ? "compound-entry"
+                        : "transition-target";
+
             return {
                 id: `edge-compound-initial-${compound.id}-${initialChild.id}`,
                 source: compound.id,
                 target: initialChild.id,
                 sourceHandle: "compound-entry",
-                targetHandle: "transition-target",
+                targetHandle: initialTargetHandle,
                 label: "",
                 // The entry point is visually on the compound's left border,
                 // but this helper edge should travel directly inward to the
@@ -4061,37 +5550,191 @@ function AppContent() {
         })
         .filter(Boolean);
 
+    // A parallel state starts one initial state per lane. This mirrors the
+    // compound-state entry helper, except that a parallel has one branch entry
+    // target for every lane. If the lane contains a compound, the parallel
+    // enters that compound and the compound's own initial edge continues to its
+    // initial child. These edges are display-only and are never persisted as
+    // normal SCXML transitions.
+    const parallelEntryEdges = nodes
+        .filter((node) => node.type === "parallel" && !node.data?.isCollapsed)
+        .flatMap((parallel) => {
+            const lanes = nodes.filter(
+                (node) =>
+                    node.type === "parallelLane" &&
+                    node.parentId === parallel.id
+            );
+
+            return lanes
+                .map((lane) => {
+                    const directChildren = nodes.filter(
+                        (node) => node.parentId === lane.id
+                    );
+
+                    const candidates = directChildren.filter(
+                        (node) =>
+                            node.type !== "slot" &&
+                            node.type !== "parallelLane"
+                    );
+
+                    if (candidates.length === 0) {
+                        return null;
+                    }
+
+                    const sortedCandidates = [...candidates].sort((a, b) => {
+                        const ax = Number(a.position?.x || 0);
+                        const bx = Number(b.position?.x || 0);
+                        if (ax !== bx) return ax - bx;
+
+                        const ay = Number(a.position?.y || 0);
+                        const by = Number(b.position?.y || 0);
+                        return ay - by;
+                    });
+
+                    // A compound is itself the branch entry target. Its normal
+                    // compound-entry edge then selects the initial child.
+                    const target =
+                        candidates.find(isAutoParallelLaneCompound) ||
+                        candidates.find((node) => node.data?.isInitial) ||
+                        sortedCandidates[0];
+
+                    const targetHandle =
+                        target.type === "compound"
+                            ? "compound-entry"
+                            : target.type === "parallel"
+                                ? "target"
+                                : "transition-target";
+
+                    return {
+                        id: `edge-parallel-entry-${parallel.id}-${lane.id}-${target.id}`,
+                        // Each lane owns an entry point on its left border. Since
+                        // the lane spans the full parallel width, this point lies
+                        // directly on the parallel state's left edge. A lane with
+                        // one skill therefore gets the same visual entry arrow as
+                        // an initial child inside a normal compound.
+                        source: lane.id,
+                        target: target.id,
+                        sourceHandle: "parallel-entry",
+                        targetHandle,
+                        label: "",
+                        type: "straight",
+                        selectable: false,
+                        focusable: false,
+                        deletable: false,
+                        markerEnd: {
+                            type: MarkerType.ArrowClosed,
+                            color: "#0284c7",
+                        },
+                        style: {
+                            stroke: "#0284c7",
+                            strokeWidth: 1.5,
+                        },
+                        data: {
+                            parallelEntryEdge: true,
+                            parallelLaneId: lane.id,
+                            displayOnly: true,
+                        },
+                    };
+                })
+                .filter(Boolean);
+        });
+
     let visibleNodes = injectedNodes;
     let visibleEdges = [
         ...highlightedTransitionEdges,
         ...compoundInitialEdges,
+        ...parallelEntryEdges,
     ];
     if (activeMode === "slots") {
         visibleNodes = [...injectedNodes, ...injectedSlotNodes];
-        visibleEdges = editableSlotEdges;
+
+        // Transition edges are normally hidden in Slots mode. Hovering a
+        // transition-capable node directly on the canvas temporarily reveals
+        // that node's transitions with the same semantic highlighting as
+        // selection. Slot nodes simply have no matching transition edges.
+        const hoveredTransitionEdges = hoveredEditorNodeId
+            ? highlightedTransitionEdges.filter(
+                (edge) =>
+                    edge.source === hoveredEditorNodeId ||
+                    edge.target === hoveredEditorNodeId
+            )
+            : [];
+
+        visibleEdges = [
+            ...hoveredTransitionEdges,
+            ...editableSlotEdges,
+        ];
     } else if (activeMode === "overview") {
         visibleNodes = [...injectedNodes, ...injectedSlotNodes];
         visibleEdges = [
             ...highlightedTransitionEdges,
             ...compoundInitialEdges,
+            ...parallelEntryEdges,
             ...editableSlotEdges,
         ];
     }
 
+    if (hiddenNodeIds.size > 0) {
+        visibleEdges = visibleEdges.filter(
+            (edge) =>
+                !hiddenNodeIds.has(edge.source) &&
+                !hiddenNodeIds.has(edge.target)
+        );
+    }
+
     visibleNodes = visibleNodes.map((visibleNode) => {
+        if (
+            visibleNode.id === hoveredEditorNodeId &&
+            ["custom", "submachine", "compound", "parallel", "slot"].includes(
+                visibleNode.type
+            )
+        ) {
+            // Canvas hover mirrors the visual selected state without changing
+            // the real selection or opening a different details panel.
+            return {
+                ...visibleNode,
+                selected: true,
+            };
+        }
+
+        if (visibleNode.type === "parallelLane") {
+            const isLaneDropTarget =
+                visibleNode.id === parallelDropTargetId;
+
+            if (!isLaneDropTarget) {
+                return visibleNode;
+            }
+
+            return {
+                ...visibleNode,
+                style: {
+                    ...visibleNode.style,
+                    outline: "3px solid #0284c7",
+                    outlineOffset: "-3px",
+                    backgroundColor: "rgba(2, 132, 199, 0.12)",
+                    boxShadow:
+                        "inset 0 0 0 2px rgba(56, 189, 248, 0.35)",
+                    borderRadius: 4,
+                },
+                data: {
+                    ...visibleNode.data,
+                    isDropTarget: true,
+                },
+            };
+        }
+
         if (visibleNode.type === "parallel") {
             return {
                 ...visibleNode,
                 data: {
                     ...visibleNode.data,
-                    isDropTarget: visibleNode.id === parallelDropTargetId,
+                    isDropTarget: false,
                 },
             };
         }
 
         if (
-            visibleNode.type === "compound" &&
-            visibleNode.className !== "compound-in-lane"
+            visibleNode.type === "compound"
         ) {
             return {
                 ...visibleNode,
@@ -4271,7 +5914,7 @@ function AppContent() {
                                         inSlots: nextNode.data.inSlots.map(
                                             (slot, index) =>
                                                 index === slotIndex
-                                                    ? { ...slot, path: "" }
+                                                    ? { ...slot, path: "", inherited: null }
                                                     : slot
                                         ),
                                     },
@@ -4291,7 +5934,7 @@ function AppContent() {
                                         outSlots: nextNode.data.outSlots.map(
                                             (slot, index) =>
                                                 index === slotIndex
-                                                    ? { ...slot, path: "" }
+                                                    ? { ...slot, path: "", inherited: null }
                                                     : slot
                                         ),
                                     },
@@ -4402,30 +6045,34 @@ function AppContent() {
             eventMap.set(eventId, { id: eventId, description: "" });
         });
 
-        const availableTargets = nodes.map((node) => {
-            const fullSkillName = node.data?.fullSkillName || "";
-            const stateName = fullSkillName.includes("#")
-                ? fullSkillName.split("#").pop()
-                : "";
-            const skillName =
-                node.data?.label ||
-                fullSkillName.split(".").pop()?.split("#")[0] ||
-                node.id;
-            const displayName =
-                stateName && stateName !== skillName
-                    ? `${skillName} (${stateName})`
-                    : skillName;
+        const availableTargets = nodes
+            .filter((node) =>
+                canTargetAcrossStateBoundaries(sourceNode, node, nodes)
+            )
+            .map((node) => {
+                const fullSkillName = node.data?.fullSkillName || "";
+                const stateName = fullSkillName.includes("#")
+                    ? fullSkillName.split("#").pop()
+                    : "";
+                const skillName =
+                    node.data?.label ||
+                    fullSkillName.split(".").pop()?.split("#")[0] ||
+                    node.id;
+                const displayName =
+                    stateName && stateName !== skillName
+                        ? `${skillName} (${stateName})`
+                        : skillName;
 
-            return {
-                id: node.id,
-                label: node.data?.label || node.id,
-                displayName,
-                skillName,
-                stateName,
-                fullSkillName,
-                packageName: getSkillPackageName(fullSkillName),
-            };
-        });
+                return {
+                    id: node.id,
+                    label: node.data?.label || node.id,
+                    displayName,
+                    skillName,
+                    stateName,
+                    fullSkillName,
+                    packageName: getSkillPackageName(fullSkillName),
+                };
+            });
 
         const initialTransition = transitions.find(
             (transition) =>
@@ -4536,10 +6183,36 @@ function AppContent() {
             );
         }
 
-        // Normal transitions stay directional: they must start from an event
-        // handle. This prevents loose slot connection mode from making normal
-        // transition target handles behave as sources.
-        return Boolean(connection.sourceHandle);
+        const sourceNode = nodes.find(
+            (node) => node.id === connection.source
+        );
+        const targetNode = nodes.find(
+            (node) => node.id === connection.target
+        );
+
+        if (
+            !sourceNode ||
+            !targetNode ||
+            !canTargetAcrossStateBoundaries(sourceNode, targetNode, nodes)
+        ) {
+            return false;
+        }
+
+        // Normal transitions are strictly directional even though the canvas
+        // stays in ConnectionMode.Loose for bidirectional slot wiring:
+        //   event handle (right) -> transition target handle (left)
+        // A left transition handle can never start an edge, and an event
+        // handle can never receive one.
+        const normalTransitionTargetHandles = new Set([
+            "transition-target",
+            "target",
+        ]);
+
+        return Boolean(
+            connection.sourceHandle &&
+            !normalTransitionTargetHandles.has(connection.sourceHandle) &&
+            normalTransitionTargetHandles.has(connection.targetHandle)
+        );
     }, [nodes, slotNodes]);
 
     const handleConnectStart = useCallback((_, params) => {
@@ -4736,6 +6409,14 @@ function AppContent() {
                                                 ? {
                                                     ...slot,
                                                     path: `/${path}`,
+                                                    inherited: slotNode.data?.inherited
+                                                        ? {
+                                                            state:
+                                                                slotNode.data?.inheritedFrom ||
+                                                                "",
+                                                            xpath: `/${path}`,
+                                                        }
+                                                        : null,
                                                 }
                                                 : slot
                                     ),
@@ -4753,6 +6434,14 @@ function AppContent() {
                                             ? {
                                                 ...slot,
                                                 path: `/${path}`,
+                                                inherited: slotNode.data?.inherited
+                                                    ? {
+                                                        state:
+                                                            slotNode.data?.inheritedFrom ||
+                                                            "",
+                                                        xpath: `/${path}`,
+                                                    }
+                                                    : null,
                                             }
                                             : slot
                                 ),
@@ -4834,6 +6523,19 @@ function AppContent() {
             );
 
             if (!sourceNode || !targetNode) {
+                return;
+            }
+
+            // Do not let a normal transition cross a compound/parallel entry
+            // boundary and land directly on an interior state. The external
+            // edge must terminate on the container's left entry handle first.
+            if (
+                !canTargetAcrossStateBoundaries(
+                    sourceNode,
+                    targetNode,
+                    nodes
+                )
+            ) {
                 return;
             }
 
@@ -5511,6 +7213,20 @@ function AppContent() {
         const sourceId = drawerData.sourceNodeId;
         if (!sourceId || !Array.isArray(updatedTransitions)) return;
 
+        const sourceNode = nodes.find((node) => node.id === sourceId);
+        if (!sourceNode) return;
+
+        const validUpdatedTransitions = updatedTransitions.filter((transition) => {
+            const targetNode = nodes.find(
+                (node) => node.id === transition.target
+            );
+
+            return Boolean(
+                targetNode &&
+                canTargetAcrossStateBoundaries(sourceNode, targetNode, nodes)
+            );
+        });
+
         // Rebuild this state's edges in exactly the order selected in step 1.
         setEdges((currentEdges) => {
             const untouchedEdges = currentEdges.filter(
@@ -5520,7 +7236,7 @@ function AppContent() {
                 currentEdges.map((edge) => [edge.id, edge])
             );
 
-            const rebuiltEdges = updatedTransitions.map((transition) => {
+            const rebuiltEdges = validUpdatedTransitions.map((transition) => {
                 const existing = transition.edgeId
                     ? existingById.get(transition.edgeId)
                     : null;
@@ -5542,8 +7258,9 @@ function AppContent() {
                     target: transition.target,
                     sourceHandle: eventId,
                     targetHandle:
-                        cleanedExisting?.targetHandle ||
-                        "transition-target",
+                        getTransitionTargetHandleForNode(
+                            nodes.find((node) => node.id === transition.target)
+                        ),
                     type: "smartTransition",
                     selected: false,
                     label: hasCondition
@@ -5597,7 +7314,7 @@ function AppContent() {
                 });
 
                 const usedEventIds = new Set();
-                const orderedTransitionEvents = updatedTransitions.map(
+                const orderedTransitionEvents = validUpdatedTransitions.map(
                     (transition) => {
                         usedEventIds.add(transition.event);
                         const baseEvent = baseEventById.get(transition.event) || {
@@ -5667,7 +7384,16 @@ function AppContent() {
         if (!selectedNode || !targetNodeId) return;
 
         const targetNode = nodes.find((node) => node.id === targetNodeId);
-        if (!targetNode) return;
+        if (
+            !targetNode ||
+            !canTargetAcrossStateBoundaries(
+                selectedNode,
+                targetNode,
+                nodes
+            )
+        ) {
+            return;
+        }
 
         setEdges((currentEdges) => {
             const withoutPreviousDirectTarget = currentEdges.filter((edge) => {
@@ -5702,7 +7428,7 @@ function AppContent() {
                     source: selectedNode.id,
                     target: targetNodeId,
                     sourceHandle: event.id,
-                    targetHandle: "transition-target",
+                    targetHandle: getTransitionTargetHandleForNode(targetNode),
                     label: event.id,
                     type: "smartTransition",
                     markerEnd: { type: MarkerType.ArrowClosed },
@@ -5736,14 +7462,86 @@ function AppContent() {
 
         const usedPaths = new Map();
 
-        const registerSlotUsage = (s) => {
+        // The current machine's inheritance status must come from the current
+        // SCXML's own #_SLOTS declarations. Child-machine inheritSlot metadata
+        // must never make a normal parent <slot> look like an <inheritSlot>.
+        const currentMachineDeclarations = new Map();
+        (activeManualSlots || []).forEach((slot) => {
+            const cleanPath = normalizeSlotPath(
+                slot?.inherited?.xpath || slot?.path
+            );
+            if (!cleanPath) return;
+
+            const existing = currentMachineDeclarations.get(cleanPath) || {
+                declared: false,
+                inherited: null,
+            };
+            const isInheritedDeclaration =
+                slot?.slotKind === "inheritSlot" || Boolean(slot?.inherited);
+
+            currentMachineDeclarations.set(cleanPath, {
+                declared: true,
+                inherited:
+                    existing.inherited ||
+                    (isInheritedDeclaration
+                        ? slot?.inherited || {
+                        state: slot?.state || "",
+                        xpath: `/${cleanPath}`,
+                    }
+                        : null),
+            });
+        });
+
+        const registerSlotUsage = (s, options = {}) => {
             if (!s.path || !s.path.trim()) return;
-            const cleanPath = s.path.trim().replace(/^\//, "");
-            const existing = usedPaths.get(cleanPath);
+            const cleanPath = normalizeSlotPath(s.path);
+            const existing = usedPaths.get(cleanPath) || {};
+            const requiredByChildren = [
+                ...(existing.requiredByChildren || []),
+            ];
+
+            if (options.requiredByChild) {
+                const requirement = options.requiredByChild;
+                const duplicate = requiredByChildren.some(
+                    (entry) =>
+                        entry?.childNodeId === requirement.childNodeId &&
+                        entry?.access === requirement.access
+                );
+
+                if (!duplicate) {
+                    requiredByChildren.push(requirement);
+                }
+            }
+
+            const declaration = currentMachineDeclarations.get(cleanPath);
+            let currentMachineInherited =
+                existing.currentMachineInherited || null;
+
+            if (!options.requiredByChild) {
+                if (declaration?.declared) {
+                    // Explicit current-machine declarations are authoritative.
+                    // A normal <slot> therefore stays normal even if a child
+                    // machine has an <inheritSlot> with the same xpath.
+                    currentMachineInherited = declaration.inherited || null;
+                } else if (!currentMachineInherited && s.inherited) {
+                    // Backwards compatibility for editor-created/legacy slots
+                    // which may not yet have a separate declaration entry.
+                    currentMachineInherited = s.inherited;
+                }
+            }
 
             usedPaths.set(cleanPath, {
-                type: s.type || existing?.type || "Unknown",
-                inherited: s.inherited || existing?.inherited || null,
+                type: s.type || existing.type || "Unknown",
+                // Keep the two inheritance directions independent:
+                // - currentMachineInherited: this workflow itself declares the
+                //   path as <inheritSlot> and receives it from its own parent.
+                // - requiredByChildren: one or more sourced child state machines
+                //   declare the same path as <inheritSlot>.
+                // A path may legitimately have BOTH properties at the same time.
+                currentMachineInherited,
+                // Keep the legacy field for older code / persisted state.
+                inherited: currentMachineInherited,
+                requiredByChildren,
             });
         };
 
@@ -5753,16 +7551,22 @@ function AppContent() {
 
             if (node.type === "submachine") {
                 (node.data.inheritedSlots || []).forEach((slot) => {
-                    registerSlotUsage({
-                        path: slot.path,
-                        type: slot.type || "Unknown",
-                        inherited: {
-                            state:
-                                node.data?.label ||
-                                node.data?.fullSkillName ||
-                                "Sub-state machine",
+                    registerSlotUsage(
+                        {
+                            path: slot.path,
+                            type: slot.type || "Unknown",
                         },
-                    });
+                        {
+                            requiredByChild: {
+                                childNodeId: node.id,
+                                childLabel:
+                                    node.data?.label ||
+                                    node.data?.fullSkillName ||
+                                    "Sub-state machine",
+                                access: slot.access || "inherit",
+                            },
+                        }
+                    );
                 });
             }
         });
@@ -5772,31 +7576,48 @@ function AppContent() {
         const generatedSlotNodes = [];
         let index = 0;
 
-        usedPaths.forEach(({ type, inherited }, path) => {
-            const slotNodeId = `slot-${path}`;
-            const existingSlotNode = slotNodes.find(
-                (node) => node.id === slotNodeId
-            );
+        usedPaths.forEach(
+            ({
+                 type,
+                 inherited,
+                 currentMachineInherited,
+                 requiredByChildren = [],
+             }, path) => {
+                const slotNodeId = `slot-${path}`;
+                const existingSlotNode = slotNodes.find(
+                    (node) => node.id === slotNodeId
+                );
 
-            generatedSlotNodes.push({
-                id: slotNodeId,
-                position:
-                    existingSlotNode?.position || {
-                        x: 380 + (index % 3) * 200,
-                        y: 120 + Math.floor(index / 3) * 140,
+                generatedSlotNodes.push({
+                    id: slotNodeId,
+                    position:
+                        existingSlotNode?.position || {
+                            x: 380 + (index % 3) * 200,
+                            y: 120 + Math.floor(index / 3) * 140,
+                        },
+                    type: "slot",
+                    data: {
+                        path: `/${path}`,
+                        label: `/${path}`,
+                        slotType: type,
+                        currentMachineInherited: Boolean(
+                            currentMachineInherited || inherited
+                        ),
+                        inherited: Boolean(currentMachineInherited || inherited),
+                        slotKind:
+                            currentMachineInherited || inherited
+                                ? "inheritSlot"
+                                : undefined,
+                        inheritedFrom:
+                            (currentMachineInherited || inherited)?.state || "",
+                        requiredByChild: requiredByChildren.length > 0,
+                        requiredByChildren,
                     },
-                type: "slot",
-                data: {
-                    path: `/${path}`,
-                    label: `/${path}`,
-                    slotType: type,
-                    inherited: Boolean(inherited),
-                    inheritedFrom: inherited?.state || "",
-                },
-            });
+                });
 
-            index++;
-        });
+                index++;
+            }
+        );
 
         setSlotNodes(generatedSlotNodes);
 
@@ -5955,6 +7776,127 @@ function AppContent() {
         });
 
         setSlotEdges(newSlotEdges);
+    };
+
+    const handleUpdateSelectedSlotPath = (nextPath) => {
+        if (!selectedRawNode || selectedRawNode.type !== "slot") return;
+
+        const oldPath = getSlotPathFromNode(selectedRawNode);
+        const newPath = normalizeSlotPath(nextPath);
+        if (!oldPath || !newPath || oldPath === newPath) return;
+
+        const formattedPath = `/${newPath}`;
+        const updateSlotReference = (slot) => {
+            if (normalizeSlotPath(slot?.path) !== oldPath) return slot;
+
+            return {
+                ...slot,
+                path: formattedPath,
+                inherited: slot?.inherited
+                    ? {
+                        ...slot.inherited,
+                        xpath: formattedPath,
+                    }
+                    : slot?.inherited,
+            };
+        };
+
+        const updatedNodes = nodes.map((node) => ({
+            ...node,
+            data: {
+                ...node.data,
+                inSlots: (node.data?.inSlots || []).map(updateSlotReference),
+                outSlots: (node.data?.outSlots || []).map(updateSlotReference),
+            },
+        }));
+
+        const updatedManualSlots = (manualSlots || []).map((slot) => {
+            const declarationPath = normalizeSlotPath(
+                slot?.inherited?.xpath || slot?.path
+            );
+            if (declarationPath !== oldPath) return slot;
+
+            return {
+                ...slot,
+                path: formattedPath,
+                inherited: slot?.inherited
+                    ? {
+                        ...slot.inherited,
+                        xpath: formattedPath,
+                    }
+                    : slot?.inherited,
+            };
+        });
+
+        setNodes(updatedNodes);
+        setManualSlots(updatedManualSlots);
+        setSelectedNodeId(`slot-${newPath}`);
+        checkSlotConnection(updatedNodes, updatedManualSlots);
+    };
+
+    const handleUpdateSelectedSlotInherited = (shouldInherit) => {
+        if (!selectedRawNode || selectedRawNode.type !== "slot") return;
+
+        const path = getSlotPathFromNode(selectedRawNode);
+        if (!path) return;
+        const formattedPath = `/${path}`;
+
+        const updatedNodes = nodes.map((node) => {
+            const stateName =
+                node.data?.fullSkillName ||
+                node.data?.label ||
+                node.id;
+
+            const updateSlotReference = (slot) => {
+                if (normalizeSlotPath(slot?.path) !== path) return slot;
+
+                return {
+                    ...slot,
+                    inherited: shouldInherit
+                        ? {
+                            ...(slot?.inherited || {}),
+                            state: slot?.inherited?.state || stateName,
+                            xpath: formattedPath,
+                        }
+                        : null,
+                };
+            };
+
+            return {
+                ...node,
+                data: {
+                    ...node.data,
+                    inSlots: (node.data?.inSlots || []).map(updateSlotReference),
+                    outSlots: (node.data?.outSlots || []).map(updateSlotReference),
+                },
+            };
+        });
+
+        const updatedManualSlots = (manualSlots || []).map((slot) => {
+            const declarationPath = normalizeSlotPath(
+                slot?.inherited?.xpath || slot?.path
+            );
+            if (declarationPath !== path) return slot;
+
+            return {
+                ...slot,
+                slotKind: shouldInherit ? "inheritSlot" : "slot",
+                inherited: shouldInherit
+                    ? {
+                        ...(slot?.inherited || {}),
+                        state:
+                            slot?.inherited?.state ||
+                            slot?.state ||
+                            "",
+                        xpath: formattedPath,
+                    }
+                    : null,
+            };
+        });
+
+        setNodes(updatedNodes);
+        setManualSlots(updatedManualSlots);
+        checkSlotConnection(updatedNodes, updatedManualSlots);
     };
 
     // Graph-aware copy/paste/duplicate/select-all shortcuts. A copied
@@ -6281,7 +8223,16 @@ function AppContent() {
                         ...node.data,
                         [key]: node.data[key].map((slot, index) =>
                             index === slotIndex
-                                ? { ...slot, path: cleanPath }
+                                ? {
+                                    ...slot,
+                                    path: cleanPath,
+                                    inherited: slotData.isInherited
+                                        ? {
+                                            state: "",
+                                            xpath: cleanPath,
+                                        }
+                                        : null,
+                                }
                                 : slot
                         ),
                     },
@@ -6917,12 +8868,10 @@ function AppContent() {
 
         setIsOverTrash(isOverTrash);
 
-        if (
-            isOverTrash ||
-            ["parallel", "parallelLane", "compound"].includes(
-                draggedNode.type
-            )
-        ) {
+        // Parallel-lane helper nodes are layout-only and are never reparented.
+        // Compound and parallel states, however, are real SCXML states and can
+        // be nested just like normal states.
+        if (isOverTrash || draggedNode.type === "parallelLane") {
             setParallelDropTargetId(null);
             setCompoundDropTargetId(null);
             return;
@@ -6933,36 +8882,72 @@ function AppContent() {
             y: event.clientY,
         });
 
-        const hoveredLane = nodes
-            .filter((candidate) => candidate.type === "parallelLane")
-            .find((lane) => {
-                const lanePosition = getAbsoluteNodePosition(
-                    lane,
-                    nodes
-                );
+        const canDropIntoParallelLane = draggedNode.type !== "parallel";
+        // Compounds are real state containers and may be nested inside other
+        // compounds. Cycles are prevented by the descendant check below.
+        const canDropIntoCompound = true;
 
-                const width = Number(lane.style?.width) || 420;
-                const height = Number(lane.style?.height) || 110;
+        const hoveredLane = canDropIntoParallelLane
+            ? nodes
+                .filter(
+                    (candidate) =>
+                        candidate.type === "parallelLane" &&
+                        // Do not allow a container to become a child of one of
+                        // its own descendants.
+                        !isNodeInsideContainer(
+                            candidate,
+                            draggedNode.id,
+                            nodes
+                        )
+                )
+                .find((lane) => {
+                    const lanePosition = getAbsoluteNodePosition(
+                        lane,
+                        nodes
+                    );
 
-                return (
-                    pointerPosition.x >= lanePosition.x &&
-                    pointerPosition.x <= lanePosition.x + width &&
-                    pointerPosition.y >= lanePosition.y &&
-                    pointerPosition.y <= lanePosition.y + height
-                );
-            });
+                    const width = Number(lane.style?.width) || 420;
+                    const height = Number(lane.style?.height) || 110;
 
-        const hoveredCompound = nodes
-            .filter((candidate) => candidate.type === "compound" && candidate.className !== "compound-in-lane" && candidate.id !== draggedNode.id)
-            .find((compound) => {
+                    return (
+                        pointerPosition.x >= lanePosition.x &&
+                        pointerPosition.x <= lanePosition.x + width &&
+                        pointerPosition.y >= lanePosition.y &&
+                        pointerPosition.y <= lanePosition.y + height
+                    );
+                })
+            : null;
+
+        const hoveredCompound = canDropIntoCompound
+            ? nodes
+            .filter(
+                (candidate) =>
+                    candidate.type === "compound" &&
+                    candidate.id !== draggedNode.id &&
+                    !isNodeInsideContainer(
+                        candidate,
+                        draggedNode.id,
+                        nodes
+                    )
+            )
+            .filter((compound) => {
                 const pos = getAbsoluteNodePosition(compound, nodes);
                 const { width, height } = getNodeSize(compound);
                 return pointerPosition.x >= pos.x && pointerPosition.x <= pos.x + width &&
                     pointerPosition.y >= pos.y && pointerPosition.y <= pos.y + height;
-            });
+            })
+            // Nested compounds overlap their parents. Prefer the deepest
+            // visible compound under the pointer so Compound -> Compound
+            // nesting remains usable at arbitrary depth.
+            .sort(
+                (a, b) =>
+                    getNodeNestingDepth(b, nodes) -
+                    getNodeNestingDepth(a, nodes)
+            )[0] || null
+            : null;
 
         setCompoundDropTargetId(hoveredCompound?.id || null);
-        setParallelDropTargetId(hoveredCompound ? null : (hoveredLane?.parentId || null));
+        setParallelDropTargetId(hoveredCompound ? null : (hoveredLane?.id || null));
     }, [nodes, screenToFlowPosition]);
 
     const handleNodeDragStop = useCallback((event, node) => {
@@ -7069,12 +9054,9 @@ function AppContent() {
             return;
         }
 
-        // Container selbst werden nicht in Lanes verschoben.
-        if (
-            node.type === "parallel" ||
-            node.type === "parallelLane" ||
-            node.type === "compound"
-        ) {
+        // Parallel-lane helper nodes themselves are not draggable between
+        // containers. Compound and parallel states are intentionally allowed.
+        if (node.type === "parallelLane") {
             setIsDraggingNode(false);
             setIsOverTrash(false);
             setParallelDropTargetId(null);
@@ -7105,10 +9087,17 @@ function AppContent() {
                 .filter(
                     (c) =>
                         c.type === "compound" &&
-                        c.className !== "compound-in-lane" &&
-                        c.id !== draggedNode.id
+                        c.id !== draggedNode.id &&
+                        // Never allow a compound to become a child of one of
+                        // its own descendants. Compound -> Compound itself is
+                        // otherwise fully supported.
+                        !isNodeInsideContainer(
+                            c,
+                            draggedNode.id,
+                            currentNodes
+                        )
                 )
-                .find((compound) => {
+                .filter((compound) => {
                     const p = getAbsoluteNodePosition(
                         compound,
                         currentNodes
@@ -7122,7 +9111,12 @@ function AppContent() {
                         dropPoint.y >= p.y &&
                         dropPoint.y <= p.y + z.height
                     );
-                });
+                })
+                .sort(
+                    (a, b) =>
+                        getNodeNestingDepth(b, currentNodes) -
+                        getNodeNestingDepth(a, currentNodes)
+                )[0] || null;
 
 
             // ---------------------------------------------------------
@@ -7132,63 +9126,22 @@ function AppContent() {
             // ---------------------------------------------------------
 
             if (
-                draggedNode.type !== "compound" &&
                 sourceCompound &&
                 targetCompound &&
                 sourceCompound.id === targetCompound.id
             ) {
-                let next = [...currentNodes];
-
-                // Compound an neue Node-Position anpassen
-                const members = next.filter(
-                    (c) => c.parentId === sourceCompound.id
+                // Keep the containing compound fitted to all immediate
+                // children, including nested compounds, and propagate any
+                // size change through outer compound ancestors.
+                const next = fitCompoundAndAncestorCompounds(
+                    [...currentNodes],
+                    sourceCompound.id
                 );
 
-                let right = 0;
-                let bottom = 0;
-
-                members.forEach((member) => {
-                    const size = getNodeSize(member);
-
-                    right = Math.max(
-                        right,
-                        Number(member.position?.x || 0) + size.width
-                    );
-
-                    bottom = Math.max(
-                        bottom,
-                        Number(member.position?.y || 0) + size.height
-                    );
-                });
-
-                next = next.map((c) =>
-                    c.id === sourceCompound.id
-                        ? {
-                            ...c,
-                            style: {
-                                ...c.style,
-                                width: Math.max(
-                                    320,
-                                    right +
-                                    COMPOUND_PADDING_X +
-                                    getCompoundExitGutterWidth(
-                                        sourceCompound.data?.events || []
-                                    )
-                                ),
-                                height: Math.max(
-                                    180,
-                                    bottom + COMPOUND_BOTTOM_PADDING
-                                ),
-                            },
-                        }
-                        : c
-                );
-
-                return orderNodesParentsFirst(next);
+                return resolveNodeCollisionsAndRefit(next, draggedNode.id);
             }
 
             if (
-                draggedNode.type !== "compound" &&
                 !getLaneForNode(draggedNode, currentNodes) &&
                 (sourceCompound || targetCompound)
             ) {
@@ -7229,6 +9182,7 @@ function AppContent() {
                                 ...c,
                                 parentId: targetCompound.id,
                                 extent: "parent",
+                                expandParent: true,
 
                                 // Drop-Position beibehalten
                                 position: {
@@ -7260,54 +9214,24 @@ function AppContent() {
                     );
                 }
 
-                const resize = (id) => {
-                    if (!id) return;
-
-                    const members = next.filter(
-                        (c) => c.parentId === id
+                // Auto-fit both the old and new compound after reparenting.
+                // This uses the real React Flow dimensions (width/height +
+                // style) and therefore also works after manual NodeResizer use.
+                // Fitting is propagated through nested compound ancestors.
+                if (sourceCompound?.id) {
+                    next = fitCompoundAndAncestorCompounds(
+                        next,
+                        sourceCompound.id
                     );
+                }
 
-                    let right = 0;
-                    let bottom = 0;
-
-                    members.forEach((member) => {
-                        const size = getNodeSize(member);
-
-                        right = Math.max(
-                            right,
-                            Number(member.position?.x || 0) +
-                            size.width
-                        );
-
-                        bottom = Math.max(
-                            bottom,
-                            Number(member.position?.y || 0) +
-                            size.height
-                        );
-                    });
-
-                    next = next.map((c) =>
-                        c.id === id
-                            ? {
-                                ...c,
-                                style: {
-                                    ...c.style,
-                                    width: Math.max(
-                                        320,
-                                        right + 160
-                                    ),
-                                    height: Math.max(
-                                        180,
-                                        bottom + 30
-                                    ),
-                                },
-                            }
-                            : c
+                if (targetCompound?.id) {
+                    next = fitCompoundAndAncestorCompounds(
+                        next,
+                        targetCompound.id
                     );
-                };
+                }
 
-                resize(sourceCompound?.id);
-                resize(targetCompound?.id);
 
 
                 /*
@@ -7541,26 +9465,10 @@ function AppContent() {
                             String(event?.id || "") !== "compound-entry"
                     );
 
-                    const targetChildrenRight = getCompoundChildrenRight(
-                        targetCompound.id,
-                        next
-                    );
-
                     next = next.map((candidate) =>
                         candidate.id === targetCompound.id
                             ? {
                                 ...candidate,
-                                style: {
-                                    ...candidate.style,
-                                    width: Math.max(
-                                        Number(candidate.style?.width) || 320,
-                                        targetChildrenRight +
-                                        COMPOUND_PADDING_X +
-                                        getCompoundExitGutterWidth(
-                                            nextCompoundEvents
-                                        )
-                                    ),
-                                },
                                 data: {
                                     ...candidate.data,
                                     events: nextCompoundEvents,
@@ -7570,9 +9478,25 @@ function AppContent() {
                     );
                 }
 
+                // Events can change the exit gutter width, so do one final
+                // fit after the compound transition metadata has been updated.
+                if (sourceCompound?.id) {
+                    next = fitCompoundAndAncestorCompounds(
+                        next,
+                        sourceCompound.id
+                    );
+                }
+
+                if (targetCompound?.id) {
+                    next = fitCompoundAndAncestorCompounds(
+                        next,
+                        targetCompound.id
+                    );
+                }
+
                 setEdges(rewrittenEdges);
 
-                return orderNodesParentsFirst(next);
+                return resolveNodeCollisionsAndRefit(next, draggedNode.id);
             }
 
             const sourceLane = getLaneForNode(
@@ -7580,40 +9504,66 @@ function AppContent() {
                 currentNodes
             );
 
-            const targetLane = currentNodes
-                .filter(
-                    (candidate) =>
-                        candidate.type === "parallelLane"
-                )
-                .find((lane) => {
-                    const position = getAbsoluteNodePosition(
-                        lane,
-                        currentNodes
-                    );
+            const targetLane = draggedNode.type !== "parallel"
+                ? currentNodes
+                    .filter(
+                        (candidate) =>
+                            candidate.type === "parallelLane" &&
+                            !isNodeInsideContainer(
+                                candidate,
+                                draggedNode.id,
+                                currentNodes
+                            )
+                    )
+                    .find((lane) => {
+                        const position = getAbsoluteNodePosition(
+                            lane,
+                            currentNodes
+                        );
 
-                    const width =
-                        Number(lane.style?.width) || 420;
-                    const height =
-                        Number(lane.style?.height) || 110;
+                        const width =
+                            Number(lane.style?.width) || 420;
+                        const height =
+                            Number(lane.style?.height) || 110;
 
-                    return (
-                        dropPoint.x >= position.x &&
-                        dropPoint.x <= position.x + width &&
-                        dropPoint.y >= position.y &&
-                        dropPoint.y <= position.y + height
-                    );
-                });
+                        return (
+                            dropPoint.x >= position.x &&
+                            dropPoint.x <= position.x + width &&
+                            dropPoint.y >= position.y &&
+                            dropPoint.y <= position.y + height
+                        );
+                    })
+                : null;
 
             // Die Node wurde lediglich innerhalb derselben Lane bewegt.
+            // Keep its free position, but still allow the lane/parallel to
+            // grow when the node reaches beyond the manually resized bounds.
             if (targetLane?.id === sourceLane?.id) {
-                return currentNodes.map((candidate) =>
+                let next = currentNodes.map((candidate) =>
                     candidate.id === draggedNode.id
                         ? {
                             ...candidate,
                             extent: "parent",
+                            expandParent: true,
                         }
                         : candidate
                 );
+
+                if (sourceCompound?.id) {
+                    next = fitCompoundAndAncestorCompounds(
+                        next,
+                        sourceCompound.id
+                    );
+                }
+
+                if (sourceLane?.parentId) {
+                    next = growParallelToLaneContents(
+                        next,
+                        sourceLane.parentId
+                    );
+                }
+
+                return resolveNodeCollisionsAndRefit(next, draggedNode.id);
             }
 
             const sourceParallel = sourceLane
@@ -7642,30 +9592,27 @@ function AppContent() {
             const normalizeLane = (lane, nodeToArrangeId = null) => {
                 if (!lane) return;
 
-                const directChildren = nextNodes.filter(
-                    (candidate) => candidate.parentId === lane.id
+                const currentLane =
+                    nextNodes.find((candidate) => candidate.id === lane.id) ||
+                    lane;
+
+                let directChildren = nextNodes.filter(
+                    (candidate) => candidate.parentId === currentLane.id
                 );
 
-                // Der Compound existiert bereits automatisch in jeder Lane.
-                const wrapper = directChildren.find(
-                    (candidate) =>
-                        candidate.type === "compound" &&
-                        candidate.className === "compound-in-lane"
+                // A lane may already have the automatically managed compound
+                // wrapper used when it contains multiple branch states.
+                let wrapper = directChildren.find(
+                    (candidate) => isAutoParallelLaneCompound(candidate)
                 );
 
-                const parentId = wrapper?.id || lane.id;
+                const parentId = wrapper?.id || currentLane.id;
 
-                // Alle States innerhalb der Lane / des Compounds
-                const members = wrapper
+                let members = wrapper
                     ? nextNodes.filter(
-                        (candidate) =>
-                            candidate.parentId === wrapper.id
+                        (candidate) => candidate.parentId === wrapper.id
                     )
-                    : directChildren.filter(
-                        (candidate) =>
-                            candidate.type !== "compound"
-                    );
-
+                    : directChildren.filter(isParallelLaneSkillCandidate);
 
                 if (nodeToArrangeId) {
                     const newNode = members.find(
@@ -7678,7 +9625,10 @@ function AppContent() {
                         );
 
                         const newX =
-                            25 + existingMembers.length * 190;
+                            25 + existingMembers.reduce((x, member) => {
+                                const size = getNodeSize(member);
+                                return x + size.width + PARALLEL_NODE_GAP;
+                            }, 0);
 
                         nextNodes = nextNodes.map((candidate) => {
                             if (candidate.id !== nodeToArrangeId) {
@@ -7689,140 +9639,43 @@ function AppContent() {
                                 ...candidate,
                                 parentId,
                                 extent: "parent",
+                                expandParent: true,
                                 position: {
                                     x: newX,
-                                    y: 20,
+                                    // When a lane has a compound wrapper, its
+                                    // children must begin below the compound
+                                    // header just like in a normal compound.
+                                    y: wrapper
+                                        ? COMPOUND_HEADER_HEIGHT
+                                        : 20,
                                 },
                             };
                         });
                     }
                 }
 
-                const requiredWidth = Math.max(
-                    420,
-                    members.length * 190 + 80
-                );
+                // If this lane owns an auto compound, fit that compound to its
+                // children before calculating the lane/parallel dimensions.
+                if (wrapper) {
+                    nextNodes = fitCompoundToChildren(
+                        nextNodes,
+                        wrapper.id
+                    );
+                    wrapper = nextNodes.find(
+                        (candidate) => candidate.id === wrapper.id
+                    );
+                }
 
                 const parallel = nextNodes.find(
-                    (candidate) => candidate.id === lane.parentId
+                    (candidate) => candidate.id === currentLane.parentId
                 );
 
                 if (!parallel) return;
 
-                const parallelLanes = nextNodes.filter(
-                    (candidate) =>
-                        candidate.type === "parallelLane" &&
-                        candidate.parentId === parallel.id
+                nextNodes = growParallelToLaneContents(
+                    nextNodes,
+                    parallel.id
                 );
-
-                let requiredParallelWidth = 420;
-
-                parallelLanes.forEach((parallelLane) => {
-                    const directChildren = nextNodes.filter(
-                        (candidate) =>
-                            candidate.parentId === parallelLane.id
-                    );
-
-                    const laneWrapper = directChildren.find(
-                        (candidate) =>
-                            candidate.type === "compound" &&
-                            candidate.className === "compound-in-lane"
-                    );
-
-                    // States dieser Lane
-                    const laneMembers = laneWrapper
-                        ? nextNodes.filter(
-                            (candidate) =>
-                                candidate.parentId === laneWrapper.id
-                        )
-                        : directChildren.filter(
-                            (candidate) =>
-                                candidate.type !== "compound"
-                        );
-
-                    let maxRight = 0;
-
-                    laneMembers.forEach((member) => {
-                        const nodeWidth =
-                            Number(member.measured?.width) ||
-                            Number(member.width) ||
-                            Number(member.style?.width) ||
-                            160;
-
-                        const right =
-                            Number(member.position?.x || 0) +
-                            nodeWidth;
-
-                        maxRight = Math.max(maxRight, right);
-                    });
-
-                    const laneRequiredWidth =
-                        15 +
-                        maxRight +
-                        PARALLEL_EXIT_GUTTER;
-
-                    requiredParallelWidth = Math.max(
-                        requiredParallelWidth,
-                        laneRequiredWidth
-                    );
-                });
-
-                const parallelWidth = requiredParallelWidth;
-
-                // Parallel, Lanes und Compounds auf dieselbe
-                // benötigte Breite bringen.
-                nextNodes = nextNodes.map((candidate) => {
-                    // Parallel-State
-                    if (candidate.id === parallel.id) {
-                        return {
-                            ...candidate,
-                            style: {
-                                ...candidate.style,
-                                width: parallelWidth,
-                            },
-                        };
-                    }
-
-                    // Alle Lanes des Parallel-States
-                    if (
-                        candidate.type === "parallelLane" &&
-                        candidate.parentId === parallel.id
-                    ) {
-                        return {
-                            ...candidate,
-                            style: {
-                                ...candidate.style,
-                                width: parallelWidth,
-                            },
-                        };
-                    }
-
-                    // Compounds aller Lanes dieses Parallel-States
-                    const belongsToParallelLane =
-                        parallelLanes.some(
-                            (parallelLane) =>
-                                parallelLane.id === candidate.parentId
-                        );
-
-                    if (
-                        candidate.type === "compound" &&
-                        candidate.className === "compound-in-lane" &&
-                        belongsToParallelLane
-                    ) {
-                        return {
-                            ...candidate,
-                            style: {
-                                ...candidate.style,
-                                width: Math.max(
-                                    390,
-                                    parallelWidth - 30
-                                ),
-                            },
-                        };
-                    }
-
-                    return candidate;
-                });
             };
 
             if (targetLane) {
@@ -7830,8 +9683,7 @@ function AppContent() {
                 const wrapper = nextNodes.find(
                     (candidate) =>
                         candidate.parentId === targetLane.id &&
-                        candidate.type === "compound" &&
-                        candidate.className === "compound-in-lane"
+                        isAutoParallelLaneCompound(candidate)
                 );
 
 
@@ -7849,6 +9701,7 @@ function AppContent() {
 
                     parentId: targetParent.id,
                     extent: "parent",
+                    expandParent: true,
 
                     position: {
                         x:
@@ -8124,15 +9977,70 @@ function AppContent() {
             setEdges(nextEdges);
 
             // React Flow benötigt Parent-Nodes vor ihren Children.
-            return orderNodesParentsFirst(nextNodes);
+            return resolveNodeCollisionsAndRefit(nextNodes, draggedNode.id);
         });
+
+        // Slot nodes live in a separate state array, but in Slot/Overview mode
+        // they share the same React Flow canvas with root state nodes. Run one
+        // final root-scope pass after React has committed the drag so a slot
+        // cannot overlap a root skill (and vice versa). Nested states are still
+        // handled only inside their own parent scope above.
+        if (activeMode === "slots" || activeMode === "overview") {
+            requestAnimationFrame(() => {
+                const currentVisibleNodes = getNodes();
+                const focusNode = currentVisibleNodes.find(
+                    (candidate) => candidate.id === node.id
+                );
+
+                if (
+                    !focusNode ||
+                    focusNode.parentId ||
+                    focusNode.type === "parallelLane"
+                ) {
+                    return;
+                }
+
+                const resolvedVisibleNodes = resolveCollisionScope(
+                    currentVisibleNodes,
+                    node.id,
+                    NODE_COLLISION_OPTIONS
+                );
+                const positionsById = new Map(
+                    resolvedVisibleNodes.map((candidate) => [
+                        candidate.id,
+                        candidate.position,
+                    ])
+                );
+
+                setNodes((currentNodes) =>
+                    currentNodes.map((candidate) => {
+                        if (candidate.parentId) return candidate;
+                        const position = positionsById.get(candidate.id);
+                        return position
+                            ? { ...candidate, position }
+                            : candidate;
+                    })
+                );
+
+                setSlotNodes((currentSlotNodes) =>
+                    currentSlotNodes.map((candidate) => {
+                        const position = positionsById.get(candidate.id);
+                        return position
+                            ? { ...candidate, position }
+                            : candidate;
+                    })
+                );
+            });
+        }
 
         setIsDraggingNode(false);
         setIsOverTrash(false);
         setParallelDropTargetId(null);
         setCompoundDropTargetId(null);
     }, [
+        activeMode,
         edges,
+        getNodes,
         screenToFlowPosition,
         setNodes,
         setEdges,
@@ -8485,8 +10393,7 @@ function AppContent() {
                             const hoveredCompound = nodes
                                 .filter(
                                     (node) =>
-                                        node.type === "compound" &&
-                                        node.className !== "compound-in-lane"
+                                        node.type === "compound"
                                 )
                                 .find((compound) => {
                                     const position = getAbsoluteNodePosition(
@@ -8533,7 +10440,7 @@ function AppContent() {
                             setParallelDropTargetId(
                                 hoveredCompound
                                     ? null
-                                    : hoveredLane?.parentId || null
+                                    : hoveredLane?.id || null
                             );
                         }}
                         onDragLeave={(e) => {
@@ -8574,7 +10481,11 @@ function AppContent() {
                                         behavior,
                                         mousePosition
                                     );
-                                    const updatedNodes = [...nodes, newNode];
+                                    const updatedNodes =
+                                        resolveNodeCollisionsAndRefit(
+                                            [...nodes, newNode],
+                                            newNode.id
+                                        );
                                     setNodes(updatedNodes);
                                     checkSlotConnection(updatedNodes);
                                 } catch (error) {
@@ -8592,8 +10503,7 @@ function AppContent() {
                             const targetCompound = nodes
                                 .filter(
                                     (node) =>
-                                        node.type === "compound" &&
-                                        node.className !== "compound-in-lane"
+                                        node.type === "compound"
                                 )
                                 .find((compound) => {
                                     const position = getAbsoluteNodePosition(
@@ -8915,10 +10825,12 @@ function AppContent() {
                                     estimatedNodeHeight / 2,
                             };
 
-                            setNodes((currentNodes) => [
-                                ...currentNodes,
-                                newNode,
-                            ]);
+                            setNodes((currentNodes) =>
+                                resolveNodeCollisionsAndRefit(
+                                    [...currentNodes, newNode],
+                                    newNode.id
+                                )
+                            );
                             setSelectedNodeId(newNode.id);
                         }}
                     >
@@ -8987,9 +10899,11 @@ function AppContent() {
                                         <button className="context-menu-item" onClick={() => handleSelectAction("submachine")}>
                                             Sub-State-Machine
                                         </button>
-                                        <button className="context-menu-item" onClick={() => handleSelectAction("slot")}>
-                                            Slot
-                                        </button>
+                                        {(activeMode === "slots" || activeMode === "overview") && (
+                                            <button className="context-menu-item" onClick={() => handleSelectAction("slot")}>
+                                                Slot
+                                            </button>
+                                        )}
                                     </div>
                                 )}
 
@@ -9006,7 +10920,10 @@ function AppContent() {
                                         isValidConnection={isValidConnection}
                                         connectionMode={ConnectionMode.Loose}
                                         onEdgeClick={(_, edge) => {
-                                            if (edge.data?.compoundInitialEdge) {
+                                            if (
+                                                edge.data?.compoundInitialEdge ||
+                                                edge.data?.parallelEntryEdge
+                                            ) {
                                                 return;
                                             }
                                             if (isSlotEdge(edge)) {
@@ -9016,7 +10933,10 @@ function AppContent() {
                                             selectTransitionEdge(edge.id);
                                         }}
                                         onEdgeDoubleClick={(event, edge) => {
-                                            if (edge.data?.compoundInitialEdge) {
+                                            if (
+                                                edge.data?.compoundInitialEdge ||
+                                                edge.data?.parallelEntryEdge
+                                            ) {
                                                 return;
                                             }
                                             if (isSlotEdge(edge)) {
@@ -9037,26 +10957,40 @@ function AppContent() {
 
                                             setSelectedNodeId(n.id);
 
-                                            // Slot nodes participate in slot-edge highlighting,
-                                            // but they do not have a skill detail panel.
                                             if (n.type === "slot") {
-                                                const cleanPath = getSlotPathFromNode(n);
-                                                const hasOwningSkill = nodes.some((node) =>
-                                                    [
-                                                        ...(node.data?.inSlots || []),
-                                                        ...(node.data?.outSlots || []),
-                                                    ].some(
-                                                        (slot) => normalizeSlotPath(slot.path) === cleanPath
-                                                    )
-                                                );
-                                                if (hasOwningSkill) {
-                                                    setActiveTab("slots");
-                                                    setRightPanelTab("details");
-                                                }
+                                                setRightPanelTab("details");
                                                 return;
                                             }
 
                                             setRightPanelTab("details");
+                                        }}
+                                        onNodeMouseEnter={(_, n) => {
+                                            if (
+                                                [
+                                                    "custom",
+                                                    "submachine",
+                                                    "compound",
+                                                    "parallel",
+                                                    "slot",
+                                                ].includes(n.type)
+                                            ) {
+                                                setHoveredEditorNodeId(n.id);
+                                            }
+                                        }}
+                                        onNodeMouseLeave={(_, n) => {
+                                            if (
+                                                [
+                                                    "custom",
+                                                    "submachine",
+                                                    "compound",
+                                                    "parallel",
+                                                    "slot",
+                                                ].includes(n.type)
+                                            ) {
+                                                setHoveredEditorNodeId((current) =>
+                                                    current === n.id ? null : current
+                                                );
+                                            }
                                         }}
                                         onPaneClick={() => {
                                             clearAllEdgeSelection();
@@ -9102,7 +11036,7 @@ function AppContent() {
                                 className={`right-panel-tab ${rightPanelTab === "details" ? "active" : ""}`}
                                 onClick={() => setRightPanelTab("details")}
                             >
-                                Skill Detail
+                                {selectedNode.type === "slot" ? "Slot Details" : "Skill Detail"}
                             </button>
                         )}
 
@@ -9303,17 +11237,97 @@ function AppContent() {
                                         )
                                     )
                                 }
-                                onUpdateInSlotPath={(idx, val) =>
-                                    setNodes((nds) =>
-                                        nds.map((n) => (n.id === selectedNode.id ? { ...n, data: { ...n.data, inSlots: n.data.inSlots.map((s, i) => (i === idx ? { ...s, path: val } : s)) } } : n))
-                                    )
+                                onUpdateInSlotPath={(idx, val, commit = false) =>
+                                    setNodes((nds) => {
+                                        const updatedNodes = nds.map((n) =>
+                                            n.id === selectedNode.id
+                                                ? {
+                                                    ...n,
+                                                    data: {
+                                                        ...n.data,
+                                                        inSlots: n.data.inSlots.map((s, i) =>
+                                                            i === idx
+                                                                ? { ...s, path: val }
+                                                                : s
+                                                        ),
+                                                    },
+                                                }
+                                                : n
+                                        );
+
+                                        if (commit) {
+                                            requestAnimationFrame(() =>
+                                                checkSlotConnection(updatedNodes)
+                                            );
+                                        }
+
+                                        return updatedNodes;
+                                    })
                                 }
-                                onUpdateOutSlotPath={(idx, val) =>
-                                    setNodes((nds) =>
-                                        nds.map((n) => (n.id === selectedNode.id ? { ...n, data: { ...n.data, outSlots: n.data.outSlots.map((s, i) => (i === idx ? { ...s, path: val } : s)) } } : n))
-                                    )
+                                onUpdateOutSlotPath={(idx, val, commit = false) =>
+                                    setNodes((nds) => {
+                                        const updatedNodes = nds.map((n) =>
+                                            n.id === selectedNode.id
+                                                ? {
+                                                    ...n,
+                                                    data: {
+                                                        ...n.data,
+                                                        outSlots: n.data.outSlots.map((s, i) =>
+                                                            i === idx
+                                                                ? { ...s, path: val }
+                                                                : s
+                                                        ),
+                                                    },
+                                                }
+                                                : n
+                                        );
+
+                                        if (commit) {
+                                            requestAnimationFrame(() =>
+                                                checkSlotConnection(updatedNodes)
+                                            );
+                                        }
+
+                                        return updatedNodes;
+                                    })
                                 }
                                 onCheckSlots={checkSlotConnection}
+                                availableSlotPaths={canvasSlotPathOptions}
+                                slotDetails={selectedSlotDetails}
+                                onUpdateSlotPath={handleUpdateSelectedSlotPath}
+                                onUpdateSlotInherited={handleUpdateSelectedSlotInherited}
+                                onHoverSlotAccessSkill={(nodeId) =>
+                                    setHoveredSlotAccessNodeId(nodeId || null)
+                                }
+                                onSelectSlotAccessSkill={(nodeId) => {
+                                    if (!nodeId) return;
+
+                                    setHoveredSlotAccessNodeId(null);
+                                    clearAllEdgeSelection();
+                                    setNodes((currentNodes) =>
+                                        currentNodes.map((node) => ({
+                                            ...node,
+                                            selected: node.id === nodeId,
+                                        }))
+                                    );
+                                    setSlotNodes((currentNodes) =>
+                                        currentNodes.map((node) => ({
+                                            ...node,
+                                            selected: false,
+                                        }))
+                                    );
+                                    setSelectedNodeId(nodeId);
+                                    setRightPanelTab("details");
+
+                                    window.setTimeout(() => {
+                                        fitView({
+                                            nodes: [{ id: nodeId }],
+                                            padding: 0.8,
+                                            maxZoom: 1.35,
+                                            duration: 250,
+                                        });
+                                    }, 0);
+                                }}
                             />
                         )}
                     </div>
@@ -9511,7 +11525,6 @@ function AppContent() {
                 isOpen={isCreateSlotModalOpen}
                 onClose={() => setIsCreateSlotModalOpen(false)}
                 onCreate={handleCreateManualSlot}
-                availableStates={availableSlotStates}
                 skillSlotOptions={canvasSkillSlotOptions}
             />
         </div>
@@ -9525,3 +11538,4 @@ export default function App() {
         </ReactFlowProvider>
     );
 }
+

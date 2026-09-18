@@ -31,6 +31,28 @@ export default function ParallelLaneNode({ id, data }) {
         pointerEvents: 'none',
       }}
     >
+      {/*
+        Display-only entry point for this branch. The lane fills the parallel
+        state's width, so its left border is also the parallel state's left
+        border. App.jsx uses this handle for the arrow into the lane's entry
+        state, just like a compound's compound-entry handle.
+      */}
+      <Handle
+        type="source"
+        position={Position.Right}
+        id="parallel-entry"
+        className="target-handle"
+        style={{
+          top: '50%',
+          left: '-5px',
+          right: 'auto',
+          backgroundColor: '#0284c7',
+          borderColor: '#ffffff',
+        }}
+        isConnectableStart={false}
+        isConnectableEnd={false}
+      />
+
       {/* Exits genau am rechten Rand dieser Lane */}
       <div
         style={{
@@ -69,6 +91,8 @@ export default function ParallelLaneNode({ id, data }) {
                 border: '1px solid #ffffff',
                 borderRadius: '50%',
               }}
+              isConnectableStart={false}
+              isConnectableEnd={false}
             />
 
             <span className="compound-frame-exit-label">
@@ -88,6 +112,8 @@ export default function ParallelLaneNode({ id, data }) {
                 width: 8,
                 height: 8,
               }}
+              isConnectableStart={true}
+              isConnectableEnd={false}
             />
           </div>
         ))}

@@ -417,6 +417,7 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             for (let laneIdx = 0; laneIdx < branchElements.length; laneIdx++) {
                 const branchElem = branchElements[laneIdx];
                 const branchId = branchElem.getAttribute("id");
+                const branchInitial = branchElem.getAttribute("initial") || "";
                 const innerStates = Array.from(branchElem.children).filter((c) => c.localName === "state");
                 const laneNodeId = getNodeId();
 
@@ -502,6 +503,7 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                         const stElem = innerStates[sIdx];
                         const stId = stElem.getAttribute("id");
                         const stNodeId = getNodeId();
+                        const isSubInitial = stId === branchInitial;
 
                         Array.from(stElem.children)
                             .filter((c) => c.localName === "transition")
@@ -526,7 +528,7 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                                 }
                             });
 
-                        const nodeData = await buildSkillNodeData(stId, false, false, "", stElem);
+                        const nodeData = await buildSkillNodeData(stId, isSubInitial, false, "", stElem);
                         newNodes.push({
                             id: stNodeId,
                             position: { x: 15 + sIdx * 180, y: 35 },

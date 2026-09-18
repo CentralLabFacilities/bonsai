@@ -1,7 +1,9 @@
-import { Handle, Position } from "@xyflow/react";
+import { Handle, NodeResizer, Position } from "@xyflow/react";
+import { FiChevronDown, FiChevronRight } from "react-icons/fi";
 
-function CompoundNode({ data = {}, selected = false }) {
+function CompoundNode({ id, data = {}, selected = false }) {
     const events = Array.isArray(data.events) ? data.events : [];
+    const isCollapsed = Boolean(data.isCollapsed);
 
     const uniqueEvents = [];
     const seen = new Set();
@@ -19,37 +21,69 @@ function CompoundNode({ data = {}, selected = false }) {
                 data.isInitial ? "initial-compound" : ""
             } ${selected ? "selected-compound" : ""} ${
                 data.isDropTarget ? "compound-drop-target" : ""
-            }`}
+            } ${isCollapsed ? "collapsed-container" : ""}`}
         >
+            <NodeResizer
+                isVisible={selected && !isCollapsed}
+                minWidth={220}
+                minHeight={120}
+                color="#475569"
+                handleStyle={{ pointerEvents: "all" }}
+                lineStyle={{ pointerEvents: "all" }}
+            />
+
             {/*
-             * Dedicated compound entry connector. This handle is SOURCE-ONLY:
-             * it may only point inward to exactly one immediate child state.
-             * App.jsx interprets this connection as the compound's initial state,
-             * not as a normal SCXML transition.
-             *
-             * Keep the target-handle CSS class so compounds embedded invisibly
-             * inside parallel lanes retain the existing hide behaviour.
+             * The only user-connectable handle on the left side of a compound
+             * is its normal incoming transition target. It can receive edges,
+             * but it can never start one.
+             */}
+            <Handle
+                id="transition-target"
+                type="target"
+                position={Position.Left}
+                className="target-handle"
+                isConnectableStart={false}
+                isConnectableEnd={true}
+            />
+
+            {/*
+             * Invisible display anchor for the compound's initial-child arrow.
+             * Existing helper edges can still originate at the left boundary,
+             * but users cannot drag a connection from this anchor.
              */}
             <Handle
                 id="compound-entry"
                 type="source"
-                // Position.Right tells React Flow that this connection travels
-                // inward. The inline left override keeps the point physically
-                // on the compound's left border.
                 position={Position.Right}
-                className="target-handle compound-frame-entry-handle"
+                className="compound-frame-entry-handle"
                 style={{
                     top: "50%",
                     left: "-5px",
                     right: "auto",
+                    opacity: 0,
+                    pointerEvents: "none",
                 }}
-                title="Drag inward to the compound's initial child state"
+                isConnectableStart={false}
+                isConnectableEnd={false}
             />
 
             <div className="compound-frame-header">
-                <span className="compound-frame-title">
+                <button
+                    type="button"
+                    className="container-collapse-btn nodrag nopan"
+                    title={isCollapsed ? "Expand compound" : "Collapse compound"}
+                    aria-label={isCollapsed ? "Expand compound" : "Collapse compound"}
+                    onClick={(event) => {
+                        event.stopPropagation();
+                        data.onToggleCollapse?.(id);
+                    }}
+                >
+                    {isCollapsed ? <FiChevronRight size={14} /> : <FiChevronDown size={14} />}
+                </button>
+                <span className="compound-frame-badge">COMPOUND</span>
+                <strong className="compound-frame-title">
                     {data.label || "Compound"}
-                </span>
+                </strong>
             </div>
 
             {uniqueEvents.length > 0 && (
@@ -81,6 +115,8 @@ function CompoundNode({ data = {}, selected = false }) {
                                         opacity: 0,
                                         pointerEvents: "none",
                                     }}
+                                    isConnectableStart={false}
+                                    isConnectableEnd={false}
                                 />
 
                                 <span
@@ -95,6 +131,8 @@ function CompoundNode({ data = {}, selected = false }) {
                                     type="source"
                                     position={Position.Right}
                                     className="compound-frame-source-handle"
+                                    isConnectableStart={true}
+                                    isConnectableEnd={false}
                                 />
                             </div>
                         );

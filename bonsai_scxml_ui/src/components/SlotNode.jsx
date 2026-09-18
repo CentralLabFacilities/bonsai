@@ -1,4 +1,6 @@
 import { Handle, Position } from "@xyflow/react";
+import { FiDatabase } from "react-icons/fi";
+import { getSlotTypeStyle } from "../utils/slotVisuals";
 
 const normalizeSlotType = (type) =>
     String(type || "").trim().toLowerCase();
@@ -31,16 +33,23 @@ const getSlotHandleDragClass = ({
         : "slot-handle-incompatible";
 };
 
-function SlotNode({ id, data }) {
+function SlotNode({ id, data, selected = false }) {
     const displayPath = data.path || data.label || "Undefined slot";
+    const normalizedPath = displayPath.startsWith("/")
+        ? displayPath
+        : `/${displayPath}`;
     const slotType = data.slotType || "Unknown";
 
     // Two different inheritance directions must stay visible independently:
     // 1) current workflow declares <inheritSlot> -> inherited from its parent
     // 2) sourced child declares <inheritSlot> -> required by that child
-    const isInheritedFromParent = Boolean(
-        data.inherited || data.slotKind === "inheritSlot"
-    );
+    // `currentMachineInherited` is the authoritative flag when present.
+    // This prevents a child machine's inheritSlot metadata from being shown as
+    // though the current machine itself declared <inheritSlot>.
+    const isInheritedFromParent =
+        data.currentMachineInherited !== undefined
+            ? Boolean(data.currentMachineInherited)
+            : Boolean(data.inherited || data.slotKind === "inheritSlot");
     const childRequirements = Array.isArray(data.requiredByChildren)
         ? data.requiredByChildren
         : [];
@@ -56,14 +65,10 @@ function SlotNode({ id, data }) {
         ),
     ];
 
-    const inheritedTitle = data.inheritedFrom
-        ? `Inherited from parent (${data.inheritedFrom})`
-        : "Inherited from parent";
-
     const childRequirementTitle =
         requiredByLabels.length > 0
-            ? `Required by child: ${requiredByLabels.join(", ")}`
-            : "Required by sourced child state machine";
+            ? `Inherited by sub-state machine: ${requiredByLabels.join(", ")}`
+            : "Inherited by a sub-state machine.";
 
     const writeHandleId = "slot-node-write";
     const readHandleId = "slot-node-read";
@@ -74,9 +79,9 @@ function SlotNode({ id, data }) {
                 isInheritedFromParent ? "slot-node-inherited" : ""
             } ${
                 isRequiredByChild ? "slot-node-child-required" : ""
-            }`}
+            } ${selected ? "selected-slot-node" : ""}`}
+            style={getSlotTypeStyle(slotType)}
         >
-            {/* Write endpoint: both slot endpoints are on the lower edge. */}
             <Handle
                 id={writeHandleId}
                 type="target"
@@ -92,41 +97,6 @@ function SlotNode({ id, data }) {
                 title="Write"
             />
 
-            <div className="slot-node-label">
-                {displayPath.startsWith("/")
-                    ? displayPath
-                    : `/${displayPath}`}
-            </div>
-
-            <div className="slot-node-type">{slotType}</div>
-
-            {(isInheritedFromParent || isRequiredByChild) && (
-                <div className="slot-node-provenance">
-                    {isInheritedFromParent && (
-                        <div
-                            className="slot-node-provenance-badge slot-node-provenance-parent"
-                            title={inheritedTitle}
-                        >
-                            Inherited from parent
-                        </div>
-                    )}
-
-                    {isRequiredByChild && (
-                        <div
-                            className="slot-node-provenance-badge slot-node-provenance-child"
-                            title={childRequirementTitle}
-                        >
-                            {requiredByLabels.length === 1
-                                ? `Required by ${requiredByLabels[0]}`
-                                : requiredByLabels.length > 1
-                                    ? `Required by ${requiredByLabels.length} children`
-                                    : "Required by child"}
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* Read endpoint: both slot endpoints are on the lower edge. */}
             <Handle
                 id={readHandleId}
                 type="target"
@@ -141,6 +111,46 @@ function SlotNode({ id, data }) {
                 })}`}
                 title="Read"
             />
+
+            <div className="slot-node-header">
+                <div className="slot-node-kind">
+                    <FiDatabase size={11} aria-hidden="true" />
+                    <span>SLOT</span>
+                </div>
+                <div className="slot-node-type" title={slotType}>
+                    {slotType}
+                </div>
+            </div>
+
+            <div className="slot-node-path" title={normalizedPath}>
+                {normalizedPath}
+            </div>
+
+            <div className="slot-node-access-guide" aria-hidden="true">
+                <div className="slot-node-access slot-node-access-write">
+                    <span className="slot-node-access-dot" />
+                    <span>Write</span>
+                </div>
+                <div className="slot-node-access slot-node-access-read">
+                    <span className="slot-node-access-dot" />
+                    <span>Read</span>
+                </div>
+            </div>
+
+            {isRequiredByChild && (
+                <div className="slot-node-provenance">
+                    <div
+                        className="slot-node-provenance-badge slot-node-provenance-child"
+                        title={childRequirementTitle}
+                    >
+                        {requiredByLabels.length === 1
+                            ? `Inherited by sub-state: ${requiredByLabels[0]}`
+                            : requiredByLabels.length > 1
+                                ? `Inherited by ${requiredByLabels.length} sub-states`
+                                : "Inherited by sub-state"}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

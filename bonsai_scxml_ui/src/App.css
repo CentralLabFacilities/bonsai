@@ -1682,20 +1682,6 @@
 
     z-index: 4;
 }
-.compound-in-lane {
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-}
-
-.compound-in-lane .compound-frame-header {
-    display: none !important;
-}
-
-.compound-in-lane .target-handle {
-    display: none !important;
-}
-
 .compound-frame-node {
     width: 100%;
     height: 100%;
@@ -1861,17 +1847,17 @@
 
 .parallel-group-container {
     transition:
-        border-color 140ms ease,
-        box-shadow 140ms ease,
-        background-color 140ms ease;
+            border-color 140ms ease,
+            box-shadow 140ms ease,
+            background-color 140ms ease;
 }
 
 .react-flow__node-parallel.parallel-drop-target,
 .react-flow__node-parallel:has(.parallel-drop-target) {
     border-color: #38bdf8 !important;
     box-shadow:
-        0 0 0 3px rgba(56, 189, 248, 0.3),
-        0 8px 28px rgba(2, 132, 199, 0.22);
+            0 0 0 3px rgba(56, 189, 248, 0.3),
+            0 8px 28px rgba(2, 132, 199, 0.22);
 }
 
 .parallel-drop-target {
@@ -4778,113 +4764,113 @@
    FLOATING "NEW SLOT" BUTTON (top-right of Slot Mode canvas)
    ========================================================================== */
 .create-slot-button-floating {
-  position: absolute;
-  top: 15px;
-  right: 15px;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 2.2rem;
-  padding: 0 1rem;
-  border: 1px solid var(--secondary-color);
-  border-radius: 6px;
-  background-color: var(--secondary-color);
-  color: #ffffff;
-  font-weight: 500;
-  font-size: 13px;
-  cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-  transition: background-color 0.15s ease;
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 2.2rem;
+    padding: 0 1rem;
+    border: 1px solid var(--secondary-color);
+    border-radius: 6px;
+    background-color: var(--secondary-color);
+    color: #ffffff;
+    font-weight: 500;
+    font-size: 13px;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+    transition: background-color 0.15s ease;
 }
 
 .create-slot-button-floating:hover {
-  background-color: #1c7fcf;
+    background-color: #1c7fcf;
 }
 
 /* ==========================================================================
    CREATE SLOT MODAL
    ========================================================================== */
 .slot-create-modal-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 2000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.55);
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.55);
 }
 
 .slot-create-modal {
-  width: 360px;
-  max-width: calc(100vw - 40px);
-  background: #0f172a;
-  border: 1px solid #334155;
-  border-radius: 10px;
-  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.5);
-  padding: 18px 20px;
+    width: 360px;
+    max-width: calc(100vw - 40px);
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.5);
+    padding: 18px 20px;
 }
 
 .slot-create-modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
 }
 
 .slot-create-modal-header h3 {
-  margin: 0;
-  font-size: 15px;
-  color: #f8fafc;
+    margin: 0;
+    font-size: 15px;
+    color: #f8fafc;
 }
 
 .slot-create-modal-close {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: #94a3b8;
-  cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
 }
 
 .slot-create-modal-close:hover {
-  background: rgba(239, 68, 68, 0.14);
-  color: #fca5a5;
+    background: rgba(239, 68, 68, 0.14);
+    color: #fca5a5;
 }
 
 .slot-create-modal-form {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
 }
 
 .slot-create-modal-label {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #cbd5e1;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #cbd5e1;
 }
 
 .slot-create-modal-checkbox-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: #e2e8f0;
-  cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #e2e8f0;
+    cursor: pointer;
 }
 
 .slot-create-modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 6px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 6px;
 }
 
 
@@ -4892,5 +4878,1109 @@
     outline: 3px solid rgba(245, 158, 11, 0.55);
     outline-offset: 3px;
     box-shadow:
-        0 0 0 5px rgba(245, 158, 11, 0.12);
+            0 0 0 5px rgba(245, 158, 11, 0.12);
+}
+/* ================= COLLAPSIBLE CONTAINERS ================= */
+.container-collapse-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    flex: 0 0 auto;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    pointer-events: auto;
+}
+
+.container-collapse-btn:hover {
+    background: rgba(15, 23, 42, 0.08);
+}
+
+.compound-frame-header {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.compound-frame-node.collapsed-container,
+.parallel-group-container.collapsed-container {
+    overflow: visible;
+}
+
+.parallel-group-container.collapsed-container .parallel-group-header {
+    height: 100%;
+    border-bottom: none;
+    border-radius: 6px;
+}
+
+
+/* ==========================================================================
+   WORKFLOW NODE VISUAL REFRESH
+   Regular skills use the application's slate palette; compound states use the
+   same container language as parallel and sub-state-machine nodes.
+   ========================================================================== */
+
+/* ---------- Regular skill nodes ---------- */
+/* Deliberately close to the Skill Library / Details panel palette. */
+.costum-node:not(.terminal-final-node):not(.behavior-exit-node) {
+    background: #233443;
+    border: 1.5px solid #526779;
+    border-top: 3.5px solid #6f879b;
+    border-radius: 8px;
+    color: #eef4f8;
+    padding: 0 0 8px;
+    box-shadow:
+            0 5px 14px rgba(8, 15, 22, 0.28),
+            0 1px 3px rgba(0, 0, 0, 0.18);
+    overflow: visible;
+    transition:
+            border-color 0.18s ease,
+            box-shadow 0.18s ease,
+            transform 0.18s ease;
+}
+
+.costum-node:not(.terminal-final-node):not(.behavior-exit-node):hover {
+    background: #283b4b;
+    border-color: #70879a;
+    border-top-color: #8fa3b5;
+    box-shadow:
+            0 7px 18px rgba(8, 15, 22, 0.34),
+            0 1px 3px rgba(0, 0, 0, 0.2);
+    transform: translateY(-1px);
+}
+
+.costum-node:not(.terminal-final-node):not(.behavior-exit-node) .custom-node-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-height: 34px;
+    padding: 6px 10px;
+    box-sizing: border-box;
+    background: #1e2c3a;
+    border-bottom: 1px solid #455a6c;
+    border-radius: 4px 4px 0 0;
+    color: #f1f5f9;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.costum-node:not(.terminal-final-node):not(.behavior-exit-node) .custom-node-label::before {
+    content: "SKILL";
+    flex: 0 0 auto;
+    padding: 2px 6px;
+    border: 1px solid #60768a;
+    border-radius: 10px;
+    background: #33495b;
+    color: #dce7ef;
+    font-size: 9px;
+    font-weight: 800;
+    line-height: 1.2;
+    letter-spacing: 0.45px;
+}
+
+.costum-node:not(.terminal-final-node):not(.behavior-exit-node) .event-list {
+    padding-top: 5px;
+}
+
+.costum-node:not(.terminal-final-node):not(.behavior-exit-node) .event-name {
+    color: #d4dee7;
+    font-weight: 500;
+}
+
+.costum-node:not(.terminal-final-node):not(.behavior-exit-node) .source-handle {
+    background-color: #8fa3b5;
+    border: 1.5px solid #1e2c3a;
+}
+
+.costum-node:not(.terminal-final-node):not(.behavior-exit-node) > .target-handle {
+    background-color: #38bdf8;
+    border: 1.5px solid #1e2c3a;
+}
+
+.costum-node:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-divider {
+    background-color: #455a6c;
+}
+
+/* Keep selection dominant over the dark skill palette. */
+.costum-node:not(.terminal-final-node):not(.behavior-exit-node).selected-node {
+    border-color: #38bdf8 !important;
+    border-top-color: #38bdf8 !important;
+    box-shadow:
+            0 0 0 3px rgba(56, 189, 248, 0.30),
+            0 8px 20px rgba(8, 15, 22, 0.36) !important;
+}
+
+/* ---------- Compound state containers ---------- */
+.compound-frame-node {
+    background: rgba(248, 250, 252, 0.82);
+    border: 1.5px solid #64748b;
+    border-radius: 8px;
+    box-shadow:
+            0 4px 12px rgba(71, 85, 105, 0.08),
+            0 1px 3px rgba(15, 23, 42, 0.04);
+    overflow: visible;
+    transition:
+            border-color 0.18s ease,
+            box-shadow 0.18s ease;
+}
+
+.compound-frame-node:hover {
+    border-color: #475569;
+    box-shadow:
+            0 6px 16px rgba(71, 85, 105, 0.13),
+            0 1px 3px rgba(15, 23, 42, 0.05);
+}
+
+.compound-frame-header {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 38px;
+    padding: 6px 10px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(71, 85, 105, 0.07);
+    border-bottom: 1.5px solid #94a3b8;
+    border-radius: 6px 6px 0 0;
+    color: #334155;
+    z-index: 10;
+    pointer-events: auto;
+}
+
+.compound-frame-badge {
+    flex: 0 0 auto;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: #475569;
+    color: #ffffff;
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1.4;
+    letter-spacing: 0.35px;
+}
+
+.compound-frame-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #0f172a;
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: none;
+}
+
+.compound-frame-node > .target-handle {
+    background-color: #8fa0b5 !important;
+    border: 1.5px solid #ffffff !important;
+}
+
+.compound-frame-exits {
+    top: 48px;
+}
+
+.compound-frame-exit-label {
+    color: #334155;
+    background: #ffffff;
+    border: 1px solid #94a3b8;
+    border-radius: 4px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.compound-frame-source-handle {
+    background-color: #475569 !important;
+    border: 1.5px solid #ffffff !important;
+}
+
+.compound-frame-node.selected-compound {
+    border-color: #38bdf8;
+    box-shadow:
+            0 0 0 3px rgba(56, 189, 248, 0.22),
+            0 8px 20px rgba(15, 23, 42, 0.12);
+}
+
+.compound-frame-node.initial-compound {
+    border-color: #334155;
+    border-width: 2.5px;
+}
+
+.compound-frame-node.initial-compound.selected-compound {
+    border-color: #38bdf8;
+}
+
+.compound-frame-node.compound-drop-target {
+    outline-color: rgba(56, 189, 248, 0.6);
+    box-shadow:
+            0 0 0 5px rgba(56, 189, 248, 0.12),
+            0 6px 16px rgba(71, 85, 105, 0.12);
+}
+
+.compound-frame-node.collapsed-container .compound-frame-header {
+    height: 100%;
+    border-bottom: none;
+    border-radius: 6px;
+}
+
+/* Dark-surface readability for regular skill content. */
+.costum-node:not(.terminal-final-node):not(.behavior-exit-node) .custom-node-label > span {
+    color: #aebdca !important;
+}
+
+.costum-node:not(.terminal-final-node):not(.behavior-exit-node) .node-parameter-key {
+    color: #c7d3dd !important;
+}
+
+.costum-node:not(.terminal-final-node):not(.behavior-exit-node) .node-parameter-value {
+    color: #eef4f8 !important;
+}
+
+.costum-node:not(.terminal-final-node):not(.behavior-exit-node) .node-parameter-default-value {
+    color: #94a3b8 !important;
+}
+
+.costum-node:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-entry {
+    color: #dbe5ec;
+}
+
+.costum-node:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-access {
+    color: #aebdca;
+}
+
+.costum-node:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-access-read {
+    color: #7dd3fc;
+}
+
+.costum-node:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-access-write {
+    color: #86efac;
+}
+
+.costum-node:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-entry-inherited .node-slot-key {
+    color: #fdba74;
+}
+
+/* ==========================================================================
+   SLOT NODE VISUAL REFRESH
+   Slots are data endpoints, not workflow states. Their indigo surface,
+   dual-colour port rail and monospace path keep them visually distinct from
+   regular skills and state containers while matching the application's dark UI.
+   ========================================================================== */
+.slot-node {
+    position: relative;
+    min-width: 190px;
+    max-width: 280px;
+    padding: 0 0 9px;
+    box-sizing: border-box;
+    overflow: visible;
+    color: #e8edf7;
+    background:
+            linear-gradient(145deg, #202a43 0%, #1d283d 52%, #192638 100%);
+    border: 1.5px solid #596685;
+    border-radius: 10px;
+    box-shadow:
+            0 6px 16px rgba(9, 15, 28, 0.30),
+            0 1px 3px rgba(0, 0, 0, 0.18);
+    font-size: 12px;
+    font-weight: 500;
+    transition:
+            border-color 0.18s ease,
+            box-shadow 0.18s ease,
+            transform 0.18s ease,
+            background 0.18s ease;
+}
+
+.slot-node::before {
+    content: "";
+    position: absolute;
+    top: -1.5px;
+    left: 12px;
+    right: 12px;
+    height: 3px;
+    border-radius: 0 0 3px 3px;
+    background: linear-gradient(
+            90deg,
+            #d946ef 0%,
+            #d946ef 45%,
+            #7c6df2 50%,
+            #6366f1 55%,
+            #6366f1 100%
+    );
+    opacity: 0.92;
+    pointer-events: none;
+}
+
+.slot-node:hover {
+    background:
+            linear-gradient(145deg, #25304c 0%, #212e46 52%, #1c2b40 100%);
+    border-color: #7280a2;
+    box-shadow:
+            0 8px 20px rgba(9, 15, 28, 0.36),
+            0 1px 3px rgba(0, 0, 0, 0.2);
+    transform: translateY(-1px);
+}
+
+.slot-node.selected-slot-node {
+    border-color: #818cf8;
+    box-shadow:
+            0 0 0 3px rgba(129, 140, 248, 0.24),
+            0 8px 20px rgba(9, 15, 28, 0.36);
+}
+
+.slot-node-header {
+    min-height: 34px;
+    padding: 7px 10px 6px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    background: rgba(10, 17, 32, 0.24);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 8px 8px 0 0;
+}
+
+.slot-node-kind {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: #c7d2fe;
+    font-size: 9px;
+    font-weight: 850;
+    line-height: 1;
+    letter-spacing: 0.65px;
+}
+
+.slot-node-kind svg {
+    color: #a5b4fc;
+    stroke-width: 2.2;
+}
+
+.slot-node-type {
+    min-width: 0;
+    max-width: 150px;
+    padding: 2px 7px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    border: 1px solid rgba(165, 180, 252, 0.38);
+    border-radius: 999px;
+    background: rgba(99, 102, 241, 0.13);
+    color: #d8ddff;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    line-height: 1.35;
+}
+
+.slot-node-path {
+    min-width: 0;
+    padding: 11px 12px 9px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #f4f7fb;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", monospace;
+    font-size: 12.5px;
+    font-weight: 650;
+    line-height: 1.25;
+    letter-spacing: -0.1px;
+}
+
+.slot-node-access-guide {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    margin: 0 20%;
+    padding-top: 6px;
+    border-top: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.slot-node-access {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    font-size: 8px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: 0.45px;
+    text-transform: uppercase;
+}
+
+.slot-node-access-dot {
+    width: 5px;
+    height: 5px;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.05);
+}
+
+.slot-node-access-write {
+    color: #f0abfc;
+}
+
+.slot-node-access-write .slot-node-access-dot {
+    background: #d946ef;
+}
+
+.slot-node-access-read {
+    color: #a5b4fc;
+}
+
+.slot-node-access-read .slot-node-access-dot {
+    background: #6366f1;
+}
+
+.slot-node-handle {
+    width: 10px;
+    height: 10px;
+    border-width: 2px;
+    box-shadow: 0 0 0 2px #1d283d;
+}
+
+.slot-node-handle.slot-node-write-handle {
+    background-color: #d946ef !important;
+    border-color: #fdf4ff;
+}
+
+.slot-node-handle.slot-node-read-handle {
+    background-color: #6366f1 !important;
+    border-color: #eef2ff;
+}
+
+.slot-node-provenance {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 8px 10px 0;
+    padding-top: 8px;
+    align-items: flex-start;
+    border-top: 1px solid rgba(148, 163, 184, 0.13);
+}
+
+.slot-node-provenance-badge {
+    max-width: 178px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    font-size: 8.5px;
+    line-height: 1.35;
+    font-weight: 750;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.slot-node-provenance-parent {
+    color: #fcd9a8;
+    background: rgba(245, 158, 11, 0.10);
+    border-color: rgba(245, 158, 11, 0.32);
+}
+
+.slot-node-provenance-child {
+    color: #a5f3fc;
+    background: rgba(6, 182, 212, 0.09);
+    border-color: rgba(6, 182, 212, 0.30);
+}
+
+.slot-node.slot-node-inherited {
+    color: #e8edf7;
+    background:
+            linear-gradient(145deg, #292b3c 0%, #252b3b 50%, #202a39 100%);
+    border: 1.5px solid rgba(245, 158, 11, 0.68);
+    border-radius: 10px;
+    padding: 0 0 9px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.slot-node.slot-node-inherited::before {
+    background: linear-gradient(
+            90deg,
+            #f59e0b 0%,
+            #d946ef 42%,
+            #6366f1 100%
+    );
+}
+
+.slot-node.slot-node-child-required {
+    box-shadow:
+            inset 0 0 0 1px rgba(34, 211, 238, 0.30),
+            0 6px 16px rgba(9, 15, 28, 0.30),
+            0 1px 3px rgba(0, 0, 0, 0.18);
+}
+
+.slot-node.slot-node-inherited.slot-node-child-required {
+    border-style: solid;
+}
+
+.slot-node.slot-node-child-required.selected-slot-node,
+.slot-node.slot-node-inherited.selected-slot-node {
+    border-color: #818cf8;
+    box-shadow:
+            0 0 0 3px rgba(129, 140, 248, 0.24),
+            0 8px 20px rgba(9, 15, 28, 0.36);
+}
+
+/* ==========================================================================
+   SKILL SLOT PORT DOCK
+   Slot connections originate from a dedicated rail along the bottom edge of
+   the skill. Names rise diagonally from their ports so they stay legible while
+   clearly reading as connection labels rather than normal node content.
+   ========================================================================== */
+:is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) {
+    padding-bottom: 0;
+}
+
+:is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-divider {
+    margin-bottom: 2px;
+}
+
+:is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-summary {
+    position: relative;
+    display: block;
+    height: 80px;
+    padding: 0;
+    box-sizing: border-box;
+    overflow: visible;
+}
+
+/* Slot ports spread evenly through the usable width, but do not touch the
+   skill's side borders. The outer gutters keep both the connection points and
+   their labels inside the node. The coloured bottom rail remains independent
+   and still spans the complete lower border. */
+:is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-ports {
+    position: absolute;
+    bottom: 0;
+    height: 80px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: stretch;
+    gap: 0;
+    overflow: visible;
+}
+
+/* Keep the connection points slightly inset from both skill borders. The same
+   compact gutters are used for horizontal and slanted layouts; horizontal
+   labels get their collision protection from the node-width calculation in
+   CustomNode.jsx rather than from oversized CSS gutters. */
+:is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-summary-horizontal .node-slot-ports,
+:is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-summary-slanted .node-slot-ports {
+    left: 16px;
+    right: 24px;
+}
+
+:is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-row {
+    position: relative;
+    flex: 1 1 25px;
+    width: auto;
+    min-width: 25px;
+    min-height: 80px;
+    padding: 0;
+    display: block;
+    overflow: visible;
+}
+
+:is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-entry {
+    position: absolute;
+    left: 50%;
+    bottom: 14px;
+    display: block;
+    max-width: 92px;
+    transform: translateX(-50%);
+    transform-origin: 50% 100%;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 2;
+}
+
+
+/* Keep one or two slot labels horizontal. Starting with the third slot, the
+   labels switch to the compact -55deg layout. Pivoting from the lower-left
+   corner makes the complete label rise above the port; rotating around the
+   centre would swing half of the text below the skill's lower border. */
+:is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-summary-slanted .node-slot-entry {
+    transform: translateX(-1px) rotate(-55deg);
+    transform-origin: 0% 100%;
+}
+
+:is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-summary-horizontal .node-slot-key {
+    text-align: center;
+}
+:is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-key {
+    display: block;
+    max-width: 92px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #dbe5ec;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: 0;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    text-shadow: 0 1px 1px rgba(8, 15, 22, 0.5);
+}
+
+:is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-entry-inherited .node-slot-key {
+    color: #fdba74;
+}
+
+/* Use the same access legend as the standalone slot node. The individual
+   ports no longer need R/W badges; colour communicates the access direction. */
+:is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .skill-slot-access-guide {
+    display: grid;
+    grid-template-columns: auto auto;
+    justify-content: center;
+    gap: 12px;
+    margin: 8px 12px 0;
+    padding-top: 6px;
+    border-top: 1px solid rgba(148, 163, 184, 0.14);
+    pointer-events: none;
+}
+
+:is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .skill-slot-access {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    font-size: 8px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: 0.45px;
+    text-transform: uppercase;
+}
+
+:is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .skill-slot-access-dot {
+    width: 5px;
+    height: 5px;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.05);
+}
+
+:is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .skill-slot-access-write {
+    color: #f0abfc;
+}
+
+:is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .skill-slot-access-write .skill-slot-access-dot {
+    background: #d946ef;
+}
+
+:is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .skill-slot-access-read {
+    color: #a5b4fc;
+}
+
+:is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .skill-slot-access-read .skill-slot-access-dot {
+    background: #6366f1;
+}
+
+/* The coloured rail is independent from the compact port positions. Each slot
+   receives an equal share, so together the segments fill the complete lower
+   border even though the physical connection points sit close to each other. */
+:is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .skill-slot-border-rail {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 3px;
+    display: flex;
+    pointer-events: none;
+    z-index: 4;
+}
+
+:is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .skill-slot-border-segment {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 100%;
+}
+
+:is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .skill-slot-border-segment-read {
+    background: #6366f1;
+    box-shadow: 0 0 7px rgba(99, 102, 241, 0.42);
+}
+
+:is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .skill-slot-border-segment-write {
+    background: #d946ef;
+    box-shadow: 0 0 7px rgba(217, 70, 239, 0.42);
+}
+
+/* React Flow's bottom handle is positioned relative to each dock cell. Moving
+   it slightly below the cell puts the centre of the port directly on the
+   skill's outer bottom border. */
+:is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .skill-slot-handle.react-flow__handle-bottom {
+    left: 50%;
+    bottom: -4px;
+    transform: translate(-50%, 50%);
+    width: 9px;
+    height: 9px;
+    border-width: 1.5px;
+    z-index: 5;
+}
+
+:is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .skill-slot-handle.slot-skill-read-handle {
+    background-color: #6366f1 !important;
+    border-color: #eef2ff !important;
+}
+
+:is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .skill-slot-handle.slot-skill-write-handle {
+    background-color: #d946ef !important;
+    border-color: #fdf4ff !important;
+}
+
+
+/* Sub-state-machines use the same slot dock geometry as normal skills.
+   Rotated text can look soft at small sizes, so use a stronger, slightly
+   larger label treatment with a subtle light backing for crisp contrast. */
+.submachine-node.has-slot-dock .node-slot-key {
+    color: #3b0764;
+    font-size: 11px;
+    font-weight: 750;
+    letter-spacing: 0;
+    background: rgba(250, 245, 255, 0.9);
+    border-radius: 2px;
+    padding: 1px 2px;
+    text-shadow: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Inherited sub-state-machine slot labels should use the same text colour as
+   the sub-state-machine parameter/value text. Match the shared selector's
+   specificity so the generic inherited-slot orange does not win. */
+:is(.costum-node, .submachine-node).submachine-node.has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-entry-inherited .node-slot-key {
+    color: #3b0764;
+    background: rgba(250, 245, 255, 0.9);
+}
+
+.submachine-node.has-slot-dock .skill-slot-access-write {
+    color: #a21caf;
+}
+
+.submachine-node.has-slot-dock .skill-slot-access-read {
+    color: #4f46e5;
+}
+
+/* ==========================================================================
+   SLOT DETAILS PANEL
+   ========================================================================== */
+.slot-details-panel {
+    padding: 0;
+}
+
+.slot-details-heading {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 18px 18px 16px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+    background: linear-gradient(
+            180deg,
+            rgba(99, 102, 241, 0.075),
+            rgba(99, 102, 241, 0.018) 60%,
+            transparent
+    );
+}
+
+.slot-details-heading h3 {
+    margin: 2px 0 0;
+    font-size: 17px;
+    line-height: 1.2;
+}
+
+.slot-details-kicker {
+    color: #8fa0b5;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+}
+
+.slot-inherit-control {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    padding: 10px 11px;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 9px;
+    background: rgba(15, 23, 42, 0.45);
+    cursor: pointer;
+    transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+}
+
+.slot-inherit-control:hover {
+    border-color: rgba(129, 140, 248, 0.45);
+    background: rgba(30, 41, 59, 0.62);
+}
+
+.slot-inherit-control.is-active {
+    border-color: rgba(129, 140, 248, 0.48);
+    background: rgba(99, 102, 241, 0.095);
+}
+
+.slot-inherit-copy {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.slot-inherit-title {
+    color: #f8fafc;
+    font-size: 12px;
+    font-weight: 750;
+}
+
+.slot-inherit-subtitle {
+    color: #8fa0b5;
+    font-size: 10px;
+    line-height: 1.35;
+}
+
+.slot-inherit-checkbox {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.slot-inherit-switch {
+    position: relative;
+    flex: 0 0 auto;
+    width: 34px;
+    height: 19px;
+    border: 1px solid rgba(148, 163, 184, 0.36);
+    border-radius: 999px;
+    background: rgba(71, 85, 105, 0.65);
+    transition: background 150ms ease, border-color 150ms ease;
+}
+
+.slot-inherit-switch-knob {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    background: #e2e8f0;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+    transition: transform 150ms ease, background 150ms ease;
+}
+
+.slot-inherit-control.is-active .slot-inherit-switch {
+    border-color: rgba(129, 140, 248, 0.7);
+    background: rgba(99, 102, 241, 0.78);
+}
+
+.slot-inherit-control.is-active .slot-inherit-switch-knob {
+    transform: translateX(15px);
+    background: #ffffff;
+}
+
+.slot-inherit-control:focus-within {
+    outline: 2px solid rgba(129, 140, 248, 0.4);
+    outline-offset: 2px;
+}
+
+.slot-details-content {
+    gap: 16px;
+    padding: 16px 18px 18px;
+}
+
+.slot-overview-card {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 10px;
+    background: rgba(15, 23, 42, 0.32);
+}
+
+.slot-detail-field-label,
+.slot-summary-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #91a1b7;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.045em;
+    text-transform: uppercase;
+}
+
+.slot-detail-field-label svg,
+.slot-summary-label svg {
+    flex: 0 0 auto;
+    font-size: 12px;
+    color: #a5b4fc;
+}
+
+.slot-path-editor-shell .typed-value-editor,
+.slot-path-editor-shell .typed-value-editor-row {
+    width: 100%;
+}
+
+.slot-path-editor-shell .compact-slot-path-input {
+    min-height: 36px;
+    padding: 8px 10px;
+    border-color: rgba(148, 163, 184, 0.27);
+    border-radius: 7px;
+    background: rgba(2, 6, 23, 0.48);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 12px;
+}
+
+.slot-path-editor-shell .compact-slot-path-input:focus {
+    border-color: rgba(129, 140, 248, 0.75);
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.13);
+}
+
+.slot-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 2px;
+}
+
+.slot-summary-item {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 7px;
+    padding: 9px 10px;
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    border-radius: 8px;
+    background: rgba(30, 41, 59, 0.42);
+}
+
+.slot-summary-value {
+    display: flex;
+    min-height: 20px;
+    align-items: center;
+    min-width: 0;
+}
+
+.slot-summary-accesses {
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.slot-summary-empty {
+    color: #7f8da1;
+    font-size: 11px;
+}
+
+.slot-access-section {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    min-height: 0;
+}
+
+.slot-section-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.slot-section-title {
+    color: #f8fafc;
+    font-size: 13px;
+    font-weight: 750;
+}
+
+.slot-section-subtitle {
+    margin-top: 2px;
+    color: #7f8da1;
+    font-size: 10px;
+}
+
+.slot-access-count {
+    display: inline-flex;
+    min-width: 23px;
+    height: 23px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 7px;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 999px;
+    background: rgba(30, 41, 59, 0.72);
+    color: #cbd5e1;
+    font-size: 10px;
+    font-weight: 800;
+}
+
+.slot-access-list {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    overflow: visible;
+}
+
+.slot-access-skill-card {
+    margin: 0;
+    cursor: pointer;
+    transition: transform 120ms ease, border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
+}
+
+.slot-access-skill-card:hover,
+.slot-access-skill-card:focus-visible {
+    transform: translateY(-1px);
+    border-color: rgba(148, 163, 184, 0.34);
+    box-shadow: 0 5px 16px rgba(2, 6, 23, 0.2);
+    outline: none;
+}
+
+.slot-access-open-icon {
+    flex: 0 0 auto;
+    color: #7f8da1;
+    font-size: 12px;
+    transition: color 120ms ease, transform 120ms ease;
+}
+
+.slot-access-skill-card:hover .slot-access-open-icon,
+.slot-access-skill-card:focus-visible .slot-access-open-icon {
+    color: #c7d2fe;
+    transform: translate(1px, -1px);
+}
+
+.slot-access-empty-state {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px;
+    border: 1px dashed rgba(148, 163, 184, 0.22);
+    border-radius: 8px;
+    color: #8493a8;
+    font-size: 11px;
+    background: rgba(15, 23, 42, 0.23);
+}
+
+.slot-access-empty-state svg {
+    flex: 0 0 auto;
+    color: #818cf8;
+}
+
+@media (max-width: 420px) {
+    .slot-summary-grid {
+        grid-template-columns: 1fr;
+    }
 }

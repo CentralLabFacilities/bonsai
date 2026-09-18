@@ -1,6 +1,355 @@
-import { useState } from "react";
-import { FiChevronDown, FiExternalLink, FiLayers } from "react-icons/fi";
+import { useMemo, useState } from "react";
+import { FiActivity, FiChevronDown, FiDatabase, FiExternalLink, FiLayers, FiLink2 } from "react-icons/fi";
 import StateActionsEditor from "./StateActionsEditor";
+
+
+const normalizeSlotPath = (value) =>
+    String(value || "")
+        .trim()
+        .replace(/^\/+/, "")
+        .toLowerCase();
+
+const normalizeSlotType = (value) =>
+    String(value || "").trim().toLowerCase();
+
+function SlotPathEditor({
+                            id,
+                            value,
+                            slotType,
+                            availableSlotPaths = [],
+                            onChange,
+                            onCommit,
+                        }) {
+    const [isOpen, setIsOpen] = useState(false);
+    const [activeIndex, setActiveIndex] = useState(-1);
+
+    const matches = useMemo(() => {
+        const query = normalizeSlotPath(value);
+        const type = normalizeSlotType(slotType);
+
+        return (availableSlotPaths || [])
+            .filter((option) => {
+                if (!option?.path) return false;
+                if (type && normalizeSlotType(option.type) !== type) return false;
+
+                const candidate = normalizeSlotPath(option.path);
+                return !query || candidate.includes(query);
+            })
+            .sort((a, b) => {
+                const aPath = normalizeSlotPath(a.path);
+                const bPath = normalizeSlotPath(b.path);
+                const aStarts = !query || aPath.startsWith(query) ? 0 : 1;
+                const bStarts = !query || bPath.startsWith(query) ? 0 : 1;
+
+                return (
+                    aStarts - bStarts ||
+                    String(a.path).localeCompare(String(b.path))
+                );
+            });
+    }, [availableSlotPaths, slotType, value]);
+
+    const selectMatch = (path) => {
+        onChange(path, true);
+        setIsOpen(false);
+        setActiveIndex(-1);
+    };
+
+    const handleKeyDown = (event) => {
+        if (event.key === "ArrowDown") {
+            if (matches.length === 0) return;
+            event.preventDefault();
+            setIsOpen(true);
+            setActiveIndex((current) =>
+                current < matches.length - 1 ? current + 1 : 0
+            );
+            return;
+        }
+
+        if (event.key === "ArrowUp") {
+            if (matches.length === 0) return;
+            event.preventDefault();
+            setIsOpen(true);
+            setActiveIndex((current) =>
+                current > 0 ? current - 1 : matches.length - 1
+            );
+            return;
+        }
+
+        if (event.key === "Enter") {
+            event.preventDefault();
+
+            if (isOpen && matches.length > 0 && activeIndex >= 0) {
+                selectMatch(matches[activeIndex].path);
+                return;
+            }
+
+            // No matching existing path was selected. Keeping the typed path
+            // makes it a new slot when the slot graph is rebuilt on blur.
+            event.currentTarget.blur();
+            return;
+        }
+
+        if (event.key === "Escape") {
+            setIsOpen(false);
+            setActiveIndex(-1);
+        }
+    };
+
+    return (
+        <div className="typed-value-editor">
+            <div className="typed-value-editor-row">
+                <input
+                    id={id}
+                    className="parameter-value-input compact-slot-path-input"
+                    type="text"
+                    value={value || ""}
+                    placeholder="Enter or select path"
+                    autoComplete="off"
+                    onChange={(event) => {
+                        onChange(event.target.value, false);
+                        setIsOpen(true);
+                        setActiveIndex(-1);
+                    }}
+                    onFocus={() => {
+                        setIsOpen(true);
+                        setActiveIndex(-1);
+                    }}
+                    onBlur={() => {
+                        setIsOpen(false);
+                        setActiveIndex(-1);
+                        onCommit?.();
+                    }}
+                    onKeyDown={handleKeyDown}
+                />
+
+                {isOpen && matches.length > 0 && (
+                    <div className="typed-value-autocomplete">
+                        {matches.map((option, index) => (
+                            <button
+                                key={`${option.path}-${option.type || ""}`}
+                                type="button"
+                                className={`typed-value-autocomplete-option ${
+                                    index === activeIndex ? "active" : ""
+                                }`}
+                                onMouseDown={(event) => {
+                                    event.preventDefault();
+                                    selectMatch(option.path);
+                                }}
+                            >
+                                <span className="typed-value-autocomplete-value">
+                                    {option.path}
+                                </span>
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+function SlotDetailsPanel({
+                              selectedNode,
+                              slotDetails,
+                              availableSlotPaths = [],
+                              onUpdateSlotPath,
+                              onUpdateSlotInherited,
+                              onSelectSkill,
+                              onHoverSkill,
+                          }) {
+    const initialPath =
+        selectedNode.data?.path ||
+        selectedNode.data?.label ||
+        "";
+    const [pathDraft, setPathDraft] = useState(initialPath);
+
+    const slotType =
+        slotDetails?.dataType ||
+        selectedNode.data?.slotType ||
+        "Unknown";
+    const accessTypes = slotDetails?.accessTypes || [];
+    const skillAccesses = slotDetails?.skillAccesses || [];
+    const isInherited = Boolean(
+        slotDetails?.isInherited ??
+        selectedNode.data?.currentMachineInherited
+    );
+
+    const commitPath = (nextValue = pathDraft) => {
+        const cleanPath = String(nextValue || "").trim();
+        if (!cleanPath) {
+            setPathDraft(initialPath);
+            return;
+        }
+        onUpdateSlotPath?.(cleanPath);
+    };
+
+    return (
+        <aside className="details-panel slot-details-panel">
+            <div className="slot-details-heading">
+                <div>
+                    <div className="slot-details-kicker">Slot</div>
+                    <h3>Slot Details</h3>
+                </div>
+
+                <label
+                    className={`slot-inherit-control ${isInherited ? "is-active" : ""}`}
+                    title="Mark this slot as inheritSlot in the current state machine"
+                >
+                    <div className="slot-inherit-copy">
+                        <span className="slot-inherit-title">inheritSlot</span>
+                        <span className="slot-inherit-subtitle">
+                            {isInherited
+                                ? "Inherited from the parent state machine"
+                                : "Local to this state machine"}
+                        </span>
+                    </div>
+                    <input
+                        className="slot-inherit-checkbox"
+                        type="checkbox"
+                        checked={isInherited}
+                        onChange={(event) =>
+                            onUpdateSlotInherited?.(event.target.checked)
+                        }
+                    />
+                    <span className="slot-inherit-switch" aria-hidden="true">
+                        <span className="slot-inherit-switch-knob" />
+                    </span>
+                </label>
+            </div>
+
+            <div className="tab-content slot-details-content">
+                <section className="slot-overview-card">
+                    <div className="slot-detail-field-label">
+                        <FiLink2 />
+                        <span>Path</span>
+                    </div>
+                    <div className="slot-path-editor-shell">
+                        <SlotPathEditor
+                            id={`slot-detail-path-${selectedNode.id}`}
+                            value={pathDraft}
+                            slotType={slotType}
+                            availableSlotPaths={availableSlotPaths}
+                            onChange={(value, commit) => {
+                                setPathDraft(value);
+                                if (commit) {
+                                    commitPath(value);
+                                }
+                            }}
+                            onCommit={() => commitPath(pathDraft)}
+                        />
+                    </div>
+
+                    <div className="slot-summary-grid">
+                        <div className="slot-summary-item">
+                            <div className="slot-summary-label">
+                                <FiDatabase />
+                                <span>Data type</span>
+                            </div>
+                            <div className="slot-summary-value">
+                                <span
+                                    className={`parameter-type-badge parameter-type-${String(
+                                        slotType || "other"
+                                    )
+                                        .toLowerCase()
+                                        .replace(/[^a-z0-9]+/g, "-")}`}
+                                >
+                                    {slotType}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div className="slot-summary-item">
+                            <div className="slot-summary-label">
+                                <FiActivity />
+                                <span>Access</span>
+                            </div>
+                            <div className="slot-summary-value slot-summary-accesses">
+                                {accessTypes.length > 0 ? (
+                                    accessTypes.map((access) => (
+                                        <span
+                                            key={access}
+                                            className={`slot-access-badge slot-access-${access}`}
+                                        >
+                                            {access === "read" ? "Read" : "Write"}
+                                        </span>
+                                    ))
+                                ) : (
+                                    <span className="slot-summary-empty">None</span>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section className="slot-access-section">
+                    <div className="slot-section-heading">
+                        <div>
+                            <div className="slot-section-title">Accessed by</div>
+                            <div className="slot-section-subtitle">
+                                Skills connected to this slot
+                            </div>
+                        </div>
+                        <span className="slot-access-count">
+                            {skillAccesses.length}
+                        </span>
+                    </div>
+
+                    <div className="slot-list slot-access-list">
+                        {skillAccesses.length > 0 ? (
+                            skillAccesses.map((access, index) => (
+                                <div
+                                    className={`slot-text-field compact-slot-card compact-slot-${access.access} slot-access-skill-card`}
+                                    key={`${access.nodeId}-${access.access}-${access.key}-${index}`}
+                                    role="button"
+                                    tabIndex={0}
+                                    title={`Open ${access.skillName}`}
+                                    onClick={() => onSelectSkill?.(access.nodeId)}
+                                    onMouseEnter={() => onHoverSkill?.(access.nodeId)}
+                                    onMouseLeave={() => onHoverSkill?.(null)}
+                                    onFocus={() => onHoverSkill?.(access.nodeId)}
+                                    onBlur={() => onHoverSkill?.(null)}
+                                    onKeyDown={(event) => {
+                                        if (event.key === "Enter" || event.key === " ") {
+                                            event.preventDefault();
+                                            onSelectSkill?.(access.nodeId);
+                                        }
+                                    }}
+                                >
+                                    <div className="compact-slot-header">
+                                        <div className="compact-slot-name">
+                                            {access.skillName}
+                                        </div>
+                                        <div className="compact-slot-badges">
+                                            <span
+                                                className={`slot-access-badge slot-access-${access.access}`}
+                                            >
+                                                {access.access === "read" ? "Read" : "Write"}
+                                            </span>
+                                            <FiExternalLink className="slot-access-open-icon" />
+                                        </div>
+                                    </div>
+                                    <MetadataRow label="Key" value={access.key} />
+                                    <MetadataRow label="Type" value={access.type} />
+                                    {access.description && (
+                                        <MetadataRow
+                                            label="Description"
+                                            value={access.description}
+                                        />
+                                    )}
+                                </div>
+                            ))
+                        ) : (
+                            <div className="slot-access-empty-state">
+                                <FiLayers />
+                                <span>No skill currently accesses this slot.</span>
+                            </div>
+                        )}
+                    </div>
+                </section>
+            </div>
+        </aside>
+    );
+}
 
 function MetadataRow({ label, value }) {
     return (
@@ -108,18 +457,42 @@ function DetailsPanel({
                           onUpdateInSlotPath,
                           onUpdateOutSlotPath,
                           onCheckSlots,
+                          availableSlotPaths = [],
                           onUpdateSrc,
                           onUpdateParameterBlur,
                           globalDataModel,
                           actionValueVariables,
                           onUpdateStateActions,
+                          slotDetails,
+                          onUpdateSlotPath,
+                          onUpdateSlotInherited,
+                          onSelectSlotAccessSkill,
+                          onHoverSlotAccessSkill,
                       }) {
     const isSubMachine =
         selectedNode.type === "submachine" ||
         Boolean(selectedNode.data.src);
+    const isContainerState =
+        selectedNode.type === "compound" ||
+        selectedNode.type === "parallel";
 
     const [openTargetSelector, setOpenTargetSelector] = useState(null);
     const [targetQueries, setTargetQueries] = useState({});
+
+    if (selectedNode.type === "slot") {
+        return (
+            <SlotDetailsPanel
+                key={selectedNode.id}
+                selectedNode={selectedNode}
+                slotDetails={slotDetails}
+                availableSlotPaths={availableSlotPaths}
+                onUpdateSlotPath={onUpdateSlotPath}
+                onUpdateSlotInherited={onUpdateSlotInherited}
+                onSelectSkill={onSelectSlotAccessSkill}
+                onHoverSkill={onHoverSlotAccessSkill}
+            />
+        );
+    }
 
     const targetNodeOptions = (availableTargetNodes || []).map((node) => {
         const fullSkillName = node.data?.fullSkillName || "";
@@ -422,6 +795,21 @@ function DetailsPanel({
                                     Open in a new tab
                                 </button>
                             </>
+                        ) : isContainerState ? (
+                            <div className="field-row">
+                                <label className="field-label">
+                                    Name:
+                                </label>
+
+                                <input
+                                    className="text-field"
+                                    type="text"
+                                    value={selectedNode.data.label || ""}
+                                    onChange={(e) =>
+                                        onUpdateName(e.target.value)
+                                    }
+                                />
+                            </div>
                         ) : (
                             <>
                                 <div className="field-row">
@@ -822,19 +1210,19 @@ function DetailsPanel({
                                             </div>
                                         )}
 
-                                        <input
+                                        <SlotPathEditor
                                             id={`in-slot-${selectedNode.id}-${index}`}
-                                            className="parameter-value-input compact-slot-path-input"
-                                            type="text"
                                             value={slot.path || ""}
-                                            placeholder="Enter path"
-                                            onChange={(e) =>
+                                            slotType={slot.type}
+                                            availableSlotPaths={availableSlotPaths}
+                                            onChange={(value, commit) =>
                                                 onUpdateInSlotPath(
                                                     index,
-                                                    e.target.value
+                                                    value,
+                                                    commit
                                                 )
                                             }
-                                            onBlur={onCheckSlots}
+                                            onCommit={onCheckSlots}
                                         />
                                     </div>
                                 )
@@ -877,19 +1265,19 @@ function DetailsPanel({
                                             </div>
                                         )}
 
-                                        <input
+                                        <SlotPathEditor
                                             id={`out-slot-${selectedNode.id}-${index}`}
-                                            className="parameter-value-input compact-slot-path-input"
-                                            type="text"
                                             value={slot.path || ""}
-                                            placeholder="Enter path"
-                                            onChange={(e) =>
+                                            slotType={slot.type}
+                                            availableSlotPaths={availableSlotPaths}
+                                            onChange={(value, commit) =>
                                                 onUpdateOutSlotPath(
                                                     index,
-                                                    e.target.value
+                                                    value,
+                                                    commit
                                                 )
                                             }
-                                            onBlur={onCheckSlots}
+                                            onCommit={onCheckSlots}
                                         />
                                     </div>
                                 )
