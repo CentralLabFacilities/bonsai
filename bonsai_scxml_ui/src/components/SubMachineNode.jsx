@@ -85,6 +85,7 @@ export default function SubMachineNode({ id, data, selected }) {
                 path: slot.path,
                 type: slot.type,
                 access: "read",
+                index,
                 handleId: `slot-skill-read-${index}`,
                 inherited: Boolean(slot.inherited),
             })),
@@ -93,6 +94,7 @@ export default function SubMachineNode({ id, data, selected }) {
                 path: slot.path,
                 type: slot.type,
                 access: "write",
+                index,
                 handleId: `slot-skill-write-${index}`,
                 inherited: Boolean(slot.inherited),
             })),
@@ -104,6 +106,7 @@ export default function SubMachineNode({ id, data, selected }) {
                 path: slot.path,
                 type: slot.type,
                 access: slot.access,
+                index,
                 handleId:
                     slot.access === "read" || slot.access === "write"
                         ? `slot-submachine-${slot.access}-${index}`
@@ -123,20 +126,64 @@ export default function SubMachineNode({ id, data, selected }) {
     }, [data.inSlots, data.outSlots, data.inheritedSlots]);
 
     const overviewWidth = useMemo(() => {
-        if (!showLocalDataModel || localDataModelEntries.length === 0) {
-            return undefined;
+        let requiredWidth = 0;
+
+        if (showLocalDataModel && localDataModelEntries.length > 0) {
+            const longestRow = localDataModelEntries.reduce((longest, entry) => {
+                const text = entry.expr
+                    ? `${entry.id} = ${entry.expr}`
+                    : entry.id;
+
+                return Math.max(longest, text.length);
+            }, String(data.label || "").length);
+
+            requiredWidth = Math.max(
+                requiredWidth,
+                Math.min(520, Math.max(190, 55 + longestRow * 7))
+            );
         }
 
-        const longestRow = localDataModelEntries.reduce((longest, entry) => {
-            const text = entry.expr
-                ? `${entry.id} = ${entry.expr}`
-                : entry.id;
+        if (showSlots && slotEntries.length > 0) {
+            const slotGutters = 16 + 24;
+            const minimumPortWidth = 25;
 
-            return Math.max(longest, text.length);
-        }, String(data.label || "").length);
+            // Match the normal skill-node dock: one/two slots stay horizontal
+            // and therefore reserve enough room for their full labels. Three or
+            // more slots use the compact -55deg layout and only need the 25px
+            // minimum spacing between connection points.
+            const requiredSlotWidth =
+                slotEntries.length <= 2
+                    ? slotGutters +
+                    slotEntries.reduce((total, entry) => {
+                        const label = String(
+                            entry.key || entry.path || "Slot"
+                        );
+                        const estimatedLabelWidth = Math.min(
+                            92,
+                            Math.max(
+                                minimumPortWidth,
+                                12 + label.length * 6.5
+                            )
+                        );
+                        return total + estimatedLabelWidth;
+                    }, 0) +
+                    Math.max(0, slotEntries.length - 1) * 12
+                    : slotGutters + slotEntries.length * minimumPortWidth;
 
-        return Math.min(520, Math.max(190, 55 + longestRow * 7));
-    }, [data.label, localDataModelEntries, showLocalDataModel]);
+            requiredWidth = Math.max(
+                requiredWidth,
+                Math.min(520, Math.max(180, requiredSlotWidth))
+            );
+        }
+
+        return requiredWidth || undefined;
+    }, [
+        data.label,
+        localDataModelEntries,
+        showLocalDataModel,
+        showSlots,
+        slotEntries,
+    ]);
 
     const handleSignature = useMemo(
         () =>
@@ -171,7 +218,9 @@ export default function SubMachineNode({ id, data, selected }) {
         <div
             className={`submachine-node ${
                 data.isInitial ? "initial-node" : ""
-            } ${selected ? "selected-node" : ""} mode-${mode}`}
+            } ${selected ? "selected-node" : ""} ${
+                hasSlots ? "has-slot-dock" : ""
+            } mode-${mode}`}
             style={
                 overviewWidth
                     ? {
@@ -194,6 +243,8 @@ export default function SubMachineNode({ id, data, selected }) {
                     type="target"
                     position={Position.Left}
                     className="target-handle"
+                    isConnectableStart={false}
+                    isConnectableEnd={true}
                 />
             )}
 
@@ -221,15 +272,36 @@ export default function SubMachineNode({ id, data, selected }) {
                 {data.label || id}
             </div>
 
+            {hasEvents && (
+                <div className="event-list">
+                    {eventIds.map((eventId) => (
+                        <div className="event-row" key={eventId}>
+                            <span className="event-name">{eventId}</span>
+
+                            <Handle
+                                id={eventId}
+                                type="source"
+                                position={Position.Right}
+                                className="source-handle"
+                                isConnectableStart={true}
+                                isConnectableEnd={false}
+                            />
+                        </div>
+                    ))}
+                </div>
+            )}
+
             {showLocalDataModel && localDataModelEntries.length > 0 && (
                 <>
+                    {hasEvents && <div className="node-slot-divider" />}
+
                     <div
                         className="submachine-datamodel-summary"
                         style={{
                             display: "flex",
                             flexDirection: "column",
                             gap: "3px",
-                            padding: "0 10px 6px",
+                            padding: "6px 10px 6px",
                         }}
                     >
                         <div
@@ -296,86 +368,99 @@ export default function SubMachineNode({ id, data, selected }) {
                             </div>
                         ))}
                     </div>
-
-                    {(hasEvents || hasSlots) && (
-                        <div className="node-slot-divider" />
-                    )}
                 </>
-            )}
-
-            {hasEvents && (
-                <div className="event-list">
-                    {eventIds.map((eventId) => (
-                        <div className="event-row" key={eventId}>
-                            <span className="event-name">{eventId}</span>
-
-                            <Handle
-                                id={eventId}
-                                type="source"
-                                position={Position.Right}
-                                className="source-handle"
-                            />
-                        </div>
-                    ))}
-                </div>
             )}
 
             {hasSlots && (
                 <>
-                    {hasEvents && <div className="node-slot-divider" />}
+                    {(hasEvents ||
+                        (showLocalDataModel && localDataModelEntries.length > 0)) && (
+                        <div className="node-slot-divider" />
+                    )}
 
-                    <div className="node-slot-summary">
-                        {slotEntries.map((entry) => {
-                            const dragClass = getSlotHandleDragClass({
-                                drag: data.slotConnectionDrag,
-                                nodeId: id,
-                                handleId: entry.handleId,
-                                access: entry.access,
-                                slotType: entry.type,
-                            });
+                    <div className="skill-slot-access-guide" aria-hidden="true">
+                        <div className="skill-slot-access skill-slot-access-write">
+                            <span className="skill-slot-access-dot" />
+                            <span>Write</span>
+                        </div>
+                        <div className="skill-slot-access skill-slot-access-read">
+                            <span className="skill-slot-access-dot" />
+                            <span>Read</span>
+                        </div>
+                    </div>
 
-                            const label = String(
-                                entry.key || entry.path || "Slot"
-                            );
-
-                            return (
-                                <div
-                                    key={`${entry.handleId}-${label}`}
-                                    className={`node-slot-row node-slot-row-${entry.access}`}
-                                >
+                    <div
+                        className={`node-slot-summary ${
+                            slotEntries.length >= 3
+                                ? "node-slot-summary-slanted"
+                                : "node-slot-summary-horizontal"
+                        }`}
+                    >
+                        <div className="skill-slot-border-rail" aria-hidden="true">
+                            {slotEntries.map((entry) => {
+                                const label = String(
+                                    entry.key || entry.path || "Slot"
+                                );
+                                return (
                                     <span
-                                        className={`node-slot-entry ${
-                                            entry.inherited
-                                                ? "node-slot-entry-inherited"
-                                                : ""
-                                        }`}
-                                        title={`${
-                                            entry.access === "read"
-                                                ? "Read"
-                                                : "Write"
-                                        } slot ${label}`}
+                                        key={`rail-${entry.handleId}-${label}`}
+                                        className={`skill-slot-border-segment skill-slot-border-segment-${entry.access}`}
+                                    />
+                                );
+                            })}
+                        </div>
+
+                        <div className="node-slot-ports">
+                            {slotEntries.map((entry) => {
+                                const dragClass = getSlotHandleDragClass({
+                                    drag: data.slotConnectionDrag,
+                                    nodeId: id,
+                                    handleId: entry.handleId,
+                                    access: entry.access,
+                                    slotType: entry.type,
+                                });
+
+                                const label = String(
+                                    entry.key || entry.path || "Slot"
+                                );
+
+                                return (
+                                    <div
+                                        key={`${entry.handleId}-${label}`}
+                                        className={`node-slot-row node-slot-row-${entry.access}`}
                                     >
                                         <span
-                                            className={`node-slot-access node-slot-access-${entry.access}`}
+                                            className={`node-slot-entry ${
+                                                entry.inherited
+                                                    ? "node-slot-entry-inherited"
+                                                    : ""
+                                            }`}
+                                            title={`${
+                                                entry.access === "read"
+                                                    ? "Read"
+                                                    : "Write"
+                                            } slot ${label}`}
                                         >
-                                            {entry.access === "read"
-                                                ? "Read"
-                                                : "Write"}
+                                            <span className="node-slot-key">
+                                                {label}
+                                            </span>
                                         </span>
-                                        <span className="node-slot-key">
-                                            {label}
-                                        </span>
-                                    </span>
 
-                                    <Handle
-                                        id={entry.handleId}
-                                        type="source"
-                                        position={Position.Right}
-                                        className={`source-handle skill-slot-handle slot-skill-${entry.access}-handle ${dragClass}`}
-                                    />
-                                </div>
-                            );
-                        })}
+                                        <Handle
+                                            id={entry.handleId}
+                                            type="source"
+                                            position={Position.Bottom}
+                                            className={`source-handle skill-slot-handle slot-skill-${entry.access}-handle ${dragClass}`}
+                                            title={`${
+                                                entry.access === "read"
+                                                    ? "Read"
+                                                    : "Write"
+                                            } ${label}`}
+                                        />
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
                 </>
             )}

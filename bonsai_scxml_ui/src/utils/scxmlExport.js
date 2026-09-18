@@ -15,7 +15,7 @@ const escapeXmlAttribute = (value) => String(value)
  * Generiert den SCXML-Code-String inklusive <metadata> Positionen, Slots,
  * Sub-State-Machines und Condition/Assign-Transitions.
  */
-export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel = []) => {
+export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel = [], extraSlotDeclarations = []) => {
     if (!nodes || nodes.length === 0) return "";
 
     // Parameter-Flexibilität (edges vs. globalDataModel)
@@ -41,25 +41,59 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
         allSlots.forEach((slot) => {
             if (!slot.path || slot.path.trim() === "") return;
 
-                    const formattedPath = slot.path.startsWith("/") ? slot.path : `/${slot.path}`;
-                    const tagName = slot.inherited ? "inheritSlot" : "slot";
+            const formattedPath = slot.path.startsWith("/") ? slot.path : `/${slot.path}`;
+            const tagName = slot.inherited ? "inheritSlot" : "slot";
 
-                    // Bei inheritSlot referenziert `state`/`xpath` die ursprüngliche
-                    // Deklaration (kann von der aktuellen Node abweichen), sonst geht
-                    // beim nächsten Import/Export-Zyklus die Herkunft verloren.
-                    const declaredState = slot.inherited?.state || skillName;
-                    const declaredPath = slot.inherited?.xpath
-                        ? (slot.inherited.xpath.startsWith("/") ? slot.inherited.xpath : `/${slot.inherited.xpath}`)
-                        : formattedPath;
+            // Bei inheritSlot referenziert `state`/`xpath` die ursprüngliche
+            // Deklaration (kann von der aktuellen Node abweichen), sonst geht
+            // beim nächsten Import/Export-Zyklus die Herkunft verloren.
+            const declaredState = slot.inherited?.state || skillName;
+            const declaredPath = slot.inherited?.xpath
+                ? (slot.inherited.xpath.startsWith("/") ? slot.inherited.xpath : `/${slot.inherited.xpath}`)
+                : formattedPath;
 
-                    const dedupeKey = `${tagName}|${slot.key}|${declaredState}|${declaredPath}`;
-                    if (seenSlotKeys.has(dedupeKey)) return;
-                    seenSlotKeys.add(dedupeKey);
+            const dedupeKey = `${tagName}|${slot.key}|${declaredState}|${declaredPath}`;
+            if (seenSlotKeys.has(dedupeKey)) return;
+            seenSlotKeys.add(dedupeKey);
 
-                    slotEntries.push(
-                        `                <${tagName} key="${slot.key}" state="${declaredState}" xpath="${declaredPath}"/>`
-                    );
+            slotEntries.push(
+                `                <${tagName} key="${slot.key}" state="${declaredState}" xpath="${declaredPath}"/>`
+            );
         });
+    });
+
+    // Preserve workflow-level declarations which are not attached to a local
+    // skill. This is required for slots that only exist to satisfy a sourced
+    // sub-state-machine's <inheritSlot>.
+    (extraSlotDeclarations || []).forEach((slot) => {
+        const key = String(slot?.key || "").trim();
+        const state = String(
+            slot?.inherited?.state || slot?.state || ""
+        ).trim();
+        const rawPath = String(
+            slot?.inherited?.xpath || slot?.path || ""
+        ).trim();
+
+        // Manually created visual-only slots do not necessarily have enough
+        // SCXML information (key/state) to form a declaration. Linked skill
+        // slots are already exported from node metadata above.
+        if (!key || !state || !rawPath) return;
+
+        const declaredPath = rawPath.startsWith("/")
+            ? rawPath
+            : `/${rawPath}`;
+        const tagName =
+            slot?.slotKind === "inheritSlot" || slot?.inherited
+                ? "inheritSlot"
+                : "slot";
+        const dedupeKey = `${tagName}|${key}|${state}|${declaredPath}`;
+
+        if (seenSlotKeys.has(dedupeKey)) return;
+        seenSlotKeys.add(dedupeKey);
+
+        slotEntries.push(
+            `                <${tagName} key="${key}" state="${state}" xpath="${declaredPath}"/>`
+        );
     });
 
     const slotsXml = slotEntries.length > 0
@@ -341,7 +375,7 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
 
                         const targetId = targetNode
                             ? targetNode.data.fullSkillName ||
-                              targetNode.data.label
+                            targetNode.data.label
                             : e.target;
 
                         /*
@@ -384,8 +418,8 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
                         const condAttr =
                             e.data?.cond
                                 ? ` cond="${escapeXmlAttribute(
-                                      e.data.cond
-                                  )}"`
+                                    e.data.cond
+                                )}"`
                                 : "";
 
                         const assignments =
@@ -394,8 +428,8 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
                             )
                                 ? e.data.assignments
                                 : e.data?.assign?.location
-                                  ? [e.data.assign]
-                                  : [];
+                                    ? [e.data.assign]
+                                    : [];
 
                         if (assignments.length > 0) {
                             const assignmentLines =
@@ -404,7 +438,7 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
                                         (assignment) =>
                                             assignment?.location &&
                                             assignment?.expr !==
-                                                undefined
+                                            undefined
                                     )
                                     .map((assignment) => {
                                         const location =

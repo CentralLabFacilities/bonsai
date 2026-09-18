@@ -92,7 +92,11 @@ function CustomNode({ id, data, selected }) {
             ...(data.inSlots || []).map((slot, index) => ({
                 key: slot.key,
                 type: slot.type,
-                inherited: Boolean(slot.inherited),
+                inherited: Boolean(
+                    slot.inherited &&
+                    (String(slot.path || "").trim() ||
+                        String(slot.inherited?.xpath || "").trim())
+                ),
                 access: "read",
                 index,
                 handleId: `slot-skill-read-${index}`,
@@ -100,7 +104,11 @@ function CustomNode({ id, data, selected }) {
             ...(data.outSlots || []).map((slot, index) => ({
                 key: slot.key,
                 type: slot.type,
-                inherited: Boolean(slot.inherited),
+                inherited: Boolean(
+                    slot.inherited &&
+                    (String(slot.path || "").trim() ||
+                        String(slot.inherited?.xpath || "").trim())
+                ),
                 access: "write",
                 index,
                 handleId: `slot-skill-write-${index}`,
@@ -140,21 +148,62 @@ function CustomNode({ id, data, selected }) {
     );
 
     const overviewWidth = useMemo(() => {
-        if (!showParameters || parameterEntries.length === 0) {
-            return undefined;
+        let requiredWidth = 0;
+
+        if (showParameters && parameterEntries.length > 0) {
+            const longestRow = parameterEntries.reduce((longest, parameter) => {
+                const text = parameter.displayValue
+                    ? `${parameter.key} = ${parameter.displayValue}`
+                    : parameter.key;
+                return Math.max(longest, text.length);
+            }, String(data.label || "").length);
+
+            // Grow for long names/values, but cap the node so very large string
+            // parameters wrap instead of producing an enormous workflow node.
+            requiredWidth = Math.max(
+                requiredWidth,
+                Math.min(520, Math.max(190, 55 + longestRow * 7))
+            );
         }
 
-        const longestRow = parameterEntries.reduce((longest, parameter) => {
-            const text = parameter.displayValue
-                ? `${parameter.key} = ${parameter.displayValue}`
-                : parameter.key;
-            return Math.max(longest, text.length);
-        }, String(data.label || "").length);
+        if (showSlots && slotEntries.length > 0) {
+            const slotGutters = 16 + 24;
+            const minimumPortWidth = 25;
 
-        // Grow for long names/values, but cap the node so very large string
-        // parameters wrap instead of producing an enormous workflow node.
-        return Math.min(520, Math.max(190, 55 + longestRow * 7));
-    }, [data.label, parameterEntries, showParameters]);
+            // Three or more slots use the compact slanted layout, so only the
+            // minimum connection-point spacing is required. One/two slots keep
+            // horizontal labels; reserve enough real width for those labels so
+            // they cannot overlap while the ports still distribute evenly.
+            const requiredSlotWidth =
+                slotEntries.length <= 2
+                    ? slotGutters +
+                    slotEntries.reduce((total, entry) => {
+                        const estimatedLabelWidth = Math.min(
+                            92,
+                            Math.max(
+                                minimumPortWidth,
+                                12 + String(entry.key || "").length * 6.5
+                            )
+                        );
+                        return total + estimatedLabelWidth;
+                    }, 0) +
+                    Math.max(0, slotEntries.length - 1) * 12
+                    : slotGutters + slotEntries.length * minimumPortWidth;
+
+            requiredWidth = Math.max(
+                requiredWidth,
+                Math.min(520, Math.max(180, requiredSlotWidth))
+            );
+        }
+
+        return requiredWidth || undefined;
+    }, [
+        data.label,
+        parameterEntries,
+        showParameters,
+        showSlots,
+        slotEntries,
+    ]);
 
     const handleSignature = useMemo(
         () =>
@@ -256,7 +305,9 @@ function CustomNode({ id, data, selected }) {
                 data.isInitial ? "initial-node" : ""
             } ${selected ? "selected-node" : ""} ${
                 isFinalState ? "terminal-final-node" : ""
-            } ${isBehaviorExit ? "behavior-exit-node" : ""} mode-${mode}`}
+            } ${isBehaviorExit ? "behavior-exit-node" : ""} ${
+                showSlots && slotEntries.length > 0 ? "has-slot-dock" : ""
+            } mode-${mode}`}
             style={
                 overviewWidth
                     ? {
@@ -288,6 +339,8 @@ function CustomNode({ id, data, selected }) {
                     type="target"
                     position={Position.Left}
                     className="target-handle"
+                    isConnectableStart={false}
+                    isConnectableEnd={true}
                 />
             )}
 
@@ -307,15 +360,44 @@ function CustomNode({ id, data, selected }) {
                 )}
             </div>
 
+            {showEvents &&
+                !isFinalState &&
+                !isBehaviorExit &&
+                eventIds.length > 0 && (
+                    <div className="event-list">
+                        {eventIds.map((eventId) => (
+                            <div className="event-row" key={eventId}>
+                                <span className="event-name">{eventId}</span>
+
+                                <Handle
+                                    id={eventId}
+                                    type="source"
+                                    position={Position.Right}
+                                    className="source-handle"
+                                    isConnectableStart={true}
+                                    isConnectableEnd={false}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                )}
+
             {showParameters && parameterEntries.length > 0 && (
                 <>
+                    {showEvents &&
+                        !isFinalState &&
+                        !isBehaviorExit &&
+                        eventIds.length > 0 && (
+                            <div className="node-slot-divider" />
+                        )}
+
                     <div
                         className="node-parameter-summary"
                         style={{
                             display: "flex",
                             flexDirection: "column",
                             gap: "3px",
-                            padding: "0 10px 4px",
+                            padding: "6px 10px 4px",
                         }}
                     >
                         {parameterEntries.map((parameter) => (
@@ -385,100 +467,94 @@ function CustomNode({ id, data, selected }) {
                             </div>
                         ))}
                     </div>
-
-                    {(
-                        (showEvents &&
-                            !isFinalState &&
-                            !isBehaviorExit &&
-                            eventIds.length > 0) ||
-                        (showSlots && slotEntries.length > 0)
-                    ) && <div className="node-slot-divider" />}
                 </>
             )}
 
-            {showEvents &&
-                !isFinalState &&
-                !isBehaviorExit &&
-                eventIds.length > 0 && (
-                    <div className="event-list">
-                        {eventIds.map((eventId) => (
-                            <div className="event-row" key={eventId}>
-                                <span className="event-name">{eventId}</span>
-
-                                <Handle
-                                    id={eventId}
-                                    type="source"
-                                    position={Position.Right}
-                                    className="source-handle"
-                                />
-                            </div>
-                        ))}
-                    </div>
-                )}
-
             {showSlots && slotEntries.length > 0 && (
                 <>
-                    {showEvents &&
-                        !isFinalState &&
-                        !isBehaviorExit &&
-                        eventIds.length > 0 && (
-                            <div className="node-slot-divider" />
-                        )}
+                    {((showEvents &&
+                            !isFinalState &&
+                            !isBehaviorExit &&
+                            eventIds.length > 0) ||
+                        (showParameters && parameterEntries.length > 0)) && (
+                        <div className="node-slot-divider" />
+                    )}
 
-                    <div className="node-slot-summary">
-                        {slotEntries.map((entry) => {
-                            const dragClass = getSlotHandleDragClass({
-                                drag: data.slotConnectionDrag,
-                                nodeId: id,
-                                handleId: entry.handleId,
-                                access: entry.access,
-                                origin: "skill",
-                                slotType: entry.type,
-                            });
+                    <div className="skill-slot-access-guide" aria-hidden="true">
+                        <div className="skill-slot-access skill-slot-access-write">
+                            <span className="skill-slot-access-dot" />
+                            <span>Write</span>
+                        </div>
+                        <div className="skill-slot-access skill-slot-access-read">
+                            <span className="skill-slot-access-dot" />
+                            <span>Read</span>
+                        </div>
+                    </div>
 
-                            return (
-                                <div
-                                    key={`${entry.access}-${entry.index}-${entry.key}`}
-                                    className={`node-slot-row node-slot-row-${entry.access}`}
-                                >
-                                    <span
-                                        className={`node-slot-entry ${
-                                            entry.inherited
-                                                ? "node-slot-entry-inherited"
-                                                : ""
-                                        }`}
-                                        title={`${
-                                            entry.access === "read"
-                                                ? "Read"
-                                                : "Write"
-                                        } slot ${entry.key}`}
+                    <div
+                        className={`node-slot-summary ${
+                            slotEntries.length >= 3
+                                ? "node-slot-summary-slanted"
+                                : "node-slot-summary-horizontal"
+                        }`}
+                    >
+                        <div className="skill-slot-border-rail" aria-hidden="true">
+                            {slotEntries.map((entry) => (
+                                <span
+                                    key={`rail-${entry.access}-${entry.index}-${entry.key}`}
+                                    className={`skill-slot-border-segment skill-slot-border-segment-${entry.access}`}
+                                />
+                            ))}
+                        </div>
+
+                        <div className="node-slot-ports">
+                            {slotEntries.map((entry) => {
+                                const dragClass = getSlotHandleDragClass({
+                                    drag: data.slotConnectionDrag,
+                                    nodeId: id,
+                                    handleId: entry.handleId,
+                                    access: entry.access,
+                                    origin: "skill",
+                                    slotType: entry.type,
+                                });
+
+                                return (
+                                    <div
+                                        key={`${entry.access}-${entry.index}-${entry.key}`}
+                                        className={`node-slot-row node-slot-row-${entry.access}`}
                                     >
                                         <span
-                                            className={`node-slot-access node-slot-access-${entry.access}`}
+                                            className={`node-slot-entry ${
+                                                entry.inherited
+                                                    ? "node-slot-entry-inherited"
+                                                    : ""
+                                            }`}
+                                            title={`${
+                                                entry.access === "read"
+                                                    ? "Read"
+                                                    : "Write"
+                                            } slot ${entry.key}`}
                                         >
-                                            {entry.access === "read"
-                                                ? "Read"
-                                                : "Write"}
+                                            <span className="node-slot-key">
+                                                {entry.key}
+                                            </span>
                                         </span>
-                                        <span className="node-slot-key">
-                                            {entry.key}
-                                        </span>
-                                    </span>
 
-                                    <Handle
-                                        id={entry.handleId}
-                                        type="source"
-                                        position={Position.Right}
-                                        className={`source-handle skill-slot-handle slot-skill-${entry.access}-handle ${dragClass}`}
-                                        title={`${
-                                            entry.access === "read"
-                                                ? "Read"
-                                                : "Write"
-                                        } ${entry.key}`}
-                                    />
-                                </div>
-                            );
-                        })}
+                                        <Handle
+                                            id={entry.handleId}
+                                            type="source"
+                                            position={Position.Bottom}
+                                            className={`source-handle skill-slot-handle slot-skill-${entry.access}-handle ${dragClass}`}
+                                            title={`${
+                                                entry.access === "read"
+                                                    ? "Read"
+                                                    : "Write"
+                                            } ${entry.key}`}
+                                        />
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
                 </>
             )}
