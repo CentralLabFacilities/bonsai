@@ -5984,3 +5984,263 @@
         grid-template-columns: 1fr;
     }
 }
+
+/* ==========================================================================
+   Nop Send panel
+   ========================================================================== */
+
+.nop-send-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 2px 0 12px;
+}
+
+.nop-send-hero {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 2px 2px 0;
+}
+
+.nop-send-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: var(--surface-secondary, rgba(127, 127, 127, 0.10));
+    border: 1px solid var(--border-color, rgba(127, 127, 127, 0.18));
+    font-size: 17px;
+}
+
+.nop-send-eyebrow {
+    margin-bottom: 2px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.56;
+}
+
+.nop-send-hero h3 {
+    margin: 0;
+    font-size: 16px;
+}
+
+.nop-send-hero p {
+    margin: 5px 0 0;
+    font-size: 12px;
+    line-height: 1.5;
+    opacity: 0.68;
+}
+
+.nop-send-card {
+    padding: 14px;
+    border-radius: 12px;
+    border: 1px solid var(--border-color, rgba(127, 127, 127, 0.18));
+    background: var(--surface-secondary, rgba(127, 127, 127, 0.055));
+}
+
+.nop-send-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.nop-send-card-title {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.nop-send-card-subtitle {
+    margin-top: 3px;
+    font-size: 11px;
+    opacity: 0.58;
+}
+
+.nop-send-status {
+    flex: 0 0 auto;
+    padding: 4px 7px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap;
+    border: 1px solid transparent;
+}
+
+.nop-send-status.configured {
+    background: rgba(46, 160, 67, 0.10);
+    border-color: rgba(46, 160, 67, 0.24);
+}
+
+.nop-send-status.empty {
+    background: rgba(127, 127, 127, 0.08);
+    border-color: rgba(127, 127, 127, 0.16);
+    opacity: 0.72;
+}
+
+.nop-send-field-label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    opacity: 0.72;
+}
+
+.nop-send-input-wrap {
+    position: relative;
+}
+
+.nop-send-input {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 38px;
+    padding: 9px 36px 9px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color, rgba(127, 127, 127, 0.22));
+    background: var(--input-background, rgba(127, 127, 127, 0.045));
+    color: inherit;
+    outline: none;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 12px;
+    transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+
+.nop-send-input:focus {
+    border-color: currentColor;
+    box-shadow: 0 0 0 2px rgba(127, 127, 127, 0.10);
+    background: var(--input-background-focus, rgba(127, 127, 127, 0.075));
+}
+
+.nop-send-clear {
+    position: absolute;
+    top: 50%;
+    right: 7px;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    opacity: 0.52;
+}
+
+.nop-send-clear:hover {
+    background: rgba(127, 127, 127, 0.10);
+    opacity: 0.9;
+}
+
+.nop-send-suggestions {
+    position: absolute;
+    z-index: 30;
+    top: calc(100% + 5px);
+    left: 0;
+    right: 0;
+    overflow: hidden;
+    padding: 4px;
+    border-radius: 9px;
+    border: 1px solid var(--border-color, rgba(127, 127, 127, 0.2));
+    background: var(--panel-background, var(--background-color, #fff));
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.14);
+}
+
+.nop-send-suggestion {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 8px 9px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    text-align: left;
+    font-size: 12px;
+}
+
+.nop-send-suggestion:hover,
+.nop-send-suggestion.selected {
+    background: rgba(127, 127, 127, 0.10);
+}
+
+.nop-send-suggestion-kind {
+    font-size: 10px;
+    opacity: 0.48;
+}
+
+.nop-send-presets {
+    margin-top: 12px;
+}
+
+.nop-send-presets > span {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    opacity: 0.5;
+}
+
+.nop-send-preset-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.nop-send-preset {
+    padding: 5px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--border-color, rgba(127, 127, 127, 0.18));
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font-size: 11px;
+}
+
+.nop-send-preset:hover,
+.nop-send-preset.active {
+    background: rgba(127, 127, 127, 0.10);
+}
+
+.nop-send-preview {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+    padding: 9px 11px;
+    border-radius: 9px;
+    background: rgba(127, 127, 127, 0.055);
+    border: 1px solid rgba(127, 127, 127, 0.11);
+}
+
+.nop-send-preview > span {
+    flex: 0 0 auto;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.46;
+}
+
+.nop-send-preview code {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+    opacity: 0.8;
+}

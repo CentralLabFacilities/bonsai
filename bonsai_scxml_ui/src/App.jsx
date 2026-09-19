@@ -2205,48 +2205,287 @@ const normalizeAssignmentForScxml = (assignment) =>
         }
         : assignment;
 
-const prepareGraphForScxml = (sourceNodes = [], sourceEdges = []) => {
-    const exportNodes = (sourceNodes || []).map((node) => ({
+const getBehaviorExitSignature = (node) => {
+    if (!node?.data?.isBehaviorExit) return "";
+
+    const transitions =
+        Array.isArray(node.data?.behaviorExitTransitions) &&
+        node.data.behaviorExitTransitions.length > 0
+            ? node.data.behaviorExitTransitions
+            : [
+                {
+                    triggerEvent: "Nop.fatal",
+                    sendEvents: node.data?.behaviorExitEvents || [],
+                },
+            ];
+
+    return transitions
+        .map((transition) => {
+            const trigger = String(transition?.triggerEvent || "Nop.fatal").trim();
+            const sendEvents = Array.isArray(transition?.sendEvents)
+                ? transition.sendEvents.map((eventName) => String(eventName || "").trim()).filter(Boolean)
+                : [];
+
+            return `${trigger}|${sendEvents.sort().join(",")}`;
+        })
+        .sort()
+        .join("||");
+};
+
+const getSharedScxmlStateId = (node) => {
+    if (node?.type !== "custom") return "";
+
+    const fullSkillName = String(node.data?.fullSkillName || "").trim();
+    if (!fullSkillName) return "";
+
+    const skillBase = fullSkillName.split("#")[0];
+    const skillName = skillBase.split(".").pop()?.toLowerCase() || "";
+
+    if (skillName === "end" || skillName === "fatal") {
+        return String(node.data?.scxmlStateId || skillBase).trim();
+    }
+
+    if (skillName === "nop" && node.data?.isBehaviorExit) {
+        return String(
+            node.data?.scxmlStateId ||
+            node.data?.behaviorExitScxmlStateId ||
+            fullSkillName
+        ).trim();
+    }
+
+    return "";
+};
+
+const getSharedScxmlStateKey = (node) => {
+    const scxmlStateId = getSharedScxmlStateId(node);
+    if (!scxmlStateId) return null;
+
+    const fullSkillName = String(node.data?.fullSkillName || "").trim();
+    const skillBase = fullSkillName.split("#")[0];
+    const skillName = skillBase.split(".").pop()?.toLowerCase() || "";
+
+    if (skillName === "end" || skillName === "fatal") {
+        return `${skillName}|${scxmlStateId}`;
+    }
+
+    if (skillName === "nop" && node.data?.isBehaviorExit) {
+        return `nop-exit|${skillBase}|${getBehaviorExitSignature(node)}`;
+    }
+
+    return null;
+};
+
+const normalizeSharedScxmlStateIdentity = (node) => {
+    const sharedKey = getSharedScxmlStateKey(node);
+    if (!sharedKey) return node;
+
+    const fullSkillName = String(node.data?.fullSkillName || "").trim();
+    const skillBase = fullSkillName.split("#")[0];
+    const skillName = skillBase.split(".").pop()?.toLowerCase() || "";
+    const scxmlStateId = getSharedScxmlStateId(node) || skillBase;
+
+    if (skillName === "nop" && node.data?.isBehaviorExit) {
+        const sentEvents = Array.isArray(node.data?.behaviorExitEvents)
+            ? node.data.behaviorExitEvents.filter(Boolean)
+            : [];
+
+        return {
+            ...node,
+            data: {
+                ...(node.data || {}),
+                label:
+                    sentEvents.length > 0
+                        ? sentEvents.join(", ")
+                        : node.data?.label || "Nop",
+                behaviorExitScxmlStateId:
+                    node.data?.behaviorExitScxmlStateId || scxmlStateId,
+                scxmlStateId,
+                // fullSkillName remains the editor-facing skill identity. The
+                // shared SCXML identity is kept separately in scxmlStateId.
+                fullSkillName: fullSkillName || skillBase,
+            },
+        };
+    }
+
+    return {
         ...node,
         data: {
             ...(node.data || {}),
-            onEntry: Array.isArray(node.data?.onEntry)
-                ? node.data.onEntry.map(normalizeAssignmentForScxml)
-                : node.data?.onEntry,
-            onExit: Array.isArray(node.data?.onExit)
-                ? node.data.onExit.map(normalizeAssignmentForScxml)
-                : node.data?.onExit,
-            // Keep legacy/event-backed transition assignment data normalized
-            // too, in case the exporter reads it instead of edge.data.
-            events: Array.isArray(node.data?.events)
-                ? node.data.events.map((event) => ({
-                    ...event,
-                    assignments: Array.isArray(event.assignments)
-                        ? event.assignments.map(normalizeAssignmentForScxml)
-                        : event.assignments,
-                    assignExpr: event.assignExpr !== undefined
-                        ? normalizeAssignmentExpressionForScxml(event.assignExpr)
-                        : event.assignExpr,
-                }))
-                : node.data?.events,
+            label: skillName === "end" ? "End" : "Fatal",
+            scxmlStateId,
+            fullSkillName: fullSkillName || skillBase,
+            isFinal: true,
         },
-    }));
+    };
+};
 
-    const exportEdges = (sourceEdges || []).map((edge) => ({
-        ...edge,
-        data: {
-            ...(edge.data || {}),
-            assignments: Array.isArray(edge.data?.assignments)
-                ? edge.data.assignments.map(normalizeAssignmentForScxml)
-                : edge.data?.assignments,
-            assign: edge.data?.assign
-                ? normalizeAssignmentForScxml(edge.data.assign)
-                : edge.data?.assign,
-            assignExpr: edge.data?.assignExpr !== undefined
-                ? normalizeAssignmentExpressionForScxml(edge.data.assignExpr)
-                : edge.data?.assignExpr,
-        },
-    }));
+const ensureSharedEditorInstanceIds = (sourceNodes = []) => {
+    const usedByKey = new Map();
+
+    sourceNodes.forEach((rawNode) => {
+        const node = normalizeSharedScxmlStateIdentity(rawNode);
+        const sharedKey = getSharedScxmlStateKey(node);
+        if (!sharedKey) return;
+
+        const existing = String(node.data?.editorInstanceId || "").trim();
+        if (!existing) return;
+
+        if (!usedByKey.has(sharedKey)) usedByKey.set(sharedKey, new Set());
+        usedByKey.get(sharedKey).add(existing);
+    });
+
+    return sourceNodes.map((rawNode) => {
+        const node = normalizeSharedScxmlStateIdentity(rawNode);
+        const sharedKey = getSharedScxmlStateKey(node);
+        if (!sharedKey) return node;
+
+        if (!usedByKey.has(sharedKey)) usedByKey.set(sharedKey, new Set());
+        const used = usedByKey.get(sharedKey);
+        const existing = String(node.data?.editorInstanceId || "").trim();
+
+        if (existing) return node;
+
+        let index = 1;
+        while (used.has(String(index))) index += 1;
+        const editorInstanceId = String(index);
+        used.add(editorInstanceId);
+
+        return {
+            ...node,
+            data: {
+                ...(node.data || {}),
+                editorInstanceId,
+            },
+        };
+    });
+};
+
+const getExportFullSkillName = (node) => {
+    const sharedScxmlStateId = getSharedScxmlStateId(node);
+    if (sharedScxmlStateId) return sharedScxmlStateId;
+    return String(node.data?.fullSkillName || "").trim();
+};
+
+const prepareGraphForScxml = (sourceNodes = [], sourceEdges = []) => {
+    // End, Fatal, and identical forwarding-Nop exits may appear multiple times
+    // visually while representing one SCXML state. Their editor node IDs and
+    // editorInstanceIds stay distinct, while export keeps one canonical state.
+    const normalizedNodes = ensureSharedEditorInstanceIds(
+        (sourceNodes || []).map(normalizeSharedScxmlStateIdentity)
+    );
+
+    const sharedGroups = new Map();
+    normalizedNodes.forEach((node) => {
+        const sharedKey = getSharedScxmlStateKey(node);
+        if (!sharedKey) return;
+        if (!sharedGroups.has(sharedKey)) sharedGroups.set(sharedKey, []);
+        sharedGroups.get(sharedKey).push(node);
+    });
+
+    const aliasToCanonicalId = new Map();
+    const clonePositionsByCanonicalId = new Map();
+
+    sharedGroups.forEach((group) => {
+        const canonical = group.find((node) => !node.parentId) || group[0];
+        group.forEach((node) => aliasToCanonicalId.set(node.id, canonical.id));
+
+        clonePositionsByCanonicalId.set(
+            canonical.id,
+            group.map((node, index) => {
+                const absolutePosition = getAbsoluteNodePosition(
+                    node,
+                    normalizedNodes
+                );
+
+                return {
+                    instanceId:
+                        String(node.data?.editorInstanceId || "").trim() ||
+                        String(index + 1),
+                    x: Number(absolutePosition.x || 0),
+                    y: Number(absolutePosition.y || 0),
+                };
+            })
+        );
+    });
+
+    const remapNodeId = (nodeId) => aliasToCanonicalId.get(nodeId) || nodeId;
+    const seenSharedStates = new Set();
+
+    const exportNodes = normalizedNodes
+        .filter((node) => {
+            const sharedKey = getSharedScxmlStateKey(node);
+            if (!sharedKey) return true;
+
+            const canonicalId = aliasToCanonicalId.get(node.id);
+            if (node.id !== canonicalId || seenSharedStates.has(sharedKey)) {
+                return false;
+            }
+
+            seenSharedStates.add(sharedKey);
+            return true;
+        })
+        .map((node) => ({
+            ...node,
+            data: {
+                ...(node.data || {}),
+                fullSkillName: getExportFullSkillName(node),
+                editorClonePositions:
+                    clonePositionsByCanonicalId.get(node.id) || undefined,
+                onEntry: Array.isArray(node.data?.onEntry)
+                    ? node.data.onEntry.map(normalizeAssignmentForScxml)
+                    : node.data?.onEntry,
+                onExit: Array.isArray(node.data?.onExit)
+                    ? node.data.onExit.map(normalizeAssignmentForScxml)
+                    : node.data?.onExit,
+                events: Array.isArray(node.data?.events)
+                    ? node.data.events.map((event) => ({
+                        ...event,
+                        target: event.target ? remapNodeId(event.target) : event.target,
+                        assignments: Array.isArray(event.assignments)
+                            ? event.assignments.map(normalizeAssignmentForScxml)
+                            : event.assignments,
+                        assignExpr: event.assignExpr !== undefined
+                            ? normalizeAssignmentExpressionForScxml(event.assignExpr)
+                            : event.assignExpr,
+                    }))
+                    : node.data?.events,
+            },
+        }));
+
+    const seenExportEdges = new Set();
+    const exportEdges = (sourceEdges || [])
+        .map((edge) => ({
+            ...edge,
+            source: remapNodeId(edge.source),
+            target: remapNodeId(edge.target),
+            data: {
+                ...(edge.data || {}),
+                assignments: Array.isArray(edge.data?.assignments)
+                    ? edge.data.assignments.map(normalizeAssignmentForScxml)
+                    : edge.data?.assignments,
+                assign: edge.data?.assign
+                    ? normalizeAssignmentForScxml(edge.data.assign)
+                    : edge.data?.assign,
+                assignExpr: edge.data?.assignExpr !== undefined
+                    ? normalizeAssignmentExpressionForScxml(edge.data.assignExpr)
+                    : edge.data?.assignExpr,
+            },
+        }))
+        .filter((edge) => {
+            // Multiple editor aliases of one shared state collapse to one SCXML
+            // target. Avoid emitting duplicate transitions after remapping.
+            const transitionKey = JSON.stringify({
+                source: edge.source,
+                target: edge.target,
+                sourceHandle: edge.sourceHandle || edge.label || "",
+                cond: edge.data?.cond || "",
+                assignments: edge.data?.assignments || edge.data?.assign || [],
+            });
+
+            if (seenExportEdges.has(transitionKey)) return false;
+            seenExportEdges.add(transitionKey);
+            return true;
+        });
 
     return { nodes: exportNodes, edges: exportEdges };
 };
@@ -3527,9 +3766,11 @@ function AppContent() {
                     },
                 };
             });
-            const parsedNodes = await hydrateSubMachineInheritedSlots(
-                parsed.nodes,
-                resolvedFilePath
+            const parsedNodes = ensureSharedEditorInstanceIds(
+                (await hydrateSubMachineInheritedSlots(
+                    parsed.nodes,
+                    resolvedFilePath
+                )).map(normalizeSharedScxmlStateIdentity)
             );
 
             const inheritedForChild = buildInheritedGlobalsForChild(
@@ -4775,9 +5016,11 @@ function AppContent() {
                     fetchSkillData,
                     getNodeId
                 );
-                const parsedNodes = await hydrateSubMachineInheritedSlots(
-                    parsed.nodes,
-                    loaded.path
+                const parsedNodes = ensureSharedEditorInstanceIds(
+                    (await hydrateSubMachineInheritedSlots(
+                        parsed.nodes,
+                        loaded.path
+                    )).map(normalizeSharedScxmlStateIdentity)
                 );
 
                 const newTabObj = {
@@ -5767,13 +6010,39 @@ function AppContent() {
             baseSkillLabel.toLowerCase() === "end" ||
             baseSkillLabel.toLowerCase() === "fatal";
 
+        let sharedEditorInstanceId;
+        if (isFinalSkill) {
+            const sharedStateId = selectedSkill.split("#")[0];
+            const usedIds = new Set(
+                nodes
+                    .filter((node) => {
+                        const candidate = normalizeSharedScxmlStateIdentity(node);
+                        return getSharedScxmlStateId(candidate) === sharedStateId;
+                    })
+                    .map((node) => String(node.data?.editorInstanceId || "").trim())
+                    .filter(Boolean)
+            );
+
+            let index = 1;
+            while (usedIds.has(String(index))) index += 1;
+            sharedEditorInstanceId = String(index);
+        }
+
         return {
             id: nodeid,
             position,
             type: "custom",
             data: {
                 label: baseSkillLabel,
-                fullSkillName: createNameforSkill(selectedSkill),
+                fullSkillName: isFinalSkill
+                    ? selectedSkill.split("#")[0]
+                    : createNameforSkill(selectedSkill),
+                ...(isFinalSkill
+                    ? {
+                        scxmlStateId: selectedSkill.split("#")[0],
+                        editorInstanceId: sharedEditorInstanceId,
+                    }
+                    : {}),
                 description: data.description || "",
                 isInitial: false,
                 isFinal: isFinalSkill,
@@ -7576,6 +7845,38 @@ function AppContent() {
         const generatedSlotNodes = [];
         let index = 0;
 
+        // New slot nodes should appear underneath the workflow instead of
+        // being mixed into the skill/state area. Keep positions of slots the
+        // user has already moved, but derive the initial row for new slots
+        // from the current workflow bounds.
+        const slotLayoutNodes = targetNodes.filter(
+            (node) => node.type !== "parallelLane"
+        );
+        const slotLayoutBounds = slotLayoutNodes.reduce(
+            (bounds, node) => {
+                const absolutePosition = getAbsoluteNodePosition(
+                    node,
+                    targetNodes
+                );
+                const size = getNodeSize(node);
+
+                return {
+                    minX: Math.min(bounds.minX, absolutePosition.x),
+                    maxBottom: Math.max(
+                        bounds.maxBottom,
+                        absolutePosition.y + size.height
+                    ),
+                };
+            },
+            { minX: Infinity, maxBottom: -Infinity }
+        );
+        const slotSpawnX = Number.isFinite(slotLayoutBounds.minX)
+            ? slotLayoutBounds.minX
+            : 380;
+        const slotSpawnY = Number.isFinite(slotLayoutBounds.maxBottom)
+            ? slotLayoutBounds.maxBottom + 100
+            : 120;
+
         usedPaths.forEach(
             ({
                  type,
@@ -7592,8 +7893,8 @@ function AppContent() {
                     id: slotNodeId,
                     position:
                         existingSlotNode?.position || {
-                            x: 380 + (index % 3) * 200,
-                            y: 120 + Math.floor(index / 3) * 140,
+                            x: slotSpawnX + (index % 3) * 220,
+                            y: slotSpawnY + Math.floor(index / 3) * 140,
                         },
                     type: "slot",
                     data: {
@@ -7915,9 +8216,25 @@ function AppContent() {
         };
 
         const captureSelection = () => {
-            const nodesToCopy = nodes.filter(
+            let nodesToCopy = nodes.filter(
                 (node) => node.selected && node.type !== "parallelLane"
             );
+
+            // React Flow can clear/delay its internal `selected` flag while the
+            // editor still has a node selected in the details panel. Falling
+            // back to selectedNodeId keeps Ctrl+C reliable for the common
+            // single-node case (including shared End/Fatal/Nop clones).
+            if (nodesToCopy.length === 0 && selectedNodeId) {
+                const selectedNode = nodes.find(
+                    (node) =>
+                        node.id === selectedNodeId &&
+                        node.type !== "parallelLane"
+                );
+
+                if (selectedNode) {
+                    nodesToCopy = [selectedNode];
+                }
+            }
 
             if (nodesToCopy.length === 0) return false;
 
@@ -7969,14 +8286,99 @@ function AppContent() {
                     .filter(Boolean)
             );
 
+            const usedSharedInstanceIds = new Map();
+            ensureSharedEditorInstanceIds(nodes).forEach((node) => {
+                const sharedKey = getSharedScxmlStateKey(node);
+                if (!sharedKey) return;
+                if (!usedSharedInstanceIds.has(sharedKey)) {
+                    usedSharedInstanceIds.set(sharedKey, new Set());
+                }
+                const instanceId = String(node.data?.editorInstanceId || "").trim();
+                if (instanceId) usedSharedInstanceIds.get(sharedKey).add(instanceId);
+            });
+
+            const allocateSharedEditorInstanceId = (data) => {
+                const candidateNode = normalizeSharedScxmlStateIdentity({
+                    type: "custom",
+                    data,
+                });
+                const sharedKey = getSharedScxmlStateKey(candidateNode);
+                if (!sharedKey) return undefined;
+
+                if (!usedSharedInstanceIds.has(sharedKey)) {
+                    usedSharedInstanceIds.set(sharedKey, new Set());
+                }
+
+                const used = usedSharedInstanceIds.get(sharedKey);
+                let index = 1;
+                while (used.has(String(index))) index += 1;
+                const instanceId = String(index);
+                used.add(instanceId);
+                return instanceId;
+            };
+
             const allocateFullSkillName = (node, data) => {
                 if (node.type !== "custom") return data;
 
-                const current = String(data?.fullSkillName || "");
-                const match = current.match(/^(.*)#\d+$/);
-                if (!match) return data;
+                const current = String(data?.fullSkillName || "").trim();
+                if (!current) return data;
 
-                const base = match[1];
+                const base = current.split("#")[0];
+                const skillName = base.split(".").pop()?.toLowerCase() || "";
+
+                // End/Fatal copies are editor aliases, not separate SCXML
+                // instances. Their unique React Flow node id is sufficient.
+                if (skillName === "end" || skillName === "fatal") {
+                    const normalizedData = {
+                        ...data,
+                        label: skillName === "end" ? "End" : "Fatal",
+                        scxmlStateId: data?.scxmlStateId || base,
+                        fullSkillName: base,
+                        isFinal: true,
+                    };
+
+                    return {
+                        ...normalizedData,
+                        editorInstanceId: allocateSharedEditorInstanceId(
+                            normalizedData
+                        ),
+                    };
+                }
+
+                // A forwarding Nop is also an editor alias when copied. Keep
+                // its original SCXML state identity privately, while the visible
+                // editor skill identity stays unsuffixed and its name comes from
+                // the event(s) it forwards.
+                if (skillName === "nop" && data?.isBehaviorExit) {
+                    const sentEvents = Array.isArray(data?.behaviorExitEvents)
+                        ? data.behaviorExitEvents.filter(Boolean)
+                        : [];
+
+                    const normalizedData = {
+                        ...data,
+                        label:
+                            sentEvents.length > 0
+                                ? sentEvents.join(", ")
+                                : data?.label || "Nop",
+                        behaviorExitScxmlStateId:
+                            data?.behaviorExitScxmlStateId || current,
+                        scxmlStateId:
+                            data?.scxmlStateId ||
+                            data?.behaviorExitScxmlStateId ||
+                            current,
+                        fullSkillName: base,
+                    };
+
+                    return {
+                        ...normalizedData,
+                        editorInstanceId: allocateSharedEditorInstanceId(
+                            normalizedData
+                        ),
+                    };
+                }
+
+                // Normal skills still need a distinct SCXML state id when
+                // duplicated.
                 let index = 1;
                 let candidate = `${base}#${index}`;
 
@@ -8177,14 +8579,22 @@ function AppContent() {
             }
         };
 
-        window.addEventListener("keydown", handleGraphClipboardShortcut);
+        // Capture phase makes the graph clipboard deterministic even when
+        // React Flow or a focused panel component handles the same shortcut.
+        window.addEventListener(
+            "keydown",
+            handleGraphClipboardShortcut,
+            true
+        );
         return () =>
             window.removeEventListener(
                 "keydown",
-                handleGraphClipboardShortcut
+                handleGraphClipboardShortcut,
+                true
             );
     }, [
         activeMode,
+        selectedNodeId,
         nodes,
         edges,
         setNodes,
@@ -8494,9 +8904,11 @@ function AppContent() {
                 if (!content) return;
 
                 const parsed = await parseScxmlFile(content, fetchSkillData, getNodeId);
-                const parsedNodes = await hydrateSubMachineInheritedSlots(
-                    parsed.nodes,
-                    filePath
+                const parsedNodes = ensureSharedEditorInstanceIds(
+                    (await hydrateSubMachineInheritedSlots(
+                        parsed.nodes,
+                        filePath
+                    )).map(normalizeSharedScxmlStateIdentity)
                 );
 
                 setGlobalDataModel(parsed.globalDataModel);
@@ -8539,9 +8951,11 @@ function AppContent() {
         reader.onload = async (e) => {
             try {
                 const parsed = await parseScxmlFile(e.target.result, fetchSkillData, getNodeId);
-                const parsedNodes = await hydrateSubMachineInheritedSlots(
-                    parsed.nodes,
-                    null
+                const parsedNodes = ensureSharedEditorInstanceIds(
+                    (await hydrateSubMachineInheritedSlots(
+                        parsed.nodes,
+                        null
+                    )).map(normalizeSharedScxmlStateIdentity)
                 );
 
                 setGlobalDataModel(parsed.globalDataModel);
@@ -11191,15 +11605,53 @@ function AppContent() {
                                     setNodes((nds) =>
                                         nds.map((n) => {
                                             if (n.id !== selectedNode.id) return n;
-                                            const isContainerOrSub = n.type === "compound" || n.type === "parallel" || n.type === "submachine";
+
+                                            const isContainerOrSub =
+                                                n.type === "compound" ||
+                                                n.type === "parallel" ||
+                                                n.type === "submachine";
+
+                                            if (isContainerOrSub) {
+                                                return {
+                                                    ...n,
+                                                    data: {
+                                                        ...n.data,
+                                                        label: name,
+                                                        fullSkillName: name,
+                                                    },
+                                                };
+                                            }
+
+                                            const skillType = String(
+                                                n.data?.fullSkillName || ""
+                                            )
+                                                .split("#")[0]
+                                                .split(".")
+                                                .pop()
+                                                .toLowerCase();
+
+                                            // End, Fatal and forwarding Nop clones use an
+                                            // editor-only instance ID. Renaming that ID must
+                                            // never modify the underlying skill/SCXML identity.
+                                            if (["nop", "fatal", "end"].includes(skillType)) {
+                                                return {
+                                                    ...n,
+                                                    data: {
+                                                        ...n.data,
+                                                        editorInstanceId: name,
+                                                        fullSkillName:
+                                                            n.data?.fullSkillName?.split("#")[0] ||
+                                                            n.data?.fullSkillName,
+                                                    },
+                                                };
+                                            }
+
                                             return {
                                                 ...n,
                                                 data: {
                                                     ...n.data,
                                                     label: name,
-                                                    fullSkillName: isContainerOrSub
-                                                        ? name
-                                                        : `${n.data.fullSkillName?.split("#")[0]}#${name}`,
+                                                    fullSkillName: `${n.data.fullSkillName?.split("#")[0]}#${name}`,
                                                 },
                                             };
                                         })
@@ -11237,6 +11689,128 @@ function AppContent() {
                                         )
                                     )
                                 }
+                                onUpdateSendEvents={(nodeId, events) => {
+                                    const sourceNode = nodes.find((node) => node.id === nodeId);
+                                    if (!sourceNode) return;
+
+                                    const nextEvent = Array.isArray(events)
+                                        ? String(events[0] ?? "")
+                                        : "";
+                                    const nextEvents = nextEvent ? [nextEvent] : [];
+                                    const nonEmptyEvents = nextEvent.trim()
+                                        ? [nextEvent.trim()]
+                                        : [];
+                                    const currentTransitions = Array.isArray(
+                                        sourceNode.data?.behaviorExitTransitions
+                                    )
+                                        ? sourceNode.data.behaviorExitTransitions
+                                        : [];
+                                    const triggerEvent =
+                                        currentTransitions[0]?.triggerEvent || "Nop.fatal";
+                                    const sharedScxmlStateId = String(
+                                        sourceNode.data?.scxmlStateId ||
+                                        sourceNode.data?.behaviorExitScxmlStateId ||
+                                        ""
+                                    ).trim();
+
+                                    const isSameSharedNop = (node) => {
+                                        if (node.type !== "custom") return false;
+                                        const baseName = String(
+                                            node.data?.fullSkillName || ""
+                                        )
+                                            .split("#")[0]
+                                            .split(".")
+                                            .pop()
+                                            .toLowerCase();
+                                        if (baseName !== "nop") return false;
+                                        if (!sharedScxmlStateId) {
+                                            return node.id === nodeId;
+                                        }
+                                        const candidateSharedId = String(
+                                            node.data?.scxmlStateId ||
+                                            node.data?.behaviorExitScxmlStateId ||
+                                            ""
+                                        ).trim();
+                                        return candidateSharedId === sharedScxmlStateId;
+                                    };
+
+                                    const sharedNopIds = new Set(
+                                        nodes.filter(isSameSharedNop).map((node) => node.id)
+                                    );
+
+                                    // Once a Nop sends an event it becomes an outward forwarding
+                                    // state. Ordinary SCXML transitions are mutually exclusive
+                                    // with that behavior, so remove them from every visual clone.
+                                    if (nonEmptyEvents.length > 0) {
+                                        setEdges((currentEdges) =>
+                                            currentEdges.filter(
+                                                (edge) =>
+                                                    !sharedNopIds.has(edge.source) ||
+                                                    isSlotEdge(edge)
+                                            )
+                                        );
+                                    }
+
+                                    setNodes((nds) =>
+                                        nds.map((node) => {
+                                            if (!isSameSharedNop(node)) return node;
+
+                                            const clearedEvents =
+                                                nonEmptyEvents.length > 0
+                                                    ? (node.data?.events || []).map((event) => ({
+                                                        ...event,
+                                                        target: null,
+                                                        cond: "",
+                                                        assignments: [],
+                                                        assign: null,
+                                                        assignLocation: "",
+                                                        assignExpr: "",
+                                                        selectedPackage: "",
+                                                        selectedSkill: "",
+                                                    }))
+                                                    : node.data?.events;
+
+                                            return {
+                                                ...node,
+                                                data: {
+                                                    ...node.data,
+                                                    ...(nonEmptyEvents.length > 0
+                                                        ? { events: clearedEvents }
+                                                        : {}),
+                                                    isBehaviorExit: nextEvents.length > 0,
+                                                    behaviorExitEvents: nextEvents,
+                                                    behaviorExitTransitions:
+                                                        nextEvents.length > 0
+                                                            ? [
+                                                                {
+                                                                    triggerEvent,
+                                                                    sendEvents: nextEvents,
+                                                                },
+                                                            ]
+                                                            : [],
+                                                    label:
+                                                        nonEmptyEvents.length > 0
+                                                            ? nonEmptyEvents.join(", ")
+                                                            : "Nop",
+                                                    ...(nextEvents.length > 0
+                                                        ? {
+                                                            behaviorExitScxmlStateId:
+                                                                node.data?.behaviorExitScxmlStateId ||
+                                                                node.data?.scxmlStateId ||
+                                                                node.data?.fullSkillName ||
+                                                                sourceNode.data?.fullSkillName,
+                                                            scxmlStateId:
+                                                                node.data?.scxmlStateId ||
+                                                                node.data?.behaviorExitScxmlStateId ||
+                                                                node.data?.fullSkillName ||
+                                                                sourceNode.data?.fullSkillName,
+                                                        }
+                                                        : {}),
+                                                },
+                                            };
+                                        })
+                                    );
+                                }}
                                 onUpdateInSlotPath={(idx, val, commit = false) =>
                                     setNodes((nds) => {
                                         const updatedNodes = nds.map((n) =>
