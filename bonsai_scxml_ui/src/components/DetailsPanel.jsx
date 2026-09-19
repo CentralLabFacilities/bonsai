@@ -1,5 +1,14 @@
-import { useMemo, useState } from "react";
-import { FiActivity, FiChevronDown, FiDatabase, FiExternalLink, FiLayers, FiLink2 } from "react-icons/fi";
+import { useEffect, useMemo, useState } from "react";
+import {
+    FiActivity,
+    FiChevronDown,
+    FiDatabase,
+    FiExternalLink,
+    FiLayers,
+    FiLink2,
+    FiSend,
+    FiX,
+} from "react-icons/fi";
 import StateActionsEditor from "./StateActionsEditor";
 
 
@@ -403,6 +412,151 @@ function getSkillPackageName(fullSkillName) {
 }
 
 
+const NOP_SEND_EVENT_SUGGESTIONS = ["success", "fatal", "error"];
+
+function NopSendEditor({ nodeId, events = [], onChange }) {
+    const eventName = String(
+        Array.isArray(events) && events.length > 0 ? events[0] ?? "" : ""
+    );
+    const [isFocused, setIsFocused] = useState(false);
+
+    const normalizedQuery = eventName.trim().toLowerCase();
+    const matchingSuggestions = NOP_SEND_EVENT_SUGGESTIONS.filter((suggestion) =>
+        !normalizedQuery || suggestion.includes(normalizedQuery)
+    );
+
+    const setEventName = (value) => {
+        const nextValue = String(value ?? "");
+        onChange?.(nextValue ? [nextValue] : []);
+    };
+
+    const handleKeyDown = (event) => {
+        if (event.key !== "Enter") return;
+
+        const exactMatch = NOP_SEND_EVENT_SUGGESTIONS.find(
+            (suggestion) => suggestion === normalizedQuery
+        );
+        const onlyMatch = matchingSuggestions.length === 1
+            ? matchingSuggestions[0]
+            : null;
+        const match = exactMatch || onlyMatch;
+
+        if (match && match !== eventName) {
+            event.preventDefault();
+            setEventName(match);
+        }
+    };
+
+    return (
+        <div className="nop-send-panel">
+            <div className="nop-send-hero">
+                <div className="nop-send-icon" aria-hidden="true">
+                    <FiSend />
+                </div>
+                <div>
+                    <div className="nop-send-eyebrow">Nop action</div>
+                    <h3>Send event</h3>
+                    <p>
+                        A Nop can emit one event when it is reached. Use a standard
+                        exit event or enter a custom event name.
+                    </p>
+                </div>
+            </div>
+
+            <div className="nop-send-card">
+                <div className="nop-send-card-header">
+                    <div>
+                        <div className="nop-send-card-title">Outgoing event</div>
+                        <div className="nop-send-card-subtitle">
+                            Event sent to the parent state machine
+                        </div>
+                    </div>
+                    <div className={`nop-send-status ${eventName.trim() ? "configured" : "empty"}`}>
+                        {eventName.trim() ? "Configured" : "Not configured"}
+                    </div>
+                </div>
+
+                <label className="nop-send-field-label" htmlFor={`nop-send-event-${nodeId}`}>
+                    Event
+                </label>
+
+                <div className="nop-send-input-wrap">
+                    <input
+                        id={`nop-send-event-${nodeId}`}
+                        className="nop-send-input"
+                        type="text"
+                        autoComplete="off"
+                        spellCheck="false"
+                        value={eventName}
+                        placeholder="e.g. success or my.custom.event"
+                        onFocus={() => setIsFocused(true)}
+                        onBlur={() => {
+                            window.setTimeout(() => setIsFocused(false), 100);
+                        }}
+                        onChange={(event) => setEventName(event.target.value)}
+                        onKeyDown={handleKeyDown}
+                    />
+
+                    {eventName && (
+                        <button
+                            type="button"
+                            className="nop-send-clear"
+                            title="Clear event"
+                            aria-label="Clear event"
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => setEventName("")}
+                        >
+                            <FiX />
+                        </button>
+                    )}
+
+                    {isFocused && matchingSuggestions.length > 0 && (
+                        <div className="nop-send-suggestions">
+                            {matchingSuggestions.map((suggestion) => (
+                                <button
+                                    type="button"
+                                    key={suggestion}
+                                    className={`nop-send-suggestion ${
+                                        suggestion === normalizedQuery ? "selected" : ""
+                                    }`}
+                                    onMouseDown={(event) => event.preventDefault()}
+                                    onClick={() => {
+                                        setEventName(suggestion);
+                                        setIsFocused(false);
+                                    }}
+                                >
+                                    <span>{suggestion}</span>
+                                    <span className="nop-send-suggestion-kind">standard</span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <div className="nop-send-presets">
+                    <span>Common events</span>
+                    <div className="nop-send-preset-list">
+                        {NOP_SEND_EVENT_SUGGESTIONS.map((suggestion) => (
+                            <button
+                                type="button"
+                                key={suggestion}
+                                className={`nop-send-preset ${
+                                    suggestion === normalizedQuery ? "active" : ""
+                                }`}
+                                onClick={() => setEventName(suggestion)}
+                            >
+                                {suggestion}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    );
+}
+
+
 function getExitTokenType(eventId) {
     const mainType = String(eventId || "")
         .trim()
@@ -463,6 +617,7 @@ function DetailsPanel({
                           globalDataModel,
                           actionValueVariables,
                           onUpdateStateActions,
+                          onUpdateSendEvents,
                           slotDetails,
                           onUpdateSlotPath,
                           onUpdateSlotInherited,
@@ -475,9 +630,51 @@ function DetailsPanel({
     const isContainerState =
         selectedNode.type === "compound" ||
         selectedNode.type === "parallel";
+    const selectedSkillType = String(selectedNode.data?.fullSkillName || "")
+        .split("#")[0]
+        .split(".")
+        .pop()
+        .toLowerCase();
+    const isNopSkill = !isSubMachine && selectedSkillType === "nop";
+    const hasNopSend =
+        isNopSkill &&
+        Array.isArray(selectedNode.data?.behaviorExitEvents) &&
+        String(selectedNode.data.behaviorExitEvents[0] || "").trim().length > 0;
+    const usesEditorInstanceId =
+        !isSubMachine &&
+        ["nop", "fatal", "end"].includes(selectedSkillType);
+    const skillDisplayName = String(selectedNode.data?.fullSkillName || "")
+        .split("#")[0]
+        .split(".")
+        .pop() || selectedNode.data?.label || "—";
+    const hidesParameterAndSlots =
+        !isSubMachine &&
+        ["nop", "fatal", "end"].includes(selectedSkillType);
+    const hidesEntryExit =
+        !isSubMachine &&
+        ["nop", "fatal", "end"].includes(selectedSkillType);
 
     const [openTargetSelector, setOpenTargetSelector] = useState(null);
     const [targetQueries, setTargetQueries] = useState({});
+
+    useEffect(() => {
+        const hiddenStandardTab =
+            hidesParameterAndSlots &&
+            (activeTab === "parameter" || activeTab === "slots");
+        const invalidSendTab = activeTab === "send" && !isNopSkill;
+        const hiddenActionsTab = activeTab === "actions" && hidesEntryExit;
+
+        if (hiddenStandardTab || invalidSendTab || hiddenActionsTab) {
+            setActiveTab("allgemein");
+        }
+    }, [
+        activeTab,
+        hidesParameterAndSlots,
+        hidesEntryExit,
+        isNopSkill,
+        selectedNode.id,
+        setActiveTab,
+    ]);
 
     if (selectedNode.type === "slot") {
         return (
@@ -496,17 +693,23 @@ function DetailsPanel({
 
     const targetNodeOptions = (availableTargetNodes || []).map((node) => {
         const fullSkillName = node.data?.fullSkillName || "";
-        const stateName = fullSkillName.includes("#")
-            ? fullSkillName.split("#").pop()
-            : "";
+        const editorInstanceId = String(
+            node.data?.editorInstanceId || ""
+        ).trim();
+        const stateName = editorInstanceId
+            ? `#${editorInstanceId}`
+            : fullSkillName.includes("#")
+                ? fullSkillName.split("#").pop()
+                : "";
 
         const skillName =
             node.data?.label ||
             fullSkillName.split(".").pop().split("#")[0] ||
             node.id;
 
-        const displayName =
-            stateName && stateName !== skillName
+        const displayName = editorInstanceId
+            ? `${skillName} (#${editorInstanceId})`
+            : stateName && stateName !== skillName
                 ? `${skillName} (${stateName})`
                 : skillName;
 
@@ -516,6 +719,7 @@ function DetailsPanel({
             skillName,
             stateName,
             fullSkillName,
+            editorInstanceId,
             packageName: getSkillPackageName(fullSkillName),
         };
     });
@@ -663,7 +867,7 @@ function DetailsPanel({
                     Overall
                 </div>
 
-                {!isSubMachine && (
+                {!isSubMachine && !hidesParameterAndSlots && (
                     <>
                         <div
                             className={`tab ${
@@ -685,14 +889,27 @@ function DetailsPanel({
                     </>
                 )}
 
-                <div
-                    className={`tab ${
-                        activeTab === "actions" ? "active-tab" : ""
-                    }`}
-                    onClick={() => setActiveTab("actions")}
-                >
-                    Entry / Exit
-                </div>
+                {isNopSkill && (
+                    <div
+                        className={`tab ${
+                            activeTab === "send" ? "active-tab" : ""
+                        }`}
+                        onClick={() => setActiveTab("send")}
+                    >
+                        Send
+                    </div>
+                )}
+
+                {!hidesEntryExit && (
+                    <div
+                        className={`tab ${
+                            activeTab === "actions" ? "active-tab" : ""
+                        }`}
+                        onClick={() => setActiveTab("actions")}
+                    >
+                        Entry / Exit
+                    </div>
+                )}
             </div>
 
             <div className="tab-content">
@@ -830,20 +1047,22 @@ function DetailsPanel({
                                     </span>
 
                                     <span className="field-value">
-                                        {selectedNode.data.label || "—"}
+                                        {skillDisplayName}
                                     </span>
                                 </div>
 
                                 <div className="field-row">
                                     <label className="field-label">
-                                        Name:
+                                        {usesEditorInstanceId ? "Instance ID:" : "Name:"}
                                     </label>
 
                                     <input
                                         className="text-field"
                                         type="text"
                                         value={
-                                            selectedNode.data.fullSkillName
+                                            usesEditorInstanceId
+                                                ? selectedNode.data.editorInstanceId || ""
+                                                : selectedNode.data.fullSkillName
                                                 ?.split("#")[1] || ""
                                         }
                                         onChange={(e) =>
@@ -874,7 +1093,7 @@ function DetailsPanel({
                             </>
                         )}
 
-                        {!isSubMachine && (
+                        {!isSubMachine && !hasNopSend && (
                             <div className="events-container">
                                 <h3>Exit Tokens</h3>
 
@@ -1081,7 +1300,7 @@ function DetailsPanel({
                     </div>
                 )}
 
-                {activeTab === "parameter" && !isSubMachine && (
+                {activeTab === "parameter" && !isSubMachine && !hidesParameterAndSlots && (
                     <div className="slots-container">
                         <h3>Parameters</h3>
 
@@ -1168,7 +1387,7 @@ function DetailsPanel({
                     </div>
                 )}
 
-                {activeTab === "slots" && !isSubMachine && (
+                {activeTab === "slots" && !isSubMachine && !hidesParameterAndSlots && (
                     <div className="slots-container">
                         <h3>Slots</h3>
 
@@ -1286,7 +1505,17 @@ function DetailsPanel({
                     </div>
                 )}
 
-                {activeTab === "actions" && (
+                {activeTab === "send" && isNopSkill && (
+                    <NopSendEditor
+                        nodeId={selectedNode.id}
+                        events={selectedNode.data.behaviorExitEvents || []}
+                        onChange={(events) =>
+                            onUpdateSendEvents?.(selectedNode.id, events)
+                        }
+                    />
+                )}
+
+                {activeTab === "actions" && !hidesEntryExit && (
                     <div className="state-actions-container">
                         <StateActionsEditor
                             actionName="OnEntry"

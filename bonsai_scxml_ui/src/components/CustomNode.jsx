@@ -59,8 +59,9 @@ function CustomNode({ id, data, selected }) {
     const edges = useEdges();
     const updateNodeInternals = useUpdateNodeInternals();
 
-    const instanceId =
-        data.fullSkillName && data.fullSkillName.includes("#")
+    const instanceId = String(data.editorInstanceId || "").trim()
+        ? `#${String(data.editorInstanceId).trim()}`
+        : data.fullSkillName && data.fullSkillName.includes("#")
             ? `#${data.fullSkillName.split("#")[1]}`
             : "";
 
@@ -347,7 +348,7 @@ function CustomNode({ id, data, selected }) {
             <div className="custom-node-label">
                 {data.label}
 
-                {instanceId && !isBehaviorExit && (
+                {instanceId && (
                     <span
                         style={{
                             marginLeft: "4px",

@@ -11,6 +11,31 @@ const escapeXmlAttribute = (value) => String(value)
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;");
 
+const buildEditorMetadataXml = (node, indent, isLane) => {
+    if (isLane) return "";
+
+    const clonePositions = Array.isArray(node.data?.editorClonePositions)
+        ? node.data.editorClonePositions
+        : [];
+
+    const positionLines = clonePositions.length > 0
+        ? clonePositions.map((position, index) => {
+            const x = Math.round(Number(position?.x || 0));
+            const y = Math.round(Number(position?.y || 0));
+            const instanceId = String(position?.instanceId || index + 1).trim();
+            const instanceAttr = instanceId
+                ? ` instance="${escapeXmlAttribute(instanceId)}"`
+                : "";
+
+            return `${indent}        <editor:position${instanceAttr} x="${x}" y="${y}"/>`;
+        })
+        : [
+            `${indent}        <editor:position x="${Math.round(node.position?.x || 0)}" y="${Math.round(node.position?.y || 0)}"/>`,
+        ];
+
+    return `${indent}    <metadata>\n${positionLines.join("\n")}\n${indent}    </metadata>`;
+};
+
 /**
  * Generiert den SCXML-Code-String inklusive <metadata> Positionen, Slots,
  * Sub-State-Machines und Condition/Assign-Transitions.
@@ -41,24 +66,24 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
         allSlots.forEach((slot) => {
             if (!slot.path || slot.path.trim() === "") return;
 
-            const formattedPath = slot.path.startsWith("/") ? slot.path : `/${slot.path}`;
-            const tagName = slot.inherited ? "inheritSlot" : "slot";
+                    const formattedPath = slot.path.startsWith("/") ? slot.path : `/${slot.path}`;
+                    const tagName = slot.inherited ? "inheritSlot" : "slot";
 
-            // Bei inheritSlot referenziert `state`/`xpath` die ursprüngliche
-            // Deklaration (kann von der aktuellen Node abweichen), sonst geht
-            // beim nächsten Import/Export-Zyklus die Herkunft verloren.
-            const declaredState = slot.inherited?.state || skillName;
-            const declaredPath = slot.inherited?.xpath
-                ? (slot.inherited.xpath.startsWith("/") ? slot.inherited.xpath : `/${slot.inherited.xpath}`)
-                : formattedPath;
+                    // Bei inheritSlot referenziert `state`/`xpath` die ursprüngliche
+                    // Deklaration (kann von der aktuellen Node abweichen), sonst geht
+                    // beim nächsten Import/Export-Zyklus die Herkunft verloren.
+                    const declaredState = slot.inherited?.state || skillName;
+                    const declaredPath = slot.inherited?.xpath
+                        ? (slot.inherited.xpath.startsWith("/") ? slot.inherited.xpath : `/${slot.inherited.xpath}`)
+                        : formattedPath;
 
-            const dedupeKey = `${tagName}|${slot.key}|${declaredState}|${declaredPath}`;
-            if (seenSlotKeys.has(dedupeKey)) return;
-            seenSlotKeys.add(dedupeKey);
+                    const dedupeKey = `${tagName}|${slot.key}|${declaredState}|${declaredPath}`;
+                    if (seenSlotKeys.has(dedupeKey)) return;
+                    seenSlotKeys.add(dedupeKey);
 
-            slotEntries.push(
-                `                <${tagName} key="${slot.key}" state="${declaredState}" xpath="${declaredPath}"/>`
-            );
+                    slotEntries.push(
+                        `                <${tagName} key="${slot.key}" state="${declaredState}" xpath="${declaredPath}"/>`
+                    );
         });
     });
 
@@ -263,11 +288,12 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
             : [];
         const onentryBlock = buildStateActionXml("onentry", onEntryAssignments, indent + "    ");
         const onexitBlock = buildStateActionXml("onexit", onExitAssignments, indent + "    ");
+        const metadataXml = buildEditorMetadataXml(node, indent, isLane);
 
         if (isFinal && !isSubMachine && children.length === 0) {
-            const finalActionBlocks = [onentryBlock, onexitBlock].filter(Boolean);
-            if (finalActionBlocks.length > 0) {
-                return `${indent}<final id="${skillId}">\n${finalActionBlocks.join("\n\n")}\n${indent}</final>`;
+            const finalBlocks = [metadataXml, onentryBlock, onexitBlock].filter(Boolean);
+            if (finalBlocks.length > 0) {
+                return `${indent}<final id="${skillId}">\n${finalBlocks.join("\n\n")}\n${indent}</final>`;
             }
             return `${indent}<final id="${skillId}"/>`;
         }
@@ -285,12 +311,7 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
             }
         }
 
-        // A) Position
-        const posX = Math.round(node.position?.x || 0);
-        const posY = Math.round(node.position?.y || 0);
-        const metadataXml = !isLane
-            ? `${indent}    <metadata>\n${indent}        <editor:position x="${posX}" y="${posY}"/>\n${indent}    </metadata>`
-            : "";
+        // A) Editor metadata / position
 
         // B) Datamodel
         const localParams = (node.data.params || []).filter(
@@ -325,30 +346,24 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
                         },
                     ];
 
-            transitionsXml = configuredTransitions
+            const configuredSend = configuredTransitions
                 .map((transition) => {
-                    const triggerEvent =
-                        transition.triggerEvent || "Nop.fatal";
-                    const sendEvents = Array.isArray(
-                        transition.sendEvents
-                    )
-                        ? transition.sendEvents
-                        : [];
-
-                    const sendLines = sendEvents
-                        .filter(Boolean)
-                        .map(
-                            (eventName) =>
-                                `${indent}        <send event="${escapeXmlAttribute(eventName)}"/>`
-                        )
-                        .join("\n");
-
-                    if (!sendLines) return "";
-
-                    return `${indent}    <transition event="${escapeXmlAttribute(triggerEvent)}">\n${sendLines}\n${indent}    </transition>`;
+                    const sendEvent = Array.isArray(transition.sendEvents)
+                        ? transition.sendEvents.find(Boolean)
+                        : null;
+                    return sendEvent
+                        ? {
+                            triggerEvent:
+                                transition.triggerEvent || "Nop.fatal",
+                            sendEvent,
+                        }
+                        : null;
                 })
-                .filter(Boolean)
-                .join("\n");
+                .find(Boolean);
+
+            if (configuredSend) {
+                transitionsXml = `${indent}    <transition event="${escapeXmlAttribute(configuredSend.triggerEvent)}">\n${indent}        <send event="${escapeXmlAttribute(configuredSend.sendEvent)}"/>\n${indent}    </transition>`;
+            }
         } else if (isContainer) {
             const leavingTransitions = [];
 
@@ -375,7 +390,7 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
 
                         const targetId = targetNode
                             ? targetNode.data.fullSkillName ||
-                            targetNode.data.label
+                              targetNode.data.label
                             : e.target;
 
                         /*
@@ -418,8 +433,8 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
                         const condAttr =
                             e.data?.cond
                                 ? ` cond="${escapeXmlAttribute(
-                                    e.data.cond
-                                )}"`
+                                      e.data.cond
+                                  )}"`
                                 : "";
 
                         const assignments =
@@ -428,8 +443,8 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
                             )
                                 ? e.data.assignments
                                 : e.data?.assign?.location
-                                    ? [e.data.assign]
-                                    : [];
+                                  ? [e.data.assign]
+                                  : [];
 
                         if (assignments.length > 0) {
                             const assignmentLines =
@@ -438,7 +453,7 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
                                         (assignment) =>
                                             assignment?.location &&
                                             assignment?.expr !==
-                                            undefined
+                                                undefined
                                     )
                                     .map((assignment) => {
                                         const location =

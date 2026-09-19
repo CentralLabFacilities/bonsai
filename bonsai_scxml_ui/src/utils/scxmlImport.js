@@ -51,6 +51,49 @@ const isNamedFinalState = (fullSkillName) => {
     return name === "end" || name === "fatal";
 };
 
+const parseEditorPositions = (stateElem) => {
+    const metadataElems = Array.from(stateElem?.children || []).filter(
+        (child) => child.localName === "metadata"
+    );
+
+    if (metadataElems.length === 0) return [];
+
+    return Array.from(metadataElems[0].children || [])
+        .filter(
+            (child) =>
+                child.localName === "position" ||
+                child.nodeName.includes("position")
+        )
+        .map((positionElement) => ({
+            x: parseFloat(positionElement.getAttribute("x")),
+            y: parseFloat(positionElement.getAttribute("y")),
+            instanceId:
+                positionElement.getAttribute("instance")?.trim() || "",
+        }))
+        .filter(
+            (position) =>
+                Number.isFinite(position.x) && Number.isFinite(position.y)
+        );
+};
+
+const getImportedAbsolutePosition = (node, allNodes) => {
+    let x = Number(node?.position?.x || 0);
+    let y = Number(node?.position?.y || 0);
+    let parentId = node?.parentId;
+    const visited = new Set();
+
+    while (parentId && !visited.has(parentId)) {
+        visited.add(parentId);
+        const parent = allNodes.find((candidate) => candidate.id === parentId);
+        if (!parent) break;
+        x += Number(parent.position?.x || 0);
+        y += Number(parent.position?.y || 0);
+        parentId = parent.parentId;
+    }
+
+    return { x, y };
+};
+
 const parseBehaviorExitForwarding = (stateElem, fullSkillName) => {
     if (getBaseStateName(fullSkillName).toLowerCase() !== "nop") {
         return null;
@@ -328,20 +371,14 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
         const srcAttr = stateElem.getAttribute("src");
         const isInitial = fullSkillName === initialAttr;
 
-        // Position aus <metadata>
-        let x = null;
-        let y = null;
-        const metadataElems = Array.from(stateElem.children).filter((c) => c.localName === "metadata");
-        if (metadataElems.length > 0) {
-            const posTag = Array.from(metadataElems[0].children).find(
-                (c) => c.localName === "position" || c.nodeName.includes("position")
-            );
-            if (posTag) {
-                x = parseFloat(posTag.getAttribute("x"));
-                y = parseFloat(posTag.getAttribute("y"));
-            }
-        }
-        if (x === null || isNaN(x) || y === null || isNaN(y)) {
+        // Position(s) aus <metadata>. Shared editor aliases (End/Fatal and
+        // forwarding Nop exits) may store multiple positions for one SCXML
+        // state. Normal states continue to use the first position.
+        const editorPositions = parseEditorPositions(stateElem);
+        let x = editorPositions[0]?.x ?? null;
+        let y = editorPositions[0]?.y ?? null;
+
+        if (x === null || !Number.isFinite(x) || y === null || !Number.isFinite(y)) {
             hasCustomPositions = false;
             x = 0;
             y = 0;
@@ -761,12 +798,47 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             effectiveElem
         );
 
-        newNodes.push({
-            id: nodeId,
-            position: { x, y },
-            type: srcAttr ? "submachine" : "custom",
-            data: nodeData,
-        });
+        const isSharedEditorState =
+            !srcAttr &&
+            (isNamedFinalState(effectiveSkillName) || nodeData.isBehaviorExit);
+
+        if (isSharedEditorState) {
+            const clonePositions = editorPositions.length > 0
+                ? editorPositions
+                : [{ x, y, instanceId: "1" }];
+
+            clonePositions.forEach((clonePosition, cloneIndex) => {
+                const cloneNodeId = cloneIndex === 0 ? nodeId : getNodeId();
+                const editorInstanceId =
+                    String(clonePosition.instanceId || "").trim() ||
+                    String(cloneIndex + 1);
+
+                newNodes.push({
+                    id: cloneNodeId,
+                    position: {
+                        x: clonePosition.x,
+                        y: clonePosition.y,
+                    },
+                    type: "custom",
+                    data: {
+                        ...nodeData,
+                        isInitial: Boolean(nodeData.isInitial && cloneIndex === 0),
+                        scxmlStateId: effectiveSkillName,
+                        editorInstanceId,
+                        ...(nodeData.isBehaviorExit
+                            ? { behaviorExitScxmlStateId: effectiveSkillName }
+                            : {}),
+                    },
+                });
+            });
+        } else {
+            newNodes.push({
+                id: nodeId,
+                position: { x, y },
+                type: srcAttr ? "submachine" : "custom",
+                data: nodeData,
+            });
+        }
     }
 
     // Editor representation: @ is a visual marker for variable references.
@@ -803,25 +875,54 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
     // 4. Edges und Node-Events mit exakter Struktur aufbauen
 
     rawTransitions.forEach((trans) => {
-        // Zielknoten finden
-        const targetNode = newNodes.find(
-            (n) =>
-                n.data.fullSkillName === trans.targetStateName ||
-                n.data.label === trans.targetStateName ||
-                n.id === trans.targetStateName
-        );
-
-        // Quellknoten finden (entweder über ID oder über SkillName/Prefix)
+        // Quellknoten zuerst bestimmen. Wenn ein SCXML-Ziel mehrere visuelle
+        // Aliase besitzt, wird anschließend der räumlich nächste Alias gewählt.
         const sourceNode = trans.sourceNodeId
             ? newNodes.find((n) => n.id === trans.sourceNodeId)
             : newNodes.find(
                 (n) =>
                     n.data.fullSkillName === trans.sourceSkillName ||
+                    n.data.scxmlStateId === trans.sourceSkillName ||
                     n.data.label === trans.sourceSkillName ||
                     (n.data.fullSkillName && n.data.fullSkillName.startsWith(trans.sourceSkillName))
             );
 
-        if (!targetNode || !sourceNode) return;
+        if (!sourceNode) return;
+
+        const targetCandidates = newNodes.filter(
+            (n) =>
+                n.data.scxmlStateId === trans.targetStateName ||
+                n.data.fullSkillName === trans.targetStateName ||
+                n.data.label === trans.targetStateName ||
+                n.id === trans.targetStateName
+        );
+
+        if (targetCandidates.length === 0) return;
+
+        const sourcePosition = getImportedAbsolutePosition(
+            sourceNode,
+            newNodes
+        );
+
+        const targetNode = targetCandidates.length === 1
+            ? targetCandidates[0]
+            : targetCandidates.reduce((closest, candidate) => {
+                const candidatePosition = getImportedAbsolutePosition(
+                    candidate,
+                    newNodes
+                );
+                const dx = candidatePosition.x - sourcePosition.x;
+                const dy = candidatePosition.y - sourcePosition.y;
+                const distanceSquared = dx * dx + dy * dy;
+
+                if (!closest || distanceSquared < closest.distanceSquared) {
+                    return { candidate, distanceSquared };
+                }
+
+                return closest;
+            }, null)?.candidate;
+
+        if (!targetNode) return;
 
         const eventHandleId = getTransitionExitToken(
             trans.eventId,

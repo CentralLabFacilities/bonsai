@@ -67,8 +67,8 @@ function SlotNode({ id, data, selected = false }) {
 
     const childRequirementTitle =
         requiredByLabels.length > 0
-            ? `Inherited by sub-state machine: ${requiredByLabels.join(", ")}`
-            : "Inherited by a sub-state machine.";
+            ? `Sub-state machine <inheritSlot>: ${requiredByLabels.join(", ")}`
+            : "A sub-state machine declares this slot as <inheritSlot>.";
 
     const writeHandleId = "slot-node-write";
     const readHandleId = "slot-node-read";
@@ -113,9 +113,16 @@ function SlotNode({ id, data, selected = false }) {
             />
 
             <div className="slot-node-header">
-                <div className="slot-node-kind">
-                    <FiDatabase size={11} aria-hidden="true" />
-                    <span>SLOT</span>
+                <div
+                    className="slot-node-kind"
+                    style={isInheritedFromParent ? { color: "#f59e0b" } : undefined}
+                >
+                    <FiDatabase
+                        size={11}
+                        aria-hidden="true"
+                        style={isInheritedFromParent ? { color: "#f59e0b" } : undefined}
+                    />
+                    <span>{isInheritedFromParent ? "INHERIT SLOT" : "SLOT"}</span>
                 </div>
                 <div className="slot-node-type" title={slotType}>
                     {slotType}
@@ -139,16 +146,18 @@ function SlotNode({ id, data, selected = false }) {
 
             {isRequiredByChild && (
                 <div className="slot-node-provenance">
-                    <div
-                        className="slot-node-provenance-badge slot-node-provenance-child"
-                        title={childRequirementTitle}
-                    >
-                        {requiredByLabels.length === 1
-                            ? `Inherited by sub-state: ${requiredByLabels[0]}`
-                            : requiredByLabels.length > 1
-                                ? `Inherited by ${requiredByLabels.length} sub-states`
-                                : "Inherited by sub-state"}
-                    </div>
+                    {isRequiredByChild && (
+                        <div
+                            className="slot-node-provenance-badge slot-node-provenance-child"
+                            title={childRequirementTitle}
+                        >
+                            {requiredByLabels.length === 1
+                                ? `Inherited by sub-state: ${requiredByLabels[0]}`
+                                : requiredByLabels.length > 1
+                                    ? `Inherited by ${requiredByLabels.length} sub-states`
+                                    : "Inherited by sub-state"}
+                        </div>
+                    )}
                 </div>
             )}
         </div>
