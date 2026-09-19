@@ -197,6 +197,274 @@ const normalizeSlotPath = (path) =>
 const normalizeSlotType = (type) =>
     String(type || "").trim().toLowerCase();
 
+const getAncestorSlotSourcesByPath = (
+    tabList = [],
+    activeTabId = null,
+    activeSnapshot = null
+) => {
+    const result = new Map();
+    const tabsById = new Map((tabList || []).map((tab) => [tab.id, tab]));
+
+    // The active tab stored in `tabs` is only synchronized when changing tabs.
+    // Merge in the live editor state so newly edited inheritSlots participate in
+    // the hierarchy immediately.
+    if (activeTabId && activeSnapshot) {
+        const storedActiveTab = tabsById.get(activeTabId) || { id: activeTabId };
+        tabsById.set(activeTabId, {
+            ...storedActiveTab,
+            ...activeSnapshot,
+            id: activeTabId,
+            parentTabId:
+                activeSnapshot.parentTabId ?? storedActiveTab.parentTabId ?? null,
+        });
+    }
+
+    const currentTab = tabsById.get(activeTabId);
+    if (!currentTab?.parentTabId) {
+        return result;
+    }
+
+    const inheritedDeclarationsForPath = (tab, path) => {
+        const declarations = [];
+        const addDeclaration = (declaration) => {
+            if (!declaration) return;
+            declarations.push(declaration);
+        };
+
+        (tab?.manualSlots || []).forEach((slot) => {
+            const slotPath = normalizeSlotPath(slot?.inherited?.xpath || slot?.path);
+            const inherited =
+                slot?.slotKind === "inheritSlot" || Boolean(slot?.inherited);
+            if (inherited && slotPath === path) {
+                addDeclaration({
+                    type: slot?.type || "Unknown",
+                    description: slot?.description || "",
+                    key: slot?.key || "inheritSlot",
+                    source: "manual",
+                });
+            }
+        });
+
+        (tab?.slotNodes || []).forEach((slotNode) => {
+            const slotPath = normalizeSlotPath(
+                slotNode?.data?.path || slotNode?.data?.label
+            );
+            if (
+                slotPath === path &&
+                Boolean(slotNode?.data?.currentMachineInherited)
+            ) {
+                addDeclaration({
+                    type: slotNode?.data?.slotType || "Unknown",
+                    description: slotNode?.data?.description || "",
+                    key: slotNode?.data?.key || "inheritSlot",
+                    source: "slotNode",
+                });
+            }
+        });
+
+        (tab?.nodes || []).forEach((node) => {
+            [...(node.data?.inSlots || []), ...(node.data?.outSlots || [])].forEach(
+                (slot) => {
+                    const slotPath = normalizeSlotPath(
+                        slot?.inherited?.xpath || slot?.path
+                    );
+                    if (slotPath !== path || !slot?.inherited) return;
+
+                    addDeclaration({
+                        type: slot?.type || "Unknown",
+                        description: slot?.description || "",
+                        key: slot?.key || "inheritSlot",
+                        source: "skillSlot",
+                        nodeId: node.id,
+                    });
+                }
+            );
+        });
+
+        return declarations;
+    };
+
+    const collectInheritedPaths = (tab) => {
+        const paths = new Set();
+        const addPath = (value) => {
+            const path = normalizeSlotPath(value);
+            if (path) paths.add(path);
+        };
+
+        (tab?.manualSlots || []).forEach((slot) => {
+            if (slot?.slotKind === "inheritSlot" || slot?.inherited) {
+                addPath(slot?.inherited?.xpath || slot?.path);
+            }
+        });
+
+        (tab?.slotNodes || []).forEach((slotNode) => {
+            if (slotNode?.data?.currentMachineInherited) {
+                addPath(slotNode?.data?.path || slotNode?.data?.label);
+            }
+        });
+
+        (tab?.nodes || []).forEach((node) => {
+            [...(node.data?.inSlots || []), ...(node.data?.outSlots || [])].forEach(
+                (slot) => {
+                    if (slot?.inherited) {
+                        addPath(slot?.inherited?.xpath || slot?.path);
+                    }
+                }
+            );
+        });
+
+        return paths;
+    };
+
+    // Build the open sourcing hierarchy from the direct parent up to the root.
+    const ancestors = [];
+    const seenTabIds = new Set();
+    let parentTabId = currentTab.parentTabId;
+    let depth = 1;
+
+    while (parentTabId && !seenTabIds.has(parentTabId)) {
+        seenTabIds.add(parentTabId);
+        const parentTab = tabsById.get(parentTabId);
+        if (!parentTab) break;
+
+        ancestors.push({ tab: parentTab, depth });
+        parentTabId = parentTab.parentTabId;
+        depth += 1;
+    }
+
+    // We only need ancestry for paths that are inherited by the current state
+    // machine. This avoids unrelated parent slots appearing in Slot Details.
+    const candidatePaths = collectInheritedPaths(currentTab);
+
+    candidatePaths.forEach((path) => {
+        const entries = [];
+
+        for (const { tab: parentTab, depth: ancestorDepth } of ancestors) {
+            const parentMachineName =
+                parentTab.title || parentTab.fileName || "Parent state machine";
+            const inheritedDeclarations = inheritedDeclarationsForPath(
+                parentTab,
+                path
+            );
+            const isInheritedDeclaration = inheritedDeclarations.length > 0;
+
+            const writers = [];
+            const writerKeys = new Set();
+            const registerWriter = (writer) => {
+                const dedupeKey = [
+                    writer.nodeId || "",
+                    writer.key || "",
+                    writer.slotIndex ?? "",
+                    writer.sourceKind || "skill",
+                ].join("|");
+                if (writerKeys.has(dedupeKey)) return;
+                writerKeys.add(dedupeKey);
+
+                const entry = {
+                    ...writer,
+                    path: `/${path}`,
+                    parentTabId: parentTab.id,
+                    parentMachineName,
+                    ancestorDepth,
+                    sourceKind: writer.sourceKind || "skill",
+                    hierarchyKind: "writer",
+                };
+                writers.push(entry);
+                entries.push(entry);
+            };
+
+            (parentTab.nodes || []).forEach((node) => {
+                const skillName =
+                    node.data?.fullSkillName || node.data?.label || node.id;
+
+                (node.data?.outSlots || []).forEach((slot, slotIndex) => {
+                    if (normalizeSlotPath(slot?.path) !== path) return;
+
+                    registerWriter({
+                        nodeId: node.id,
+                        skillName,
+                        key: slot?.key || `output ${slotIndex + 1}`,
+                        type: slot?.type || "Unknown",
+                        description: slot?.description || "",
+                        access: "write",
+                        slotIndex,
+                        sourceKind: "skill",
+                    });
+                });
+
+                // A nested sub-state-machine that exposes a write inheritSlot is
+                // also a writer of the parent machine's slot.
+                if (node.type === "submachine") {
+                    (node.data?.inheritedSlots || []).forEach((slot, slotIndex) => {
+                        if (
+                            slot?.access !== "write" ||
+                            normalizeSlotPath(slot?.path) !== path
+                        ) {
+                            return;
+                        }
+
+                        registerWriter({
+                            nodeId: node.id,
+                            skillName,
+                            key: slot?.key || `inheritSlot ${slotIndex + 1}`,
+                            type: slot?.type || "Unknown",
+                            description: slot?.description || "",
+                            access: "write",
+                            slotIndex,
+                            sourceKind: "submachine",
+                        });
+                    });
+                }
+            });
+
+            if (isInheritedDeclaration) {
+                const declaration = inheritedDeclarations[0];
+                entries.push({
+                    nodeId: declaration.nodeId || null,
+                    skillName: "inheritSlot",
+                    key: declaration.key || "inheritSlot",
+                    type: declaration.type || "Unknown",
+                    description: declaration.description || "",
+                    access: "inherit",
+                    slotIndex: null,
+                    sourceKind: "inheritSlot",
+                    hierarchyKind: "inherit",
+                    path: `/${path}`,
+                    parentTabId: parentTab.id,
+                    parentMachineName,
+                    ancestorDepth,
+                });
+            }
+
+            // The slot may cross another state-machine boundary only when that
+            // parent declares the same path as inheritSlot. A writer in a
+            // non-inheriting parent is the root source for this chain.
+            if (!isInheritedDeclaration) {
+                break;
+            }
+        }
+
+        if (entries.length > 0) {
+            // Root-most source first, then move down toward the current machine.
+            entries.sort((a, b) => {
+                const depthDifference =
+                    (b.ancestorDepth || 0) - (a.ancestorDepth || 0);
+                if (depthDifference !== 0) return depthDifference;
+
+                if (a.hierarchyKind !== b.hierarchyKind) {
+                    return a.hierarchyKind === "writer" ? -1 : 1;
+                }
+                return String(a.skillName || "").localeCompare(
+                    String(b.skillName || "")
+                );
+            });
+            result.set(path, entries);
+        }
+    });
+
+    return result;
+};
+
 const extractInheritedSlotsFromScxml = (xmlText) => {
     if (!xmlText) return [];
 
@@ -350,7 +618,9 @@ const buildEditorProblems = (
     edges,
     globalDataModel,
     behaviorDirectories,
-    isBehaviorWorkflow = false
+    isBehaviorWorkflow = false,
+    manualSlots = [],
+    ancestorSlotSourcesByPath = new Map()
 ) => {
     const problems = [];
     const nodeMap = new Map((nodes || []).map((node) => [node.id, node]));
@@ -762,6 +1032,18 @@ const buildEditorProblems = (
         });
     });
 
+    const inheritedPaths = new Set(
+        (manualSlots || [])
+            .filter(
+                (slot) =>
+                    slot?.slotKind === "inheritSlot" || Boolean(slot?.inherited)
+            )
+            .map((slot) =>
+                normalizeSlotPath(slot?.inherited?.xpath || slot?.path)
+            )
+            .filter(Boolean)
+    );
+
     const paths = new Set([...readers.keys(), ...writers.keys()]);
 
     paths.forEach((path) => {
@@ -793,6 +1075,19 @@ const buildEditorProblems = (
         });
 
         if (pathReaders.length > 0 && pathWriters.length === 0) {
+            const isInheritedPath = inheritedPaths.has(path);
+            const ancestorSources = ancestorSlotSourcesByPath.get(path) || [];
+            const hasAncestorWriter = ancestorSources.some(
+                (entry) => entry?.hierarchyKind === "writer"
+            );
+
+            // An inheritSlot may be supplied through multiple parent state
+            // machines. It is valid when a writer is reachable through the
+            // complete inheritSlot chain, even if there is no local writer.
+            if (isInheritedPath && hasAncestorWriter) {
+                return;
+            }
+
             pathReaders.forEach((reader) => {
                 addProblem({
                     id: `slot-no-writer-${path}-${reader.node.id}-${reader.index}`,
@@ -3046,7 +3341,7 @@ function AppContent() {
         }
     }, [selectedNodeId]);
 
-    const { screenToFlowPosition, fitView, getNodes } = useReactFlow();
+    const { screenToFlowPosition, fitView, getNodes, setCenter } = useReactFlow();
 
     const buildInheritedGlobalsForChild = (
         inheritedGlobals,
@@ -5445,6 +5740,16 @@ function AppContent() {
     // dedicated slot detail view and made multi-skill slots ambiguous.
     const selectedNode = selectedRawNode;
 
+    const ancestorSlotSourcesByPath = useMemo(
+        () =>
+            getAncestorSlotSourcesByPath(tabs, activeTabId, {
+                nodes,
+                slotNodes,
+                manualSlots,
+            }),
+        [tabs, activeTabId, nodes, slotNodes, manualSlots]
+    );
+
     const selectedSlotDetails = useMemo(() => {
         if (!selectedRawNode || selectedRawNode.type !== "slot") {
             return null;
@@ -5507,6 +5812,9 @@ function AppContent() {
                     ? [...dataTypes].join(" / ")
                     : "Unknown");
 
+        const ancestorSlotAccesses =
+            ancestorSlotSourcesByPath.get(cleanPath) || [];
+
         return {
             path: cleanPath ? `/${cleanPath}` : "",
             dataType,
@@ -5517,8 +5825,9 @@ function AppContent() {
                 selectedRawNode.data?.currentMachineInherited
             ),
             skillAccesses,
+            ancestorSlotAccesses,
         };
-    }, [selectedRawNode, nodes]);
+    }, [selectedRawNode, nodes, ancestorSlotSourcesByPath]);
 
     // OnEntry/OnExit has asymmetric scope for sub-state-machines:
     // - assignment location belongs to the child machine's local datamodel
@@ -5675,7 +5984,9 @@ function AppContent() {
                 edges,
                 globalDataModel,
                 behaviorDirectories,
-                isBehaviorWorkflow
+                isBehaviorWorkflow,
+                manualSlots,
+                ancestorSlotSourcesByPath
             ),
         [
             nodes,
@@ -5683,6 +5994,8 @@ function AppContent() {
             globalDataModel,
             behaviorDirectories,
             isBehaviorWorkflow,
+            manualSlots,
+            ancestorSlotSourcesByPath,
         ]
     );
 
@@ -12420,14 +12733,102 @@ function AppContent() {
                                     setSelectedNodeId(nodeId);
                                     setRightPanelTab("details");
 
+                                    // Selection alone is easy to miss in a large graph. Move
+                                    // the viewport to the clicked Accessed-by skill as well.
                                     window.setTimeout(() => {
-                                        fitView({
-                                            nodes: [{ id: nodeId }],
-                                            padding: 0.8,
-                                            maxZoom: 1.35,
-                                            duration: 250,
-                                        });
-                                    }, 0);
+                                        const flowNode = getNodes().find(
+                                            (node) => node.id === nodeId
+                                        );
+                                        if (!flowNode) {
+                                            fitView({
+                                                nodes: [{ id: nodeId }],
+                                                padding: 0.8,
+                                                maxZoom: 1.2,
+                                                duration: 250,
+                                            });
+                                            return;
+                                        }
+
+                                        const position =
+                                            flowNode.positionAbsolute ||
+                                            flowNode.position ||
+                                            { x: 0, y: 0 };
+                                        const width =
+                                            Number(flowNode.measured?.width) ||
+                                            Number(flowNode.width) ||
+                                            220;
+                                        const height =
+                                            Number(flowNode.measured?.height) ||
+                                            Number(flowNode.height) ||
+                                            90;
+
+                                        setCenter(
+                                            position.x + width / 2,
+                                            position.y + height / 2,
+                                            { zoom: 1, duration: 300 }
+                                        );
+                                    }, 50);
+                                }}
+                                onNavigateAncestorSlot={(tabId, nodeId = null) => {
+                                    if (!tabId) return;
+
+                                    if (tabId !== activeTabId) {
+                                        switchTab(tabId);
+                                    }
+                                    setRightPanelTab("details");
+
+                                    if (!nodeId) return;
+
+                                    // Wait until the parent tab's graph has been installed,
+                                    // then select and center the hierarchy writer there.
+                                    window.setTimeout(() => {
+                                        setNodes((currentNodes) =>
+                                            currentNodes.map((node) => ({
+                                                ...node,
+                                                selected: node.id === nodeId,
+                                            }))
+                                        );
+                                        setSlotNodes((currentNodes) =>
+                                            currentNodes.map((node) => ({
+                                                ...node,
+                                                selected: false,
+                                            }))
+                                        );
+                                        setSelectedNodeId(nodeId);
+
+                                        window.setTimeout(() => {
+                                            const flowNode = getNodes().find(
+                                                (node) => node.id === nodeId
+                                            );
+                                            if (!flowNode) {
+                                                fitView({
+                                                    nodes: [{ id: nodeId }],
+                                                    padding: 0.8,
+                                                    maxZoom: 1.2,
+                                                    duration: 250,
+                                                });
+                                                return;
+                                            }
+
+                                            const position =
+                                                flowNode.positionAbsolute ||
+                                                flowNode.position ||
+                                                { x: 0, y: 0 };
+                                            const width =
+                                                Number(flowNode.measured?.width) ||
+                                                Number(flowNode.width) ||
+                                                220;
+                                            const height =
+                                                Number(flowNode.measured?.height) ||
+                                                Number(flowNode.height) ||
+                                                90;
+                                            setCenter(
+                                                position.x + width / 2,
+                                                position.y + height / 2,
+                                                { zoom: 1, duration: 300 }
+                                            );
+                                        }, 60);
+                                    }, tabId === activeTabId ? 0 : 80);
                                 }}
                                 parameterFocusRequest={parameterFocusRequest}
                                 slotFocusRequest={slotFocusRequest}

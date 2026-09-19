@@ -165,6 +165,7 @@ function SlotDetailsPanel({
                               onUpdateSlotInherited,
                               onSelectSkill,
                               onHoverSkill,
+                              onNavigateAncestorSlot,
                           }) {
     const initialPath =
         selectedNode.data?.path ||
@@ -178,6 +179,7 @@ function SlotDetailsPanel({
         "Unknown";
     const accessTypes = slotDetails?.accessTypes || [];
     const skillAccesses = slotDetails?.skillAccesses || [];
+    const ancestorSlotAccesses = slotDetails?.ancestorSlotAccesses || [];
     const isInherited = Boolean(
         slotDetails?.isInherited ??
         selectedNode.data?.currentMachineInherited
@@ -289,6 +291,99 @@ function SlotDetailsPanel({
                         </div>
                     </div>
                 </section>
+
+                {isInherited && (
+                    <section className="slot-access-section">
+                        <div className="slot-section-heading">
+                            <div>
+                                <div className="slot-section-title">Source hierarchy</div>
+                                <div className="slot-section-subtitle">
+                                    Writers and inheritSlot hops through parent state machines
+                                </div>
+                            </div>
+                            <span className="slot-access-count">
+                                {ancestorSlotAccesses.length}
+                            </span>
+                        </div>
+
+                        <div className="slot-list slot-access-list">
+                            {ancestorSlotAccesses.length > 0 ? (
+                                ancestorSlotAccesses.map((access, index) => {
+                                    const isInheritanceHop =
+                                        access.hierarchyKind === "inherit" ||
+                                        access.access === "inherit";
+
+                                    return (
+                                        <div
+                                            className={`slot-text-field compact-slot-card ${
+                                                isInheritanceHop
+                                                    ? "compact-slot-read"
+                                                    : "compact-slot-write"
+                                            } slot-access-skill-card`}
+                                            key={`ancestor-${access.parentTabId}-${access.nodeId || "slot"}-${access.key}-${index}`}
+                                            role="button"
+                                            tabIndex={0}
+                                            title={`Open ${access.parentMachineName}`}
+                                            onClick={() =>
+                                                onNavigateAncestorSlot?.(access.parentTabId, access.nodeId || null)
+                                            }
+                                            onKeyDown={(event) => {
+                                                if (event.key === "Enter" || event.key === " ") {
+                                                    event.preventDefault();
+                                                    onNavigateAncestorSlot?.(access.parentTabId, access.nodeId || null);
+                                                }
+                                            }}
+                                        >
+                                            <div className="compact-slot-header">
+                                                <div className="compact-slot-name">
+                                                    {access.parentMachineName}
+                                                </div>
+                                                <div className="compact-slot-badges">
+                                                    <span
+                                                        className={`slot-access-badge ${
+                                                            isInheritanceHop
+                                                                ? "slot-access-read"
+                                                                : "slot-access-write"
+                                                        }`}
+                                                    >
+                                                        {isInheritanceHop ? "inheritSlot" : "Write"}
+                                                    </span>
+                                                    <FiExternalLink aria-hidden="true" />
+                                                </div>
+                                            </div>
+
+                                            <MetadataRow
+                                                label={isInheritanceHop ? "Path" : "Skill"}
+                                                value={
+                                                    isInheritanceHop
+                                                        ? access.path
+                                                        : access.skillName
+                                                }
+                                            />
+                                            {!isInheritanceHop && (
+                                                <MetadataRow label="Key" value={access.key} />
+                                            )}
+                                            <MetadataRow label="Type" value={access.type} />
+                                            {access.description && (
+                                                <MetadataRow
+                                                    label="Description"
+                                                    value={access.description}
+                                                />
+                                            )}
+                                        </div>
+                                    );
+                                })
+                            ) : (
+                                <div className="slot-access-empty-state">
+                                    <FiLayers />
+                                    <span>
+                                        No writer was found through the parent state-machine hierarchy.
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                    </section>
+                )}
 
                 <section className="slot-access-section">
                     <div className="slot-section-heading">
@@ -623,6 +718,7 @@ function DetailsPanel({
                           onUpdateSlotInherited,
                           onSelectSlotAccessSkill,
                           onHoverSlotAccessSkill,
+                          onNavigateAncestorSlot,
                           parameterFocusRequest,
                           slotFocusRequest,
                           transitionFocusRequest,
@@ -866,6 +962,7 @@ function DetailsPanel({
                 onUpdateSlotInherited={onUpdateSlotInherited}
                 onSelectSkill={onSelectSlotAccessSkill}
                 onHoverSkill={onHoverSlotAccessSkill}
+                onNavigateAncestorSlot={onNavigateAncestorSlot}
             />
         );
     }
