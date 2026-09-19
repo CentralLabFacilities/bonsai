@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
     FiActivity,
     FiChevronDown,
@@ -623,6 +623,9 @@ function DetailsPanel({
                           onUpdateSlotInherited,
                           onSelectSlotAccessSkill,
                           onHoverSlotAccessSkill,
+                          parameterFocusRequest,
+                          slotFocusRequest,
+                          transitionFocusRequest,
                       }) {
     const isSubMachine =
         selectedNode.type === "submachine" ||
@@ -652,10 +655,186 @@ function DetailsPanel({
         ["nop", "fatal", "end"].includes(selectedSkillType);
     const hidesEntryExit =
         !isSubMachine &&
-        ["nop", "fatal", "end"].includes(selectedSkillType);
+        (selectedSkillType === "fatal" ||
+            selectedSkillType === "end" ||
+            (isNopSkill && hasNopSend));
 
     const [openTargetSelector, setOpenTargetSelector] = useState(null);
     const [targetQueries, setTargetQueries] = useState({});
+
+    const handledParameterFocusRequestRef = useRef(null);
+
+    useEffect(() => {
+        if (!parameterFocusRequest) return;
+        if (activeTab !== "parameter") return;
+        if (selectedNode.id !== parameterFocusRequest.nodeId) return;
+        if (
+            handledParameterFocusRequestRef.current ===
+            parameterFocusRequest.requestId
+        ) {
+            return;
+        }
+
+        const parameterIndex = (selectedNode.data?.params || []).findIndex(
+            (parameter) =>
+                String(parameter?.key || "") ===
+                String(parameterFocusRequest.parameterKey || "")
+        );
+
+        if (parameterIndex < 0) return;
+
+        let frameA = null;
+        let frameB = null;
+
+        frameA = requestAnimationFrame(() => {
+            frameB = requestAnimationFrame(() => {
+                const input = document.getElementById(
+                    `param-${selectedNode.id}-${parameterIndex}`
+                );
+
+                if (!input) return;
+
+                handledParameterFocusRequestRef.current =
+                    parameterFocusRequest.requestId;
+                input.focus();
+
+                const cursorPosition = String(input.value || "").length;
+                if (typeof input.setSelectionRange === "function") {
+                    input.setSelectionRange(cursorPosition, cursorPosition);
+                }
+
+                input.scrollIntoView({ block: "nearest", behavior: "smooth" });
+            });
+        });
+
+        return () => {
+            if (frameA !== null) cancelAnimationFrame(frameA);
+            if (frameB !== null) cancelAnimationFrame(frameB);
+        };
+    }, [
+        activeTab,
+        parameterFocusRequest,
+        selectedNode.id,
+        selectedNode.data?.params,
+    ]);
+
+    const handledSlotFocusRequestRef = useRef(null);
+
+    useEffect(() => {
+        if (!slotFocusRequest) return;
+        if (activeTab !== "slots") return;
+        if (selectedNode.id !== slotFocusRequest.nodeId) return;
+        if (
+            handledSlotFocusRequestRef.current ===
+            slotFocusRequest.requestId
+        ) {
+            return;
+        }
+
+        const slots =
+            slotFocusRequest.access === "write"
+                ? selectedNode.data?.outSlots || []
+                : selectedNode.data?.inSlots || [];
+        const slotIndex = slots.findIndex(
+            (slot) =>
+                String(slot?.key || "") ===
+                String(slotFocusRequest.slotKey || "")
+        );
+
+        if (slotIndex < 0) return;
+
+        const inputId = `${
+            slotFocusRequest.access === "write" ? "out" : "in"
+        }-slot-${selectedNode.id}-${slotIndex}`;
+
+        let frameA = null;
+        let frameB = null;
+
+        frameA = requestAnimationFrame(() => {
+            frameB = requestAnimationFrame(() => {
+                const input = document.getElementById(inputId);
+                if (!input) return;
+
+                handledSlotFocusRequestRef.current =
+                    slotFocusRequest.requestId;
+                input.focus();
+
+                const cursorPosition = String(input.value || "").length;
+                if (typeof input.setSelectionRange === "function") {
+                    input.setSelectionRange(cursorPosition, cursorPosition);
+                }
+
+                input.scrollIntoView({ block: "nearest", behavior: "smooth" });
+            });
+        });
+
+        return () => {
+            if (frameA !== null) cancelAnimationFrame(frameA);
+            if (frameB !== null) cancelAnimationFrame(frameB);
+        };
+    }, [
+        activeTab,
+        slotFocusRequest,
+        selectedNode.id,
+        selectedNode.data?.inSlots,
+        selectedNode.data?.outSlots,
+    ]);
+
+    const handledTransitionFocusRequestRef = useRef(null);
+
+    useEffect(() => {
+        if (!transitionFocusRequest) return;
+        if (activeTab !== "allgemein") return;
+        if (selectedNode.id !== transitionFocusRequest.nodeId) return;
+        if (
+            handledTransitionFocusRequestRef.current ===
+            transitionFocusRequest.requestId
+        ) {
+            return;
+        }
+
+        const sortedEvents = sortExitTokens(selectedNode.data?.events || []);
+        const eventIndex = sortedEvents.findIndex(
+            (event) =>
+                String(event?.id || "") ===
+                String(transitionFocusRequest.eventId || "")
+        );
+
+        if (eventIndex < 0) return;
+
+        let frameA = null;
+        let frameB = null;
+
+        frameA = requestAnimationFrame(() => {
+            frameB = requestAnimationFrame(() => {
+                const input = document.getElementById(
+                    `transition-target-${selectedNode.id}-${eventIndex}`
+                );
+                if (!input) return;
+
+                handledTransitionFocusRequestRef.current =
+                    transitionFocusRequest.requestId;
+                input.focus();
+
+                const cursorPosition = String(input.value || "").length;
+                if (typeof input.setSelectionRange === "function") {
+                    input.setSelectionRange(cursorPosition, cursorPosition);
+                }
+
+                input.scrollIntoView({ block: "nearest", behavior: "smooth" });
+            });
+        });
+
+        return () => {
+            if (frameA !== null) cancelAnimationFrame(frameA);
+            if (frameB !== null) cancelAnimationFrame(frameB);
+        };
+    }, [
+        activeTab,
+        transitionFocusRequest,
+        selectedNode.id,
+        selectedNode.data?.events,
+    ]);
 
     useEffect(() => {
         const hiddenStandardTab =
@@ -1063,7 +1242,7 @@ function DetailsPanel({
                                             usesEditorInstanceId
                                                 ? selectedNode.data.editorInstanceId || ""
                                                 : selectedNode.data.fullSkillName
-                                                ?.split("#")[1] || ""
+                                                    ?.split("#")[1] || ""
                                         }
                                         onChange={(e) =>
                                             onUpdateName(e.target.value)
@@ -1158,6 +1337,7 @@ function DetailsPanel({
                                                             <div className="exit-target-selector">
                                                                 <div className="exit-target-input-row">
                                                                     <input
+                                                                        id={`transition-target-${selectedNode.id}-${index}`}
                                                                         className="exit-target-input"
                                                                         type="text"
                                                                         value={query}

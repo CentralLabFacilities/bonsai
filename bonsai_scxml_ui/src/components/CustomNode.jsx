@@ -368,7 +368,55 @@ function CustomNode({ id, data, selected }) {
                     <div className="event-list">
                         {eventIds.map((eventId) => (
                             <div className="event-row" key={eventId}>
-                                <span className="event-name">{eventId}</span>
+                                <span
+                                    className={`event-name ${
+                                        mode === "overview"
+                                            ? "nodrag nopan"
+                                            : ""
+                                    }`}
+                                    role={mode === "overview" ? "button" : undefined}
+                                    tabIndex={mode === "overview" ? 0 : undefined}
+                                    title={
+                                        mode === "overview"
+                                            ? `${eventId} — click to edit transition`
+                                            : undefined
+                                    }
+                                    onMouseDown={
+                                        mode === "overview"
+                                            ? (event) => event.stopPropagation()
+                                            : undefined
+                                    }
+                                    onClick={
+                                        mode === "overview"
+                                            ? (event) => {
+                                                event.stopPropagation();
+                                                data.onOpenTransition?.(id, eventId);
+                                            }
+                                            : undefined
+                                    }
+                                    onKeyDown={
+                                        mode === "overview"
+                                            ? (event) => {
+                                                if (
+                                                    event.key !== "Enter" &&
+                                                    event.key !== " "
+                                                ) {
+                                                    return;
+                                                }
+                                                event.preventDefault();
+                                                event.stopPropagation();
+                                                data.onOpenTransition?.(id, eventId);
+                                            }
+                                            : undefined
+                                    }
+                                    style={
+                                        mode === "overview"
+                                            ? { cursor: "text" }
+                                            : undefined
+                                    }
+                                >
+                                    {eventId}
+                                </span>
 
                                 <Handle
                                     id={eventId}
@@ -404,16 +452,31 @@ function CustomNode({ id, data, selected }) {
                         {parameterEntries.map((parameter) => (
                             <div
                                 key={parameter.key}
-                                className="node-parameter-row"
+                                className="node-parameter-row nodrag nopan"
+                                role="button"
+                                tabIndex={0}
                                 title={
                                     parameter.displayValue
                                         ? `${parameter.key} = ${parameter.displayValue}${
                                             parameter.usesDefault
                                                 ? " (default)"
                                                 : ""
-                                        }`
-                                        : parameter.key
+                                        } — click to edit`
+                                        : `${parameter.key} — click to edit`
                                 }
+                                onMouseDown={(event) => event.stopPropagation()}
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    data.onOpenParameter?.(id, parameter.key);
+                                }}
+                                onKeyDown={(event) => {
+                                    if (event.key !== "Enter" && event.key !== " ") {
+                                        return;
+                                    }
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    data.onOpenParameter?.(id, parameter.key);
+                                }}
                                 style={{
                                     display: "flex",
                                     alignItems: "baseline",
@@ -421,6 +484,7 @@ function CustomNode({ id, data, selected }) {
                                     minWidth: 0,
                                     fontSize: "10px",
                                     lineHeight: 1.35,
+                                    cursor: "text",
                                 }}
                             >
                                 <span
@@ -529,12 +593,63 @@ function CustomNode({ id, data, selected }) {
                                                 entry.inherited
                                                     ? "node-slot-entry-inherited"
                                                     : ""
+                                            } ${
+                                                mode === "overview"
+                                                    ? "nodrag nopan"
+                                                    : ""
                                             }`}
+                                            role={mode === "overview" ? "button" : undefined}
+                                            tabIndex={mode === "overview" ? 0 : undefined}
                                             title={`${
                                                 entry.access === "read"
                                                     ? "Read"
                                                     : "Write"
-                                            } slot ${entry.key}`}
+                                            } slot ${entry.key}${
+                                                mode === "overview"
+                                                    ? " — click to edit path"
+                                                    : ""
+                                            }`}
+                                            onMouseDown={
+                                                mode === "overview"
+                                                    ? (event) => event.stopPropagation()
+                                                    : undefined
+                                            }
+                                            onClick={
+                                                mode === "overview"
+                                                    ? (event) => {
+                                                        event.stopPropagation();
+                                                        data.onOpenSlot?.(
+                                                            id,
+                                                            entry.access,
+                                                            entry.key
+                                                        );
+                                                    }
+                                                    : undefined
+                                            }
+                                            onKeyDown={
+                                                mode === "overview"
+                                                    ? (event) => {
+                                                        if (
+                                                            event.key !== "Enter" &&
+                                                            event.key !== " "
+                                                        ) {
+                                                            return;
+                                                        }
+                                                        event.preventDefault();
+                                                        event.stopPropagation();
+                                                        data.onOpenSlot?.(
+                                                            id,
+                                                            entry.access,
+                                                            entry.key
+                                                        );
+                                                    }
+                                                    : undefined
+                                            }
+                                            style={
+                                                mode === "overview"
+                                                    ? { cursor: "text" }
+                                                    : undefined
+                                            }
                                         >
                                             <span className="node-slot-key">
                                                 {entry.key}

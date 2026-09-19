@@ -11,20 +11,26 @@ export function initApiProxy() {
 
   const originalFetch = window.fetch;
 
-  window.fetch = async function (input, init) {
+  window.fetch = async function (input, init = {}) {
     let url = '';
-    let method = 'GET';
-    let body = null;
-
+    let method = init?.method || 'GET';
+    let body = init?.body ?? null;
 
     if (typeof input === 'string') {
       url = input;
     } else if (input instanceof Request) {
       url = input.url;
-      method = input.method || 'GET';
-      if (input.body) {
-        body = await input.text();
+      method = init?.method || input.method || 'GET';
+
+      if (init?.body == null && input.body) {
+        // Clone the request so reading its body for IPC does not consume the
+        // original Request object.
+        body = await input.clone().text();
       }
+    }
+
+    if (body != null && typeof body !== 'string') {
+      body = String(body);
     }
 
     console.info("Tauri fetch")

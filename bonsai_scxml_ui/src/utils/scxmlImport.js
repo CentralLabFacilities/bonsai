@@ -105,7 +105,7 @@ const parseBehaviorExitForwarding = (stateElem, fullSkillName) => {
             const target = transitionElement.getAttribute("target")?.trim();
 
             // A behavior-exit Nop stays inside no local target. Instead it
-            // forwards one or more events to the parent state machine. Any
+            // forwards exactly one event to the parent state machine. Any
             // targetless Nop transition containing <send event="..."/> is
             // therefore an outward exit, regardless of its trigger event.
             if (target) return null;
@@ -121,7 +121,8 @@ const parseBehaviorExitForwarding = (stateElem, fullSkillName) => {
                 .map((sendElement) =>
                     sendElement.getAttribute("event")?.trim()
                 )
-                .filter(Boolean);
+                .filter(Boolean)
+                .slice(0, 1);
 
             if (sendEvents.length === 0) return null;
 
@@ -136,21 +137,13 @@ const parseBehaviorExitForwarding = (stateElem, fullSkillName) => {
         return null;
     }
 
-    const sentEvents = Array.from(
-        new Set(
-            forwardingTransitions.flatMap(
-                (transition) => transition.sendEvents
-            )
-        )
-    );
+    const firstTransition = forwardingTransitions[0];
+    const sentEvents = firstTransition?.sendEvents?.slice(0, 1) || [];
 
     return {
-        transitions: forwardingTransitions,
+        transitions: firstTransition ? [firstTransition] : [],
         sentEvents,
-        displayLabel:
-            sentEvents.length === 1
-                ? sentEvents[0]
-                : sentEvents.join(", "),
+        displayLabel: sentEvents[0] || "Nop",
     };
 };
 
@@ -213,24 +206,32 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             const expr = dataTag.getAttribute("expr");
 
             if (id === "#_SLOTS") {
-                const slotTags = dataTag.getElementsByTagName("slot");
-                Array.from(slotTags).forEach((sn) => {
+                // Slot declarations can be namespaced (e.g. <bonsai:slot> /
+                // <bonsai:inheritSlot>). Match by localName so both prefixed and
+                // unprefixed SCXML are handled consistently.
+                const slotElements = Array.from(
+                    dataTag.getElementsByTagName("*")
+                ).filter(
+                    (element) =>
+                        element.localName === "slot" ||
+                        element.localName === "inheritSlot"
+                );
+
+                slotElements.forEach((element) => {
+                    const isInherited = element.localName === "inheritSlot";
+                    const state = element.getAttribute("state");
+                    const xpath = element.getAttribute("xpath");
+
                     parsedSlots.push({
-                        key: sn.getAttribute("key"),
-                        state: sn.getAttribute("state"),
-                        xpath: sn.getAttribute("xpath"),
-                    });
-                });
-                const inheritSlotTags = dataTag.getElementsByTagName("inheritSlot");
-                Array.from(inheritSlotTags).forEach((sn) => {
-                    parsedSlots.push({
-                        key: sn.getAttribute("key"),
-                        state: sn.getAttribute("state"),
-                        xpath: sn.getAttribute("xpath"),
-                        inherited: {
-                            state: sn.getAttribute("state"),
-                            xpath: sn.getAttribute("xpath"),
-                        },
+                        key: element.getAttribute("key"),
+                        state,
+                        xpath,
+                        inherited: isInherited
+                            ? {
+                                state,
+                                xpath,
+                            }
+                            : null,
                     });
                 });
             } else if (id) {
@@ -242,21 +243,61 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
         });
     }
 
-    const findSlotMatch = (fullSkillName, baseSkillName, slotKey) => {
-        const candidates = parsedSlots.filter((ps) => ps.key === slotKey);
-        if (candidates.length === 0) return undefined;
+    const slotDeclarationAppliesToSkill = (slot, fullSkillName, baseSkillName) =>
+        slot?.state === fullSkillName ||
+        (slot?.state && fullSkillName.startsWith(slot.state + "#")) ||
+        slot?.state === baseSkillName ||
+        slot?.state === "*";
 
-        // Priorität (von spezifisch zu allgemein):
-        // 1) exakter State-Match (z.B. "slots.SlotIO#1")
-        // 2) State ist ein Instanz-Präfix von fullSkillName (z.B. "Skill" für "Skill#3")
-        // 3) State entspricht dem Basis-Skill-Namen ohne Instanznummer
-        // 4) Wildcard "*"
-        return (
-            candidates.find((ps) => ps.state === fullSkillName) ||
-            candidates.find((ps) => fullSkillName.startsWith(ps.state + "#")) ||
-            candidates.find((ps) => ps.state === baseSkillName) ||
-            candidates.find((ps) => ps.state === "*")
+    const findSlotMatch = (fullSkillName, baseSkillName, slotKey) => {
+        // Slot declarations in SCXML do not necessarily use the same key as the
+        // concrete read/write requests returned by the configured skill. For
+        // example, slots.SlotIO may declare one logical slot as "StringSlot"
+        // while the skill API exposes the access requests as "Read" and
+        // "Write". Resolve the declaration by state first, and only use the
+        // key to disambiguate when the state has more than one declaration.
+        const groups = [
+            parsedSlots.filter((ps) => ps.state === fullSkillName),
+            parsedSlots.filter((ps) => ps.state === baseSkillName),
+            parsedSlots.filter((ps) => ps.state === "*"),
+        ];
+
+        for (const candidates of groups) {
+            if (candidates.length === 0) continue;
+
+            const exactKeyMatch = candidates.find((ps) => ps.key === slotKey);
+            if (exactKeyMatch) return exactKeyMatch;
+
+            // A single declaration for the state is unambiguous, even when the
+            // configured skill exposes separate read/write request keys.
+            if (candidates.length === 1) return candidates[0];
+
+            // Multiple declarations without a matching key are ambiguous. Do
+            // not guess a path, because that could connect the request to the
+            // wrong logical slot.
+            return undefined;
+        }
+
+        return undefined;
+    };
+
+    const mergeDeclaredSlotRequests = (configured = [], fallback = [], declaredKeys) => {
+        const merged = [...(Array.isArray(configured) ? configured : [])];
+        const seen = new Set(
+            merged.map((slot) => `${slot?.key || ""}|${slot?.type || ""}`)
         );
+
+        (Array.isArray(fallback) ? fallback : []).forEach((slot) => {
+            if (!declaredKeys.has(slot?.key)) return;
+
+            const identity = `${slot?.key || ""}|${slot?.type || ""}`;
+            if (seen.has(identity)) return;
+
+            seen.add(identity);
+            merged.push(slot);
+        });
+
+        return merged;
     };
 
     // Hilfsfunktion: Vollständiges NodeData-Objekt erzeugen
@@ -266,11 +307,16 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             stateElem,
             fullSkillName
         );
-        const skillApiData = behaviorExit
-            ? {}
-            : (await fetchSkillData(baseSkillName)) || {};
 
-        const localParams = {};
+        // Parameter-dependent skills can expose a different set of slot
+        // requests. A state's datamodel is not guaranteed to contain only
+        // skill parameters, though. Sending unrelated <data> entries to the
+        // configurator can make the POST fail and silently fall back to the
+        // unconfigured skill, which in turn drops conditional slot requests.
+        //
+        // Load the base skill first to learn the real parameter keys, then send
+        // only those values back to the parameterized endpoint.
+        const stateDatamodelValues = {};
         const stateDataModel = Array.from(stateElem.children).find((c) => c.localName === "datamodel");
         if (stateDataModel) {
             const sDataTags = Array.from(stateDataModel.children).filter((c) => c.localName === "data");
@@ -278,11 +324,81 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                 const pid = dt.getAttribute("id");
                 const pexpr = dt.getAttribute("expr");
                 if (pid) {
-                    localParams[pid] = deserializeStateDatamodelValueForEditor(
+                    stateDatamodelValues[pid] = deserializeStateDatamodelValueForEditor(
                         pexpr || ""
                     );
                 }
             });
+        }
+
+        const baseSkillApiData = behaviorExit
+            ? {}
+            : (await fetchSkillData(baseSkillName)) || {};
+
+        const knownParameterKeys = new Set(
+            (baseSkillApiData.params || [])
+                .map((param) => param?.key)
+                .filter(Boolean)
+        );
+
+        const localParams = Object.fromEntries(
+            Object.entries(stateDatamodelValues).filter(([key]) =>
+                knownParameterKeys.size === 0 || knownParameterKeys.has(key)
+            )
+        );
+
+        const hasConfiguredParameters = Object.keys(localParams).length > 0;
+        let skillApiData = behaviorExit
+            ? {}
+            : hasConfiguredParameters
+                ? (await fetchSkillData(baseSkillName, localParams)) || baseSkillApiData
+                : baseSkillApiData;
+
+        if (!behaviorExit) {
+            // The SCXML document is authoritative for connections that already
+            // exist. If a parameterized skill response unexpectedly omits a
+            // slot explicitly declared by this state, recover the request from
+            // the base skill definition instead of loading a half-connected
+            // slot node. This also protects older files from backend/config
+            // changes while preserving the declaration stored in #_SLOTS.
+            const declaredKeys = new Set(
+                parsedSlots
+                    .filter((slot) =>
+                        slotDeclarationAppliesToSkill(
+                            slot,
+                            fullSkillName,
+                            baseSkillName
+                        )
+                    )
+                    .map((slot) => slot.key)
+                    .filter(Boolean)
+            );
+
+            if (declaredKeys.size > 0) {
+                const configuredKeys = new Set([
+                    ...(skillApiData.inSlots || []).map((slot) => slot?.key),
+                    ...(skillApiData.outSlots || []).map((slot) => slot?.key),
+                ]);
+                const hasMissingDeclaredRequest = [...declaredKeys].some(
+                    (key) => !configuredKeys.has(key)
+                );
+
+                if (hasMissingDeclaredRequest) {
+                    skillApiData = {
+                        ...skillApiData,
+                        inSlots: mergeDeclaredSlotRequests(
+                            skillApiData.inSlots,
+                            baseSkillApiData.inSlots,
+                            declaredKeys
+                        ),
+                        outSlots: mergeDeclaredSlotRequests(
+                            skillApiData.outSlots,
+                            baseSkillApiData.outSlots,
+                            declaredKeys
+                        ),
+                    };
+                }
+            }
         }
 
         const inSlots = (skillApiData.inSlots || []).map((s) => {
@@ -307,13 +423,27 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             };
         });
 
-        const params = (skillApiData.params || []).map((param) => ({
+        const parameterDefinitions = Array.from(
+            new Map(
+                [
+                    ...(baseSkillApiData.params || []),
+                    ...(skillApiData.params || []),
+                ]
+                    .filter((param) => param?.key)
+                    .map((param) => [param.key, param])
+            ).values()
+        );
+
+        const params = parameterDefinitions.map((param) => ({
             key: param.key,
             type: param.type,
             required: param.required,
             default: param.default,
             description: param.description || "",
-            expr: localParams[param.key] !== undefined ? localParams[param.key] : "",
+            expr:
+                stateDatamodelValues[param.key] !== undefined
+                    ? stateDatamodelValues[param.key]
+                    : "",
         }));
 
         const events = behaviorExit
