@@ -2726,6 +2726,12 @@ function AppContent() {
     // skill-to-slot connection; canvas hover mirrors normal node highlighting.
     const [hoveredSlotAccessNodeId, setHoveredSlotAccessNodeId] = useState(null);
     const [hoveredEditorNodeId, setHoveredEditorNodeId] = useState(null);
+    const [hoveredEditorEdgeId, setHoveredEditorEdgeId] = useState(null);
+    // Drag focus is deliberately separate from pointer hover. During a drag the
+    // cursor can temporarily outrun the rendered node, which fires mouse-leave
+    // events. Keep the dragged node as the authoritative canvas focus until the
+    // drag ends so highlighting never flickers.
+    const [draggedEditorNodeId, setDraggedEditorNodeId] = useState(null);
 
     // Slot creation belongs to the slot-centric views only. If the user switches
     // to Event or Code mode while the dialog is open, close it immediately.
@@ -2736,6 +2742,12 @@ function AppContent() {
     }, [activeMode]);
     const [activeTab, setActiveTab] = useState("allgemein");
     const [rightPanelTab, setRightPanelTab] = useState("datamodel");
+    const [parameterFocusRequest, setParameterFocusRequest] = useState(null);
+    const parameterFocusRequestIdRef = useRef(0);
+    const [slotFocusRequest, setSlotFocusRequest] = useState(null);
+    const slotFocusRequestIdRef = useRef(0);
+    const [transitionFocusRequest, setTransitionFocusRequest] = useState(null);
+    const transitionFocusRequestIdRef = useRef(0);
 
     const [isDraggingNode, setIsDraggingNode] = useState(false);
     const [isOverTrash, setIsOverTrash] = useState(false);
@@ -4772,6 +4784,73 @@ function AppContent() {
         [setNodes]
     );
 
+    const handleOpenParameter = useCallback(
+        (nodeId, parameterKey) => {
+            setNodes((currentNodes) =>
+                currentNodes.map((node) => ({
+                    ...node,
+                    selected: node.id === nodeId,
+                }))
+            );
+
+            setSelectedNodeId(nodeId);
+            setRightPanelTab("details");
+            setActiveTab("parameter");
+            parameterFocusRequestIdRef.current += 1;
+            setParameterFocusRequest({
+                nodeId,
+                parameterKey,
+                requestId: parameterFocusRequestIdRef.current,
+            });
+        },
+        [setNodes]
+    );
+
+    const handleOpenSlot = useCallback(
+        (nodeId, access, slotKey) => {
+            setNodes((currentNodes) =>
+                currentNodes.map((node) => ({
+                    ...node,
+                    selected: node.id === nodeId,
+                }))
+            );
+
+            setSelectedNodeId(nodeId);
+            setRightPanelTab("details");
+            setActiveTab("slots");
+            slotFocusRequestIdRef.current += 1;
+            setSlotFocusRequest({
+                nodeId,
+                access,
+                slotKey,
+                requestId: slotFocusRequestIdRef.current,
+            });
+        },
+        [setNodes]
+    );
+
+    const handleOpenTransition = useCallback(
+        (nodeId, eventId) => {
+            setNodes((currentNodes) =>
+                currentNodes.map((node) => ({
+                    ...node,
+                    selected: node.id === nodeId,
+                }))
+            );
+
+            setSelectedNodeId(nodeId);
+            setRightPanelTab("details");
+            setActiveTab("allgemein");
+            transitionFocusRequestIdRef.current += 1;
+            setTransitionFocusRequest({
+                nodeId,
+                eventId,
+                requestId: transitionFocusRequestIdRef.current,
+            });
+        },
+        [setNodes]
+    );
+
     const handleToggleContainerCollapse = useCallback(
         (containerId) => {
             setNodes((currentNodes) =>
@@ -4916,6 +4995,9 @@ function AppContent() {
                 ...n.data,
                 mode: activeMode,
                 onOpenStateActions: handleOpenStateActions,
+                onOpenParameter: handleOpenParameter,
+                onOpenSlot: handleOpenSlot,
+                onOpenTransition: handleOpenTransition,
                 mode: activeMode,
                 slotConnectionDrag,
                 onToggleCollapse: handleToggleContainerCollapse,
@@ -4972,6 +5054,7 @@ function AppContent() {
         activeMode,
         handleAddLaneToParallel,
         handleOpenStateActions,
+        handleOpenParameter,
         handleToggleContainerCollapse,
         hiddenNodeIds,
         activeMode,
@@ -4990,24 +5073,158 @@ function AppContent() {
         [slotNodes, slotConnectionDrag]
     );
 
-    useEffect(() => {
-        const fetchSkills = async () => {
-            try {
-                const response = await fetch("/api/skills");
-                const data = await response.json();
-                setSkills(data);
-            } catch (error) {
-                console.error("Error loading skills:", error);
+    const [isReloadingSkills, setIsReloadingSkills] = useState(false);
+    const [skillLibraryRefreshVersion, setSkillLibraryRefreshVersion] = useState(0);
+    const skillLibrarySignatureRef = useRef("");
+
+    const fetchSkills = useCallback(async ({ manual = false } = {}) => {
+        if (manual) {
+            setIsReloadingSkills(true);
+        }
+
+        try {
+            const response = await fetch("/api/skills", { cache: "no-store" });
+            if (!response.ok) {
+                throw new Error(`Server returned ${response.status}`);
             }
-        };
-        fetchSkills();
+
+            const data = await response.json();
+            const normalizedSkills = Array.isArray(data?.skills)
+                ? [...data.skills].sort()
+                : [];
+            const signature = JSON.stringify(normalizedSkills);
+            const changed = signature !== skillLibrarySignatureRef.current;
+
+            if (changed) {
+                skillLibrarySignatureRef.current = signature;
+                setSkills(data);
+                setSkillLibraryRefreshVersion((version) => version + 1);
+            }
+
+            return changed;
+        } catch (error) {
+            console.error("Error loading skills:", error);
+            return false;
+        } finally {
+            if (manual) {
+                setIsReloadingSkills(false);
+            }
+        }
     }, []);
 
-    const fetchSkillData = async (fullSkillName) => {
+    useEffect(() => {
+        fetchSkills();
+
+        const intervalId = window.setInterval(() => {
+            if (document.visibilityState === "visible") {
+                fetchSkills();
+            }
+        }, 3000);
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === "visible") {
+                fetchSkills();
+            }
+        };
+
+        const handleWindowFocus = () => fetchSkills();
+
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+        window.addEventListener("focus", handleWindowFocus);
+
+        return () => {
+            window.clearInterval(intervalId);
+            document.removeEventListener("visibilitychange", handleVisibilityChange);
+            window.removeEventListener("focus", handleWindowFocus);
+        };
+    }, [fetchSkills]);
+
+    const normalizeSkillApiParamValue = (value) => {
+        if (typeof value !== "string") return value;
+
+        const trimmed = value.trim();
+        if (trimmed.length < 2) return trimmed;
+
+        const first = trimmed[0];
+        const last = trimmed[trimmed.length - 1];
+        if ((first !== "\"" && first !== "'") || last !== first) {
+            return trimmed;
+        }
+
+        // SkillConfigurator expects the actual parameter value. SCXML/editor
+        // strings, however, are represented as quoted expressions (e.g.
+        // 'Foo'). Strip only that outer literal quoting before calling the API.
+        const inner = trimmed.slice(1, -1);
+        return inner.replace(/\\([\\'\"])/g, "$1");
+    };
+
+    const normalizeSkillApiParams = (params) => {
+        if (!params || typeof params !== "object") return {};
+
+        return Object.fromEntries(
+            Object.entries(params)
+                .filter(([, value]) => value !== undefined && value !== null)
+                .map(([key, value]) => [
+                    key,
+                    normalizeSkillApiParamValue(value),
+                ])
+        );
+    };
+
+    const fetchSkillData = async (fullSkillName, params = null) => {
+        const apiParams = normalizeSkillApiParams(params);
+        const hasParams = Object.keys(apiParams).length > 0;
+
         try {
-            const response = await fetch(`/api/skill/${fullSkillName}`);
-            return await response.json();
+            const response = await fetch(`/api/skill/${fullSkillName}`, {
+                ...(hasParams
+                    ? {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({ params: apiParams }),
+                    }
+                    : { cache: "no-store" }),
+            });
+
+            if (response.ok) {
+                return await response.json();
+            }
+
+            if (!hasParams) {
+                throw new Error(`Server returned ${response.status}`);
+            }
+
+            console.warn(
+                `Parameterized skill configuration failed for ${fullSkillName} (${response.status}); falling back to the base skill definition.`
+            );
         } catch (error) {
+            if (!hasParams) {
+                console.error(`Error loading skill ${fullSkillName}:`, error);
+                return null;
+            }
+
+            console.warn(
+                `Parameterized skill configuration failed for ${fullSkillName}; falling back to the base skill definition.`,
+                error
+            );
+        }
+
+        // Parameter expressions can legitimately be non-literal (for example
+        // references to datamodel variables). If the backend cannot configure
+        // those values at edit time, keep the workflow usable with the static
+        // skill definition instead of losing all requests during import.
+        try {
+            const fallbackResponse = await fetch(`/api/skill/${fullSkillName}`, {
+                cache: "no-store",
+            });
+            if (!fallbackResponse.ok) {
+                throw new Error(`Server returned ${fallbackResponse.status}`);
+            }
+            return await fallbackResponse.json();
+        } catch (fallbackError) {
+            console.error(`Error loading skill ${fullSkillName}:`, fallbackError);
             return null;
         }
     };
@@ -5617,10 +5834,19 @@ function AppContent() {
         [setEdges, setSlotEdges]
     );
 
+    // While dragging, the dragged node takes precedence over pointer hover.
+    // Edge hover is suppressed for the duration of the drag for the same
+    // reason: whichever DOM element happens to be under the cursor must not
+    // steal focus from the node being moved.
+    const activeCanvasFocusNodeId = draggedEditorNodeId || hoveredEditorNodeId;
+    const activeHoveredEditorEdgeId = draggedEditorNodeId
+        ? null
+        : hoveredEditorEdgeId;
+
     const selectedTransitionNodeIds = new Set([
         ...selectedNodes.map((node) => node.id),
         ...(selectedNodeId ? [selectedNodeId] : []),
-        ...(hoveredEditorNodeId ? [hoveredEditorNodeId] : []),
+        ...(activeCanvasFocusNodeId ? [activeCanvasFocusNodeId] : []),
     ]);
 
     const normalizedTransitionEdges = useMemo(
@@ -5675,7 +5901,7 @@ function AppContent() {
     // selection for connection highlighting. Slot Details hover is different:
     // it previews only the exact connection from the hovered skill to the
     // currently selected slot.
-    const selectedSlotContextId = hoveredEditorNodeId || selectedNodeId;
+    const selectedSlotContextId = activeCanvasFocusNodeId || selectedNodeId;
     const hasSelectedSlotContext = Boolean(
         selectedSlotContextId &&
         (
@@ -5920,11 +6146,11 @@ function AppContent() {
         // transition-capable node directly on the canvas temporarily reveals
         // that node's transitions with the same semantic highlighting as
         // selection. Slot nodes simply have no matching transition edges.
-        const hoveredTransitionEdges = hoveredEditorNodeId
+        const hoveredTransitionEdges = activeCanvasFocusNodeId
             ? highlightedTransitionEdges.filter(
                 (edge) =>
-                    edge.source === hoveredEditorNodeId ||
-                    edge.target === hoveredEditorNodeId
+                    edge.source === activeCanvasFocusNodeId ||
+                    edge.target === activeCanvasFocusNodeId
             )
             : [];
 
@@ -5950,15 +6176,166 @@ function AppContent() {
         );
     }
 
+    // Hover focus mode. Canvas hover keeps the hovered node and all of its
+    // direct connections vivid. Hovering an "Accessed by" entry in Slot
+    // Details focuses only that skill, the selected slot, and their exact
+    // skill-to-slot connection; transitions stay dimmed in that context.
+    const isSlotDetailsFocus = Boolean(
+        hoveredSlotAccessNodeId &&
+        selectedNodeId &&
+        slotNodes.some((node) => node.id === selectedNodeId)
+    );
+    const hoveredEditorEdge = activeHoveredEditorEdgeId
+        ? visibleEdges.find((edge) => edge.id === activeHoveredEditorEdgeId)
+        : null;
+    const hasHoverFocus = Boolean(
+        activeCanvasFocusNodeId ||
+        hoveredEditorEdge ||
+        isSlotDetailsFocus
+    );
+
+    const hoverFocusNodeIds = new Set();
+    if (activeCanvasFocusNodeId) {
+        hoverFocusNodeIds.add(activeCanvasFocusNodeId);
+
+        // Every endpoint of an edge that belongs to the active canvas node is
+        // part of the same focus group. During a drag this stays locked to the
+        // dragged node even if the pointer briefly leaves its DOM element.
+        visibleEdges.forEach((edge) => {
+            if (
+                edge.source === activeCanvasFocusNodeId ||
+                edge.target === activeCanvasFocusNodeId
+            ) {
+                hoverFocusNodeIds.add(edge.source);
+                hoverFocusNodeIds.add(edge.target);
+            }
+        });
+    }
+
+    if (hoveredEditorEdge) {
+        // Edge hover focuses the relationship itself and both endpoint nodes.
+        // Unlike node hover, it does not pull in the endpoints' other edges.
+        hoverFocusNodeIds.add(hoveredEditorEdge.source);
+        hoverFocusNodeIds.add(hoveredEditorEdge.target);
+    }
+
+    if (isSlotDetailsFocus) {
+        // Slot Details deliberately keeps the narrower preview requested for
+        // Accessed by: the referenced skill, the selected slot and their edge.
+        hoverFocusNodeIds.add(hoveredSlotAccessNodeId);
+        hoverFocusNodeIds.add(selectedNodeId);
+    }
+
+    if (hasHoverFocus) {
+        const HOVER_INACTIVE_EDGE_COLOR = "#94a3b8";
+
+        visibleEdges = visibleEdges.map((edge) => {
+            const isCanvasHoverConnection = Boolean(
+                activeCanvasFocusNodeId &&
+                (
+                    edge.source === activeCanvasFocusNodeId ||
+                    edge.target === activeCanvasFocusNodeId
+                )
+            );
+            const isHoveredEditorEdge = Boolean(
+                activeHoveredEditorEdgeId && edge.id === activeHoveredEditorEdgeId
+            );
+            const isSlotDetailsConnection = Boolean(
+                isSlotDetailsFocus &&
+                (
+                    (
+                        edge.source === hoveredSlotAccessNodeId &&
+                        edge.target === selectedNodeId
+                    ) ||
+                    (
+                        edge.target === hoveredSlotAccessNodeId &&
+                        edge.source === selectedNodeId
+                    )
+                )
+            );
+
+            if (
+                isCanvasHoverConnection ||
+                isHoveredEditorEdge ||
+                isSlotDetailsConnection
+            ) {
+                return edge;
+            }
+
+            const existingOpacity = Number(edge.style?.opacity);
+            const dimmedOpacity = Number.isFinite(existingOpacity)
+                ? Math.min(existingOpacity, 0.22)
+                : 0.22;
+
+            return {
+                ...edge,
+                animated: false,
+                style: {
+                    ...(edge.style || {}),
+                    stroke: HOVER_INACTIVE_EDGE_COLOR,
+                    opacity: dimmedOpacity,
+                },
+                markerEnd: edge.markerEnd
+                    ? {
+                        ...edge.markerEnd,
+                        color: HOVER_INACTIVE_EDGE_COLOR,
+                    }
+                    : edge.markerEnd,
+                labelStyle: {
+                    ...(edge.labelStyle || {}),
+                    opacity: 0.42,
+                },
+            };
+        });
+    }
+
     visibleNodes = visibleNodes.map((visibleNode) => {
-        if (
-            visibleNode.id === hoveredEditorNodeId &&
-            ["custom", "submachine", "compound", "parallel", "slot"].includes(
-                visibleNode.type
+        const isCanvasHoverHighlight =
+            visibleNode.id === activeCanvasFocusNodeId;
+        const isSlotDetailsSkillHoverHighlight =
+            visibleNode.id === hoveredSlotAccessNodeId &&
+            visibleNode.type === "custom";
+        const isSlotDetailsSelectedSlot =
+            isSlotDetailsFocus && visibleNode.id === selectedNodeId;
+        const isHoveredEdgeEndpoint = Boolean(
+            hoveredEditorEdge &&
+            (
+                visibleNode.id === hoveredEditorEdge.source ||
+                visibleNode.id === hoveredEditorEdge.target
             )
+        );
+        const isConnectedHoverFocusNode =
+            hasHoverFocus && hoverFocusNodeIds.has(visibleNode.id);
+        const isDimmedByHoverFocus =
+            hasHoverFocus &&
+            !isConnectedHoverFocusNode &&
+            !isCanvasHoverHighlight &&
+            !isSlotDetailsSkillHoverHighlight &&
+            !isSlotDetailsSelectedSlot;
+
+        if (isDimmedByHoverFocus) {
+            return {
+                ...visibleNode,
+                style: {
+                    ...(visibleNode.style || {}),
+                    opacity: 0.42,
+                    filter: "grayscale(0.72)",
+                    transition:
+                        visibleNode.style?.transition ||
+                        "opacity 120ms ease, filter 120ms ease",
+                },
+            };
+        }
+
+        if (
+            isCanvasHoverHighlight ||
+            isHoveredEdgeEndpoint ||
+            isSlotDetailsSkillHoverHighlight
         ) {
-            // Canvas hover mirrors the visual selected state without changing
-            // the real selection or opening a different details panel.
+            // Canvas hover mirrors the normal selected state. Hover coming
+            // from Slot Details highlights only the referenced skill node;
+            // its transition edges remain untouched and only the exact
+            // skill-to-slot edge is previewed above.
             return {
                 ...visibleNode,
                 selected: true,
@@ -8838,87 +9215,177 @@ function AppContent() {
         ]
     );
 
-// Dynamische Aktualisierung der Events basierend auf neuen Parameterwerten
-    const updateEventsFromParameters = async (nodeId) => {
-        const node = nodes.find((n) => n.id === nodeId);
-        if (!node) return;
+    // Reconfigure a skill after one of its parameters changes. The Bonsai skill
+    // endpoint can expose a different set of events, sensors/actuators and slot
+    // requests depending on the current parameter values.
+    const skillConfigurationRequestVersionsRef = useRef(new Map());
 
-        const fullSkillName = node.data.fullSkillName.split("#")[0];
-        const params = {};
+    const reconcileDynamicSlots = (currentSlots = [], requestedSlots = []) =>
+        (Array.isArray(requestedSlots) ? requestedSlots : []).map((requestedSlot) => {
+            const existingSlot = (currentSlots || []).find(
+                (slot) =>
+                    slot?.key === requestedSlot?.key &&
+                    normalizeSlotType(slot?.type) ===
+                    normalizeSlotType(requestedSlot?.type)
+            );
 
-        node.data.params.forEach((param) => {
-            params[param.key] = param.expr;
+            return {
+                ...requestedSlot,
+                key: requestedSlot?.key || "",
+                type: requestedSlot?.type || "Unknown",
+                description:
+                    requestedSlot?.description ?? existingSlot?.description ?? "",
+                // Keep a user's existing connection when the same request is
+                // still exposed. Newly exposed requests deliberately start
+                // without a path and therefore show up as unconnected slots.
+                path: existingSlot?.path || "",
+                inherited: existingSlot?.inherited || null,
+            };
         });
 
+    const updateEventsFromParameters = async (nodeId, parameterOverride = null) => {
+        const node = nodes.find((candidate) => candidate.id === nodeId);
+        if (!node) return;
+
+        const fullSkillName = String(node.data?.fullSkillName || "").split("#")[0];
+        if (!fullSkillName) return;
+
+        const params = {};
+        const parameterList = Array.isArray(parameterOverride)
+            ? parameterOverride
+            : node.data?.params || [];
+
+        parameterList.forEach((param) => {
+            if (!param?.key) return;
+
+            // An empty editor field means that the parameter is not supplied to
+            // the skill. This is important for skills whose requested slots are
+            // conditional on the presence of an optional parameter.
+            const expr = param.expr;
+            if (expr === undefined || expr === null || String(expr).trim() === "") {
+                return;
+            }
+
+            params[param.key] = expr;
+        });
+
+        const requestVersions = skillConfigurationRequestVersionsRef.current;
+        const requestVersion = (requestVersions.get(nodeId) || 0) + 1;
+        requestVersions.set(nodeId, requestVersion);
+
         try {
-            const response = await fetch(`/api/skill/${fullSkillName}`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ params }),
-            });
+            const data = await fetchSkillData(fullSkillName, params);
+            if (!data) return;
 
-            const data = await response.json();
+            // If a newer edit was sent while this request was in flight, ignore
+            // the stale response so old slot requests cannot overwrite new ones.
+            if (requestVersions.get(nodeId) !== requestVersion) return;
 
-            const newEvents = data.events.map((event) => ({
-                id: event.event,
-                description: event.description || "",
-                selectedPackage: "",
-                selectedSkill: "",
-                target: null,
-                cond: "",
-                assignments: [],
-                assignLocation: "",
-                assignExpr: "",
-            }));
+            setNodes((currentNodes) => {
+                const currentNode = currentNodes.find(
+                    (candidate) => candidate.id === nodeId
+                );
+                if (!currentNode) return currentNodes;
 
-            newEvents.push({
-                id: "fatal",
-                selectedPackage: "",
-                selectedSkill: "",
-                target: null,
-                cond: "",
-                assignments: [],
-                assignLocation: "",
-                assignExpr: "",
-            });
+                let nextEvents = currentNode.data?.events || [];
+                if (Array.isArray(data.events)) {
+                    const previousEvents = new Map(
+                        (currentNode.data?.events || []).map((event) => [
+                            event.id,
+                            event,
+                        ])
+                    );
 
-            newEvents.push({
-                id: "*",
-                selectedPackage: "",
-                selectedSkill: "",
-                target: null,
-                cond: "",
-                assignments: [],
-                assignLocation: "",
-                assignExpr: "",
-            });
+                    const configuredEvents = data.events.map((event) => {
+                        const existing = previousEvents.get(event.event);
+                        return {
+                            ...(existing || {}),
+                            id: event.event,
+                            description: event.description || "",
+                            selectedPackage: existing?.selectedPackage || "",
+                            selectedSkill: existing?.selectedSkill || "",
+                            target: existing?.target ?? null,
+                            cond: existing?.cond || "",
+                            assignments: existing?.assignments || [],
+                            assignLocation: existing?.assignLocation || "",
+                            assignExpr: existing?.assignExpr || "",
+                        };
+                    });
 
-            setNodes((nds) =>
-                nds.map((n) => {
-                    if (n.id !== nodeId) return n;
+                    const appendBuiltInEvent = (eventId) => {
+                        if (configuredEvents.some((event) => event.id === eventId)) {
+                            return;
+                        }
+                        const existing = previousEvents.get(eventId);
+                        configuredEvents.push({
+                            ...(existing || {}),
+                            id: eventId,
+                            selectedPackage: existing?.selectedPackage || "",
+                            selectedSkill: existing?.selectedSkill || "",
+                            target: existing?.target ?? null,
+                            cond: existing?.cond || "",
+                            assignments: existing?.assignments || [],
+                            assignLocation: existing?.assignLocation || "",
+                            assignExpr: existing?.assignExpr || "",
+                        });
+                    };
+
+                    appendBuiltInEvent("fatal");
+                    appendBuiltInEvent("*");
+                    nextEvents = configuredEvents;
+                }
+
+                const nextInSlots =
+                    data.inSlots !== undefined
+                        ? reconcileDynamicSlots(
+                            currentNode.data?.inSlots || [],
+                            data.inSlots
+                        )
+                        : currentNode.data?.inSlots || [];
+
+                const nextOutSlots =
+                    data.outSlots !== undefined
+                        ? reconcileDynamicSlots(
+                            currentNode.data?.outSlots || [],
+                            data.outSlots
+                        )
+                        : currentNode.data?.outSlots || [];
+
+                const updatedNodes = currentNodes.map((candidate) => {
+                    if (candidate.id !== nodeId) return candidate;
+
                     return {
-                        ...n,
+                        ...candidate,
                         data: {
-                            ...n.data,
-                            events: newEvents,
+                            ...candidate.data,
+                            events: nextEvents,
                             sensors:
                                 data.sensors !== undefined
                                     ? data.sensors
-                                    : n.data.sensors || [],
+                                    : candidate.data?.sensors || [],
                             actuators:
                                 data.actuator !== undefined
                                     ? data.actuator
                                     : data.actuators !== undefined
                                         ? data.actuators
-                                        : n.data.actuators || [],
+                                        : candidate.data?.actuators || [],
+                            inSlots: nextInSlots,
+                            outSlots: nextOutSlots,
                         },
                     };
-                })
-            );
+                });
+
+                // Slot nodes/edges are derived from skill requests. Rebuild them
+                // after the node update so newly exposed requests appear and
+                // removed requests disappear immediately.
+                window.requestAnimationFrame(() =>
+                    checkSlotConnection(updatedNodes)
+                );
+
+                return updatedNodes;
+            });
         } catch (error) {
-            console.error("Error updating events from parameters:", error);
+            console.error("Error updating skill from parameters:", error);
         }
     };
 
@@ -9288,6 +9755,8 @@ function AppContent() {
 
     const handleNodeDragStart = useCallback((event, node) => {
         setIsDraggingNode(true);
+        setDraggedEditorNodeId(node.id);
+        setHoveredEditorEdgeId(null);
 
         // Nodes innerhalb einer Lane dürfen vorübergehend den
         // bisherigen Parent verlassen.
@@ -9491,6 +9960,7 @@ function AppContent() {
             });
 
             setIsDraggingNode(false);
+            setDraggedEditorNodeId(null);
             setIsOverTrash(false);
             setParallelDropTargetId(null);
             setCompoundDropTargetId(null);
@@ -9501,6 +9971,7 @@ function AppContent() {
         // containers. Compound and parallel states are intentionally allowed.
         if (node.type === "parallelLane") {
             setIsDraggingNode(false);
+            setDraggedEditorNodeId(null);
             setIsOverTrash(false);
             setParallelDropTargetId(null);
             setCompoundDropTargetId(null);
@@ -10477,6 +10948,7 @@ function AppContent() {
         }
 
         setIsDraggingNode(false);
+        setDraggedEditorNodeId(null);
         setIsOverTrash(false);
         setParallelDropTargetId(null);
         setCompoundDropTargetId(null);
@@ -10556,6 +11028,9 @@ function AppContent() {
                         directSkills={directSkills}
                         activeLibraryTab={leftLibraryTab}
                         onLibraryTabChange={setLeftLibraryTab}
+                        onReloadSkills={() => fetchSkills({ manual: true })}
+                        isReloadingSkills={isReloadingSkills}
+                        refreshVersion={skillLibraryRefreshVersion}
                     />
                 ) : (
                     <BehaviorLibrary
@@ -11408,32 +11883,22 @@ function AppContent() {
                                             setRightPanelTab("details");
                                         }}
                                         onNodeMouseEnter={(_, n) => {
-                                            if (
-                                                [
-                                                    "custom",
-                                                    "submachine",
-                                                    "compound",
-                                                    "parallel",
-                                                    "slot",
-                                                ].includes(n.type)
-                                            ) {
-                                                setHoveredEditorNodeId(n.id);
-                                            }
+                                            setHoveredEditorEdgeId(null);
+                                            setHoveredEditorNodeId(n.id);
                                         }}
                                         onNodeMouseLeave={(_, n) => {
-                                            if (
-                                                [
-                                                    "custom",
-                                                    "submachine",
-                                                    "compound",
-                                                    "parallel",
-                                                    "slot",
-                                                ].includes(n.type)
-                                            ) {
-                                                setHoveredEditorNodeId((current) =>
-                                                    current === n.id ? null : current
-                                                );
-                                            }
+                                            setHoveredEditorNodeId((current) =>
+                                                current === n.id ? null : current
+                                            );
+                                        }}
+                                        onEdgeMouseEnter={(_, edge) => {
+                                            setHoveredEditorNodeId(null);
+                                            setHoveredEditorEdgeId(edge.id);
+                                        }}
+                                        onEdgeMouseLeave={(_, edge) => {
+                                            setHoveredEditorEdgeId((current) =>
+                                                current === edge.id ? null : current
+                                            );
                                         }}
                                         onPaneClick={() => {
                                             clearAllEdgeSelection();
@@ -11445,6 +11910,7 @@ function AppContent() {
                                         multiSelectionKeyCode={["Control", "Meta"]}
                                         selectionKeyCode={["Control", "Meta"]}
                                         deleteKeyCode={["Delete"]}
+                                        minZoom={0.08}
                                         onNodeDoubleClick={(_, n) => {
                                             if (n.type === "submachine" && n.data?.src) {
                                                 handleOpenSubMachine(n.data.src, n.data.label);
@@ -11694,11 +12160,39 @@ function AppContent() {
                                 onUpdateEvent={updateNodeEvent}
                                 availableTargetNodes={nodes}
                                 onSetEventTarget={setExistingTargetForEvent}
-                                onUpdateParameter={(idx, val) =>
+                                onUpdateParameter={(idx, val) => {
+                                    const nextParams = (selectedNode.data?.params || []).map(
+                                        (parameter, i) =>
+                                            i === idx
+                                                ? { ...parameter, expr: val }
+                                                : parameter
+                                    );
+
                                     setNodes((nds) =>
-                                        nds.map((n) => (n.id === selectedNode.id ? { ...n, data: { ...n.data, params: n.data.params.map((p, i) => (i === idx ? { ...p, expr: val } : p)) } } : n))
-                                    )
-                                }
+                                        nds.map((n) =>
+                                            n.id === selectedNode.id
+                                                ? {
+                                                    ...n,
+                                                    data: {
+                                                        ...n.data,
+                                                        params: nextParams,
+                                                    },
+                                                }
+                                                : n
+                                        )
+                                    );
+
+                                    // Clearing a parameter changes the configured
+                                    // skill just as adding one does. Refresh right
+                                    // away and pass the new parameter list explicitly
+                                    // so the request cannot see stale React state.
+                                    if (String(val ?? "").trim() === "") {
+                                        updateEventsFromParameters(
+                                            selectedNode.id,
+                                            nextParams
+                                        );
+                                    }
+                                }}
 
                                 onUpdateParameterBlur={updateEventsFromParameters}
                                 globalDataModel={selectedActionDataModel}
@@ -11805,6 +12299,9 @@ function AppContent() {
                                                     ...node.data,
                                                     ...(nonEmptyEvents.length > 0
                                                         ? { events: clearedEvents }
+                                                        : {}),
+                                                    ...(nonEmptyEvents.length > 0
+                                                        ? { onEntry: [], onExit: [] }
                                                         : {}),
                                                     isBehaviorExit: nextEvents.length > 0,
                                                     behaviorExitEvents: nextEvents,
@@ -11932,6 +12429,9 @@ function AppContent() {
                                         });
                                     }, 0);
                                 }}
+                                parameterFocusRequest={parameterFocusRequest}
+                                slotFocusRequest={slotFocusRequest}
+                                transitionFocusRequest={transitionFocusRequest}
                             />
                         )}
                     </div>

@@ -6,15 +6,15 @@ function CodeView({ codeString, activeMode, setActiveMode, onCodeChange,}) {
     const [copied, setCopied] = useState(false);
 
     useEffect(() => {
-            setCode(codeString || "");
-        }, [codeString]);
+        setCode(codeString || "");
+    }, [codeString]);
 
     const handleCodeChange = (e) => {
-            const newCode = e.target.value;
-            setCode(newCode);
-            if (onCodeChange) {
-                onCodeChange(newCode);
-            }
+        const newCode = e.target.value;
+        setCode(newCode);
+        if (onCodeChange) {
+            onCodeChange(newCode);
+        }
     };
 
     const handleCopy = async () => {
@@ -26,13 +26,13 @@ function CodeView({ codeString, activeMode, setActiveMode, onCodeChange,}) {
     return (
         <div className="inline-code-view">
             <div className="mode-button-group-floating">
-                {["event", "slots", "both", "code"].map((m) => (
+                {["event", "slots", "overview", "code"].map((m) => (
                     <button
                         key={m}
                         className={`mode-button ${activeMode === m ? "active" : ""}`}
                         onClick={() => setActiveMode(m)}
                     >
-                        {m === "event" ? "Event Mode" : m === "slots" ? "Slot Mode" : m === "both" ? "Both Mode" : "Code View"}
+                        {m === "event" ? "Event Mode" : m === "slots" ? "Slot Mode" : m === "overview" ? "Overview Mode" : "Code View"}
                     </button>
                 ))}
             </div>
@@ -44,13 +44,13 @@ function CodeView({ codeString, activeMode, setActiveMode, onCodeChange,}) {
                     <span>{copied ? "Copy!" : "Copy"}</span>
                 </button>
             </div>
-             <textarea
-                            className="code-view-body"
-                            value={code}
-                            onChange={handleCodeChange}
-                            spellCheck={false}
-                            wrap="off"
-             />
+            <textarea
+                className="code-view-body"
+                value={code}
+                onChange={handleCodeChange}
+                spellCheck={false}
+                wrap="off"
+            />
         </div>
     );
 }

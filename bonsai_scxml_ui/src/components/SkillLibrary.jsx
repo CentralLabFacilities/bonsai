@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import {
     FiSearch,
@@ -6,6 +6,7 @@ import {
     FiMessageCircle,
     FiTag,
     FiChevronRight,
+    FiRefreshCw,
 } from "react-icons/fi";
 import { MdAssistantNavigation } from "react-icons/md";
 import { FaHandPaper } from "react-icons/fa";
@@ -29,10 +30,19 @@ function SkillLibrary({
                           fetchSkillData,
                           activeLibraryTab = "skills",
                           onLibraryTabChange,
+                          onReloadSkills,
+                          isReloadingSkills = false,
+                          refreshVersion = 0,
                       }) {
     const [skillDescriptions, setSkillDescriptions] = useState({});
     const [loadingDescription, setLoadingDescription] = useState(null);
     const [skillTooltip, setSkillTooltip] = useState(null);
+
+    useEffect(() => {
+        setSkillDescriptions({});
+        setSkillTooltip(null);
+        setLoadingDescription(null);
+    }, [refreshVersion]);
 
     const getApiSkillName = (skill) => {
         if (!skill) return "";
@@ -209,7 +219,53 @@ function SkillLibrary({
                     </button>
                 </div>
 
-                <h3>Skill Library</h3>
+                <div
+                    style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 8,
+                        marginBottom: 8,
+                    }}
+                >
+                    <h3 style={{ margin: 0 }}>Skill Library</h3>
+                    <button
+                        type="button"
+                        title="Reload skill library"
+                        aria-label="Reload skill library"
+                        onClick={() => onReloadSkills?.()}
+                        disabled={isReloadingSkills}
+                        style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            width: 30,
+                            height: 30,
+                            padding: 0,
+                            border: "1px solid var(--border)",
+                            borderRadius: 7,
+                            background: "transparent",
+                            color: "inherit",
+                            cursor: isReloadingSkills ? "default" : "pointer",
+                            opacity: isReloadingSkills ? 0.6 : 1,
+                        }}
+                    >
+                        <FiRefreshCw
+                            style={{
+                                animation: isReloadingSkills
+                                    ? "skill-library-refresh-spin 0.8s linear infinite"
+                                    : "none",
+                            }}
+                        />
+                    </button>
+                </div>
+
+                <style>{`
+                    @keyframes skill-library-refresh-spin {
+                        from { transform: rotate(0deg); }
+                        to { transform: rotate(360deg); }
+                    }
+                `}</style>
 
                 <div className="search-container">
                     <input
