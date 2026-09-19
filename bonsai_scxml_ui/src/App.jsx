@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, memo } from "react";
 import { createPortal } from "react-dom";
 import { FiTrash2, FiPlus, FiX } from "react-icons/fi";
 import {
@@ -49,7 +49,14 @@ import "./App.css";
 // Initialize API proxy for Tauri desktop mode (intercepts /api/* fetch calls)
 initApiProxy();
 
-const nodeTypes = { custom: CustomNode, slot: SlotNode, submachine: SubMachineNode, parallel: ParallelNode, compound: CompoundNode, parallelLane: ParallelLaneNode, };
+const nodeTypes = {
+    custom: memo(CustomNode),
+    slot: memo(SlotNode),
+    submachine: memo(SubMachineNode),
+    parallel: memo(ParallelNode),
+    compound: memo(CompoundNode),
+    parallelLane: memo(ParallelLaneNode),
+};
 
 // Transition edges stay smart-routed, but selected edges can also be shaped
 // with persistent, draggable control points. Keep this mapping at module scope
@@ -125,18 +132,25 @@ const TRANSITION_HIGHLIGHT_COLOR_VALUES = new Set(
 );
 
 const clearTransientTransitionHighlight = (edge) => {
+    const hadTransientStroke = TRANSITION_HIGHLIGHT_COLOR_VALUES.has(
+        edge.style?.stroke
+    );
+    const hadTransientMarker = Boolean(
+        edge.markerEnd &&
+        TRANSITION_HIGHLIGHT_COLOR_VALUES.has(edge.markerEnd.color)
+    );
+
+    // Preserve object identity for the common case. Recreating every edge on
+    // every hover defeats React Flow memoization even when nothing about that
+    // edge changed.
+    if (!hadTransientStroke && !hadTransientMarker) {
+        return edge;
+    }
+
     const style = { ...(edge.style || {}) };
     const markerEnd = edge.markerEnd
         ? { ...edge.markerEnd }
         : edge.markerEnd;
-
-    const hadTransientStroke = TRANSITION_HIGHLIGHT_COLOR_VALUES.has(
-        style.stroke
-    );
-    const hadTransientMarker = Boolean(
-        markerEnd &&
-        TRANSITION_HIGHLIGHT_COLOR_VALUES.has(markerEnd.color)
-    );
 
     if (hadTransientStroke) {
         delete style.stroke;
@@ -148,10 +162,7 @@ const clearTransientTransitionHighlight = (edge) => {
 
     return {
         ...edge,
-        animated:
-            hadTransientStroke || hadTransientMarker
-                ? false
-                : edge.animated,
+        animated: false,
         style,
         markerEnd,
     };
@@ -620,7 +631,8 @@ const buildEditorProblems = (
     behaviorDirectories,
     isBehaviorWorkflow = false,
     manualSlots = [],
-    ancestorSlotSourcesByPath = new Map()
+    ancestorSlotSourcesByPath = new Map(),
+    currentSlotNodes = []
 ) => {
     const problems = [];
     const nodeMap = new Map((nodes || []).map((node) => [node.id, node]));
@@ -1032,17 +1044,40 @@ const buildEditorProblems = (
         });
     });
 
-    const inheritedPaths = new Set(
-        (manualSlots || [])
-            .filter(
-                (slot) =>
-                    slot?.slotKind === "inheritSlot" || Boolean(slot?.inherited)
-            )
-            .map((slot) =>
-                normalizeSlotPath(slot?.inherited?.xpath || slot?.path)
-            )
-            .filter(Boolean)
-    );
+    // A current-machine inheritSlot can come from several representations:
+    // manual declarations, imported skill slot metadata, or the generated
+    // visual slot node. Problems validation must recognize all of them, just
+    // like Slot Details does, otherwise an upstream writer is found but the
+    // path is still incorrectly treated as an ordinary local slot.
+    const inheritedPaths = new Set();
+    const registerInheritedPath = (value) => {
+        const path = normalizeSlotPath(value);
+        if (path) inheritedPaths.add(path);
+    };
+
+    (manualSlots || []).forEach((slot) => {
+        if (slot?.slotKind === "inheritSlot" || Boolean(slot?.inherited)) {
+            registerInheritedPath(slot?.inherited?.xpath || slot?.path);
+        }
+    });
+
+    (nodes || []).forEach((node) => {
+        [...(node.data?.inSlots || []), ...(node.data?.outSlots || [])].forEach(
+            (slot) => {
+                if (slot?.inherited) {
+                    registerInheritedPath(slot?.inherited?.xpath || slot?.path);
+                }
+            }
+        );
+    });
+
+    (currentSlotNodes || []).forEach((slotNode) => {
+        if (slotNode?.data?.currentMachineInherited) {
+            registerInheritedPath(
+                slotNode?.data?.path || slotNode?.data?.label
+            );
+        }
+    });
 
     const paths = new Set([...readers.keys(), ...writers.keys()]);
 
@@ -2974,17 +3009,33 @@ function AppContent() {
     const [slotNodes, setSlotNodes, onSlotNodesChange] = useNodesState([]);
     const [slotEdges, setSlotEdges, onSlotEdgesChange] = useEdgesState([]);
 
+    // Structural normalization must not run for pure position changes. React
+    // Flow updates `nodes` continuously while dragging, and the old nodes-based
+    // effect normalized the entire graph on every frame. Track only fields that
+    // can change the workflow structure; live container growth/reparenting is
+    // already handled by the dedicated drag/drop paths below.
+    const nodeStructureSignature = useMemo(
+        () =>
+            nodes
+                .map((node) =>
+                    [
+                        node.id,
+                        node.type || "",
+                        node.parentId || "",
+                        node.data?.isInitial ? "1" : "0",
+                        node.data?.initialChildId || "",
+                        node.data?.isCollapsed ? "1" : "0",
+                        Array.isArray(node.data?.lanes)
+                            ? node.data.lanes.join(",")
+                            : "",
+                    ].join("|")
+                )
+                .join(";") ,
+        [nodes]
+    );
+
     useEffect(() => {
         setNodes((currentNodes) => {
-            // Keep structural normalization here, but do not run the grow-all
-            // pass from a nodes-dependent effect. The grow helpers intentionally
-            // create updated node objects when fitting containers; doing that
-            // here caused an endless nodes -> effect -> nodes loop as soon as a
-            // parallel/compound existed (visible as a black screen).
-            //
-            // Automatic growth is still handled by expandParent during live
-            // dragging and by the explicit fit/grow calls in the drop/reparent
-            // paths below.
             const withAutoExpansion =
                 normalizeContainerAutoExpansion(currentNodes);
             const withParallelLaneCompounds =
@@ -2994,7 +3045,7 @@ function AppContent() {
                 withParallelLaneCompounds
             );
         });
-    }, [nodes, setNodes]);
+    }, [nodeStructureSignature, setNodes]);
 
     // Internal graph clipboard. This intentionally does not use the system
     // clipboard: Ctrl+C copies the current React Flow selection and
@@ -3046,6 +3097,19 @@ function AppContent() {
 
     const [isDraggingNode, setIsDraggingNode] = useState(false);
     const [isOverTrash, setIsOverTrash] = useState(false);
+    // Expensive drag-over work (DOM hit testing + container lookup) is limited
+    // to one execution per animation frame. React Flow can emit pointer-move
+    // callbacks faster than the browser can paint, so doing this work for every
+    // raw event only adds latency without improving visual fidelity.
+    const dragFrameRef = useRef(null);
+    const pendingNodeDragRef = useRef(null);
+
+    useEffect(() => () => {
+        if (dragFrameRef.current !== null) {
+            cancelAnimationFrame(dragFrameRef.current);
+            dragFrameRef.current = null;
+        }
+    }, []);
 
     const [globalDataModel, setGlobalDataModel] = useState([
         { id: "#_STATE_PREFIX", expr: "'de.unibi.citec.clf.bonsai.skills.'" },
@@ -3152,11 +3216,9 @@ function AppContent() {
     }, [getHistoryHash]);
 
     useEffect(() => {
-        const snapshot = createHistorySnapshot();
-        currentHistorySnapshotRef.current = snapshot;
-
         // Never let Ctrl+Z cross workflow-tab boundaries. Each tab starts its
-        // own undo stack from the state visible when it becomes active.
+        // own undo stack from the state visible when it becomes active. This is
+        // one of the few cases where we need an immediate snapshot.
         if (historyTabRef.current !== activeTabId) {
             historyTabRef.current = activeTabId;
             historyRef.current = [];
@@ -3168,6 +3230,8 @@ function AppContent() {
                 historyTimerRef.current = null;
             }
 
+            const snapshot = createHistorySnapshot();
+            currentHistorySnapshotRef.current = snapshot;
             commitHistorySnapshot(snapshot);
             return;
         }
@@ -3179,19 +3243,24 @@ function AppContent() {
         }
 
         if (historyRef.current.length === 0) {
+            const snapshot = createHistorySnapshot();
+            currentHistorySnapshotRef.current = snapshot;
             commitHistorySnapshot(snapshot);
             return;
         }
 
-        // Debounce state changes so a node drag/control-point drag is one undo
-        // step instead of dozens of intermediate positions.
+        // Debounce *before* cloning the graph. Previously createHistorySnapshot
+        // ran on every drag frame and deep-copied the full workflow even though
+        // only the final debounced snapshot was committed.
         if (historyTimerRef.current) {
             clearTimeout(historyTimerRef.current);
         }
 
         historyTimerRef.current = setTimeout(() => {
             historyTimerRef.current = null;
-            commitHistorySnapshot(currentHistorySnapshotRef.current);
+            const snapshot = createHistorySnapshot();
+            currentHistorySnapshotRef.current = snapshot;
+            commitHistorySnapshot(snapshot);
         }, 180);
 
         return () => {
@@ -3266,8 +3335,11 @@ function AppContent() {
 
     const undo = useCallback(() => {
         // Capture the newest edit even if Ctrl+Z is pressed before the 180 ms
-        // debounce has committed it.
-        commitHistorySnapshot(currentHistorySnapshotRef.current);
+        // debounce has committed it. Creating the snapshot here is cheap in the
+        // normal case because Undo is user-triggered, not frame-triggered.
+        const latestSnapshot = createHistorySnapshot();
+        currentHistorySnapshotRef.current = latestSnapshot;
+        commitHistorySnapshot(latestSnapshot);
 
         if (historyIndexRef.current <= 0) return false;
 
@@ -3276,7 +3348,11 @@ function AppContent() {
             historyRef.current[historyIndexRef.current]?.snapshot
         );
         return true;
-    }, [applyHistorySnapshot, commitHistorySnapshot]);
+    }, [
+        applyHistorySnapshot,
+        commitHistorySnapshot,
+        createHistorySnapshot,
+    ]);
 
     const redo = useCallback(() => {
         if (historyIndexRef.current >= historyRef.current.length - 1) {
@@ -4176,6 +4252,190 @@ function AppContent() {
     const selectedNodes = useMemo(() => {
         return nodes.filter((n) => n.selected && !n.parentId);
     }, [nodes]);
+
+    // Semantic node snapshots intentionally ignore position/selection changes.
+    // Validation and state-machine hierarchy traversal only care about node
+    // identity, parentage and data. Reusing these arrays while a node moves
+    // keeps expensive Problems/inheritance calculations off the drag path.
+    const semanticNodesRef = useRef([]);
+    const semanticNodes = useMemo(() => {
+        const previous = semanticNodesRef.current;
+        const unchanged =
+            previous.length === nodes.length &&
+            nodes.every((node, index) => {
+                const oldNode = previous[index];
+                return (
+                    oldNode?.id === node.id &&
+                    oldNode?.type === node.type &&
+                    oldNode?.parentId === node.parentId &&
+                    oldNode?.data === node.data
+                );
+            });
+
+        if (unchanged) return previous;
+
+        const next = nodes.map((node) => ({
+            id: node.id,
+            type: node.type,
+            parentId: node.parentId,
+            data: node.data,
+        }));
+        semanticNodesRef.current = next;
+        return next;
+    }, [nodes]);
+
+    const semanticSlotNodesRef = useRef([]);
+    const semanticSlotNodes = useMemo(() => {
+        const previous = semanticSlotNodesRef.current;
+        const unchanged =
+            previous.length === slotNodes.length &&
+            slotNodes.every((node, index) => {
+                const oldNode = previous[index];
+                return (
+                    oldNode?.id === node.id &&
+                    oldNode?.type === node.type &&
+                    oldNode?.data === node.data
+                );
+            });
+
+        if (unchanged) return previous;
+
+        const next = slotNodes.map((node) => ({
+            id: node.id,
+            type: node.type,
+            parentId: node.parentId,
+            data: node.data,
+        }));
+        semanticSlotNodesRef.current = next;
+        return next;
+    }, [slotNodes]);
+
+    // Shared graph indexes replace repeated nodes.find()/nodes.filter() scans
+    // in display-only edge construction and hover/normalization helpers.
+    const nodeById = useMemo(
+        () => new Map(semanticNodes.map((node) => [node.id, node])),
+        [semanticNodes]
+    );
+
+    const slotNodeIdSet = useMemo(
+        () => new Set(semanticSlotNodes.map((node) => node.id)),
+        [semanticSlotNodes]
+    );
+
+    // Parent/child membership is semantic and does not change while a node is
+    // merely moving. Store child IDs from the semantic snapshot so the index is
+    // not rebuilt on every drag frame. Layout code can resolve those IDs to the
+    // current node objects only when it actually needs geometry.
+    const childIdsByParent = useMemo(() => {
+        const index = new Map();
+        semanticNodes.forEach((node) => {
+            if (!node.parentId) return;
+            if (!index.has(node.parentId)) {
+                index.set(node.parentId, []);
+            }
+            index.get(node.parentId).push(node.id);
+        });
+        return index;
+    }, [semanticNodes]);
+
+    // Drag/drop target geometry changes far less often than ordinary node
+    // positions. In particular, dragging a skill should not repeatedly scan the
+    // entire graph and recompute every compound/lane absolute position. Keep a
+    // compact signature for container geometry and rebuild the target index only
+    // when container bounds or graph parentage actually change.
+    const dragContainerGeometrySignature = useMemo(
+        () =>
+            nodes
+                .filter((node) =>
+                    node.type === "compound" ||
+                    node.type === "parallelLane" ||
+                    node.type === "parallel"
+                )
+                .map((node) =>
+                    [
+                        node.id,
+                        node.type || "",
+                        node.parentId || "",
+                        Number(node.position?.x || 0),
+                        Number(node.position?.y || 0),
+                        Number(node.measured?.width || node.width || node.style?.width || 0),
+                        Number(node.measured?.height || node.height || node.style?.height || 0),
+                    ].join("|")
+                )
+                .join(";"),
+        [nodes]
+    );
+
+    const dragContainerIndex = useMemo(() => {
+        const currentNodeById = new Map(nodes.map((node) => [node.id, node]));
+
+        const getAncestorIds = (node) => {
+            const result = new Set();
+            let parentId = node?.parentId;
+            const seen = new Set();
+
+            while (parentId && !seen.has(parentId)) {
+                seen.add(parentId);
+                result.add(parentId);
+                parentId = currentNodeById.get(parentId)?.parentId;
+            }
+
+            return result;
+        };
+
+        const toBounds = (node) => {
+            const absolute = getAbsoluteNodePosition(node, nodes);
+            const size =
+                node.type === "parallelLane"
+                    ? {
+                        width: Number(node.style?.width) || 420,
+                        height: Number(node.style?.height) || 110,
+                    }
+                    : getNodeSize(node);
+            const ancestorIds = getAncestorIds(node);
+
+            return {
+                id: node.id,
+                type: node.type,
+                x: absolute.x,
+                y: absolute.y,
+                width: size.width,
+                height: size.height,
+                depth: ancestorIds.size,
+                ancestorIds,
+            };
+        };
+
+        const lanes = [];
+        const compounds = [];
+
+        nodes.forEach((node) => {
+            if (node.type === "parallelLane") {
+                lanes.push(toBounds(node));
+            } else if (node.type === "compound") {
+                compounds.push(toBounds(node));
+            }
+        });
+
+        compounds.sort((a, b) => b.depth - a.depth);
+
+        return { lanes, compounds };
+        // `nodes` is intentionally represented by the two signatures above: a
+        // normal skill position update must not invalidate this cache.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [nodeStructureSignature, dragContainerGeometrySignature]);
+
+    const semanticChildrenByParent = useMemo(() => {
+        const index = new Map();
+        semanticNodes.forEach((node) => {
+            if (!node.parentId) return;
+            if (!index.has(node.parentId)) {
+                index.set(node.parentId, []);
+            }
+            index.get(node.parentId).push(node);
+        });
+        return index;
+    }, [semanticNodes]);
 
     // Hilfsfunktion: Bounding Box um alle ausgewählten Nodes berechnen
     const getSelectionBoundingBox = (selectedList) => {
@@ -5269,47 +5529,59 @@ function AppContent() {
     const hiddenNodeIds = useMemo(() => {
         const hidden = new Set();
 
-        nodes
+        semanticNodes
             .filter(
                 (node) =>
                     (node.type === "compound" || node.type === "parallel") &&
                     Boolean(node.data?.isCollapsed)
             )
             .forEach((container) => {
-                getDescendantNodeIds(container.id, nodes).forEach((id) =>
-                    hidden.add(id)
-                );
+                const queue = [
+                    ...(semanticChildrenByParent.get(container.id) || []),
+                ];
+
+                while (queue.length > 0) {
+                    const child = queue.shift();
+                    if (!child || hidden.has(child.id)) continue;
+                    hidden.add(child.id);
+                    queue.push(
+                        ...(semanticChildrenByParent.get(child.id) || [])
+                    );
+                }
             });
 
         return hidden;
-    }, [nodes]);
+    }, [semanticNodes, semanticChildrenByParent]);
+
+    const handleOpenSubMachineRef = useRef(handleOpenSubMachine);
+    handleOpenSubMachineRef.current = handleOpenSubMachine;
+    const stableHandleOpenSubMachine = useCallback(
+        (...args) => handleOpenSubMachineRef.current?.(...args),
+        []
+    );
+
+    // Keep the injected React Flow node objects stable whenever the source
+    // node itself did not change. During a drag React Flow normally replaces
+    // only the moved node; recreating wrappers for every other node forces
+    // unnecessary custom-node renders.
+    const injectedNodeCacheRef = useRef(new Map());
+    const injectedSlotNodeCacheRef = useRef(new Map());
 
     const injectedNodes = useMemo(() => {
-        return nodes.map((n) => {
-            const injectedData = {
-                ...n.data,
-                mode: activeMode,
-                onOpenStateActions: handleOpenStateActions,
-                onOpenParameter: handleOpenParameter,
-                onOpenSlot: handleOpenSlot,
-                onOpenTransition: handleOpenTransition,
-                mode: activeMode,
-                slotConnectionDrag,
-                onToggleCollapse: handleToggleContainerCollapse,
-            };
+        const previousCache = injectedNodeCacheRef.current;
+        const nextCache = new Map();
+
+        const result = nodes.map((n) => {
+            const hidden = hiddenNodeIds.has(n.id);
+            let childTab = null;
 
             if (n.type === "submachine") {
-                injectedData.onOpenSubMachine = handleOpenSubMachine;
-
-                // If this sub-state machine is open as a child tab, use that
-                // tab's current datamodel for the Overview card. This keeps
-                // the parent node in sync after editing the child workflow.
                 const srcFileName = String(n.data?.src || "")
                     .split(/[\\/]/)
                     .pop()
                     ?.replace(/\.(xml|scxml)$/i, "");
 
-                const childTab = tabs.find((tab) => {
+                childTab = tabs.find((tab) => {
                     if (tab.parentTabId !== activeTabId) return false;
 
                     const tabFileName = String(tab.fileName || "")
@@ -5323,7 +5595,47 @@ function AppContent() {
                         String(tab.title || "") === String(n.data?.label || "") ||
                         (srcFileName && tabFileName === srcFileName)
                     );
-                });
+                }) || null;
+            }
+
+            const cached = previousCache.get(n.id);
+            const childGlobalDataModel = childTab?.globalDataModel || null;
+            const canReuse = Boolean(
+                cached &&
+                cached.sourceNode === n &&
+                cached.hidden === hidden &&
+                cached.activeMode === activeMode &&
+                cached.slotConnectionDrag === slotConnectionDrag &&
+                cached.childGlobalDataModel === childGlobalDataModel &&
+                cached.handleOpenStateActions === handleOpenStateActions &&
+                cached.handleOpenParameter === handleOpenParameter &&
+                cached.handleOpenSlot === handleOpenSlot &&
+                cached.handleOpenTransition === handleOpenTransition &&
+                cached.handleToggleContainerCollapse === handleToggleContainerCollapse &&
+                (n.type !== "submachine" ||
+                    cached.handleOpenSubMachine === stableHandleOpenSubMachine) &&
+                (n.type !== "parallel" ||
+                    cached.handleAddLaneToParallel === handleAddLaneToParallel)
+            );
+
+            if (canReuse) {
+                nextCache.set(n.id, cached);
+                return cached.value;
+            }
+
+            const injectedData = {
+                ...n.data,
+                mode: activeMode,
+                onOpenStateActions: handleOpenStateActions,
+                onOpenParameter: handleOpenParameter,
+                onOpenSlot: handleOpenSlot,
+                onOpenTransition: handleOpenTransition,
+                slotConnectionDrag,
+                onToggleCollapse: handleToggleContainerCollapse,
+            };
+
+            if (n.type === "submachine") {
+                injectedData.onOpenSubMachine = stableHandleOpenSubMachine;
 
                 if (childTab) {
                     injectedData.localDataModel = getLocalDataModelEntries(
@@ -5336,12 +5648,33 @@ function AppContent() {
                 injectedData.onAddLane = handleAddLaneToParallel;
             }
 
-            return {
+            const value = {
                 ...n,
-                hidden: hiddenNodeIds.has(n.id),
+                hidden,
                 data: injectedData,
             };
+
+            nextCache.set(n.id, {
+                sourceNode: n,
+                hidden,
+                activeMode,
+                slotConnectionDrag,
+                childGlobalDataModel,
+                handleOpenStateActions,
+                handleOpenParameter,
+                handleOpenSlot,
+                handleOpenTransition,
+                handleToggleContainerCollapse,
+                handleOpenSubMachine: stableHandleOpenSubMachine,
+                handleAddLaneToParallel,
+                value,
+            });
+
+            return value;
         });
+
+        injectedNodeCacheRef.current = nextCache;
+        return result;
     }, [
         nodes,
         tabs,
@@ -5350,27 +5683,53 @@ function AppContent() {
         handleAddLaneToParallel,
         handleOpenStateActions,
         handleOpenParameter,
+        handleOpenSlot,
+        handleOpenTransition,
+        stableHandleOpenSubMachine,
         handleToggleContainerCollapse,
         hiddenNodeIds,
-        activeMode,
         slotConnectionDrag,
     ]);
 
-    const injectedSlotNodes = useMemo(
-        () =>
-            slotNodes.map((node) => ({
+    const injectedSlotNodes = useMemo(() => {
+        const previousCache = injectedSlotNodeCacheRef.current;
+        const nextCache = new Map();
+
+        const result = slotNodes.map((node) => {
+            const cached = previousCache.get(node.id);
+            if (
+                cached?.sourceNode === node &&
+                cached?.slotConnectionDrag === slotConnectionDrag
+            ) {
+                nextCache.set(node.id, cached);
+                return cached.value;
+            }
+
+            const value = {
                 ...node,
                 data: {
                     ...node.data,
                     slotConnectionDrag,
                 },
-            })),
-        [slotNodes, slotConnectionDrag]
-    );
+            };
+
+            nextCache.set(node.id, {
+                sourceNode: node,
+                slotConnectionDrag,
+                value,
+            });
+
+            return value;
+        });
+
+        injectedSlotNodeCacheRef.current = nextCache;
+        return result;
+    }, [slotNodes, slotConnectionDrag]);
 
     const [isReloadingSkills, setIsReloadingSkills] = useState(false);
     const [skillLibraryRefreshVersion, setSkillLibraryRefreshVersion] = useState(0);
     const skillLibrarySignatureRef = useRef("");
+    const skillDataCacheRef = useRef(new Map());
 
     const fetchSkills = useCallback(async ({ manual = false } = {}) => {
         if (manual) {
@@ -5389,6 +5748,11 @@ function AppContent() {
                 : [];
             const signature = JSON.stringify(normalizedSkills);
             const changed = signature !== skillLibrarySignatureRef.current;
+
+            // The list of skill names can stay identical while an individual
+            // skill definition changes (parameters/slots). Each library refresh
+            // therefore invalidates the short-lived definition cache as well.
+            skillDataCacheRef.current.clear();
 
             if (changed) {
                 skillLibrarySignatureRef.current = signature;
@@ -5410,11 +5774,14 @@ function AppContent() {
     useEffect(() => {
         fetchSkills();
 
+        // Focus/visibility changes already refresh immediately. A slower
+        // background poll keeps automatic updates without waking the UI/network
+        // every three seconds while the editor is in active use.
         const intervalId = window.setInterval(() => {
             if (document.visibilityState === "visible") {
                 fetchSkills();
             }
-        }, 3000);
+        }, 10000);
 
         const handleVisibilityChange = () => {
             if (document.visibilityState === "visible") {
@@ -5469,6 +5836,14 @@ function AppContent() {
     const fetchSkillData = async (fullSkillName, params = null) => {
         const apiParams = normalizeSkillApiParams(params);
         const hasParams = Object.keys(apiParams).length > 0;
+        const normalizedParamEntries = Object.entries(apiParams).sort(
+            ([left], [right]) => left.localeCompare(right)
+        );
+        const cacheKey = `${fullSkillName}\u0001${JSON.stringify(normalizedParamEntries)}`;
+
+        if (skillDataCacheRef.current.has(cacheKey)) {
+            return skillDataCacheRef.current.get(cacheKey);
+        }
 
         try {
             const response = await fetch(`/api/skill/${fullSkillName}`, {
@@ -5484,7 +5859,9 @@ function AppContent() {
             });
 
             if (response.ok) {
-                return await response.json();
+                const data = await response.json();
+                skillDataCacheRef.current.set(cacheKey, data);
+                return data;
             }
 
             if (!hasParams) {
@@ -5510,6 +5887,13 @@ function AppContent() {
         // references to datamodel variables). If the backend cannot configure
         // those values at edit time, keep the workflow usable with the static
         // skill definition instead of losing all requests during import.
+        const baseCacheKey = `${fullSkillName}\u0001[]`;
+        if (skillDataCacheRef.current.has(baseCacheKey)) {
+            const fallbackData = skillDataCacheRef.current.get(baseCacheKey);
+            skillDataCacheRef.current.set(cacheKey, fallbackData);
+            return fallbackData;
+        }
+
         try {
             const fallbackResponse = await fetch(`/api/skill/${fullSkillName}`, {
                 cache: "no-store",
@@ -5517,7 +5901,10 @@ function AppContent() {
             if (!fallbackResponse.ok) {
                 throw new Error(`Server returned ${fallbackResponse.status}`);
             }
-            return await fallbackResponse.json();
+            const fallbackData = await fallbackResponse.json();
+            skillDataCacheRef.current.set(baseCacheKey, fallbackData);
+            skillDataCacheRef.current.set(cacheKey, fallbackData);
+            return fallbackData;
         } catch (fallbackError) {
             console.error(`Error loading skill ${fullSkillName}:`, fallbackError);
             return null;
@@ -5732,23 +6119,44 @@ function AppContent() {
         [behaviorDirectories, handleOpenSubMachine]
     );
 
-    const selectedRawNode =
-        [...nodes, ...slotNodes].find((node) => node.id === selectedNodeId) || null;
+    const selectedRawNode = useMemo(
+        () =>
+            [...semanticNodes, ...semanticSlotNodes].find(
+                (node) => node.id === selectedNodeId
+            ) || null,
+        [semanticNodes, semanticSlotNodes, selectedNodeId]
+    );
 
     // Keep a clicked slot selected as the slot itself. Previously slot nodes
     // were converted to the first skill that used the path, which prevented a
     // dedicated slot detail view and made multi-skill slots ambiguous.
     const selectedNode = selectedRawNode;
 
-    const ancestorSlotSourcesByPath = useMemo(
-        () =>
-            getAncestorSlotSourcesByPath(tabs, activeTabId, {
-                nodes,
-                slotNodes,
-                manualSlots,
-            }),
-        [tabs, activeTabId, nodes, slotNodes, manualSlots]
-    );
+    // Freeze expensive ancestor-slot traversal while a node is being dragged.
+    // Dragging changes geometry, not slot semantics, so recalculating the full
+    // open-tab inheritance chain during the gesture only steals time from the
+    // interaction thread. The cache is refreshed immediately after drag end.
+    const ancestorSlotSourcesCacheRef = useRef(new Map());
+    const ancestorSlotSourcesByPath = useMemo(() => {
+        if (isDraggingNode) {
+            return ancestorSlotSourcesCacheRef.current;
+        }
+
+        const next = getAncestorSlotSourcesByPath(tabs, activeTabId, {
+            nodes: semanticNodes,
+            slotNodes: semanticSlotNodes,
+            manualSlots,
+        });
+        ancestorSlotSourcesCacheRef.current = next;
+        return next;
+    }, [
+        isDraggingNode,
+        tabs,
+        activeTabId,
+        semanticNodes,
+        semanticSlotNodes,
+        manualSlots,
+    ]);
 
     const selectedSlotDetails = useMemo(() => {
         if (!selectedRawNode || selectedRawNode.type !== "slot") {
@@ -5760,7 +6168,7 @@ function AppContent() {
         const accessTypes = new Set();
         const dataTypes = new Set();
 
-        nodes.forEach((node) => {
+        semanticNodes.forEach((node) => {
             const skillName =
                 node.data?.fullSkillName ||
                 node.data?.label ||
@@ -5827,7 +6235,7 @@ function AppContent() {
             skillAccesses,
             ancestorSlotAccesses,
         };
-    }, [selectedRawNode, nodes, ancestorSlotSourcesByPath]);
+    }, [selectedRawNode, semanticNodes, ancestorSlotSourcesByPath]);
 
     // OnEntry/OnExit has asymmetric scope for sub-state-machines:
     // - assignment location belongs to the child machine's local datamodel
@@ -5913,7 +6321,7 @@ function AppContent() {
             }
         };
 
-        nodes.forEach((node) => {
+        semanticNodes.forEach((node) => {
             (node.data?.inSlots || []).forEach(addOption);
             (node.data?.outSlots || []).forEach(addOption);
         });
@@ -5922,12 +6330,12 @@ function AppContent() {
         return [...options.values()].sort((a, b) =>
             a.path.localeCompare(b.path)
         );
-    }, [nodes, manualSlots]);
+    }, [semanticNodes, manualSlots]);
 
     const canvasSkillSlotOptions = useMemo(() => {
         const options = [];
 
-        nodes.forEach((node) => {
+        semanticNodes.forEach((node) => {
             if (node.type !== "custom") return;
 
             const nodeLabel =
@@ -5965,7 +6373,7 @@ function AppContent() {
         });
 
         return options;
-    }, [nodes]);
+    }, [semanticNodes]);
 
     const activeWorkflowTab = useMemo(
         () => tabs.find((tab) => tab.id === activeTabId) || null,
@@ -5977,27 +6385,39 @@ function AppContent() {
         activeWorkflowTab?.parentTabId
     );
 
-    const editorProblems = useMemo(
-        () =>
-            buildEditorProblems(
-                nodes,
-                edges,
-                globalDataModel,
-                behaviorDirectories,
-                isBehaviorWorkflow,
-                manualSlots,
-                ancestorSlotSourcesByPath
-            ),
-        [
-            nodes,
+    // Problems are semantic, not geometric. Keep the last validated result
+    // during a drag and refresh it once the node is dropped. This also avoids
+    // re-running slot/inheritance validation when React Flow emits incidental
+    // edge/node updates as part of the drag gesture.
+    const editorProblemsCacheRef = useRef([]);
+    const editorProblems = useMemo(() => {
+        if (isDraggingNode) {
+            return editorProblemsCacheRef.current;
+        }
+
+        const next = buildEditorProblems(
+            semanticNodes,
             edges,
             globalDataModel,
             behaviorDirectories,
             isBehaviorWorkflow,
             manualSlots,
             ancestorSlotSourcesByPath,
-        ]
-    );
+            semanticSlotNodes
+        );
+        editorProblemsCacheRef.current = next;
+        return next;
+    }, [
+        isDraggingNode,
+        semanticNodes,
+        edges,
+        globalDataModel,
+        behaviorDirectories,
+        isBehaviorWorkflow,
+        manualSlots,
+        ancestorSlotSourcesByPath,
+        semanticSlotNodes,
+    ]);
 
     const errorProblemCount = useMemo(
         () =>
@@ -6064,65 +6484,96 @@ function AppContent() {
         [nodes, setNodes, setEdges, fitView]
     );
 
-// Multi-level package/subpackage parser
-    let packages = [];
-    let directSkills = [];
+// Multi-level package/subpackage parser. This used to run from scratch on
+    // every hover state update even though the skill library inputs had not
+    // changed. Keep all derived lists behind one memoized calculation.
+    const {
+        packages,
+        directSkills,
+        packageSkills,
+        subPackages,
+        searchedSkills,
+        filteredSkills,
+    } = useMemo(() => {
+        const nextPackages = [];
+        const nextDirectSkills = [];
+        const allSkills = skills.skills || [];
 
-    (skills.skills || []).forEach((skill) => {
-        const afterSkills = skill.split("skills.")[1];
-        if (!afterSkills) return;
-        const parts = afterSkills.split(".");
+        allSkills.forEach((skill) => {
+            const afterSkills = skill.split("skills.")[1];
+            if (!afterSkills) return;
+            const parts = afterSkills.split(".");
 
-        if (parts.length === 1) {
-            directSkills.push(skill);
-        } else {
-            const packageName = parts[0];
-            if (!packages.includes(packageName)) {
-                packages.push(packageName);
-            }
-        }
-    });
-
-    let packageSkills = [];
-    let subPackages = [];
-
-    if (selectedPackage !== null) {
-        (skills.skills || []).forEach((skill) => {
-            const afterSkill = skill.split("skills.")[1];
-            if (!afterSkill) return;
-            const parts = afterSkill.split(".");
-
-            if (parts[0] !== selectedPackage) {
-                return;
-            }
-
-            if (selectedSubPackage === null) {
-                if (parts.length === 2) {
-                    packageSkills.push(skill);
-                }
-                if (parts.length > 2) {
-                    const subPackageName = parts[1];
-                    if (!subPackages.includes(subPackageName)) {
-                        subPackages.push(subPackageName);
-                    }
-                }
+            if (parts.length === 1) {
+                nextDirectSkills.push(skill);
             } else {
-                if (parts[1] === selectedSubPackage && parts.length === 3) {
-                    packageSkills.push(skill);
+                const packageName = parts[0];
+                if (!nextPackages.includes(packageName)) {
+                    nextPackages.push(packageName);
                 }
             }
         });
-    }
 
-    packageSkills = packageSkills.filter((skill) =>
-        skill.toLowerCase().includes(searchText.toLowerCase())
-    );
+        let nextPackageSkills = [];
+        const nextSubPackages = [];
 
-    const searchedSkills = (skills.skills || []).filter((s) => s.toLowerCase().includes(searchText.toLowerCase()));
+        if (selectedPackage !== null) {
+            allSkills.forEach((skill) => {
+                const afterSkill = skill.split("skills.")[1];
+                if (!afterSkill) return;
+                const parts = afterSkill.split(".");
 
-    const filteredSkills = (skills.skills || [])
-        .filter((s) => (activeFilter === "Everything" ? true : s.includes(activeFilter)))
-        .filter((s) => s.toLowerCase().includes(searchText.toLowerCase()));
+                if (parts[0] !== selectedPackage) return;
+
+                if (selectedSubPackage === null) {
+                    if (parts.length === 2) {
+                        nextPackageSkills.push(skill);
+                    }
+                    if (parts.length > 2) {
+                        const subPackageName = parts[1];
+                        if (!nextSubPackages.includes(subPackageName)) {
+                            nextSubPackages.push(subPackageName);
+                        }
+                    }
+                } else if (
+                    parts[1] === selectedSubPackage &&
+                    parts.length === 3
+                ) {
+                    nextPackageSkills.push(skill);
+                }
+            });
+        }
+
+        const normalizedSearch = searchText.toLowerCase();
+        nextPackageSkills = nextPackageSkills.filter((skill) =>
+            skill.toLowerCase().includes(normalizedSearch)
+        );
+
+        return {
+            packages: nextPackages,
+            directSkills: nextDirectSkills,
+            packageSkills: nextPackageSkills,
+            subPackages: nextSubPackages,
+            searchedSkills: allSkills.filter((skill) =>
+                skill.toLowerCase().includes(normalizedSearch)
+            ),
+            filteredSkills: allSkills
+                .filter((skill) =>
+                    activeFilter === "Everything"
+                        ? true
+                        : skill.includes(activeFilter)
+                )
+                .filter((skill) =>
+                    skill.toLowerCase().includes(normalizedSearch)
+                ),
+        };
+    }, [
+        skills.skills,
+        selectedPackage,
+        selectedSubPackage,
+        searchText,
+        activeFilter,
+    ]);
 
 
     const updatePersistentEdgeControlPoints = useCallback(
@@ -6156,11 +6607,15 @@ function AppContent() {
         ? null
         : hoveredEditorEdgeId;
 
-    const selectedTransitionNodeIds = new Set([
-        ...selectedNodes.map((node) => node.id),
-        ...(selectedNodeId ? [selectedNodeId] : []),
-        ...(activeCanvasFocusNodeId ? [activeCanvasFocusNodeId] : []),
-    ]);
+    const selectedTransitionNodeIdKey = [
+        ...new Set([
+            ...selectedNodes.map((node) => node.id),
+            ...(selectedNodeId ? [selectedNodeId] : []),
+            ...(activeCanvasFocusNodeId ? [activeCanvasFocusNodeId] : []),
+        ]),
+    ]
+        .sort()
+        .join("\u0001");
 
     const normalizedTransitionEdges = useMemo(
         () =>
@@ -6169,9 +6624,7 @@ function AppContent() {
                     return edge;
                 }
 
-                const targetNode = nodes.find(
-                    (node) => node.id === edge.target
-                );
+                const targetNode = nodeById.get(edge.target);
 
                 if (!targetNode) {
                     return edge;
@@ -6191,23 +6644,39 @@ function AppContent() {
                     targetHandle: "transition-target",
                 };
             }),
-        [edges, nodes]
+        [edges, nodeById]
     );
 
-    const highlightedTransitionEdges = highlightSelectedTransitions(
-        withSmartTransitionRouting(normalizedTransitionEdges).map((edge) => ({
-            ...edge,
-            data: {
-                ...(edge.data || {}),
-                onControlPointsChange: (controlPoints) =>
-                    updatePersistentEdgeControlPoints(
-                        edge.id,
-                        controlPoints,
-                        "transition"
-                    ),
-            },
-        })),
-        selectedTransitionNodeIds
+    const smartTransitionEdges = useMemo(
+        () =>
+            withSmartTransitionRouting(normalizedTransitionEdges).map(
+                (edge) => ({
+                    ...edge,
+                    data: {
+                        ...(edge.data || {}),
+                        onControlPointsChange: (controlPoints) =>
+                            updatePersistentEdgeControlPoints(
+                                edge.id,
+                                controlPoints,
+                                "transition"
+                            ),
+                    },
+                })
+            ),
+        [normalizedTransitionEdges, updatePersistentEdgeControlPoints]
+    );
+
+    const highlightedTransitionEdges = useMemo(
+        () =>
+            highlightSelectedTransitions(
+                smartTransitionEdges,
+                new Set(
+                    selectedTransitionNodeIdKey
+                        ? selectedTransitionNodeIdKey.split("\u0001")
+                        : []
+                )
+            ),
+        [smartTransitionEdges, selectedTransitionNodeIdKey]
     );
 
     // Hovering a supported node directly in the editor acts like a temporary
@@ -6218,211 +6687,172 @@ function AppContent() {
     const hasSelectedSlotContext = Boolean(
         selectedSlotContextId &&
         (
-            nodes.some((node) => node.id === selectedSlotContextId) ||
-            slotNodes.some((node) => node.id === selectedSlotContextId)
+            nodeById.has(selectedSlotContextId) ||
+            slotNodeIdSet.has(selectedSlotContextId)
         )
     );
     const isSlotDetailsConnectionPreview = Boolean(
         hoveredSlotAccessNodeId &&
         selectedNodeId &&
-        slotNodes.some((node) => node.id === selectedNodeId)
+        slotNodeIdSet.has(selectedNodeId)
     );
 
     const SLOT_EDGE_INACTIVE_COLOR = "#64748b";
+    const inactiveSlotEdgeCacheRef = useRef(new WeakMap());
+    const hoveredSlotEdgeCacheRef = useRef(new WeakMap());
 
-    const editableSlotEdges = slotEdges.map((edge) => {
-        const access =
-            edge.data?.access === "write" ? "write" : "read";
-        const semanticColor = SLOT_CONNECTION_COLORS[access];
+    const routedSlotEdges = useMemo(
+        () =>
+            slotEdges.map((edge) => {
+                const access =
+                    edge.data?.access === "write" ? "write" : "read";
 
-        const skillNodeId = edge.data?.skillNodeId || edge.source;
-        const slotNodeId = edge.data?.slotNodeId || edge.target;
-        const isHoveredSlotDetailsConnection =
-            isSlotDetailsConnectionPreview &&
-            (
-                skillNodeId === hoveredSlotAccessNodeId ||
-                edge.source === hoveredSlotAccessNodeId ||
-                edge.target === hoveredSlotAccessNodeId
-            ) &&
-            (
-                slotNodeId === selectedNodeId ||
-                edge.source === selectedNodeId ||
-                edge.target === selectedNodeId
-            );
+                return {
+                    ...edge,
+                    type: "smartTransition",
+                    data: {
+                        ...(edge.data || {}),
+                        access,
+                        onControlPointsChange: (controlPoints) =>
+                            updatePersistentEdgeControlPoints(
+                                edge.id,
+                                controlPoints,
+                                "slot"
+                            ),
+                    },
+                };
+            }),
+        [slotEdges, updatePersistentEdgeControlPoints]
+    );
 
-        const isConnectedToSelection = isSlotDetailsConnectionPreview
-            ? isHoveredSlotDetailsConnection
-            : (
-                !hasSelectedSlotContext ||
-                skillNodeId === selectedSlotContextId ||
-                slotNodeId === selectedSlotContextId ||
-                edge.source === selectedSlotContextId ||
-                edge.target === selectedSlotContextId
-            );
+    const editableSlotEdges = useMemo(() => {
+        if (!hasSelectedSlotContext && !isSlotDetailsConnectionPreview) {
+            return routedSlotEdges;
+        }
 
-        const color = isConnectedToSelection
-            ? semanticColor
-            : SLOT_EDGE_INACTIVE_COLOR;
+        return routedSlotEdges.map((edge) => {
+            const access =
+                edge.data?.access === "write" ? "write" : "read";
+            const semanticColor = SLOT_CONNECTION_COLORS[access];
 
-        return {
-            ...edge,
-            type: "smartTransition",
-            // Slot edge colours are display-only. A canvas skill hover mirrors
-            // selection. A Slot Details hover highlights only the exact edge
-            // between that skill and the selected slot.
-            style: {
-                ...(edge.style || {}),
-                stroke: color,
-                strokeWidth: isHoveredSlotDetailsConnection
-                    ? 3
-                    : isConnectedToSelection
-                        ? edge.style?.strokeWidth || 1.7
-                        : 1.35,
-                strokeDasharray: edge.style?.strokeDasharray || "5 5",
-                opacity: isConnectedToSelection ? 1 : 0.3,
-            },
-            markerEnd: {
-                ...(edge.markerEnd || {}),
-                type: edge.markerEnd?.type || MarkerType.ArrowClosed,
-                color,
-            },
-            data: {
-                ...(edge.data || {}),
-                access,
-                onControlPointsChange: (controlPoints) =>
-                    updatePersistentEdgeControlPoints(
-                        edge.id,
-                        controlPoints,
-                        "slot"
-                    ),
-            },
-        };
-    });
+            const skillNodeId = edge.data?.skillNodeId || edge.source;
+            const slotNodeId = edge.data?.slotNodeId || edge.target;
+            const isHoveredSlotDetailsConnection =
+                isSlotDetailsConnectionPreview &&
+                (
+                    skillNodeId === hoveredSlotAccessNodeId ||
+                    edge.source === hoveredSlotAccessNodeId ||
+                    edge.target === hoveredSlotAccessNodeId
+                ) &&
+                (
+                    slotNodeId === selectedNodeId ||
+                    edge.source === selectedNodeId ||
+                    edge.target === selectedNodeId
+                );
 
-    const compoundInitialEdges = nodes
-        .filter(
-            (node) => node.type === "compound" && !node.data?.isCollapsed
-        )
-        .map((compound) => {
-            const initialChild = nodes.find(
-                (node) =>
-                    node.parentId === compound.id &&
-                    (
-                        node.id === compound.data?.initialChildId ||
-                        (
-                            !compound.data?.initialChildId &&
-                            node.data?.isInitial
-                        )
-                    )
-            );
+            const isConnectedToSelection = isSlotDetailsConnectionPreview
+                ? isHoveredSlotDetailsConnection
+                : (
+                    skillNodeId === selectedSlotContextId ||
+                    slotNodeId === selectedSlotContextId ||
+                    edge.source === selectedSlotContextId ||
+                    edge.target === selectedSlotContextId
+                );
 
-            if (!initialChild) {
-                return null;
+            if (isConnectedToSelection && !isHoveredSlotDetailsConnection) {
+                return edge;
             }
 
-            const initialTargetHandle =
-                initialChild.type === "parallel"
-                    ? "target"
-                    : initialChild.type === "compound"
-                        ? "compound-entry"
-                        : "transition-target";
+            if (isHoveredSlotDetailsConnection) {
+                const cachedHovered = hoveredSlotEdgeCacheRef.current.get(edge);
+                if (cachedHovered) return cachedHovered;
 
-            return {
-                id: `edge-compound-initial-${compound.id}-${initialChild.id}`,
-                source: compound.id,
-                target: initialChild.id,
-                sourceHandle: "compound-entry",
-                targetHandle: initialTargetHandle,
-                label: "",
-                // The entry point is visually on the compound's left border,
-                // but this helper edge should travel directly inward to the
-                // initial child instead of first routing outside the compound.
-                type: "straight",
-                selectable: false,
-                focusable: false,
-                deletable: false,
-                markerEnd: {
-                    type: MarkerType.ArrowClosed,
-                    color: "#111827",
-                },
+                const hoveredEdge = {
+                    ...edge,
+                    style: {
+                        ...(edge.style || {}),
+                        stroke: semanticColor,
+                        strokeWidth: 3,
+                        strokeDasharray: edge.style?.strokeDasharray || "5 5",
+                        opacity: 1,
+                    },
+                    markerEnd: {
+                        ...(edge.markerEnd || {}),
+                        type: edge.markerEnd?.type || MarkerType.ArrowClosed,
+                        color: semanticColor,
+                    },
+                };
+                hoveredSlotEdgeCacheRef.current.set(edge, hoveredEdge);
+                return hoveredEdge;
+            }
+
+            const cachedInactive = inactiveSlotEdgeCacheRef.current.get(edge);
+            if (cachedInactive) return cachedInactive;
+
+            const inactiveEdge = {
+                ...edge,
                 style: {
-                    stroke: "#111827",
-                    strokeWidth: 1.6,
+                    ...(edge.style || {}),
+                    stroke: SLOT_EDGE_INACTIVE_COLOR,
+                    strokeWidth: 1.35,
+                    strokeDasharray: edge.style?.strokeDasharray || "5 5",
+                    opacity: 0.3,
                 },
-                data: {
-                    compoundInitialEdge: true,
-                    displayOnly: true,
+                markerEnd: {
+                    ...(edge.markerEnd || {}),
+                    type: edge.markerEnd?.type || MarkerType.ArrowClosed,
+                    color: SLOT_EDGE_INACTIVE_COLOR,
                 },
             };
-        })
-        .filter(Boolean);
+            inactiveSlotEdgeCacheRef.current.set(edge, inactiveEdge);
+            return inactiveEdge;
+        });
+    }, [
+        routedSlotEdges,
+        isSlotDetailsConnectionPreview,
+        hoveredSlotAccessNodeId,
+        selectedNodeId,
+        hasSelectedSlotContext,
+        selectedSlotContextId,
+    ]);
 
-    // A parallel state starts one initial state per lane. This mirrors the
-    // compound-state entry helper, except that a parallel has one branch entry
-    // target for every lane. If the lane contains a compound, the parallel
-    // enters that compound and the compound's own initial edge continues to its
-    // initial child. These edges are display-only and are never persisted as
-    // normal SCXML transitions.
-    const parallelEntryEdges = nodes
-        .filter((node) => node.type === "parallel" && !node.data?.isCollapsed)
-        .flatMap((parallel) => {
-            const lanes = nodes.filter(
-                (node) =>
-                    node.type === "parallelLane" &&
-                    node.parentId === parallel.id
-            );
-
-            return lanes
-                .map((lane) => {
-                    const directChildren = nodes.filter(
-                        (node) => node.parentId === lane.id
-                    );
-
-                    const candidates = directChildren.filter(
+    const compoundInitialEdges = useMemo(
+        () =>
+            semanticNodes
+                .filter(
+                    (node) =>
+                        node.type === "compound" &&
+                        !node.data?.isCollapsed
+                )
+                .map((compound) => {
+                    const directChildren =
+                        semanticChildrenByParent.get(compound.id) || [];
+                    const initialChild = directChildren.find(
                         (node) =>
-                            node.type !== "slot" &&
-                            node.type !== "parallelLane"
+                            node.id === compound.data?.initialChildId ||
+                            (
+                                !compound.data?.initialChildId &&
+                                node.data?.isInitial
+                            )
                     );
 
-                    if (candidates.length === 0) {
+                    if (!initialChild) {
                         return null;
                     }
 
-                    const sortedCandidates = [...candidates].sort((a, b) => {
-                        const ax = Number(a.position?.x || 0);
-                        const bx = Number(b.position?.x || 0);
-                        if (ax !== bx) return ax - bx;
-
-                        const ay = Number(a.position?.y || 0);
-                        const by = Number(b.position?.y || 0);
-                        return ay - by;
-                    });
-
-                    // A compound is itself the branch entry target. Its normal
-                    // compound-entry edge then selects the initial child.
-                    const target =
-                        candidates.find(isAutoParallelLaneCompound) ||
-                        candidates.find((node) => node.data?.isInitial) ||
-                        sortedCandidates[0];
-
-                    const targetHandle =
-                        target.type === "compound"
-                            ? "compound-entry"
-                            : target.type === "parallel"
-                                ? "target"
+                    const initialTargetHandle =
+                        initialChild.type === "parallel"
+                            ? "target"
+                            : initialChild.type === "compound"
+                                ? "compound-entry"
                                 : "transition-target";
 
                     return {
-                        id: `edge-parallel-entry-${parallel.id}-${lane.id}-${target.id}`,
-                        // Each lane owns an entry point on its left border. Since
-                        // the lane spans the full parallel width, this point lies
-                        // directly on the parallel state's left edge. A lane with
-                        // one skill therefore gets the same visual entry arrow as
-                        // an initial child inside a normal compound.
-                        source: lane.id,
-                        target: target.id,
-                        sourceHandle: "parallel-entry",
-                        targetHandle,
+                        id: `edge-compound-initial-${compound.id}-${initialChild.id}`,
+                        source: compound.id,
+                        target: initialChild.id,
+                        sourceHandle: "compound-entry",
+                        targetHandle: initialTargetHandle,
                         label: "",
                         type: "straight",
                         selectable: false,
@@ -6430,281 +6860,519 @@ function AppContent() {
                         deletable: false,
                         markerEnd: {
                             type: MarkerType.ArrowClosed,
-                            color: "#0284c7",
+                            color: "#111827",
                         },
                         style: {
-                            stroke: "#0284c7",
-                            strokeWidth: 1.5,
+                            stroke: "#111827",
+                            strokeWidth: 1.6,
                         },
                         data: {
-                            parallelEntryEdge: true,
-                            parallelLaneId: lane.id,
+                            compoundInitialEdge: true,
                             displayOnly: true,
                         },
                     };
                 })
-                .filter(Boolean);
-        });
+                .filter(Boolean),
+        [semanticNodes, semanticChildrenByParent]
+    );
 
-    let visibleNodes = injectedNodes;
-    let visibleEdges = [
-        ...highlightedTransitionEdges,
-        ...compoundInitialEdges,
-        ...parallelEntryEdges,
-    ];
-    if (activeMode === "slots") {
-        visibleNodes = [...injectedNodes, ...injectedSlotNodes];
+    // Display-only branch entry edges are structural/layout-derived. They do
+    // not need to chase a moving pointer frame-by-frame, so retain the last
+    // stable set during a drag and rebuild them when the drag finishes.
+    const parallelEntryEdgesCacheRef = useRef([]);
+    const parallelEntryEdges = useMemo(() => {
+        if (isDraggingNode) {
+            return parallelEntryEdgesCacheRef.current;
+        }
 
-        // Transition edges are normally hidden in Slots mode. Hovering a
-        // transition-capable node directly on the canvas temporarily reveals
-        // that node's transitions with the same semantic highlighting as
-        // selection. Slot nodes simply have no matching transition edges.
-        const hoveredTransitionEdges = activeCanvasFocusNodeId
-            ? highlightedTransitionEdges.filter(
-                (edge) =>
-                    edge.source === activeCanvasFocusNodeId ||
-                    edge.target === activeCanvasFocusNodeId
+        const liveNodeById = new Map(nodes.map((node) => [node.id, node]));
+        const next = nodes
+            .filter(
+                (node) =>
+                    node.type === "parallel" &&
+                    !node.data?.isCollapsed
             )
-            : [];
+            .flatMap((parallel) => {
+                const lanes = (childIdsByParent.get(parallel.id) || [])
+                    .map((id) => liveNodeById.get(id))
+                    .filter((node) => node?.type === "parallelLane");
 
-        visibleEdges = [
-            ...hoveredTransitionEdges,
-            ...editableSlotEdges,
-        ];
-    } else if (activeMode === "overview") {
-        visibleNodes = [...injectedNodes, ...injectedSlotNodes];
-        visibleEdges = [
+                return lanes
+                    .map((lane) => {
+                        const directChildren = (
+                            childIdsByParent.get(lane.id) || []
+                        )
+                            .map((id) => liveNodeById.get(id))
+                            .filter(Boolean);
+
+                        const candidates = directChildren.filter(
+                            (node) =>
+                                node.type !== "slot" &&
+                                node.type !== "parallelLane"
+                        );
+
+                        if (candidates.length === 0) {
+                            return null;
+                        }
+
+                        const sortedCandidates = [...candidates].sort(
+                            (a, b) => {
+                                const ax = Number(a.position?.x || 0);
+                                const bx = Number(b.position?.x || 0);
+                                if (ax !== bx) return ax - bx;
+
+                                const ay = Number(a.position?.y || 0);
+                                const by = Number(b.position?.y || 0);
+                                return ay - by;
+                            }
+                        );
+
+                        const target =
+                            candidates.find(isAutoParallelLaneCompound) ||
+                            candidates.find((node) => node.data?.isInitial) ||
+                            sortedCandidates[0];
+
+                        const targetHandle =
+                            target.type === "compound"
+                                ? "compound-entry"
+                                : target.type === "parallel"
+                                    ? "target"
+                                    : "transition-target";
+
+                        return {
+                            id: `edge-parallel-entry-${parallel.id}-${lane.id}-${target.id}`,
+                            source: lane.id,
+                            target: target.id,
+                            sourceHandle: "parallel-entry",
+                            targetHandle,
+                            label: "",
+                            type: "straight",
+                            selectable: false,
+                            focusable: false,
+                            deletable: false,
+                            markerEnd: {
+                                type: MarkerType.ArrowClosed,
+                                color: "#0284c7",
+                            },
+                            style: {
+                                stroke: "#0284c7",
+                                strokeWidth: 1.5,
+                            },
+                            data: {
+                                parallelEntryEdge: true,
+                                parallelLaneId: lane.id,
+                                displayOnly: true,
+                            },
+                        };
+                    })
+                    .filter(Boolean);
+            });
+
+        parallelEntryEdgesCacheRef.current = next;
+        return next;
+    }, [isDraggingNode, nodes, childIdsByParent]);
+
+    const baseVisibleNodes = useMemo(
+        () =>
+            activeMode === "slots" || activeMode === "overview"
+                ? [...injectedNodes, ...injectedSlotNodes]
+                : injectedNodes,
+        [activeMode, injectedNodes, injectedSlotNodes]
+    );
+
+    // Smart-edge obstacle routing is considerably more expensive than moving
+    // the node itself. Keep the node canvas at full pointer/React-Flow speed,
+    // but publish geometry to SmartEdgeProvider at roughly 30 FPS while a node
+    // is being dragged. The final geometry is committed immediately on drop.
+    const [smartRoutingNodes, setSmartRoutingNodes] = useState(baseVisibleNodes);
+    const pendingSmartRoutingNodesRef = useRef(baseVisibleNodes);
+    const smartRoutingTimerRef = useRef(null);
+    const smartRoutingLastCommitRef = useRef(0);
+
+    useEffect(() => {
+        pendingSmartRoutingNodesRef.current = baseVisibleNodes;
+
+        if (!isDraggingNode) {
+            if (smartRoutingTimerRef.current !== null) {
+                clearTimeout(smartRoutingTimerRef.current);
+                smartRoutingTimerRef.current = null;
+            }
+            smartRoutingLastCommitRef.current = performance.now();
+            setSmartRoutingNodes((current) =>
+                current === baseVisibleNodes ? current : baseVisibleNodes
+            );
+            return;
+        }
+
+        if (smartRoutingTimerRef.current !== null) return;
+
+        const elapsed =
+            performance.now() - smartRoutingLastCommitRef.current;
+        const delay = Math.max(0, 33 - elapsed);
+
+        smartRoutingTimerRef.current = setTimeout(() => {
+            smartRoutingTimerRef.current = null;
+            smartRoutingLastCommitRef.current = performance.now();
+            const next = pendingSmartRoutingNodesRef.current;
+            setSmartRoutingNodes((current) =>
+                current === next ? current : next
+            );
+        }, delay);
+    }, [baseVisibleNodes, isDraggingNode]);
+
+    useEffect(
+        () => () => {
+            if (smartRoutingTimerRef.current !== null) {
+                clearTimeout(smartRoutingTimerRef.current);
+            }
+        },
+        []
+    );
+
+    const dimmedHoverEdgeCacheRef = useRef(new WeakMap());
+    const dimmedHoverNodeCacheRef = useRef(new WeakMap());
+    const selectedHoverNodeCacheRef = useRef(new WeakMap());
+
+    // The complete display-layer transformation (mode filtering, drag animation
+    // pause, hover focus/dimming and drop-target styling) used to execute on
+    // every App render. Keep it behind one memo so unrelated panel/library/
+    // validation updates do not rebuild hundreds of React Flow node/edge
+    // objects. It still updates immediately for actual hover/drag changes.
+    const { visibleNodes, visibleEdges } = useMemo(() => {
+        let nextVisibleNodes = baseVisibleNodes;
+        let nextVisibleEdges = [
             ...highlightedTransitionEdges,
             ...compoundInitialEdges,
             ...parallelEntryEdges,
-            ...editableSlotEdges,
         ];
-    }
 
-    if (hiddenNodeIds.size > 0) {
-        visibleEdges = visibleEdges.filter(
-            (edge) =>
-                !hiddenNodeIds.has(edge.source) &&
-                !hiddenNodeIds.has(edge.target)
+        if (activeMode === "slots") {
+            // Transition edges are normally hidden in Slots mode. Hovering a
+            // transition-capable node directly on the canvas temporarily reveals
+            // that node's transitions with the same semantic highlighting as
+            // selection. Slot nodes simply have no matching transition edges.
+            const hoveredTransitionEdges = activeCanvasFocusNodeId
+                ? highlightedTransitionEdges.filter(
+                    (edge) =>
+                        edge.source === activeCanvasFocusNodeId ||
+                        edge.target === activeCanvasFocusNodeId
+                )
+                : [];
+
+            nextVisibleEdges = [
+                ...hoveredTransitionEdges,
+                ...editableSlotEdges,
+            ];
+        } else if (activeMode === "overview") {
+            nextVisibleEdges = [
+                ...highlightedTransitionEdges,
+                ...compoundInitialEdges,
+                ...parallelEntryEdges,
+                ...editableSlotEdges,
+            ];
+        }
+
+        // Keep smart routing while dragging. Only pause animated flow effects;
+        // the router geometry itself is throttled separately for performance.
+        if (isDraggingNode) {
+            nextVisibleEdges = nextVisibleEdges.map((edge) =>
+                edge.animated
+                    ? {
+                        ...edge,
+                        animated: false,
+                    }
+                    : edge
+            );
+        }
+
+        if (hiddenNodeIds.size > 0) {
+            nextVisibleEdges = nextVisibleEdges.filter(
+                (edge) =>
+                    !hiddenNodeIds.has(edge.source) &&
+                    !hiddenNodeIds.has(edge.target)
+            );
+        }
+
+        // Hover focus mode. Canvas hover keeps the hovered node and all of its
+        // direct connections vivid. Hovering an "Accessed by" entry in Slot
+        // Details focuses only that skill, the selected slot, and their exact
+        // skill-to-slot connection; transitions stay dimmed in that context.
+        const isSlotDetailsFocus = Boolean(
+            hoveredSlotAccessNodeId &&
+            selectedNodeId &&
+            slotNodeIdSet.has(selectedNodeId)
         );
-    }
+        const hoveredEditorEdge = activeHoveredEditorEdgeId
+            ? nextVisibleEdges.find(
+                (edge) => edge.id === activeHoveredEditorEdgeId
+            )
+            : null;
+        const hasHoverFocus = Boolean(
+            activeCanvasFocusNodeId ||
+            hoveredEditorEdge ||
+            isSlotDetailsFocus
+        );
 
-    // Hover focus mode. Canvas hover keeps the hovered node and all of its
-    // direct connections vivid. Hovering an "Accessed by" entry in Slot
-    // Details focuses only that skill, the selected slot, and their exact
-    // skill-to-slot connection; transitions stay dimmed in that context.
-    const isSlotDetailsFocus = Boolean(
-        hoveredSlotAccessNodeId &&
-        selectedNodeId &&
-        slotNodes.some((node) => node.id === selectedNodeId)
-    );
-    const hoveredEditorEdge = activeHoveredEditorEdgeId
-        ? visibleEdges.find((edge) => edge.id === activeHoveredEditorEdgeId)
-        : null;
-    const hasHoverFocus = Boolean(
-        activeCanvasFocusNodeId ||
-        hoveredEditorEdge ||
-        isSlotDetailsFocus
-    );
+        const hoverFocusNodeIds = new Set();
+        if (activeCanvasFocusNodeId) {
+            hoverFocusNodeIds.add(activeCanvasFocusNodeId);
 
-    const hoverFocusNodeIds = new Set();
-    if (activeCanvasFocusNodeId) {
-        hoverFocusNodeIds.add(activeCanvasFocusNodeId);
-
-        // Every endpoint of an edge that belongs to the active canvas node is
-        // part of the same focus group. During a drag this stays locked to the
-        // dragged node even if the pointer briefly leaves its DOM element.
-        visibleEdges.forEach((edge) => {
-            if (
-                edge.source === activeCanvasFocusNodeId ||
-                edge.target === activeCanvasFocusNodeId
-            ) {
-                hoverFocusNodeIds.add(edge.source);
-                hoverFocusNodeIds.add(edge.target);
-            }
-        });
-    }
-
-    if (hoveredEditorEdge) {
-        // Edge hover focuses the relationship itself and both endpoint nodes.
-        // Unlike node hover, it does not pull in the endpoints' other edges.
-        hoverFocusNodeIds.add(hoveredEditorEdge.source);
-        hoverFocusNodeIds.add(hoveredEditorEdge.target);
-    }
-
-    if (isSlotDetailsFocus) {
-        // Slot Details deliberately keeps the narrower preview requested for
-        // Accessed by: the referenced skill, the selected slot and their edge.
-        hoverFocusNodeIds.add(hoveredSlotAccessNodeId);
-        hoverFocusNodeIds.add(selectedNodeId);
-    }
-
-    if (hasHoverFocus) {
-        const HOVER_INACTIVE_EDGE_COLOR = "#94a3b8";
-
-        visibleEdges = visibleEdges.map((edge) => {
-            const isCanvasHoverConnection = Boolean(
-                activeCanvasFocusNodeId &&
-                (
+            // Every endpoint of an edge that belongs to the active canvas node
+            // is part of the same focus group. During a drag this stays locked
+            // to the dragged node even if the pointer leaves its DOM element.
+            nextVisibleEdges.forEach((edge) => {
+                if (
                     edge.source === activeCanvasFocusNodeId ||
                     edge.target === activeCanvasFocusNodeId
-                )
-            );
-            const isHoveredEditorEdge = Boolean(
-                activeHoveredEditorEdgeId && edge.id === activeHoveredEditorEdgeId
-            );
-            const isSlotDetailsConnection = Boolean(
-                isSlotDetailsFocus &&
-                (
+                ) {
+                    hoverFocusNodeIds.add(edge.source);
+                    hoverFocusNodeIds.add(edge.target);
+                }
+            });
+        }
+
+        if (hoveredEditorEdge) {
+            hoverFocusNodeIds.add(hoveredEditorEdge.source);
+            hoverFocusNodeIds.add(hoveredEditorEdge.target);
+        }
+
+        if (isSlotDetailsFocus) {
+            hoverFocusNodeIds.add(hoveredSlotAccessNodeId);
+            hoverFocusNodeIds.add(selectedNodeId);
+        }
+
+        if (hasHoverFocus) {
+            const HOVER_INACTIVE_EDGE_COLOR = "#94a3b8";
+
+            nextVisibleEdges = nextVisibleEdges.map((edge) => {
+                const isCanvasHoverConnection = Boolean(
+                    activeCanvasFocusNodeId &&
                     (
-                        edge.source === hoveredSlotAccessNodeId &&
-                        edge.target === selectedNodeId
-                    ) ||
-                    (
-                        edge.target === hoveredSlotAccessNodeId &&
-                        edge.source === selectedNodeId
+                        edge.source === activeCanvasFocusNodeId ||
+                        edge.target === activeCanvasFocusNodeId
                     )
-                )
-            );
+                );
+                const isHoveredEditorEdge = Boolean(
+                    activeHoveredEditorEdgeId &&
+                    edge.id === activeHoveredEditorEdgeId
+                );
+                const isSlotDetailsConnection = Boolean(
+                    isSlotDetailsFocus &&
+                    (
+                        (
+                            edge.source === hoveredSlotAccessNodeId &&
+                            edge.target === selectedNodeId
+                        ) ||
+                        (
+                            edge.target === hoveredSlotAccessNodeId &&
+                            edge.source === selectedNodeId
+                        )
+                    )
+                );
 
-            if (
-                isCanvasHoverConnection ||
-                isHoveredEditorEdge ||
-                isSlotDetailsConnection
-            ) {
-                return edge;
-            }
+                if (
+                    isCanvasHoverConnection ||
+                    isHoveredEditorEdge ||
+                    isSlotDetailsConnection
+                ) {
+                    return edge;
+                }
 
-            const existingOpacity = Number(edge.style?.opacity);
-            const dimmedOpacity = Number.isFinite(existingOpacity)
-                ? Math.min(existingOpacity, 0.22)
-                : 0.22;
+                const existingOpacity = Number(edge.style?.opacity);
+                const dimmedOpacity = Number.isFinite(existingOpacity)
+                    ? Math.min(existingOpacity, 0.22)
+                    : 0.22;
 
-            return {
-                ...edge,
-                animated: false,
-                style: {
-                    ...(edge.style || {}),
-                    stroke: HOVER_INACTIVE_EDGE_COLOR,
-                    opacity: dimmedOpacity,
-                },
-                markerEnd: edge.markerEnd
-                    ? {
-                        ...edge.markerEnd,
-                        color: HOVER_INACTIVE_EDGE_COLOR,
+                const cachedDimmedEdge =
+                    dimmedHoverEdgeCacheRef.current.get(edge);
+                if (cachedDimmedEdge) {
+                    return cachedDimmedEdge;
+                }
+
+                const dimmedEdge = {
+                    ...edge,
+                    animated: false,
+                    style: {
+                        ...(edge.style || {}),
+                        stroke: HOVER_INACTIVE_EDGE_COLOR,
+                        opacity: dimmedOpacity,
+                    },
+                    markerEnd: edge.markerEnd
+                        ? {
+                            ...edge.markerEnd,
+                            color: HOVER_INACTIVE_EDGE_COLOR,
+                        }
+                        : edge.markerEnd,
+                    labelStyle: {
+                        ...(edge.labelStyle || {}),
+                        opacity: 0.42,
+                    },
+                };
+                dimmedHoverEdgeCacheRef.current.set(edge, dimmedEdge);
+                return dimmedEdge;
+            });
+        }
+
+        if (hasHoverFocus || parallelDropTargetId || compoundDropTargetId) {
+            nextVisibleNodes = nextVisibleNodes.map((visibleNode) => {
+                const isCanvasHoverHighlight =
+                    visibleNode.id === activeCanvasFocusNodeId;
+                const isSlotDetailsSkillHoverHighlight =
+                    visibleNode.id === hoveredSlotAccessNodeId &&
+                    visibleNode.type === "custom";
+                const isSlotDetailsSelectedSlot =
+                    isSlotDetailsFocus && visibleNode.id === selectedNodeId;
+                const isHoveredEdgeEndpoint = Boolean(
+                    hoveredEditorEdge &&
+                    (
+                        visibleNode.id === hoveredEditorEdge.source ||
+                        visibleNode.id === hoveredEditorEdge.target
+                    )
+                );
+                const isConnectedHoverFocusNode =
+                    hasHoverFocus && hoverFocusNodeIds.has(visibleNode.id);
+                const isDimmedByHoverFocus =
+                    hasHoverFocus &&
+                    !isConnectedHoverFocusNode &&
+                    !isCanvasHoverHighlight &&
+                    !isSlotDetailsSkillHoverHighlight &&
+                    !isSlotDetailsSelectedSlot;
+
+                if (isDimmedByHoverFocus) {
+                    const cachedDimmedNode =
+                        dimmedHoverNodeCacheRef.current.get(visibleNode);
+                    if (cachedDimmedNode) {
+                        return cachedDimmedNode;
                     }
-                    : edge.markerEnd,
-                labelStyle: {
-                    ...(edge.labelStyle || {}),
-                    opacity: 0.42,
-                },
-            };
-        });
-    }
 
-    visibleNodes = visibleNodes.map((visibleNode) => {
-        const isCanvasHoverHighlight =
-            visibleNode.id === activeCanvasFocusNodeId;
-        const isSlotDetailsSkillHoverHighlight =
-            visibleNode.id === hoveredSlotAccessNodeId &&
-            visibleNode.type === "custom";
-        const isSlotDetailsSelectedSlot =
-            isSlotDetailsFocus && visibleNode.id === selectedNodeId;
-        const isHoveredEdgeEndpoint = Boolean(
-            hoveredEditorEdge &&
-            (
-                visibleNode.id === hoveredEditorEdge.source ||
-                visibleNode.id === hoveredEditorEdge.target
-            )
-        );
-        const isConnectedHoverFocusNode =
-            hasHoverFocus && hoverFocusNodeIds.has(visibleNode.id);
-        const isDimmedByHoverFocus =
-            hasHoverFocus &&
-            !isConnectedHoverFocusNode &&
-            !isCanvasHoverHighlight &&
-            !isSlotDetailsSkillHoverHighlight &&
-            !isSlotDetailsSelectedSlot;
+                    const dimmedNode = {
+                        ...visibleNode,
+                        style: {
+                            ...(visibleNode.style || {}),
+                            opacity: 0.42,
+                            filter: "grayscale(0.72)",
+                            transition:
+                                visibleNode.style?.transition ||
+                                "opacity 120ms ease, filter 120ms ease",
+                        },
+                    };
+                    dimmedHoverNodeCacheRef.current.set(
+                        visibleNode,
+                        dimmedNode
+                    );
+                    return dimmedNode;
+                }
 
-        if (isDimmedByHoverFocus) {
-            return {
-                ...visibleNode,
-                style: {
-                    ...(visibleNode.style || {}),
-                    opacity: 0.42,
-                    filter: "grayscale(0.72)",
-                    transition:
-                        visibleNode.style?.transition ||
-                        "opacity 120ms ease, filter 120ms ease",
-                },
-            };
-        }
+                if (
+                    isCanvasHoverHighlight ||
+                    isHoveredEdgeEndpoint ||
+                    isSlotDetailsSkillHoverHighlight
+                ) {
+                    if (visibleNode.selected) {
+                        return visibleNode;
+                    }
 
-        if (
-            isCanvasHoverHighlight ||
-            isHoveredEdgeEndpoint ||
-            isSlotDetailsSkillHoverHighlight
-        ) {
-            // Canvas hover mirrors the normal selected state. Hover coming
-            // from Slot Details highlights only the referenced skill node;
-            // its transition edges remain untouched and only the exact
-            // skill-to-slot edge is previewed above.
-            return {
-                ...visibleNode,
-                selected: true,
-            };
-        }
+                    const cachedSelectedNode =
+                        selectedHoverNodeCacheRef.current.get(visibleNode);
+                    if (cachedSelectedNode) {
+                        return cachedSelectedNode;
+                    }
 
-        if (visibleNode.type === "parallelLane") {
-            const isLaneDropTarget =
-                visibleNode.id === parallelDropTargetId;
+                    const selectedNode = {
+                        ...visibleNode,
+                        selected: true,
+                    };
+                    selectedHoverNodeCacheRef.current.set(
+                        visibleNode,
+                        selectedNode
+                    );
+                    return selectedNode;
+                }
 
-            if (!isLaneDropTarget) {
+                if (visibleNode.type === "parallelLane") {
+                    const isLaneDropTarget =
+                        visibleNode.id === parallelDropTargetId;
+
+                    if (!isLaneDropTarget) {
+                        return visibleNode;
+                    }
+
+                    return {
+                        ...visibleNode,
+                        style: {
+                            ...visibleNode.style,
+                            outline: "3px solid #0284c7",
+                            outlineOffset: "-3px",
+                            backgroundColor: "rgba(2, 132, 199, 0.12)",
+                            boxShadow:
+                                "inset 0 0 0 2px rgba(56, 189, 248, 0.35)",
+                            borderRadius: 4,
+                        },
+                        data: {
+                            ...visibleNode.data,
+                            isDropTarget: true,
+                        },
+                    };
+                }
+
+                if (visibleNode.type === "parallel") {
+                    if (!visibleNode.data?.isDropTarget) {
+                        return visibleNode;
+                    }
+
+                    return {
+                        ...visibleNode,
+                        data: {
+                            ...visibleNode.data,
+                            isDropTarget: false,
+                        },
+                    };
+                }
+
+                if (visibleNode.type === "compound") {
+                    const isDropTarget =
+                        visibleNode.id === compoundDropTargetId;
+                    if (
+                        Boolean(visibleNode.data?.isDropTarget) ===
+                        isDropTarget
+                    ) {
+                        return visibleNode;
+                    }
+
+                    return {
+                        ...visibleNode,
+                        data: {
+                            ...visibleNode.data,
+                            isDropTarget,
+                        },
+                    };
+                }
+
                 return visibleNode;
-            }
-
-            return {
-                ...visibleNode,
-                style: {
-                    ...visibleNode.style,
-                    outline: "3px solid #0284c7",
-                    outlineOffset: "-3px",
-                    backgroundColor: "rgba(2, 132, 199, 0.12)",
-                    boxShadow:
-                        "inset 0 0 0 2px rgba(56, 189, 248, 0.35)",
-                    borderRadius: 4,
-                },
-                data: {
-                    ...visibleNode.data,
-                    isDropTarget: true,
-                },
-            };
+            });
         }
 
-        if (visibleNode.type === "parallel") {
-            return {
-                ...visibleNode,
-                data: {
-                    ...visibleNode.data,
-                    isDropTarget: false,
-                },
-            };
-        }
-
-        if (
-            visibleNode.type === "compound"
-        ) {
-            return {
-                ...visibleNode,
-                data: {
-                    ...visibleNode.data,
-                    isDropTarget: visibleNode.id === compoundDropTargetId,
-                },
-            };
-        }
-
-        return visibleNode;
-    });
+        return {
+            visibleNodes: nextVisibleNodes,
+            visibleEdges: nextVisibleEdges,
+        };
+    }, [
+        baseVisibleNodes,
+        highlightedTransitionEdges,
+        compoundInitialEdges,
+        parallelEntryEdges,
+        activeMode,
+        activeCanvasFocusNodeId,
+        editableSlotEdges,
+        isDraggingNode,
+        hiddenNodeIds,
+        hoveredSlotAccessNodeId,
+        selectedNodeId,
+        slotNodeIdSet,
+        activeHoveredEditorEdgeId,
+        parallelDropTargetId,
+        compoundDropTargetId,
+    ]);
 
     const createNameforSkill = (fullSkillName) => {
         const label = fullSkillName.split(".").pop();
@@ -8559,6 +9227,28 @@ function AppContent() {
 
         const generatedSlotNodes = [];
         let index = 0;
+        const existingSlotNodeById = new Map(
+            (slotNodes || []).map((node) => [node.id, node])
+        );
+        const existingSlotEdgeByKey = new Map();
+        (slotEdges || []).forEach((edge) => {
+            if (edge.data?.edgeKind !== "slot") return;
+
+            if (edge.data?.subMachineInherited === true) {
+                existingSlotEdgeByKey.set(
+                    `sub:${edge.data?.subMachineNodeId || edge.source}:` +
+                    `${edge.data?.access || ""}:${Number(edge.data?.inheritIndex)}`,
+                    edge
+                );
+                return;
+            }
+
+            existingSlotEdgeByKey.set(
+                `skill:${edge.data?.skillNodeId || edge.source}:` +
+                `${edge.data?.access || ""}:${Number(edge.data?.slotIndex)}`,
+                edge
+            );
+        });
 
         // New slot nodes should appear underneath the workflow instead of
         // being mixed into the skill/state area. Keep positions of slots the
@@ -8600,9 +9290,7 @@ function AppContent() {
                  requiredByChildren = [],
              }, path) => {
                 const slotNodeId = `slot-${path}`;
-                const existingSlotNode = slotNodes.find(
-                    (node) => node.id === slotNodeId
-                );
+                const existingSlotNode = existingSlotNodeById.get(slotNodeId);
 
                 generatedSlotNodes.push({
                     id: slotNodeId,
@@ -8635,7 +9323,59 @@ function AppContent() {
             }
         );
 
-        setSlotNodes(generatedSlotNodes);
+        // Reuse unchanged slot-node objects instead of replacing the complete
+        // slot graph every time one skill/parameter changes. React Flow can then
+        // rerender only the paths whose declaration/type actually changed.
+        setSlotNodes((currentSlotNodes) => {
+            const currentById = new Map(
+                currentSlotNodes.map((node) => [node.id, node])
+            );
+            let changed = currentSlotNodes.length !== generatedSlotNodes.length;
+
+            const next = generatedSlotNodes.map((generated) => {
+                const current = currentById.get(generated.id);
+                if (!current) {
+                    changed = true;
+                    return generated;
+                }
+
+                const currentRequirements = current.data?.requiredByChildren || [];
+                const nextRequirements = generated.data?.requiredByChildren || [];
+                const requirementsEqual =
+                    currentRequirements.length === nextRequirements.length &&
+                    currentRequirements.every((entry, index) => {
+                        const nextEntry = nextRequirements[index];
+                        return (
+                            entry?.childNodeId === nextEntry?.childNodeId &&
+                            entry?.childLabel === nextEntry?.childLabel &&
+                            entry?.access === nextEntry?.access
+                        );
+                    });
+
+                const equivalent =
+                    current.type === generated.type &&
+                    current.position?.x === generated.position?.x &&
+                    current.position?.y === generated.position?.y &&
+                    current.data?.path === generated.data?.path &&
+                    current.data?.label === generated.data?.label &&
+                    current.data?.slotType === generated.data?.slotType &&
+                    Boolean(current.data?.currentMachineInherited) ===
+                    Boolean(generated.data?.currentMachineInherited) &&
+                    Boolean(current.data?.inherited) ===
+                    Boolean(generated.data?.inherited) &&
+                    current.data?.slotKind === generated.data?.slotKind &&
+                    current.data?.inheritedFrom === generated.data?.inheritedFrom &&
+                    Boolean(current.data?.requiredByChild) ===
+                    Boolean(generated.data?.requiredByChild) &&
+                    requirementsEqual;
+
+                if (equivalent) return current;
+                changed = true;
+                return generated;
+            });
+
+            return changed ? next : currentSlotNodes;
+        });
 
         const newSlotEdges = [];
         targetNodes.forEach((node) => {
@@ -8643,12 +9383,8 @@ function AppContent() {
                 if (inslot.path && inslot.path.trim() !== "") {
                     const cleanPath = inslot.path.trim().replace(/^\//, "");
                     const slotNodeId = `slot-${cleanPath}`;
-                    const existingReadEdge = (slotEdges || []).find(
-                        (edge) =>
-                            edge.data?.edgeKind === "slot" &&
-                            edge.data?.access === "read" &&
-                            (edge.data?.skillNodeId || edge.source) === node.id &&
-                            Number(edge.data?.slotIndex) === inIndex
+                    const existingReadEdge = existingSlotEdgeByKey.get(
+                        `skill:${node.id}:read:${inIndex}`
                     );
 
                     newSlotEdges.push({
@@ -8688,12 +9424,8 @@ function AppContent() {
                 if (outslot.path && outslot.path.trim() !== "") {
                     const cleanPath = outslot.path.trim().replace(/^\//, "");
                     const slotNodeId = `slot-${cleanPath}`;
-                    const existingWriteEdge = (slotEdges || []).find(
-                        (edge) =>
-                            edge.data?.edgeKind === "slot" &&
-                            edge.data?.access === "write" &&
-                            (edge.data?.skillNodeId || edge.source) === node.id &&
-                            Number(edge.data?.slotIndex) === outIndex
+                    const existingWriteEdge = existingSlotEdgeByKey.get(
+                        `skill:${node.id}:write:${outIndex}`
                     );
 
                     newSlotEdges.push({
@@ -8744,13 +9476,8 @@ function AppContent() {
                     const slotNodeId = `slot-${cleanPath}`;
                     const handleId =
                         `slot-submachine-${access}-${inheritIndex}`;
-                    const existingInheritedEdge = (slotEdges || []).find(
-                        (edge) =>
-                            edge.data?.edgeKind === "slot" &&
-                            edge.data?.subMachineInherited === true &&
-                            edge.data?.subMachineNodeId === node.id &&
-                            edge.data?.access === access &&
-                            Number(edge.data?.inheritIndex) === inheritIndex
+                    const existingInheritedEdge = existingSlotEdgeByKey.get(
+                        `sub:${node.id}:${access}:${inheritIndex}`
                     );
 
                     newSlotEdges.push({
@@ -8791,7 +9518,62 @@ function AppContent() {
             }
         });
 
-        setSlotEdges(newSlotEdges);
+        // Same principle for slot edges: preserve object identity for every
+        // unaffected skill-slot connection and completely skip the state update
+        // when the rebuilt graph is equivalent. This makes parameter-driven
+        // slot exposure/removal much cheaper on larger workflows.
+        setSlotEdges((currentSlotEdges) => {
+            const currentById = new Map(
+                currentSlotEdges.map((edge) => [edge.id, edge])
+            );
+            let changed = currentSlotEdges.length !== newSlotEdges.length;
+
+            const next = newSlotEdges.map((generated) => {
+                const current = currentById.get(generated.id);
+                if (!current) {
+                    changed = true;
+                    return generated;
+                }
+
+                const currentPoints = current.data?.controlPoints || [];
+                const nextPoints = generated.data?.controlPoints || [];
+                const controlPointsEqual =
+                    currentPoints.length === nextPoints.length &&
+                    currentPoints.every((point, index) => {
+                        const nextPoint = nextPoints[index];
+                        return (
+                            point?.x === nextPoint?.x &&
+                            point?.y === nextPoint?.y
+                        );
+                    });
+
+                const equivalent =
+                    current.source === generated.source &&
+                    current.target === generated.target &&
+                    current.sourceHandle === generated.sourceHandle &&
+                    current.targetHandle === generated.targetHandle &&
+                    current.type === generated.type &&
+                    Boolean(current.selected) === Boolean(generated.selected) &&
+                    current.data?.edgeKind === generated.data?.edgeKind &&
+                    current.data?.access === generated.data?.access &&
+                    current.data?.slotIndex === generated.data?.slotIndex &&
+                    current.data?.path === generated.data?.path &&
+                    current.data?.skillNodeId === generated.data?.skillNodeId &&
+                    current.data?.slotNodeId === generated.data?.slotNodeId &&
+                    Boolean(current.data?.subMachineInherited) ===
+                    Boolean(generated.data?.subMachineInherited) &&
+                    current.data?.subMachineNodeId ===
+                    generated.data?.subMachineNodeId &&
+                    current.data?.inheritIndex === generated.data?.inheritIndex &&
+                    controlPointsEqual;
+
+                if (equivalent) return current;
+                changed = true;
+                return generated;
+            });
+
+            return changed ? next : currentSlotEdges;
+        });
     };
 
     const handleUpdateSelectedSlotPath = (nextPath) => {
@@ -10067,6 +10849,12 @@ function AppContent() {
     ]);
 
     const handleNodeDragStart = useCallback((event, node) => {
+        if (dragFrameRef.current !== null) {
+            cancelAnimationFrame(dragFrameRef.current);
+            dragFrameRef.current = null;
+        }
+        pendingNodeDragRef.current = null;
+
         setIsDraggingNode(true);
         setDraggedEditorNodeId(node.id);
         setHoveredEditorEdgeId(null);
@@ -10084,98 +10872,74 @@ function AppContent() {
         }
     }, [nodes, setNodes]);
 
-    const handleNodeDrag = useCallback((event, draggedNode) => {
+    const processPendingNodeDrag = useCallback(() => {
+        dragFrameRef.current = null;
+        const pending = pendingNodeDragRef.current;
+        if (!pending) return;
+
+        const { clientX, clientY, nodeId, nodeType } = pending;
         const isOverTrash = Boolean(
             document
-                .elementFromPoint(event.clientX, event.clientY)
+                .elementFromPoint(clientX, clientY)
                 ?.closest(".trash-bin-dropzone")
         );
 
         setIsOverTrash(isOverTrash);
 
         // Parallel-lane helper nodes are layout-only and are never reparented.
-        // Compound and parallel states, however, are real SCXML states and can
-        // be nested just like normal states.
-        if (isOverTrash || draggedNode.type === "parallelLane") {
+        if (isOverTrash || nodeType === "parallelLane") {
             setParallelDropTargetId(null);
             setCompoundDropTargetId(null);
             return;
         }
 
         const pointerPosition = screenToFlowPosition({
-            x: event.clientX,
-            y: event.clientY,
+            x: clientX,
+            y: clientY,
         });
+        const containsPointer = (entry) =>
+            pointerPosition.x >= entry.x &&
+            pointerPosition.x <= entry.x + entry.width &&
+            pointerPosition.y >= entry.y &&
+            pointerPosition.y <= entry.y + entry.height;
+        const canUseTarget = (entry) =>
+            entry.id !== nodeId && !entry.ancestorIds.has(nodeId);
 
-        const canDropIntoParallelLane = draggedNode.type !== "parallel";
-        // Compounds are real state containers and may be nested inside other
-        // compounds. Cycles are prevented by the descendant check below.
-        const canDropIntoCompound = true;
+        const hoveredCompound = dragContainerIndex.compounds.find(
+            (entry) => canUseTarget(entry) && containsPointer(entry)
+        );
 
-        const hoveredLane = canDropIntoParallelLane
-            ? nodes
-                .filter(
-                    (candidate) =>
-                        candidate.type === "parallelLane" &&
-                        // Do not allow a container to become a child of one of
-                        // its own descendants.
-                        !isNodeInsideContainer(
-                            candidate,
-                            draggedNode.id,
-                            nodes
-                        )
+        const hoveredLane =
+            !hoveredCompound && nodeType !== "parallel"
+                ? dragContainerIndex.lanes.find(
+                    (entry) => canUseTarget(entry) && containsPointer(entry)
                 )
-                .find((lane) => {
-                    const lanePosition = getAbsoluteNodePosition(
-                        lane,
-                        nodes
-                    );
-
-                    const width = Number(lane.style?.width) || 420;
-                    const height = Number(lane.style?.height) || 110;
-
-                    return (
-                        pointerPosition.x >= lanePosition.x &&
-                        pointerPosition.x <= lanePosition.x + width &&
-                        pointerPosition.y >= lanePosition.y &&
-                        pointerPosition.y <= lanePosition.y + height
-                    );
-                })
-            : null;
-
-        const hoveredCompound = canDropIntoCompound
-            ? nodes
-            .filter(
-                (candidate) =>
-                    candidate.type === "compound" &&
-                    candidate.id !== draggedNode.id &&
-                    !isNodeInsideContainer(
-                        candidate,
-                        draggedNode.id,
-                        nodes
-                    )
-            )
-            .filter((compound) => {
-                const pos = getAbsoluteNodePosition(compound, nodes);
-                const { width, height } = getNodeSize(compound);
-                return pointerPosition.x >= pos.x && pointerPosition.x <= pos.x + width &&
-                    pointerPosition.y >= pos.y && pointerPosition.y <= pos.y + height;
-            })
-            // Nested compounds overlap their parents. Prefer the deepest
-            // visible compound under the pointer so Compound -> Compound
-            // nesting remains usable at arbitrary depth.
-            .sort(
-                (a, b) =>
-                    getNodeNestingDepth(b, nodes) -
-                    getNodeNestingDepth(a, nodes)
-            )[0] || null
-            : null;
+                : null;
 
         setCompoundDropTargetId(hoveredCompound?.id || null);
-        setParallelDropTargetId(hoveredCompound ? null : (hoveredLane?.id || null));
-    }, [nodes, screenToFlowPosition]);
+        setParallelDropTargetId(hoveredLane?.id || null);
+    }, [dragContainerIndex, screenToFlowPosition]);
+
+    const handleNodeDrag = useCallback((event, draggedNode) => {
+        pendingNodeDragRef.current = {
+            clientX: event.clientX,
+            clientY: event.clientY,
+            nodeId: draggedNode.id,
+            nodeType: draggedNode.type,
+        };
+
+        if (dragFrameRef.current === null) {
+            dragFrameRef.current = requestAnimationFrame(processPendingNodeDrag);
+        }
+    }, [processPendingNodeDrag]);
 
     const handleNodeDragStop = useCallback((event, node) => {
+        if (dragFrameRef.current !== null) {
+            cancelAnimationFrame(dragFrameRef.current);
+            dragFrameRef.current = null;
+        }
+        pendingNodeDragRef.current = null;
+
         const element = document.elementFromPoint(
             event.clientX,
             event.clientY
@@ -12139,7 +12903,7 @@ function AppContent() {
                                 )}
 
                                 {/* ReactFlow mit Strg-Support */}
-                                <SmartEdgeProvider nodes={visibleNodes}>
+                                <SmartEdgeProvider nodes={smartRoutingNodes}>
                                     <ReactFlow
                                         nodes={visibleNodes}
                                         edges={visibleEdges}
@@ -12224,6 +12988,7 @@ function AppContent() {
                                         selectionKeyCode={["Control", "Meta"]}
                                         deleteKeyCode={["Delete"]}
                                         minZoom={0.08}
+                                        onlyRenderVisibleElements
                                         onNodeDoubleClick={(_, n) => {
                                             if (n.type === "submachine" && n.data?.src) {
                                                 handleOpenSubMachine(n.data.src, n.data.label);
