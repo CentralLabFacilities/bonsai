@@ -2205,6 +2205,30 @@ const normalizeAssignmentForScxml = (assignment) =>
         }
         : assignment;
 
+const getForwardingNopScxmlStateId = (node, eventName) => {
+    const fullSkillName = String(node?.data?.fullSkillName || "").trim();
+    const skillBase = fullSkillName.split("#")[0] || "Nop";
+    const normalizedEvent = String(eventName || "").trim();
+
+    if (!normalizedEvent) {
+        return String(
+            node?.data?.scxmlStateId ||
+            node?.data?.behaviorExitScxmlStateId ||
+            fullSkillName ||
+            skillBase
+        ).trim();
+    }
+
+    // Keep the SCXML state readable and deterministic while avoiding the
+    // editor-only clone/instance id. Nops forwarding the same event therefore
+    // share one state, while different events get distinct states.
+    const eventSuffix = normalizedEvent
+        .replace(/[^A-Za-z0-9_.-]+/g, "_")
+        .replace(/^_+|_+$/g, "") || "send";
+
+    return `${skillBase}#${eventSuffix}`;
+};
+
 const getBehaviorExitSignature = (node) => {
     if (!node?.data?.isBehaviorExit) return "";
 
@@ -2246,11 +2270,13 @@ const getSharedScxmlStateId = (node) => {
     }
 
     if (skillName === "nop" && node.data?.isBehaviorExit) {
-        return String(
-            node.data?.scxmlStateId ||
-            node.data?.behaviorExitScxmlStateId ||
-            fullSkillName
-        ).trim();
+        const sentEvent = Array.isArray(node.data?.behaviorExitEvents)
+            ? node.data.behaviorExitEvents.find((eventName) =>
+                String(eventName || "").trim()
+            )
+            : "";
+
+        return getForwardingNopScxmlStateId(node, sentEvent);
     }
 
     return "";
@@ -2297,8 +2323,7 @@ const normalizeSharedScxmlStateIdentity = (node) => {
                     sentEvents.length > 0
                         ? sentEvents.join(", ")
                         : node.data?.label || "Nop",
-                behaviorExitScxmlStateId:
-                    node.data?.behaviorExitScxmlStateId || scxmlStateId,
+                behaviorExitScxmlStateId: scxmlStateId,
                 scxmlStateId,
                 // fullSkillName remains the editor-facing skill identity. The
                 // shared SCXML identity is kept separately in scxmlStateId.
@@ -8360,14 +8385,18 @@ function AppContent() {
                             sentEvents.length > 0
                                 ? sentEvents.join(", ")
                                 : data?.label || "Nop",
-                        behaviorExitScxmlStateId:
-                            data?.behaviorExitScxmlStateId || current,
-                        scxmlStateId:
-                            data?.scxmlStateId ||
-                            data?.behaviorExitScxmlStateId ||
-                            current,
                         fullSkillName: base,
                     };
+
+                    const normalizedScxmlStateId =
+                        getForwardingNopScxmlStateId(
+                            { type: "custom", data: normalizedData },
+                            sentEvents[0] || ""
+                        );
+
+                    normalizedData.behaviorExitScxmlStateId =
+                        normalizedScxmlStateId;
+                    normalizedData.scxmlStateId = normalizedScxmlStateId;
 
                     return {
                         ...normalizedData,
@@ -11793,18 +11822,19 @@ function AppContent() {
                                                             ? nonEmptyEvents.join(", ")
                                                             : "Nop",
                                                     ...(nextEvents.length > 0
-                                                        ? {
-                                                            behaviorExitScxmlStateId:
-                                                                node.data?.behaviorExitScxmlStateId ||
-                                                                node.data?.scxmlStateId ||
-                                                                node.data?.fullSkillName ||
-                                                                sourceNode.data?.fullSkillName,
-                                                            scxmlStateId:
-                                                                node.data?.scxmlStateId ||
-                                                                node.data?.behaviorExitScxmlStateId ||
-                                                                node.data?.fullSkillName ||
-                                                                sourceNode.data?.fullSkillName,
-                                                        }
+                                                        ? (() => {
+                                                            const nextScxmlStateId =
+                                                                getForwardingNopScxmlStateId(
+                                                                    node,
+                                                                    nextEvents[0]
+                                                                );
+                                                            return {
+                                                                behaviorExitScxmlStateId:
+                                                                nextScxmlStateId,
+                                                                scxmlStateId:
+                                                                nextScxmlStateId,
+                                                            };
+                                                        })()
                                                         : {}),
                                                 },
                                             };
