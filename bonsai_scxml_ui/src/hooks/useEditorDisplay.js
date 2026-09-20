@@ -100,23 +100,57 @@ export function useEditorDisplay({
     const normalizedTransitionEdges = useMemo(
         () =>
             edges.map((edge) => {
-                if (edge.targetHandle) return edge;
+                let normalizedEdge = edge;
 
-                const targetNode = nodeById.get(edge.target);
-                if (!targetNode) return edge;
+                if (!normalizedEdge.targetHandle) {
+                    const targetNode = nodeById.get(normalizedEdge.target);
 
-                if (
-                    targetNode.type === "compound" ||
-                    targetNode.type === "parallel" ||
-                    targetNode.type === "parallelLane"
-                ) {
-                    return edge;
+                    if (
+                        targetNode &&
+                        targetNode.type !== "compound" &&
+                        targetNode.type !== "parallel" &&
+                        targetNode.type !== "parallelLane"
+                    ) {
+                        normalizedEdge = {
+                            ...normalizedEdge,
+                            targetHandle: "transition-target",
+                        };
+                    }
                 }
 
-                return {
-                    ...edge,
-                    targetHandle: "transition-target",
-                };
+                // Loaded/older self loops may not have editor control points.
+                // Give them a deterministic two-point route so they visibly
+                // leave the node and return around its top edge.
+                if (
+                    normalizedEdge.source === normalizedEdge.target &&
+                    !(
+                        Array.isArray(normalizedEdge.data?.controlPoints) &&
+                        normalizedEdge.data.controlPoints.length >= 2
+                    )
+                ) {
+                    normalizedEdge = {
+                        ...normalizedEdge,
+                        data: {
+                            ...(normalizedEdge.data || {}),
+                            controlPoints: [
+                                {
+                                    id: `${normalizedEdge.id}-self-source`,
+                                    anchor: "source",
+                                    dx: 76,
+                                    dy: -92,
+                                },
+                                {
+                                    id: `${normalizedEdge.id}-self-target`,
+                                    anchor: "target",
+                                    dx: -76,
+                                    dy: -92,
+                                },
+                            ],
+                        },
+                    };
+                }
+
+                return normalizedEdge;
             }),
         [edges, nodeById]
     );

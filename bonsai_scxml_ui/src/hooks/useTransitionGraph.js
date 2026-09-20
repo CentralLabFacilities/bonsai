@@ -39,6 +39,21 @@ const canTargetVisualNode = (sourceNode, targetNode, allNodes = []) =>
         allNodes
     );
 
+const makeSelfLoopControlPoints = () => [
+    {
+        id: `cp-${crypto.randomUUID()}`,
+        anchor: "source",
+        dx: 76,
+        dy: -92,
+    },
+    {
+        id: `cp-${crypto.randomUUID()}`,
+        anchor: "target",
+        dx: -76,
+        dy: -92,
+    },
+];
+
 export function useTransitionGraph({
     nodes,
     edges,
@@ -1130,6 +1145,9 @@ export function useTransitionGraph({
                     cond: "",
                     assignments: [],
                     assign: null,
+                    ...(params.source === params.target
+                        ? { controlPoints: makeSelfLoopControlPoints() }
+                        : {}),
                 },
             };
 
@@ -1404,6 +1422,15 @@ export function useTransitionGraph({
                                 expr: transition.assignments[0].expr,
                             }
                             : null,
+                        controlPoints:
+                            sourceId === transition.target
+                                ? (
+                                    Array.isArray(cleanedExisting?.data?.controlPoints) &&
+                                    cleanedExisting.data.controlPoints.length >= 2
+                                        ? cleanedExisting.data.controlPoints
+                                        : makeSelfLoopControlPoints()
+                                )
+                                : cleanedExisting?.data?.controlPoints,
                     },
                 };
             });
