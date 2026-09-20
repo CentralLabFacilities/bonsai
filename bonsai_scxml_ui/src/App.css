@@ -6497,3 +6497,115 @@
         transform: rotate(360deg);
     }
 }
+
+/* ================= CREATE SUB-STATE-MACHINE ================= */
+.submachine-create-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 6200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(2, 6, 23, 0.72);
+    backdrop-filter: blur(2px);
+}
+
+.submachine-create-dialog {
+    width: min(540px, calc(100vw - 48px));
+    padding: 22px;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    background: #0f172a;
+    color: #e2e8f0;
+    box-shadow: 0 22px 55px rgba(0, 0, 0, 0.55);
+}
+
+.submachine-create-dialog h3 {
+    margin: 0 0 6px;
+    color: #f8fafc;
+    font-size: 17px;
+}
+
+.submachine-create-dialog > p {
+    margin: 0 0 18px;
+    color: #94a3b8;
+    font-size: 12px;
+}
+
+.submachine-create-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 13px;
+    color: #cbd5e1;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.submachine-create-field input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 9px 10px;
+    border: 1px solid #475569;
+    border-radius: 7px;
+    outline: none;
+    background: #111827;
+    color: #f8fafc;
+}
+
+.submachine-create-field input:focus {
+    border-color: #38bdf8;
+    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.16);
+}
+
+.submachine-create-directory-row {
+    display: flex;
+    gap: 7px;
+}
+
+.submachine-create-directory-row input {
+    flex: 1;
+}
+
+.submachine-create-browse {
+    width: 40px;
+    border: 1px solid #475569;
+    border-radius: 7px;
+    background: #1e293b;
+    color: #cbd5e1;
+    cursor: pointer;
+}
+
+.submachine-create-browse:hover {
+    border-color: #64748b;
+    background: #273449;
+    color: #f8fafc;
+}
+
+.submachine-create-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 20px;
+}
+
+.submachine-create-actions button {
+    padding: 8px 14px;
+    border: 1px solid #475569;
+    border-radius: 7px;
+    background: #1e293b;
+    color: #e2e8f0;
+    cursor: pointer;
+}
+
+.submachine-create-actions button.primary {
+    border-color: #0284c7;
+    background: #0369a1;
+    color: #f8fafc;
+}
+
+.submachine-create-actions button:disabled {
+    cursor: default;
+    opacity: 0.55;
+}

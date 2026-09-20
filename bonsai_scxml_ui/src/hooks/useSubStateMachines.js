@@ -1,7 +1,7 @@
 import { useCallback, useRef } from "react";
 import { parseScxmlFile, extractBehaviorExitEventsFromScxml } from "../utils/scxmlImport";
 import { DEFAULT_PREFIX_CONFIG, resolveSrcPath } from "../config/prefixMapping";
-import { isTauri, readWorkflowSource } from "../tauri-client.js";
+import { isTauri, readWorkflowSource, saveFile } from "../tauri-client.js";
 import {
     extractInheritedSlotsFromScxml,
     collectInheritedSlotUsages,
@@ -11,9 +11,79 @@ import {
     getLocalDataModelEntries,
     ensureSharedEditorInstanceIds,
     normalizeSharedScxmlStateIdentity,
+    prepareGraphForScxml,
 } from "../utils/editorScxml";
+import { generateXmlString } from "../utils/scxmlExport";
 
 const IS_DESKTOP = isTauri();
+
+const normalizeFsPath = (value) =>
+    String(value || "").trim().replace(/\\/g, "/").replace(/\/+$/, "");
+
+const joinFsPath = (directory, fileName) => {
+    const dir = normalizeFsPath(directory);
+    return dir ? `${dir}/${fileName}` : fileName;
+};
+
+const getSymbolicBehaviorSource = (filePath, behaviorDirectories = []) => {
+    const normalizedFile = normalizeFsPath(filePath);
+    const matches = (behaviorDirectories || [])
+        .map((entry) => ({
+            entry,
+            root: normalizeFsPath(entry?.path),
+        }))
+        .filter(({ entry, root }) =>
+            entry?.key && root &&
+            (normalizedFile === root || normalizedFile.startsWith(`${root}/`))
+        )
+        .sort((a, b) => b.root.length - a.root.length);
+
+    if (matches.length === 0) return normalizedFile;
+
+    const { entry, root } = matches[0];
+    const relative = normalizedFile.slice(root.length).replace(/^\/+/, "");
+    const key = String(entry.key).trim().toUpperCase();
+    return relative ? `\${${key}}/${relative}` : `\${${key}}`;
+};
+
+const DEFAULT_CHILD_DATA_MODEL = [
+    { id: "#_STATE_PREFIX", expr: "'de.unibi.citec.clf.bonsai.skills.'" },
+];
+
+const buildEmptySubMachineXml = () => `<?xml version="1.0" encoding="UTF-8"?>
+<scxml xmlns="http://www.w3.org/2005/07/scxml"
+       xmlns:editor="http://bonsai.cit-ec.uni-bielefeld.de/editor"
+       version="1.0">
+    <datamodel>
+        <data id="#_STATE_PREFIX" expr="'de.unibi.citec.clf.bonsai.skills.'"/>
+    </datamodel>
+</scxml>
+`;
+
+const writeNewSubMachineFile = async ({ filePath, nodes = [], edges = [] }) => {
+    if (!IS_DESKTOP) return { success: true, filePath };
+
+    let xml = buildEmptySubMachineXml();
+    if (nodes.length > 0) {
+        const exportGraph = prepareGraphForScxml(nodes, edges);
+        xml = generateXmlString(
+            exportGraph.nodes,
+            exportGraph.edges,
+            DEFAULT_CHILD_DATA_MODEL
+        ) || xml;
+    }
+
+    const result = await saveFile(xml, filePath, "Create Sub-State-Machine");
+    if (!result?.success) {
+        throw new Error("The sub-state-machine file could not be created.");
+    }
+
+    return {
+        success: true,
+        filePath: result.path || filePath,
+        fileName: result.file_name || filePath.split(/[\\/]/).pop(),
+    };
+};
 
 const getSelectionBoundingBox = (selectedList) => {
     let minX = Infinity;
@@ -353,96 +423,118 @@ export function useSubStateMachines({
         []
     );
 
-    const handleCreateEmptySubMachine = (pos) => {
-        const subMachineId = getNodeId();
-        const subMachineLabel = `SubMachine_${nodes.filter((n) => n.type === "submachine").length + 1}`;
+    const handleCreateEmptySubMachine = async (pos, fileConfig = {}) => {
+        const fallbackLabel = `SubMachine_${nodes.filter((n) => n.type === "submachine").length + 1}`;
+        const fileName = String(fileConfig.fileName || `${fallbackLabel}.xml`).trim();
+        const subMachineLabel = fileName.replace(/\.(xml|scxml)$/i, "") || fallbackLabel;
+        const requestedFilePath = joinFsPath(fileConfig.directory, fileName);
 
-        const subMachineNode = {
-            id: subMachineId,
-            type: "submachine",
-            position: pos,
-            data: {
-                label: subMachineLabel,
-                fullSkillName: subMachineLabel,
-                src: `\${${behaviorDirectories[0]?.key || "ROBOCUP"}}/${subMachineLabel}.xml`,
-                localDataModel: [],
-                isInitial: nodes.length === 0,
-                events: [{ id: "success" }, { id: "failure" }],
-                onOpenSubMachine: handleOpenSubMachine,
-            },
-        };
+        try {
+            const created = await writeNewSubMachineFile({
+                filePath: requestedFilePath,
+            });
+            const resolvedFilePath = created.filePath || requestedFilePath;
+            const sourcePath = getSymbolicBehaviorSource(
+                resolvedFilePath,
+                behaviorDirectories
+            );
+            const subMachineId = getNodeId();
 
-        const newTabId = `tab-sub-${crypto.randomUUID().slice(0, 6)}`;
-        const newTabObj = {
-            id: newTabId,
-            title: subMachineLabel,
-            fileName: `${subMachineLabel}.xml`,
-            fileHandle: null,
-            filePath: null,
-            nodes: [],
-            edges: [],
-            slotNodes: [],
-            slotEdges: [],
-            manualSlots: [],
-            parentTabId: activeTabId,
-            inheritedGlobalDataModel: buildInheritedGlobalsForChild(
+            const subMachineNode = {
+                id: subMachineId,
+                type: "submachine",
+                position: pos,
+                data: {
+                    label: subMachineLabel,
+                    fullSkillName: subMachineLabel,
+                    src: sourcePath,
+                    localDataModel: [],
+                    isInitial: nodes.length === 0,
+                    events: [{ id: "success" }, { id: "failure" }],
+                    onOpenSubMachine: handleOpenSubMachine,
+                },
+            };
+
+            const parentNodes = [...nodes, subMachineNode];
+            const newTabId = `tab-sub-${resolvedFilePath || crypto.randomUUID().slice(0, 6)}`;
+            const inheritedForChild = buildInheritedGlobalsForChild(
                 inheritedGlobalDataModel,
                 globalDataModel,
                 tabs.find((tab) => tab.id === activeTabId)?.title || "Parent"
-            ),
-            globalDataModel: [
-                { id: "#_STATE_PREFIX", expr: "'de.unibi.citec.clf.bonsai.skills.'" },
-            ],
-        };
+            );
+            const newTabObj = {
+                id: newTabId,
+                title: subMachineLabel,
+                fileName: created.fileName || fileName,
+                fileHandle: null,
+                filePath: resolvedFilePath || null,
+                sourcePath,
+                nodes: [],
+                edges: [],
+                slotNodes: [],
+                slotEdges: [],
+                manualSlots: [],
+                parentTabId: activeTabId,
+                inheritedGlobalDataModel: inheritedForChild,
+                globalDataModel: DEFAULT_CHILD_DATA_MODEL,
+            };
 
-        setTabs((prevTabs) => [
-            ...prevTabs.map((t) =>
-                t.id === activeTabId
-                    ? {
-                        ...t,
-                        nodes,
-                        edges,
-                        slotNodes,
-                        slotEdges,
-                        manualSlots,
-                        globalDataModel,
-                        inheritedGlobalDataModel,
-                    }
-                    : t
-            ),
-            newTabObj,
-        ]);
+            // Save the new Sub-SM node in the parent tab before switching to
+            // the child. Otherwise returning to the parent can restore the old
+            // snapshot without the freshly created node.
+            setTabs((prevTabs) => [
+                ...prevTabs.map((tab) =>
+                    tab.id === activeTabId
+                        ? {
+                            ...tab,
+                            nodes: parentNodes,
+                            edges,
+                            slotNodes,
+                            slotEdges,
+                            manualSlots,
+                            globalDataModel,
+                            inheritedGlobalDataModel,
+                        }
+                        : tab
+                ),
+                newTabObj,
+            ]);
 
-        setNodes((nds) => [...nds, subMachineNode]);
-        setContextMenu(null);
-
-        // Direkt in den neuen Sub-Tab wechseln
-        setActiveTabId(newTabId);
-        setNodes([]);
-        setEdges([]);
-        setSlotNodes([]);
-        setSlotEdges([]);
-        setManualSlots([]);
-        setGlobalDataModel(newTabObj.globalDataModel);
-        setInheritedGlobalDataModel(newTabObj.inheritedGlobalDataModel || []);
-        setSelectedNodeId(null);
-        setTimeout(() => fitView({ padding: 0.2, duration: 300 }), 80);
+            setContextMenu(null);
+            setActiveTabId(newTabId);
+            setNodes([]);
+            setEdges([]);
+            setSlotNodes([]);
+            setSlotEdges([]);
+            setManualSlots([]);
+            setGlobalDataModel(DEFAULT_CHILD_DATA_MODEL);
+            setInheritedGlobalDataModel(inheritedForChild);
+            setSelectedNodeId(null);
+            setTimeout(() => fitView({ padding: 0.2, duration: 300 }), 80);
+            return true;
+        } catch (error) {
+            console.error("Could not create sub-state-machine:", error);
+            alert(`Could not create the sub-state-machine file:\n${error.message}`);
+            return false;
+        }
     };
 
-    const handleCreateSubMachineFromSelected = () => {
-        if (selectedNodes.length < 1) return;
+    const handleCreateSubMachineFromSelected = async (fileConfig = {}) => {
+        if (selectedNodes.length < 1) return false;
 
         const { minX, minY } = getSelectionBoundingBox(selectedNodes);
+        const fallbackLabel = `SubMachine_${nodes.filter((n) => n.type === "submachine").length + 1}`;
+        const fileName = String(fileConfig.fileName || `${fallbackLabel}.xml`).trim();
+        const subMachineLabel = fileName.replace(/\.(xml|scxml)$/i, "") || fallbackLabel;
+        const requestedFilePath = joinFsPath(fileConfig.directory, fileName);
         const subMachineId = getNodeId();
-        const subMachineLabel = `SubMachine_${nodes.filter((n) => n.type === "submachine").length + 1}`;
         const selectedIds = new Set(selectedNodes.map((n) => n.id));
 
-        // 1. Externe Transitions für die Handles der Sub-Machine-Node im Parent sammeln
         const externalEvents = [];
         edges.forEach((edge) => {
             if (selectedIds.has(edge.source) && !selectedIds.has(edge.target)) {
                 const evHandle = edge.sourceHandle || "success";
-                if (!externalEvents.some((e) => e.id === evHandle)) {
+                if (!externalEvents.some((event) => event.id === evHandle)) {
                     externalEvents.push({
                         id: evHandle,
                         name: evHandle,
@@ -454,120 +546,128 @@ export function useSubStateMachines({
             }
         });
 
-        // 2. Neue Sub-Machine-Knoten für den aktuellen (Parent-)Workflow vorbereiten
-        const subMachineNode = {
-            id: subMachineId,
-            type: "submachine",
-            position: { x: minX, y: minY },
-            data: {
-                label: subMachineLabel,
-                fullSkillName: subMachineLabel,
-                localDataModel: [],
-                src: `\${${behaviorDirectories[0]?.key || "ROBOCUP"}}/${subMachineLabel}.xml`,
-                isInitial: selectedNodes.some((n) => n.data?.isInitial),
-                events: externalEvents.length > 0 ? externalEvents : [{ id: "success" }, { id: "failure" }],
-                onEntry: [],
-                onExit: [],
-                onOpenSubMachine: handleOpenSubMachine,
-            },
-        };
-
-    // 3. Kanten im Parent anpassen (externe Kanten an die SubMachine heften, interne entfernen)
-        const updatedParentEdges = edges
-            .map((edge) => {
-                if (selectedIds.has(edge.source) && !selectedIds.has(edge.target)) {
-                    return { ...edge, source: subMachineId };
-                }
-                if (!selectedIds.has(edge.source) && selectedIds.has(edge.target)) {
-                    return { ...edge, target: subMachineId };
-                }
-                if (selectedIds.has(edge.source) && selectedIds.has(edge.target)) {
-                    return null; // Geht in den neuen Sub-Tab über
-                }
-                return edge;
-            })
-            .filter(Boolean);
-
-        const remainingParentNodes = [
-            ...nodes.filter((n) => !selectedIds.has(n.id)),
-            subMachineNode,
-        ];
-
-    // 4. Nodes für das neue Sub-Machine-Tab normalisieren (Koordinaten relativ zum Ursprung)
-        const subTabNodes = selectedNodes.map((n) => ({
-            ...n,
+        const subTabNodes = selectedNodes.map((node) => ({
+            ...node,
             position: {
-                x: n.position.x - minX + 50,
-                y: n.position.y - minY + 50,
+                x: node.position.x - minX + 50,
+                y: node.position.y - minY + 50,
             },
             selected: false,
         }));
-
-    // Nur interne Kanten für den Sub-Tab mitnehmen
         const subTabEdges = edges.filter(
             (edge) => selectedIds.has(edge.source) && selectedIds.has(edge.target)
         );
 
-    // 5. Neues Tab-Objekt anlegen
-        const parentTab = tabs.find((tab) => tab.id === activeTabId);
-        const inheritedForChild = buildInheritedGlobalsForChild(
-            inheritedGlobalDataModel,
-            globalDataModel,
-            parentTab?.title || parentTab?.fileName || "Parent"
-        );
+        try {
+            const created = await writeNewSubMachineFile({
+                filePath: requestedFilePath,
+                nodes: subTabNodes,
+                edges: subTabEdges,
+            });
+            const resolvedFilePath = created.filePath || requestedFilePath;
+            const sourcePath = getSymbolicBehaviorSource(
+                resolvedFilePath,
+                behaviorDirectories
+            );
 
-        const newTabId = `tab-sub-${crypto.randomUUID().slice(0, 6)}`;
-        const newTabObj = {
-            id: newTabId,
-            title: subMachineLabel,
-            fileName: `${subMachineLabel}.xml`,
-            fileHandle: null,
-            filePath: null,
-            nodes: subTabNodes,
-            edges: subTabEdges,
-            slotNodes: [],
-            slotEdges: [],
-            manualSlots: [],
-            parentTabId: activeTabId,
-            inheritedGlobalDataModel: inheritedForChild,
-            globalDataModel: [
-                { id: "#_STATE_PREFIX", expr: "'de.unibi.citec.clf.bonsai.skills.'" },
-            ],
-        };
+            const subMachineNode = {
+                id: subMachineId,
+                type: "submachine",
+                position: { x: minX, y: minY },
+                data: {
+                    label: subMachineLabel,
+                    fullSkillName: subMachineLabel,
+                    localDataModel: [],
+                    src: sourcePath,
+                    isInitial: selectedNodes.some((node) => node.data?.isInitial),
+                    events: externalEvents.length > 0
+                        ? externalEvents
+                        : [{ id: "success" }, { id: "failure" }],
+                    onEntry: [],
+                    onExit: [],
+                    onOpenSubMachine: handleOpenSubMachine,
+                },
+            };
 
-    // 6. Parent-Tab mit verbleibenden Nodes speichern und neuen Sub-Tab anhängen
-        setTabs((prevTabs) => [
-            ...prevTabs.map((t) =>
-                t.id === activeTabId
-                    ? {
-                        ...t,
-                        nodes: remainingParentNodes,
-                        edges: updatedParentEdges,
-                        slotNodes,
-                        slotEdges,
-                        manualSlots,
-                        globalDataModel,
-                        inheritedGlobalDataModel,
+            const updatedParentEdges = edges
+                .map((edge) => {
+                    if (selectedIds.has(edge.source) && !selectedIds.has(edge.target)) {
+                        return { ...edge, source: subMachineId };
                     }
-                    : t
-            ),
-            newTabObj,
-        ]);
+                    if (!selectedIds.has(edge.source) && selectedIds.has(edge.target)) {
+                        return { ...edge, target: subMachineId };
+                    }
+                    if (selectedIds.has(edge.source) && selectedIds.has(edge.target)) {
+                        return null;
+                    }
+                    return edge;
+                })
+                .filter(Boolean);
 
-    // 7. Direkt in den neuen Sub-Machine-Tab wechseln
-        setActiveTabId(newTabId);
-        setNodes(subTabNodes);
-        setEdges(subTabEdges);
-        setSlotNodes([]);
-        setSlotEdges([]);
-        setManualSlots([]);
-        setGlobalDataModel(newTabObj.globalDataModel);
-        setInheritedGlobalDataModel(inheritedForChild);
-        setSelectedNodeId(null);
+            const remainingParentNodes = [
+                ...nodes.filter((node) => !selectedIds.has(node.id)),
+                subMachineNode,
+            ];
 
-    // Slot-Verbindungen des neuen Tabs berechnen & View zentrieren
-        checkSlotConnection(subTabNodes);
-        setTimeout(() => fitView({ padding: 0.2, duration: 300 }), 80);
+            const parentTab = tabs.find((tab) => tab.id === activeTabId);
+            const inheritedForChild = buildInheritedGlobalsForChild(
+                inheritedGlobalDataModel,
+                globalDataModel,
+                parentTab?.title || parentTab?.fileName || "Parent"
+            );
+            const newTabId = `tab-sub-${resolvedFilePath || crypto.randomUUID().slice(0, 6)}`;
+            const newTabObj = {
+                id: newTabId,
+                title: subMachineLabel,
+                fileName: created.fileName || fileName,
+                fileHandle: null,
+                filePath: resolvedFilePath || null,
+                sourcePath,
+                nodes: subTabNodes,
+                edges: subTabEdges,
+                slotNodes: [],
+                slotEdges: [],
+                manualSlots: [],
+                parentTabId: activeTabId,
+                inheritedGlobalDataModel: inheritedForChild,
+                globalDataModel: DEFAULT_CHILD_DATA_MODEL,
+            };
+
+            setTabs((prevTabs) => [
+                ...prevTabs.map((tab) =>
+                    tab.id === activeTabId
+                        ? {
+                            ...tab,
+                            nodes: remainingParentNodes,
+                            edges: updatedParentEdges,
+                            slotNodes,
+                            slotEdges,
+                            manualSlots,
+                            globalDataModel,
+                            inheritedGlobalDataModel,
+                        }
+                        : tab
+                ),
+                newTabObj,
+            ]);
+
+            setActiveTabId(newTabId);
+            setNodes(subTabNodes);
+            setEdges(subTabEdges);
+            setSlotNodes([]);
+            setSlotEdges([]);
+            setManualSlots([]);
+            setGlobalDataModel(DEFAULT_CHILD_DATA_MODEL);
+            setInheritedGlobalDataModel(inheritedForChild);
+            setSelectedNodeId(null);
+            checkSlotConnection(subTabNodes);
+            setTimeout(() => fitView({ padding: 0.2, duration: 300 }), 80);
+            return true;
+        } catch (error) {
+            console.error("Could not create sub-state-machine:", error);
+            alert(`Could not create the sub-state-machine file:\n${error.message}`);
+            return false;
+        }
     };
 
     return {

@@ -18,6 +18,7 @@ import WorkflowPanel from "./components/WorkflowPanel";
 import ConditionModal from "./components/ConditionModal";
 import ProblemsPanel from "./components/ProblemsPanel";
 import CreateSlotModal from "./components/CreateSlotModal";
+import CreateSubMachineModal from "./components/CreateSubMachineModal";
 import EditorCanvas from "./components/EditorCanvas";
 import WorkflowTabBar from "./components/WorkflowTabBar";
 import EditorFindOverlay from "./components/EditorFindOverlay";
@@ -233,6 +234,7 @@ function AppContent() {
     const [isCreateSlotModalOpen, setIsCreateSlotModalOpen] = useState(false);
     const [pendingSkillPaste, setPendingSkillPaste] = useState(null);
     const pendingSkillPasteActionRef = useRef(null);
+    const [pendingSubMachineCreation, setPendingSubMachineCreation] = useState(null);
     const [stateMachineLoading, setStateMachineLoading] = useState(null);
 
     const beginStateMachineLoad = useCallback((label = "State machine") => {
@@ -832,11 +834,13 @@ function AppContent() {
                 handleCreateEmptyParallel(contextMenu.flowPosition);
             }
         } else if (type === "submachine") {
-            if (hasSelection) {
-                handleCreateSubMachineFromSelected();
-            } else {
-                handleCreateEmptySubMachine(contextMenu.flowPosition);
-            }
+            const nextIndex = nodes.filter((node) => node.type === "submachine").length + 1;
+            setPendingSubMachineCreation({
+                fromSelection: hasSelection,
+                flowPosition: contextMenu.flowPosition,
+                defaultDirectory: behaviorDirectories[0]?.path || "",
+                defaultFileName: `SubMachine_${nextIndex}.xml`,
+            });
         } else if (type === "slot") {
             if (activeMode === "slots" || activeMode === "overview") {
                 setIsCreateSlotModalOpen(true);
@@ -3451,6 +3455,23 @@ function AppContent() {
                     </div>
                 </div>
             )}
+
+            <CreateSubMachineModal
+                isOpen={Boolean(pendingSubMachineCreation)}
+                defaultDirectory={pendingSubMachineCreation?.defaultDirectory || ""}
+                defaultFileName={pendingSubMachineCreation?.defaultFileName || "SubMachine.xml"}
+                onCancel={() => setPendingSubMachineCreation(null)}
+                onConfirm={async (fileConfig) => {
+                    if (!pendingSubMachineCreation) return false;
+                    if (pendingSubMachineCreation.fromSelection) {
+                        return await handleCreateSubMachineFromSelected(fileConfig);
+                    }
+                    return await handleCreateEmptySubMachine(
+                        pendingSubMachineCreation.flowPosition,
+                        fileConfig
+                    );
+                }}
+            />
 
             {pendingSkillPaste && (
                 <div
