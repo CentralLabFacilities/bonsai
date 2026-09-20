@@ -79,14 +79,15 @@ function CustomNode({ id, data, selected }) {
         baseStateName === "fatal";
 
     const isBehaviorExit = Boolean(data.isBehaviorExit);
+    const isSkillClone = Boolean(data.isSkillClone);
 
     // "event"    -> transitions only
     // "slots"    -> slots only
     // "overview" -> transitions, slots and parameters
     const mode = data.mode || "overview";
     const showEvents = mode === "event" || mode === "overview";
-    const showSlots = mode === "slots" || mode === "overview";
-    const showParameters = mode === "overview";
+    const showSlots = !isSkillClone && (mode === "slots" || mode === "overview");
+    const showParameters = !isSkillClone && mode === "overview";
 
     const slotEntries = useMemo(
         () => [
@@ -119,14 +120,17 @@ function CustomNode({ id, data, selected }) {
     );
 
     const eventIds = useMemo(
-        () => [
-            ...new Set(
-                (data.events || [])
-                    .map((event) => event.id)
-                    .filter(Boolean)
-            ),
-        ],
-        [data.events]
+        () =>
+            isSkillClone
+                ? []
+                : [
+                    ...new Set(
+                        (data.events || [])
+                            .map((event) => event.id)
+                            .filter(Boolean)
+                    ),
+                ],
+        [data.events, isSkillClone]
     );
 
     const parameterEntries = useMemo(
@@ -279,7 +283,8 @@ function CustomNode({ id, data, selected }) {
 
         const hasMissingSlots = showSlots ? missingSlots : false;
         const hasError =
-            hasMissingSlots || missingParams || missingTransitions;
+            !isSkillClone &&
+            (hasMissingSlots || missingParams || missingTransitions);
 
         const reasons = [];
         if (hasMissingSlots) reasons.push("Not every slot has a path");
@@ -298,6 +303,7 @@ function CustomNode({ id, data, selected }) {
         showSlots,
         isFinalState,
         isBehaviorExit,
+        isSkillClone,
     ]);
 
     return (
@@ -307,8 +313,8 @@ function CustomNode({ id, data, selected }) {
             } ${selected ? "selected-node" : ""} ${
                 isFinalState ? "terminal-final-node" : ""
             } ${isBehaviorExit ? "behavior-exit-node" : ""} ${
-                showSlots && slotEntries.length > 0 ? "has-slot-dock" : ""
-            } mode-${mode}`}
+                isSkillClone ? "skill-clone-node" : ""
+            } ${showSlots && slotEntries.length > 0 ? "has-slot-dock" : ""} mode-${mode}`}
             style={
                 overviewWidth
                     ? {
@@ -318,12 +324,14 @@ function CustomNode({ id, data, selected }) {
                     : undefined
             }
         >
-            <StateActionBadges
-                onEntry={data.onEntry}
-                onExit={data.onExit}
-                onEntryClick={() => data.onOpenStateActions?.(id)}
-                onExitClick={() => data.onOpenStateActions?.(id)}
-            />
+            {!isSkillClone && (
+                <StateActionBadges
+                    onEntry={data.onEntry}
+                    onExit={data.onExit}
+                    onEntryClick={() => data.onOpenStateActions?.(id)}
+                    onExitClick={() => data.onOpenStateActions?.(id)}
+                />
+            )}
 
             {validation.hasError && (
                 <div
@@ -347,6 +355,10 @@ function CustomNode({ id, data, selected }) {
 
             <div className="custom-node-label">
                 {data.label}
+
+                {isSkillClone && (
+                    <span className="skill-clone-badge">CLONE</span>
+                )}
 
                 {instanceId && (
                     <span

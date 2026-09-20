@@ -1,4 +1,4 @@
-import { FiPlus, FiX } from "react-icons/fi";
+import { FiArrowLeft, FiArrowRight, FiPlus, FiX } from "react-icons/fi";
 
 export default function WorkflowTabBar({
     tabs,
@@ -13,9 +13,36 @@ export default function WorkflowTabBar({
     handleTabMouseLeave,
     handleCloseTab,
     handleAddNewTab,
+    canGoFocusBack = false,
+    canGoFocusForward = false,
+    onFocusBack,
+    onFocusForward,
 }) {
     return (
         <div className="editor-header-intellij">
+            <div className="focus-history-controls">
+                <button
+                    type="button"
+                    className="focus-history-button"
+                    onClick={onFocusBack}
+                    disabled={!canGoFocusBack}
+                    title="Previous focus (Alt+Left)"
+                    aria-label="Previous focus"
+                >
+                    <FiArrowLeft />
+                </button>
+                <button
+                    type="button"
+                    className="focus-history-button"
+                    onClick={onFocusForward}
+                    disabled={!canGoFocusForward}
+                    title="Next focus (Alt+Right)"
+                    aria-label="Next focus"
+                >
+                    <FiArrowRight />
+                </button>
+            </div>
+
             <div className="editor-title-badge">
                 <span>Node Editor</span>
             </div>

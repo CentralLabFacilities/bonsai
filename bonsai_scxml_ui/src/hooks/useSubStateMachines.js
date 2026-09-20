@@ -91,6 +91,8 @@ export function useSubStateMachines({
     setContextMenu,
     fitView,
     checkSlotConnection,
+    onStateMachineLoadStart,
+    onStateMachineLoadEnd,
 }) {
     const hydrateSubMachineInheritedSlots = async (
         targetNodes,
@@ -162,6 +164,13 @@ export function useSubStateMachines({
         const fileName = srcPath.split(/[\\/]/).pop();
         const baseName = fileName.replace(/\.(xml|scxml)$/i, "");
         const currentTab = tabs.find((tab) => tab.id === activeTabId);
+
+        onStateMachineLoadStart?.(label || baseName || "State machine");
+        await new Promise((resolve) =>
+            window.requestAnimationFrame(() =>
+                window.requestAnimationFrame(resolve)
+            )
+        );
 
         let tabId = `tab-sub-${baseName}`;
         let resolvedFilePath = null;
@@ -333,6 +342,8 @@ export function useSubStateMachines({
             alert(
                 `Error loading the sub-state machine:\n${err.message}\n\nSource: ${srcPath}`
             );
+        } finally {
+            onStateMachineLoadEnd?.();
         }
     };
     const handleOpenSubMachineRef = useRef(handleOpenSubMachineImpl);

@@ -22,12 +22,15 @@ const buildEditorMetadataXml = (node, indent, isLane) => {
         ? clonePositions.map((position, index) => {
             const x = Math.round(Number(position?.x || 0));
             const y = Math.round(Number(position?.y || 0));
-            const instanceId = String(position?.instanceId || index + 1).trim();
+            const instanceId = String(position?.instanceId || "").trim();
             const instanceAttr = instanceId
                 ? ` instance="${escapeXmlAttribute(instanceId)}"`
                 : "";
+            const cloneAttr = position?.isSkillClone
+                ? ' clone="skill"'
+                : "";
 
-            return `${indent}        <editor:position${instanceAttr} x="${x}" y="${y}"/>`;
+            return `${indent}        <editor:position${instanceAttr}${cloneAttr} x="${x}" y="${y}"/>`;
         })
         : [
             `${indent}        <editor:position x="${Math.round(node.position?.x || 0)}" y="${Math.round(node.position?.y || 0)}"/>`,

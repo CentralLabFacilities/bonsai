@@ -5,10 +5,52 @@ import {
     highlightSelectedTransitions,
     withSmartTransitionRouting,
 } from "../utils/editorGraph";
-import { isAutoParallelLaneCompound } from "../utils/editorGeometry";
+import {
+    getAbsoluteNodePosition,
+    getNodeSize,
+    isAutoParallelLaneCompound,
+} from "../utils/editorGeometry";
 
 const SLOT_EDGE_INACTIVE_COLOR = "#64748b";
 const HOVER_INACTIVE_EDGE_COLOR = "#94a3b8";
+
+const pointInsideRect = (point, rect) =>
+    point.x >= rect.left &&
+    point.x <= rect.right &&
+    point.y >= rect.top &&
+    point.y <= rect.bottom;
+
+const segmentIntersectsRect = (start, end, rect) => {
+    if (pointInsideRect(start, rect) || pointInsideRect(end, rect)) {
+        return true;
+    }
+
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    let tMin = 0;
+    let tMax = 1;
+
+    const clip = (p, q) => {
+        if (p === 0) return q >= 0;
+        const ratio = q / p;
+        if (p < 0) {
+            if (ratio > tMax) return false;
+            if (ratio > tMin) tMin = ratio;
+        } else {
+            if (ratio < tMin) return false;
+            if (ratio < tMax) tMax = ratio;
+        }
+        return true;
+    };
+
+    return (
+        clip(-dx, start.x - rect.left) &&
+        clip(dx, rect.right - start.x) &&
+        clip(-dy, start.y - rect.top) &&
+        clip(dy, rect.bottom - start.y) &&
+        tMin <= tMax
+    );
+};
 
 export function useEditorDisplay({
     hoveredEditorNodeId,
@@ -79,6 +121,108 @@ export function useEditorDisplay({
         [edges, nodeById]
     );
 
+    const compoundAvoidanceCacheRef = useRef(new Map());
+    const compoundAvoidanceNodesDependency = isDraggingNode ? null : nodes;
+    const compoundAvoidanceByEdgeId = useMemo(() => {
+        if (!compoundAvoidanceNodesDependency) {
+            return compoundAvoidanceCacheRef.current;
+        }
+
+        const liveNodes = compoundAvoidanceNodesDependency;
+        const liveNodeById = new Map(
+            liveNodes.map((node) => [node.id, node])
+        );
+        const compounds = liveNodes.filter(
+            (node) => node.type === "compound" && !node.hidden
+        );
+        const ancestorIdsByNodeId = new Map();
+        const getAncestorIds = (node) => {
+            if (!node) return new Set();
+            const cached = ancestorIdsByNodeId.get(node.id);
+            if (cached) return cached;
+
+            const ancestors = new Set();
+            const visited = new Set();
+            let parentId = node.parentId;
+
+            while (parentId && !visited.has(parentId)) {
+                visited.add(parentId);
+                ancestors.add(parentId);
+                parentId = liveNodeById.get(parentId)?.parentId;
+            }
+
+            ancestorIdsByNodeId.set(node.id, ancestors);
+            return ancestors;
+        };
+        const next = new Map();
+
+        normalizedTransitionEdges.forEach((edge) => {
+            if (
+                edge.data?.compoundInternalEdge ||
+                edge.data?.parallelEntryEdge ||
+                edge.data?.compoundInitialEdge
+            ) {
+                return;
+            }
+
+            const sourceNode = liveNodeById.get(edge.source);
+            const targetNode = liveNodeById.get(edge.target);
+            if (!sourceNode || !targetNode) return;
+
+            const sourcePosition = getAbsoluteNodePosition(
+                sourceNode,
+                liveNodes
+            );
+            const targetPosition = getAbsoluteNodePosition(
+                targetNode,
+                liveNodes
+            );
+            const sourceSize = getNodeSize(sourceNode);
+            const targetSize = getNodeSize(targetNode);
+            const start = {
+                x: sourcePosition.x + sourceSize.width / 2,
+                y: sourcePosition.y + sourceSize.height / 2,
+            };
+            const end = {
+                x: targetPosition.x + targetSize.width / 2,
+                y: targetPosition.y + targetSize.height / 2,
+            };
+
+            const sourceAncestorIds = getAncestorIds(sourceNode);
+            const targetAncestorIds = getAncestorIds(targetNode);
+
+            const crossesCompound = compounds.some((compound) => {
+                if (
+                    compound.id === sourceNode.id ||
+                    compound.id === targetNode.id ||
+                    sourceAncestorIds.has(compound.id) ||
+                    targetAncestorIds.has(compound.id)
+                ) {
+                    return false;
+                }
+
+                const position = getAbsoluteNodePosition(compound, liveNodes);
+                const size = getNodeSize(compound);
+                const padding = 18;
+                const rect = {
+                    left: position.x - padding,
+                    right: position.x + size.width + padding,
+                    top: position.y - padding,
+                    bottom: position.y + size.height + padding,
+                };
+
+                return segmentIntersectsRect(start, end, rect);
+            });
+
+            if (crossesCompound) {
+                next.set(edge.id, true);
+            }
+        });
+
+        compoundAvoidanceCacheRef.current = next;
+        return next;
+    }, [compoundAvoidanceNodesDependency, normalizedTransitionEdges]);
+
     const smartTransitionEdges = useMemo(
         () =>
             withSmartTransitionRouting(normalizedTransitionEdges).map(
@@ -86,6 +230,9 @@ export function useEditorDisplay({
                     ...edge,
                     data: {
                         ...(edge.data || {}),
+                        ...(compoundAvoidanceByEdgeId.has(edge.id)
+                            ? { forceObstacleRouting: true }
+                            : {}),
                         onControlPointsChange: (controlPoints) =>
                             updatePersistentEdgeControlPoints(
                                 edge.id,
@@ -95,7 +242,11 @@ export function useEditorDisplay({
                     },
                 })
             ),
-        [normalizedTransitionEdges, updatePersistentEdgeControlPoints]
+        [
+            normalizedTransitionEdges,
+            compoundAvoidanceByEdgeId,
+            updatePersistentEdgeControlPoints,
+        ]
     );
 
     const highlightedTransitionEdges = useMemo(

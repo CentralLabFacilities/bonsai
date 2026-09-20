@@ -22,6 +22,23 @@ import {
     getStoredTransitionAssignments,
 } from "../utils/editorScxml";
 
+const getSemanticTransitionTarget = (targetNode, allNodes = []) => {
+    if (!targetNode?.data?.isSkillClone) return targetNode;
+
+    return (
+        allNodes.find(
+            (node) => node.id === targetNode.data?.cloneOfNodeId
+        ) || targetNode
+    );
+};
+
+const canTargetVisualNode = (sourceNode, targetNode, allNodes = []) =>
+    canTargetAcrossStateBoundaries(
+        sourceNode,
+        getSemanticTransitionTarget(targetNode, allNodes),
+        allNodes
+    );
+
 export function useTransitionGraph({
     nodes,
     edges,
@@ -139,20 +156,25 @@ export function useTransitionGraph({
 
         const availableTargets = nodes
             .filter((node) =>
-                canTargetAcrossStateBoundaries(sourceNode, node, nodes)
+                canTargetVisualNode(sourceNode, node, nodes)
             )
             .map((node) => {
                 const fullSkillName = node.data?.fullSkillName || "";
-                const stateName = fullSkillName.includes("#")
-                    ? fullSkillName.split("#").pop()
-                    : "";
+                const editorInstanceId = String(
+                    node.data?.editorInstanceId || ""
+                ).trim();
+                const stateName = editorInstanceId
+                    ? editorInstanceId
+                    : fullSkillName.includes("#")
+                        ? fullSkillName.split("#").pop()
+                        : "";
                 const skillName =
                     node.data?.label ||
                     fullSkillName.split(".").pop()?.split("#")[0] ||
                     node.id;
                 const displayName =
                     stateName && stateName !== skillName
-                        ? `${skillName} (${stateName})`
+                        ? `${skillName}#${stateName.replace(/^#/, "")}`
                         : skillName;
 
                 return {
@@ -285,7 +307,8 @@ export function useTransitionGraph({
         if (
             !sourceNode ||
             !targetNode ||
-            !canTargetAcrossStateBoundaries(sourceNode, targetNode, nodes)
+            sourceNode.data?.isSkillClone ||
+            !canTargetVisualNode(sourceNode, targetNode, nodes)
         ) {
             return false;
         }
@@ -611,7 +634,7 @@ export function useTransitionGraph({
                 (n) => n.id === params.target
             );
 
-            if (!sourceNode || !targetNode) {
+            if (!sourceNode || !targetNode || sourceNode.data?.isSkillClone) {
                 return;
             }
 
@@ -619,7 +642,7 @@ export function useTransitionGraph({
             // boundary and land directly on an interior state. The external
             // edge must terminate on the container's left entry handle first.
             if (
-                !canTargetAcrossStateBoundaries(
+                !canTargetVisualNode(
                     sourceNode,
                     targetNode,
                     nodes
@@ -628,14 +651,21 @@ export function useTransitionGraph({
                 return;
             }
 
-            // Prüfen, ob Source / Target innerhalb einer Parallel-Lane liegen
+            const semanticTargetNode = getSemanticTransitionTarget(
+                targetNode,
+                nodes
+            );
+
+            // Container/lane semantics follow the real target. A skill clone
+            // is only a visual endpoint and must not make a transition appear
+            // to enter or leave a state boundary that its original does not.
             const sourceLane = getLaneForNode(
                 sourceNode,
                 nodes
             );
 
             const targetLane = getLaneForNode(
-                targetNode,
+                semanticTargetNode,
                 nodes
             );
 
@@ -675,7 +705,7 @@ export function useTransitionGraph({
 
             const targetCompound =
                 getDirectCompoundForNode(
-                    targetNode,
+                    semanticTargetNode,
                     nodes
                 );
 
@@ -1312,7 +1342,7 @@ export function useTransitionGraph({
 
             return Boolean(
                 targetNode &&
-                canTargetAcrossStateBoundaries(sourceNode, targetNode, nodes)
+                canTargetVisualNode(sourceNode, targetNode, nodes)
             );
         });
 
@@ -1476,7 +1506,7 @@ export function useTransitionGraph({
         const targetNode = nodes.find((node) => node.id === targetNodeId);
         if (
             !targetNode ||
-            !canTargetAcrossStateBoundaries(
+            !canTargetVisualNode(
                 selectedNode,
                 targetNode,
                 nodes

@@ -142,7 +142,7 @@ export function useNodeDrag({
         const pending = pendingNodeDragRef.current;
         if (!pending) return;
 
-        const { clientX, clientY, nodeId, nodeType } = pending;
+        const { clientX, clientY, nodeId, nodeType, isSkillClone } = pending;
         const isOverTrash = Boolean(
             document
                 .elementFromPoint(clientX, clientY)
@@ -151,8 +151,9 @@ export function useNodeDrag({
 
         setIsOverTrash(isOverTrash);
 
-        // Parallel-lane helper nodes are layout-only and are never reparented.
-        if (isOverTrash || nodeType === "parallelLane") {
+        // Parallel-lane helper nodes are layout-only and editor-only skill
+        // clones stay top-level, so neither participates in container drops.
+        if (isOverTrash || nodeType === "parallelLane" || isSkillClone) {
             setParallelDropTargetId(null);
             setCompoundDropTargetId(null);
             return;
@@ -192,6 +193,7 @@ export function useNodeDrag({
             clientY: event.clientY,
             nodeId: draggedNode.id,
             nodeType: draggedNode.type,
+            isSkillClone: Boolean(draggedNode.data?.isSkillClone),
         };
 
         if (dragFrameRef.current === null) {
@@ -221,9 +223,15 @@ export function useNodeDrag({
                     foundNew = false;
 
                     currentNodes.forEach((candidate) => {
-                        if (
+                        const isDescendant =
                             candidate.parentId &&
-                            idsToDelete.has(candidate.parentId) &&
+                            idsToDelete.has(candidate.parentId);
+                        const isCloneOfDeletedSkill =
+                            candidate.data?.isSkillClone &&
+                            idsToDelete.has(candidate.data?.cloneOfNodeId);
+
+                        if (
+                            (isDescendant || isCloneOfDeletedSkill) &&
                             !idsToDelete.has(candidate.id)
                         ) {
                             idsToDelete.add(candidate.id);
@@ -313,6 +321,41 @@ export function useNodeDrag({
         // Parallel-lane helper nodes themselves are not draggable between
         // containers. Compound and parallel states are intentionally allowed.
         if (node.type === "parallelLane") {
+            setIsDraggingNode(false);
+            setIsOverTrash(false);
+            setParallelDropTargetId(null);
+            setCompoundDropTargetId(null);
+            return;
+        }
+
+        // Skill clones are visual aliases only. Keep them top-level so their
+        // saved absolute editor position has the same meaning after reload.
+        if (node.data?.isSkillClone) {
+            setNodes((currentNodes) => {
+                const liveNode = currentNodes.find(
+                    (candidate) => candidate.id === node.id
+                );
+
+                if (!liveNode?.parentId) return currentNodes;
+
+                const absolute = getAbsoluteNodePosition(
+                    liveNode,
+                    currentNodes
+                );
+
+                return currentNodes.map((candidate) =>
+                    candidate.id === liveNode.id
+                        ? {
+                            ...candidate,
+                            parentId: undefined,
+                            extent: undefined,
+                            expandParent: undefined,
+                            position: absolute,
+                        }
+                        : candidate
+                );
+            });
+
             setIsDraggingNode(false);
             setIsOverTrash(false);
             setParallelDropTargetId(null);

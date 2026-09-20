@@ -31,42 +31,57 @@ export function useScxmlDocument({
     hydrateSubMachineInheritedSlots,
     checkSlotConnection,
     fitView,
+    onStateMachineLoadStart,
+    onStateMachineLoadEnd,
 }) {
     const applyImportedDocument = useCallback(
         async ({ content, filePath = null, fileName, fileHandle = null }) => {
-            const parsed = await parseScxmlFile(content, fetchSkillData, getNodeId);
-            const parsedNodes = ensureSharedEditorInstanceIds(
-                (await hydrateSubMachineInheritedSlots(parsed.nodes, filePath)).map(
-                    normalizeSharedScxmlStateIdentity
+            onStateMachineLoadStart?.(
+                String(fileName || "State machine").replace(/\.(xml|scxml)$/i, "")
+            );
+            await new Promise((resolve) =>
+                window.requestAnimationFrame(() =>
+                    window.requestAnimationFrame(resolve)
                 )
             );
 
-            setGlobalDataModel(parsed.globalDataModel);
-            setNodes(parsedNodes);
-            setEdges(parsed.edges);
-            setManualSlots([]);
-            setSelectedNodeId(null);
+            try {
+                const parsed = await parseScxmlFile(content, fetchSkillData, getNodeId);
+                const parsedNodes = ensureSharedEditorInstanceIds(
+                    (await hydrateSubMachineInheritedSlots(parsed.nodes, filePath)).map(
+                        normalizeSharedScxmlStateIdentity
+                    )
+                );
 
-            const cleanTitle = fileName.replace(/\.(xml|scxml)$/i, "");
-            setTabs((previousTabs) =>
-                previousTabs.map((tab) =>
-                    tab.id === activeTabId
-                        ? {
-                            ...tab,
-                            title: cleanTitle,
-                            fileName,
-                            fileHandle,
-                            ...(filePath ? { filePath } : {}),
-                        }
-                        : tab
-                )
-            );
+                setGlobalDataModel(parsed.globalDataModel);
+                setNodes(parsedNodes);
+                setEdges(parsed.edges);
+                setManualSlots([]);
+                setSelectedNodeId(null);
 
-            checkSlotConnection(parsedNodes);
-            window.setTimeout(
-                () => fitView({ padding: 0.2, duration: 400 }),
-                150
-            );
+                const cleanTitle = fileName.replace(/\.(xml|scxml)$/i, "");
+                setTabs((previousTabs) =>
+                    previousTabs.map((tab) =>
+                        tab.id === activeTabId
+                            ? {
+                                ...tab,
+                                title: cleanTitle,
+                                fileName,
+                                fileHandle,
+                                ...(filePath ? { filePath } : {}),
+                            }
+                            : tab
+                    )
+                );
+
+                checkSlotConnection(parsedNodes);
+                window.setTimeout(
+                    () => fitView({ padding: 0.2, duration: 400 }),
+                    150
+                );
+            } finally {
+                onStateMachineLoadEnd?.();
+            }
         },
         [
             fetchSkillData,
@@ -80,6 +95,8 @@ export function useScxmlDocument({
             activeTabId,
             checkSlotConnection,
             fitView,
+            onStateMachineLoadStart,
+            onStateMachineLoadEnd,
         ]
     );
 

@@ -722,10 +722,13 @@ function DetailsPanel({
                           parameterFocusRequest,
                           slotFocusRequest,
                           transitionFocusRequest,
+                          cloneSourceNode,
+                          onNavigateCloneSource,
                       }) {
     const isSubMachine =
         selectedNode.type === "submachine" ||
         Boolean(selectedNode.data.src);
+    const isSkillClone = Boolean(selectedNode.data?.isSkillClone);
     const isContainerState =
         selectedNode.type === "compound" ||
         selectedNode.type === "parallel";
@@ -934,10 +937,12 @@ function DetailsPanel({
 
     useEffect(() => {
         const hiddenStandardTab =
-            hidesParameterAndSlots &&
+            (hidesParameterAndSlots || isSkillClone) &&
             (activeTab === "parameter" || activeTab === "slots");
-        const invalidSendTab = activeTab === "send" && !isNopSkill;
-        const hiddenActionsTab = activeTab === "actions" && hidesEntryExit;
+        const invalidSendTab =
+            activeTab === "send" && (!isNopSkill || isSkillClone);
+        const hiddenActionsTab =
+            activeTab === "actions" && (hidesEntryExit || isSkillClone);
 
         if (hiddenStandardTab || invalidSendTab || hiddenActionsTab) {
             setActiveTab("allgemein");
@@ -947,6 +952,7 @@ function DetailsPanel({
         hidesParameterAndSlots,
         hidesEntryExit,
         isNopSkill,
+        isSkillClone,
         selectedNode.id,
         setActiveTab,
     ]);
@@ -967,6 +973,61 @@ function DetailsPanel({
         );
     }
 
+    if (isSkillClone) {
+        const sourceIdentity = cloneSourceNode
+            ? String(
+                cloneSourceNode.data?.fullSkillName ||
+                cloneSourceNode.data?.label ||
+                cloneSourceNode.id
+            )
+                .split(".")
+                .pop()
+            : "Original skill not found";
+
+        return (
+            <aside className="details-panel">
+                <h3>Details: {selectedNode.data?.label || "Skill Clone"}</h3>
+
+                <div className="tabs">
+                    <div className="tab active-tab">Overall</div>
+                </div>
+
+                <div className="tab-content">
+                    <div className="allgemein-container">
+                        <div className="description-header">
+                            <h3>Skill Clone</h3>
+                        </div>
+
+                        <div className="skill-clone-detail-card">
+                            <div className="detail-card-title">Cloned from</div>
+                            <button
+                                type="button"
+                                className="skill-clone-source-button"
+                                disabled={!cloneSourceNode}
+                                onClick={() =>
+                                    cloneSourceNode &&
+                                    onNavigateCloneSource?.(cloneSourceNode.id)
+                                }
+                                title={
+                                    cloneSourceNode
+                                        ? "Go to the original skill node"
+                                        : "The original skill node no longer exists"
+                                }
+                            >
+                                {sourceIdentity}
+                            </button>
+                            <div className="detail-description">
+                                This is an editor-only inbound alias. Incoming
+                                transitions target the original skill in SCXML;
+                                outgoing transitions remain on the original node.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        );
+    }
+
     const targetNodeOptions = (availableTargetNodes || []).map((node) => {
         const fullSkillName = node.data?.fullSkillName || "";
         const editorInstanceId = String(
@@ -984,9 +1045,9 @@ function DetailsPanel({
             node.id;
 
         const displayName = editorInstanceId
-            ? `${skillName} (#${editorInstanceId})`
+            ? `${skillName}#${editorInstanceId}`
             : stateName && stateName !== skillName
-                ? `${skillName} (${stateName})`
+                ? `${skillName}${stateName.startsWith("#") ? "" : "#"}${stateName}`
                 : skillName;
 
         return {

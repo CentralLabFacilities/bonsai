@@ -2854,6 +2854,14 @@
             box-shadow 0.15s ease;
 }
 
+/* Let the target autocomplete escape the card while it is open. The card's
+   normal overflow stays clipped so the exit-token accent/border styling is
+   unchanged when the selector is closed. */
+.exit-token-card:has(.exit-target-suggestions) {
+    overflow: visible;
+    z-index: 250;
+}
+
 /* success / success.* */
 .exit-token-success {
     border-left-color: #22c55e;
@@ -6243,4 +6251,249 @@
     white-space: nowrap;
     font-size: 11px;
     opacity: 0.8;
+}
+
+/* Browser-style focus navigation for node/sub-machine jumps. */
+.focus-history-controls {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 0 6px;
+    background: #030712;
+    border-right: 1px solid var(--secondary-color);
+    flex: 0 0 auto;
+}
+
+.focus-history-button {
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    background: transparent;
+    color: #cbd5e1;
+    cursor: pointer;
+}
+
+.focus-history-button:hover:not(:disabled) {
+    background: #1e293b;
+    border-color: #475569;
+    color: #f8fafc;
+}
+
+.focus-history-button:disabled {
+    color: #475569;
+    cursor: default;
+    opacity: 0.55;
+}
+
+/* Editor-only aliases of real skill nodes. */
+.costum-node.skill-clone-node:not(.terminal-final-node):not(.behavior-exit-node) {
+    background: #263b3f;
+    border-color: #5f7b80;
+    border-top-color: #7d9a9f;
+    padding-bottom: 0;
+}
+
+.costum-node.skill-clone-node:not(.terminal-final-node):not(.behavior-exit-node):hover {
+    background: #2b4348;
+    border-color: #789398;
+    border-top-color: #93adb1;
+}
+
+.costum-node.skill-clone-node:not(.terminal-final-node):not(.behavior-exit-node) .custom-node-label {
+    background: #213337;
+    border-bottom-color: #506c71;
+}
+
+.skill-clone-badge {
+    flex: 0 0 auto;
+    padding: 2px 5px;
+    border: 1px solid #739096;
+    border-radius: 9px;
+    background: #344f54;
+    color: #d9eef0 !important;
+    font-size: 8px;
+    font-weight: 800 !important;
+    line-height: 1.15;
+    letter-spacing: 0.45px;
+}
+
+.skill-clone-detail-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    border: 1px solid #506c71;
+    border-radius: 8px;
+    background: #1f3034;
+}
+
+.skill-clone-source-button {
+    width: 100%;
+    padding: 9px 10px;
+    border: 1px solid #6f8d92;
+    border-radius: 6px;
+    background: #2b4348;
+    color: #e5f3f4;
+    font-weight: 700;
+    text-align: left;
+    cursor: pointer;
+}
+
+.skill-clone-source-button:hover:not(:disabled) {
+    background: #355157;
+    border-color: #8aa6aa;
+}
+
+.skill-clone-source-button:disabled {
+    opacity: 0.55;
+    cursor: default;
+}
+
+/* ================= SKILL PASTE CHOICE ================= */
+.skill-paste-choice-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 3200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.58);
+}
+
+.skill-paste-choice-dialog {
+    width: 430px;
+    max-width: calc(100vw - 40px);
+    padding: 20px;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    background: #0f172a;
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.5);
+    color: #e2e8f0;
+}
+
+.skill-paste-choice-dialog h3 {
+    margin: 0 0 8px;
+    color: #f8fafc;
+    font-size: 16px;
+}
+
+.skill-paste-choice-dialog p {
+    margin: 0 0 16px;
+    color: #cbd5e1;
+    font-size: 13px;
+}
+
+.skill-paste-choice-options {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.skill-paste-choice-option {
+    display: flex;
+    min-height: 92px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 12px;
+    border: 1px solid #475569;
+    border-radius: 8px;
+    background: #172033;
+    color: #e2e8f0;
+    text-align: left;
+    cursor: pointer;
+}
+
+.skill-paste-choice-option:hover {
+    border-color: #64748b;
+    background: #1e293b;
+}
+
+.skill-paste-choice-option-title {
+    color: #f8fafc;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.skill-paste-choice-option-description {
+    color: #94a3b8;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.skill-paste-choice-cancel {
+    display: block;
+    margin: 14px 0 0 auto;
+    padding: 7px 12px;
+    border: 1px solid #475569;
+    border-radius: 6px;
+    background: transparent;
+    color: #cbd5e1;
+    cursor: pointer;
+}
+
+.skill-paste-choice-cancel:hover {
+    background: #1e293b;
+    color: #f8fafc;
+}
+
+/* ================= STATE MACHINE LOADING ================= */
+.state-machine-loading-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 4000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(2, 6, 23, 0.76);
+    backdrop-filter: blur(2px);
+}
+
+.state-machine-loading-card {
+    display: flex;
+    min-width: 250px;
+    max-width: calc(100vw - 40px);
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 24px 28px;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    background: #0f172a;
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.5);
+}
+
+.state-machine-loading-spinner {
+    width: 34px;
+    height: 34px;
+    border: 3px solid #334155;
+    border-top-color: #cbd5e1;
+    border-radius: 50%;
+    animation: state-machine-loading-spin 0.8s linear infinite;
+}
+
+.state-machine-loading-title {
+    color: #f8fafc;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.state-machine-loading-label {
+    max-width: 340px;
+    overflow: hidden;
+    color: #94a3b8;
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@keyframes state-machine-loading-spin {
+    to {
+        transform: rotate(360deg);
+    }
 }

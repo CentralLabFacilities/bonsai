@@ -44,6 +44,7 @@ export default function EditorCanvas({
     selectedNodes,
     contextMenu,
     handleSelectAction,
+    canCreateSkillClone,
     setIsCreateSlotModalOpen,
     isDraggingNode,
     isOverTrash,
@@ -138,6 +139,14 @@ export default function EditorCanvas({
                             ? `change ${selectedNodes.length} node(s) in:`
                             : "Create new element"}
                     </div>
+                    {canCreateSkillClone && (
+                        <button
+                            className="context-menu-item"
+                            onClick={() => handleSelectAction("clone")}
+                        >
+                            Create Skill Clone
+                        </button>
+                    )}
                     <button
                         className="context-menu-item"
                         onClick={() => handleSelectAction("compound")}

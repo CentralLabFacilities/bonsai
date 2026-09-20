@@ -31,6 +31,14 @@ const AutoSmartTransitionEdge = createSmartEdge(
     AUTO_ROUTING_OPTIONS
 );
 
+const ForcedSmartTransitionEdge = createSmartEdge(
+    "bezier",
+    {
+        ...AUTO_ROUTING_OPTIONS,
+        routeOnlyWhenBlocked: false,
+    }
+);
+
 const CONTROL_POINT_SIZE = 14;
 const ADD_POINT_SIZE = 18;
 
@@ -782,9 +790,13 @@ function AutoEditableTransitionEdge(props) {
         [data, id, setEdges, sourceX, sourceY, targetX, targetY]
     );
 
+    const SmartTransitionEdge = data?.forceObstacleRouting
+        ? ForcedSmartTransitionEdge
+        : AutoSmartTransitionEdge;
+
     return (
         <>
-            <AutoSmartTransitionEdge {...props} />
+            <SmartTransitionEdge {...props} />
 
             {selected && (
                 <EdgeLabelRenderer>
