@@ -26,6 +26,8 @@ export const EDITOR_SHORTCUTS = [
     { keys: "Ctrl + Shift + S", action: "Save workflow as…" },
     { keys: "Ctrl + Tab", action: "Next workflow tab" },
     { keys: "Ctrl + Shift + Tab", action: "Previous workflow tab" },
+    { keys: "Alt + Left / ←", action: "Previous focus" },
+    { keys: "Alt + Right / →", action: "Next focus" },
     { keys: "Ctrl + Z", action: "Undo" },
     { keys: "Ctrl + Y", action: "Redo" },
     { keys: "Ctrl + C", action: "Copy selected nodes" },
