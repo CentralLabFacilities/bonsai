@@ -22,6 +22,7 @@ import CreateSubMachineModal from "./components/CreateSubMachineModal";
 import EditorCanvas from "./components/EditorCanvas";
 import WorkflowTabBar from "./components/WorkflowTabBar";
 import EditorFindOverlay from "./components/EditorFindOverlay";
+import HintPage from "./components/HintPage";
 
 import { parseScxmlFile, extractBehaviorExitEventsFromScxml } from "./utils/scxmlImport";
 import { DEFAULT_PREFIX_CONFIG, resolveSrcPath } from "./config/prefixMapping";
@@ -228,6 +229,7 @@ function AppContent() {
     const findInputRef = useRef(null);
     const findPanelRef = useRef(null);
     const [isShortcutHelpOpen, setIsShortcutHelpOpen] = useState(false);
+    const [isHintPageOpen, setIsHintPageOpen] = useState(false);
 
     const [activeMode, setActiveMode] = useState("event");
     const [manualSlots, setManualSlots] = useState([]);
@@ -3456,6 +3458,10 @@ function AppContent() {
                 </div>
             )}
 
+            {isHintPageOpen && (
+                <HintPage onClose={() => setIsHintPageOpen(false)} />
+            )}
+
             <CreateSubMachineModal
                 isOpen={Boolean(pendingSubMachineCreation)}
                 defaultDirectory={pendingSubMachineCreation?.defaultDirectory || ""}
@@ -4699,6 +4705,16 @@ function AppContent() {
                     </div>
                 </div>
             </div>
+
+            <button
+                type="button"
+                className="hint-page-open-button nodrag nopan"
+                onClick={() => setIsHintPageOpen(true)}
+                title="Quick guide"
+                aria-label="Open Bonsai UI quick guide"
+            >
+                ?
+            </button>
 
             <div
                 className="nodrag nopan"
