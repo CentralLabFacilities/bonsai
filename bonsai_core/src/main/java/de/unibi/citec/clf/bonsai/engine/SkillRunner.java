@@ -178,6 +178,10 @@ public class SkillRunner implements Runnable {
         return configurator.getOptionalParams();
     }
 
+    public String inspectionGetDescription() {
+        return skill.getDoc();
+    }
+
     public Map<String, Class<?>> inspectionGetSensors() {
         return configurator.getSensorRequests();
     }

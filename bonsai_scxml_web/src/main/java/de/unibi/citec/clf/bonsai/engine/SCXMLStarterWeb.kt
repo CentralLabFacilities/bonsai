@@ -226,13 +226,18 @@ class SCXMLStarterWeb : SCXMLStarter() {
         } catch (e: NotImplementedError) {
             throw Exception(e)
         }
-        val inSlots = runner.inspectionGetInSlots().map { SkillSlot(it.key, it.value.simpleName) }
-        val outSlots = runner.inspectionGetOutSlots().map { SkillSlot(it.key, it.value.simpleName) }
-        val transitions = runner.inspectionGetRequestedTokens().map { SkillTransition(it.exitStatus.fullStatus) }
+
+        val description = runner.inspectionGetDescription()
+        val slotDescriptions = runner.inspectionGetSlotDescription()
+        val exitTokenDescription =  runner.inspectionGetTokenDescription()
+        val paramDescription = runner.inspectionGetAllParamsDescription()
+        val inSlots = runner.inspectionGetInSlots().map { SkillSlot(it.key, it.value.simpleName, slotDescriptions[it.key] ?: "") }
+        val outSlots = runner.inspectionGetOutSlots().map { SkillSlot(it.key, it.value.simpleName, slotDescriptions[it.key] ?: "") }
+        val transitions = runner.inspectionGetRequestedTokens().map { SkillTransition(it.exitStatus.fullStatus, exitTokenDescription[it.exitStatus] ?: "") }
         val params = mutableListOf<SkillParameter>()
-        params.addAll(runner.inspectionGetRequiredParams().map { SkillParameter(it.key, it.value.simpleName, true) })
-        params.addAll(runner.inspectionGetAllOptionalParams().map { SkillParameter(it.key, it.value.type.simpleName, false, it.value.defaultValue.toString()) })
-        return SkillInfo(mid, inSlots, outSlots, params, transitions)
+        params.addAll(runner.inspectionGetRequiredParams().map { SkillParameter(it.key, it.value.simpleName, true,  description = paramDescription[it.key] ?: "") })
+        params.addAll(runner.inspectionGetAllOptionalParams().map { SkillParameter(it.key, it.value.type.simpleName, false, it.value.defaultValue.toString(),  paramDescription[it.key] ?: "") })
+        return SkillInfo(mid, description, inSlots, outSlots, params, transitions)
     }
 
     companion object {
