@@ -49,6 +49,7 @@ export default function EditorCanvas({
     isOverTrash,
     handleNodesChange,
     handleVisibleEdgesChange,
+    onSelectionChange,
     onConnect,
     handleConnectStart,
     handleConnectEnd,
@@ -173,6 +174,7 @@ export default function EditorCanvas({
                     edges={visibleEdges}
                     onNodesChange={handleNodesChange}
                     onEdgesChange={handleVisibleEdgesChange}
+                    onSelectionChange={onSelectionChange}
                     onConnect={onConnect}
                     onConnectStart={handleConnectStart}
                     onConnectEnd={handleConnectEnd}

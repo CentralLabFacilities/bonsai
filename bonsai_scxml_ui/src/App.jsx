@@ -219,6 +219,15 @@ function AppContent() {
     // clipboard: Ctrl+C copies the current React Flow selection and
     // Ctrl+V recreates it with fresh graph IDs.
     const graphClipboardRef = useRef(null);
+    // Keep an authoritative snapshot of React Flow's current selection.
+    // Reading `node.selected` from the controlled nodes array can lag behind
+    // the interaction by a render, especially when Ctrl/Meta multi-selecting.
+    const graphSelectionRef = useRef(new Set());
+    const handleGraphSelectionChange = useCallback(({ nodes: selectedFlowNodes = [] }) => {
+        graphSelectionRef.current = new Set(
+            selectedFlowNodes.map((node) => node.id)
+        );
+    }, []);
     const pasteSequenceRef = useRef(0);
 
     // Editor-wide Find (Ctrl+F): searches skill/behavior nodes and slot paths
@@ -2444,23 +2453,30 @@ function AppContent() {
         };
 
         const captureSelection = () => {
+            const selectedIds = graphSelectionRef.current;
             let nodesToCopy = nodes.filter(
-                (node) => node.selected && node.type !== "parallelLane"
+                (node) =>
+                    selectedIds.has(node.id) &&
+                    node.type !== "parallelLane"
             );
 
-            // React Flow can clear/delay its internal `selected` flag while the
-            // editor still has a node selected in the details panel. Falling
-            // back to selectedNodeId keeps Ctrl+C reliable for the common
-            // single-node case (including shared End/Fatal/Nop clones).
-            if (nodesToCopy.length === 0 && selectedNodeId) {
-                const selectedNode = nodes.find(
+            // React Flow's onSelectionChange is the authoritative source for
+            // multi-selection. Only fall back to the explicitly focused node
+            // when there is no usable Flow selection (or a single stale node
+            // from the previous click). This keeps the original stale-click
+            // fix without collapsing a genuine Ctrl/Meta selection to one node.
+            if (selectedNodeId && nodesToCopy.length <= 1) {
+                const focusedNode = nodes.find(
                     (node) =>
                         node.id === selectedNodeId &&
                         node.type !== "parallelLane"
                 );
+                const focusedNodeIsSelected = nodesToCopy.some(
+                    (node) => node.id === selectedNodeId
+                );
 
-                if (selectedNode) {
-                    nodesToCopy = [selectedNode];
+                if (focusedNode && !focusedNodeIsSelected) {
+                    nodesToCopy = [focusedNode];
                 }
             }
 
@@ -4313,6 +4329,7 @@ function AppContent() {
                             isOverTrash={isOverTrash}
                             handleNodesChange={handleNodesChange}
                             handleVisibleEdgesChange={handleVisibleEdgesChange}
+                            onSelectionChange={handleGraphSelectionChange}
                             onConnect={onConnect}
                             handleConnectStart={handleConnectStart}
                             handleConnectEnd={handleConnectEnd}

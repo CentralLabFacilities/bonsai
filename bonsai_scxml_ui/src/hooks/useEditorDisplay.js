@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { MarkerType } from "@xyflow/react";
 import {
     SLOT_CONNECTION_COLORS,
-    getTransitionHighlightColor,
     highlightSelectedTransitions,
     withSmartTransitionRouting,
 } from "../utils/editorGraph";
@@ -96,6 +95,18 @@ export function useEditorDisplay({
                 .sort()
                 .join("\u0001"),
         [selectedNodes, selectedNodeId, activeCanvasFocusNodeId]
+    );
+
+    // Keep true editor selection visually independent from hover focus. A
+    // hovered node may dim unrelated context, but it must never fade nodes the
+    // user has explicitly selected (including Ctrl/Meta multi-selection).
+    const selectedNodeIdSet = useMemo(
+        () =>
+            new Set([
+                ...selectedNodes.map((node) => node.id),
+                ...(selectedNodeId ? [selectedNodeId] : []),
+            ]),
+        [selectedNodes, selectedNodeId]
     );
 
     const normalizedTransitionEdges = useMemo(
@@ -592,7 +603,7 @@ export function useEditorDisplay({
 
     const dimmedHoverEdgeCacheRef = useRef(new WeakMap());
     const dimmedHoverNodeCacheRef = useRef(new WeakMap());
-    const selectedHoverNodeCacheRef = useRef(new WeakMap());
+    const highlightedHoverNodeCacheRef = useRef(new WeakMap());
 
     const isSlotDetailsFocus = Boolean(
         hoveredSlotAccessNodeId &&
@@ -673,29 +684,11 @@ export function useEditorDisplay({
                             edge.source === selectedNodeId))
             );
 
-            if (isHoveredEditorEdge && edge.data?.edgeKind !== "slot") {
-                const color = getTransitionHighlightColor(
-                    edge.sourceHandle || edge.label
-                );
-                return {
-                    ...edge,
-                    animated: true,
-                    style: {
-                        ...(edge.style || {}),
-                        stroke: color,
-                        opacity: 1,
-                    },
-                    markerEnd: edge.markerEnd
-                        ? { ...edge.markerEnd, color }
-                        : edge.markerEnd,
-                    labelStyle: {
-                        ...(edge.labelStyle || {}),
-                        opacity: 1,
-                    },
-                };
-            }
-
-            if (isCanvasHoverConnection || isSlotDetailsConnection) {
+            if (
+                isCanvasHoverConnection ||
+                isHoveredEditorEdge ||
+                isSlotDetailsConnection
+            ) {
                 return edge;
             }
 
@@ -824,8 +817,11 @@ export function useEditorDisplay({
             );
             const isConnectedHoverFocusNode =
                 hasHoverFocus && hoverFocusNodeIds?.has(visibleNode.id);
+            const isSelectedNode =
+                visibleNode.selected || selectedNodeIdSet.has(visibleNode.id);
             const isDimmedByHoverFocus =
                 hasHoverFocus &&
+                !isSelectedNode &&
                 !isConnectedHoverFocusNode &&
                 !isCanvasHoverHighlight &&
                 !isSlotDetailsSkillHoverHighlight &&
@@ -856,21 +852,33 @@ export function useEditorDisplay({
                 isHoveredEdgeEndpoint ||
                 isSlotDetailsSkillHoverHighlight
             ) {
+                // Hover highlighting must never mutate React Flow's real
+                // selection state. Setting `selected: true` here made a mere
+                // mouse hover replace Ctrl/Meta multi-selection and then clear
+                // it again on mouse leave. Use a presentation-only class
+                // instead, while preserving an already selected node as-is.
                 if (visibleNode.selected) return visibleNode;
 
-                const cachedSelectedNode =
-                    selectedHoverNodeCacheRef.current.get(visibleNode);
-                if (cachedSelectedNode) return cachedSelectedNode;
+                const cachedHighlightedNode =
+                    highlightedHoverNodeCacheRef.current.get(visibleNode);
+                if (cachedHighlightedNode) return cachedHighlightedNode;
 
-                const selectedNode = {
+                const classNames = String(visibleNode.className || "")
+                    .split(/\s+/)
+                    .filter(Boolean);
+                if (!classNames.includes("editor-hover-highlight")) {
+                    classNames.push("editor-hover-highlight");
+                }
+
+                const highlightedNode = {
                     ...visibleNode,
-                    selected: true,
+                    className: classNames.join(" "),
                 };
-                selectedHoverNodeCacheRef.current.set(
+                highlightedHoverNodeCacheRef.current.set(
                     visibleNode,
-                    selectedNode
+                    highlightedNode
                 );
-                return selectedNode;
+                return highlightedNode;
             }
 
             if (visibleNode.type === "parallelLane") {
@@ -938,6 +946,7 @@ export function useEditorDisplay({
         hoveredSlotAccessNodeId,
         isSlotDetailsFocus,
         selectedNodeId,
+        selectedNodeIdSet,
         hoveredEditorEdge,
         parallelDropTargetId,
         compoundDropTargetId,

@@ -6906,3 +6906,12 @@
     opacity: 0 !important;
     pointer-events: none !important;
 }
+
+
+/* Hover/focus emphasis is intentionally visual-only. Do not reuse React
+   Flow's selected flag here, because hover must not alter multi-selection. */
+.react-flow__node.editor-hover-highlight {
+    outline: 3px solid rgba(37, 99, 235, 0.72);
+    outline-offset: 3px;
+    border-radius: 8px;
+}
