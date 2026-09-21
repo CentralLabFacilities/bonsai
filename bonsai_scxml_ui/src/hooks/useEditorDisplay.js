@@ -782,6 +782,14 @@ export function useEditorDisplay({
             return baseVisibleNodes;
         }
 
+        const activeParallelLane = parallelDropTargetId
+            ? baseVisibleNodes.find((node) => node.id === parallelDropTargetId)
+            : null;
+        const activeParallelId =
+            activeParallelLane?.type === "parallelLane"
+                ? activeParallelLane.parentId
+                : null;
+
         return baseVisibleNodes.map((visibleNode) => {
             const isCanvasHoverHighlight =
                 visibleNode.id === activeCanvasFocusNodeId;
@@ -870,13 +878,16 @@ export function useEditorDisplay({
             }
 
             if (visibleNode.type === "parallel") {
-                if (!visibleNode.data?.isDropTarget) return visibleNode;
+                const isDropTarget = visibleNode.id === activeParallelId;
+                if (Boolean(visibleNode.data?.isDropTarget) === isDropTarget) {
+                    return visibleNode;
+                }
 
                 return {
                     ...visibleNode,
                     data: {
                         ...visibleNode.data,
-                        isDropTarget: false,
+                        isDropTarget,
                     },
                 };
             }

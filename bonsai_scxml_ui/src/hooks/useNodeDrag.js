@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { resolveCollisionScope } from "../utils/nodeCollisions";
+import { rebuildBoundaryTransitions } from "../utils/boundaryTransitions";
 import {
     COMPOUND_HEADER_HEIGHT,
     COMPOUND_PADDING_X,
+    COMPOUND_BOTTOM_PADDING,
     NODE_COLLISION_OPTIONS,
     PARALLEL_NODE_GAP,
     fitCompoundAndAncestorCompounds,
     fitCompoundToChildren,
     getAbsoluteNodePosition,
     getDirectCompoundForNode,
+    getCompoundExitGutterWidth,
     getLaneForNode,
     getNodeNestingDepth,
     getNodeSize,
@@ -18,6 +21,16 @@ import {
     isParallelLaneSkillCandidate,
     resolveNodeCollisionsAndRefit,
 } from "../utils/editorGeometry";
+
+const CONTAINER_EXIT_RESISTANCE = 52;
+
+const pointInsideBounds = (point, bounds, margin = 0) => Boolean(
+    bounds &&
+    point.x >= bounds.x - margin &&
+    point.x <= bounds.x + bounds.width + margin &&
+    point.y >= bounds.y - margin &&
+    point.y <= bounds.y + bounds.height + margin
+);
 
 export function useNodeDrag({
     edges,
@@ -47,6 +60,7 @@ export function useNodeDrag({
     }, []);
 
     const dragContainerIndexRef = useRef({ lanes: [], compounds: [] });
+    const dragOriginContainerRef = useRef(null);
 
     const buildDragContainerIndex = useCallback((currentNodes) => {
         const currentNodeById = new Map(
@@ -118,6 +132,31 @@ export function useNodeDrag({
         const currentNodes = getNodes();
         dragContainerIndexRef.current = buildDragContainerIndex(currentNodes);
 
+        const sourceLane = getLaneForNode(node, currentNodes);
+        const sourceCompound = sourceLane
+            ? null
+            : getDirectCompoundForNode(node, currentNodes);
+        const sourceContainer = sourceLane || sourceCompound;
+        if (sourceContainer) {
+            const absolute = getAbsoluteNodePosition(sourceContainer, currentNodes);
+            const size = sourceLane
+                ? {
+                    width: Number(sourceLane.style?.width) || 420,
+                    height: Number(sourceLane.style?.height) || 110,
+                }
+                : getNodeSize(sourceCompound);
+            dragOriginContainerRef.current = {
+                kind: sourceLane ? "parallelLane" : "compound",
+                id: sourceContainer.id,
+                x: absolute.x,
+                y: absolute.y,
+                width: size.width,
+                height: size.height,
+            };
+        } else {
+            dragOriginContainerRef.current = null;
+        }
+
         setIsDraggingNode(true);
         setHoveredEditorEdgeId(null);
 
@@ -176,14 +215,36 @@ export function useNodeDrag({
             (entry) => canUseTarget(entry) && containsPointer(entry)
         );
 
-        const hoveredLane =
+        let hoveredLane =
             !hoveredCompound && nodeType !== "parallel"
                 ? dragContainerIndex.lanes.find(
                       (entry) => canUseTarget(entry) && containsPointer(entry)
                   )
                 : null;
+        let effectiveCompound = hoveredCompound;
 
-        setCompoundDropTargetId(hoveredCompound?.id || null);
+        // A node already inside a container is "sticky" at the border. The
+        // source container remains highlighted for a small margin outside its
+        // real bounds; only dragging farther than that margin releases it.
+        const origin = dragOriginContainerRef.current;
+        if (
+            !effectiveCompound &&
+            !hoveredLane &&
+            origin &&
+            pointInsideBounds(pointerPosition, origin, CONTAINER_EXIT_RESISTANCE)
+        ) {
+            if (origin.kind === "compound") {
+                effectiveCompound = dragContainerIndex.compounds.find(
+                    (entry) => entry.id === origin.id
+                ) || origin;
+            } else if (origin.kind === "parallelLane" && nodeType !== "parallel") {
+                hoveredLane = dragContainerIndex.lanes.find(
+                    (entry) => entry.id === origin.id
+                ) || origin;
+            }
+        }
+
+        setCompoundDropTargetId(effectiveCompound?.id || null);
         setParallelDropTargetId(hoveredLane?.id || null);
     }, [screenToFlowPosition]);
 
@@ -207,7 +268,9 @@ export function useNodeDrag({
             dragFrameRef.current = null;
         }
         pendingNodeDragRef.current = null;
+        const dragOriginContainer = dragOriginContainerRef.current;
         dragContainerIndexRef.current = { lanes: [], compounds: [] };
+        dragOriginContainerRef.current = null;
 
         const element = document.elementFromPoint(
             event.clientX,
@@ -245,6 +308,9 @@ export function useNodeDrag({
                         (edge) =>
                             !idsToDelete.has(edge.source) &&
                             !idsToDelete.has(edge.target) &&
+                            !idsToDelete.has(
+                                edge.data?.boundaryOriginalSource
+                            ) &&
                             !idsToDelete.has(
                                 edge.data?.compoundOriginalSource
                             ) &&
@@ -290,7 +356,10 @@ export function useNodeDrag({
                             !idsToDelete.has(candidate.id)
                     )
                     .map((candidate) => {
-                        if (candidate.type !== "compound") {
+                        if (
+                            candidate.type !== "compound" &&
+                            candidate.type !== "parallelLane"
+                        ) {
                             return candidate;
                         }
 
@@ -298,13 +367,9 @@ export function useNodeDrag({
                             ...candidate,
                             data: {
                                 ...candidate.data,
-                                events: (
-                                    candidate.data?.events || []
-                                ).filter(
+                                events: (candidate.data?.events || []).filter(
                                     (event) =>
-                                        !idsToDelete.has(
-                                            event.sourceNodeId
-                                        )
+                                        !idsToDelete.has(event.sourceNodeId)
                                 ),
                             },
                         };
@@ -382,7 +447,7 @@ export function useNodeDrag({
                 currentNodes
             );
 
-            const targetCompound = currentNodes
+            let targetCompound = currentNodes
                 .filter(
                     (c) =>
                         c.type === "compound" &&
@@ -417,6 +482,21 @@ export function useNodeDrag({
                         getNodeNestingDepth(a, currentNodes)
                 )[0] || null;
 
+            const resistedCompoundDrop = Boolean(
+                !targetCompound &&
+                sourceCompound &&
+                dragOriginContainer?.kind === "compound" &&
+                dragOriginContainer.id === sourceCompound.id &&
+                pointInsideBounds(
+                    dropPoint,
+                    dragOriginContainer,
+                    CONTAINER_EXIT_RESISTANCE
+                )
+            );
+            if (resistedCompoundDrop) {
+                targetCompound = sourceCompound;
+            }
+
 
             // ---------------------------------------------------------
             // Node befindet sich bereits im selben Compound
@@ -429,11 +509,57 @@ export function useNodeDrag({
                 targetCompound &&
                 sourceCompound.id === targetCompound.id
             ) {
+                let retainedNodes = [...currentNodes];
+
+                if (resistedCompoundDrop) {
+                    const containerSize = getNodeSize(sourceCompound);
+                    const draggedSize = getNodeSize(draggedNode);
+                    const maxX = Math.max(
+                        COMPOUND_PADDING_X,
+                        containerSize.width -
+                            getCompoundExitGutterWidth(sourceCompound.data?.events || []) -
+                            COMPOUND_PADDING_X -
+                            draggedSize.width
+                    );
+                    const maxY = Math.max(
+                        COMPOUND_HEADER_HEIGHT,
+                        containerSize.height -
+                            COMPOUND_BOTTOM_PADDING -
+                            draggedSize.height
+                    );
+
+                    retainedNodes = retainedNodes.map((candidate) =>
+                        candidate.id === draggedNode.id
+                            ? {
+                                ...candidate,
+                                position: {
+                                    x: Math.min(
+                                        maxX,
+                                        Math.max(
+                                            COMPOUND_PADDING_X,
+                                            Number(candidate.position?.x || 0)
+                                        )
+                                    ),
+                                    y: Math.min(
+                                        maxY,
+                                        Math.max(
+                                            COMPOUND_HEADER_HEIGHT,
+                                            Number(candidate.position?.y || 0)
+                                        )
+                                    ),
+                                },
+                                extent: "parent",
+                                expandParent: true,
+                            }
+                            : candidate
+                    );
+                }
+
                 // Keep the containing compound fitted to all immediate
                 // children, including nested compounds, and propagate any
                 // size change through outer compound ancestors.
                 const next = fitCompoundAndAncestorCompounds(
-                    [...currentNodes],
+                    retainedNodes,
                     sourceCompound.id
                 );
 
@@ -793,9 +919,17 @@ export function useNodeDrag({
                     );
                 }
 
-                setEdges(rewrittenEdges);
+                const collisionResolved = resolveNodeCollisionsAndRefit(
+                    next,
+                    draggedNode.id
+                );
+                const rebuilt = rebuildBoundaryTransitions(
+                    collisionResolved,
+                    rewrittenEdges
+                );
+                setEdges(rebuilt.edges);
 
-                return resolveNodeCollisionsAndRefit(next, draggedNode.id);
+                return rebuilt.nodes;
             }
 
             const sourceLane = getLaneForNode(
@@ -803,7 +937,7 @@ export function useNodeDrag({
                 currentNodes
             );
 
-            const targetLane = draggedNode.type !== "parallel"
+            let targetLane = draggedNode.type !== "parallel"
                 ? currentNodes
                     .filter(
                         (candidate) =>
@@ -834,6 +968,21 @@ export function useNodeDrag({
                     })
                 : null;
 
+            const resistedLaneDrop = Boolean(
+                !targetLane &&
+                sourceLane &&
+                dragOriginContainer?.kind === "parallelLane" &&
+                dragOriginContainer.id === sourceLane.id &&
+                pointInsideBounds(
+                    dropPoint,
+                    dragOriginContainer,
+                    CONTAINER_EXIT_RESISTANCE
+                )
+            );
+            if (resistedLaneDrop) {
+                targetLane = sourceLane;
+            }
+
             // Die Node wurde lediglich innerhalb derselben Lane bewegt.
             // Keep its free position, but still allow the lane/parallel to
             // grow when the node reaches beyond the manually resized bounds.
@@ -847,6 +996,49 @@ export function useNodeDrag({
                         }
                         : candidate
                 );
+
+                if (resistedLaneDrop && sourceLane) {
+                    const laneAbsolute = getAbsoluteNodePosition(
+                        sourceLane,
+                        currentNodes
+                    );
+                    const laneWidth = Number(sourceLane.style?.width) || 420;
+                    const laneHeight = Number(sourceLane.style?.height) || 110;
+                    const draggedSize = getNodeSize(draggedNode);
+                    const desiredAbsolute = getAbsoluteNodePosition(
+                        draggedNode,
+                        currentNodes
+                    );
+                    const padding = 16;
+                    const clampedAbsolute = {
+                        x: Math.min(
+                            laneAbsolute.x + laneWidth - draggedSize.width - padding,
+                            Math.max(laneAbsolute.x + padding, desiredAbsolute.x)
+                        ),
+                        y: Math.min(
+                            laneAbsolute.y + laneHeight - draggedSize.height - padding,
+                            Math.max(laneAbsolute.y + padding, desiredAbsolute.y)
+                        ),
+                    };
+                    const immediateParent = currentNodes.find(
+                        (candidate) => candidate.id === draggedNode.parentId
+                    );
+                    const parentAbsolute = immediateParent
+                        ? getAbsoluteNodePosition(immediateParent, currentNodes)
+                        : { x: 0, y: 0 };
+
+                    next = next.map((candidate) =>
+                        candidate.id === draggedNode.id
+                            ? {
+                                ...candidate,
+                                position: {
+                                    x: clampedAbsolute.x - parentAbsolute.x,
+                                    y: clampedAbsolute.y - parentAbsolute.y,
+                                },
+                            }
+                            : candidate
+                    );
+                }
 
                 if (sourceCompound?.id) {
                     next = fitCompoundAndAncestorCompounds(
@@ -1266,10 +1458,20 @@ export function useNodeDrag({
                 );
             }
 
-            setEdges(nextEdges);
-
-            // React Flow benötigt Parent-Nodes vor ihren Children.
-            return resolveNodeCollisionsAndRefit(nextNodes, draggedNode.id);
+            // React Flow benötigt Parent-Nodes vor ihren Children. Rebuild
+            // boundary exit points after the final parent/position is known so
+            // dragging into/out of Compound/Parallel updates the border edges
+            // immediately and keeps the original skill.event semantics.
+            const collisionResolved = resolveNodeCollisionsAndRefit(
+                nextNodes,
+                draggedNode.id
+            );
+            const rebuilt = rebuildBoundaryTransitions(
+                collisionResolved,
+                nextEdges
+            );
+            setEdges(rebuilt.edges);
+            return rebuilt.nodes;
         });
 
         // Slot nodes live in a separate state array, but in Slot/Overview mode

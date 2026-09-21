@@ -6772,3 +6772,13 @@
         grid-template-columns: 1fr;
     }
 }
+
+/* Stronger visual feedback while inserting a skill into a container. */
+.compound-frame-node.compound-drop-target,
+.parallel-group-container.parallel-drop-target {
+    outline: 3px solid #38bdf8 !important;
+    outline-offset: -3px;
+    box-shadow:
+            inset 0 0 0 2px rgba(56, 189, 248, 0.28),
+            0 0 0 4px rgba(56, 189, 248, 0.12) !important;
+}
