@@ -112,46 +112,25 @@ export const highlightSelectedTransitions = (transitionEdges, selectedNodeIds) =
         // currently selected. This prevents edited edges from staying coloured
         // after React Flow has deselected them.
         const edge = clearTransientTransitionHighlight(rawEdge);
-
-        // Boundary transitions are displayed as container -> target edges, but
-        // semantically still belong to the skill inside the container. Use that
-        // semantic source for both selection and success/error/fatal colouring.
-        const semanticSource =
-            edge.data?.boundaryOriginalSource ||
-            edge.data?.compoundOriginalSource ||
-            edge.data?.parallelOriginalSource ||
-            edge.source;
-        const semanticTarget =
-            edge.data?.boundaryOriginalTarget ||
-            edge.data?.compoundOriginalTarget ||
-            edge.data?.parallelOriginalTarget ||
-            edge.target;
-        const semanticHandle =
-            edge.data?.boundaryOriginalSourceHandle ||
-            edge.data?.compoundOriginalSourceHandle ||
-            edge.data?.parallelOriginalSourceHandle ||
-            edge.sourceHandle ||
-            edge.label;
-
         const isConnectedToSelection =
-            selectedNodeIds.has(edge.source) ||
-            selectedNodeIds.has(edge.target) ||
-            selectedNodeIds.has(semanticSource) ||
-            selectedNodeIds.has(semanticTarget);
+            selectedNodeIds.has(edge.source) || selectedNodeIds.has(edge.target);
         const isEdgeSelected = Boolean(edge.selected);
 
         if (!isConnectedToSelection && !isEdgeSelected) {
             return edge;
         }
 
-        const color = getTransitionHighlightColor(semanticHandle);
+        const color = getTransitionHighlightColor(edge.sourceHandle || edge.label);
 
         // Keep the same geometry. Connected transitions animate while a skill
         // is selected, and directly selected transitions use the same semantic
         // success/error/fatal colour.
         return {
             ...edge,
-            animated: isConnectedToSelection ? true : edge.animated,
+            animated:
+                isConnectedToSelection || isEdgeSelected
+                    ? true
+                    : edge.animated,
             style: {
                 ...(edge.style || {}),
                 stroke: color,

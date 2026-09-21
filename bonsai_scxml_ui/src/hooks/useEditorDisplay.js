@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { MarkerType } from "@xyflow/react";
 import {
     SLOT_CONNECTION_COLORS,
+    getTransitionHighlightColor,
     highlightSelectedTransitions,
     withSmartTransitionRouting,
 } from "../utils/editorGraph";
@@ -672,11 +673,29 @@ export function useEditorDisplay({
                             edge.source === selectedNodeId))
             );
 
-            if (
-                isCanvasHoverConnection ||
-                isHoveredEditorEdge ||
-                isSlotDetailsConnection
-            ) {
+            if (isHoveredEditorEdge && edge.data?.edgeKind !== "slot") {
+                const color = getTransitionHighlightColor(
+                    edge.sourceHandle || edge.label
+                );
+                return {
+                    ...edge,
+                    animated: true,
+                    style: {
+                        ...(edge.style || {}),
+                        stroke: color,
+                        opacity: 1,
+                    },
+                    markerEnd: edge.markerEnd
+                        ? { ...edge.markerEnd, color }
+                        : edge.markerEnd,
+                    labelStyle: {
+                        ...(edge.labelStyle || {}),
+                        opacity: 1,
+                    },
+                };
+            }
+
+            if (isCanvasHoverConnection || isSlotDetailsConnection) {
                 return edge;
             }
 
