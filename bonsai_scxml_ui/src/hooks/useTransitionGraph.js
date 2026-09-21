@@ -110,6 +110,13 @@ const getExitedBoundarySteps = (sourceNode, targetNode, allNodes = []) => {
         if (!parent) break;
 
         if (parent.type === "compound") {
+            // The automatically managed Compound inside a Parallel lane is
+            // structural only. The visible lane is the actual transition
+            // boundary, so routing through both would duplicate the same exit.
+            if (parent.data?.autoParallelLaneCompound) {
+                parentId = parent.parentId;
+                continue;
+            }
             if (!targetIsInside(parent)) {
                 steps.push({ kind: "compound", anchor: parent, container: parent });
             }

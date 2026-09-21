@@ -468,6 +468,62 @@ function MetadataRow({ label, value }) {
     );
 }
 
+function NodeReferenceCard({
+                               nodeId,
+                               name,
+                               badge,
+                               onNavigate,
+                               onHover,
+                               hoverFallbackId = null,
+                           }) {
+    if (!nodeId || !name) return null;
+
+    return (
+        <div
+            className="slot-text-field compact-slot-card slot-access-skill-card exit-token-node-reference"
+            role="button"
+            tabIndex={0}
+            title={`Open ${name}`}
+            onClick={(event) => {
+                event.stopPropagation();
+                onNavigate?.(nodeId);
+            }}
+            onMouseEnter={(event) => {
+                event.stopPropagation();
+                onHover?.(nodeId);
+            }}
+            onMouseLeave={(event) => {
+                event.stopPropagation();
+                onHover?.(hoverFallbackId);
+            }}
+            onFocus={() => onHover?.(nodeId)}
+            onBlur={() => onHover?.(hoverFallbackId)}
+            onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onNavigate?.(nodeId);
+                }
+            }}
+        >
+            <div className="compact-slot-header exit-token-node-reference-header">
+                <div className="compact-slot-name">{name}</div>
+                <div className="compact-slot-badges">
+                    {badge && (
+                        <span className="slot-access-badge exit-token-node-reference-badge">
+                            {badge}
+                        </span>
+                    )}
+                    <FiExternalLink
+                        className="slot-access-open-icon"
+                        aria-hidden="true"
+                    />
+                </div>
+            </div>
+        </div>
+    );
+}
+
 
 function formatResourceKeys(items) {
     if (!Array.isArray(items) || items.length === 0) {
@@ -690,6 +746,14 @@ function sortExitTokens(events) {
         .map(({ event }) => event);
 }
 
+function getEditableExitTokens(events) {
+    return sortExitTokens(
+        (events || []).filter(
+            (event) => !(event?.sourceNodeId && event?.transitionHandleId)
+        )
+    );
+}
+
 function DetailsPanel({
                           selectedNode,
                           hasInitialNode,
@@ -724,6 +788,9 @@ function DetailsPanel({
                           transitionFocusRequest,
                           cloneSourceNode,
                           onNavigateCloneSource,
+                          containerOutgoingTransitions = [],
+                          onNavigateTransitionNode,
+                          onHoverTransitionNode,
                       }) {
     const isSubMachine =
         selectedNode.type === "submachine" ||
@@ -892,7 +959,7 @@ function DetailsPanel({
             return;
         }
 
-        const sortedEvents = sortExitTokens(selectedNode.data?.events || []);
+        const sortedEvents = getEditableExitTokens(selectedNode.data?.events || []);
         const eventIndex = sortedEvents.findIndex(
             (event) =>
                 String(event?.id || "") ===
@@ -1060,6 +1127,17 @@ function DetailsPanel({
             packageName: getSkillPackageName(fullSkillName),
         };
     });
+
+    const resolveEventTargetNodeId = (event) => {
+        if (!event?.target) return null;
+        const option = targetNodeOptions.find(
+            (candidate) =>
+                candidate.id === event.target ||
+                candidate.fullSkillName === event.target ||
+                candidate.displayName === event.target
+        );
+        return option?.id || null;
+    };
 
     const getTargetSelectorKey = (event, index) =>
         `${selectedNode.id}:${event.id}:${index}`;
@@ -1435,17 +1513,76 @@ function DetailsPanel({
                                 <h3>Exit Tokens</h3>
 
                                 <div className="event-list">
-                                    {sortExitTokens(
+                                    {isContainerState &&
+                                        containerOutgoingTransitions.map((transition) => (
+                                            <div
+                                                className={`slot-text-field compact-slot-card exit-token-card exit-token-${getExitTokenType(
+                                                    transition.eventId
+                                                )}`}
+                                                key={`container-${transition.edgeId}`}
+                                                onMouseEnter={() =>
+                                                    onHoverTransitionNode?.(
+                                                        transition.targetNodeId
+                                                    )
+                                                }
+                                                onMouseLeave={() =>
+                                                    onHoverTransitionNode?.(null)
+                                                }
+                                            >
+                                                <div className="compact-slot-header">
+                                                    <span className="compact-slot-name detail-card-title">
+                                                        {transition.eventDisplayName}
+                                                    </span>
+
+                                                    <span
+                                                        className={`detail-badge exit-token-badge exit-token-badge-${getExitTokenType(
+                                                            transition.eventId
+                                                        )}`}
+                                                    >
+                                                        Exit Token
+                                                    </span>
+                                                </div>
+
+                                                <div className="exit-token-node-references">
+                                                    <NodeReferenceCard
+                                                        nodeId={transition.sourceNodeId}
+                                                        name={transition.sourceDisplayName}
+                                                        badge="Source skill"
+                                                        onNavigate={onNavigateTransitionNode}
+                                                        onHover={onHoverTransitionNode}
+                                                        hoverFallbackId={transition.targetNodeId}
+                                                    />
+                                                    <NodeReferenceCard
+                                                        nodeId={transition.targetNodeId}
+                                                        name={transition.targetDisplayName}
+                                                        badge="Target"
+                                                        onNavigate={onNavigateTransitionNode}
+                                                        onHover={onHoverTransitionNode}
+                                                        hoverFallbackId={transition.targetNodeId}
+                                                    />
+                                                </div>
+                                            </div>
+                                        ))}
+
+                                    {getEditableExitTokens(
                                         selectedNode.data.events
                                     ).map((event, index) => (
                                             <div
-                                                className={`slot-text-field exit-token-card exit-token-${getExitTokenType(
+                                                className={`slot-text-field compact-slot-card exit-token-card exit-token-${getExitTokenType(
                                                     event.id
                                                 )}`}
                                                 key={`${event.id}-${index}`}
+                                                onMouseEnter={() =>
+                                                    onHoverTransitionNode?.(
+                                                        resolveEventTargetNodeId(event)
+                                                    )
+                                                }
+                                                onMouseLeave={() =>
+                                                    onHoverTransitionNode?.(null)
+                                                }
                                             >
-                                                <div className="detail-card-header">
-                                                    <span className="detail-card-title">
+                                                <div className="compact-slot-header">
+                                                    <span className="compact-slot-name detail-card-title">
                                                         {event.id}
                                                     </span>
 
@@ -1463,6 +1600,38 @@ function DetailsPanel({
                                                         {event.description}
                                                     </div>
                                                 )}
+
+                                                {(() => {
+                                                    const targetNodeId =
+                                                        resolveEventTargetNodeId(event);
+                                                    if (!targetNodeId) return null;
+
+                                                    const targetOption =
+                                                        targetNodeOptions.find(
+                                                            (option) =>
+                                                                option.id === targetNodeId
+                                                        );
+
+                                                    return (
+                                                        <div className="exit-token-node-references">
+                                                            <NodeReferenceCard
+                                                                nodeId={targetNodeId}
+                                                                name={
+                                                                    targetOption?.displayName ||
+                                                                    event.target
+                                                                }
+                                                                badge="Target"
+                                                                onNavigate={
+                                                                    onNavigateTransitionNode
+                                                                }
+                                                                onHover={
+                                                                    onHoverTransitionNode
+                                                                }
+                                                                hoverFallbackId={targetNodeId}
+                                                            />
+                                                        </div>
+                                                    );
+                                                })()}
 
                                                 <div className="editable-field">
                                                     <label className="editable-field-label">

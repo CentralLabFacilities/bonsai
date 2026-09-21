@@ -4,6 +4,7 @@ import { FiChevronDown, FiChevronRight } from "react-icons/fi";
 function CompoundNode({ id, data = {}, selected = false }) {
     const events = Array.isArray(data.events) ? data.events : [];
     const isCollapsed = Boolean(data.isCollapsed);
+    const isParallelLaneWrapper = Boolean(data.autoParallelLaneCompound);
 
     const uniqueEvents = [];
     const seen = new Set();
@@ -18,13 +19,15 @@ function CompoundNode({ id, data = {}, selected = false }) {
     return (
         <div
             className={`compound-frame-node ${
+                isParallelLaneWrapper ? "parallel-lane-auto-compound" : ""
+            } ${
                 data.isInitial ? "initial-compound" : ""
             } ${selected ? "selected-compound" : ""} ${
                 data.isDropTarget ? "compound-drop-target" : ""
             } ${isCollapsed ? "collapsed-container" : ""}`}
         >
             <NodeResizer
-                isVisible={selected && !isCollapsed}
+                isVisible={selected && !isCollapsed && !isParallelLaneWrapper}
                 minWidth={220}
                 minHeight={120}
                 color="#475569"

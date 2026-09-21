@@ -781,8 +781,14 @@ export const normalizeParallelLaneCompounds = (allNodes) => {
             return;
         }
 
-        const laneWidth = Number(currentLane.style?.width) || 420;
-        const laneHeight = Number(currentLane.style?.height) || 140;
+        // The automatically managed Compound represents the lane itself in
+        // SCXML. Its editor geometry must therefore be an exact overlay of
+        // the visible Parallel lane, not merely "at least" as large. Using
+        // getNodeSize also covers measured/imported dimensions that may live
+        // on width/height instead of style.
+        const laneSize = getNodeSize(currentLane);
+        const laneWidth = Math.max(1, Number(laneSize.width) || 420);
+        const laneHeight = Math.max(1, Number(laneSize.height) || 140);
 
         /*
          * If the lane already contains a normal compound and another sibling
@@ -838,9 +844,8 @@ export const normalizeParallelLaneCompounds = (allNodes) => {
                     siblingsToAbsorb.map((node) => node.id)
                 );
 
-                const existingCompoundSize = getNodeSize(existingDirectCompound);
-                const promotedWidth = Math.max(laneWidth, existingCompoundSize.width);
-                const promotedHeight = Math.max(laneHeight, existingCompoundSize.height);
+                const promotedWidth = laneWidth;
+                const promotedHeight = laneHeight;
 
                 nextNodes = nextNodes.map((node) => {
                     if (node.id === existingDirectCompound.id) {
@@ -850,8 +855,8 @@ export const normalizeParallelLaneCompounds = (allNodes) => {
                             parentId: currentLane.id,
                             extent: "parent",
                             expandParent: true,
-                            draggable: true,
-                            selectable: true,
+                            draggable: false,
+                            selectable: false,
                             width: promotedWidth,
                             height: promotedHeight,
                             style: {
@@ -924,8 +929,8 @@ export const normalizeParallelLaneCompounds = (allNodes) => {
                 parentId: currentLane.id,
                 extent: "parent",
                 expandParent: true,
-                draggable: true,
-                selectable: true,
+                draggable: false,
+                selectable: false,
                 width: laneWidth,
                 height: laneHeight,
                 style: {
@@ -988,9 +993,8 @@ export const normalizeParallelLaneCompounds = (allNodes) => {
             directSkills.length > 0 ||
             extraWrappedSkills.length > 0 ||
             extraWrapperIds.size > 0;
-        const wrapperSize = getNodeSize(wrapper);
-        const desiredWrapperWidth = Math.max(laneWidth, wrapperSize.width);
-        const desiredWrapperHeight = Math.max(laneHeight, wrapperSize.height);
+        const desiredWrapperWidth = laneWidth;
+        const desiredWrapperHeight = laneHeight;
         const needsResize =
             Number(wrapper.width) !== desiredWrapperWidth ||
             Number(wrapper.height) !== desiredWrapperHeight ||
@@ -999,14 +1003,18 @@ export const normalizeParallelLaneCompounds = (allNodes) => {
         const desiredInitialId = initialSkill?.id || null;
         const needsInitialUpdate =
             (wrapper.data?.initialChildId || null) !== desiredInitialId;
+        const needsPositionReset =
+            Number(wrapper.position?.x || 0) !== 0 ||
+            Number(wrapper.position?.y || 0) !== 0;
         const needsPresentationUpgrade =
             wrapper.className === "compound-in-lane" ||
-            wrapper.draggable === false ||
-            wrapper.selectable === false;
+            wrapper.draggable !== false ||
+            wrapper.selectable !== false;
 
         if (
             !needsMerge &&
             !needsResize &&
+            !needsPositionReset &&
             !needsInitialUpdate &&
             !needsPresentationUpgrade
         ) {
@@ -1021,8 +1029,9 @@ export const normalizeParallelLaneCompounds = (allNodes) => {
 
                     return {
                         ...normalCompound,
-                        draggable: true,
-                        selectable: true,
+                        position: { x: 0, y: 0 },
+                        draggable: false,
+                        selectable: false,
                         width: desiredWrapperWidth,
                         height: desiredWrapperHeight,
                         style: {
@@ -1045,6 +1054,16 @@ export const normalizeParallelLaneCompounds = (allNodes) => {
                 if (node.parentId === wrapper.id) {
                     return {
                         ...node,
+                        position: needsPositionReset
+                            ? {
+                                  x:
+                                      Number(wrapperPosition.x || 0) +
+                                      Number(node.position?.x || 0),
+                                  y:
+                                      Number(wrapperPosition.y || 0) +
+                                      Number(node.position?.y || 0),
+                              }
+                            : node.position,
                         data: {
                             ...node.data,
                             isInitial: node.id === desiredInitialId,

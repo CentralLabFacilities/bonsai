@@ -44,7 +44,6 @@ export default function EditorCanvas({
     selectedNodes,
     contextMenu,
     handleSelectAction,
-    canCreateSkillClone,
     setIsCreateSlotModalOpen,
     isDraggingNode,
     isOverTrash,
@@ -139,14 +138,6 @@ export default function EditorCanvas({
                             ? `change ${selectedNodes.length} node(s) in:`
                             : "Create new element"}
                     </div>
-                    {canCreateSkillClone && (
-                        <button
-                            className="context-menu-item"
-                            onClick={() => handleSelectAction("clone")}
-                        >
-                            Create Skill Clone
-                        </button>
-                    )}
                     <button
                         className="context-menu-item"
                         onClick={() => handleSelectAction("compound")}
@@ -217,10 +208,33 @@ export default function EditorCanvas({
                     edgeTypes={edgeTypes}
                     onNodeClick={(_, node) => {
                         clearAllEdgeSelection();
-                        if (node.type === "parallelLane" && node.parentId) {
-                            setSelectedNodeId(node.parentId);
-                            setActiveTab("allgemein");
-                            return;
+
+                        const isParallelLaneStructure =
+                            node.type === "parallelLane" ||
+                            Boolean(node.data?.autoParallelLaneCompound) ||
+                            node.className === "compound-in-lane";
+
+                        if (isParallelLaneStructure) {
+                            let currentNode = node;
+                            const visited = new Set();
+
+                            while (currentNode?.parentId && !visited.has(currentNode.id)) {
+                                visited.add(currentNode.id);
+                                const parentNode = nodes.find(
+                                    (candidate) => candidate.id === currentNode.parentId
+                                );
+
+                                if (!parentNode) break;
+
+                                if (parentNode.type === "parallel") {
+                                    setSelectedNodeId(parentNode.id);
+                                    setRightPanelTab("details");
+                                    setActiveTab("allgemein");
+                                    return;
+                                }
+
+                                currentNode = parentNode;
+                            }
                         }
 
                         setSelectedNodeId(node.id);

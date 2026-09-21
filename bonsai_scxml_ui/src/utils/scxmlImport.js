@@ -77,6 +77,13 @@ const getImportedExitedBoundaries = (sourceNode, targetNode, allNodes) => {
         if (!parent) break;
 
         if (parent.type === "compound") {
+            // The automatically managed Compound inside a Parallel lane is
+            // structural only. The visible lane is the actual transition
+            // boundary, so routing through both would duplicate the same exit.
+            if (parent.data?.autoParallelLaneCompound) {
+                parentId = parent.parentId;
+                continue;
+            }
             if (!targetIsInside(parent)) {
                 steps.push({ kind: "compound", anchor: parent, container: parent });
             }
@@ -991,6 +998,11 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                             label: branchId.split(".").pop().split("#")[0],
                             fullSkillName: branchId,
                             isInitial: false,
+                            // This node represents the Parallel branch state in
+                            // SCXML, but the Parallel lane is its visible editor
+                            // boundary. Keep it structural so boundary exits are
+                            // materialized only once at the lane border.
+                            autoParallelLaneCompound: true,
                             events: [],
                             onEntry: parseStateAssignments(branchElem, "onentry"),
                             onExit: parseStateAssignments(branchElem, "onexit"),

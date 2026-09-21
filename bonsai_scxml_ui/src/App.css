@@ -6782,3 +6782,127 @@
             inset 0 0 0 2px rgba(56, 189, 248, 0.28),
             0 0 0 4px rgba(56, 189, 248, 0.12) !important;
 }
+
+
+/* Container outgoing transition summary in the Details panel. */
+.container-transition-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.container-transition-card {
+    border: 1px solid var(--border-color, #d5dbe3);
+    border-radius: 8px;
+    padding: 9px 10px;
+    background: rgba(2, 132, 199, 0.04);
+}
+
+.container-transition-event {
+    margin-bottom: 7px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #0369a1;
+    overflow-wrap: anywhere;
+}
+
+.container-transition-route {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+}
+
+.container-transition-node-link {
+    min-width: 0;
+    max-width: calc(50% - 16px);
+    padding: 3px 6px;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    text-decoration: underline;
+    text-decoration-color: transparent;
+    text-underline-offset: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.container-transition-node-link:hover,
+.container-transition-node-link:focus-visible {
+    background: rgba(2, 132, 199, 0.1);
+    color: #0369a1;
+    text-decoration-color: currentColor;
+    outline: none;
+}
+
+.container-transition-arrow {
+    flex: 0 0 auto;
+    color: #64748b;
+}
+
+/* Exit-token node references use the same compact, clickable treatment as the
+   Slot Details "Accessed by" cards. */
+.exit-token-node-references {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.exit-token-node-reference {
+    margin: 0;
+    padding: 8px 9px;
+    border-left-color: rgba(99, 102, 241, 0.75);
+    background: rgba(30, 41, 59, 0.52);
+}
+
+.exit-token-node-reference-header {
+    margin-bottom: 0;
+}
+
+.exit-token-node-reference-badge {
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    background: rgba(71, 85, 105, 0.3);
+    color: #cbd5e1;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+
+/* Parallel lanes own their visible frame. The automatically managed Compound
+   inside a lane is structural only: keep its geometry/handles for routing,
+   but never draw another Compound UI on top of the lane. */
+.compound-frame-node.parallel-lane-auto-compound {
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+    pointer-events: none;
+}
+
+.compound-frame-node.parallel-lane-auto-compound::before,
+.compound-frame-node.parallel-lane-auto-compound::after,
+.compound-frame-node.parallel-lane-auto-compound > .compound-frame-header {
+    display: none !important;
+}
+
+/* Keep exit handles mounted so existing helper edges still have valid React
+   Flow endpoints, but the Parallel lane renders the visible border token. */
+.compound-frame-node.parallel-lane-auto-compound > .compound-frame-exits {
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+.compound-frame-node.parallel-lane-auto-compound > .target-handle,
+.compound-frame-node.parallel-lane-auto-compound > .compound-frame-entry-handle {
+    opacity: 0 !important;
+    pointer-events: none !important;
+}

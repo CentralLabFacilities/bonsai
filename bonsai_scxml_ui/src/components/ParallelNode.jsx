@@ -101,31 +101,6 @@ export default function ParallelNode({ id, data, selected = false }) {
                         };
                     }
 
-                    // The automatically managed lane compound represents the
-                    // lane itself. When the user manually resizes the whole
-                    // parallel state, resize that wrapper at the same time so
-                    // normalization does not restore the old wrapper size.
-                    const parentGeometry = laneGeometry.get(node.parentId);
-                    const isLaneCompound =
-                        node.type === 'compound' &&
-                        Boolean(
-                            node.data?.autoParallelLaneCompound ||
-                            node.className === 'compound-in-lane'
-                        );
-
-                    if (parentGeometry && isLaneCompound) {
-                        return {
-                            ...node,
-                            width: parentGeometry.width,
-                            height: parentGeometry.height,
-                            style: {
-                                ...node.style,
-                                width: parentGeometry.width,
-                                height: parentGeometry.height,
-                            },
-                        };
-                    }
-
                     return node;
                 });
             });

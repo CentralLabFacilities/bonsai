@@ -799,10 +799,12 @@ export function useContainerCreation({
                 data: {
                     label: laneName,
                     events: [],
+                    initialChildId: group[0]?.id || null,
                 },
             });
 
-            // States DIREKT in die Lane.
+            // States DIREKT in die Lane. The lane itself is the single SCXML
+            // compound branch; do not create another wrapper compound.
             // Kein Group_X_Part Compound mehr.
             let currentX = 25;
 
@@ -821,6 +823,10 @@ export function useContainerCreation({
                     },
 
                     selected: false,
+                    data: {
+                        ...(node.data || {}),
+                        isInitial: node.id === group[0]?.id,
+                    },
                 });
 
                 currentX += nodeWidth + PARALLEL_NODE_GAP;

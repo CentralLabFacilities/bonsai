@@ -1509,6 +1509,110 @@ function AppContent() {
         ) || null;
     }, [selectedNode, semanticNodes]);
 
+    const selectedContainerOutgoingTransitions = useMemo(() => {
+        if (
+            !selectedNode ||
+            (selectedNode.type !== "compound" && selectedNode.type !== "parallel")
+        ) {
+            return [];
+        }
+
+        const nodeById = new Map(semanticNodes.map((node) => [node.id, node]));
+        const isInsideSelectedContainer = (nodeId) => {
+            if (!nodeId) return false;
+            if (nodeId === selectedNode.id) return true;
+
+            const visited = new Set();
+            let current = nodeById.get(nodeId);
+            while (current?.parentId && !visited.has(current.parentId)) {
+                visited.add(current.parentId);
+                if (current.parentId === selectedNode.id) return true;
+                current = nodeById.get(current.parentId);
+            }
+            return false;
+        };
+
+        const displayNameFor = (node) => {
+            if (!node) return "Unknown";
+            const fullSkillName = String(
+                node.data?.fullSkillName || node.data?.label || node.id
+            ).trim();
+            const editorInstanceId = String(
+                node.data?.editorInstanceId || ""
+            ).trim();
+            const baseName =
+                node.data?.label ||
+                fullSkillName.split(".").pop()?.split("#")[0] ||
+                node.id;
+
+            if (editorInstanceId) return `${baseName}#${editorInstanceId}`;
+            if (fullSkillName.includes("#")) {
+                const instanceId = fullSkillName.split("#").pop();
+                return `${baseName}#${instanceId}`;
+            }
+            return baseName;
+        };
+
+        const seen = new Set();
+        const result = [];
+
+        edges.forEach((edge) => {
+            if (
+                edge.data?.boundaryInternalEdge ||
+                edge.data?.compoundInternalEdge ||
+                edge.data?.parallelInternalEdge ||
+                edge.data?.compoundInitialEdge ||
+                edge.data?.parallelEntryEdge ||
+                String(edge.id || "").startsWith("edge-internal-")
+            ) {
+                return;
+            }
+
+            const sourceId =
+                edge.data?.boundaryOriginalSource ||
+                edge.data?.compoundOriginalSource ||
+                edge.data?.parallelOriginalSource ||
+                edge.source;
+            const sourceHandle = String(
+                edge.data?.boundaryOriginalSourceHandle ||
+                edge.data?.compoundOriginalSourceHandle ||
+                edge.data?.parallelOriginalSourceHandle ||
+                edge.sourceHandle ||
+                edge.label ||
+                "success"
+            );
+            const targetId =
+                edge.data?.compoundOriginalTarget ||
+                edge.data?.parallelOriginalTarget ||
+                edge.target;
+
+            if (
+                !isInsideSelectedContainer(sourceId) ||
+                isInsideSelectedContainer(targetId)
+            ) {
+                return;
+            }
+
+            const key = `${sourceId}::${sourceHandle}::${targetId}`;
+            if (seen.has(key)) return;
+            seen.add(key);
+
+            const sourceNode = nodeById.get(sourceId);
+            const targetNode = nodeById.get(targetId);
+            result.push({
+                edgeId: edge.id,
+                sourceNodeId: sourceId,
+                sourceDisplayName: displayNameFor(sourceNode),
+                eventId: sourceHandle,
+                eventDisplayName: `${displayNameFor(sourceNode)}.${sourceHandle}`,
+                targetNodeId: targetId,
+                targetDisplayName: displayNameFor(targetNode),
+            });
+        });
+
+        return result;
+    }, [selectedNode, semanticNodes, edges]);
+
     const handleNavigateCloneSource = useCallback((nodeId) => {
         if (!nodeId) return;
 
@@ -3951,15 +4055,30 @@ function AppContent() {
                                     );
                                 });
 
+                                const isFirstLaneState = existingMembers.length === 0;
                                 newNode.parentId = targetLane.id;
                                 newNode.extent = "parent";
                                 newNode.position = { x: newX, y: 20 };
+                                newNode.data = {
+                                    ...(newNode.data || {}),
+                                    isInitial: isFirstLaneState,
+                                };
 
                                 const parallelId = targetLane.parentId;
 
                                 setNodes((currentNodes) => {
                                     let nextNodes = [
-                                        ...currentNodes,
+                                        ...currentNodes.map((candidate) =>
+                                            candidate.id === targetLane.id && isFirstLaneState
+                                                ? {
+                                                    ...candidate,
+                                                    data: {
+                                                        ...(candidate.data || {}),
+                                                        initialChildId: newNode.id,
+                                                    },
+                                                }
+                                                : candidate
+                                        ),
                                         newNode,
                                     ];
 
@@ -4276,6 +4395,11 @@ function AppContent() {
                                 selectedNode={selectedNode}
                                 cloneSourceNode={selectedCloneSourceNode}
                                 onNavigateCloneSource={handleNavigateCloneSource}
+                                containerOutgoingTransitions={selectedContainerOutgoingTransitions}
+                                onNavigateTransitionNode={handleNavigateCloneSource}
+                                onHoverTransitionNode={(nodeId) =>
+                                    setHoveredEditorNodeId(nodeId || null)
+                                }
                                 hasInitialNode={hasInitialNode}
                                 activeTab={activeTab}
                                 setActiveTab={setActiveTab}
