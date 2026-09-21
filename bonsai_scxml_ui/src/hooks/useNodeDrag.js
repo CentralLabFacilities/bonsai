@@ -24,13 +24,40 @@ import {
 
 const CONTAINER_EXIT_RESISTANCE = 52;
 
-const pointInsideBounds = (point, bounds, margin = 0) => Boolean(
-    bounds &&
-    point.x >= bounds.x - margin &&
-    point.x <= bounds.x + bounds.width + margin &&
-    point.y >= bounds.y - margin &&
-    point.y <= bounds.y + bounds.height + margin
-);
+const getPointerDrivenBoundaryState = (pointerPosition, origin) => {
+    if (!origin || !pointerPosition) return null;
+
+    // Reconstruct the skill's intended absolute position from the pointer and
+    // the place where the user grabbed the skill. Resistance is therefore
+    // based on the SKILL BORDER reaching the container boundary, not on the
+    // cursor reaching that boundary.
+    const desiredAbsolute = {
+        x: pointerPosition.x - Number(origin.grabOffsetX || 0),
+        y: pointerPosition.y - Number(origin.grabOffsetY || 0),
+    };
+
+    const minX = Number(origin.nodeMinX);
+    const minY = Number(origin.nodeMinY);
+    const maxX = Number(origin.nodeMaxX);
+    const maxY = Number(origin.nodeMaxY);
+
+    const exitDistance = Math.max(
+        0,
+        minX - desiredAbsolute.x,
+        desiredAbsolute.x - maxX,
+        minY - desiredAbsolute.y,
+        desiredAbsolute.y - maxY
+    );
+
+    return {
+        desiredAbsolute,
+        exitDistance,
+        clampedAbsolute: {
+            x: Math.min(maxX, Math.max(minX, desiredAbsolute.x)),
+            y: Math.min(maxY, Math.max(minY, desiredAbsolute.y)),
+        },
+    };
+};
 
 export function useNodeDrag({
     edges,
@@ -132,11 +159,14 @@ export function useNodeDrag({
         const currentNodes = getNodes();
         dragContainerIndexRef.current = buildDragContainerIndex(currentNodes);
 
-        const sourceLane = getLaneForNode(node, currentNodes);
-        const sourceCompound = sourceLane
+        // Prefer the immediate Compound boundary when a skill is nested in a
+        // Compound that itself lives inside a Parallel lane. If there is no
+        // direct Compound parent, the lane boundary becomes the sticky one.
+        const sourceCompound = getDirectCompoundForNode(node, currentNodes);
+        const sourceLane = sourceCompound
             ? null
-            : getDirectCompoundForNode(node, currentNodes);
-        const sourceContainer = sourceLane || sourceCompound;
+            : getLaneForNode(node, currentNodes);
+        const sourceContainer = sourceCompound || sourceLane;
         if (sourceContainer) {
             const absolute = getAbsoluteNodePosition(sourceContainer, currentNodes);
             const size = sourceLane
@@ -145,6 +175,38 @@ export function useNodeDrag({
                     height: Number(sourceLane.style?.height) || 110,
                 }
                 : getNodeSize(sourceCompound);
+            const immediateParent = currentNodes.find(
+                (candidate) => candidate.id === node.parentId
+            );
+            const parentAbsolute = immediateParent
+                ? getAbsoluteNodePosition(immediateParent, currentNodes)
+                : { x: 0, y: 0 };
+            const nodeSize = getNodeSize(node);
+
+            const pointerPosition = screenToFlowPosition({
+                x: event.clientX,
+                y: event.clientY,
+            });
+            const nodeAbsolute = getAbsoluteNodePosition(node, currentNodes);
+            // Resistance must use the container's *visible outer frame*, not
+            // its internal child-layout area. Padding, the compound header and
+            // the exit-label gutter are layout reservations inside the frame;
+            // using them here makes the skill appear to hit an invisible wall
+            // before it reaches the Compound/Parallel border.
+            //
+            // nodeMin/Max describe the top-left positions at which the dragged
+            // skill's own border is exactly flush with the container border.
+            const nodeMinX = absolute.x;
+            const nodeMinY = absolute.y;
+            const nodeMaxX = Math.max(
+                nodeMinX,
+                absolute.x + size.width - nodeSize.width
+            );
+            const nodeMaxY = Math.max(
+                nodeMinY,
+                absolute.y + size.height - nodeSize.height
+            );
+
             dragOriginContainerRef.current = {
                 kind: sourceLane ? "parallelLane" : "compound",
                 id: sourceContainer.id,
@@ -152,6 +214,16 @@ export function useNodeDrag({
                 y: absolute.y,
                 width: size.width,
                 height: size.height,
+                parentAbsolute,
+                nodeWidth: nodeSize.width,
+                nodeHeight: nodeSize.height,
+                nodeMinX,
+                nodeMinY,
+                nodeMaxX,
+                nodeMaxY,
+                grabOffsetX: pointerPosition.x - nodeAbsolute.x,
+                grabOffsetY: pointerPosition.y - nodeAbsolute.y,
+                exitDistance: 0,
             };
         } else {
             dragOriginContainerRef.current = null;
@@ -180,7 +252,13 @@ export function useNodeDrag({
                 )
             );
         }
-    }, [buildDragContainerIndex, getNodes, setNodes, setHoveredEditorEdgeId]);
+    }, [
+        buildDragContainerIndex,
+        getNodes,
+        screenToFlowPosition,
+        setNodes,
+        setHoveredEditorEdgeId,
+    ]);
 
     const processPendingNodeDrag = useCallback(() => {
         dragFrameRef.current = null;
@@ -229,15 +307,16 @@ export function useNodeDrag({
                 : null;
         let effectiveCompound = hoveredCompound;
 
-        // A node already inside a container is "sticky" at the border. The
-        // source container remains highlighted for a small margin outside its
-        // real bounds; only dragging farther than that margin releases it.
+        // A node already inside a container remains the active target while
+        // its SKILL BORDER is inside the resistance range. The pointer itself
+        // may already be outside (for example when the skill was grabbed near
+        // its far edge) without prematurely releasing the node.
         const origin = dragOriginContainerRef.current;
         if (
             !effectiveCompound &&
             !hoveredLane &&
             origin &&
-            pointInsideBounds(pointerPosition, origin, CONTAINER_EXIT_RESISTANCE)
+            Number(origin.exitDistance || 0) <= CONTAINER_EXIT_RESISTANCE
         ) {
             if (origin.kind === "compound") {
                 effectiveCompound = dragContainerIndex.compounds.find(
@@ -263,10 +342,57 @@ export function useNodeDrag({
             isSkillClone: Boolean(draggedNode.data?.isSkillClone),
         };
 
+        // Give skills a tangible "sticky" container border while dragging.
+        // The pointer-to-node offset captured on drag start lets us reconstruct
+        // where the skill would be without resistance. This means resistance
+        // begins exactly when the SKILL BORDER reaches/leaves the container,
+        // independent of where on the skill the user grabbed it.
+        const origin = dragOriginContainerRef.current;
+        if (
+            origin &&
+            draggedNode.type === "custom" &&
+            !draggedNode.data?.isSkillClone
+        ) {
+            const pointerPosition = screenToFlowPosition({
+                x: event.clientX,
+                y: event.clientY,
+            });
+            const boundaryState = getPointerDrivenBoundaryState(
+                pointerPosition,
+                origin
+            );
+
+            if (boundaryState) {
+                origin.exitDistance = boundaryState.exitDistance;
+
+                if (
+                    boundaryState.exitDistance > 0 &&
+                    boundaryState.exitDistance <= CONTAINER_EXIT_RESISTANCE
+                ) {
+                    const parentAbsolute = origin.parentAbsolute || { x: 0, y: 0 };
+                    const { clampedAbsolute } = boundaryState;
+
+                    setNodes((currentNodes) =>
+                        currentNodes.map((candidate) =>
+                            candidate.id === draggedNode.id
+                                ? {
+                                    ...candidate,
+                                    position: {
+                                        x: clampedAbsolute.x - parentAbsolute.x,
+                                        y: clampedAbsolute.y - parentAbsolute.y,
+                                    },
+                                }
+                                : candidate
+                        )
+                    );
+                }
+            }
+        }
+
         if (dragFrameRef.current === null) {
             dragFrameRef.current = requestAnimationFrame(processPendingNodeDrag);
         }
-    }, [processPendingNodeDrag]);
+    }, [processPendingNodeDrag, screenToFlowPosition, setNodes]);
 
     const handleNodeDragStop = useCallback((event, node) => {
         if (dragFrameRef.current !== null) {
@@ -275,6 +401,19 @@ export function useNodeDrag({
         }
         pendingNodeDragRef.current = null;
         const dragOriginContainer = dragOriginContainerRef.current;
+        if (dragOriginContainer) {
+            const pointerPosition = screenToFlowPosition({
+                x: event.clientX,
+                y: event.clientY,
+            });
+            const boundaryState = getPointerDrivenBoundaryState(
+                pointerPosition,
+                dragOriginContainer
+            );
+            if (boundaryState) {
+                dragOriginContainer.exitDistance = boundaryState.exitDistance;
+            }
+        }
         dragContainerIndexRef.current = { lanes: [], compounds: [] };
         dragOriginContainerRef.current = null;
 
@@ -493,11 +632,8 @@ export function useNodeDrag({
                 sourceCompound &&
                 dragOriginContainer?.kind === "compound" &&
                 dragOriginContainer.id === sourceCompound.id &&
-                pointInsideBounds(
-                    dropPoint,
-                    dragOriginContainer,
+                Number(dragOriginContainer.exitDistance || 0) <=
                     CONTAINER_EXIT_RESISTANCE
-                )
             );
             if (resistedCompoundDrop) {
                 targetCompound = sourceCompound;
@@ -978,11 +1114,8 @@ export function useNodeDrag({
                 sourceLane &&
                 dragOriginContainer?.kind === "parallelLane" &&
                 dragOriginContainer.id === sourceLane.id &&
-                pointInsideBounds(
-                    dropPoint,
-                    dragOriginContainer,
+                Number(dragOriginContainer.exitDistance || 0) <=
                     CONTAINER_EXIT_RESISTANCE
-                )
             );
             if (resistedLaneDrop) {
                 targetLane = sourceLane;
