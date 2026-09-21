@@ -4,13 +4,13 @@ import { SLOT_CONNECTION_COLORS, normalizeSlotPath } from "../utils/editorGraph"
 import { getAbsoluteNodePosition, getNodeSize } from "../utils/editorGeometry";
 
 export function useSlotGraph({
-    nodes,
-    manualSlots,
-    slotNodes,
-    slotEdges,
-    setSlotNodes,
-    setSlotEdges,
-}) {
+                                 nodes,
+                                 manualSlots,
+                                 slotNodes,
+                                 slotEdges,
+                                 setSlotNodes,
+                                 setSlotEdges,
+                             }) {
     const checkSlotConnection = useCallback((customNodes = null, customManualSlots = null) => {
         const targetNodes = Array.isArray(customNodes) ? customNodes : nodes;
         const activeManualSlots =
@@ -46,9 +46,9 @@ export function useSlotGraph({
                     existing.inherited ||
                     (isInheritedDeclaration
                         ? slot?.inherited || {
-                            state: slot?.state || "",
-                            xpath: `/${cleanPath}`,
-                        }
+                        state: slot?.state || "",
+                        xpath: `/${cleanPath}`,
+                    }
                         : null),
             });
         });
@@ -91,6 +91,11 @@ export function useSlotGraph({
                 }
             }
 
+            const accessNodeIds = new Set(existing.accessNodeIds || []);
+            if (options.accessNodeId) {
+                accessNodeIds.add(options.accessNodeId);
+            }
+
             usedPaths.set(cleanPath, {
                 type: s.type || existing.type || "Unknown",
                 // Keep the two inheritance directions independent:
@@ -103,12 +108,17 @@ export function useSlotGraph({
                 // Keep the legacy field for older code / persisted state.
                 inherited: currentMachineInherited,
                 requiredByChildren,
+                accessNodeIds: [...accessNodeIds],
             });
         };
 
         targetNodes.forEach((node) => {
-            (node.data.inSlots || []).forEach(registerSlotUsage);
-            (node.data.outSlots || []).forEach(registerSlotUsage);
+            (node.data.inSlots || []).forEach((slot) =>
+                registerSlotUsage(slot, { accessNodeId: node.id })
+            );
+            (node.data.outSlots || []).forEach((slot) =>
+                registerSlotUsage(slot, { accessNodeId: node.id })
+            );
 
             if (node.type === "submachine") {
                 (node.data.inheritedSlots || []).forEach((slot) => {
@@ -118,6 +128,7 @@ export function useSlotGraph({
                             type: slot.type || "Unknown",
                         },
                         {
+                            accessNodeId: node.id,
                             requiredByChild: {
                                 childNodeId: node.id,
                                 childLabel:
@@ -146,7 +157,7 @@ export function useSlotGraph({
             if (edge.data?.subMachineInherited === true) {
                 existingSlotEdgeByKey.set(
                     `sub:${edge.data?.subMachineNodeId || edge.source}:` +
-                        `${edge.data?.access || ""}:${Number(edge.data?.inheritIndex)}`,
+                    `${edge.data?.access || ""}:${Number(edge.data?.inheritIndex)}`,
                     edge
                 );
                 return;
@@ -154,13 +165,58 @@ export function useSlotGraph({
 
             existingSlotEdgeByKey.set(
                 `skill:${edge.data?.skillNodeId || edge.source}:` +
-                    `${edge.data?.access || ""}:${Number(edge.data?.slotIndex)}`,
+                `${edge.data?.access || ""}:${Number(edge.data?.slotIndex)}`,
                 edge
             );
         });
 
-        // New slot nodes should appear underneath the workflow instead of
-        // being mixed into the skill/state area. Keep positions of slots the
+        const targetNodeById = new Map(
+            targetNodes.map((node) => [node.id, node])
+        );
+        const slotSpawnCountByAnchor = new Map();
+        const getAccessAnchoredSlotPosition = (accessNodeIds = []) => {
+            const accessors = accessNodeIds
+                .map((nodeId) => targetNodeById.get(nodeId))
+                .filter(Boolean);
+            if (accessors.length === 0) return null;
+
+            let minLeft = Infinity;
+            let maxRight = -Infinity;
+            let maxBottom = -Infinity;
+            accessors.forEach((node) => {
+                const absolute = getAbsoluteNodePosition(node, targetNodes);
+                const size = getNodeSize(node);
+                minLeft = Math.min(minLeft, absolute.x);
+                maxRight = Math.max(maxRight, absolute.x + size.width);
+                maxBottom = Math.max(maxBottom, absolute.y + size.height);
+            });
+
+            if (
+                !Number.isFinite(minLeft) ||
+                !Number.isFinite(maxRight) ||
+                !Number.isFinite(maxBottom)
+            ) {
+                return null;
+            }
+
+            const anchorKey = [...accessNodeIds].sort().join("|");
+            const spawnIndex = slotSpawnCountByAnchor.get(anchorKey) || 0;
+            slotSpawnCountByAnchor.set(anchorKey, spawnIndex + 1);
+            const estimatedSlotWidth = 190;
+            const groupCenterX = (minLeft + maxRight) / 2;
+
+            return {
+                x:
+                    groupCenterX - estimatedSlotWidth / 2 +
+                    (spawnIndex % 3) * 205,
+                y: maxBottom + 320 + Math.floor(spawnIndex / 3) * 125,
+            };
+        };
+
+        // New slot nodes should appear underneath the skills that access them.
+        // Keep positions of slots the user has already moved. Slots without an
+        // accessor (for example a manually declared unused slot) fall back to
+        // the workflow-wide row below.
         // user has already moved, but derive the initial row for new slots
         // from the current workflow bounds.
         const slotLayoutNodes = targetNodes.filter(
@@ -188,7 +244,7 @@ export function useSlotGraph({
             ? slotLayoutBounds.minX
             : 380;
         const slotSpawnY = Number.isFinite(slotLayoutBounds.maxBottom)
-            ? slotLayoutBounds.maxBottom + 100
+            ? slotLayoutBounds.maxBottom + 340
             : 120;
 
         usedPaths.forEach(
@@ -197,6 +253,7 @@ export function useSlotGraph({
                  inherited,
                  currentMachineInherited,
                  requiredByChildren = [],
+                 accessNodeIds = [],
              }, path) => {
                 const slotNodeId = `slot-${path}`;
                 const existingSlotNode = existingSlotNodeById.get(slotNodeId);
@@ -204,7 +261,8 @@ export function useSlotGraph({
                 generatedSlotNodes.push({
                     id: slotNodeId,
                     position:
-                        existingSlotNode?.position || {
+                        existingSlotNode?.position ||
+                        getAccessAnchoredSlotPosition(accessNodeIds) || {
                             x: slotSpawnX + (index % 3) * 220,
                             y: slotSpawnY + Math.floor(index / 3) * 140,
                         },
@@ -269,13 +327,13 @@ export function useSlotGraph({
                     current.data?.label === generated.data?.label &&
                     current.data?.slotType === generated.data?.slotType &&
                     Boolean(current.data?.currentMachineInherited) ===
-                        Boolean(generated.data?.currentMachineInherited) &&
+                    Boolean(generated.data?.currentMachineInherited) &&
                     Boolean(current.data?.inherited) ===
-                        Boolean(generated.data?.inherited) &&
+                    Boolean(generated.data?.inherited) &&
                     current.data?.slotKind === generated.data?.slotKind &&
                     current.data?.inheritedFrom === generated.data?.inheritedFrom &&
                     Boolean(current.data?.requiredByChild) ===
-                        Boolean(generated.data?.requiredByChild) &&
+                    Boolean(generated.data?.requiredByChild) &&
                     requirementsEqual;
 
                 if (equivalent) return current;
@@ -470,9 +528,9 @@ export function useSlotGraph({
                     current.data?.skillNodeId === generated.data?.skillNodeId &&
                     current.data?.slotNodeId === generated.data?.slotNodeId &&
                     Boolean(current.data?.subMachineInherited) ===
-                        Boolean(generated.data?.subMachineInherited) &&
+                    Boolean(generated.data?.subMachineInherited) &&
                     current.data?.subMachineNodeId ===
-                        generated.data?.subMachineNodeId &&
+                    generated.data?.subMachineNodeId &&
                     current.data?.inheritIndex === generated.data?.inheritIndex &&
                     controlPointsEqual;
 
