@@ -169,7 +169,13 @@ export function useNodeDrag({
             setNodes((allNodes) =>
                 allNodes.map((candidate) =>
                     candidate.id === node.id
-                        ? { ...candidate, extent: undefined }
+                        ? {
+                            ...candidate,
+                            extent: undefined,
+                            // React Flow's expandParent would otherwise resize
+                            // the container live while this child is dragged.
+                            expandParent: undefined,
+                        }
                         : candidate
                 )
             );
@@ -555,15 +561,14 @@ export function useNodeDrag({
                     );
                 }
 
-                // Keep the containing compound fitted to all immediate
-                // children, including nested compounds, and propagate any
-                // size change through outer compound ancestors.
-                const next = fitCompoundAndAncestorCompounds(
+                // Moving a child within the same Compound must not change
+                // the Compound dimensions. Resolve overlaps, but keep the
+                // existing container size untouched.
+                return resolveNodeCollisionsAndRefit(
                     retainedNodes,
-                    sourceCompound.id
+                    draggedNode.id,
+                    { refitContainers: false }
                 );
-
-                return resolveNodeCollisionsAndRefit(next, draggedNode.id);
             }
 
             if (
@@ -984,8 +989,7 @@ export function useNodeDrag({
             }
 
             // Die Node wurde lediglich innerhalb derselben Lane bewegt.
-            // Keep its free position, but still allow the lane/parallel to
-            // grow when the node reaches beyond the manually resized bounds.
+            // Keep its free position without resizing the lane/parallel.
             if (targetLane?.id === sourceLane?.id) {
                 let next = currentNodes.map((candidate) =>
                     candidate.id === draggedNode.id
@@ -1040,21 +1044,11 @@ export function useNodeDrag({
                     );
                 }
 
-                if (sourceCompound?.id) {
-                    next = fitCompoundAndAncestorCompounds(
-                        next,
-                        sourceCompound.id
-                    );
-                }
-
-                if (sourceLane?.parentId) {
-                    next = growParallelToLaneContents(
-                        next,
-                        sourceLane.parentId
-                    );
-                }
-
-                return resolveNodeCollisionsAndRefit(next, draggedNode.id);
+                return resolveNodeCollisionsAndRefit(
+                    next,
+                    draggedNode.id,
+                    { refitContainers: false }
+                );
             }
 
             const sourceParallel = sourceLane

@@ -615,7 +615,11 @@ export const NODE_COLLISION_OPTIONS = {
     margin: 15,
 };
 
-export const resolveNodeCollisionsAndRefit = (allNodes, focusNodeId) => {
+export const resolveNodeCollisionsAndRefit = (
+    allNodes,
+    focusNodeId,
+    { refitContainers = true } = {}
+) => {
     let nextNodes = resolveCollisionScope(
         allNodes,
         focusNodeId,
@@ -671,19 +675,22 @@ export const resolveNodeCollisionsAndRefit = (allNodes, focusNodeId) => {
         }
     }
 
-    // Collision resolution can move a child farther than the container's
-    // previous bounds. Re-run the existing grow logic afterwards so compound
-    // and parallel layouts remain valid instead of clipping the moved nodes.
-    if (parent?.type === "compound") {
-        nextNodes = fitCompoundAndAncestorCompounds(
-            nextNodes,
-            parent.id
-        );
-    } else if (parent?.type === "parallelLane" && parent.parentId) {
-        nextNodes = growParallelToLaneContents(
-            nextNodes,
-            parent.parentId
-        );
+    // Adding/removing children may intentionally refit their container, but a
+    // plain move inside an existing Compound/Parallel must not resize it. The
+    // drag hook disables this final refit for same-container movement while
+    // preserving collision resolution itself.
+    if (refitContainers) {
+        if (parent?.type === "compound") {
+            nextNodes = fitCompoundAndAncestorCompounds(
+                nextNodes,
+                parent.id
+            );
+        } else if (parent?.type === "parallelLane" && parent.parentId) {
+            nextNodes = growParallelToLaneContents(
+                nextNodes,
+                parent.parentId
+            );
+        }
     }
 
     return orderNodesParentsFirst(nextNodes);
