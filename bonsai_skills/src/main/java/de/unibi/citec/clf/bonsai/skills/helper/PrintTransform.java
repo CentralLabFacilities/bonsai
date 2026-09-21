@@ -10,6 +10,21 @@ import de.unibi.citec.clf.bonsai.util.CoordinateTransformer;
 import de.unibi.citec.clf.btl.Transform;
 
 /**
+ * Looks up and prints the transform between two coordinate frames.
+ * <pre>
+ *
+ * Options:
+ *  #_FROM: [String]
+ *          -> Source coordinate frame.
+ *
+ *  #_TO: [String]
+ *        -> Target coordinate frame.
+ *
+ * ExitTokens:
+ *  success:   Transform lookup was successful during initialization.
+ *
+ * </pre>
+ *
  * @author lruegeme
  */
 public class PrintTransform extends AbstractSkill {
