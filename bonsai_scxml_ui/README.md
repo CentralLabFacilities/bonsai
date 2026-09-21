@@ -22,6 +22,9 @@ A native desktop application with file system access and direct save support.
 - **BUN** `https://github.com/oven-sh/bun/releases/`
 - **[Tauri Prerequisites](https://v2.tauri.app/start/prerequisites/)**: `apt install libwebkit2gtk-4.1-dev libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev`
 - **Cargo**: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --profile default`
+  - in clf system in cargo in volume installed has do be linked as followed: 
+    - rustup toolchain link tiago /vol/tiago/one/nightly/toolchains/1.90.0-x86_64-unknown-linux-gnu/
+    - rustup default tiago
 
 ### Development
 
