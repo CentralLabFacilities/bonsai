@@ -288,6 +288,51 @@ function AppContent() {
     });
 
     const { screenToFlowPosition, fitView, getNodes, setCenter } = useReactFlow();
+    const previousActiveModeRef = useRef(activeMode);
+
+    useEffect(() => {
+        const previousMode = previousActiveModeRef.current;
+        previousActiveModeRef.current = activeMode;
+
+        if (previousMode !== "code" || activeMode === "code") return;
+
+        // Code View unmounts React Flow. Wait until the canvas has mounted and
+        // measured its nodes again, then restore a useful workflow viewport.
+        let frameA = null;
+        let frameB = null;
+        frameA = requestAnimationFrame(() => {
+            frameB = requestAnimationFrame(() => {
+                const currentNodes = getNodes();
+                const skillNodes = currentNodes.filter(
+                    (node) =>
+                        !node.hidden &&
+                        (node.type === "custom" || node.type === "submachine")
+                );
+                const focusNodes =
+                    skillNodes.length > 0
+                        ? skillNodes
+                        : currentNodes.filter(
+                            (node) =>
+                                !node.hidden &&
+                                node.type !== "slot" &&
+                                node.type !== "parallelLane"
+                        );
+
+                if (focusNodes.length === 0) return;
+                fitView({
+                    nodes: focusNodes.map((node) => ({ id: node.id })),
+                    padding: 0.22,
+                    maxZoom: 1.15,
+                    duration: 260,
+                });
+            });
+        });
+
+        return () => {
+            if (frameA !== null) cancelAnimationFrame(frameA);
+            if (frameB !== null) cancelAnimationFrame(frameB);
+        };
+    }, [activeMode, fitView, getNodes]);
 
     const {
         parallelDropTargetId,
