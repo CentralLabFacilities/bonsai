@@ -1951,13 +1951,87 @@ function AppContent() {
             });
 
             if (graphChanges.length > 0) {
+                const removedNodeIds = new Set(
+                    graphChanges
+                        .filter((change) => change.type === "remove")
+                        .map((change) => change.id)
+                );
+
                 onNodesChange(graphChanges);
+
+                if (removedNodeIds.size > 0) {
+                    // Boundary transitions are drawn from a Compound/Parallel
+                    // border, so React Flow does not see them as connected to
+                    // the real source skill. Remove them explicitly by their
+                    // semantic source/target metadata when that skill is
+                    // deleted.
+                    setEdges((currentEdges) =>
+                        currentEdges.filter((edge) => {
+                            const semanticSource =
+                                edge.data?.boundaryOriginalSource ||
+                                edge.data?.compoundOriginalSource ||
+                                edge.data?.parallelOriginalSource ||
+                                edge.source;
+                            const semanticTarget =
+                                edge.data?.boundaryOriginalTarget ||
+                                edge.data?.compoundOriginalTarget ||
+                                edge.data?.parallelOriginalTarget ||
+                                edge.target;
+
+                            return (
+                                !removedNodeIds.has(edge.source) &&
+                                !removedNodeIds.has(edge.target) &&
+                                !removedNodeIds.has(semanticSource) &&
+                                !removedNodeIds.has(semanticTarget)
+                            );
+                        })
+                    );
+
+                    // Remove the editor-only border handle belonging to a
+                    // deleted source skill as well. Otherwise the Compound or
+                    // Parallel could keep showing a stale skill.event point.
+                    setNodes((currentNodes) =>
+                        currentNodes.map((node) => {
+                            if (
+                                node.type !== "compound" &&
+                                node.type !== "parallelLane"
+                            ) {
+                                return node;
+                            }
+
+                            const currentEvents = node.data?.events || [];
+                            const nextEvents = currentEvents.filter(
+                                (event) =>
+                                    !removedNodeIds.has(event?.sourceNodeId)
+                            );
+
+                            if (nextEvents.length === currentEvents.length) {
+                                return node;
+                            }
+
+                            return {
+                                ...node,
+                                data: {
+                                    ...(node.data || {}),
+                                    events: nextEvents,
+                                },
+                            };
+                        })
+                    );
+                }
             }
             if (slotChanges.length > 0) {
                 onSlotNodesChange(slotChanges);
             }
         },
-        [nodeById, slotNodeIdSet, onNodesChange, onSlotNodesChange]
+        [
+            nodeById,
+            slotNodeIdSet,
+            onNodesChange,
+            onSlotNodesChange,
+            setEdges,
+            setNodes,
+        ]
     );
 
     const handleVisibleEdgesChange = useCallback(
