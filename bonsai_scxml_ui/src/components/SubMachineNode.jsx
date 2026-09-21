@@ -70,7 +70,10 @@ export default function SubMachineNode({ id, data, selected }) {
     const localDataModelEntries = useMemo(
         () =>
             (data.localDataModel || [])
-                .filter((entry) => String(entry?.id || "").trim())
+                .filter((entry) => {
+                    const entryId = String(entry?.id || "").trim();
+                    return entryId && entryId !== "#_STATE_PREFIX";
+                })
                 .map((entry) => ({
                     id: String(entry.id).trim(),
                     expr: formatDataModelValue(entry),
@@ -314,7 +317,7 @@ export default function SubMachineNode({ id, data, selected }) {
                                 marginBottom: "1px",
                             }}
                         >
-                            Local Datamodel
+                            Local Data
                         </div>
 
                         {localDataModelEntries.map((entry) => (

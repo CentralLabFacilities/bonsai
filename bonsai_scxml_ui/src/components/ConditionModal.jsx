@@ -1264,7 +1264,7 @@ function ConditionModal({
                                 <>
                                     {editorVariables.length === 0 ? (
                                         <div className="transition-help-text">
-                                            Create a datamodel variable before adding an assignment.
+                                            Create a data variable before adding an assignment.
                                         </div>
                                     ) : (selectedTransition.assignments || []).length === 0 ? (
                                         <div className="transition-empty-state">
@@ -1365,7 +1365,7 @@ function ConditionModal({
                                                                     className="slot-field-edit"
                                                                     type="text"
                                                                     value={assignment.expr || ""}
-                                                                    placeholder="Expression, e.g. @test_value + 1"
+                                                                    placeholder="Value, e.g. @test_value + 1"
                                                                     autoComplete="off"
                                                                     spellCheck={false}
                                                                     onFocus={(event) =>

@@ -229,7 +229,7 @@ function tokenize(expression) {
 
         return {
             valid: false,
-            error: "Invalid expression",
+            error: "Invalid value",
         };
     }
 
@@ -302,7 +302,7 @@ function inferExpressionType(expression, variables = []) {
     const parsePrimary = () => {
         const token = tokens[position];
         if (!token) {
-            return { valid: false, error: "Invalid expression" };
+            return { valid: false, error: "Invalid value" };
         }
 
         if (token.kind === "operator" && ["+", "-"].includes(token.value)) {
@@ -324,7 +324,7 @@ function inferExpressionType(expression, variables = []) {
             if (!nested.valid) return nested;
 
             if (tokens[position]?.kind !== "paren" || tokens[position]?.value !== ")") {
-                return { valid: false, error: "Invalid expression" };
+                return { valid: false, error: "Invalid value" };
             }
             position += 1;
             return nested;
@@ -358,7 +358,7 @@ function inferExpressionType(expression, variables = []) {
 
         return {
             valid: false,
-            error: "Invalid expression",
+            error: "Invalid value",
         };
     };
 
@@ -426,7 +426,7 @@ function inferExpressionType(expression, variables = []) {
         const token = tokens[position];
         return {
             valid: false,
-            error: "Invalid expression",
+            error: "Invalid value",
         };
     }
 
@@ -444,13 +444,13 @@ export function validateAssignmentExpression(
     if (!value) {
         return allowEmpty
             ? { valid: true, value: "", resultType: null }
-            : { valid: false, error: "Expression required" };
+            : { valid: false, error: "Value required" };
     }
 
     if (!targetVariable) {
         return {
             valid: false,
-            error: "Select location",
+            error: "Select variable",
         };
     }
 

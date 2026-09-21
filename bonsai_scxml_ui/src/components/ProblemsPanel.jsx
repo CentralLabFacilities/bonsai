@@ -13,6 +13,9 @@ const CATEGORY_ORDER = [
     "Workflow",
 ];
 
+const getCategoryLabel = (category) =>
+    category === "Datamodel" ? "Data" : category;
+
 function SeverityIcon({ severity }) {
     if (severity === "warning") {
         return <FiAlertTriangle aria-hidden="true" />;
@@ -108,7 +111,7 @@ export default function ProblemsPanel({
                             key={category}
                         >
                             <div className="problem-category-header">
-                                <span>{category}</span>
+                                <span>{getCategoryLabel(category)}</span>
                                 <span className="problem-category-count">
                                     {categoryProblems.length}
                                 </span>

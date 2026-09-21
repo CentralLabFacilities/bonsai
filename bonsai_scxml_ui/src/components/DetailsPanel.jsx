@@ -1250,7 +1250,11 @@ function DetailsPanel({
     // - valueVariables: variables readable by the assignment expression. For
     //   a sub-state machine App.jsx supplies the parent workflow datamodel.
     const availableActionLocations = [
-        ...(globalDataModel || []).filter((parameter) => parameter?.id),
+        ...(globalDataModel || []).filter(
+            (parameter) =>
+                parameter?.id &&
+                String(parameter.id).trim() !== "#_STATE_PREFIX"
+        ),
         ...(!isSubMachine
             ? (selectedNode.data.params || [])
                 .filter((parameter) => parameter?.key)

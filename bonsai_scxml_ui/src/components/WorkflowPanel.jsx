@@ -7,6 +7,9 @@ function getDatamodelType(parameter) {
     return inferLiteralValueType(parameter?.expr).toLowerCase();
 }
 
+const isVisibleDataParameter = (parameter) =>
+    String(parameter?.id || "").trim() !== "#_STATE_PREFIX";
+
 function WorkflowPanel({
                            globalDataModel,
                            inheritedGlobalDataModel = [],
@@ -32,12 +35,12 @@ function WorkflowPanel({
     );
 
     const { globalParameters, localParameters } = useMemo(() => {
-        const withOriginalIndex = (globalDataModel || []).map(
-            (parameter, index) => ({
+        const withOriginalIndex = (globalDataModel || [])
+            .map((parameter, index) => ({
                 parameter,
                 index,
-            })
-        );
+            }))
+            .filter(({ parameter }) => isVisibleDataParameter(parameter));
 
         return {
             globalParameters: withOriginalIndex.filter(({ parameter }) =>
@@ -172,8 +175,12 @@ function WorkflowPanel({
     };
 
     const renderSourcedGlobals = () => {
-        const hasInherited = inheritedGlobalDataModel.length > 0;
-        const hasDescendants = descendantGlobalDataModel.length > 0;
+        const visibleInheritedGlobalDataModel =
+            inheritedGlobalDataModel.filter(isVisibleDataParameter);
+        const visibleDescendantGlobalDataModel =
+            descendantGlobalDataModel.filter(isVisibleDataParameter);
+        const hasInherited = visibleInheritedGlobalDataModel.length > 0;
+        const hasDescendants = visibleDescendantGlobalDataModel.length > 0;
 
         if (!hasInherited && !hasDescendants) {
             return null;
@@ -187,7 +194,7 @@ function WorkflowPanel({
 
                 {hasInherited && (
                     <div className="datamodel-inherited-list">
-                        {inheritedGlobalDataModel.map(
+                        {visibleInheritedGlobalDataModel.map(
                             (parameter, index) => (
                                 <div
                                     className={`slot-text-field datamodel-inherited-parameter datamodel-type-accent datamodel-type-accent-${getDatamodelType(parameter)}`}
@@ -225,7 +232,7 @@ function WorkflowPanel({
                         </div>
 
                         <div className="datamodel-inherited-list">
-                            {descendantGlobalDataModel.map(
+                            {visibleDescendantGlobalDataModel.map(
                                 (parameter, index) => (
                                     <div
                                         className={`slot-text-field datamodel-descendant-parameter datamodel-type-accent datamodel-type-accent-${getDatamodelType(parameter)}`}
@@ -300,7 +307,7 @@ function WorkflowPanel({
                         <input
                             className="slot-field-edit"
                             type="text"
-                            placeholder="Expression"
+                            placeholder="Value"
                             value={newParamExpr}
                             onChange={(event) =>
                                 setNewParamExpr(event.target.value)

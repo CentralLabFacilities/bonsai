@@ -25,7 +25,11 @@ const getMatchingExpressionVariables = (value, caretPosition, variables) => {
 
     const query = context.query.toLowerCase();
     const options = (Array.isArray(variables) ? variables : [])
-        .filter((variable) => variable?.id)
+        .filter(
+            (variable) =>
+                variable?.id &&
+                String(variable.id).trim() !== "#_STATE_PREFIX"
+        )
         .filter((variable) =>
             String(variable.id).toLowerCase().includes(query)
         )
@@ -76,10 +80,14 @@ function StateActionsEditor({
             (Array.isArray(availableLocations) ? availableLocations : [])
                 .map((location) =>
                     typeof location === "string"
-                        ? { id: location, type: null, source: "Datamodel" }
+                        ? { id: location, type: null, source: "Data" }
                         : location
                 )
-                .filter((location) => location?.id),
+                .filter(
+                    (location) =>
+                        location?.id &&
+                        String(location.id).trim() !== "#_STATE_PREFIX"
+                ),
         [availableLocations]
     );
 
@@ -517,7 +525,7 @@ function StateActionsEditor({
                                 <div className="state-action-compact-fields">
                                     <label className="state-action-compact-field">
                                         <span className="state-action-field-label-row">
-                                            <span>Location</span>
+                                            <span>Variable</span>
                                             {targetLocation?.type && (
                                                 <span className={`datamodel-value-type-badge datamodel-value-type-${targetLocation.type.toLowerCase()}`}>
                                                     {targetLocation.type}
@@ -536,7 +544,7 @@ function StateActionsEditor({
                                                 value={
                                                     assignment.location || ""
                                                 }
-                                                placeholder="Select target"
+                                                placeholder="Select variable"
                                                 autoComplete="off"
                                                 onFocus={() => {
                                                     const matches =
@@ -638,8 +646,8 @@ function StateActionsEditor({
                                                 disabled={!targetLocation}
                                                 placeholder={
                                                     targetLocation
-                                                        ? "Expression, e.g. @test_value + 1"
-                                                        : "Select target first"
+                                                        ? "Value, e.g. @test_value + 1"
+                                                        : "Select variable first"
                                                 }
                                                 autoComplete="off"
                                                 spellCheck={false}

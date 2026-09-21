@@ -498,7 +498,7 @@ function AppContent() {
 
     const [globalDataModel, setGlobalDataModel] = useState([
         { id: "#_STATE_PREFIX", expr: "'de.unibi.citec.clf.bonsai.skills.'" },
-        { id: "Test: globales Datamodel", expr: "testen" },
+        { id: "Test: global data", expr: "testen" },
     ]);
     const [inheritedGlobalDataModel, setInheritedGlobalDataModel] = useState([]);
     const [newParamId, setNewParamId] = useState("");
@@ -4359,7 +4359,7 @@ function AppContent() {
                             className={`right-panel-tab ${rightPanelTab === "datamodel" ? "active" : ""}`}
                             onClick={() => setRightPanelTab("datamodel")}
                         >
-                            Datamodel
+                            Data
                         </button>
 
                         {selectedNode && (
