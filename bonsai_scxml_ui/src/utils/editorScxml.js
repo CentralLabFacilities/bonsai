@@ -471,16 +471,33 @@ export const prepareGraphForScxml = (sourceNodes = [], sourceEdges = []) => {
                     ? node.data.onExit.map(normalizeAssignmentForScxml)
                     : node.data?.onExit,
                 events: Array.isArray(node.data?.events)
-                    ? node.data.events.map((event) => ({
-                        ...event,
-                        target: event.target ? remapNodeId(event.target) : event.target,
-                        assignments: Array.isArray(event.assignments)
-                            ? event.assignments.map(normalizeAssignmentForScxml)
-                            : event.assignments,
-                        assignExpr: event.assignExpr !== undefined
-                            ? normalizeAssignmentExpressionForScxml(event.assignExpr)
-                            : event.assignExpr,
-                    }))
+                    ? node.data.events
+                        // Compound/Parallel border events are editor-only
+                        // handles for visualizing a child skill transition at
+                        // the container boundary. The semantic external edge
+                        // below is already collapsed back to the real skill,
+                        // so exporting these handles as container transitions
+                        // would create duplicates such as
+                        // compound_2.Wait.success.
+                        .filter(
+                            (event) =>
+                                !(
+                                    (node.type === "compound" ||
+                                        node.type === "parallelLane") &&
+                                    event?.sourceNodeId &&
+                                    event?.transitionHandleId
+                                )
+                        )
+                        .map((event) => ({
+                            ...event,
+                            target: event.target ? remapNodeId(event.target) : event.target,
+                            assignments: Array.isArray(event.assignments)
+                                ? event.assignments.map(normalizeAssignmentForScxml)
+                                : event.assignments,
+                            assignExpr: event.assignExpr !== undefined
+                                ? normalizeAssignmentExpressionForScxml(event.assignExpr)
+                                : event.assignExpr,
+                        }))
                     : node.data?.events,
             },
         }));
