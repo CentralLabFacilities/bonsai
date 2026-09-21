@@ -7,6 +7,8 @@ import {
     orderNodesParentsFirst,
     resolveNodeCollisionsAndRefit,
 } from "../utils/editorGeometry";
+import { rebuildBoundaryTransitions } from "../utils/boundaryTransitions";
+
 
 export function useContainerCreation({
     nodes,
@@ -564,12 +566,16 @@ export function useContainerCreation({
                 ...updatedNodes,
             ]);
 
-        setNodes(nextNodes);
+        const normalizedGraph = rebuildBoundaryTransitions(
+            nextNodes,
+            [
+                ...updatedEdges,
+                ...internalExitEdges,
+            ]
+        );
 
-        setEdges([
-            ...updatedEdges,
-            ...internalExitEdges,
-        ]);
+        setNodes(normalizedGraph.nodes);
+        setEdges(normalizedGraph.edges);
 
         requestAnimationFrame(() => {
             updateNodeInternals(
@@ -945,8 +951,12 @@ export function useContainerCreation({
         const newRootNodes = [...remainingNodes];
         newRootNodes.splice(insertIndex, 0, parallelNode);
 
-        setNodes([...newRootNodes, ...newLanes, ...movedNodes]);
-        setEdges([...updatedEdges, ...newEdgesToAdd]);
+        const normalizedGraph = rebuildBoundaryTransitions(
+            [...newRootNodes, ...newLanes, ...movedNodes],
+            [...updatedEdges, ...newEdgesToAdd]
+        );
+        setNodes(normalizedGraph.nodes);
+        setEdges(normalizedGraph.edges);
         setSelectedNodeId(parallelId);
         setActiveTab("allgemein");
     };

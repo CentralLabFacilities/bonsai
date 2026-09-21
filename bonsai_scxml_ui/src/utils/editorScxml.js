@@ -339,14 +339,31 @@ export const getExportFullSkillName = (node) => {
 
 export const prepareGraphForScxml = (sourceNodes = [], sourceEdges = []) => {
     // End, Fatal, and identical forwarding-Nop exits may appear multiple times
-    // visually while representing one SCXML state. Their editor node IDs and
-    // editorInstanceIds stay distinct, while export keeps one canonical state.
+    // visually while representing one SCXML state. Normal skill clones are
+    // editor-only aliases as well: they never become SCXML states, but incoming
+    // transitions targeting a clone are remapped to the real skill state.
     const normalizedNodes = ensureSharedEditorInstanceIds(
         (sourceNodes || []).map(normalizeSharedScxmlStateIdentity)
     );
 
+    const nodeById = new Map(
+        normalizedNodes.map((node) => [node.id, node])
+    );
+
+    const skillCloneNodes = normalizedNodes.filter(
+        (node) =>
+            Boolean(node.data?.isSkillClone) &&
+            Boolean(node.data?.cloneOfNodeId) &&
+            nodeById.has(node.data.cloneOfNodeId)
+    );
+    const skillCloneIdSet = new Set(
+        skillCloneNodes.map((node) => node.id)
+    );
+
     const sharedGroups = new Map();
     normalizedNodes.forEach((node) => {
+        if (skillCloneIdSet.has(node.id)) return;
+
         const sharedKey = getSharedScxmlStateKey(node);
         if (!sharedKey) return;
         if (!sharedGroups.has(sharedKey)) sharedGroups.set(sharedKey, []);
@@ -355,6 +372,49 @@ export const prepareGraphForScxml = (sourceNodes = [], sourceEdges = []) => {
 
     const aliasToCanonicalId = new Map();
     const clonePositionsByCanonicalId = new Map();
+
+    // Normal skill clones explicitly point to their real node. Store their
+    // visual positions in metadata on that real state so the aliases survive a
+    // save/reload without becoming executable SCXML states.
+    const skillClonesByOriginalId = new Map();
+    skillCloneNodes.forEach((cloneNode) => {
+        const originalId = cloneNode.data.cloneOfNodeId;
+        aliasToCanonicalId.set(cloneNode.id, originalId);
+        if (!skillClonesByOriginalId.has(originalId)) {
+            skillClonesByOriginalId.set(originalId, []);
+        }
+        skillClonesByOriginalId.get(originalId).push(cloneNode);
+    });
+
+    skillClonesByOriginalId.forEach((clones, originalId) => {
+        const original = nodeById.get(originalId);
+        if (!original) return;
+
+        const originalPosition = getAbsoluteNodePosition(
+            original,
+            normalizedNodes
+        );
+        const positions = [
+            {
+                x: Number(originalPosition.x || 0),
+                y: Number(originalPosition.y || 0),
+                isSkillClone: false,
+            },
+            ...clones.map((cloneNode) => {
+                const absolutePosition = getAbsoluteNodePosition(
+                    cloneNode,
+                    normalizedNodes
+                );
+                return {
+                    x: Number(absolutePosition.x || 0),
+                    y: Number(absolutePosition.y || 0),
+                    isSkillClone: true,
+                };
+            }),
+        ];
+
+        clonePositionsByCanonicalId.set(originalId, positions);
+    });
 
     sharedGroups.forEach((group) => {
         const canonical = group.find((node) => !node.parentId) || group[0];
@@ -384,6 +444,8 @@ export const prepareGraphForScxml = (sourceNodes = [], sourceEdges = []) => {
 
     const exportNodes = normalizedNodes
         .filter((node) => {
+            if (skillCloneIdSet.has(node.id)) return false;
+
             const sharedKey = getSharedScxmlStateKey(node);
             if (!sharedKey) return true;
 
@@ -425,6 +487,43 @@ export const prepareGraphForScxml = (sourceNodes = [], sourceEdges = []) => {
 
     const seenExportEdges = new Set();
     const exportEdges = (sourceEdges || [])
+        // Boundary helper edges are editor-only. The visible external edge
+        // stores the real skill/event in metadata and is collapsed back to the
+        // semantic transition here before SCXML generation.
+        .filter(
+            (edge) =>
+                !edge.data?.boundaryInternalEdge &&
+                !edge.data?.compoundInternalEdge &&
+                !edge.data?.parallelInternalEdge &&
+                !String(edge.id || "").startsWith("edge-internal-")
+        )
+        .map((edge) => {
+            const semanticSource =
+                edge.data?.boundaryOriginalSource ||
+                edge.data?.compoundOriginalSource ||
+                edge.data?.parallelOriginalSource ||
+                edge.source;
+            const semanticSourceHandle =
+                edge.data?.boundaryOriginalSourceHandle ||
+                edge.data?.compoundOriginalSourceHandle ||
+                edge.data?.parallelOriginalSourceHandle ||
+                edge.sourceHandle;
+            const semanticTarget =
+                edge.data?.boundaryOriginalTarget ||
+                edge.data?.compoundOriginalTarget ||
+                edge.data?.parallelOriginalTarget ||
+                edge.target;
+
+            return {
+                ...edge,
+                source: semanticSource,
+                sourceHandle: semanticSourceHandle,
+                target: semanticTarget,
+            };
+        })
+        // Skill clones are inbound-only editor aliases. Even if stale graph
+        // data contains an outgoing clone edge, never let it affect SCXML.
+        .filter((edge) => !skillCloneIdSet.has(edge.source))
         .map((edge) => ({
             ...edge,
             source: remapNodeId(edge.source),

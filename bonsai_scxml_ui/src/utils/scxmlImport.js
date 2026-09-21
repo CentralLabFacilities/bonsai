@@ -7,6 +7,302 @@ import {
     deserializeScxmlValueForEditor,
     deserializeStateDatamodelValueForEditor,
 } from "./valueTypes.js";
+import {
+    COMPOUND_PADDING_X,
+    getCompoundChildrenRight,
+    getCompoundExitGutterWidth,
+    getLaneForNode,
+    isNodeInsideContainer,
+} from "./editorGeometry.js";
+
+const makeImportedSelfLoopControlPoints = () => [
+    { id: `cp-${crypto.randomUUID()}`, anchor: "source", dx: 76, dy: -92 },
+    { id: `cp-${crypto.randomUUID()}`, anchor: "target", dx: -76, dy: -92 },
+];
+
+const getImportedBoundaryLogicalSource = (sourceNode, sourceHandle, allNodes) => {
+    if (!sourceNode || !["compound", "parallelLane"].includes(sourceNode.type)) {
+        return null;
+    }
+
+    const event = (sourceNode.data?.events || []).find(
+        (candidate) => String(candidate?.id || "") === String(sourceHandle || "")
+    );
+    if (!event) return null;
+
+    const rawEvent = String(event.rawEvent || event.name || "").trim();
+    const separatorIndex = rawEvent.lastIndexOf(".");
+    if (separatorIndex <= 0) return null;
+
+    const skillName = rawEvent.slice(0, separatorIndex);
+    const transitionHandleId = rawEvent.slice(separatorIndex + 1) || sourceHandle;
+    const candidates = allNodes.filter((node) => {
+        if (node.type !== "custom" && node.type !== "submachine") return false;
+        const full = String(node.data?.fullSkillName || "");
+        const label = String(node.data?.label || "");
+        const matches =
+            full === skillName ||
+            full.split("#")[0] === skillName ||
+            full.split("#")[0].split(".").pop() === skillName ||
+            label === skillName;
+        if (!matches) return false;
+
+        return sourceNode.type === "parallelLane"
+            ? getLaneForNode(node, allNodes)?.id === sourceNode.id
+            : isNodeInsideContainer(node, sourceNode.id, allNodes);
+    });
+
+    if (candidates.length !== 1) return null;
+    return {
+        logicalSourceNode: candidates[0],
+        logicalHandle: transitionHandleId,
+    };
+};
+
+const getImportedExitedBoundaries = (sourceNode, targetNode, allNodes) => {
+    if (!sourceNode || !targetNode) return [];
+    const byId = new Map(allNodes.map((node) => [node.id, node]));
+    const steps = [];
+    const visited = new Set();
+    const seenParallelIds = new Set();
+    let parentId = sourceNode.parentId;
+
+    const targetIsInside = (container) =>
+        targetNode.id === container.id ||
+        isNodeInsideContainer(targetNode, container.id, allNodes);
+
+    while (parentId && !visited.has(parentId)) {
+        visited.add(parentId);
+        const parent = byId.get(parentId);
+        if (!parent) break;
+
+        if (parent.type === "compound") {
+            if (!targetIsInside(parent)) {
+                steps.push({ kind: "compound", anchor: parent, container: parent });
+            }
+        } else if (parent.type === "parallelLane") {
+            const parallel = byId.get(parent.parentId);
+            if (
+                parallel?.type === "parallel" &&
+                !seenParallelIds.has(parallel.id)
+            ) {
+                seenParallelIds.add(parallel.id);
+                if (!targetIsInside(parallel)) {
+                    steps.push({ kind: "parallel", anchor: parent, container: parallel });
+                }
+            }
+        } else if (parent.type === "parallel") {
+            seenParallelIds.add(parent.id);
+        }
+
+        parentId = parent.parentId;
+    }
+
+    return steps;
+};
+
+const materializeImportedBoundaryTransitions = (allNodes, sourceEdges) => {
+    const semanticEdges = (sourceEdges || []).filter(
+        (edge) => !String(edge.id || "").startsWith("edge-internal-")
+    );
+    const result = [];
+    const boundaryEvents = new Map();
+
+    const ensureBoundaryEvent = (anchor, exitId, label, logicalSourceNode, logicalHandle, targetId) => {
+        if (!boundaryEvents.has(anchor.id)) boundaryEvents.set(anchor.id, new Map());
+        boundaryEvents.get(anchor.id).set(exitId, {
+            id: exitId,
+            name: label,
+            rawEvent: label,
+            target: targetId,
+            sourceNodeId: logicalSourceNode.id,
+            transitionHandleId: logicalHandle,
+        });
+    };
+
+    semanticEdges.forEach((edge) => {
+        const sourceNode = allNodes.find((node) => node.id === edge.source);
+        const targetNode = allNodes.find((node) => node.id === edge.target);
+        if (!sourceNode || !targetNode) {
+            result.push(edge);
+            return;
+        }
+
+        const boundarySource = getImportedBoundaryLogicalSource(
+            sourceNode,
+            edge.sourceHandle,
+            allNodes
+        );
+        const logicalSourceNode = boundarySource?.logicalSourceNode || sourceNode;
+        const logicalHandle = String(
+            boundarySource?.logicalHandle || edge.sourceHandle || edge.label || "success"
+        );
+        const steps = getImportedExitedBoundaries(
+            logicalSourceNode,
+            targetNode,
+            allNodes
+        );
+
+        if (steps.length === 0 && !boundarySource) {
+            result.push(edge);
+            return;
+        }
+
+        const baseName =
+            logicalSourceNode.data?.label ||
+            String(logicalSourceNode.data?.fullSkillName || "state")
+                .split("#")[0]
+                .split(".")
+                .pop();
+        const exitLabel = `${baseName}.${logicalHandle}`;
+        const exitId = `${logicalSourceNode.id}-${logicalHandle}`;
+        let currentSourceId = logicalSourceNode.id;
+        let currentSourceHandle = logicalHandle;
+        const crossedKinds = new Set();
+
+        steps.forEach((step) => {
+            crossedKinds.add(step.kind);
+            ensureBoundaryEvent(
+                step.anchor,
+                exitId,
+                exitLabel,
+                logicalSourceNode,
+                logicalHandle,
+                edge.target
+            );
+            result.push({
+                id:
+                    `edge-internal-boundary-${logicalSourceNode.id}-` +
+                    `${logicalHandle}-${step.anchor.id}-${crypto.randomUUID()}`,
+                source: currentSourceId,
+                target: step.anchor.id,
+                sourceHandle: currentSourceHandle,
+                targetHandle: `target-${exitId}`,
+                type: "smoothstep",
+                selectable: false,
+                focusable: false,
+                style: {
+                    strokeDasharray: "4 4",
+                    stroke: "#0284c7",
+                    strokeWidth: 1.5,
+                },
+                data: {
+                    boundaryInternalEdge: true,
+                    boundaryKind: step.kind,
+                    boundaryExitId: exitId,
+                    boundaryOriginalSource: logicalSourceNode.id,
+                    boundaryOriginalSourceHandle: logicalHandle,
+                    ...(step.kind === "compound"
+                        ? { compoundInternalEdge: true, compoundExitId: exitId }
+                        : { parallelInternalEdge: true, parallelExitId: exitId }),
+                },
+            });
+            currentSourceId = step.anchor.id;
+            currentSourceHandle = exitId;
+        });
+
+        // Imported legacy parallel edges may already start on the lane border.
+        // If no new step was required, keep that border as the visual source
+        // but migrate its handle to the unique skill.event exit point.
+        if (steps.length === 0 && boundarySource) {
+            currentSourceId = sourceNode.id;
+            currentSourceHandle = exitId;
+            ensureBoundaryEvent(
+                sourceNode,
+                exitId,
+                exitLabel,
+                logicalSourceNode,
+                logicalHandle,
+                edge.target
+            );
+            crossedKinds.add(sourceNode.type === "compound" ? "compound" : "parallel");
+            result.push({
+                id:
+                    `edge-internal-boundary-${logicalSourceNode.id}-` +
+                    `${logicalHandle}-${sourceNode.id}-${crypto.randomUUID()}`,
+                source: logicalSourceNode.id,
+                target: sourceNode.id,
+                sourceHandle: logicalHandle,
+                targetHandle: `target-${exitId}`,
+                type: "smoothstep",
+                selectable: false,
+                focusable: false,
+                style: {
+                    strokeDasharray: "4 4",
+                    stroke: "#0284c7",
+                    strokeWidth: 1.5,
+                },
+                data: {
+                    boundaryInternalEdge: true,
+                    boundaryKind: sourceNode.type === "compound" ? "compound" : "parallel",
+                    boundaryExitId: exitId,
+                    boundaryOriginalSource: logicalSourceNode.id,
+                    boundaryOriginalSourceHandle: logicalHandle,
+                    ...(sourceNode.type === "compound"
+                        ? { compoundInternalEdge: true, compoundExitId: exitId }
+                        : { parallelInternalEdge: true, parallelExitId: exitId }),
+                },
+            });
+        }
+
+        result.push({
+            ...edge,
+            source: currentSourceId,
+            sourceHandle: currentSourceHandle,
+            type: "smartTransition",
+            label: logicalHandle,
+            data: {
+                ...(edge.data || {}),
+                boundaryOriginalSource: logicalSourceNode.id,
+                boundaryOriginalSourceHandle: logicalHandle,
+                boundaryExitId: exitId,
+                ...(crossedKinds.has("compound") || sourceNode.type === "compound"
+                    ? {
+                        compoundOriginalSource: logicalSourceNode.id,
+                        compoundOriginalSourceHandle: logicalHandle,
+                        compoundExitId: exitId,
+                    }
+                    : {}),
+                ...(crossedKinds.has("parallel") || sourceNode.type === "parallelLane"
+                    ? {
+                        parallelOriginalSource: logicalSourceNode.id,
+                        parallelOriginalSourceHandle: logicalHandle,
+                        parallelExitId: exitId,
+                    }
+                    : {}),
+            },
+        });
+    });
+
+    boundaryEvents.forEach((eventsById, anchorId) => {
+        const anchor = allNodes.find((node) => node.id === anchorId);
+        if (!anchor) return;
+        const replacementIds = new Set(eventsById.keys());
+        const replacementRawEvents = new Set(
+            [...eventsById.values()].map((event) => event.rawEvent)
+        );
+        const existing = (anchor.data?.events || []).filter((event) => {
+            if (String(event?.id || "") === "compound-entry") return false;
+            if (replacementIds.has(String(event?.id || ""))) return false;
+            return !replacementRawEvents.has(String(event?.rawEvent || event?.name || ""));
+        });
+        const nextEvents = [...existing, ...eventsById.values()];
+        anchor.data = { ...(anchor.data || {}), events: nextEvents };
+
+        if (anchor.type === "compound") {
+            const requiredWidth =
+                getCompoundChildrenRight(anchor.id, allNodes) +
+                COMPOUND_PADDING_X +
+                getCompoundExitGutterWidth(nextEvents);
+            anchor.style = {
+                ...(anchor.style || {}),
+                width: Math.max(Number(anchor.style?.width) || 320, requiredWidth),
+            };
+        }
+    });
+
+    return result;
+};
 
 const getSkillPackageName = (fullSkillName) => {
     let baseName = String(fullSkillName || "").split("#")[0];
@@ -69,6 +365,9 @@ const parseEditorPositions = (stateElem) => {
             y: parseFloat(positionElement.getAttribute("y")),
             instanceId:
                 positionElement.getAttribute("instance")?.trim() || "",
+            isSkillClone:
+                positionElement.getAttribute("clone")?.trim().toLowerCase() ===
+                "skill",
         }))
         .filter(
             (position) =>
@@ -489,6 +788,35 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
     const rawTransitions = [];
     let hasCustomPositions = true;
 
+    const appendImportedSkillClones = (stateElement, nodeData, sourceNodeId) => {
+        parseEditorPositions(stateElement)
+            .filter((position) => position.isSkillClone)
+            .forEach((clonePosition) => {
+                newNodes.push({
+                    id: getNodeId(),
+                    position: {
+                        x: clonePosition.x,
+                        y: clonePosition.y,
+                    },
+                    type: "custom",
+                    data: {
+                        label: nodeData.label,
+                        fullSkillName: nodeData.fullSkillName,
+                        isSkillClone: true,
+                        cloneOfNodeId: sourceNodeId,
+                        isInitial: false,
+                        isFinal: false,
+                        events: [],
+                        inSlots: [],
+                        outSlots: [],
+                        params: [],
+                        onEntry: [],
+                        onExit: [],
+                    },
+                });
+            });
+    };
+
     for (const stateElem of directChildren) {
         const fullSkillName = stateElem.getAttribute("id");
         if (!fullSkillName) continue;
@@ -505,8 +833,11 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
         // forwarding Nop exits) may store multiple positions for one SCXML
         // state. Normal states continue to use the first position.
         const editorPositions = parseEditorPositions(stateElem);
-        let x = editorPositions[0]?.x ?? null;
-        let y = editorPositions[0]?.y ?? null;
+        const primaryEditorPosition =
+            editorPositions.find((position) => !position.isSkillClone) ||
+            editorPositions[0];
+        let x = primaryEditorPosition?.x ?? null;
+        let y = primaryEditorPosition?.y ?? null;
 
         if (x === null || !Number.isFinite(x) || y === null || !Number.isFinite(y)) {
             hasCustomPositions = false;
@@ -704,6 +1035,7 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                             type: "custom",
                             data: nodeData,
                         });
+                        appendImportedSkillClones(stElem, nodeData, stNodeId);
                     }
                 }
                 // FALL A2: Lane ist ein einfacher State (z.B. Wait)
@@ -744,6 +1076,7 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                         type: "custom",
                         data: nodeData,
                     });
+                    appendImportedSkillClones(branchElem, nodeData, stNodeId);
 
                     // Verbindung von Wait zum Lane-Rand herstellen (nur 1x)
                     laneEvents.forEach((levt) => {
@@ -882,6 +1215,7 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                     type: "custom",
                     data: nodeData,
                 });
+                appendImportedSkillClones(csElem, nodeData, csNodeId);
             }
             continue;
         }
@@ -968,6 +1302,13 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                 type: srcAttr ? "submachine" : "custom",
                 data: nodeData,
             });
+
+            // Normal skill clones are stored only as editor metadata. They are
+            // visual inbound aliases of the real state and therefore do not
+            // get their own SCXML state or outgoing transition data.
+            if (!srcAttr) {
+                appendImportedSkillClones(stateElem, nodeData, nodeId);
+            }
         }
     }
 
@@ -1084,6 +1425,9 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             markerEnd: { type: MarkerType.ArrowClosed },
             data: {
                 cond: trans.cond || "",
+                ...(sourceNode.id === targetNode.id
+                    ? { controlPoints: makeImportedSelfLoopControlPoints() }
+                    : {}),
                 assignments: Array.isArray(trans.assignments)
                     ? trans.assignments.map((assignment) => ({
                         location: assignment.location,
@@ -1145,14 +1489,18 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
         }
     });
 
-    // 5. Automatisches Dagre-Layouting (Dagre nutzt exakt berechnete Maße)
+    // Recreate visual Compound/Parallel boundary exit points from the
+    // semantic SCXML transitions. The helper edges remain editor-only and are
+    // collapsed again by prepareGraphForScxml on save.
     let finalNodes = newNodes;
-    let finalEdges = newEdges;
+    let finalEdges = materializeImportedBoundaryTransitions(newNodes, newEdges);
+
+    // 5. Automatisches Dagre-Layouting (Dagre nutzt exakt berechnete Maße)
 
     if (!hasCustomPositions && newNodes.length > 0) {
         const topLevelNodes = newNodes.filter((n) => !n.parentId);
 
-        const topLevelEdgesForDagre = newEdges
+        const topLevelEdgesForDagre = finalEdges
             .map((edge) => {
                 const sourceNode = newNodes.find((n) => n.id === edge.source);
                 const targetNode = newNodes.find((n) => n.id === edge.target);

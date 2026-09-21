@@ -15,12 +15,14 @@ import {
     getDirectCompoundForNode,
     getLaneForNode,
     getTransitionTargetHandleForNode,
+    isNodeInsideContainer,
     isCompoundInitialChildCandidate,
 } from "../utils/editorGeometry";
 import {
     getSkillPackageName,
     getStoredTransitionAssignments,
 } from "../utils/editorScxml";
+import { rebuildBoundaryTransitions } from "../utils/boundaryTransitions";
 
 const getSemanticTransitionTarget = (targetNode, allNodes = []) => {
     if (!targetNode?.data?.isSkillClone) return targetNode;
@@ -38,6 +40,113 @@ const canTargetVisualNode = (sourceNode, targetNode, allNodes = []) =>
         getSemanticTransitionTarget(targetNode, allNodes),
         allNodes
     );
+
+const getBoundarySourceEvent = (sourceNode, sourceHandle, allNodes = []) => {
+    if (!sourceNode || !["compound", "parallelLane"].includes(sourceNode.type)) {
+        return null;
+    }
+
+    const event = (sourceNode.data?.events || []).find(
+        (candidate) => String(candidate?.id || "") === String(sourceHandle || "")
+    );
+    if (!event) return null;
+
+    let sourceNodeId = event.sourceNodeId || null;
+    let transitionHandleId = event.transitionHandleId || null;
+
+    // Older parallel exit metadata only stored rawEvent="Skill.event". Resolve
+    // that format once so drawing onward from an existing border point still
+    // preserves the real skill event.
+    if (!sourceNodeId) {
+        const rawEvent = String(event.rawEvent || event.name || "").trim();
+        const separatorIndex = rawEvent.lastIndexOf(".");
+        if (separatorIndex > 0) {
+            const skillName = rawEvent.slice(0, separatorIndex);
+            transitionHandleId = transitionHandleId || rawEvent.slice(separatorIndex + 1);
+            const candidates = allNodes.filter((node) => {
+                if (node.type !== "custom" && node.type !== "submachine") return false;
+                const full = String(node.data?.fullSkillName || "");
+                const label = String(node.data?.label || "");
+                const matchesName =
+                    full === skillName ||
+                    full.split("#")[0] === skillName ||
+                    label === skillName;
+                if (!matchesName) return false;
+                if (sourceNode.type === "parallelLane") {
+                    return getLaneForNode(node, allNodes)?.id === sourceNode.id;
+                }
+                return isNodeInsideContainer(node, sourceNode.id, allNodes);
+            });
+            if (candidates.length === 1) sourceNodeId = candidates[0].id;
+        }
+    }
+
+    const logicalSourceNode = allNodes.find((node) => node.id === sourceNodeId);
+    if (!logicalSourceNode) return null;
+
+    return {
+        event,
+        logicalSourceNode,
+        logicalSourceId: logicalSourceNode.id,
+        logicalHandle: transitionHandleId || sourceHandle || "success",
+    };
+};
+
+const getExitedBoundarySteps = (sourceNode, targetNode, allNodes = []) => {
+    if (!sourceNode || !targetNode) return [];
+    const byId = new Map(allNodes.map((node) => [node.id, node]));
+    const steps = [];
+    const seenParallelIds = new Set();
+    const visited = new Set();
+    let parentId = sourceNode.parentId;
+
+    const targetIsInside = (container) =>
+        targetNode.id === container.id ||
+        isNodeInsideContainer(targetNode, container.id, allNodes);
+
+    while (parentId && !visited.has(parentId)) {
+        visited.add(parentId);
+        const parent = byId.get(parentId);
+        if (!parent) break;
+
+        if (parent.type === "compound") {
+            if (!targetIsInside(parent)) {
+                steps.push({ kind: "compound", anchor: parent, container: parent });
+            }
+        } else if (parent.type === "parallelLane") {
+            const parallel = byId.get(parent.parentId);
+            if (
+                parallel?.type === "parallel" &&
+                !seenParallelIds.has(parallel.id)
+            ) {
+                seenParallelIds.add(parallel.id);
+                if (!targetIsInside(parallel)) {
+                    steps.push({ kind: "parallel", anchor: parent, container: parallel });
+                }
+            }
+        } else if (parent.type === "parallel") {
+            seenParallelIds.add(parent.id);
+        }
+
+        parentId = parent.parentId;
+    }
+
+    return steps;
+};
+
+const getLogicalEdgeSourceId = (edge) =>
+    edge?.data?.boundaryOriginalSource ||
+    edge?.data?.compoundOriginalSource ||
+    edge?.data?.parallelOriginalSource ||
+    edge?.source;
+
+const getLogicalEdgeSourceHandle = (edge) =>
+    edge?.data?.boundaryOriginalSourceHandle ||
+    edge?.data?.compoundOriginalSourceHandle ||
+    edge?.data?.parallelOriginalSourceHandle ||
+    edge?.sourceHandle ||
+    edge?.label ||
+    "success";
 
 const makeSelfLoopControlPoints = () => [
     {
@@ -86,7 +195,13 @@ export function useTransitionGraph({
         if (!sourceNode) return;
 
         const currentEdges = customEdges || edges;
-        const outgoingEdges = currentEdges.filter((edge) => edge.source === sourceId);
+        const outgoingEdges = currentEdges.filter(
+            (edge) =>
+                !edge.data?.boundaryInternalEdge &&
+                !edge.data?.compoundInternalEdge &&
+                !edge.data?.parallelInternalEdge &&
+                getLogicalEdgeSourceId(edge) === sourceId
+        );
         const sourceEvents = sourceNode.data.events || [];
 
         // Edges preserve the SCXML transition order, so they are the primary
@@ -94,12 +209,12 @@ export function useTransitionGraph({
         const transitions = outgoingEdges.map((edge) => {
             const matchingEvent = sourceEvents.find(
                 (event) =>
-                    event.id === edge.sourceHandle &&
+                    event.id === getLogicalEdgeSourceHandle(edge) &&
                     event.target === edge.target &&
                     String(event.cond || "") === String(edge.data?.cond || "")
             ) || sourceEvents.find(
                 (event) =>
-                    event.id === edge.sourceHandle &&
+                    event.id === getLogicalEdgeSourceHandle(edge) &&
                     event.target === edge.target
             );
 
@@ -108,7 +223,7 @@ export function useTransitionGraph({
             return {
                 transitionId: edge.id,
                 edgeId: edge.id,
-                event: edge.sourceHandle || matchingEvent?.id || edge.label || "success",
+                event: getLogicalEdgeSourceHandle(edge) || matchingEvent?.id || "success",
                 target: edge.target,
                 targetLabel:
                     targetNode?.data?.label ||
@@ -319,11 +434,20 @@ export function useTransitionGraph({
             (node) => node.id === connection.target
         );
 
+        const boundarySource = getBoundarySourceEvent(
+            sourceNode,
+            connection.sourceHandle,
+            nodes
+        );
+        const semanticSourceNode =
+            boundarySource?.logicalSourceNode || sourceNode;
+
         if (
             !sourceNode ||
+            !semanticSourceNode ||
             !targetNode ||
-            sourceNode.data?.isSkillClone ||
-            !canTargetVisualNode(sourceNode, targetNode, nodes)
+            semanticSourceNode.data?.isSkillClone ||
+            !canTargetVisualNode(semanticSourceNode, targetNode, nodes)
         ) {
             return false;
         }
@@ -670,6 +794,280 @@ export function useTransitionGraph({
                 targetNode,
                 nodes
             );
+
+            const boundarySource = getBoundarySourceEvent(
+                sourceNode,
+                params.sourceHandle,
+                nodes
+            );
+            const logicalSourceNode =
+                boundarySource?.logicalSourceNode || sourceNode;
+            const logicalSourceId = logicalSourceNode.id;
+            const logicalSourceHandle = String(
+                boundarySource?.logicalHandle ||
+                params.sourceHandle ||
+                "success"
+            );
+
+            const exitedBoundarySteps = getExitedBoundarySteps(
+                logicalSourceNode,
+                semanticTargetNode,
+                nodes
+            );
+            const currentBoundaryIndex = boundarySource
+                ? exitedBoundarySteps.findIndex(
+                    (step) => step.anchor.id === sourceNode.id
+                )
+                : -1;
+            const boundaryStepsToCreate =
+                currentBoundaryIndex >= 0
+                    ? exitedBoundarySteps.slice(currentBoundaryIndex + 1)
+                    : exitedBoundarySteps;
+
+            const logicalDuplicate = edges.some((edge) =>
+                !edge.data?.boundaryInternalEdge &&
+                !edge.data?.compoundInternalEdge &&
+                !edge.data?.parallelInternalEdge &&
+                getLogicalEdgeSourceId(edge) === logicalSourceId &&
+                String(getLogicalEdgeSourceHandle(edge)) === logicalSourceHandle &&
+                edge.target === params.target
+            );
+
+            if (logicalDuplicate) {
+                openConditionDrawer(
+                    logicalSourceId,
+                    logicalSourceHandle,
+                    params.target
+                );
+                return;
+            }
+
+            // Any transition that crosses a Compound/Parallel boundary is
+            // represented as a chain of display-only helper edges. The final
+            // external edge keeps the original skill + exit token in metadata,
+            // so drawing onward from a border point preserves skill.event.
+            if (boundarySource || boundaryStepsToCreate.length > 0) {
+                const baseName =
+                    logicalSourceNode.data?.label ||
+                    String(logicalSourceNode.data?.fullSkillName || "state")
+                        .split("#")[0]
+                        .split(".")
+                        .pop();
+                const exitLabel = `${baseName}.${logicalSourceHandle}`;
+                const sharedExitId = String(
+                    boundarySource?.event?.id ||
+                    `${logicalSourceId}-${logicalSourceHandle}`
+                );
+
+                let currentVisualSourceId = sourceNode.id;
+                let currentVisualSourceHandle =
+                    params.sourceHandle || logicalSourceHandle;
+                const helperEdges = [];
+                const anchorUpdates = new Map();
+                const crossedKinds = new Set();
+
+                boundaryStepsToCreate.forEach((step) => {
+                    crossedKinds.add(step.kind);
+                    const exitId = sharedExitId;
+
+                    helperEdges.push({
+                        id:
+                            `edge-internal-boundary-${logicalSourceId}-` +
+                            `${logicalSourceHandle}-${step.anchor.id}-${crypto.randomUUID()}`,
+                        source: currentVisualSourceId,
+                        target: step.anchor.id,
+                        sourceHandle: currentVisualSourceHandle,
+                        targetHandle: `target-${exitId}`,
+                        type: "smoothstep",
+                        selectable: false,
+                        focusable: false,
+                        style: {
+                            strokeDasharray: "4 4",
+                            stroke: "#0284c7",
+                            strokeWidth: 1.5,
+                        },
+                        data: {
+                            boundaryInternalEdge: true,
+                            boundaryKind: step.kind,
+                            boundaryExitId: exitId,
+                            boundaryOriginalSource: logicalSourceId,
+                            boundaryOriginalSourceHandle: logicalSourceHandle,
+                            ...(step.kind === "compound"
+                                ? {
+                                    compoundInternalEdge: true,
+                                    compoundExitId: exitId,
+                                }
+                                : {
+                                    parallelInternalEdge: true,
+                                    parallelExitId: exitId,
+                                }),
+                        },
+                    });
+
+                    anchorUpdates.set(step.anchor.id, {
+                        kind: step.kind,
+                        exitId,
+                    });
+                    currentVisualSourceId = step.anchor.id;
+                    currentVisualSourceHandle = exitId;
+                });
+
+                // If the drag started from an already existing border point,
+                // preserve which kinds of boundary have already been crossed.
+                exitedBoundarySteps
+                    .slice(0, Math.max(0, currentBoundaryIndex + 1))
+                    .forEach((step) => crossedKinds.add(step.kind));
+
+                const externalEdge = {
+                    id:
+                        `edge-${logicalSourceId}-${logicalSourceHandle}-` +
+                        `${params.target}-${crypto.randomUUID()}`,
+                    source: currentVisualSourceId,
+                    target: params.target,
+                    sourceHandle: currentVisualSourceHandle,
+                    targetHandle: params.targetHandle,
+                    label: logicalSourceHandle,
+                    type: "smartTransition",
+                    markerEnd: { type: MarkerType.ArrowClosed },
+                    data: {
+                        cond: "",
+                        assignments: [],
+                        assign: null,
+                        boundaryOriginalSource: logicalSourceId,
+                        boundaryOriginalSourceHandle: logicalSourceHandle,
+                        boundaryExitId: sharedExitId,
+                        ...(crossedKinds.has("compound") || sourceNode.type === "compound"
+                            ? {
+                                compoundOriginalSource: logicalSourceId,
+                                compoundOriginalSourceHandle: logicalSourceHandle,
+                                compoundExitId: sharedExitId,
+                            }
+                            : {}),
+                        ...(crossedKinds.has("parallel") || sourceNode.type === "parallelLane"
+                            ? {
+                                parallelOriginalSource: logicalSourceId,
+                                parallelOriginalSourceHandle: logicalSourceHandle,
+                                parallelExitId: sharedExitId,
+                            }
+                            : {}),
+                    },
+                };
+
+                const nextEdges = [...edges, externalEdge, ...helperEdges];
+                setEdges(nextEdges);
+
+                setNodes((currentNodes) => {
+                    const childRightByCompound = new Map();
+                    return currentNodes.map((node) => {
+                        if (node.id === logicalSourceId) {
+                            const events = node.data?.events || [];
+                            if (events.some((event) => String(event.id) === logicalSourceHandle)) {
+                                return node;
+                            }
+                            return {
+                                ...node,
+                                data: {
+                                    ...node.data,
+                                    events: [
+                                        ...events,
+                                        {
+                                            id: logicalSourceHandle,
+                                            selectedPackage: getSkillPackageName(
+                                                targetNode?.data?.fullSkillName
+                                            ),
+                                            selectedSkill:
+                                                targetNode?.data?.fullSkillName?.split("#")[0] || "",
+                                            target: params.target,
+                                            cond: "",
+                                            assignments: [],
+                                            assignLocation: "",
+                                            assignExpr: "",
+                                        },
+                                    ],
+                                },
+                            };
+                        }
+
+                        const update = anchorUpdates.get(node.id);
+                        if (!update) return node;
+
+                        const currentEvents = (node.data?.events || []).filter(
+                            (event) => String(event?.id || "") !== "compound-entry"
+                        );
+                        const existingIndex = currentEvents.findIndex(
+                            (event) => String(event.id) === String(update.exitId)
+                        );
+                        const boundaryEvent = {
+                            ...(existingIndex >= 0 ? currentEvents[existingIndex] : {}),
+                            id: update.exitId,
+                            name: exitLabel,
+                            rawEvent: exitLabel,
+                            target: params.target,
+                            sourceNodeId: logicalSourceId,
+                            transitionHandleId: logicalSourceHandle,
+                        };
+                        const nextEvents = existingIndex >= 0
+                            ? currentEvents.map((event, index) =>
+                                index === existingIndex ? boundaryEvent : event
+                            )
+                            : [...currentEvents, boundaryEvent];
+
+                        if (node.type !== "compound") {
+                            return {
+                                ...node,
+                                data: { ...node.data, events: nextEvents },
+                            };
+                        }
+
+                        let childRight = childRightByCompound.get(node.id);
+                        if (childRight === undefined) {
+                            childRight = getCompoundChildrenRight(
+                                node.id,
+                                currentNodes
+                            );
+                            childRightByCompound.set(node.id, childRight);
+                        }
+                        const requiredWidth =
+                            childRight +
+                            COMPOUND_PADDING_X +
+                            getCompoundExitGutterWidth(nextEvents);
+
+                        return {
+                            ...node,
+                            style: {
+                                ...node.style,
+                                width: Math.max(
+                                    Number(node.style?.width) || 320,
+                                    requiredWidth
+                                ),
+                            },
+                            data: { ...node.data, events: nextEvents },
+                        };
+                    });
+                });
+
+                requestAnimationFrame(() => {
+                    anchorUpdates.forEach((_, nodeId) =>
+                        updateNodeInternals(nodeId)
+                    );
+                });
+
+                const outgoingFromHandle = nextEdges.filter(
+                    (edge) =>
+                        !edge.data?.boundaryInternalEdge &&
+                        getLogicalEdgeSourceId(edge) === logicalSourceId &&
+                        String(getLogicalEdgeSourceHandle(edge)) === logicalSourceHandle
+                );
+                if (outgoingFromHandle.length >= 2) {
+                    openConditionDrawer(
+                        logicalSourceId,
+                        logicalSourceHandle,
+                        params.target,
+                        nextEdges
+                    );
+                }
+                return;
+            }
 
             // Container/lane semantics follow the real target. A skill clone
             // is only a visual endpoint and must not make a transition appear
@@ -1326,7 +1724,11 @@ export function useTransitionGraph({
     const onEdgeDoubleClick = useCallback(
         (event, edge) => {
             selectTransitionEdge(edge.id);
-            openConditionDrawer(edge.source, edge.sourceHandle, edge.target);
+            openConditionDrawer(
+                getLogicalEdgeSourceId(edge),
+                getLogicalEdgeSourceHandle(edge),
+                edge.target
+            );
         },
         [edges, nodes, selectTransitionEdge]
     );
@@ -1354,59 +1756,137 @@ export function useTransitionGraph({
         if (!sourceNode) return;
 
         const validUpdatedTransitions = updatedTransitions.filter((transition) => {
-            const targetNode = nodes.find(
-                (node) => node.id === transition.target
-            );
-
+            const targetNode = nodes.find((node) => node.id === transition.target);
             return Boolean(
-                targetNode &&
-                canTargetVisualNode(sourceNode, targetNode, nodes)
+                targetNode && canTargetVisualNode(sourceNode, targetNode, nodes)
             );
         });
 
-        // Rebuild this state's edges in exactly the order selected in step 1.
-        setEdges((currentEdges) => {
-            const untouchedEdges = currentEdges.filter(
-                (edge) => edge.source !== sourceId
+        const existingById = new Map(edges.map((edge) => [edge.id, edge]));
+        const untouchedEdges = edges.filter(
+            (edge) => getLogicalEdgeSourceId(edge) !== sourceId
+        );
+
+        const semanticEdges = validUpdatedTransitions.map((transition) => {
+            const existing = transition.edgeId
+                ? existingById.get(transition.edgeId)
+                : null;
+            const eventId = transition.event || "success";
+            const hasCondition = Boolean(
+                transition.cond && transition.cond.trim()
             );
-            const existingById = new Map(
-                currentEdges.map((edge) => [edge.id, edge])
-            );
+            const cleanedExisting = existing
+                ? clearTransientTransitionHighlight(existing)
+                : null;
+            const existingData = { ...(cleanedExisting?.data || {}) };
 
-            const rebuiltEdges = validUpdatedTransitions.map((transition) => {
-                const existing = transition.edgeId
-                    ? existingById.get(transition.edgeId)
-                    : null;
-                const eventId = transition.event || "success";
-                const hasCondition = Boolean(
-                    transition.cond && transition.cond.trim()
-                );
+            // Boundary helper metadata describes the visual representation,
+            // not the semantic SCXML transition. Rebuild it from the edited
+            // source/target below so changing a transition cannot leave stale
+            // border points behind.
+            [
+                "boundaryInternalEdge",
+                "boundaryOriginalSource",
+                "boundaryOriginalSourceHandle",
+                "compoundInternalEdge",
+                "compoundOriginalSource",
+                "compoundOriginalSourceHandle",
+                "compoundOriginalTarget",
+                "parallelInternalEdge",
+                "parallelOriginalSource",
+                "parallelOriginalSourceHandle",
+                "parallelOriginalTarget",
+            ].forEach((key) => delete existingData[key]);
 
-                const cleanedExisting = existing
-                    ? clearTransientTransitionHighlight(existing)
-                    : null;
+            return {
+                ...(cleanedExisting || {}),
+                id:
+                    cleanedExisting?.id ||
+                    `edge-${sourceId}-${eventId}-${transition.target}-${crypto.randomUUID()}`,
+                source: sourceId,
+                target: transition.target,
+                sourceHandle: eventId,
+                targetHandle: getTransitionTargetHandleForNode(
+                    nodes.find((node) => node.id === transition.target)
+                ),
+                type: "smartTransition",
+                selected: false,
+                label: hasCondition
+                    ? `${eventId} [${transition.cond}]`
+                    : eventId,
+                markerEnd:
+                    cleanedExisting?.markerEnd || { type: MarkerType.ArrowClosed },
+                data: {
+                    ...existingData,
+                    cond: transition.cond || "",
+                    assignments: Array.isArray(transition.assignments)
+                        ? transition.assignments.map((assignment) => ({
+                            location: assignment.location,
+                            expr: assignment.expr,
+                        }))
+                        : [],
+                    assign: transition.assignments?.[0]
+                        ? {
+                            location: transition.assignments[0].location,
+                            expr: transition.assignments[0].expr,
+                        }
+                        : null,
+                    controlPoints:
+                        sourceId === transition.target
+                            ? (
+                                Array.isArray(existingData.controlPoints) &&
+                                existingData.controlPoints.length >= 2
+                                    ? existingData.controlPoints
+                                    : makeSelfLoopControlPoints()
+                            )
+                            : existingData.controlPoints,
+                },
+            };
+        });
 
-                return {
-                    ...(cleanedExisting || {}),
-                    id:
-                        cleanedExisting?.id ||
-                        `edge-${sourceId}-${eventId}-${transition.target}-${crypto.randomUUID()}`,
-                    source: sourceId,
-                    target: transition.target,
-                    sourceHandle: eventId,
-                    targetHandle:
-                        getTransitionTargetHandleForNode(
-                            nodes.find((node) => node.id === transition.target)
+        const semanticNodes = nodes.map((node) => {
+            if (node.id !== sourceId) return node;
+
+            const originalEvents = node.data.events || [];
+            const baseEventById = new Map();
+            originalEvents.forEach((event) => {
+                if (!event?.id || baseEventById.has(event.id)) return;
+                baseEventById.set(event.id, {
+                    ...event,
+                    target: null,
+                    cond: "",
+                    assignments: [],
+                    assignLocation: "",
+                    assignExpr: "",
+                    selectedPackage: "",
+                    selectedSkill: "",
+                });
+            });
+
+            const usedEventIds = new Set();
+            const orderedTransitionEvents = validUpdatedTransitions.map(
+                (transition) => {
+                    const eventId = transition.event || "success";
+                    usedEventIds.add(eventId);
+                    const baseEvent = baseEventById.get(eventId) || {
+                        id: eventId,
+                        description: "",
+                    };
+                    const targetNode = nodes.find(
+                        (candidate) => candidate.id === transition.target
+                    );
+
+                    return {
+                        ...baseEvent,
+                        id: eventId,
+                        selectedPackage: getSkillPackageName(
+                            targetNode?.data?.fullSkillName
                         ),
-                    type: "smartTransition",
-                    selected: false,
-                    label: hasCondition
-                        ? `${eventId} [${transition.cond}]`
-                        : eventId,
-                    markerEnd:
-                        cleanedExisting?.markerEnd || { type: MarkerType.ArrowClosed },
-                    data: {
-                        ...(cleanedExisting?.data || {}),
+                        selectedSkill:
+                            targetNode?.data?.fullSkillName?.split("#")[0] ||
+                            targetNode?.data?.label ||
+                            "",
+                        target: transition.target,
                         cond: transition.cond || "",
                         assignments: Array.isArray(transition.assignments)
                             ? transition.assignments.map((assignment) => ({
@@ -1414,104 +1894,37 @@ export function useTransitionGraph({
                                 expr: assignment.expr,
                             }))
                             : [],
-                        // Keep the first assignment in the legacy field for
-                        // compatibility with older saved UI state.
-                        assign: transition.assignments?.[0]
-                            ? {
-                                location: transition.assignments[0].location,
-                                expr: transition.assignments[0].expr,
-                            }
-                            : null,
-                        controlPoints:
-                            sourceId === transition.target
-                                ? (
-                                    Array.isArray(cleanedExisting?.data?.controlPoints) &&
-                                    cleanedExisting.data.controlPoints.length >= 2
-                                        ? cleanedExisting.data.controlPoints
-                                        : makeSelfLoopControlPoints()
-                                )
-                                : cleanedExisting?.data?.controlPoints,
-                    },
-                };
-            });
+                        assignLocation:
+                            transition.assignments?.[0]?.location || "",
+                        assignExpr: transition.assignments?.[0]?.expr || "",
+                    };
+                }
+            );
 
-            return [...untouchedEdges, ...rebuiltEdges];
+            const unusedEvents = [...baseEventById.entries()]
+                .filter(([eventId]) => !usedEventIds.has(eventId))
+                .map(([, event]) => event);
+
+            return {
+                ...node,
+                data: {
+                    ...node.data,
+                    events: [...orderedTransitionEvents, ...unusedEvents],
+                },
+            };
         });
 
-        setNodes((currentNodes) =>
-            currentNodes.map((node) => {
-                if (node.id !== sourceId) return node;
-
-                const originalEvents = node.data.events || [];
-                const baseEventById = new Map();
-
-                originalEvents.forEach((event) => {
-                    if (!event?.id || baseEventById.has(event.id)) return;
-                    baseEventById.set(event.id, {
-                        ...event,
-                        target: null,
-                        cond: "",
-                        assignments: [],
-                        assignLocation: "",
-                        assignExpr: "",
-                        selectedPackage: "",
-                        selectedSkill: "",
-                    });
-                });
-
-                const usedEventIds = new Set();
-                const orderedTransitionEvents = validUpdatedTransitions.map(
-                    (transition) => {
-                        usedEventIds.add(transition.event);
-                        const baseEvent = baseEventById.get(transition.event) || {
-                            id: transition.event,
-                            description: "",
-                        };
-                        const targetNode = currentNodes.find(
-                            (candidate) => candidate.id === transition.target
-                        );
-
-                        return {
-                            ...baseEvent,
-                            id: transition.event,
-                            selectedPackage: getSkillPackageName(
-                                targetNode?.data?.fullSkillName
-                            ),
-                            selectedSkill:
-                                targetNode?.data?.fullSkillName?.split("#")[0] ||
-                                targetNode?.data?.label ||
-                                "",
-                            target: transition.target,
-                            cond: transition.cond || "",
-                            assignments: Array.isArray(transition.assignments)
-                                ? transition.assignments.map((assignment) => ({
-                                    location: assignment.location,
-                                    expr: assignment.expr,
-                                }))
-                                : [],
-                            assignLocation:
-                                transition.assignments?.[0]?.location || "",
-                            assignExpr:
-                                transition.assignments?.[0]?.expr || "",
-                        };
-                    }
-                );
-
-                // Exit tokens without a transition must stay available as handles
-                // and as choices for creating a new transition later.
-                const unusedEvents = [...baseEventById.entries()]
-                    .filter(([eventId]) => !usedEventIds.has(eventId))
-                    .map(([, event]) => event);
-
-                return {
-                    ...node,
-                    data: {
-                        ...node.data,
-                        events: [...orderedTransitionEvents, ...unusedEvents],
-                    },
-                };
-            })
+        const normalized = rebuildBoundaryTransitions(
+            semanticNodes,
+            [...untouchedEdges, ...semanticEdges]
         );
+        setNodes(normalized.nodes);
+        setEdges(normalized.edges);
+        normalized.nodes.forEach((node) => {
+            if (["compound", "parallelLane"].includes(node.type)) {
+                requestAnimationFrame(() => updateNodeInternals(node.id));
+            }
+        });
 
         setDrawerData((previous) => ({ ...previous, isOpen: false }));
     };
@@ -1533,43 +1946,32 @@ export function useTransitionGraph({
         const targetNode = nodes.find((node) => node.id === targetNodeId);
         if (
             !targetNode ||
-            !canTargetVisualNode(
-                selectedNode,
-                targetNode,
-                nodes
-            )
+            !canTargetVisualNode(selectedNode, targetNode, nodes)
         ) {
             return;
         }
 
-        setEdges((currentEdges) => {
-            const withoutPreviousDirectTarget = currentEdges.filter((edge) => {
-                if (
-                    edge.source !== selectedNode.id ||
-                    edge.sourceHandle !== event.id
-                ) {
-                    return true;
-                }
+        const withoutPreviousTarget = edges.filter((edge) => {
+            if (edge.data?.boundaryInternalEdge) return true;
+            const sameSource = getLogicalEdgeSourceId(edge) === selectedNode.id;
+            const sameEvent = String(getLogicalEdgeSourceHandle(edge)) === String(event.id);
+            if (!sameSource || !sameEvent) return true;
+            if (!event.target) return true;
+            return edge.target !== event.target;
+        });
 
-                if (!event.target) {
-                    return true;
-                }
+        const alreadyExists = withoutPreviousTarget.some(
+            (edge) =>
+                !edge.data?.boundaryInternalEdge &&
+                getLogicalEdgeSourceId(edge) === selectedNode.id &&
+                String(getLogicalEdgeSourceHandle(edge)) === String(event.id) &&
+                edge.target === targetNodeId
+        );
 
-                return edge.target !== event.target;
-            });
-
-            const alreadyExists = withoutPreviousDirectTarget.some(
-                (edge) =>
-                    edge.source === selectedNode.id &&
-                    edge.sourceHandle === event.id &&
-                    edge.target === targetNodeId
-            );
-
-            if (alreadyExists) {
-                return withoutPreviousDirectTarget;
-            }
-
-            return addEdge(
+        const nextEdges = alreadyExists
+            ? withoutPreviousTarget
+            : [
+                ...withoutPreviousTarget,
                 {
                     id: `edge-${selectedNode.id}-${event.id}-${targetNodeId}-${crypto.randomUUID()}`,
                     source: selectedNode.id,
@@ -1579,23 +1981,52 @@ export function useTransitionGraph({
                     label: event.id,
                     type: "smartTransition",
                     markerEnd: { type: MarkerType.ArrowClosed },
-                    data: { cond: "", assignments: [], assign: null },
+                    data: {
+                        cond: "",
+                        assignments: [],
+                        assign: null,
+                        ...(selectedNode.id === targetNodeId
+                            ? { controlPoints: makeSelfLoopControlPoints() }
+                            : {}),
+                    },
                 },
-                withoutPreviousDirectTarget
-            );
+            ];
+
+        const nextNodes = nodes.map((node) => {
+            if (node.id !== selectedNode.id) return node;
+            return {
+                ...node,
+                data: {
+                    ...node.data,
+                    events: (node.data.events || []).map((candidate) =>
+                        candidate.id === event.id
+                            ? {
+                                ...candidate,
+                                selectedPackage: getSkillPackageName(
+                                    targetNode.data?.fullSkillName
+                                ),
+                                selectedSkill:
+                                    targetNode.data?.fullSkillName?.split("#")[0] ||
+                                    targetNode.data?.label ||
+                                    "",
+                                target: targetNodeId,
+                            }
+                            : candidate
+                    ),
+                },
+            };
         });
 
-        updateNodeEvent(selectedNode.id, event.id, {
-            selectedPackage: getSkillPackageName(
-                targetNode.data?.fullSkillName
-            ),
-            selectedSkill:
-                targetNode.data?.fullSkillName?.split("#")[0] ||
-                targetNode.data?.label ||
-                "",
-            target: targetNodeId,
+        const normalized = rebuildBoundaryTransitions(nextNodes, nextEdges);
+        setNodes(normalized.nodes);
+        setEdges(normalized.edges);
+        normalized.nodes.forEach((node) => {
+            if (["compound", "parallelLane"].includes(node.type)) {
+                requestAnimationFrame(() => updateNodeInternals(node.id));
+            }
         });
     };
+
 
     return {
         drawerData,

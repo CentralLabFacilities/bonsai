@@ -529,11 +529,23 @@ export function useSubStateMachines({
         const requestedFilePath = joinFsPath(fileConfig.directory, fileName);
         const subMachineId = getNodeId();
         const selectedIds = new Set(selectedNodes.map((n) => n.id));
+        const semanticParentGraph = prepareGraphForScxml(nodes, edges);
+        const semanticParentEdges = semanticParentGraph.edges || [];
 
         const externalEvents = [];
-        edges.forEach((edge) => {
-            if (selectedIds.has(edge.source) && !selectedIds.has(edge.target)) {
-                const evHandle = edge.sourceHandle || "success";
+        semanticParentEdges.forEach((edge) => {
+            const logicalSource =
+                edge.data?.boundaryOriginalSource ||
+                edge.data?.compoundOriginalSource ||
+                edge.data?.parallelOriginalSource ||
+                edge.source;
+            if (selectedIds.has(logicalSource) && !selectedIds.has(edge.target)) {
+                const evHandle =
+                    edge.data?.boundaryOriginalSourceHandle ||
+                    edge.data?.compoundOriginalSourceHandle ||
+                    edge.data?.parallelOriginalSourceHandle ||
+                    edge.sourceHandle ||
+                    "success";
                 if (!externalEvents.some((event) => event.id === evHandle)) {
                     externalEvents.push({
                         id: evHandle,
@@ -554,8 +566,8 @@ export function useSubStateMachines({
             },
             selected: false,
         }));
-        const subTabEdges = edges.filter(
-            (edge) => selectedIds.has(edge.source) && selectedIds.has(edge.target)
+        const subTabEdges = semanticParentEdges.filter((edge) =>
+            selectedIds.has(edge.source) && selectedIds.has(edge.target)
         );
 
         try {
@@ -589,7 +601,7 @@ export function useSubStateMachines({
                 },
             };
 
-            const updatedParentEdges = edges
+            const updatedParentEdges = semanticParentEdges
                 .map((edge) => {
                     if (selectedIds.has(edge.source) && !selectedIds.has(edge.target)) {
                         return { ...edge, source: subMachineId };

@@ -192,6 +192,7 @@ export function useEditorDisplay({
 
         normalizedTransitionEdges.forEach((edge) => {
             if (
+                edge.data?.boundaryInternalEdge ||
                 edge.data?.compoundInternalEdge ||
                 edge.data?.parallelEntryEdge ||
                 edge.data?.compoundInitialEdge
