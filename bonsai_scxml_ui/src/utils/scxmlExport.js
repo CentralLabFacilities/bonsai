@@ -26,8 +26,11 @@ const buildEditorMetadataXml = (node, indent, isLane) => {
             const instanceAttr = instanceId
                 ? ` instance="${escapeXmlAttribute(instanceId)}"`
                 : "";
-            const cloneAttr = position?.isSkillClone
-                ? ' clone="skill"'
+            const cloneType = String(
+                position?.cloneType || (position?.isSkillClone ? "skill" : "")
+            ).trim();
+            const cloneAttr = cloneType
+                ? ` clone="${escapeXmlAttribute(cloneType)}"`
                 : "";
 
             return `${indent}        <editor:position${instanceAttr}${cloneAttr} x="${x}" y="${y}"/>`;

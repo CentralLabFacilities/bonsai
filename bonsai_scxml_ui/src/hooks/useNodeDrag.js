@@ -199,7 +199,7 @@ export function useNodeDrag({
         const pending = pendingNodeDragRef.current;
         if (!pending) return;
 
-        const { clientX, clientY, nodeId, nodeType, isSkillClone } = pending;
+        const { clientX, clientY, nodeId, nodeType, isEditorClone } = pending;
         const isOverTrash = Boolean(
             document
                 .elementFromPoint(clientX, clientY)
@@ -208,9 +208,9 @@ export function useNodeDrag({
 
         setIsOverTrash(isOverTrash);
 
-        // Parallel-lane helper nodes are layout-only and editor-only skill
-        // clones stay top-level, so neither participates in container drops.
-        if (isOverTrash || nodeType === "parallelLane" || isSkillClone) {
+        // Parallel-lane helper nodes are layout-only and editor-only clones
+        // stay top-level, so neither participates in container drops.
+        if (isOverTrash || nodeType === "parallelLane" || isEditorClone) {
             setParallelDropTargetId(null);
             setCompoundDropTargetId(null);
             return;
@@ -272,7 +272,9 @@ export function useNodeDrag({
             clientY: event.clientY,
             nodeId: draggedNode.id,
             nodeType: draggedNode.type,
-            isSkillClone: Boolean(draggedNode.data?.isSkillClone),
+            isEditorClone: Boolean(
+                draggedNode.data?.isSkillClone || draggedNode.data?.isStateClone
+            ),
         };
 
         // Give skills a tangible "sticky" container border while dragging.
@@ -285,7 +287,7 @@ export function useNodeDrag({
         if (
             origin &&
             draggedNode.type === "custom" &&
-            !draggedNode.data?.isSkillClone
+            !(draggedNode.data?.isSkillClone || draggedNode.data?.isStateClone)
         ) {
             const pointerPosition = screenToFlowPosition({
                 x: event.clientX,
@@ -372,12 +374,12 @@ export function useNodeDrag({
                         const isDescendant =
                             candidate.parentId &&
                             idsToDelete.has(candidate.parentId);
-                        const isCloneOfDeletedSkill =
-                            candidate.data?.isSkillClone &&
+                        const isCloneOfDeletedState =
+                            (candidate.data?.isSkillClone || candidate.data?.isStateClone) &&
                             idsToDelete.has(candidate.data?.cloneOfNodeId);
 
                         if (
-                            (isDescendant || isCloneOfDeletedSkill) &&
+                            (isDescendant || isCloneOfDeletedState) &&
                             !idsToDelete.has(candidate.id)
                         ) {
                             idsToDelete.add(candidate.id);
@@ -476,9 +478,9 @@ export function useNodeDrag({
             return;
         }
 
-        // Skill clones are visual aliases only. Keep them top-level so their
+        // Editor clones are visual aliases only. Keep them top-level so their
         // saved absolute editor position has the same meaning after reload.
-        if (node.data?.isSkillClone) {
+        if (node.data?.isSkillClone || node.data?.isStateClone) {
             setNodes((currentNodes) => {
                 const liveNode = currentNodes.find(
                     (candidate) => candidate.id === node.id

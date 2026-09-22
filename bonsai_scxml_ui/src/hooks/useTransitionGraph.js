@@ -25,7 +25,9 @@ import {
 import { rebuildBoundaryTransitions } from "../utils/boundaryTransitions";
 
 const getSemanticTransitionTarget = (targetNode, allNodes = []) => {
-    if (!targetNode?.data?.isSkillClone) return targetNode;
+    if (!(targetNode?.data?.isSkillClone || targetNode?.data?.isStateClone)) {
+        return targetNode;
+    }
 
     return (
         allNodes.find(
@@ -453,7 +455,7 @@ export function useTransitionGraph({
             !sourceNode ||
             !semanticSourceNode ||
             !targetNode ||
-            semanticSourceNode.data?.isSkillClone ||
+            (semanticSourceNode.data?.isSkillClone || semanticSourceNode.data?.isStateClone) ||
             !canTargetVisualNode(semanticSourceNode, targetNode, nodes)
         ) {
             return false;
@@ -780,7 +782,12 @@ export function useTransitionGraph({
                 (n) => n.id === params.target
             );
 
-            if (!sourceNode || !targetNode || sourceNode.data?.isSkillClone) {
+            if (
+                !sourceNode ||
+                !targetNode ||
+                sourceNode.data?.isSkillClone ||
+                sourceNode.data?.isStateClone
+            ) {
                 return;
             }
 

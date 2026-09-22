@@ -91,8 +91,13 @@ initApiProxy();
 const IS_DESKTOP = isTauri();
 
 
+const isEditorCloneNode = (node) => Boolean(
+    node?.data?.cloneOfNodeId &&
+    (node.data?.isSkillClone || node.data?.isStateClone)
+);
+
 const isCloneableSkillNode = (node) => {
-    if (!node || node.type !== "custom" || node.data?.isSkillClone) {
+    if (!node || node.type !== "custom" || isEditorCloneNode(node)) {
         return false;
     }
 
@@ -108,6 +113,60 @@ const isCloneableSkillNode = (node) => {
         skillName === "end" ||
         skillName === "fatal"
     );
+};
+
+const isCloneableEditorNode = (node) => Boolean(
+    isCloneableSkillNode(node) ||
+    (node &&
+        ["submachine", "compound", "parallel"].includes(node.type) &&
+        !isEditorCloneNode(node) &&
+        !node.data?.autoParallelLaneCompound)
+);
+
+const buildEditorCloneNode = (sourceNode, position) => {
+    if (!isCloneableEditorNode(sourceNode)) return null;
+
+    const commonData = {
+        label: sourceNode.data?.label || sourceNode.data?.fullSkillName || "State",
+        fullSkillName:
+            sourceNode.data?.fullSkillName ||
+            sourceNode.data?.label ||
+            "State",
+        cloneOfNodeId: sourceNode.id,
+        isInitial: false,
+        isFinal: false,
+        events: [],
+        inSlots: [],
+        outSlots: [],
+        params: [],
+        onEntry: [],
+        onExit: [],
+    };
+
+    if (sourceNode.type === "custom") {
+        return {
+            id: getNodeId(),
+            position,
+            type: "custom",
+            selected: true,
+            data: {
+                ...commonData,
+                isSkillClone: true,
+            },
+        };
+    }
+
+    return {
+        id: getNodeId(),
+        position,
+        type: "stateClone",
+        selected: true,
+        data: {
+            ...commonData,
+            isStateClone: true,
+            sourceNodeType: sourceNode.type,
+        },
+    };
 };
 
 const DEFAULT_BEHAVIOR_DIRECTORIES = [
@@ -422,7 +481,7 @@ function AppContent() {
             semanticNodes
                 .filter(
                     (node) =>
-                        node.data?.isSkillClone &&
+                        isEditorCloneNode(node) &&
                         (!node.data?.cloneOfNodeId ||
                             !semanticNodeIds.has(node.data.cloneOfNodeId))
                 )
@@ -451,13 +510,13 @@ function AppContent() {
             const nextNodes = [];
 
             currentNodes.forEach((node) => {
-                if (!node.data?.isSkillClone) {
+                if (!isEditorCloneNode(node)) {
                     nextNodes.push(node);
                     return;
                 }
 
                 const sourceNode = byId.get(node.data?.cloneOfNodeId);
-                if (!sourceNode || sourceNode.data?.isSkillClone) {
+                if (!sourceNode || isEditorCloneNode(sourceNode)) {
                     changed = true;
                     return;
                 }
@@ -466,9 +525,14 @@ function AppContent() {
                 const nextFullSkillName =
                     sourceNode.data?.fullSkillName || node.data?.fullSkillName;
 
+                const nextSourceNodeType = node.data?.isStateClone
+                    ? sourceNode.type
+                    : node.data?.sourceNodeType;
+
                 if (
                     node.data?.label === nextLabel &&
-                    node.data?.fullSkillName === nextFullSkillName
+                    node.data?.fullSkillName === nextFullSkillName &&
+                    node.data?.sourceNodeType === nextSourceNodeType
                 ) {
                     nextNodes.push(node);
                     return;
@@ -481,6 +545,9 @@ function AppContent() {
                         ...(node.data || {}),
                         label: nextLabel,
                         fullSkillName: nextFullSkillName,
+                        ...(node.data?.isStateClone
+                            ? { sourceNodeType: nextSourceNodeType }
+                            : {}),
                     },
                 });
             });
@@ -812,45 +879,24 @@ function AppContent() {
         });
     }, [screenToFlowPosition, setNodes]);
 
-    const canCreateSkillClone =
+    const canCreateEditorClone =
         selectedNodes.length === 1 &&
-        isCloneableSkillNode(selectedNodes[0]);
+        isCloneableEditorNode(selectedNodes[0]);
 
-    const handleCreateSkillClone = useCallback(() => {
+    const handleCreateEditorClone = useCallback(() => {
         if (!contextMenu?.flowPosition) return;
 
         const sourceNode = selectedNodes.length === 1
             ? selectedNodes[0]
             : null;
 
-        if (!isCloneableSkillNode(sourceNode)) return;
+        if (!isCloneableEditorNode(sourceNode)) return;
 
-        const cloneNode = {
-            id: getNodeId(),
-            position: {
-                x: Number(contextMenu.flowPosition.x || 0) + 220,
-                y: Number(contextMenu.flowPosition.y || 0),
-            },
-            type: "custom",
-            selected: true,
-            data: {
-                label: sourceNode.data?.label || "Skill",
-                fullSkillName:
-                    sourceNode.data?.fullSkillName ||
-                    sourceNode.data?.label ||
-                    "Skill",
-                isSkillClone: true,
-                cloneOfNodeId: sourceNode.id,
-                isInitial: false,
-                isFinal: false,
-                events: [],
-                inSlots: [],
-                outSlots: [],
-                params: [],
-                onEntry: [],
-                onExit: [],
-            },
-        };
+        const cloneNode = buildEditorCloneNode(sourceNode, {
+            x: Number(contextMenu.flowPosition.x || 0) + 220,
+            y: Number(contextMenu.flowPosition.y || 0),
+        });
+        if (!cloneNode) return;
 
         setNodes((currentNodes) => [
             ...currentNodes.map((node) => ({
@@ -875,7 +921,7 @@ function AppContent() {
         const hasSelection = selectedNodes.length > 0;
 
         if (type === "clone") {
-            handleCreateSkillClone();
+            handleCreateEditorClone();
         } else if (type === "compound") {
             if (hasSelection) {
                 handleCreateCompoundFromSelected();
@@ -1552,7 +1598,7 @@ function AppContent() {
     const selectedNode = selectedRawNode;
 
     const selectedCloneSourceNode = useMemo(() => {
-        if (!selectedNode?.data?.isSkillClone) return null;
+        if (!isEditorCloneNode(selectedNode)) return null;
         return semanticNodes.find(
             (node) => node.id === selectedNode.data?.cloneOfNodeId
         ) || null;
@@ -1957,7 +2003,7 @@ function AppContent() {
     const createNameforSkill = (fullSkillName) => {
         const label = fullSkillName.split(".").pop();
         const count = nodes.filter(
-            (n) => !n.data?.isSkillClone && n.data?.label === label
+            (n) => !isEditorCloneNode(n) && n.data?.label === label
         ).length;
         return `${fullSkillName}#${count + 1}`;
     };
@@ -2517,7 +2563,7 @@ function AppContent() {
                     ? nodes.find((node) => node.id === copiedNode.id)
                     : null;
 
-                if (!isCloneableSkillNode(sourceNode)) return false;
+                if (!isCloneableEditorNode(sourceNode)) return false;
 
                 pasteSequenceRef.current += 1;
                 const offset = 40 * pasteSequenceRef.current;
@@ -2525,32 +2571,11 @@ function AppContent() {
                     sourceNode,
                     nodes
                 );
-                const cloneNode = {
-                    id: getNodeId(),
-                    position: {
-                        x: Number(absoluteSourcePosition.x || 0) + offset,
-                        y: Number(absoluteSourcePosition.y || 0) + offset,
-                    },
-                    type: "custom",
-                    selected: true,
-                    data: {
-                        label: sourceNode.data?.label || "Skill",
-                        fullSkillName:
-                            sourceNode.data?.fullSkillName ||
-                            sourceNode.data?.label ||
-                            "Skill",
-                        isSkillClone: true,
-                        cloneOfNodeId: sourceNode.id,
-                        isInitial: false,
-                        isFinal: false,
-                        events: [],
-                        inSlots: [],
-                        outSlots: [],
-                        params: [],
-                        onEntry: [],
-                        onExit: [],
-                    },
-                };
+                const cloneNode = buildEditorCloneNode(sourceNode, {
+                    x: Number(absoluteSourcePosition.x || 0) + offset,
+                    y: Number(absoluteSourcePosition.y || 0) + offset,
+                });
+                if (!cloneNode) return false;
 
                 setNodes((currentNodes) => [
                     ...currentNodes.map((node) => ({
@@ -2745,7 +2770,7 @@ function AppContent() {
                 }
 
                 if (
-                    data?.isSkillClone &&
+                    (data?.isSkillClone || data?.isStateClone) &&
                     data?.cloneOfNodeId &&
                     idMap.has(data.cloneOfNodeId)
                 ) {
@@ -2861,7 +2886,7 @@ function AppContent() {
                 ? nodes.find((node) => node.id === copiedNode.id)
                 : null;
 
-            if (isCloneableSkillNode(sourceNode)) {
+            if (isCloneableEditorNode(sourceNode)) {
                 // Keep the pending action itself outside React state. This
                 // avoids copying callback-heavy node data into a dialog state
                 // while still letting the user decide how this paste behaves.
@@ -3728,7 +3753,7 @@ function AppContent() {
                         aria-modal="true"
                         aria-labelledby="skill-paste-choice-title"
                     >
-                        <h3 id="skill-paste-choice-title">Paste skill</h3>
+                        <h3 id="skill-paste-choice-title">Paste state</h3>
                         <p>
                             How should <strong>{pendingSkillPaste.label}</strong> be pasted?
                         </p>
@@ -3740,7 +3765,7 @@ function AppContent() {
                             >
                                 <span className="skill-paste-choice-option-title">Clone</span>
                                 <span className="skill-paste-choice-option-description">
-                                    Inbound-only visual alias of the original skill.
+                                    Inbound-only visual alias of the original state.
                                 </span>
                             </button>
                             <button
@@ -3750,7 +3775,7 @@ function AppContent() {
                             >
                                 <span className="skill-paste-choice-option-title">Copy</span>
                                 <span className="skill-paste-choice-option-description">
-                                    Same skill with a new instance ID.
+                                    Create an independent copy of the selected state.
                                 </span>
                             </button>
                         </div>
@@ -4318,7 +4343,7 @@ function AppContent() {
                             selectedNodes={selectedNodes}
                             contextMenu={contextMenu}
                             handleSelectAction={handleSelectAction}
-                            canCreateSkillClone={canCreateSkillClone}
+                            canCreateEditorClone={canCreateEditorClone}
                             setIsCreateSlotModalOpen={setIsCreateSlotModalOpen}
                             isDraggingNode={isDraggingNode}
                             isOverTrash={isOverTrash}

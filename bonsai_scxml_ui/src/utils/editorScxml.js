@@ -352,7 +352,7 @@ export const prepareGraphForScxml = (sourceNodes = [], sourceEdges = []) => {
 
     const skillCloneNodes = normalizedNodes.filter(
         (node) =>
-            Boolean(node.data?.isSkillClone) &&
+            Boolean(node.data?.isSkillClone || node.data?.isStateClone) &&
             Boolean(node.data?.cloneOfNodeId) &&
             nodeById.has(node.data.cloneOfNodeId)
     );
@@ -399,6 +399,7 @@ export const prepareGraphForScxml = (sourceNodes = [], sourceEdges = []) => {
                 x: Number(originalPosition.x || 0),
                 y: Number(originalPosition.y || 0),
                 isSkillClone: false,
+                cloneType: "",
             },
             ...clones.map((cloneNode) => {
                 const absolutePosition = getAbsoluteNodePosition(
@@ -408,7 +409,10 @@ export const prepareGraphForScxml = (sourceNodes = [], sourceEdges = []) => {
                 return {
                     x: Number(absolutePosition.x || 0),
                     y: Number(absolutePosition.y || 0),
-                    isSkillClone: true,
+                    isSkillClone: Boolean(cloneNode.data?.isSkillClone),
+                    cloneType: cloneNode.data?.isSkillClone
+                        ? "skill"
+                        : String(cloneNode.data?.sourceNodeType || "state"),
                 };
             }),
         ];

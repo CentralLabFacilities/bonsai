@@ -829,11 +829,6 @@ function DetailsPanel({
 
     const [openTargetSelector, setOpenTargetSelector] = useState(null);
     const [targetQueries, setTargetQueries] = useState({});
-    const [activeTargetSuggestion, setActiveTargetSuggestion] = useState({
-        key: null,
-        index: -1,
-    });
-    const targetSuggestionRefs = useRef(new Map());
 
     const handledParameterFocusRequestRef = useRef(null);
 
@@ -1206,18 +1201,7 @@ function DetailsPanel({
         }));
 
         setOpenTargetSelector(null);
-        setActiveTargetSuggestion({ key: null, index: -1 });
         onSetEventTarget?.(event, option.id);
-    };
-
-    const activateTargetSuggestion = (key, suggestionIndex) => {
-        setActiveTargetSuggestion({ key, index: suggestionIndex });
-        window.requestAnimationFrame(() => {
-            const element = targetSuggestionRefs.current.get(
-                `${key}:${suggestionIndex}`
-            );
-            element?.scrollIntoView({ block: "nearest" });
-        });
     };
 
     const handleTargetKeyDown = (
@@ -1225,60 +1209,15 @@ function DetailsPanel({
         event,
         index
     ) => {
-        const selectorKey = getTargetSelectorKey(event, index);
-        const query = getTargetQuery(event, index);
-        const matches = getMatchingTargetNodes(query);
-        const activeIndex =
-            activeTargetSuggestion.key === selectorKey
-                ? activeTargetSuggestion.index
-                : -1;
-
-        if (keyboardEvent.key === "ArrowDown") {
-            if (matches.length === 0) return;
-            keyboardEvent.preventDefault();
-            setOpenTargetSelector(selectorKey);
-            activateTargetSuggestion(
-                selectorKey,
-                activeIndex < matches.length - 1 ? activeIndex + 1 : 0
-            );
-            return;
-        }
-
-        if (keyboardEvent.key === "ArrowUp") {
-            if (matches.length === 0) return;
-            keyboardEvent.preventDefault();
-            setOpenTargetSelector(selectorKey);
-            activateTargetSuggestion(
-                selectorKey,
-                activeIndex > 0 ? activeIndex - 1 : matches.length - 1
-            );
-            return;
-        }
-
-        if (keyboardEvent.key === "Escape") {
-            setOpenTargetSelector(null);
-            setActiveTargetSuggestion({ key: null, index: -1 });
-            return;
-        }
-
         if (keyboardEvent.key !== "Enter") {
             return;
         }
 
         keyboardEvent.preventDefault();
 
-        if (
-            openTargetSelector === selectorKey &&
-            activeIndex >= 0 &&
-            activeIndex < matches.length
-        ) {
-            selectExistingTarget(event, index, matches[activeIndex]);
-            return;
-        }
+        const query = getTargetQuery(event, index).trim();
 
-        const trimmedQuery = query.trim();
-
-        if (!trimmedQuery) return;
+        if (!query) return;
 
         const exactMatch = targetNodeOptions.find((option) =>
             [
@@ -1291,7 +1230,7 @@ function DetailsPanel({
             ].some(
                 (value) =>
                     String(value || "").toLowerCase() ===
-                    trimmedQuery.toLowerCase()
+                    query.toLowerCase()
             )
         );
 
@@ -1299,6 +1238,8 @@ function DetailsPanel({
             selectExistingTarget(event, index, exactMatch);
             return;
         }
+
+        const matches = getMatchingTargetNodes(query);
 
         if (matches.length === 1) {
             selectExistingTarget(event, index, matches[0]);
@@ -1725,12 +1666,6 @@ function DetailsPanel({
                                                             openTargetSelector ===
                                                             selectorKey;
 
-                                                        const activeSuggestionIndex =
-                                                            activeTargetSuggestion.key ===
-                                                            selectorKey
-                                                                ? activeTargetSuggestion.index
-                                                                : -1;
-
                                                         return (
                                                             <div className="exit-target-selector">
                                                                 <div className="exit-target-input-row">
@@ -1741,15 +1676,11 @@ function DetailsPanel({
                                                                         value={query}
                                                                         placeholder="Type or select an existing node..."
                                                                         autoComplete="off"
-                                                                        onFocus={() => {
+                                                                        onFocus={() =>
                                                                             setOpenTargetSelector(
                                                                                 selectorKey
-                                                                            );
-                                                                            setActiveTargetSuggestion({
-                                                                                key: selectorKey,
-                                                                                index: -1,
-                                                                            });
-                                                                        }}
+                                                                            )
+                                                                        }
                                                                         onChange={(e) => {
                                                                             setTargetQueries(
                                                                                 (
@@ -1766,10 +1697,6 @@ function DetailsPanel({
                                                                             setOpenTargetSelector(
                                                                                 selectorKey
                                                                             );
-                                                                            setActiveTargetSuggestion({
-                                                                                key: selectorKey,
-                                                                                index: -1,
-                                                                            });
                                                                         }}
                                                                         onKeyDown={(
                                                                             keyboardEvent
@@ -1782,7 +1709,7 @@ function DetailsPanel({
                                                                         }
                                                                         onBlur={() =>
                                                                             window.setTimeout(
-                                                                                () => {
+                                                                                () =>
                                                                                     setOpenTargetSelector(
                                                                                         (
                                                                                             current
@@ -1791,14 +1718,7 @@ function DetailsPanel({
                                                                                             selectorKey
                                                                                                 ? null
                                                                                                 : current
-                                                                                    );
-                                                                                    setActiveTargetSuggestion(
-                                                                                        (current) =>
-                                                                                            current.key === selectorKey
-                                                                                                ? { key: null, index: -1 }
-                                                                                                : current
-                                                                                    );
-                                                                                },
+                                                                                    ),
                                                                                 120
                                                                             )
                                                                         }
@@ -1833,8 +1753,7 @@ function DetailsPanel({
                                                                         0 ? (
                                                                             matches.map(
                                                                                 (
-                                                                                    option,
-                                                                                    matchIndex
+                                                                                    option
                                                                                 ) => (
                                                                                     <button
                                                                                         type="button"
@@ -1843,33 +1762,9 @@ function DetailsPanel({
                                                                                             event.target
                                                                                                 ? "selected"
                                                                                                 : ""
-                                                                                        } ${
-                                                                                            matchIndex ===
-                                                                                            activeSuggestionIndex
-                                                                                                ? "active"
-                                                                                                : ""
                                                                                         }`}
                                                                                         key={
                                                                                             option.id
-                                                                                        }
-                                                                                        ref={(element) => {
-                                                                                            const refKey = `${selectorKey}:${matchIndex}`;
-                                                                                            if (element) {
-                                                                                                targetSuggestionRefs.current.set(
-                                                                                                    refKey,
-                                                                                                    element
-                                                                                                );
-                                                                                            } else {
-                                                                                                targetSuggestionRefs.current.delete(
-                                                                                                    refKey
-                                                                                                );
-                                                                                            }
-                                                                                        }}
-                                                                                        onMouseEnter={() =>
-                                                                                            setActiveTargetSuggestion({
-                                                                                                key: selectorKey,
-                                                                                                index: matchIndex,
-                                                                                            })
                                                                                         }
                                                                                         onMouseDown={(
                                                                                             e

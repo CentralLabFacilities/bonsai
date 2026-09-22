@@ -109,6 +109,55 @@ export function useEditorDisplay({
         [selectedNodes, selectedNodeId]
     );
 
+    const cloneGroupByNodeId = useMemo(() => {
+        const clonesByOriginalId = new Map();
+
+        (nodes || []).forEach((node) => {
+            if (
+                !(node.data?.isSkillClone || node.data?.isStateClone) ||
+                !node.data?.cloneOfNodeId
+            ) return;
+            const originalId = node.data.cloneOfNodeId;
+            if (!clonesByOriginalId.has(originalId)) {
+                clonesByOriginalId.set(originalId, []);
+            }
+            clonesByOriginalId.get(originalId).push(node.id);
+        });
+
+        const groups = new Map();
+        clonesByOriginalId.forEach((cloneIds, originalId) => {
+            const group = new Set([originalId, ...cloneIds]);
+            group.forEach((nodeId) => groups.set(nodeId, group));
+        });
+
+        return groups;
+    }, [nodes]);
+
+    const selectedVisualNodeIdSet = useMemo(() => {
+        const ids = new Set(selectedNodeIdSet);
+        selectedNodeIdSet.forEach((nodeId) => {
+            cloneGroupByNodeId.get(nodeId)?.forEach((linkedId) => ids.add(linkedId));
+        });
+        return ids;
+    }, [cloneGroupByNodeId, selectedNodeIdSet]);
+
+    const cloneLinkedHighlightIds = useMemo(() => {
+        const ids = new Set();
+        selectedNodeIdSet.forEach((nodeId) => {
+            cloneGroupByNodeId.get(nodeId)?.forEach((linkedId) => {
+                if (linkedId !== nodeId) ids.add(linkedId);
+            });
+        });
+
+        if (activeCanvasFocusNodeId) {
+            cloneGroupByNodeId
+                .get(activeCanvasFocusNodeId)
+                ?.forEach((linkedId) => ids.add(linkedId));
+        }
+
+        return ids;
+    }, [activeCanvasFocusNodeId, cloneGroupByNodeId, selectedNodeIdSet]);
+
     const normalizedTransitionEdges = useMemo(
         () =>
             edges.map((edge) => {
@@ -757,6 +806,9 @@ export function useEditorDisplay({
         const ids = new Set();
         if (activeCanvasFocusNodeId) {
             ids.add(activeCanvasFocusNodeId);
+            cloneGroupByNodeId
+                .get(activeCanvasFocusNodeId)
+                ?.forEach((linkedId) => ids.add(linkedId));
             visibleEdges.forEach((edge) => {
                 if (
                     edge.source === activeCanvasFocusNodeId ||
@@ -787,6 +839,7 @@ export function useEditorDisplay({
         isSlotDetailsFocus,
         hoveredSlotAccessNodeId,
         selectedNodeId,
+        cloneGroupByNodeId,
     ]);
 
     const visibleNodes = useMemo(() => {
@@ -818,7 +871,9 @@ export function useEditorDisplay({
             const isConnectedHoverFocusNode =
                 hasHoverFocus && hoverFocusNodeIds?.has(visibleNode.id);
             const isSelectedNode =
-                visibleNode.selected || selectedNodeIdSet.has(visibleNode.id);
+                visibleNode.selected || selectedVisualNodeIdSet.has(visibleNode.id);
+            const isCloneLinkedHighlight =
+                cloneLinkedHighlightIds.has(visibleNode.id);
             const isDimmedByHoverFocus =
                 hasHoverFocus &&
                 !isSelectedNode &&
@@ -850,7 +905,8 @@ export function useEditorDisplay({
             if (
                 isCanvasHoverHighlight ||
                 isHoveredEdgeEndpoint ||
-                isSlotDetailsSkillHoverHighlight
+                isSlotDetailsSkillHoverHighlight ||
+                isCloneLinkedHighlight
             ) {
                 // Hover highlighting must never mutate React Flow's real
                 // selection state. Setting `selected: true` here made a mere
@@ -946,7 +1002,8 @@ export function useEditorDisplay({
         hoveredSlotAccessNodeId,
         isSlotDetailsFocus,
         selectedNodeId,
-        selectedNodeIdSet,
+        selectedVisualNodeIdSet,
+        cloneLinkedHighlightIds,
         hoveredEditorEdge,
         parallelDropTargetId,
         compoundDropTargetId,

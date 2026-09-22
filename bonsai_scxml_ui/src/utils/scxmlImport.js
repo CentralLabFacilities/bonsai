@@ -367,15 +367,18 @@ const parseEditorPositions = (stateElem) => {
                 child.localName === "position" ||
                 child.nodeName.includes("position")
         )
-        .map((positionElement) => ({
-            x: parseFloat(positionElement.getAttribute("x")),
-            y: parseFloat(positionElement.getAttribute("y")),
-            instanceId:
-                positionElement.getAttribute("instance")?.trim() || "",
-            isSkillClone:
-                positionElement.getAttribute("clone")?.trim().toLowerCase() ===
-                "skill",
-        }))
+        .map((positionElement) => {
+            const cloneType =
+                positionElement.getAttribute("clone")?.trim().toLowerCase() || "";
+            return {
+                x: parseFloat(positionElement.getAttribute("x")),
+                y: parseFloat(positionElement.getAttribute("y")),
+                instanceId:
+                    positionElement.getAttribute("instance")?.trim() || "",
+                cloneType,
+                isSkillClone: cloneType === "skill",
+            };
+        })
         .filter(
             (position) =>
                 Number.isFinite(position.x) && Number.isFinite(position.y)
@@ -795,21 +798,33 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
     const rawTransitions = [];
     let hasCustomPositions = true;
 
-    const appendImportedSkillClones = (stateElement, nodeData, sourceNodeId) => {
+    const appendImportedEditorClones = (
+        stateElement,
+        nodeData,
+        sourceNodeId,
+        sourceNodeType
+    ) => {
         parseEditorPositions(stateElement)
-            .filter((position) => position.isSkillClone)
+            .filter((position) => Boolean(position.cloneType))
             .forEach((clonePosition) => {
+                const isSkillClone = clonePosition.cloneType === "skill";
                 newNodes.push({
                     id: getNodeId(),
                     position: {
                         x: clonePosition.x,
                         y: clonePosition.y,
                     },
-                    type: "custom",
+                    type: isSkillClone ? "custom" : "stateClone",
                     data: {
                         label: nodeData.label,
                         fullSkillName: nodeData.fullSkillName,
-                        isSkillClone: true,
+                        ...(isSkillClone
+                            ? { isSkillClone: true }
+                            : {
+                                  isStateClone: true,
+                                  sourceNodeType:
+                                      clonePosition.cloneType || sourceNodeType,
+                              }),
                         cloneOfNodeId: sourceNodeId,
                         isInitial: false,
                         isFinal: false,
@@ -841,7 +856,7 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
         // state. Normal states continue to use the first position.
         const editorPositions = parseEditorPositions(stateElem);
         const primaryEditorPosition =
-            editorPositions.find((position) => !position.isSkillClone) ||
+            editorPositions.find((position) => !position.cloneType) ||
             editorPositions[0];
         let x = primaryEditorPosition?.x ?? null;
         let y = primaryEditorPosition?.y ?? null;
@@ -893,6 +908,15 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                     onExit: parseStateAssignments(stateElem, "onexit"),
                 },
             });
+            appendImportedEditorClones(
+                stateElem,
+                {
+                    label: fullSkillName.split(".").pop().split("#")[0],
+                    fullSkillName,
+                },
+                parallelNodeId,
+                "parallel"
+            );
 
             // 2. Transitions auf Parallel-Ebene erfassen
             parallelTransElems.forEach((tr) => {
@@ -1047,7 +1071,7 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                             type: "custom",
                             data: nodeData,
                         });
-                        appendImportedSkillClones(stElem, nodeData, stNodeId);
+                        appendImportedEditorClones(stElem, nodeData, stNodeId, "custom");
                     }
                 }
                 // FALL A2: Lane ist ein einfacher State (z.B. Wait)
@@ -1088,7 +1112,7 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                         type: "custom",
                         data: nodeData,
                     });
-                    appendImportedSkillClones(branchElem, nodeData, stNodeId);
+                    appendImportedEditorClones(branchElem, nodeData, stNodeId, "custom");
 
                     // Verbindung von Wait zum Lane-Rand herstellen (nur 1x)
                     laneEvents.forEach((levt) => {
@@ -1161,6 +1185,15 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                     onExit: parseStateAssignments(stateElem, "onexit"),
                 },
             });
+            appendImportedEditorClones(
+                stateElem,
+                {
+                    label: fullSkillName.split(".").pop().split("#")[0],
+                    fullSkillName,
+                },
+                compoundNodeId,
+                "compound"
+            );
 
             // 2. Transitions auf Compound-Ebene erfassen (z.B. Fallbacks wie Succeeder.*)
             Array.from(stateElem.children)
@@ -1227,7 +1260,7 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                     type: "custom",
                     data: nodeData,
                 });
-                appendImportedSkillClones(csElem, nodeData, csNodeId);
+                appendImportedEditorClones(csElem, nodeData, csNodeId, "custom");
             }
             continue;
         }
@@ -1318,9 +1351,12 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             // Normal skill clones are stored only as editor metadata. They are
             // visual inbound aliases of the real state and therefore do not
             // get their own SCXML state or outgoing transition data.
-            if (!srcAttr) {
-                appendImportedSkillClones(stateElem, nodeData, nodeId);
-            }
+            appendImportedEditorClones(
+                stateElem,
+                nodeData,
+                nodeId,
+                srcAttr ? "submachine" : "custom"
+            );
         }
     }
 

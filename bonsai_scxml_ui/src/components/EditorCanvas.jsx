@@ -12,6 +12,7 @@ import SlotNode from "./SlotNode";
 import ParallelNode from "./ParallelNode";
 import SubMachineNode from "./SubMachineNode";
 import CompoundNode from "./CompoundNode";
+import StateCloneNode from "./StateCloneNode";
 import ParallelLaneNode from "./ParallelLaneNode";
 import EditableTransitionEdge from "./EditableTransitionEdge";
 import CodeView from "./CodeView";
@@ -25,6 +26,7 @@ const nodeTypes = {
     submachine: memo(SubMachineNode),
     parallel: memo(ParallelNode),
     compound: memo(CompoundNode),
+    stateClone: memo(StateCloneNode),
     parallelLane: memo(ParallelLaneNode),
 };
 
@@ -44,6 +46,7 @@ export default function EditorCanvas({
     selectedNodes,
     contextMenu,
     handleSelectAction,
+    canCreateEditorClone,
     setIsCreateSlotModalOpen,
     isDraggingNode,
     isOverTrash,
@@ -139,6 +142,14 @@ export default function EditorCanvas({
                             ? `change ${selectedNodes.length} node(s) in:`
                             : "Create new element"}
                     </div>
+                    {canCreateEditorClone && (
+                        <button
+                            className="context-menu-item"
+                            onClick={() => handleSelectAction("clone")}
+                        >
+                            Clone Selected State
+                        </button>
+                    )}
                     <button
                         className="context-menu-item"
                         onClick={() => handleSelectAction("compound")}
