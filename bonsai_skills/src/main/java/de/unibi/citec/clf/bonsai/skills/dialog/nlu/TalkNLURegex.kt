@@ -85,28 +85,74 @@ class TalkNLURegex : AbstractSkill() {
     private lateinit var nlu: NLU
 
     override fun configure(configurator: ISkillConfigurator) {
-        doFinalReplacements = configurator.requestOptionalBool(KEY_DO_FINAL_REPLACEMENTS, doFinalReplacements)
-        defaultMapping = configurator.requestOptionalValue(KEY_DEFAULT_MAPPING, defaultMapping)
+        doFinalReplacements = configurator.requestOptionalBool(
+            KEY_DO_FINAL_REPLACEMENTS,
+            doFinalReplacements,
+            "some additional regex replacements in the final message: '\\bme\\b' -> 'YOU', '\\byou\\b' -> 'ME'"
+        )
+        defaultMapping = configurator.requestOptionalValue(
+            KEY_DEFAULT_MAPPING,
+            defaultMapping,
+            "Default mapping if no mapping for the intent is found"
+        )
             .replace("""\n""".toRegex(), "")
             .replace("""\s+""".toRegex(), " ")
-        useDefault = configurator.requestOptionalBool(KEY_USE_DEFAULT, useDefault)
-        if(!useDefault) tokenErrorUnlisted = configurator.requestExitToken(ExitStatus.ERROR().ps("unlisted"))
-        nluSlot = configurator.getReadSlot("NLUSlot", NLU::class.java)
+        useDefault = configurator.requestOptionalBool(
+            KEY_USE_DEFAULT,
+            useDefault,
+            "use default if the intent is not mapped (otherwise send error.unlisted)"
+        )
+        if(!useDefault) tokenErrorUnlisted = configurator.requestExitToken(
+            ExitStatus.ERROR().ps("unlisted"),
+            "Intent is not in the mappings (if USE_DEFAULT==false)"
+        )
+        nluSlot = configurator.getReadSlot(
+            "NLUSlot",
+            NLU::class.java,
+            "Memory slot containing the NLU result used to build the message."
+        )
 
-        if (configurator.requestOptionalBool(KEY_USE_LANGUAGE, true)) {
-            langSlot = configurator.getReadSlot("Language", LanguageType::class.java)
+        if (configurator.requestOptionalBool(
+                KEY_USE_LANGUAGE,
+                true,
+                "Read Language slot to determine speak language else it defaults to \"EN\""
+            )
+        ) {
+            langSlot = configurator.getReadSlot(
+                "Language",
+                LanguageType::class.java,
+                "Memory slot containing the language to speak the message in."
+            )
         }
 
-        message = configurator.requestOptionalValue(KEY_TEXT, message)
+        message = configurator.requestOptionalValue(
+            KEY_TEXT,
+            message,
+            "Text said by the robot"
+        )
             .replace("""\n""".toRegex(), "")
             .replace("""\s+""".toRegex(), " ")
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
-        tokenErrorPsMissing = configurator.requestExitToken(ExitStatus.ERROR().ps(PS_MISSING))
-        speechActuator = configurator.getActuator(ACTUATOR_SPEECHACTUATOR, SpeechActuator::class.java)
+        tokenSuccess = configurator.requestExitToken(
+            ExitStatus.SUCCESS(),
+            "Talk, constructs the message using rules and the given NLU."
+        )
+        tokenErrorPsMissing = configurator.requestExitToken(
+            ExitStatus.ERROR().ps(PS_MISSING),
+            "Some entity is missing or duplicate (e.g. '#E:object' while nlu has multiple object entities)"
+        )
+        speechActuator = configurator.getActuator(
+            ACTUATOR_SPEECHACTUATOR,
+            SpeechActuator::class.java,
+            "Used to say the constructed message"
+        )
 
-        val mappings = configurator.requestOptionalValue(KEY_MAPPING, "")
-                .replace("""\n""".toRegex(), "")
-                .replace("""\s+""".toRegex(), " ")
+        val mappings = configurator.requestOptionalValue(
+            KEY_MAPPING,
+            "",
+            "List of intent mappings 'intent=mapping' separated by ';'"
+        )
+            .replace("""\n""".toRegex(), "")
+            .replace("""\s+""".toRegex(), " ")
 
         for (m in mappings.split(";")) {
             if (m.isBlank()) continue // last string after ;
@@ -116,9 +162,21 @@ class TalkNLURegex : AbstractSkill() {
             intentMapping[s.first()] = s.last()
         }
 
-        if(configurator.requestOptionalBool(KEY_INTERRUPT, false)) {
-            tokenInt = configurator.requestExitToken(ExitStatus.ERROR().ps("interrupted"))
-            someoneSpeaking = configurator.getSensor("SomeoneTalkingSensor", Boolean::class.java)
+        if(configurator.requestOptionalBool(
+                KEY_INTERRUPT,
+                false,
+                "Talking can be interrupted (by someone speaking)"
+            )
+        ) {
+            tokenInt = configurator.requestExitToken(
+                ExitStatus.ERROR().ps("interrupted"),
+                "Talking was interrupted by someone speaking"
+            )
+            someoneSpeaking = configurator.getSensor(
+                "SomeoneTalkingSensor",
+                Boolean::class.java,
+                "Used to detect whether someone is speaking, to allow interrupting the robot's talking"
+            )
         }
     }
 

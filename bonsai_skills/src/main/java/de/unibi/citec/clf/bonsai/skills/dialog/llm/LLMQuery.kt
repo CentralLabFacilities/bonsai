@@ -64,12 +64,29 @@ class LLMQuery : AbstractSkill() {
 
     override fun configure(configurator: ISkillConfigurator) {
         llm = configurator.getActuator("LLM", LLM::class.java)
-        timeout = configurator.requestOptionalInt(KEY_TIMEOUT, timeout.toInt()).toLong()
-        blocking = configurator.requestOptionalBool(KEY_BLOCKING,blocking)
-        promt = configurator.requestValue(KEY_PROMPT)
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
+        timeout = configurator.requestOptionalInt(
+            KEY_TIMEOUT,
+            timeout.toInt(),
+            "Maximum time in milliseconds to wait for the LLM response in blocking mode."
+        ).toLong()
+        blocking = configurator.requestOptionalBool(
+            KEY_BLOCKING,
+            blocking,
+            "Whether to wait for the LLM response."
+        )
+        promt = configurator.requestValue(
+            KEY_PROMPT,
+            "The query to send to the LLM."
+        )
+        tokenSuccess = configurator.requestExitToken(
+            ExitStatus.SUCCESS(),
+            "LLM query successfully completed"
+        )
         if (blocking) {
-            tokenTimeout = configurator.requestExitToken(ExitStatus.ERROR().ps("timeout"))
+            tokenTimeout = configurator.requestExitToken(
+                ExitStatus.ERROR().ps("timeout"),
+                "LLM did not respond within the configured timeout"
+            )
             slot = configurator.getWriteSlot("reply", String::class.java)
         }
 

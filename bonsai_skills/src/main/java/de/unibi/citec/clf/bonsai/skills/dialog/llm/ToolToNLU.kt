@@ -53,9 +53,16 @@ class ToolToNLU : AbstractSkill() {
     private var tokenSuccess: ExitToken? = null
 
     override fun configure(configurator: ISkillConfigurator) {
-        splitParameterRole = configurator.requestOptionalBool(KEY_SPLIT_KEYS,splitParameterRole)
+        splitParameterRole = configurator.requestOptionalBool(
+            KEY_SPLIT_KEYS,
+            splitParameterRole,
+            "Whether to split tool parameter names at the first underscore. The part before the underscore is used as the entity key, the part after as the entity role."
+        )
         nluSlot = configurator.getWriteSlot("NLUSlot", NLU::class.java)
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
+        tokenSuccess = configurator.requestExitToken(
+            ExitStatus.SUCCESS(),
+            "Tool call successfully converted to an NLU object"
+        )
         messageSlot = configurator.getReadSlot("replyMessage", Message::class.java)
     }
 
@@ -73,8 +80,8 @@ class ToolToNLU : AbstractSkill() {
 
         logger.trace("have json: ${msg.content}")
         val fixups = msg.content.replace("'{","{" )
-                .replace("}'","}" )
-                .replace("'","\"")
+            .replace("}'","}" )
+            .replace("'","\"")
         logger.trace("have fixups: $fixups")
 
         val json: JsonObject = parser.parse(StringBuilder(fixups)) as JsonObject

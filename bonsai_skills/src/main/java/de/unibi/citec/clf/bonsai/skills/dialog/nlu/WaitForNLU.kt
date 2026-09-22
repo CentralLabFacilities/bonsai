@@ -56,7 +56,7 @@ class WaitForNLU : AbstractSkill() {
         private const val KEY_ENTITY = "#_ENTITIES"
     }
 
-    private var allowedLanguages : MutableList<Language>? = null
+    private var allowedLanguages: MutableList<Language>? = null
 
     private var required_entities: List<String> = listOf()
 
@@ -78,56 +78,114 @@ class WaitForNLU : AbstractSkill() {
     private var langSlot: MemorySlotWriter<LanguageType>? = null
 
     override fun configure(configurator: ISkillConfigurator) {
-        sensorkey = configurator.requestOptionalValue(KEY_SENSOR, sensorkey)
-        any = configurator.requestOptionalBool(KEY_ANY, any)
+        sensorkey = configurator.requestOptionalValue(
+            KEY_SENSOR,
+            sensorkey,
+            "Sensor key of the NLU sensor to listen to."
+        )
+
+        any = configurator.requestOptionalBool(
+            KEY_ANY,
+            any,
+            "Listen to any NLU and disable #_INTENTS and #_ENTITIES."
+        )
+
         if (!any) {
-            required_entities = configurator.requestOptionalValue(KEY_ENTITY, "").split(";")
+            required_entities = configurator.requestOptionalValue(
+                KEY_ENTITY,
+                "",
+                "List of entity keys that must be present in the understood NLU, separated by ';'."
+            ).split(";")
+
             if (!configurator.hasConfigurationKey(KEY_ENTITY)) {
                 required_entities = listOf()
             }
-            possible_intents = configurator.requestValue(KEY_DEFAULT).split(";")
+
+            possible_intents = configurator.requestValue(
+                KEY_DEFAULT,
+                "List of intents to listen for, separated by ';'."
+            ).split(";")
+
             for (nt in possible_intents) {
                 if (nt.isBlank()) continue
-                tokenMap[nt] = configurator.requestExitToken(ExitStatus.SUCCESS().ps(nt))
+                tokenMap[nt] = configurator.requestExitToken(
+                    ExitStatus.SUCCESS().ps(nt),
+                    "The intent '$nt' was understood."
+                )
             }
         } else if (configurator.hasConfigurationKey(KEY_DEFAULT)) {
             throw SkillConfigurationException("cant use $KEY_ANY and $KEY_DEFAULT together")
-        }  else if (configurator.hasConfigurationKey(KEY_ENTITY)) {
+        } else if (configurator.hasConfigurationKey(KEY_ENTITY)) {
             throw SkillConfigurationException("cant use $KEY_ANY and $KEY_ENTITY together")
         } else {
-            tokenMap["any"] = configurator.requestExitToken(ExitStatus.SUCCESS())
+            tokenMap["any"] = configurator.requestExitToken(
+                ExitStatus.SUCCESS(),
+                "An NLU was understood."
+            )
         }
 
+        timeout = configurator.requestOptionalInt(
+            KEY_TIMEOUT,
+            timeout.toInt(),
+            "Amount of time to wait for a matching NLU in milliseconds. A positive value enables the timeout."
+        ).toLong()
 
-        timeout = configurator.requestOptionalInt(KEY_TIMEOUT, timeout.toInt()).toLong()
+        speechSensor = configurator.getSensor(
+            sensorkey,
+            NLU::class.java
+        )
 
-        speechSensor = configurator.getSensor<NLU>(sensorkey, NLU::class.java)
-        nluSlot = configurator.getWriteSlot<NLU>("NLUSlot", NLU::class.java)
+        nluSlot = configurator.getWriteSlot(
+            "NLUSlot",
+            NLU::class.java,
+            "Memory slot where the understood NLU is stored."
+        )
 
         if (timeout > 0) {
-            tokenSuccessPsTimeout = configurator.requestExitToken(ExitStatus.ERROR().ps("timeout"))
+            tokenSuccessPsTimeout = configurator.requestExitToken(
+                ExitStatus.ERROR().ps("timeout"),
+                "The configured timeout was reached without understanding a matching NLU."
+            )
         }
 
-        if (configurator.requestOptionalBool(KEY_SET_LANGUAGE, false)) {
-            langSlot = configurator.getWriteSlot("Language", LanguageType::class.java)
+        if (configurator.requestOptionalBool(
+                KEY_SET_LANGUAGE,
+                false,
+                "Store the language of the understood NLU in the Language slot."
+            )
+        ) {
+            langSlot = configurator.getWriteSlot(
+                "Language",
+                LanguageType::class.java,
+                "Memory slot where the language of the understood NLU is stored."
+            )
         }
 
-        speechActuator = configurator.getActuator("SpeechActuator", SpeechActuator::class.java)
+        speechActuator = configurator.getActuator(
+            "SpeechActuator",
+            SpeechActuator::class.java
+        )
 
         var langs = ""
-        if(any) {
-             langs = configurator.requestOptionalValue(KEY_ALLOWED_LANGUAGES, "")
+        if (any) {
+            langs = configurator.requestOptionalValue(
+                KEY_ALLOWED_LANGUAGES,
+                "",
+                "Allowed NLU languages, separated by ';'. Only used when #_ANY is enabled."
+            )
         }
-        if (configurator.hasConfigurationKey(KEY_ALLOWED_LANGUAGES)) {
-            //TODO
-            //if(!any) throw ConfigurationException("!any has no allowed_language support")
 
+        if (configurator.hasConfigurationKey(KEY_ALLOWED_LANGUAGES)) {
             allowedLanguages = mutableListOf()
 
             for (l in langs.split(";")) {
                 allowedLanguages?.add(Language.valueOf(l))
             }
-            tokenErrorLanguage = configurator.requestExitToken(ExitStatus.ERROR().ps("language"))
+
+            tokenErrorLanguage = configurator.requestExitToken(
+                ExitStatus.ERROR().ps("language"),
+                "The understood NLU uses a language that is not allowed."
+            )
         }
     }
 
@@ -139,7 +197,7 @@ class WaitForNLU : AbstractSkill() {
 
         try {
             logger.debug("Enabling ASR")
-            speechActuator?.enableASR(true)?.get(500,TimeUnit.MILLISECONDS)
+            speechActuator?.enableASR(true)?.get(500, TimeUnit.MILLISECONDS)
         } catch (ex: Exception) {
             logger.warn(ex)
         }
@@ -163,17 +221,22 @@ class WaitForNLU : AbstractSkill() {
             }
             return ExitToken.loop(50)
         }
+
         logger.debug("have new understanding...")
 
         val understood = helper!!.allNLUs
+
         if (any) {
             val nlu = understood[0]
+
             langSlot?.apply {
                 logger.debug("write LanguageType: '${nlu.lang}' to slot")
                 memorize(LanguageType(nlu.lang))
             }
 
-            if (!allowedLanguages.isNullOrEmpty() && !allowedLanguages?.contains(nlu.lang)!!) {
+            if (!allowedLanguages.isNullOrEmpty() &&
+                !allowedLanguages?.contains(nlu.lang)!!
+            ) {
                 logger.error("Input has wrong Language: ${nlu.lang} (allowed $allowedLanguages)")
                 return tokenErrorLanguage!!
             }
@@ -185,21 +248,30 @@ class WaitForNLU : AbstractSkill() {
             } catch (e: CommunicationException) {
                 return ExitToken.fatal()
             }
-        } else for (intent in possible_intents) {
-            for (nt in understood) {
-                if (intent == nt.intent &&  nt.getEntities().map { it.key }.containsAll(required_entities)) {
-                    try {
-                        nluSlot?.memorize<NLU>(nt)
-                        langSlot?.memorize(LanguageType(nt.lang))
-                    } catch (e: CommunicationException) {
-                        logger.error("Can not write terminals $intent to memory.", e)
-                        return ExitToken.fatal()
+        } else {
+            for (intent in possible_intents) {
+                for (nt in understood) {
+                    if (intent == nt.intent &&
+                        nt.getEntities().map { it.key }.containsAll(required_entities)
+                    ) {
+                        try {
+                            nluSlot?.memorize<NLU>(nt)
+                            langSlot?.memorize(LanguageType(nt.lang))
+                        } catch (e: CommunicationException) {
+                            logger.error(
+                                "Can not write terminals $intent to memory.",
+                                e
+                            )
+                            return ExitToken.fatal()
+                        }
+
+                        logger.info("understood \"$nt\"")
+                        return tokenMap[intent]!!
                     }
-                    logger.info("understood \"$nt\"")
-                    return tokenMap[intent]!!
                 }
             }
         }
+
         return ExitToken.loop(50)
     }
 

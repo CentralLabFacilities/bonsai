@@ -41,13 +41,26 @@ class CheckIntent : AbstractSkill() {
     private var nluSlot: MemorySlotReader<NLU>? = null
 
     override fun configure(configurator: ISkillConfigurator) {
-        possibleIntents = configurator.requestValue(KEY_DEFAULT).split(";")
+        possibleIntents = configurator.requestValue(
+            KEY_DEFAULT,
+            "List of allowed intents separated by ';'"
+        ).split(";")
         for (nt in possibleIntents) {
             if (nt.isBlank()) continue
-            tokenMap[nt] = configurator.requestExitToken(ExitStatus.SUCCESS().ps(nt))
+            tokenMap[nt] = configurator.requestExitToken(
+                ExitStatus.SUCCESS().ps(nt),
+                "NLU has the specified intent"
+            )
         }
-        tokenError = configurator.requestExitToken(ExitStatus.ERROR().ps("other"))
-        nluSlot = configurator.getReadSlot<NLU>("NLUSlot", NLU::class.java)
+        tokenError = configurator.requestExitToken(
+            ExitStatus.ERROR().ps("other"),
+            "intent is not listed"
+        )
+        nluSlot = configurator.getReadSlot<NLU>(
+            "NLUSlot",
+            NLU::class.java,
+            "Memory slot containing the NLU result to check the intent of."
+        )
     }
 
     override fun init(): Boolean {

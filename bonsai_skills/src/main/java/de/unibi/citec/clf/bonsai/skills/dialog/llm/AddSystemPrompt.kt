@@ -44,9 +44,15 @@ class AddSystemPrompt : AbstractSkill() {
     private var history : MessageList = MessageList()
 
     override fun configure(configurator: ISkillConfigurator) {
-        promt = configurator.requestValue(KEY_PROMPT)
+        promt = configurator.requestValue(
+            KEY_PROMPT,
+            "The system prompt that shall be added to the conversation history."
+        )
 
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
+        tokenSuccess = configurator.requestExitToken(
+            ExitStatus.SUCCESS(),
+            "System prompt successfully added to the history"
+        )
         slotHistory = configurator.getSlot("history", MessageList::class.java)
 
     }
