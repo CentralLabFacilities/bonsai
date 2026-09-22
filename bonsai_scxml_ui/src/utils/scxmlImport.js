@@ -354,6 +354,12 @@ const isNamedFinalState = (fullSkillName) => {
     return name === "end" || name === "fatal";
 };
 
+// In Bonsai, a sub-state machine is represented directly as
+// `<state ... src="...">`. Keep this in one helper so top-level states and
+// children of Compound/Parallel containers are classified consistently.
+const getSubMachineSource = (stateElem) =>
+    stateElem?.getAttribute?.("src")?.trim() || "";
+
 const parseEditorPositions = (stateElem) => {
     const metadataElems = Array.from(stateElem?.children || []).filter(
         (child) => child.localName === "metadata"
@@ -640,7 +646,7 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             });
         }
 
-        const baseSkillApiData = behaviorExit
+        const baseSkillApiData = behaviorExit || srcAttr
             ? {}
             : (await fetchSkillData(baseSkillName)) || {};
 
@@ -663,7 +669,7 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                 ? (await fetchSkillData(baseSkillName, localParams)) || baseSkillApiData
                 : baseSkillApiData;
 
-        if (!behaviorExit) {
+        if (!behaviorExit && !srcAttr) {
             // The SCXML document is authoritative for connections that already
             // exist. If a parameterized skill response unexpectedly omits a
             // slot explicitly declared by this state, recover the request from
@@ -848,7 +854,7 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             stateElem.localName === "final" ||
             stateElem.getAttribute("final") === "true" ||
             isNamedFinalState(fullSkillName);
-        const srcAttr = stateElem.getAttribute("src");
+        const srcAttr = getSubMachineSource(stateElem);
         const isInitial = fullSkillName === initialAttr;
 
         // Position(s) aus <metadata>. Shared editor aliases (End/Fatal and
@@ -1062,16 +1068,29 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                                 }
                             });
 
-                        const nodeData = await buildSkillNodeData(stId, isSubInitial, false, "", stElem);
+                        const stSrc = getSubMachineSource(stElem);
+                        const nodeData = await buildSkillNodeData(
+                            stId,
+                            isSubInitial,
+                            false,
+                            stSrc,
+                            stElem
+                        );
+                        const childType = stSrc ? "submachine" : "custom";
                         newNodes.push({
                             id: stNodeId,
                             position: { x: 15 + sIdx * 180, y: 35 },
                             parentId: compoundNodeId,
                             extent: "parent",
-                            type: "custom",
+                            type: childType,
                             data: nodeData,
                         });
-                        appendImportedEditorClones(stElem, nodeData, stNodeId, "custom");
+                        appendImportedEditorClones(
+                            stElem,
+                            nodeData,
+                            stNodeId,
+                            childType
+                        );
                     }
                 }
                 // FALL A2: Lane ist ein einfacher State (z.B. Wait)
@@ -1102,17 +1121,30 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                             }
                         });
 
-                    const nodeData = await buildSkillNodeData(stId, false, false, "", branchElem);
+                    const stSrc = getSubMachineSource(branchElem);
+                    const nodeData = await buildSkillNodeData(
+                        stId,
+                        false,
+                        false,
+                        stSrc,
+                        branchElem
+                    );
+                    const childType = stSrc ? "submachine" : "custom";
 
                     newNodes.push({
                         id: stNodeId,
                         position: { x: 20, y: 25 },
                         parentId: laneNodeId,
                         extent: "parent",
-                        type: "custom",
+                        type: childType,
                         data: nodeData,
                     });
-                    appendImportedEditorClones(branchElem, nodeData, stNodeId, "custom");
+                    appendImportedEditorClones(
+                        branchElem,
+                        nodeData,
+                        stNodeId,
+                        childType
+                    );
 
                     // Verbindung von Wait zum Lane-Rand herstellen (nur 1x)
                     laneEvents.forEach((levt) => {
@@ -1250,17 +1282,30 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                         }
                     });
 
-                const nodeData = await buildSkillNodeData(csId, isSubInitial, false, "", csElem);
+                const csSrc = getSubMachineSource(csElem);
+                const nodeData = await buildSkillNodeData(
+                    csId,
+                    isSubInitial,
+                    false,
+                    csSrc,
+                    csElem
+                );
+                const childType = csSrc ? "submachine" : "custom";
 
                 newNodes.push({
                     id: csNodeId,
                     position: { x: 20 + i * 220, y: headerHeight + 10 },
                     parentId: compoundNodeId,
                     extent: "parent",
-                    type: "custom",
+                    type: childType,
                     data: nodeData,
                 });
-                appendImportedEditorClones(csElem, nodeData, csNodeId, "custom");
+                appendImportedEditorClones(
+                    csElem,
+                    nodeData,
+                    csNodeId,
+                    childType
+                );
             }
             continue;
         }
@@ -1537,21 +1582,33 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
         }
     });
 
+    // A state carrying `src` is always a Sub-SM in the editor. Keep this final
+    // normalization as an invariant so nested import branches cannot
+    // accidentally leave a Sub-SM rendered as a normal skill.
+    const normalizedImportedNodes = newNodes.map((node) =>
+        node.data?.src && node.type !== "submachine"
+            ? { ...node, type: "submachine" }
+            : node
+    );
+
     // Recreate visual Compound/Parallel boundary exit points from the
     // semantic SCXML transitions. The helper edges remain editor-only and are
     // collapsed again by prepareGraphForScxml on save.
-    let finalNodes = newNodes;
-    let finalEdges = materializeImportedBoundaryTransitions(newNodes, newEdges);
+    let finalNodes = normalizedImportedNodes;
+    let finalEdges = materializeImportedBoundaryTransitions(
+        normalizedImportedNodes,
+        newEdges
+    );
 
     // 5. Automatisches Dagre-Layouting (Dagre nutzt exakt berechnete Maße)
 
-    if (!hasCustomPositions && newNodes.length > 0) {
-        const topLevelNodes = newNodes.filter((n) => !n.parentId);
+    if (!hasCustomPositions && finalNodes.length > 0) {
+        const topLevelNodes = finalNodes.filter((n) => !n.parentId);
 
         const topLevelEdgesForDagre = finalEdges
             .map((edge) => {
-                const sourceNode = newNodes.find((n) => n.id === edge.source);
-                const targetNode = newNodes.find((n) => n.id === edge.target);
+                const sourceNode = finalNodes.find((n) => n.id === edge.source);
+                const targetNode = finalNodes.find((n) => n.id === edge.target);
 
                 const effectiveSourceId = sourceNode?.parentId || edge.source;
                 const effectiveTargetId = targetNode?.parentId || edge.target;

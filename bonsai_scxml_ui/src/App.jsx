@@ -274,6 +274,7 @@ function AppContent() {
     const [edges, setEdges, onEdgesChange] = useEdgesState([]);
     const [slotNodes, setSlotNodes, onSlotNodesChange] = useNodesState([]);
     const [slotEdges, setSlotEdges, onSlotEdgesChange] = useEdgesState([]);
+
     // Internal graph clipboard. This intentionally does not use the system
     // clipboard: Ctrl+C copies the current React Flow selection and
     // Ctrl+V recreates it with fresh graph IDs.
