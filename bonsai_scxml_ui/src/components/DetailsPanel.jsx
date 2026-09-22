@@ -1354,15 +1354,8 @@ function DetailsPanel({
                                     !selectedNode.data.isInitial
                                 }
                                 onClick={onSetInitial}
-                                title={
-                                    selectedNode.data.isInitial
-                                        ? "Remove initial state"
-                                        : "Set as initial state"
-                                }
                             >
-                                {selectedNode.data.isInitial
-                                    ? "Remove initial"
-                                    : "Set initial"}
+                                Initial set
                             </button>
                         </div>
 
@@ -1519,7 +1512,7 @@ function DetailsPanel({
                             </>
                         )}
 
-                        {!isSubMachine && !hasNopSend && (
+                        {!hasNopSend && (
                             <div className="events-container">
                                 <h3>Exit Tokens</h3>
 

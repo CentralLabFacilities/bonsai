@@ -194,6 +194,8 @@ export function useSubStateMachines({
                         xmlText = await response.text();
                     }
 
+                    const behaviorExitEvents =
+                        extractBehaviorExitEventsFromScxml(xmlText);
                     const declaredInheritedSlots =
                         extractInheritedSlotsFromScxml(xmlText);
                     const parsedChild = await parseScxmlFile(
@@ -208,11 +210,22 @@ export function useSubStateMachines({
                     const localDataModel = getLocalDataModelEntries(
                         parsedChild.globalDataModel
                     );
+                    const existingEventsById = new Map(
+                        (node.data?.events || []).map((event) => [
+                            String(event?.id || ""),
+                            event,
+                        ])
+                    );
+                    const events = behaviorExitEvents.map((eventId) => ({
+                        ...(existingEventsById.get(String(eventId)) || {}),
+                        id: eventId,
+                    }));
 
                     return {
                         ...node,
                         data: {
                             ...node.data,
+                            events,
                             inheritedSlots,
                             localDataModel,
                         },

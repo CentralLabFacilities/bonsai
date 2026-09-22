@@ -1512,14 +1512,10 @@ function AppContent() {
                 );
             }
 
-            // Prefer the real outward events emitted by Nop nodes. Keep the
-            // legacy fallback only when the source cannot be inspected or
-            // does not expose an outward Nop event.
-            const events = (
-                behaviorEvents.length > 0
-                    ? behaviorEvents
-                    : ["success", "failure"]
-            ).map((eventId) => ({ id: eventId }));
+            // A Sub-SM exposes exactly the events forwarded by Nop states
+            // inside the child machine. Do not invent generic success/failure
+            // tokens: an empty child interface should remain visibly empty.
+            const events = behaviorEvents.map((eventId) => ({ id: eventId }));
 
             return {
                 id: getNodeId(),
@@ -4470,9 +4466,6 @@ function AppContent() {
                                     setNodes((nds) => {
                                         const parentId =
                                             selectedNode.parentId || null;
-                                        const removeInitial = Boolean(
-                                            selectedNode.data?.isInitial
-                                        );
 
                                         const parentCompound =
                                             parentId
@@ -4496,9 +4489,7 @@ function AppContent() {
                                                     data: {
                                                         ...node.data,
                                                         initialChildId:
-                                                            removeInitial
-                                                                ? null
-                                                                : selectedNode.id,
+                                                        selectedNode.id,
                                                     },
                                                 };
                                             }
@@ -4516,20 +4507,6 @@ function AppContent() {
                                                 "parallelLane"
                                             ) {
                                                 return node;
-                                            }
-
-                                            if (removeInitial) {
-                                                if (node.id !== selectedNode.id) {
-                                                    return node;
-                                                }
-
-                                                return {
-                                                    ...node,
-                                                    data: {
-                                                        ...node.data,
-                                                        isInitial: false,
-                                                    },
-                                                };
                                             }
 
                                             return {
