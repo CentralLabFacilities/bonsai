@@ -575,6 +575,7 @@ function AppContent() {
         drawerData,
         setDrawerData,
         slotConnectionDrag,
+        openConditionDrawer,
         isValidConnection,
         handleConnectStart,
         handleConnectEnd,
@@ -2247,16 +2248,8 @@ function AppContent() {
                 (change) => !slotEdgeIds.has(change.id)
             );
 
-            // Transition selection is owned by the editor click handlers so
-            // Ctrl/Meta multi-selection cannot be overwritten by React Flow's
-            // built-in single-edge selection updates. Keep all non-selection
-            // changes (remove, reset, etc.) flowing through normally.
-            const structuralTransitionChanges = transitionChanges.filter(
-                (change) => change.type !== "select"
-            );
-
-            if (structuralTransitionChanges.length > 0) {
-                onEdgesChange(structuralTransitionChanges);
+            if (transitionChanges.length > 0) {
+                onEdgesChange(transitionChanges);
             }
 
             if (slotChanges.length === 0) {
@@ -4491,6 +4484,14 @@ function AppContent() {
                                 onHoverTransitionNode={(nodeId) =>
                                     setHoveredEditorNodeId(nodeId || null)
                                 }
+                                onOpenTransitionPanel={(sourceNodeId, eventId, targetNodeId = null) => {
+                                    if (!sourceNodeId || !eventId) return;
+                                    openConditionDrawer(
+                                        sourceNodeId,
+                                        eventId,
+                                        targetNodeId || null
+                                    );
+                                }}
                                 hasInitialNode={hasInitialNode}
                                 activeTab={activeTab}
                                 setActiveTab={setActiveTab}

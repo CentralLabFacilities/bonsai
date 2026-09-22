@@ -791,6 +791,7 @@ function DetailsPanel({
                           containerOutgoingTransitions = [],
                           onNavigateTransitionNode,
                           onHoverTransitionNode,
+                          onOpenTransitionPanel,
                       }) {
     const isSubMachine =
         selectedNode.type === "submachine" ||
@@ -811,6 +812,10 @@ function DetailsPanel({
         isNopSkill &&
         Array.isArray(selectedNode.data?.behaviorExitEvents) &&
         String(selectedNode.data.behaviorExitEvents[0] || "").trim().length > 0;
+    const editableExitTokens = getEditableExitTokens(
+        selectedNode.data?.events || []
+    );
+    const firstEditableExitToken = editableExitTokens[0] || null;
     const usesEditorInstanceId =
         !isSubMachine &&
         ["nop", "fatal", "end"].includes(selectedSkillType);
@@ -1516,7 +1521,29 @@ function DetailsPanel({
 
                         {!hasNopSend && (
                             <div className="events-container">
-                                <h3>Exit Tokens</h3>
+                                <div className="compact-slot-header">
+                                    <h3>Exit Tokens</h3>
+
+                                    {!isContainerState && firstEditableExitToken && (
+                                        <button
+                                            type="button"
+                                            className="exit-token-transition-button"
+                                            title="Open transition editor"
+                                            onClick={() =>
+                                                onOpenTransitionPanel?.(
+                                                    selectedNode.id,
+                                                    firstEditableExitToken.id,
+                                                    resolveEventTargetNodeId(
+                                                        firstEditableExitToken
+                                                    )
+                                                )
+                                            }
+                                        >
+                                            <FiActivity size={12} />
+                                            Transitions
+                                        </button>
+                                    )}
+                                </div>
 
                                 <div className="event-list">
                                     {isContainerState &&
@@ -1540,13 +1567,15 @@ function DetailsPanel({
                                                         {transition.eventDisplayName}
                                                     </span>
 
-                                                    <span
-                                                        className={`detail-badge exit-token-badge exit-token-badge-${getExitTokenType(
-                                                            transition.eventId
-                                                        )}`}
-                                                    >
-                                                        Exit Token
-                                                    </span>
+                                                    <div className="exit-token-header-actions">
+                                                        <span
+                                                            className={`detail-badge exit-token-badge exit-token-badge-${getExitTokenType(
+                                                                transition.eventId
+                                                            )}`}
+                                                        >
+                                                            Exit Token
+                                                        </span>
+                                                    </div>
                                                 </div>
 
                                                 <div className="exit-token-node-references">
@@ -1570,9 +1599,7 @@ function DetailsPanel({
                                             </div>
                                         ))}
 
-                                    {getEditableExitTokens(
-                                        selectedNode.data.events
-                                    ).map((event, index) => (
+                                    {editableExitTokens.map((event, index) => (
                                             <div
                                                 className={`slot-text-field compact-slot-card exit-token-card exit-token-${getExitTokenType(
                                                     event.id
@@ -1592,13 +1619,15 @@ function DetailsPanel({
                                                         {event.id}
                                                     </span>
 
-                                                    <span
-                                                        className={`detail-badge exit-token-badge exit-token-badge-${getExitTokenType(
-                                                            event.id
-                                                        )}`}
-                                                    >
-                                                        Exit Token
-                                                    </span>
+                                                    <div className="exit-token-header-actions">
+                                                        <span
+                                                            className={`detail-badge exit-token-badge exit-token-badge-${getExitTokenType(
+                                                                event.id
+                                                            )}`}
+                                                        >
+                                                            Exit Token
+                                                        </span>
+                                                    </div>
                                                 </div>
 
                                                 {event.description && (
