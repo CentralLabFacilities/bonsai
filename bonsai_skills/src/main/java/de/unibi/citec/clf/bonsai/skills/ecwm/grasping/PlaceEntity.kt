@@ -86,35 +86,65 @@ class PlaceEntity : AbstractSkill() {
     private var slotTargetPose: MemorySlotReader<Pose3D>? = null;
 
     override fun configure(configurator: ISkillConfigurator) {
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
-        tokenErrorNoPlan = configurator.requestExitToken(ExitStatus.ERROR().ps("no_plan"))
-        tokenErrorOther = configurator.requestExitToken(ExitStatus.ERROR().ps("other"))
+        tokenSuccess = configurator.requestExitToken(
+            ExitStatus.SUCCESS(),
+            "The object should be successfully placed"
+        )
+        tokenErrorNoPlan = configurator.requestExitToken(
+            ExitStatus.ERROR().ps("no_plan"),
+            "Could not plan a placing motion"
+        )
+        tokenErrorOther = configurator.requestExitToken(
+            ExitStatus.ERROR().ps("other"),
+            "Placing failed."
+        )
 
         ecwm = configurator.getActuator("ECWMGrasping", ECWMGrasping::class.java)
 
-        slot = configurator.getReadSlot("AttachedEntity", Entity::class.java)
+        slot = configurator.getReadSlot(
+            "AttachedEntity",
+            Entity::class.java,
+            "the entity to be placed. Should be previously attached to gripper. Can be Null"
+        )
 
-        keepScene = configurator.requestOptionalBool(KEY_KEEP_SCENE, keepScene)
+        keepScene = configurator.requestOptionalBool(
+            KEY_KEEP_SCENE,
+            keepScene,
+            "do not update planning scene"
+        )
 
-        if(configurator.hasConfigurationKey(KEY_POSE_X) || configurator.hasConfigurationKey(KEY_POSE_Y)) {
+        if (configurator.hasConfigurationKey(KEY_POSE_X) ||
+            configurator.hasConfigurationKey(KEY_POSE_Y)
+        ) {
             pose_x = configurator.requestDouble(KEY_POSE_X)
             pose_y = configurator.requestDouble(KEY_POSE_Y)
             frame_id = configurator.requestValue(KEY_FRAME_ID)
             pose_z = configurator.requestOptionalDouble(KEY_POSE_Z, pose_z)
         } else {
-            slotTargetPose = configurator.getReadSlot("TargetPose", Pose3D::class.java)
+            slotTargetPose = configurator.getReadSlot(
+                "TargetPose",
+                Pose3D::class.java,
+                "the target pose in which the entity should be placed"
+            )
         }
 
-        placement_margin = configurator.requestOptionalDouble(KEY_ACCEPTABLE_MARGIN, placement_margin)
-        if(configurator.hasConfigurationKey(KEY_ACCEPTABLE_MARGIN)) {
+        placement_margin = configurator.requestOptionalDouble(
+            KEY_ACCEPTABLE_MARGIN,
+            placement_margin,
+            "acceptable margin of error for the placement. Default is 0.15m"
+        )
+
+        if (configurator.hasConfigurationKey(KEY_ACCEPTABLE_MARGIN)) {
             own_margin = true
             max_z_offset = configurator.requestOptionalDouble("max_z", max_z_offset)
         } else if (configurator.hasConfigurationKey("max_z")) {
             throw ConfigurationException("max_z only with own margins")
         }
-        upright = configurator.requestOptionalBool(KEY_UPRIGHT,upright)
+
+        upright = configurator.requestOptionalBool(KEY_UPRIGHT, upright)
         flip = configurator.requestOptionalBool(KEY_UPSIDE_DOWN, flip)
-        if(upright && flip){
+
+        if (upright && flip) {
             throw ConfigurationException("Cannot use upright and at the same time flip!")
         }
     }

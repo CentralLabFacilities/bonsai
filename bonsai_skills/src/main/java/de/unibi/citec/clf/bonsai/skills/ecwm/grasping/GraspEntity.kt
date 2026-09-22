@@ -62,24 +62,49 @@ class GraspEntity : AbstractSkill() {
     private var add_fallback = false
 
     override fun configure(configurator: ISkillConfigurator) {
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS().ps("grasped"))
-        tokenSuccessMaybe = configurator.requestExitToken(ExitStatus.SUCCESS().ps("maybe"))
-        tokenErrorNoPlan = configurator.requestExitToken(ExitStatus.ERROR().ps("no_plan"))
-        tokenErrorOther = configurator.requestExitToken(ExitStatus.ERROR().ps("other"))
+        tokenSuccess = configurator.requestExitToken(
+            ExitStatus.SUCCESS().ps("grasped"),
+            "The object should be successfully grasped"
+        )
+        tokenSuccessMaybe = configurator.requestExitToken(
+            ExitStatus.SUCCESS().ps("maybe"),
+            "The environment changed during grasping, plan could've been invalid and failed"
+        )
+        tokenErrorNoPlan = configurator.requestExitToken(
+            ExitStatus.ERROR().ps("no_plan"),
+            "Could not plan a grasping motion"
+        )
+        tokenErrorOther = configurator.requestExitToken(
+            ExitStatus.ERROR().ps("other"),
+            "Grasping failed."
+        )
 
         ecwm = configurator.getActuator("ECWMGrasping", ECWMGrasping::class.java)
 
-        entityName = configurator.requestOptionalValue(KEY_ENTITY, entityName)
-        if(!configurator.hasConfigurationKey(KEY_ENTITY)) {
-            slot = configurator.getReadSlot("Entity", Entity::class.java)
+        entityName = configurator.requestOptionalValue(
+            KEY_ENTITY,
+            entityName,
+            "the name of the entity to be grasped"
+        )
+
+        if (!configurator.hasConfigurationKey(KEY_ENTITY)) {
+            slot = configurator.getReadSlot(
+                "Entity",
+                Entity::class.java,
+                "the entity to be grasped. Will be used if option \"entity\" is not set"
+            )
             logger.info("using slot")
         }
 
         keep_scene = configurator.requestOptionalBool(KEY_KEEP_SCENE, keep_scene)
-        upright = configurator.requestOptionalBool(KEY_UPRIGHT,upright)
-        carryPose = configurator.requestOptionalValue(KEY_CARRY_POSE,carryPose)
-        add_fallback = configurator.requestOptionalBool(KEY_ADD_FALLBACK, add_fallback)
+        upright = configurator.requestOptionalBool(KEY_UPRIGHT, upright)
+        carryPose = configurator.requestOptionalValue(KEY_CARRY_POSE, carryPose)
 
+        add_fallback = configurator.requestOptionalBool(
+            KEY_ADD_FALLBACK,
+            add_fallback,
+            "add top grasp fallback if classic grasp fails"
+        )
     }
 
     override fun init(): Boolean {

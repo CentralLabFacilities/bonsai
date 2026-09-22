@@ -82,15 +82,36 @@ class GetCategoryStorage : AbstractSkill() {
 
     @Throws(SkillConfigurationException::class)
     override fun configure(configurator: ISkillConfigurator) {
-        tokenSuccessWithStorage = configurator.requestExitToken(ExitStatus.SUCCESS().ps("withStorage"))
-        tokenSuccessNoStorage = configurator.requestExitToken(ExitStatus.SUCCESS().ps("noStorage"))
-        tokenNoStorage = configurator.requestExitToken(ExitStatus.ERROR().ps("noCategoryStorage"))
+        tokenSuccessWithStorage = configurator.requestExitToken(
+            ExitStatus.SUCCESS().ps("withStorage"),
+            "Found the Container Entity and known storage location for the objects category,"
+        )
+        tokenSuccessNoStorage = configurator.requestExitToken(
+            ExitStatus.SUCCESS().ps("noStorage"),
+            "Found the Container Entity but no storage"
+        )
+        tokenNoStorage = configurator.requestExitToken(
+            ExitStatus.ERROR().ps("noCategoryStorage"),
+            "No Known Storage for the category found"
+        )
 
         ecwm = configurator.getActuator<ECWMRobocup>("ECWMRobocup", ECWMRobocup::class.java)
 
-        val useCatSlot = configurator.requestOptionalBool(KEY_USE_CATEGORY_SLOT, false)
-        val useModelSlot = configurator.requestOptionalBool(KEY_USE_MODEL_SLOT, false)
-        category = configurator.requestOptionalValue(KEY_CATEGORY, "")
+        val useCatSlot = configurator.requestOptionalBool(
+            KEY_USE_CATEGORY_SLOT,
+            false,
+            "Read from `Category` Slot (default: false)"
+        )
+        val useModelSlot = configurator.requestOptionalBool(
+            KEY_USE_MODEL_SLOT,
+            false,
+            "Read from `Model` Slot (default: false)"
+        )
+        category = configurator.requestOptionalValue(
+            KEY_CATEGORY,
+            "",
+            "Category which default storage should be found. If given, no slot will be used."
+        )
 
         if (!category.isEmpty() && useCatSlot || !category.isEmpty() && useModelSlot) {
             throw ConfigurationException("Cant combine $KEY_CATEGORY with $KEY_USE_MODEL_SLOT or $KEY_USE_CATEGORY_SLOT")
@@ -100,30 +121,60 @@ class GetCategoryStorage : AbstractSkill() {
         }
 
         if (useCatSlot) {
-            categoryInSlot = configurator.getReadSlot<String>("Category", String::class.java)
+            categoryInSlot = configurator.getReadSlot<String>(
+                "Category",
+                String::class.java,
+                "What category this object has"
+            )
         } else {
             //Write category to slot if not given per slot always!
-            categorySlot = configurator.getWriteSlot<String>("Category", String::class.java)
+            categorySlot = configurator.getWriteSlot<String>(
+                "Category",
+                String::class.java,
+                "What category this object has"
+            )
             categoryInSlot = null
         }
 
         if (category.isEmpty() && !useCatSlot) {
             //Only use model/entity if no category is given (via data model or slot)!
             if (useModelSlot) {
-                modelInSlot = configurator.getReadSlot<Model>("Model", Model::class.java)
+                modelInSlot = configurator.getReadSlot<Model>(
+                    "Model",
+                    Model::class.java,
+                    "The Entity to get the category from"
+                )
             } else {
-                entityInSlot = configurator.getReadSlot<Entity>("Entity", Entity::class.java)
+                entityInSlot = configurator.getReadSlot<Entity>(
+                    "Entity",
+                    Entity::class.java,
+                    "The Entity to get the category from"
+                )
             }
         }
 
-        storageSlot = configurator.getWriteSlot<String>("Storage", String::class.java)
-        containerSlot = configurator.getWriteSlot<Entity>("Container", Entity::class.java)
+        storageSlot = configurator.getWriteSlot<String>(
+            "Storage",
+            String::class.java,
+            "The default storage of this object"
+        )
+        containerSlot = configurator.getWriteSlot<Entity>(
+            "Container",
+            Entity::class.java,
+            "Which entity this storage belongs to"
+        )
 
-        message = configurator.requestOptionalValue(KEY_MSG, message)
+        message = configurator.requestOptionalValue(
+            KEY_MSG,
+            message,
+            "Message to say. variables: #S=storage #C=category #E=entity(container) #N=giveName"
+        )
         if (message.isNotEmpty()) {
-            speechActuator = configurator.getActuator<SpeechActuator>("SpeechActuator", SpeechActuator::class.java)
+            speechActuator = configurator.getActuator<SpeechActuator>(
+                "SpeechActuator",
+                SpeechActuator::class.java
+            )
         }
-
     }
 
     override fun init(): Boolean {

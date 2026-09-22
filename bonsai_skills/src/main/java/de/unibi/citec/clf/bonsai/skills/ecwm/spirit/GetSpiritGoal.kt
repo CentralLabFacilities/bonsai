@@ -87,33 +87,99 @@ class GetSpiritGoal : AbstractSkill() {
     private var storageName: String = ""
 
     override fun configure(configurator: ISkillConfigurator) {
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
-        tokenError = configurator.requestExitToken(ExitStatus.ERROR().ps("blocked"))
+        tokenSuccess = configurator.requestExitToken(
+            ExitStatus.SUCCESS(),
+            "Got a Reachable Goal"
+        )
 
-        nav = configurator.getWriteSlot("NavigationGoalData", NavigationGoalData::class.java)
-        sg = configurator.getWriteSlot("SpiritGoal", SpiritGoal::class.java)
+        tokenError = configurator.requestExitToken(
+            ExitStatus.ERROR().ps("blocked"),
+            "All possible poses are blocked in costmaps; goal is using nearest target disregarding costmaps"
+        )
 
-        ecwm = configurator.getActuator("ECWMSpirit", ECWMSpirit::class.java)
-        if(logger.isDebugEnabled) ecwmRobocup = configurator.getActuator("ECWMRobocup", ECWMRobocup::class.java)
+        nav = configurator.getWriteSlot(
+            "NavigationGoalData",
+            NavigationGoalData::class.java,
+            "Slot the NavigationGoalData of the SpiritGoal will be written to"
+        )
 
-        useSpirit = configurator.requestOptionalBool(KEY_USE_SPIRIT,useSpirit)
-        if (useSpirit) {
-            spiritSlot = configurator.getReadSlot("SpiritSlot", Spirit::class.java)
-        } else {
-            entityname = configurator.requestOptionalValue(KEY_ENTITY,entityname)
-            if (!configurator.hasConfigurationKey(KEY_ENTITY)) {
-                entity = configurator.getReadSlot("Entity", Entity::class.java)
-            }
+        sg = configurator.getWriteSlot(
+            "SpiritGoal",
+            SpiritGoal::class.java,
+            "The SpiritGoal fetched from the entity"
+        )
 
-            storageName = configurator.requestOptionalValue(KEY_STORAGE,storageName)
-            if (!configurator.hasConfigurationKey(KEY_STORAGE)) {
-                storage = configurator.getReadSlot("Storage", String::class.java)
-            }
-            spiritName = configurator.requestOptionalValue(KEY_SPIRIT, spiritName)
+        ecwm = configurator.getActuator(
+            "ECWMSpirit",
+            ECWMSpirit::class.java
+        )
+
+        if (logger.isDebugEnabled) {
+            ecwmRobocup = configurator.getActuator(
+                "ECWMRobocup",
+                ECWMRobocup::class.java
+            )
         }
 
-        forceMove = configurator.requestOptionalBool(KEY_FORCE_MOVE, forceMove)
-        room = configurator.requestOptionalBool(KEY_ROOM, room)
+        useSpirit = configurator.requestOptionalBool(
+            KEY_USE_SPIRIT,
+            useSpirit,
+            "Use the Spirit from the SpiritSlot instead of constructing one from the entity, spirit and storage parameters"
+        )
+
+        if (useSpirit) {
+            spiritSlot = configurator.getReadSlot(
+                "SpiritSlot",
+                Spirit::class.java,
+                "Spirit to fetch the goal for"
+            )
+        } else {
+            entityname = configurator.requestOptionalValue(
+                KEY_ENTITY,
+                entityname,
+                "Entity name to fetch the goal from"
+            )
+
+            if (!configurator.hasConfigurationKey(KEY_ENTITY)) {
+                entity = configurator.getReadSlot(
+                    "Entity",
+                    Entity::class.java,
+                    "Entity to fetch the goal from, used if the 'entity' option is not set"
+                )
+            }
+
+            storageName = configurator.requestOptionalValue(
+                KEY_STORAGE,
+                storageName,
+                "Storage the Spirit is from"
+            )
+
+            if (!configurator.hasConfigurationKey(KEY_STORAGE)) {
+                storage = configurator.getReadSlot(
+                    "Storage",
+                    String::class.java,
+                    "Storage name of the Spirit"
+                )
+            }
+
+            spiritName = configurator.requestOptionalValue(
+                KEY_SPIRIT,
+                spiritName,
+                "Name of the Spirit"
+            )
+        }
+
+        forceMove = configurator.requestOptionalBool(
+            KEY_FORCE_MOVE,
+            forceMove,
+            "Force movement even if the current position is inside the Spirit"
+        )
+
+        room = configurator.requestOptionalBool(
+            KEY_ROOM,
+            room,
+            "Consider the entity's room when calculating the Spirit goal"
+        )
     }
 
     override fun init(): Boolean {

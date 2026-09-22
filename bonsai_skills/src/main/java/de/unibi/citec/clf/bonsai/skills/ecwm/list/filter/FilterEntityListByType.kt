@@ -60,19 +60,53 @@ class FilterEntityListByType : AbstractSkill() {
     private var typePatternSlot: MemorySlotReader<String>? = null
 
     override fun configure(configurator: ISkillConfigurator) {
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS().ps("notEmpty"))
-        tokenEmptyFilteredList = configurator.requestExitToken(ExitStatus.SUCCESS().ps("empty"))
+        tokenSuccess = configurator.requestExitToken(
+            ExitStatus.SUCCESS().ps("notEmpty"),
+            "Filtered is not empty"
+        )
 
-        entityListMemorySlot = configurator.getReadSlot("EntityList", EntityList::class.java)
-        filteredListMemorySlot = configurator.getWriteSlot("FilteredEntities", EntityList::class.java)
+        tokenEmptyFilteredList = configurator.requestExitToken(
+            ExitStatus.SUCCESS().ps("empty"),
+            "Filtered is empty"
+        )
 
-        pattern = configurator.requestOptionalValue(KEY_PATTERN, pattern)
+        entityListMemorySlot = configurator.getReadSlot(
+            "EntityList",
+            EntityList::class.java,
+            "Slot for the list that should be filtered"
+        )
+
+        filteredListMemorySlot = configurator.getWriteSlot(
+            "FilteredEntities",
+            EntityList::class.java,
+            "The filtered output"
+        )
+
+        pattern = configurator.requestOptionalValue(
+            KEY_PATTERN,
+            pattern,
+            "(RegEx) for the entity types"
+        )
+
         if (!configurator.hasConfigurationKey(KEY_PATTERN)) {
-            typePatternSlot = configurator.getReadSlot("Pattern", String::class.java)
+            typePatternSlot = configurator.getReadSlot(
+                "Pattern",
+                String::class.java,
+                "RegEx for the entity types, used if #_PATTERN is not set"
+            )
         }
 
-        invert = configurator.requestOptionalBool(KEY_INVERT, invert)
-        useRegex = configurator.requestOptionalBool(KEY_REGEX, useRegex)
+        invert = configurator.requestOptionalBool(
+            KEY_INVERT,
+            invert,
+            "Invert matches"
+        )
+
+        useRegex = configurator.requestOptionalBool(
+            KEY_REGEX,
+            useRegex,
+            "Use Regex to match"
+        )
 
     }
 

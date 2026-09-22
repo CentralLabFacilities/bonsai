@@ -66,29 +66,50 @@ class GetAttributeValue : AbstractSkill() {
 
     override fun configure(configurator: ISkillConfigurator) {
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
-        tokenErrorMissing = configurator.requestExitToken(ExitStatus.ERROR().ps("missing"))
-        if(configurator.hasConfigurationKey(KEY_ERROR)) {
-            tokenErrorMultiple = configurator.requestExitToken(ExitStatus.ERROR().ps("multiple"))
+        tokenErrorMissing = configurator.requestExitToken(
+            ExitStatus.ERROR().ps("missing"),
+            "does not have the requested attribute"
+        )
+        if (configurator.hasConfigurationKey(KEY_ERROR)) {
+            tokenErrorMultiple = configurator.requestExitToken(
+                ExitStatus.ERROR().ps("multiple"),
+                "does have multiple values for the requested attribute"
+            )
         }
 
-        key = configurator.requestValue(KEY_ATTRIBUTE)
+        key = configurator.requestValue(
+            KEY_ATTRIBUTE,
+            "The attribute key"
+        )
 
         ecwm = configurator.getActuator("ECWMRobocup", ECWMRobocup::class.java)
         attribute = configurator.getWriteSlot("Value", String::class.java)
 
         if (configurator.hasConfigurationKey(KEY_TYPE)) {
-            if(configurator.hasConfigurationKey(KEY_FROM_STRING))
+            if (configurator.hasConfigurationKey(KEY_FROM_STRING))
                 throw ConfigurationException("cant mix $KEY_TYPE and $KEY_FROM_STRING")
-            if(configurator.hasConfigurationKey(KEY_MODEL_SLOT))
+            if (configurator.hasConfigurationKey(KEY_MODEL_SLOT))
                 throw ConfigurationException("cant mix $KEY_TYPE and $KEY_MODEL_SLOT")
             typename = configurator.requestValue(KEY_TYPE)
         } else {
-            if(configurator.hasConfigurationKey(KEY_FROM_STRING)) {
-                type = configurator.getReadSlot("Type", String::class.java)
+            if (configurator.hasConfigurationKey(KEY_FROM_STRING)) {
+                type = configurator.getReadSlot(
+                    "Type",
+                    String::class.java,
+                    "Use this if option `type_from_string` is set"
+                )
             } else if (configurator.hasConfigurationKey(KEY_MODEL_SLOT)) {
-                model = configurator.getReadSlot("Model", Model::class.java)
+                model = configurator.getReadSlot(
+                    "Model",
+                    Model::class.java,
+                    "Uses this slot to get the modeltype if `use_model_slot` is set"
+                )
             } else {
-                entity = configurator.getReadSlot("Entity", Entity::class.java)
+                entity = configurator.getReadSlot(
+                    "Entity",
+                    Entity::class.java,
+                    "Uses this slot to get the entity if `type` option is not set"
+                )
             }
         }
     }

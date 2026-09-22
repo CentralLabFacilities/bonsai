@@ -44,11 +44,19 @@ class RemoveEntities : AbstractSkill() {
 
         ecwm = configurator.getActuator("ECWMCore", WorldModel::class.java)
 
-        all = configurator.requestOptionalBool("LIST", all)
-        if(all) {
-            entityListSlot = configurator.getReadSlot("EntitiesIn", EntityList::class.java)
+        all = configurator.requestOptionalBool("LIST", all, "Use a list of entities instead of a single entity.")
+        if (all) {
+            entityListSlot = configurator.getReadSlot(
+                "EntitiesIn",
+                EntityList::class.java,
+                "Memory slot containing the entities to be removed."
+            )
         } else {
-            entitySlot = configurator.getReadSlot("Entity", Entity::class.java)
+            entitySlot = configurator.getReadSlot(
+                "Entity",
+                Entity::class.java,
+                "Memory slot containing the entity to be removed."
+            )
         }
 
     }

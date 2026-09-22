@@ -72,25 +72,63 @@ class SayEntity : AbstractSkill() {
     private var langSlot: MemorySlotReader<LanguageType>? = null
     override fun configure(configurator: ISkillConfigurator) {
 
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
+        tokenSuccess = configurator.requestExitToken(
+            ExitStatus.SUCCESS(),
+            "Talk completed successfully"
+        )
 
-        slot = configurator.getReadSlot("Entity", Entity::class.java)
+        slot = configurator.getReadSlot(
+            "Entity",
+            Entity::class.java,
+            "Entity to incorporate into talk"
+        )
 
-        sayText = configurator.requestOptionalValue(SAY_TEXT, sayText)
-        blocking = configurator.requestOptionalBool(KEY_BLOCKING, blocking)
-        useType = configurator.requestOptionalBool(KEY_USE_TYPE, useType)
-        useGivenName = configurator.requestOptionalBool(KEY_USE_NAME, useGivenName)
+        sayText = configurator.requestOptionalValue(
+            SAY_TEXT,
+            sayText,
+            "Text said by the robot. $REPLACE_STRING will be replaced by entity/type"
+        )
 
-        if(useGivenName) {
-            ecwm = configurator.getActuator("ECWMRobocup", ECWMRobocup::class.java)
+        blocking = configurator.requestOptionalBool(
+            KEY_BLOCKING,
+            blocking,
+            "If true skill ends after talk was completed"
+        )
+
+        useType = configurator.requestOptionalBool(
+            KEY_USE_TYPE,
+            useType,
+            "use the modelName of the entity (prefer GIVEN_NAME)"
+        )
+
+        useGivenName = configurator.requestOptionalBool(
+            KEY_USE_NAME,
+            useGivenName,
+            "If true use the GIVEN_NAME attribute of the entity"
+        )
+
+        if (useGivenName) {
+            ecwm = configurator.getActuator(
+                "ECWMRobocup",
+                ECWMRobocup::class.java
+            )
         }
 
-        speechActuator = configurator.getActuator("SpeechActuator", SpeechActuator::class.java)
+        speechActuator = configurator.getActuator(
+            "SpeechActuator",
+            SpeechActuator::class.java
+        )
 
-        if (configurator.requestOptionalBool(KEY_USE_LANGUAGE, true)) {
-            langSlot = configurator.getReadSlot("Language", LanguageType::class.java)
+        if (configurator.requestOptionalBool(
+                KEY_USE_LANGUAGE,
+                true
+            )
+        ) {
+            langSlot = configurator.getReadSlot(
+                "Language",
+                LanguageType::class.java
+            )
         }
-
     }
 
     override fun init(): Boolean {

@@ -53,21 +53,52 @@ class GetEntitiesInRoom : AbstractSkill() {
     private var entityname: String = ""
 
     override fun configure(configurator: ISkillConfigurator) {
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
-        tokenEmpty = configurator.requestExitToken(ExitStatus.ERROR().ps("empty"))
+        tokenSuccess = configurator.requestExitToken(
+            ExitStatus.SUCCESS(),
+            "Got Entities"
+        )
 
-        entities = configurator.getWriteSlot("EntityList", EntityList::class.java)
+        tokenEmpty = configurator.requestExitToken(
+            ExitStatus.ERROR().ps("empty"),
+            "No Matching Entities found"
+        )
 
-        ecwm = configurator.getActuator("ECWMSpirit", ECWMSpirit::class.java)
+        entities = configurator.getWriteSlot(
+            "EntityList",
+            EntityList::class.java,
+            "List of entities found in the room"
+        )
 
-        entityname = configurator.requestOptionalValue(KEY_ENTITY, entityname)
+        ecwm = configurator.getActuator(
+            "ECWMSpirit",
+            ECWMSpirit::class.java
+        )
+
+        entityname = configurator.requestOptionalValue(
+            KEY_ENTITY,
+            entityname,
+            "Room name or entity ID"
+        )
+
         if (!configurator.hasConfigurationKey(KEY_ENTITY)) {
-            entity = configurator.getReadSlot("RoomEntity", Entity::class.java)
+            entity = configurator.getReadSlot(
+                "RoomEntity",
+                Entity::class.java,
+                "Uses this slot to get the room if not set with the room option"
+            )
         }
 
-        includeObjects = configurator.requestOptionalBool(KEY_INCLUDE_OBJECTS,includeObjects)
-        includeRooms = configurator.requestOptionalBool(KEY_INCLUDE_ROOMS,includeRooms)
+        includeObjects = configurator.requestOptionalBool(
+            KEY_INCLUDE_OBJECTS,
+            includeObjects,
+            "Include GraspableObjects"
+        )
 
+        includeRooms = configurator.requestOptionalBool(
+            KEY_INCLUDE_ROOMS,
+            includeRooms,
+            "Include Rooms"
+        )
     }
 
     override fun init(): Boolean {

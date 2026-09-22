@@ -88,9 +88,9 @@ class LookAtSpirit : AbstractSkill() {
     private var ecwm: ECWMSpirit? = null
 
     override fun configure(configurator: ISkillConfigurator) {
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
+        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS(), "Spirit exists")
 
-        spirit = configurator.getReadSlot("Spirit", Spirit::class.java)
+        spirit = configurator.getReadSlot("Spirit", Spirit::class.java, "The Spirit")
         gazeTimeout = configurator.requestOptionalInt(KEY_TIMEOUT,timeout.toInt()).toLong()
         timeoutZ = configurator.requestOptionalInt(KEY_TIMEOUT_Z, timeoutZ.toInt()).toLong()
         if (gazeTimeout > 0 ) {

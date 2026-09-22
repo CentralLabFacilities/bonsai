@@ -71,7 +71,11 @@ class CreateEntity : AbstractSkill() {
         type = configurator.requestOptionalValue(KEY_TYPE, type)
         usePositionData = configurator.requestOptionalBool(KEY_USE_POSITION, usePositionData)
 
-        name = configurator.requestOptionalValue(KEY_NAME, "")
+        name = configurator.requestOptionalValue(
+            KEY_NAME,
+            "",
+            "Entity name."
+        )
         if (!configurator.hasConfigurationKey(KEY_NAME)) {
             nameslot = configurator.getReadSlot("EntityName", String::class.java)
         }
