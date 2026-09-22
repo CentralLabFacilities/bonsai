@@ -191,7 +191,8 @@ export default function EditorCanvas({
                     onConnectEnd={handleConnectEnd}
                     isValidConnection={isValidConnection}
                     connectionMode={ConnectionMode.Loose}
-                    onEdgeClick={(_, edge) => {
+                    multiSelectionKeyCode={["Control", "Meta"]}
+                    onEdgeClick={(event, edge) => {
                         if (
                             edge.data?.compoundInitialEdge ||
                             edge.data?.parallelEntryEdge
@@ -202,7 +203,10 @@ export default function EditorCanvas({
                             selectSlotEdge(edge.id);
                             return;
                         }
-                        selectTransitionEdge(edge.id);
+                        selectTransitionEdge(
+                            edge.id,
+                            Boolean(event.ctrlKey || event.metaKey)
+                        );
                     }}
                     onEdgeDoubleClick={(event, edge) => {
                         if (

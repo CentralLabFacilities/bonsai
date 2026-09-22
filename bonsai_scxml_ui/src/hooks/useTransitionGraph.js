@@ -1685,7 +1685,7 @@ export function useTransitionGraph({
     }, [clearTransitionSelection, clearSlotEdgeSelection]);
 
     const selectTransitionEdge = useCallback(
-        (edgeId) => {
+        (edgeId, additive = false) => {
             // Edge and node selection are mutually exclusive. A previously
             // selected skill would otherwise keep all of its connected
             // transitions highlighted in addition to the explicitly selected
@@ -1708,10 +1708,25 @@ export function useTransitionGraph({
 
             clearSlotEdgeSelection();
             setEdges((currentEdges) =>
-                currentEdges.map((edge) => ({
-                    ...clearTransientTransitionHighlight(edge),
-                    selected: edge.id === edgeId,
-                }))
+                currentEdges.map((edge) => {
+                    const normalized = clearTransientTransitionHighlight(edge);
+
+                    if (!additive) {
+                        return {
+                            ...normalized,
+                            selected: edge.id === edgeId,
+                        };
+                    }
+
+                    if (edge.id !== edgeId) {
+                        return normalized;
+                    }
+
+                    return {
+                        ...normalized,
+                        selected: !edge.selected,
+                    };
+                })
             );
         },
         [

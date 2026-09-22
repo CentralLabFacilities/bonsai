@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { MarkerType } from "@xyflow/react";
 import {
     SLOT_CONNECTION_COLORS,
+    getTransitionHighlightColor,
     highlightSelectedTransitions,
     withSmartTransitionRouting,
 } from "../utils/editorGraph";
@@ -113,10 +114,7 @@ export function useEditorDisplay({
         const clonesByOriginalId = new Map();
 
         (nodes || []).forEach((node) => {
-            if (
-                !(node.data?.isSkillClone || node.data?.isStateClone) ||
-                !node.data?.cloneOfNodeId
-            ) return;
+            if (!node.data?.isSkillClone || !node.data?.cloneOfNodeId) return;
             const originalId = node.data.cloneOfNodeId;
             if (!clonesByOriginalId.has(originalId)) {
                 clonesByOriginalId.set(originalId, []);
@@ -732,8 +730,42 @@ export function useEditorDisplay({
                         (edge.target === hoveredSlotAccessNodeId &&
                             edge.source === selectedNodeId))
             );
+            const isSelectedTransition = Boolean(
+                edge.selected && edge.data?.edgeKind !== "slot"
+            );
+
+            // Hover focus is additive to real transition selection. A hovered
+            // transition gets the same semantic colour + flow emphasis as a
+            // selected transition, while already-selected transitions remain
+            // highlighted independently.
+            if (isHoveredEditorEdge && edge.data?.edgeKind !== "slot") {
+                const color = getTransitionHighlightColor(
+                    edge.data?.semanticSourceHandle ||
+                        edge.data?.originalSourceHandle ||
+                        edge.sourceHandle ||
+                        edge.label
+                );
+
+                return {
+                    ...edge,
+                    animated: true,
+                    style: {
+                        ...(edge.style || {}),
+                        stroke: color,
+                        opacity: 1,
+                    },
+                    markerEnd: edge.markerEnd
+                        ? { ...edge.markerEnd, color }
+                        : edge.markerEnd,
+                    labelStyle: {
+                        ...(edge.labelStyle || {}),
+                        opacity: 1,
+                    },
+                };
+            }
 
             if (
+                isSelectedTransition ||
                 isCanvasHoverConnection ||
                 isHoveredEditorEdge ||
                 isSlotDetailsConnection
