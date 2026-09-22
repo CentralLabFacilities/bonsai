@@ -106,8 +106,8 @@ export function useEditorHistory({
 
         const nextHistory = historyRef.current.slice(0, historyIndexRef.current + 1);
         nextHistory.push({ hash, snapshot: cloneGraphValue(snapshot) });
-        if (nextHistory.length > 100) {
-            nextHistory.splice(0, nextHistory.length - 100);
+        if (nextHistory.length > 20) {
+            nextHistory.splice(0, nextHistory.length - 20);
         }
         historyRef.current = nextHistory;
         historyIndexRef.current = nextHistory.length - 1;
