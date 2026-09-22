@@ -4470,6 +4470,9 @@ function AppContent() {
                                     setNodes((nds) => {
                                         const parentId =
                                             selectedNode.parentId || null;
+                                        const removeInitial = Boolean(
+                                            selectedNode.data?.isInitial
+                                        );
 
                                         const parentCompound =
                                             parentId
@@ -4493,7 +4496,9 @@ function AppContent() {
                                                     data: {
                                                         ...node.data,
                                                         initialChildId:
-                                                        selectedNode.id,
+                                                            removeInitial
+                                                                ? null
+                                                                : selectedNode.id,
                                                     },
                                                 };
                                             }
@@ -4511,6 +4516,20 @@ function AppContent() {
                                                 "parallelLane"
                                             ) {
                                                 return node;
+                                            }
+
+                                            if (removeInitial) {
+                                                if (node.id !== selectedNode.id) {
+                                                    return node;
+                                                }
+
+                                                return {
+                                                    ...node,
+                                                    data: {
+                                                        ...node.data,
+                                                        isInitial: false,
+                                                    },
+                                                };
                                             }
 
                                             return {

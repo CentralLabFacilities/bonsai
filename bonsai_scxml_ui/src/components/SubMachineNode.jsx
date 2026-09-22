@@ -252,6 +252,9 @@ export default function SubMachineNode({ id, data, selected }) {
             )}
 
             <div className="submachine-header">
+                {data.isInitial && (
+                    <span className="initial-state-badge initial-state-badge-inline">INITIAL</span>
+                )}
                 <span className="submachine-badge">
                     Sub-State-Machine
                 </span>

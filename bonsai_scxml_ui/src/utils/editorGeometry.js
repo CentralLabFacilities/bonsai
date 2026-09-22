@@ -1129,19 +1129,29 @@ export const normalizeCompoundInitialStates = (allNodes) => {
             return;
         }
 
-        const storedInitialId = compound.data?.initialChildId;
+        const compoundData = compound.data || {};
+        const hasStoredInitial = Object.prototype.hasOwnProperty.call(
+            compoundData,
+            "initialChildId"
+        );
+        const storedInitialId = compoundData.initialChildId;
         const storedInitialStillExists = children.some(
             (child) => child.id === storedInitialId
         );
         const existingInitial = children.find(
             (child) => child.data?.isInitial
         );
+        const explicitlyUnsetInitial =
+            hasStoredInitial &&
+            (storedInitialId === null || storedInitialId === "");
 
         desiredInitialByCompound.set(
             compound.id,
             storedInitialStillExists
                 ? storedInitialId
-                : existingInitial?.id || children[0].id
+                : explicitlyUnsetInitial
+                    ? null
+                    : existingInitial?.id || children[0].id
         );
     });
 

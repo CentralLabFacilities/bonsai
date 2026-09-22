@@ -113,7 +113,7 @@ export default function ParallelNode({ id, data, selected = false }) {
         className={
             `${data.isDropTarget
                 ? "parallel-group-container parallel-drop-target"
-                : "parallel-group-container"} ${isCollapsed ? "collapsed-container" : ""}`
+                : "parallel-group-container"} ${data.isInitial ? "initial-parallel" : ""} ${isCollapsed ? "collapsed-container" : ""}`
         }
     >
             <NodeResizer
@@ -157,6 +157,9 @@ export default function ParallelNode({ id, data, selected = false }) {
                 >
                     {isCollapsed ? <FiChevronRight size={14} /> : <FiChevronDown size={14} />}
                 </button>
+                {data.isInitial && (
+                    <span className="initial-state-badge initial-state-badge-inline">INITIAL</span>
+                )}
                 <span className="parallel-badge">PARALLEL</span>
                 <strong className="parallel-title">{data.label || id}</strong>
             </div>

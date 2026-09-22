@@ -1354,8 +1354,15 @@ function DetailsPanel({
                                     !selectedNode.data.isInitial
                                 }
                                 onClick={onSetInitial}
+                                title={
+                                    selectedNode.data.isInitial
+                                        ? "Remove initial state"
+                                        : "Set as initial state"
+                                }
                             >
-                                Initial set
+                                {selectedNode.data.isInitial
+                                    ? "Remove initial"
+                                    : "Set initial"}
                             </button>
                         </div>
 

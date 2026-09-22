@@ -83,6 +83,9 @@ function CompoundNode({ id, data = {}, selected = false }) {
                 >
                     {isCollapsed ? <FiChevronRight size={14} /> : <FiChevronDown size={14} />}
                 </button>
+                {data.isInitial && !isParallelLaneWrapper && (
+                    <span className="initial-state-badge initial-state-badge-inline">INITIAL</span>
+                )}
                 <span className="compound-frame-badge">COMPOUND</span>
                 <strong className="compound-frame-title">
                     {data.label || "Compound"}

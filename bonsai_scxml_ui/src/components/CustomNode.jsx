@@ -354,6 +354,16 @@ function CustomNode({ id, data, selected }) {
             )}
 
             <div className="custom-node-label">
+                {data.isInitial && !isSkillClone && (
+                    <span className="initial-state-badge initial-state-badge-inline">
+                        INITIAL
+                    </span>
+                )}
+
+                {!isFinalState && !isBehaviorExit && (
+                    <span className="skill-type-badge">SKILL</span>
+                )}
+
                 {data.label}
 
                 {isSkillClone && (
