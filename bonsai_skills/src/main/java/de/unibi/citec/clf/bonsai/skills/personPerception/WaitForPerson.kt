@@ -82,22 +82,22 @@ class WaitForPerson : AbstractSkill() {
         tf = configurator.getTransform() as? CoordinateTransformer
 
         // request all tokens that you plan to return from other methods
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
+        tokenSuccess = configurator.requestExitToken( ExitStatus.SUCCESS(), "person found" )
         personSensor = configurator.getSensor("PersonSensor", PersonDataList::class.java)
         positionSensor = configurator.getSensor("PositionSensor", Pose2D::class.java)
-        currentPersonSlot = configurator.getWriteSlot("PersonDataSlot", PersonData::class.java)
+        currentPersonSlot = configurator.getWriteSlot( "PersonDataSlot", PersonData::class.java, "saves the found person to this slot" )
 
-        timeout = configurator.requestOptionalInt(KEY_TIMEOUT, timeout.toInt()).toLong()
-        maxDist = configurator.requestOptionalDouble(KEY_DIST, maxDist)
-        maxAngle = configurator.requestOptionalDouble(KEY_ANGLE, maxAngle)
+        timeout = configurator.requestOptionalInt( KEY_TIMEOUT, timeout.toInt(), "enable timeout after x ms. -1 means not time out" ).toLong()
+        maxDist = configurator.requestOptionalDouble( KEY_DIST, maxDist, "max person distance in meter" )
+        maxAngle = configurator.requestOptionalDouble( KEY_ANGLE, maxAngle, "max Person Angle in radiant(in both directions)" )
 
         if (timeout > 0) {
-            tokenTimeout = configurator.requestExitToken(ExitStatus.ERROR().ps("timeout"))
+            tokenTimeout = configurator.requestExitToken(ExitStatus.ERROR().ps("timeout"), "timeout")
         }
 
         if (configurator.hasConfigurationKey(KEY_NAME)) {
             tokenName = configurator.requestExitToken(ExitStatus.ERROR().ps("missing"))
-            name = configurator.requestValue(KEY_NAME)
+            name = configurator.requestValue( KEY_NAME, "look for a specific name" )
         }
     }
 

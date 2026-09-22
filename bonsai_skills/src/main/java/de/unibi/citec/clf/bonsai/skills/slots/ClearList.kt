@@ -52,8 +52,8 @@ class ClearList<L : List<*>?> : AbstractSkill() {
         }
 
         // request all tokens that you plan to return from other methods
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
-        slot = configurator.getWriteSlot<L?>("List", listType)
+        tokenSuccess = configurator.requestExitToken( ExitStatus.SUCCESS(), "Cleared slot successfully" )
+        slot = configurator.getWriteSlot<L?>( "List", listType, "Memory slot the content will be cleared from" )
     }
 
     override fun init(): Boolean {

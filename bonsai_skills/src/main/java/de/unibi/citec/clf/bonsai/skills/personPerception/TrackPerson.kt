@@ -53,10 +53,13 @@ class TrackPerson : AbstractSkill() {
     private val lu: LengthUnit = LengthUnit.METER
 
     override fun configure(configurator: ISkillConfigurator) {
-        tokenError = configurator.requestExitToken(ExitStatus.ERROR())
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
+        tokenError = configurator.requestExitToken(
+            ExitStatus.ERROR(),
+            "The tracking actuator could not find a person close to the specified tracking position."
+        )
+        tokenSuccess = configurator.requestExitToken( ExitStatus.SUCCESS(), "Person tracking was started successfully." )
         trackingActuator = configurator.getActuator("ClfTracker", TrackingActuator::class.java)
-        personDataSlot = configurator.getReadSlot("PersonDataSlot", PersonData::class.java)
+        personDataSlot = configurator.getReadSlot( "PersonDataSlot", PersonData::class.java, "Person whose position shall be used as the tracking target." )
     }
 
     override fun init(): Boolean {

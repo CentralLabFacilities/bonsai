@@ -99,48 +99,54 @@ class FilterPersonDataList : AbstractSkill() {
 
     @Throws(SkillConfigurationException::class)
     override fun configure(configurator: ISkillConfigurator) {
-        tokenSuccessHasPeople = configurator.requestExitToken(ExitStatus.SUCCESS().ps("notEmpty"))
-        tokenSuccessNoPeople = configurator.requestExitToken(ExitStatus.SUCCESS().ps("empty"))
-        tokenError = configurator.requestExitToken(ExitStatus.ERROR())
+        tokenSuccessHasPeople = configurator.requestExitToken(
+            ExitStatus.SUCCESS().ps("notEmpty"),
+            "List successfully filtered, at least one PersonData remaining"
+        )
+        tokenSuccessNoPeople = configurator.requestExitToken(
+            ExitStatus.SUCCESS().ps("empty"),
+            "List successfully filtered, but no Person remaining / List empty"
+        )
+        tokenError = configurator.requestExitToken(
+            ExitStatus.ERROR(),
+            "Name of the Location could not be retrieved"
+        )
 
-        personDataReadSlot =
-            configurator.getReadSlot("PersonDataListReadSlot", PersonDataList::class.java)
-        personDataWriteSlot =
-            configurator.getWriteSlot("PersonDataListWriteSlot", PersonDataList::class.java)
-
+        personDataReadSlot = configurator.getReadSlot( "PersonDataListReadSlot", PersonDataList::class.java, "Memory slot the unfiltered list of persons will be read from" )
+        personDataWriteSlot = configurator.getWriteSlot( "PersonDataListWriteSlot", PersonDataList::class.java, "Memory slot the filtered list of persons will be written to" )
         coordTransformer = configurator.getTransform() as? CoordinateTransformer
 
         if (configurator.hasConfigurationKey(KEY_GESTURES)) {
-            gestureString = configurator.requestValue(KEY_GESTURES)
+            gestureString = configurator.requestValue( KEY_GESTURES, "The gestures to filter for. Also, sets DO_GESTURE_FILTERING" )
             doGestureFiltering = true
-            doGestureFiltering = configurator.requestOptionalBool(KEY_GESTURE_FILTERING, doGestureFiltering)
+            doGestureFiltering = configurator.requestOptionalBool( KEY_GESTURE_FILTERING, doGestureFiltering, "Filter by gesture using option or slot" )
         } else {
-            doGestureFiltering = configurator.requestOptionalBool(KEY_GESTURE_FILTERING, doGestureFiltering)
+            doGestureFiltering = configurator.requestOptionalBool( KEY_GESTURE_FILTERING, doGestureFiltering, "Filter by gesture using option or slot" )
             if (doGestureFiltering) {
-                gestureReadSlot = configurator.getReadSlot("GestureStringSlot", String::class.java)
+                gestureReadSlot = configurator.getReadSlot( "GestureStringSlot", String::class.java, "Memory Slot for the Gesture by that shall be filtered" )
             }
         }
 
         if (configurator.hasConfigurationKey(KEY_ROOMS)) {
             doRoomFiltering = true
-            roomString = configurator.requestValue(KEY_ROOMS)
-            doRoomFiltering = configurator.requestOptionalBool(KEY_ROOM_FILTERING, doRoomFiltering)
+            roomString = configurator.requestValue( KEY_ROOMS, "The rooms to filter for. Also, sets DO_ROOM_FILTERING" )
+            doRoomFiltering = configurator.requestOptionalBool( KEY_ROOM_FILTERING, doRoomFiltering, "Filter by room using option or slot" )
         } else {
-            doRoomFiltering = configurator.requestOptionalBool(KEY_ROOM_FILTERING, doRoomFiltering)
+            doRoomFiltering = configurator.requestOptionalBool( KEY_ROOM_FILTERING, doRoomFiltering, "Filter by room using option or slot" )
             if (doRoomFiltering) {
-                roomReadSlot = configurator.getReadSlot("RoomStringSlot", String::class.java)
+                roomReadSlot = configurator.getReadSlot( "RoomStringSlot", String::class.java, "Memory Slot for the Room by that shall be filtered" )
                 ecwm = configurator.getActuator("ECWMSpirit", ECWMSpirit::class.java)
             }
         }
 
         if (configurator.hasConfigurationKey(KEY_POSTURES)) {
             doPostureFiltering = true
-            postureString = configurator.requestValue(KEY_POSTURES)
-            doPostureFiltering = configurator.requestOptionalBool(KEY_POSTURE_FILTERING, doPostureFiltering)
+            postureString = configurator.requestValue( KEY_POSTURES, "The postures to filter for. Also, sets DO_POSTURE_FILTERING" )
+            doPostureFiltering = configurator.requestOptionalBool( KEY_POSTURE_FILTERING, doPostureFiltering, "Filter by person posture using option or slot" )
         } else {
-            doPostureFiltering = configurator.requestOptionalBool(KEY_POSTURE_FILTERING, doPostureFiltering)
+            doPostureFiltering = configurator.requestOptionalBool( KEY_POSTURE_FILTERING, doPostureFiltering, "Filter by person posture using option or slot" )
             if (doPostureFiltering) {
-                postureReadSlot = configurator.getReadSlot("PostureStringSlot", String::class.java)
+                postureReadSlot = configurator.getReadSlot( "PostureStringSlot", String::class.java, "Memory Slot for the Posture by that shall be filtered" )
             }
         }
 

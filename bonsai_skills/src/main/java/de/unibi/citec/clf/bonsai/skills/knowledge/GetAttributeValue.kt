@@ -47,14 +47,12 @@ class GetAttributeValue : AbstractSkill() {
 
     override fun configure(configurator: ISkillConfigurator) {
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
-        tokenErrorMissing = configurator.requestExitToken(ExitStatus.ERROR().ps("missing"))
-        if(configurator.hasConfigurationKey(KEY_ERROR)) {
-            tokenErrorMultiple = configurator.requestExitToken(ExitStatus.ERROR().ps("multiple"))
-        }
+        tokenErrorMissing = configurator.requestExitToken( ExitStatus.ERROR().ps("missing"), "does not have the requested attribute" )
+        if (configurator.hasConfigurationKey(KEY_ERROR)) { tokenErrorMultiple = configurator.requestExitToken( ExitStatus.ERROR().ps("multiple"), "does have multiple values for the requested attribute" ) }
 
-        key = configurator.requestValue(KEY_ATTRIBUTE)
-        slot = configurator.getReadSlot<Attributes>("Attributes", Attributes::class.java)
-        result = configurator.getWriteSlot("Value", String::class.java)
+        key = configurator.requestValue( KEY_ATTRIBUTE, "The attribute key" )
+        slot = configurator.getReadSlot( "Attributes", Attributes::class.java, "Attributes" )
+        result = configurator.getWriteSlot( "Value", String::class.java, "The Attribute Value" )
     }
 
     override fun init(): Boolean {

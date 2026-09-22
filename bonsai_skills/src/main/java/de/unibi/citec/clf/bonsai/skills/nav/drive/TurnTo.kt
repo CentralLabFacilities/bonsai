@@ -66,17 +66,21 @@ class TurnTo<IOException> : AbstractSkill() {
 
     @Throws(SkillConfigurationException::class)
     override fun configure(configurator: ISkillConfigurator) {
-        timeout = configurator.requestOptionalInt(KEY_TIMEOUT, timeout.toInt()).toLong()
+        timeout = configurator.requestOptionalInt(
+            KEY_TIMEOUT,
+            timeout.toInt(),
+            "Skill timeout in ms"
+        ).toLong()
 
-        tokenError = configurator.requestExitToken(ExitStatus.ERROR())
+        tokenError = configurator.requestExitToken( ExitStatus.ERROR(), "Turn failed or cancelled" )
         navActuator = configurator.getActuator("NavigationActuator", NavigationActuator::class.java)
-        navigationGoalDataSlot = configurator.getReadSlot("NavigationGoalDataSlot", NavigationGoalData::class.java)
+        navigationGoalDataSlot = configurator.getReadSlot( "NavigationGoalDataSlot", NavigationGoalData::class.java, "Navigation goal to turn towards to" )
         robotPositionSensor = configurator.getSensor("PositionSensor", Pose2D::class.java)
         if (timeout > 0) {
-            tokenSuccessPsTimeout = configurator.requestExitToken(ExitStatus.SUCCESS().ps("timeout"))
-            tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS().ps("finished"))
+            tokenSuccessPsTimeout = configurator.requestExitToken( ExitStatus.SUCCESS().ps("timeout"), "Timeout reached (only used when #_TIMEOUT is set)")
+            tokenSuccess = configurator.requestExitToken( ExitStatus.SUCCESS().ps("finished"), "Turn successful" )
         } else {
-            tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
+            tokenSuccess = configurator.requestExitToken( ExitStatus.SUCCESS(), "Turn successful" )
         }
     }
 

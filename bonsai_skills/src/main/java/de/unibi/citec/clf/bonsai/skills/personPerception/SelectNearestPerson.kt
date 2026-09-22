@@ -46,11 +46,14 @@ class SelectNearestPerson : AbstractSkill() {
     private var maxDist = Double.MAX_VALUE
 
     override fun configure(configurator: ISkillConfigurator) {
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
-        tokenError = configurator.requestExitToken(ExitStatus.ERROR())
-        personDataListSlot = configurator.getReadSlot("PersonDataListSlot", PersonDataList::class.java)
-        pose2DSlot = configurator.getReadSlot("PositionDataSlot", Pose2D::class.java)
-        personDataSlot = configurator.getWriteSlot("PersonDataSlot", PersonData::class.java)
+        tokenSuccess = configurator.requestExitToken(
+            ExitStatus.SUCCESS(),
+            "The nearest Person has been written to memory."
+        )
+        tokenError = configurator.requestExitToken( ExitStatus.ERROR(), "The nearest Person has not been written to memory." )
+        personDataListSlot = configurator.getReadSlot( "PersonDataListSlot", PersonDataList::class.java, "All found persons in a list" )
+        pose2DSlot = configurator.getReadSlot( "PositionDataSlot", Pose2D::class.java, "the robot position to calculate relative distance." )
+        personDataSlot = configurator.getWriteSlot( "PersonDataSlot", PersonData::class.java, "The nearest person" )
 
         maxDist = configurator.requestOptionalDouble(KEY_MAX_DIST, maxDist)
     }
