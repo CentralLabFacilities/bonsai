@@ -306,6 +306,46 @@ function CustomNode({ id, data, selected }) {
         isSkillClone,
     ]);
 
+    if (isSkillClone) {
+        return (
+            <div
+                className={`state-clone-node ${
+                    selected ? "selected-node" : ""
+                }`}
+                style={{ borderLeftColor: "#0f766e" }}
+            >
+                <Handle
+                    id="transition-target"
+                    type="target"
+                    position={Position.Left}
+                    className="target-handle"
+                    isConnectableStart={false}
+                    isConnectableEnd={true}
+                />
+
+                <div className="state-clone-header">
+                    <span className="state-clone-type">SKILL</span>
+                    <span className="state-clone-badge">CLONE</span>
+                </div>
+
+                <div className="state-clone-label">
+                    {data.label || data.fullSkillName || "Skill"}
+                    {instanceId && (
+                        <span
+                            style={{
+                                marginLeft: "3px",
+                                color: "#64748b",
+                                fontWeight: 600,
+                            }}
+                        >
+                            {instanceId}
+                        </span>
+                    )}
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div
             className={`costum-node ${
