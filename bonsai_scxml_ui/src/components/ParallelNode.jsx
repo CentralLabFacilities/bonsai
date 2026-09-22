@@ -2,6 +2,7 @@ import { Handle, NodeResizer, Position, useReactFlow } from '@xyflow/react';
 import StateActionBadges from './StateActionBadges';
 import { useCallback } from 'react';
 import { FiChevronDown, FiChevronRight, FiPlus } from 'react-icons/fi';
+import { PARALLEL_HEADER_HEIGHT } from '../utils/editorGeometry';
 
 export default function ParallelNode({ id, data, selected = false }) {
     const isCollapsed = Boolean(data.isCollapsed);
@@ -9,7 +10,7 @@ export default function ParallelNode({ id, data, selected = false }) {
     const laneCount = Math.max(1, Array.isArray(data.lanes) ? data.lanes.length : 1);
     const minWidth = 280;
     const minLaneHeight = 60;
-    const defaultHeaderHeight = 40;
+    const defaultHeaderHeight = PARALLEL_HEADER_HEIGHT;
     const defaultBottomReserve = 35;
     const minHeight = defaultHeaderHeight + defaultBottomReserve + laneCount * minLaneHeight;
 

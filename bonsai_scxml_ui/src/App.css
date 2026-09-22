@@ -7059,3 +7059,23 @@
     color: #dbeafe;
 }
 
+
+/* State-container header clearance ---------------------------------------
+   Keep the visible top border slightly above the colored type/name strip,
+   and reserve a real content gap so nested state action badges cannot intrude
+   into the Compound/Parallel header area. */
+.compound-frame-node:not(.collapsed-container):not(.parallel-lane-auto-compound) > .compound-frame-header {
+    top: 8px;
+}
+
+.parallel-group-container:not(.collapsed-container) > .parallel-group-header {
+    margin-top: 8px;
+}
+
+.compound-frame-node.collapsed-container > .compound-frame-header {
+    top: 0;
+}
+
+.parallel-group-container.collapsed-container > .parallel-group-header {
+    margin-top: 0;
+}

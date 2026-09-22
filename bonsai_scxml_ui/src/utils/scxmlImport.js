@@ -1,5 +1,5 @@
 import { MarkerType } from "@xyflow/react";
-import { getLayoutedElements } from "./layoutUtils";
+import { getLayoutedElements, getOverviewLayoutNodeSize } from "./layoutUtils";
 import { parseStateAssignments } from "./stateActions.js";
 import { getTransitionExitToken } from "./transitionEvents.js";
 import {
@@ -9,11 +9,213 @@ import {
 } from "./valueTypes.js";
 import {
     COMPOUND_PADDING_X,
+    COMPOUND_HEADER_HEIGHT,
+    COMPOUND_BOTTOM_PADDING,
+    COMPOUND_NODE_GAP,
+    PARALLEL_HEADER_HEIGHT,
+    PARALLEL_LANE_CHILD_TOP_INSET,
+    PARALLEL_NODE_GAP,
+    PARALLEL_EXIT_GUTTER,
     getCompoundChildrenRight,
     getCompoundExitGutterWidth,
     getLaneForNode,
     isNodeInsideContainer,
 } from "./editorGeometry.js";
+
+
+const autoLayoutImportedContainerContents = (nodes = []) => {
+    let nextNodes = [...nodes];
+
+    const replaceNode = (nodeId, updater) => {
+        nextNodes = nextNodes.map((node) =>
+            node.id === nodeId ? updater(node) : node
+        );
+    };
+
+    const getDepth = (node) => {
+        const byId = new Map(nextNodes.map((candidate) => [candidate.id, candidate]));
+        const visited = new Set();
+        let depth = 0;
+        let parentId = node?.parentId;
+        while (parentId && byId.has(parentId) && !visited.has(parentId)) {
+            visited.add(parentId);
+            depth += 1;
+            parentId = byId.get(parentId)?.parentId;
+        }
+        return depth;
+    };
+
+    const layoutHorizontalChildren = (
+        parentId,
+        { left, top, gap, include = () => true } = {}
+    ) => {
+        const children = nextNodes
+            .filter((node) => node.parentId === parentId && include(node))
+            .sort(
+                (a, b) =>
+                    Number(a.position?.x || 0) - Number(b.position?.x || 0)
+            );
+
+        let x = left;
+        let right = left;
+        let bottom = top;
+
+        children.forEach((child) => {
+            const size = getOverviewLayoutNodeSize(child);
+            replaceNode(child.id, (current) => ({
+                ...current,
+                position: { x, y: top },
+            }));
+            right = Math.max(right, x + size.width);
+            bottom = Math.max(bottom, top + size.height);
+            x += size.width + gap;
+        });
+
+        return { children, right, bottom };
+    };
+
+    const containers = nextNodes
+        .filter((node) => node.type === "compound" || node.type === "parallel")
+        .sort((a, b) => getDepth(b) - getDepth(a));
+
+    containers.forEach((containerSnapshot) => {
+        const container = nextNodes.find((node) => node.id === containerSnapshot.id);
+        if (!container) return;
+
+        if (container.type === "compound") {
+            const isLaneWrapper = Boolean(container.data?.autoParallelLaneCompound);
+            const top = isLaneWrapper
+                ? PARALLEL_LANE_CHILD_TOP_INSET
+                : COMPOUND_HEADER_HEIGHT;
+            const left = isLaneWrapper ? 25 : COMPOUND_PADDING_X;
+            const { children, right, bottom } = layoutHorizontalChildren(
+                container.id,
+                {
+                    left,
+                    top,
+                    gap: COMPOUND_NODE_GAP,
+                    include: (node) => node.type !== "parallelLane",
+                }
+            );
+
+            if (children.length === 0) return;
+
+            const width = isLaneWrapper
+                ? Math.max(320, right + 30)
+                : Math.max(
+                      320,
+                      right +
+                          COMPOUND_PADDING_X +
+                          getCompoundExitGutterWidth(container.data?.events || [])
+                  );
+            const height = Math.max(
+                isLaneWrapper ? 130 : 180,
+                bottom + (isLaneWrapper ? 30 : COMPOUND_BOTTOM_PADDING)
+            );
+
+            replaceNode(container.id, (current) => ({
+                ...current,
+                style: {
+                    ...(current.style || {}),
+                    width,
+                    height,
+                },
+            }));
+            return;
+        }
+
+        const lanes = nextNodes
+            .filter(
+                (node) =>
+                    node.parentId === container.id && node.type === "parallelLane"
+            )
+            .sort(
+                (a, b) =>
+                    Number(a.position?.y || 0) - Number(b.position?.y || 0)
+            );
+        if (lanes.length === 0) return;
+
+        const laneGeometry = [];
+        let maxLaneWidth = 420;
+
+        lanes.forEach((lane) => {
+            const wrapper = nextNodes.find(
+                (node) =>
+                    node.parentId === lane.id &&
+                    node.type === "compound" &&
+                    node.data?.autoParallelLaneCompound
+            );
+
+            let right = 25;
+            let bottom = PARALLEL_LANE_CHILD_TOP_INSET;
+
+            if (wrapper) {
+                const wrapperSize = getOverviewLayoutNodeSize(wrapper);
+                right = wrapperSize.width;
+                bottom = wrapperSize.height;
+            } else {
+                const laidOut = layoutHorizontalChildren(lane.id, {
+                    left: 25,
+                    top: PARALLEL_LANE_CHILD_TOP_INSET,
+                    gap: PARALLEL_NODE_GAP,
+                    include: (node) => node.type !== "parallelLane",
+                });
+                right = laidOut.right;
+                bottom = laidOut.bottom;
+            }
+
+            const laneWidth = Math.max(
+                420,
+                right + 25 + (wrapper ? 0 : PARALLEL_EXIT_GUTTER)
+            );
+            const laneHeight = Math.max(130, bottom + 30);
+            maxLaneWidth = Math.max(maxLaneWidth, laneWidth);
+            laneGeometry.push({ lane, wrapper, laneHeight });
+        });
+
+        let laneY = PARALLEL_HEADER_HEIGHT;
+        laneGeometry.forEach(({ lane, wrapper, laneHeight }, index) => {
+            replaceNode(lane.id, (current) => ({
+                ...current,
+                position: { x: 0, y: laneY },
+                style: {
+                    ...(current.style || {}),
+                    width: maxLaneWidth,
+                    height: laneHeight,
+                    borderBottom:
+                        index < laneGeometry.length - 1
+                            ? "1.5px solid #0284c7"
+                            : "none",
+                },
+            }));
+
+            if (wrapper) {
+                replaceNode(wrapper.id, (current) => ({
+                    ...current,
+                    position: { x: 0, y: 0 },
+                    style: {
+                        ...(current.style || {}),
+                        width: maxLaneWidth,
+                        height: laneHeight,
+                    },
+                }));
+            }
+
+            laneY += laneHeight;
+        });
+
+        replaceNode(container.id, (current) => ({
+            ...current,
+            style: {
+                ...(current.style || {}),
+                width: maxLaneWidth,
+                height: Math.max(180, laneY + 35),
+            },
+        }));
+    });
+
+    return nextNodes;
+};
 
 const makeImportedSelfLoopControlPoints = () => [
     { id: `cp-${crypto.randomUUID()}`, anchor: "source", dx: 76, dy: -92 },
@@ -1600,7 +1802,15 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
         newEdges
     );
 
-    // 5. Automatisches Dagre-Layouting (Dagre nutzt exakt berechnete Maße)
+    // 5. Automatic layout. First place children inside state containers using
+    // Overview-mode dimensions, then run Dagre on the resulting top-level
+    // container/skill sizes.
+
+    if (finalNodes.length > 0) {
+        // Nested state positions are editor-generated even when top-level nodes
+        // have saved metadata, so always normalize those container contents.
+        finalNodes = autoLayoutImportedContainerContents(finalNodes);
+    }
 
     if (!hasCustomPositions && finalNodes.length > 0) {
         const topLevelNodes = finalNodes.filter((n) => !n.parentId);
