@@ -47,7 +47,7 @@ class GetEntitiesByType : AbstractSkill() {
         slot = configurator.getWriteSlot("EntityList", EntityList::class.java)
         ecwm = configurator.getActuator("ECWMCore", WorldModel::class.java)
 
-        exp = configurator.requestOptionalValue(KEY_EXPRESSION, exp)
+        exp = configurator.requestOptionalValue(KEY_EXPRESSION, exp, "Type name.")
     }
 
     override fun init(): Boolean {

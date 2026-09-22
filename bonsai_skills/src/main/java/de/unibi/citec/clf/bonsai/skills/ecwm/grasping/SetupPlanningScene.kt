@@ -70,16 +70,41 @@ class SetupPlanningScene : AbstractSkill() {
 
         ecwm = configurator.getActuator("ECWMGrasping", ECWMGrasping::class.java)
 
-        clear = configurator.requestOptionalBool(KEY_CLEAR, clear)
-        clear_attached = configurator.requestOptionalBool(KEY_CLEARATTACHED, clear_attached)
-        distance = configurator.requestOptionalDouble(KEY_DISTANCE,distance)
-        no_objects = configurator.requestOptionalBool(KEY_NO_OBJECTS, no_objects)
+        clear = configurator.requestOptionalBool(
+            KEY_CLEAR,
+            clear,
+            "clear before adding"
+        )
+        clear_attached = configurator.requestOptionalBool(
+            KEY_CLEARATTACHED,
+            clear_attached,
+            "Also clear attached objects"
+        )
+        distance = configurator.requestOptionalDouble(
+            KEY_DISTANCE,
+            distance,
+            "Max distance to added entities"
+        )
+        no_objects = configurator.requestOptionalBool(
+            KEY_NO_OBJECTS,
+            no_objects,
+            "Do not add graspable objects"
+        )
 
-        if (configurator.requestOptionalBool(KEY_SAFETY, false)) {
-            spirit = configurator.getReadSlot("Spirit", Spirit::class.java)
+        if (configurator.requestOptionalBool(
+                KEY_SAFETY,
+                false,
+                "read Spirit from slot and add a plane at height z-0.01\n" +
+                        "where z is from the transform of\n" +
+                        "(0,0,0) frame=${spirit.entity.id}/${spirit.storage} -> map"
+            )) {
+            spirit = configurator.getReadSlot(
+                "Spirit",
+                Spirit::class.java,
+                "read if safety_plane is true"
+            )
             coordTransformer = configurator.getTransform() as? CoordinateTransformer
         }
-
     }
 
     override fun init(): Boolean {

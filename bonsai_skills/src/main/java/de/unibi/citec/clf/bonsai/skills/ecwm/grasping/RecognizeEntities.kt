@@ -96,28 +96,88 @@ class RecognizeEntities : AbstractSkill() {
 
 
     override fun configure(configurator: ISkillConfigurator) {
-        tokenSuccessSome = configurator.requestExitToken(ExitStatus.SUCCESS().ps("some"))
-        tokenSuccessNone = configurator.requestExitToken(ExitStatus.SUCCESS().ps("none"))
+        tokenSuccessSome = configurator.requestExitToken(
+            ExitStatus.SUCCESS().ps("some"),
+            "Detected one or more objects inside the target storage"
+        )
+        tokenSuccessNone = configurator.requestExitToken(
+            ExitStatus.SUCCESS().ps("none")
+        )
 
-        addPlane = configurator.requestOptionalBool(KEY_ADD_PLANE,addPlane)
-        padding = configurator.requestOptionalDouble(KEY_PADDING, padding.toDouble()).toFloat()
-        store = configurator.requestOptionalBool(KEY_STORE, store)
-        clear = configurator.requestOptionalBool(KEY_CLEAR, clear)
-        minProb = configurator.requestOptionalDouble(KEY_PROBABILITY, minProb)
-        fast = configurator.requestOptionalBool(KEY_FAST, fast)
+        addPlane = configurator.requestOptionalBool(
+            KEY_ADD_PLANE,
+            addPlane
+        )
+        padding = configurator.requestOptionalDouble(
+            KEY_PADDING,
+            padding.toDouble(),
+            "Padding around storage (x/y)"
+        ).toFloat()
+        store = configurator.requestOptionalBool(
+            KEY_STORE,
+            store,
+            "will add detected objects to the world model"
+        )
+        clear = configurator.requestOptionalBool(
+            KEY_CLEAR,
+            clear,
+            "will clear objects from the world if they aren't present at their supposed location"
+        )
+        minProb = configurator.requestOptionalDouble(
+            KEY_PROBABILITY,
+            minProb,
+            "the minimal probability for an object to be recognized as such"
+        )
+        fast = configurator.requestOptionalBool(
+            KEY_FAST,
+            fast,
+            "do fast but unprecise pose estimate (bad for grasping)"
+        )
 
-        useSpirit = configurator.requestOptionalBool(KEY_USE_SPIRIT, useSpirit)
-        if(useSpirit) {
-            slotSpirit = configurator.getReadSlot("Spirit", Spirit::class.java)
+        useSpirit = configurator.requestOptionalBool(
+            KEY_USE_SPIRIT,
+            useSpirit,
+            "use Spirit instead of entity/storage"
+        )
+        if (useSpirit) {
+            slotSpirit = configurator.getReadSlot(
+                "Spirit",
+                Spirit::class.java,
+                "Entity + Storage, only used if #_spirit is True"
+            )
         } else {
-            entityName = configurator.requestOptionalValue(KEY_ENTITY, entityName)
-            if(!configurator.hasConfigurationKey(KEY_ENTITY)) slotIn = configurator.getReadSlot("Entity", Entity::class.java)
+            entityName = configurator.requestOptionalValue(
+                KEY_ENTITY,
+                entityName,
+                "the entity the storage belongs to"
+            )
+            if (!configurator.hasConfigurationKey(KEY_ENTITY)) {
+                slotIn = configurator.getReadSlot(
+                    "Entity",
+                    Entity::class.java,
+                    "the entity the storage belongs to.\nWill only be used if option \"#_entity\" or #_spirit is not set."
+                )
+            }
 
-            storageName = configurator.requestOptionalValue(KEY_STORAGE, storageName)
-            if(!configurator.hasConfigurationKey(KEY_STORAGE)) slotIn2 = configurator.getReadSlot("Storage", String::class.java)
+            storageName = configurator.requestOptionalValue(
+                KEY_STORAGE,
+                storageName,
+                "the storage in which the detected objects have to be present"
+            )
+            if (!configurator.hasConfigurationKey(KEY_STORAGE)) {
+                slotIn2 = configurator.getReadSlot(
+                    "Storage",
+                    String::class.java,
+                    "the storage in which the detected objects have to be present.\nWill only be used if option \"#_storage\" or #_spirit is not set."
+                )
+            }
         }
 
-        slotOut = configurator.getWriteSlot("RecognizedEntities", EntityList::class.java)
+        slotOut = configurator.getWriteSlot(
+            "RecognizedEntities",
+            EntityList::class.java,
+            "a list of objects detected inside the storage."
+        )
 
         ecwm = configurator.getActuator("ECWMGrasping", ECWMGrasping::class.java)
     }

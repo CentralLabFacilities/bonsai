@@ -59,18 +59,35 @@ class GetStorages : AbstractSkill() {
 
 
     override fun configure(configurator: ISkillConfigurator) {
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
-        tokenErrorNone = configurator.requestExitToken(ExitStatus.ERROR().withProcessingStatus("none"))
+        tokenSuccess = configurator.requestExitToken(
+            ExitStatus.SUCCESS(),
+            "Wrote a list of storages to the slot."
+        )
+        tokenErrorNone = configurator.requestExitToken(
+            ExitStatus.ERROR().withProcessingStatus("none"),
+            "The Entity has no storages - wrote an empty list."
+        )
 
         ecwm = configurator.getActuator("ECWMSpirit", ECWMSpirit::class.java)
 
-        storageListSlot = configurator.getWriteSlot("Storages", StorageList::class.java)
+        storageListSlot = configurator.getWriteSlot(
+            "Storages",
+            StorageList::class.java,
+            "A list of present storages"
+        )
 
-        id = configurator.requestOptionalValue(KEY_ENTITY, id)
+        id = configurator.requestOptionalValue(
+            KEY_ENTITY,
+            id,
+            "Entity id to fetch goals from"
+        )
         if (!configurator.hasConfigurationKey(KEY_ENTITY)) {
-            entitySlot = configurator.getReadSlot("Entity", Entity::class.java)
+            entitySlot = configurator.getReadSlot(
+                "Entity",
+                Entity::class.java,
+                "Entity to retrieve storages from, used if the 'entity' option is not set"
+            )
         }
-
     }
 
     override fun init(): Boolean {

@@ -72,21 +72,66 @@ class RecognizeAllEntities : AbstractSkill() {
     private var slotIn: MemorySlotReader<Float>? = null
 
     override fun configure(configurator: ISkillConfigurator) {
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus("some"))
-        tokenSuccessNone = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus("none"))
-        tokenError = configurator.requestExitToken(ExitStatus.ERROR())
+        tokenSuccess = configurator.requestExitToken(
+            ExitStatus.SUCCESS().withProcessingStatus("some"),
+            "Detected one or more objects inside the target storage"
+        )
+        tokenSuccessNone = configurator.requestExitToken(
+            ExitStatus.SUCCESS().withProcessingStatus("none"),
+            "No objects could be found"
+        )
+        tokenError = configurator.requestExitToken(
+            ExitStatus.ERROR(),
+            "No objects could be found"
+        )
 
-        store = configurator.requestOptionalBool(KEY_STORE, store)
-        minProb = configurator.requestOptionalDouble(KEY_PROBABILITY, minProb)
-        fast = configurator.requestOptionalBool(KEY_FAST, fast)
-        safetyHeight = configurator.requestOptionalDouble(KEY_SAFETY_HEIGHT, safetyHeight)
+        store = configurator.requestOptionalBool(
+            KEY_STORE,
+            store,
+            "will add detected objects to the world model"
+        )
 
-        slotOut = configurator.getWriteSlot("RecognizedEntities", EntityList::class.java)
+        minProb = configurator.requestOptionalDouble(
+            KEY_PROBABILITY,
+            minProb,
+            "the minimal probability for an object to be recognized as such"
+        )
 
-        ecwm = configurator.getActuator("ECWMGrasping", ECWMGrasping::class.java)
-        useHeightSlot = configurator.requestOptionalBool(KEY_SAFETY_SLOT, useHeightSlot)
+        fast = configurator.requestOptionalBool(
+            KEY_FAST,
+            fast,
+            "do fast but unprecise pose estimate (bad for grasping)"
+        )
+
+        safetyHeight = configurator.requestOptionalDouble(
+            KEY_SAFETY_HEIGHT,
+            safetyHeight,
+            "may move some recognized objects above the given height to avoid them being stuck"
+        )
+
+        slotOut = configurator.getWriteSlot(
+            "RecognizedEntities",
+            EntityList::class.java,
+            "a list of objects detected inside the storage."
+        )
+
+        ecwm = configurator.getActuator(
+            "ECWMGrasping",
+            ECWMGrasping::class.java
+        )
+
+        useHeightSlot = configurator.requestOptionalBool(
+            KEY_SAFETY_SLOT,
+            useHeightSlot,
+            "use slot for #_safety_height"
+        )
+
         if (useHeightSlot) {
-            slotIn = configurator.getReadSlot("SafetyHeight", Float::class.java)
+            slotIn = configurator.getReadSlot(
+                "SafetyHeight",
+                Float::class.java,
+                "#_safety_height parameter."
+            )
         }
     }
 

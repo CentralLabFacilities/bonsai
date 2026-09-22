@@ -61,20 +61,63 @@ class FilterEntityListByAttribute : AbstractSkill() {
     private var ecwm: ECWMRobocup? = null
 
     override fun configure(configurator: ISkillConfigurator) {
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS().ps("notEmpty"))
-        tokenSuccessEmpty = configurator.requestExitToken(ExitStatus.SUCCESS().ps("empty"))
+        tokenSuccess = configurator.requestExitToken(
+            ExitStatus.SUCCESS().ps("notEmpty"),
+            "Filtered the list"
+        )
 
-        listSlot = configurator.getReadSlot("EntityList", EntityList::class.java)
-        listWriteSlot = configurator.getWriteSlot("Filtered", EntityList::class.java)
+        tokenSuccessEmpty = configurator.requestExitToken(
+            ExitStatus.SUCCESS().ps("empty"),
+            "Filtered the list, which is empty now"
+        )
 
-        key = configurator.requestValue(KEY_ATTRIBUTE)
-        value = configurator.requestOptionalValue(KEY_VALUE, value)
+        listSlot = configurator.getReadSlot(
+            "EntityList",
+            EntityList::class.java,
+            "The list to be filtered"
+        )
+
+        listWriteSlot = configurator.getWriteSlot(
+            "Filtered",
+            EntityList::class.java,
+            "The filtered entity list"
+        )
+
+        key = configurator.requestValue(
+            KEY_ATTRIBUTE,
+            "What attribute should be compared (category, given_name, etc.)"
+        )
+
+        value = configurator.requestOptionalValue(
+            KEY_VALUE,
+            value,
+            "The value the attribute needs to contain"
+        )
+
         if (!configurator.hasConfigurationKey(KEY_VALUE)) {
-            valueSlot = configurator.getReadSlot("Value", String::class.java)
+            valueSlot = configurator.getReadSlot(
+                "Value",
+                String::class.java,
+                "Value of the designated attribute to act as a filter, if not set as an option"
+            )
         }
-        invert = configurator.requestOptionalBool(KEY_INVERT, invert)
-        useRegex = configurator.requestOptionalBool(KEY_REGEX, useRegex)
-        ecwm = configurator.getActuator("ECWMRobocup", ECWMRobocup::class.java)
+
+        invert = configurator.requestOptionalBool(
+            KEY_INVERT,
+            invert,
+            "Remove entities matching the selected attribute instead of keeping them"
+        )
+
+        useRegex = configurator.requestOptionalBool(
+            KEY_REGEX,
+            useRegex,
+            "Use Regex to match"
+        )
+
+        ecwm = configurator.getActuator(
+            "ECWMRobocup",
+            ECWMRobocup::class.java
+        )
     }
 
     override fun init(): Boolean {

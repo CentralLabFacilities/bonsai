@@ -37,8 +37,11 @@ class ClearPlanningScene : AbstractSkill() {
 
         ecwm = configurator.getActuator("ECWMGrasping", ECWMGrasping::class.java)
 
-        clear_attached = configurator.requestOptionalBool(KEY_CLEARATTACHED, clear_attached)
-
+        clear_attached = configurator.requestOptionalBool(
+            KEY_CLEARATTACHED,
+            clear_attached,
+            "Also clear attached objects"
+        )
     }
 
     override fun init(): Boolean {

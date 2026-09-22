@@ -78,38 +78,79 @@ class GetSpirit : AbstractSkill() {
     private var fut: Future<Map<String, Set<String>>?>? = null
 
     override fun configure(configurator: ISkillConfigurator) {
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
+        tokenSuccess = configurator.requestExitToken(
+            ExitStatus.SUCCESS(),
+            "Spirit exists"
+        )
 
-        spiritSlot = configurator.getWriteSlot("Spirit", Spirit::class.java)
+        spiritSlot = configurator.getWriteSlot(
+            "Spirit",
+            Spirit::class.java,
+            "The Spirit"
+        )
 
-        ecwmRobocup = configurator.getActuator("ECWMRobocup", ECWMRobocup::class.java)
+        ecwmRobocup = configurator.getActuator(
+            "ECWMRobocup",
+            ECWMRobocup::class.java
+        )
 
-        entityname = configurator.requestOptionalValue(KEY_ENTITY, entityname)
+        entityname = configurator.requestOptionalValue(
+            KEY_ENTITY,
+            entityname,
+            "Entity name to fetch the Spirit from"
+        )
+
         if (!configurator.hasConfigurationKey(KEY_ENTITY)) {
-            entity = configurator.getReadSlot("Entity", Entity::class.java)
+            entity = configurator.getReadSlot(
+                "Entity",
+                Entity::class.java,
+                "Entity to fetch the Spirit from, used if the 'entity' option is not set"
+            )
         }
 
-        useStorage = configurator.requestOptionalBool(KEY_USE_STORAGE, useStorage)
-        useStorageS = configurator.requestOptionalBool(KEY_USE_STORAGE_S, useStorageS)
+        useStorage = configurator.requestOptionalBool(
+            KEY_USE_STORAGE,
+            useStorage,
+            "If false, finds the first matching Spirit if multiple exist"
+        )
 
-        storagename = configurator.requestOptionalValue(KEY_STORAGE, storagename)
+        useStorageS = configurator.requestOptionalBool(
+            KEY_USE_STORAGE_S,
+            useStorageS,
+            "Use the String slot to get the storage name"
+        )
+
+        storagename = configurator.requestOptionalValue(
+            KEY_STORAGE,
+            storagename,
+            "Storage of the Spirit; if set, 'use_storage' is enabled"
+        )
+
         if (configurator.hasConfigurationKey(KEY_STORAGE)) {
-            if(!useStorage) {
+            if (!useStorage) {
                 useStorage = true
                 logger.warn("parameter $KEY_STORAGE is set, forcing $KEY_USE_STORAGE")
             }
         } else if (useStorage) {
-            if(useStorageS) {
-                storageS = configurator.getReadSlot("StorageName", String::class.java)
+            if (useStorageS) {
+                storageS = configurator.getReadSlot(
+                    "StorageName",
+                    String::class.java,
+                    "Storage name used to find the Spirit"
+                )
             } else {
-                storage = configurator.getReadSlot("Storage", StorageArea::class.java)
+                storage = configurator.getReadSlot(
+                    "Storage",
+                    StorageArea::class.java,
+                    "Storage used to find the Spirit"
+                )
             }
-
         }
 
-        spiritname = configurator.requestValue(KEY_SPIRIT)
-
-
+        spiritname = configurator.requestValue(
+            KEY_SPIRIT,
+            "Name of the Spirit to get"
+        )
     }
 
     override fun init(): Boolean {

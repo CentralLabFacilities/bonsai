@@ -63,23 +63,49 @@ class AttachEntity : AbstractSkill() {
     private var slotTypename: MemorySlotReader<String>? = null
     private var useSlot = false
     override fun configure(configurator: ISkillConfigurator) {
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
+        tokenSuccess = configurator.requestExitToken(
+            ExitStatus.SUCCESS(),
+            "Attached entity to the gripper"
+        )
+
         slot = configurator.getReadWriteSlot("Entity", Entity::class.java)
 
-        useSlot = configurator.requestOptionalBool(KEY_USE_SLOT, useSlot)
-        create = configurator.requestOptionalBool(KEY_CREATE, create)
+        useSlot = configurator.requestOptionalBool(
+            KEY_USE_SLOT,
+            useSlot,
+            "read the entity from the specified slot instead of creating a new one"
+        )
 
-        entityType = configurator.requestOptionalValue(KEY_TYPE, entityType)
+        create = configurator.requestOptionalBool(
+            KEY_CREATE,
+            create,
+            "create a new entity with the given data, fails if the entity already exists"
+        )
+
+        entityType = configurator.requestOptionalValue(
+            KEY_TYPE,
+            entityType,
+            "Type of the attached entity"
+        )
+
         if (!configurator.hasConfigurationKey(KEY_TYPE) && useSlot) {
             slotTypename = configurator.getReadSlot("Type", String::class.java)
         }
 
-        entityName = configurator.requestOptionalValue(KEY_NAME, entityName)
+        entityName = configurator.requestOptionalValue(
+            KEY_NAME,
+            entityName,
+            "Name of the attached entity"
+        )
+
         if (!configurator.hasConfigurationKey(KEY_NAME)) {
             entityName = UUID.randomUUID().toString()
         }
 
-        ecwm = configurator.getActuator("ECWMGrasping", ECWMGrasping::class.java)
+        ecwm = configurator.getActuator(
+            "ECWMGrasping",
+            ECWMGrasping::class.java
+        )
     }
 
     override fun init(): Boolean {

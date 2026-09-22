@@ -107,32 +107,73 @@ class PlaceInsideStorage : AbstractSkill() {
     private var targetPose = Pose3D()
 
     override fun configure(configurator: ISkillConfigurator) {
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
-        tokenErrorNoPlan = configurator.requestExitToken(ExitStatus.ERROR().ps("no_plan"))
-        tokenErrorOther = configurator.requestExitToken(ExitStatus.ERROR().ps("other"))
+        tokenSuccess = configurator.requestExitToken(
+            ExitStatus.SUCCESS(),
+            "placing was successfully"
+        )
+        tokenErrorNoPlan = configurator.requestExitToken(
+            ExitStatus.ERROR().ps("no_plan"),
+            "motion planning failed"
+        )
+        tokenErrorOther = configurator.requestExitToken(
+            ExitStatus.ERROR().ps("other"),
+            "other error while placing"
+        )
 
         ecwm = configurator.getActuator("ECWMGrasping", ECWMGrasping::class.java)
 
-        entitySlot = configurator.getReadSlot("GraspedEntity", Entity::class.java)
-        useSpirit = configurator.requestOptionalBool(KEY_USE_SPIRIT, useSpirit)
+        entitySlot = configurator.getReadSlot(
+            "GraspedEntity",
+            Entity::class.java,
+            "the entity to be placed. Must be previously attached to gripper."
+        )
+
+        useSpirit = configurator.requestOptionalBool(
+            KEY_USE_SPIRIT,
+            useSpirit,
+            "use Spirit slot to read entity and storage"
+        )
+
         if (useSpirit) {
             spiritSlot = configurator.getReadSlot("Spirit", Spirit::class.java)
             ecwmSpirit = configurator.getActuator("ECWMSpirit", ECWMSpirit::class.java)
         } else {
-            storageAreaSlot =  configurator.getReadSlot("Storage", StorageArea::class.java)
-            targetEntitySlot =  configurator.getReadSlot("Entity", Entity::class.java)
+            storageAreaSlot = configurator.getReadSlot("Storage", StorageArea::class.java)
+            targetEntitySlot = configurator.getReadSlot("Entity", Entity::class.java)
         }
 
-        padding = configurator.requestOptionalDouble(KEY_PADDING,padding.toDouble()).toFloat()
-        maxSize = configurator.requestOptionalDouble(KEY_MAX_SIZE,maxSize.toDouble()).toFloat()
+        padding = configurator.requestOptionalDouble(
+            KEY_PADDING,
+            padding.toDouble(),
+            "padding for target sampling (avoids placing at the edges)"
+        ).toFloat()
+
+        maxSize = configurator.requestOptionalDouble(
+            KEY_MAX_SIZE,
+            maxSize.toDouble(),
+            "maximum size of the target sampling area (if storage is bigger)"
+        ).toFloat()
 
         minZ = configurator.requestOptionalDouble(KEY_OVERWRITE_Z_MIN, minZ)
         maxZ = configurator.requestOptionalDouble(KEY_OVERWRITE_Z_MAX, maxZ)
 
-        flip = configurator.requestOptionalBool(KEY_FLIP,flip)
-        topdown = configurator.requestOptionalBool(KEY_TOPDOWN,topdown)
-        upright = configurator.requestOptionalBool(KEY_UPRIGHT, upright)
-        if(flip && upright) throw ConfigurationException("cant flip and upright at the same time")
+        flip = configurator.requestOptionalBool(
+            KEY_FLIP,
+            flip,
+            "place the object upside down"
+        )
+
+        topdown = configurator.requestOptionalBool(KEY_TOPDOWN, topdown)
+
+        upright = configurator.requestOptionalBool(
+            KEY_UPRIGHT,
+            upright,
+            "keep the object upright during movement"
+        )
+
+        if (flip && upright) {
+            throw ConfigurationException("cant flip and upright at the same time")
+        }
     }
 
     override fun init(): Boolean {
