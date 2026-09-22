@@ -119,41 +119,84 @@ class LLMChat : AbstractSkill() {
 
     override fun configure(configurator: ISkillConfigurator) {
         llm = configurator.getActuator("LLM", LLM::class.java)
-        timeout = configurator.requestOptionalInt(KEY_TIMEOUT, timeout.toInt()).toLong()
+        timeout = configurator.requestOptionalInt(
+            KEY_TIMEOUT,
+            timeout.toInt(),
+            "Maximum time in milliseconds to wait for the LLM response in blocking mode."
+        ).toLong()
 
-        promt = configurator.requestOptionalValue(KEY_PROMPT, promt)
+        promt = configurator.requestOptionalValue(
+            KEY_PROMPT,
+            promt,
+            "The prompt to send to the LLM. If not provided, the prompt is read from the \"prompt\" slot."
+        )
         if(!configurator.hasConfigurationKey(KEY_PROMPT)) {
             slotPrompt = configurator.getReadSlot("prompt", String::class.java)
         }
 
         slotHistory = configurator.getSlot("history", MessageList::class.java)
 
-        blocking = configurator.requestOptionalBool(KEY_BLOCKING,blocking)
+        blocking = configurator.requestOptionalBool(
+            KEY_BLOCKING,
+            blocking,
+            "Whether to wait for the LLM response."
+        )
         if (blocking) {
-            tokenErrorTimeout = configurator.requestExitToken(ExitStatus.ERROR().ps("timeout"))
-            memorizeMsg = configurator.requestOptionalBool(KEY_STORE_MESSAGE,memorizeMsg)
+            tokenErrorTimeout = configurator.requestExitToken(
+                ExitStatus.ERROR().ps("timeout"),
+                "LLM did not respond within the configured timeout"
+            )
+            memorizeMsg = configurator.requestOptionalBool(
+                KEY_STORE_MESSAGE,
+                memorizeMsg,
+                "Whether to store the LLM reply as a Message. If false, the reply content is stored as a String."
+            )
         }
-        addReply = configurator.requestOptionalBool(KEY_ADD_REPLY,addReply)
+        addReply = configurator.requestOptionalBool(
+            KEY_ADD_REPLY,
+            addReply,
+            "Whether to add the LLM reply to the conversation history. Only available in blocking mode."
+        )
 
         if (addReply && !blocking) {
             throw ConfigurationException("cant $KEY_ADD_REPLY while non blocking")
         }
 
-        useTools = configurator.requestOptionalBool(KEY_USE_TOOLS,useTools)
+        useTools = configurator.requestOptionalBool(
+            KEY_USE_TOOLS,
+            useTools,
+            "Whether to provide tools to the LLM."
+        )
         if(useTools) {
             if (!memorizeMsg) {
                 logger.warn("$KEY_STORE_MESSAGE is required for tool use, automatically set to true")
                 memorizeMsg = true
             }
             slotTools = configurator.getReadSlot("tools", ToolList::class.java)
-            requireToolUse = configurator.requestOptionalBool(KEY_REQUIRE_TOOL, requireToolUse)
+            requireToolUse = configurator.requestOptionalBool(
+                KEY_REQUIRE_TOOL,
+                requireToolUse,
+                "Require the LLM to call a tool. If enabled and no tool is called, the \"noTool\" error exit token is returned."
+            )
             if (requireToolUse) {
-                tokenErrorTool= configurator.requestExitToken(ExitStatus.ERROR().ps("noTool"))
+                tokenErrorTool= configurator.requestExitToken(
+                    ExitStatus.ERROR().ps("noTool"),
+                    "#_REQUIRE_TOOL is enabled but the LLM did not call a tool"
+                )
             }
-            tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS().ps("agent"))
-            tokenSuccessTool = configurator.requestExitToken(ExitStatus.SUCCESS().ps("tool"))
+            tokenSuccess = configurator.requestExitToken(
+                ExitStatus.SUCCESS().ps("agent"),
+                "LLM returned a normal agent reply when tool usage is enabled"
+            )
+            tokenSuccessTool = configurator.requestExitToken(
+                ExitStatus.SUCCESS().ps("tool"),
+                "LLM returned a tool call"
+            )
         } else {
-            tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
+            tokenSuccess = configurator.requestExitToken(
+                ExitStatus.SUCCESS(),
+                "LLM request successfully completed"
+            )
         }
 
         if(memorizeMsg) {

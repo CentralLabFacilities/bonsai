@@ -82,25 +82,83 @@ class ConfirmYesOrNo : AbstractSkill() {
     private var langSlot: MemorySlotReader<LanguageType>? = null
 
     override fun configure(configurator: ISkillConfigurator) {
-        if (configurator.requestOptionalBool(KEY_USE_LANGUAGE, true)) {
-            langSlot = configurator.getReadSlot("Language", LanguageType::class.java)
+        if (configurator.requestOptionalBool(
+                KEY_USE_LANGUAGE,
+                true,
+                "Read Language slot to determine speak language else it defaults to \"EN\""
+            )
+        ) {
+            langSlot = configurator.getReadSlot(
+                "Language",
+                LanguageType::class.java,
+                "Memory slot containing the language to speak the confirmation in."
+            )
         }
 
-        timeout = configurator.requestOptionalInt(KEY_TIMEOUT, timeout.toInt()).toLong()
-        simpleYesOrNo = configurator.requestOptionalBool(KEY_SIMPLE, simpleYesOrNo)
-        timeUntilRepeat = configurator.requestOptionalInt(KEY_REPEAT, timeUntilRepeat.toInt()).toLong()
-        maxRepeats = configurator.requestOptionalInt(KEY_MAXREP, maxRepeats)
-        confirmText = configurator.requestOptionalValue(KEY_TEXT, confirmText)
-        intentNo = configurator.requestOptionalValue(KEY_INTENT_NO, intentNo)
-        intentYes = configurator.requestOptionalValue(KEY_INTENT_YES, intentYes)
-        speechSensorName = configurator.requestOptionalValue(KEY_SPEECH_SENSOR, speechSensorName)
-        tokenSuccessPsYes = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus(PS_YES))
-        tokenSuccessPsNo = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus(PS_NO))
+        timeout = configurator.requestOptionalInt(
+            KEY_TIMEOUT,
+            timeout.toInt(),
+            "Amount of time robot waits for confirmation in ms"
+        ).toLong()
+        simpleYesOrNo = configurator.requestOptionalBool(
+            KEY_SIMPLE,
+            simpleYesOrNo,
+            "If true: the robot only listens for confirmation (no talks)"
+        )
+        timeUntilRepeat = configurator.requestOptionalInt(
+            KEY_REPEAT,
+            timeUntilRepeat.toInt(),
+            "Time between the robot asking #_TEXT again in ms"
+        ).toLong()
+        maxRepeats = configurator.requestOptionalInt(
+            KEY_MAXREP,
+            maxRepeats,
+            "Amount of times #_TEXT is asked"
+        )
+        confirmText = configurator.requestOptionalValue(
+            KEY_TEXT,
+            confirmText,
+            "Text said by the robot before waiting for confirmation"
+        )
+        intentNo = configurator.requestOptionalValue(
+            KEY_INTENT_NO,
+            intentNo,
+            "Name of intent that signals no"
+        )
+        intentYes = configurator.requestOptionalValue(
+            KEY_INTENT_YES,
+            intentYes,
+            "Name of intent that signals yes"
+        )
+        speechSensorName = configurator.requestOptionalValue(
+            KEY_SPEECH_SENSOR,
+            speechSensorName,
+            "Which sensor to use for new understandings"
+        )
+        tokenSuccessPsYes = configurator.requestExitToken(
+            ExitStatus.SUCCESS().withProcessingStatus(PS_YES),
+            "Received confirmation"
+        )
+        tokenSuccessPsNo = configurator.requestExitToken(
+            ExitStatus.SUCCESS().withProcessingStatus(PS_NO),
+            "Received denial"
+        )
         if (timeout > 0) {
-            tokenErrorPsTimeout = configurator.requestExitToken(ExitStatus.ERROR().ps(PS_TIMEOUT))
+            tokenErrorPsTimeout = configurator.requestExitToken(
+                ExitStatus.ERROR().ps(PS_TIMEOUT),
+                "Timeout reached (only used when #_TIMEOUT is set to positive value)"
+            )
         }
-        speechSensor = configurator.getSensor(speechSensorName, NLU::class.java)
-        speechActuator = configurator.getActuator(ACTUATOR_SPEECHACTUATOR, SpeechActuator::class.java)
+        speechSensor = configurator.getSensor(
+            speechSensorName,
+            NLU::class.java,
+            "Used to listen for confirmation"
+        )
+        speechActuator = configurator.getActuator(
+            ACTUATOR_SPEECHACTUATOR,
+            SpeechActuator::class.java,
+            "Used to ask #_TEXT for confirmation"
+        )
     }
 
     override fun init(): Boolean {

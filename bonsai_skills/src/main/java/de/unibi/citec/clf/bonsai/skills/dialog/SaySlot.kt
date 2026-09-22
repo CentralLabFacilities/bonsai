@@ -63,32 +63,94 @@ class SaySlot : AbstractSkill() {
     private var textLang: Language = Language.EN
 
     override fun configure(configurator: ISkillConfigurator) {
-        sayText = configurator.requestOptionalValue(SAY_TEXT, sayText)
-        if (sayText.contains(REPLACE_STRING)) {
-            stringSlot = configurator.getReadSlot("StringSlot", String::class.java)
-        }
-        blocking = configurator.requestOptionalBool(KEY_BLOCKING, blocking)
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
-        speechActuator = configurator.getActuator("SpeechActuator", SpeechActuator::class.java)
+        sayText = configurator.requestOptionalValue(
+            SAY_TEXT,
+            sayText,
+            "Text said by the robot. '$REPLACE_STRING' is replaced by the content of the StringSlot."
+        )
 
-        val input = configurator.requestOptionalValue(KEY_TEXT_LANGUAGE, "")
-        if(configurator.hasConfigurationKey(KEY_TEXT_LANGUAGE)) {
+        if (sayText.contains(REPLACE_STRING)) {
+            stringSlot = configurator.getReadSlot(
+                "StringSlot",
+                String::class.java,
+                "Memory slot containing the string to incorporate into the message."
+            )
+        }
+
+        blocking = configurator.requestOptionalBool(
+            KEY_BLOCKING,
+            blocking,
+            "If true, the skill ends after the speech has been completed."
+        )
+
+        tokenSuccess = configurator.requestExitToken(
+            ExitStatus.SUCCESS(),
+            "The message was spoken successfully."
+        )
+
+        speechActuator = configurator.getActuator(
+            "SpeechActuator",
+            SpeechActuator::class.java
+        )
+
+        val input = configurator.requestOptionalValue(
+            KEY_TEXT_LANGUAGE,
+            "",
+            "Language of the configured message. Defaults to EN. If #_USE_LANGUAGE is enabled, the message is translated to the current language."
+        )
+
+        if (configurator.hasConfigurationKey(KEY_TEXT_LANGUAGE)) {
             textLang = Language.valueOf(input)
             speakerlang = textLang
-            if(!configurator.hasConfigurationKey(KEY_USE_LANGUAGE)) {
+
+            if (!configurator.hasConfigurationKey(KEY_USE_LANGUAGE)) {
                 logger.warn("$KEY_TEXT_LANGUAGE is defined, $KEY_USE_LANGUAGE defaults to false")
             }
-            if(configurator.requestOptionalBool(KEY_USE_LANGUAGE, false)) {
-                langSlot = configurator.getReadSlot("Language", LanguageType::class.java)
+
+            if (configurator.requestOptionalBool(
+                    KEY_USE_LANGUAGE,
+                    false,
+                    "Read the Language slot to determine the language in which the message should be spoken."
+                )
+            ) {
+                langSlot = configurator.getReadSlot(
+                    "Language",
+                    LanguageType::class.java,
+                    "Memory slot containing the current language to use for speech."
+                )
             }
-        } else if (configurator.requestOptionalBool(KEY_USE_LANGUAGE, true)) {
-            langSlot = configurator.getReadSlot("Language", LanguageType::class.java)
+        } else if (configurator.requestOptionalBool(
+                KEY_USE_LANGUAGE,
+                true,
+                "Read the Language slot to determine the language in which the message should be spoken."
+            )
+        ) {
+            langSlot = configurator.getReadSlot(
+                "Language",
+                LanguageType::class.java,
+                "Memory slot containing the current language to use for speech."
+            )
         }
 
-        if(configurator.requestOptionalBool(KEY_INTERRUPT, false)) {
-            if(!blocking) throw ConfigurationException("cant use $KEY_INTERRUPT while not $KEY_BLOCKING")
-            tokenInt = configurator.requestExitToken(ExitStatus.ERROR().ps("interrupted"))
-            someoneSpeaking = configurator.getSensor("SomeoneTalkingSensor", Boolean::class.java)
+        if (configurator.requestOptionalBool(
+                KEY_INTERRUPT,
+                false,
+                "Allow the speech to be interrupted when someone starts speaking."
+            )
+        ) {
+            if (!blocking) {
+                throw ConfigurationException("cant use $KEY_INTERRUPT while not $KEY_BLOCKING")
+            }
+
+            tokenInt = configurator.requestExitToken(
+                ExitStatus.ERROR().ps("interrupted"),
+                "Speech was interrupted because someone started speaking."
+            )
+
+            someoneSpeaking = configurator.getSensor(
+                "SomeoneTalkingSensor",
+                Boolean::class.java
+            )
         }
     }
 
@@ -112,19 +174,20 @@ class SaySlot : AbstractSkill() {
 
     override fun execute(): ExitToken {
         return if (!sayingComplete!!.isDone && blocking) {
-            if(someoneSpeaking?.readLast(50) == true) {
+            if (someoneSpeaking?.readLast(50) == true) {
                 logger.warn("someone is speaking")
                 sayingComplete?.cancel(true)
                 tokenInt!!
-            }
-            else {
+            } else {
                 ExitToken.loop(50)
             }
-        } else tokenSuccess!!
+        } else {
+            tokenSuccess!!
+        }
     }
 
     override fun end(curToken: ExitToken): ExitToken {
-        if(curToken.exitStatus.isFatal) {
+        if (curToken.exitStatus.isFatal) {
             logger.error("cancel speak")
             sayingComplete?.cancel(true)
         }

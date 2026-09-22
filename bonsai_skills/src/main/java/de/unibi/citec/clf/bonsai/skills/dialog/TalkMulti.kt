@@ -57,41 +57,92 @@ class TalkMulti : AbstractSkill() {
     private var speechActuator: SpeechActuator? = null
     private var sayingComplete: Future<String?>? = null
     private var langSlot: MemorySlotReader<LanguageType>? = null
+
     override fun configure(configurator: ISkillConfigurator) {
-        blocking = configurator.requestOptionalBool(KEY_BLOCKING, blocking)
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
-        speechActuator = configurator.getActuator("SpeechActuator", SpeechActuator::class.java)
-        langSlot = configurator.getReadSlot("Language", LanguageType::class.java)
-        default = Language.valueOf(configurator.requestOptionalValue(KEY_DEFAULT,"EN"))
+        blocking = configurator.requestOptionalBool(
+            KEY_BLOCKING,
+            blocking,
+            "If true, the skill ends after the speech has been completed."
+        )
+
+        tokenSuccess = configurator.requestExitToken(
+            ExitStatus.SUCCESS(),
+            "The message was spoken successfully."
+        )
+
+        speechActuator = configurator.getActuator(
+            "SpeechActuator",
+            SpeechActuator::class.java
+        )
+
+        langSlot = configurator.getReadSlot(
+            "Language",
+            LanguageType::class.java,
+            "Memory slot containing the language to use for selecting and speaking the message."
+        )
+
+        default = Language.valueOf(
+            configurator.requestOptionalValue(
+                KEY_DEFAULT,
+                "EN",
+                "Default language to use when no message is defined for the current language."
+            )
+        )
 
         for (key in configurator.configurationKeys) {
             if (key.startsWith(KEY_MESSAGE_PREFIX)) {
-                val value = configurator.requestValue(key).trim().replace(" +".toRegex(), " ")
+                val value = configurator.requestValue(
+                    key,
+                    "Text said by the robot when the corresponding language is selected."
+                ).trim().replace(" +".toRegex(), " ")
+
                 val lang = key.removePrefix(KEY_MESSAGE_PREFIX)
                 val language = Language.valueOf(lang)
+
                 logger.debug("found $key as ${language.name}: $value")
                 text[language] = value
             }
         }
 
         if (!text.containsKey(default)) {
-            logger.warn("Default msg to use is $default, but no #_MSG_${default.name} is defined")
+            logger.warn(
+                "Default msg to use is $default, but no #_MSG_${default.name} is defined"
+            )
         }
 
-        if(configurator.requestOptionalBool(KEY_INTERRUPT, false)) {
-            if(!blocking) throw ConfigurationException("cant use $KEY_INTERRUPT while not $KEY_BLOCKING")
-            tokenInt = configurator.requestExitToken(ExitStatus.ERROR().ps("interrupted"))
-            someoneSpeaking = configurator.getSensor("SomeoneTalkingSensor", Boolean::class.java)
-        }
+        if (configurator.requestOptionalBool(
+                KEY_INTERRUPT,
+                false,
+                "Allow the speech to be interrupted when someone starts speaking."
+            )
+        ) {
+            if (!blocking) {
+                throw ConfigurationException(
+                    "cant use $KEY_INTERRUPT while not $KEY_BLOCKING"
+                )
+            }
 
+            tokenInt = configurator.requestExitToken(
+                ExitStatus.ERROR().ps("interrupted"),
+                "Speech was interrupted because someone started speaking."
+            )
+
+            someoneSpeaking = configurator.getSensor(
+                "SomeoneTalkingSensor",
+                Boolean::class.java
+            )
+        }
     }
 
     override fun init(): Boolean {
-
         var textLanguage = Language.EN
-        val lang : Language = langSlot?.recall<LanguageType>()?.value ?: Language.EN
-        val msg = if(!text.containsKey(lang)) {
-            logger.warn("missing message for ${lang.name} default to ${default.name}")
+        val lang: Language =
+            langSlot?.recall<LanguageType>()?.value ?: Language.EN
+
+        val msg = if (!text.containsKey(lang)) {
+            logger.warn(
+                "missing message for ${lang.name} default to ${default.name}"
+            )
             textLanguage = default
             text[default]
         } else {
@@ -100,19 +151,23 @@ class TalkMulti : AbstractSkill() {
         }
 
         logger.debug("saying(${lang}): $msg")
-        sayingComplete = speechActuator!!.sayTranslated(msg!!, speakLanguage = lang, textLanguage = textLanguage)
+
+        sayingComplete = speechActuator!!.sayTranslated(
+            msg!!,
+            speakLanguage = lang,
+            textLanguage = textLanguage
+        )
 
         return true
     }
 
     override fun execute(): ExitToken {
         return if (!sayingComplete!!.isDone && blocking) {
-            if(someoneSpeaking?.readLast(50) == true) {
+            if (someoneSpeaking?.readLast(50) == true) {
                 logger.warn("someone is speaking")
                 sayingComplete?.cancel(true)
                 tokenInt!!
-            }
-            else {
+            } else {
                 ExitToken.loop(50)
             }
         } else {
@@ -122,12 +177,10 @@ class TalkMulti : AbstractSkill() {
     }
 
     override fun end(curToken: ExitToken): ExitToken {
-        if(curToken.exitStatus.isFatal) {
+        if (curToken.exitStatus.isFatal) {
             logger.error("cancel speak")
             sayingComplete?.cancel(true)
         }
         return curToken
     }
-
-
 }

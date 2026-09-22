@@ -51,14 +51,27 @@ class LoadNLU : AbstractSkill() {
     private lateinit var nlu: NLU
 
     override fun configure(configurator: ISkillConfigurator) {
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
-        intent = configurator.requestValue("#_INTENT")
+        tokenSuccess = configurator.requestExitToken(
+            ExitStatus.SUCCESS(),
+            "Load an NLU with the given #_INTENT into a slot."
+        )
+        intent = configurator.requestValue(
+            "#_INTENT",
+            "the intent"
+        )
 
-        nluSlot = configurator.getWriteSlot("NLUSlot", NLU::class.java)
+        nluSlot = configurator.getWriteSlot(
+            "NLUSlot",
+            NLU::class.java,
+            "Memory slot where the constructed NLU is stored."
+        )
         for (item in configurator.configurationKeys) {
             if(item.startsWith("#_")) continue
             if(item.startsWith("#")) {
-                val a = configurator.requestValue(item)
+                val a = configurator.requestValue(
+                    item,
+                    "Entities to create, of the form 'ENTITY[:ROLE][:GROUP]' (see example)"
+                )
                 entityMap[item.substring(1)] = a
             }
         }

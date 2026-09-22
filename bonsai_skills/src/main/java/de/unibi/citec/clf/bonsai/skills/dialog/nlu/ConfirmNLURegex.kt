@@ -122,31 +122,87 @@ class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
     private lateinit var nlu: NLU
 
     override fun configure(configurator: ISkillConfigurator) {
-        if (configurator.requestOptionalBool(KEY_USE_LANGUAGE, true)) {
-            langSlot = configurator.getReadSlot("Language", LanguageType::class.java)
+        if (configurator.requestOptionalBool(
+                KEY_USE_LANGUAGE,
+                true,
+                "Read Language slot to determine speak language else it defaults to \"EN\""
+            )
+        ) {
+            langSlot = configurator.getReadSlot(
+                "Language",
+                LanguageType::class.java,
+                "Memory slot containing the language to speak the confirmation in."
+            )
         }
 
-        useDefault = configurator.requestOptionalBool(KEY_USE_DEFAULT, useDefault)
-        doFinalReplacements = configurator.requestOptionalBool(KEY_DO_FINAL_REPLACEMENTS, doFinalReplacements)
-        if (!useDefault) tokenErrorUnlisted = configurator.requestExitToken(ExitStatus.ERROR().ps("unlisted"))
-        nluSlot = configurator.getReadSlot("NLUSlot", NLU::class.java)
-        timeout = configurator.requestOptionalInt(KEY_TIMEOUT, timeout.toInt()).toLong()
-        timeUntilRepeat = configurator.requestOptionalInt(KEY_REPEAT, timeUntilRepeat.toInt()).toLong()
-        maxRepeats = configurator.requestOptionalInt(KEY_MAXREP, maxRepeats)
-        confirmText = configurator.requestOptionalValue(KEY_TEXT, confirmText)
+        useDefault = configurator.requestOptionalBool(
+            KEY_USE_DEFAULT,
+            useDefault,
+            "use the default mapping (otherwise send error.unlisted)"
+        )
+        doFinalReplacements = configurator.requestOptionalBool(
+            KEY_DO_FINAL_REPLACEMENTS,
+            doFinalReplacements,
+            "replace some words like 'me' -> 'you'"
+        )
+        if (!useDefault) tokenErrorUnlisted = configurator.requestExitToken(
+            ExitStatus.ERROR().ps("unlisted"),
+            "The intent is not mapped (only when #_USE_DEFAULT is false)"
+        )
+        nluSlot = configurator.getReadSlot(
+            "NLUSlot",
+            NLU::class.java,
+            "Memory slot containing the NLU result used to build the confirmation message."
+        )
+        timeout = configurator.requestOptionalInt(
+            KEY_TIMEOUT,
+            timeout.toInt(),
+            "Amount of time robot waits for confirmation in ms"
+        ).toLong()
+        timeUntilRepeat = configurator.requestOptionalInt(
+            KEY_REPEAT,
+            timeUntilRepeat.toInt(),
+            "Time between the robot asking #_TEXT again in ms"
+        ).toLong()
+        maxRepeats = configurator.requestOptionalInt(
+            KEY_MAXREP,
+            maxRepeats,
+            "Amount of times #_TEXT is asked"
+        )
+        confirmText = configurator.requestOptionalValue(
+            KEY_TEXT,
+            confirmText,
+            "Text said by the robot before waiting for confirmation"
+        )
         intentNo = configurator.requestOptionalValue(KEY_INTENT_NO, intentNo)
         intentYes = configurator.requestOptionalValue(KEY_INTENT_YES, intentYes)
         speechSensorName = configurator.requestOptionalValue(KEY_SPEECH_SENSOR, speechSensorName)
-        tokenSuccessPsYes = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus(PS_YES))
-        tokenSuccessPsNo = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus(PS_NO))
+        tokenSuccessPsYes = configurator.requestExitToken(
+            ExitStatus.SUCCESS().withProcessingStatus(PS_YES),
+            "Received confirmation"
+        )
+        tokenSuccessPsNo = configurator.requestExitToken(
+            ExitStatus.SUCCESS().withProcessingStatus(PS_NO),
+            "Received denial"
+        )
         if (timeout > 0) {
-            tokenErrorPsTimeout = configurator.requestExitToken(ExitStatus.ERROR().ps(PS_TIMEOUT))
+            tokenErrorPsTimeout = configurator.requestExitToken(
+                ExitStatus.ERROR().ps(PS_TIMEOUT),
+                "Timeout reached (only used when #_TIMEOUT is set to positive value)"
+            )
         }
-        tokenErrorPsMissing = configurator.requestExitToken(ExitStatus.ERROR().ps(PS_MISSING))
+        tokenErrorPsMissing = configurator.requestExitToken(
+            ExitStatus.ERROR().ps(PS_MISSING),
+            "Some entity is missing or duplicate (e.g. '#E:object' while nlu has multiple object entities)"
+        )
         speechSensor = configurator.getSensor<NLU>(speechSensorName, NLU::class.java)
         speechActuator = configurator.getActuator<SpeechActuator>(ACTUATOR_SPEECHACTUATOR, SpeechActuator::class.java)
 
-        val mappings = configurator.requestOptionalValue(KEY_MAPPING, "")
+        val mappings = configurator.requestOptionalValue(
+            KEY_MAPPING,
+            "",
+            "List of intent mappings 'intent=mapping' separated by ';'"
+        )
             .replace("""\n""".toRegex(), "")
             .replace("""\s+""".toRegex(), " ")
 

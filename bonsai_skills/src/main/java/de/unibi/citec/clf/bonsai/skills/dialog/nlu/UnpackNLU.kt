@@ -58,26 +58,50 @@ class UnpackNLU : AbstractSkill() {
     private lateinit var nlu: NLU
 
     override fun configure(configurator: ISkillConfigurator) {
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
+        tokenSuccess = configurator.requestExitToken(
+            ExitStatus.SUCCESS(),
+            "Unpacks Entities from NLU into Slots"
+        )
 
-        intent = configurator.requestOptionalValue("#_INTENT", "")
+        intent = configurator.requestOptionalValue(
+            "#_INTENT",
+            "",
+            "check for matching intent, use ';' for multiple (\"intentA;intentB..\")"
+        )
         if (configurator.hasConfigurationKey("#_INTENT")) {
-            tokenErrorIntent = configurator.requestExitToken(ExitStatus.ERROR().ps("wrongIntent"))
+            tokenErrorIntent = configurator.requestExitToken(
+                ExitStatus.ERROR().ps("wrongIntent"),
+                "Intent is not #_INTENT (if defined)"
+            )
         }
 
-        nluSlot = configurator.getReadSlot("NLUSlot", NLU::class.java)
+        nluSlot = configurator.getReadSlot(
+            "NLUSlot",
+            NLU::class.java,
+            "Memory slot containing the NLU result to unpack entities from."
+        )
         for (item in configurator.configurationKeys) {
             if (item.startsWith("#_")) continue
             if (item.startsWith("#")) {
                 entitySet.add(item.substring(1))
-                configurator.requestValue(item)
+                configurator.requestValue(
+                    item,
+                    "Entities to unpack, of the form 'ENTITY[:ROLE][:GROUP]' (see example)"
+                )
             }
         }
 
         for (item in entitySet) {
-            slotMapping[item] = configurator.getWriteSlot(item, String::class.java)
+            slotMapping[item] = configurator.getWriteSlot(
+                item,
+                String::class.java,
+                "Memory slot where the value of the entity '$item' is stored."
+            )
             val status = item.replace(':', '.')
-            tokenMap[item] = configurator.requestExitToken(ExitStatus.ERROR().ps(status))
+            tokenMap[item] = configurator.requestExitToken(
+                ExitStatus.ERROR().ps(status),
+                "Specific Entity is missing from NLU"
+            )
         }
     }
 
@@ -109,8 +133,8 @@ class UnpackNLU : AbstractSkill() {
             val filtered = nlu.getEntities()
                 .filter {
                     (it.key == key) &&
-                    (it.role == role || (role.isEmpty() && it.role.isNullOrEmpty())) &&
-                    (it.group == group || (group == null && (it.group == -1 || it.group == 0) ) )
+                            (it.role == role || (role.isEmpty() && it.role.isNullOrEmpty())) &&
+                            (it.group == group || (group == null && (it.group == -1 || it.group == 0) ) )
                 }
 
             if (filtered.size != 1) {

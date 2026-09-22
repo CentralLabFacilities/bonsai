@@ -62,41 +62,97 @@ class TalkRandom : AbstractSkill() {
     private var textLang = Language.EN
 
     override fun configure(configurator: ISkillConfigurator) {
-        text = configurator.requestValue(KEY_MESSAGE)
-        blocking = configurator.requestOptionalBool(KEY_BLOCKING, blocking)
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
-        speechActuator = configurator.getActuator(SPEECH_ACTUATOR_NAME, SpeechActuator::class.java)
+        text = configurator.requestValue(
+            KEY_MESSAGE,
+            "Texts said by the robot, separated by ';'."
+        )
+
+        blocking = configurator.requestOptionalBool(
+            KEY_BLOCKING,
+            blocking,
+            "If true, the skill ends after the speech has been completed."
+        )
+
+        tokenSuccess = configurator.requestExitToken(
+            ExitStatus.SUCCESS(),
+            "The message was spoken successfully."
+        )
+
+        speechActuator = configurator.getActuator(
+            SPEECH_ACTUATOR_NAME,
+            SpeechActuator::class.java
+        )
+
         text = text.trim().replace(" +".toRegex(), " ")
 
-        val input = configurator.requestOptionalValue(KEY_TEXT_LANGUAGE, "")
+        val input = configurator.requestOptionalValue(
+            KEY_TEXT_LANGUAGE,
+            "",
+            "Language of the configured messages. Defaults to EN. If #_USE_LANGUAGE is enabled, messages are translated to the current language."
+        )
+
         if (configurator.hasConfigurationKey(KEY_TEXT_LANGUAGE)) {
             textLang = Language.valueOf(input)
             speakerLang = textLang
+
             if (!configurator.hasConfigurationKey(KEY_USE_LANGUAGE)) {
-                logger.warn("$KEY_TEXT_LANGUAGE is defined, but $KEY_USE_LANGUAGE defaults to false")
+                logger.warn(
+                    "$KEY_TEXT_LANGUAGE is defined, but $KEY_USE_LANGUAGE defaults to false"
+                )
             }
-            if (configurator.requestOptionalBool(KEY_USE_LANGUAGE, false)) {
-                langSlot = configurator.getReadSlot(LANG_SLOT_NAME, LanguageType::class.java)
+
+            if (configurator.requestOptionalBool(
+                    KEY_USE_LANGUAGE,
+                    false,
+                    "Read the Language slot to determine the language in which the message should be spoken."
+                )
+            ) {
+                langSlot = configurator.getReadSlot(
+                    LANG_SLOT_NAME,
+                    LanguageType::class.java,
+                    "Memory slot containing the current language to use for speech."
+                )
             }
-        } else if (configurator.requestOptionalBool(KEY_USE_LANGUAGE, true)) {
-            langSlot = configurator.getReadSlot(LANG_SLOT_NAME, LanguageType::class.java)
+        } else if (configurator.requestOptionalBool(
+                KEY_USE_LANGUAGE,
+                true,
+                "Read the Language slot to determine the language in which the message should be spoken."
+            )
+        ) {
+            langSlot = configurator.getReadSlot(
+                LANG_SLOT_NAME,
+                LanguageType::class.java,
+                "Memory slot containing the current language to use for speech."
+            )
         }
     }
 
     override fun init(): Boolean {
         speakerLang = langSlot?.recall<LanguageType>()?.value ?: speakerLang
-        val texts: Array<String?> = text.split(";".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
+
+        val texts: Array<String?> = text
+            .split(";".toRegex())
+            .dropLastWhile { it.isEmpty() }
+            .toTypedArray()
+
         randomText = texts[Random().nextInt(texts.size)] ?: randomText
+
         logger.debug("Saying (in ${speakerLang}): $randomText [$textLang]")
-        sayingComplete = speechActuator!!.sayTranslated(randomText, speakerLang, textLang)
+        sayingComplete = speechActuator!!.sayTranslated(
+            randomText,
+            speakerLang,
+            textLang
+        )
+
         return true
     }
-
 
     override fun execute(): ExitToken? {
         return if (!sayingComplete!!.isDone && blocking) {
             ExitToken.loop(50)
-        } else tokenSuccess
+        } else {
+            tokenSuccess
+        }
     }
 
     override fun end(curToken: ExitToken): ExitToken {
