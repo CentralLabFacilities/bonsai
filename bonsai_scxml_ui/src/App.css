@@ -2487,8 +2487,13 @@
 }
 
 .exit-target-suggestion:hover,
+.exit-target-suggestion.active,
 .exit-target-suggestion.selected {
     background: #1e293b;
+}
+
+.exit-target-suggestion.active {
+    outline: 1px solid #64748b;
 }
 
 .exit-target-suggestion.selected {
@@ -6956,6 +6961,7 @@
     left: 14px;
 }
 
+
 .initial-state-badge-inline {
     position: static;
     top: auto;
@@ -6968,4 +6974,57 @@
     border-width: 1px;
     box-shadow: none;
     font-size: 8px;
+}
+
+/* Editor-only aliases for Sub-SMs and container states. */
+.state-clone-node {
+    min-width: 165px;
+    max-width: 260px;
+    border: 1.5px solid #94a3b8;
+    border-left-width: 4px;
+    border-radius: 8px;
+    background: #f8fafc;
+    color: #0f172a;
+    box-shadow: 0 3px 10px rgba(15, 23, 42, 0.12);
+    overflow: visible;
+}
+
+.state-clone-node.selected-node {
+    outline: 3px solid rgba(56, 189, 248, 0.72);
+    outline-offset: 3px;
+}
+
+.state-clone-submachine { border-left-color: #9333ea; }
+.state-clone-compound { border-left-color: #475569; }
+.state-clone-parallel { border-left-color: #0284c7; }
+
+.state-clone-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 5px 8px 3px;
+}
+
+.state-clone-type,
+.state-clone-badge {
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.45px;
+}
+
+.state-clone-type { color: #475569; }
+.state-clone-badge {
+    padding: 1px 5px;
+    border-radius: 999px;
+    background: #e2e8f0;
+    color: #334155;
+}
+
+.state-clone-label {
+    padding: 3px 10px 8px;
+    font-size: 13px;
+    font-weight: 700;
+    text-align: center;
+    overflow-wrap: anywhere;
 }

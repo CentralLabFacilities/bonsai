@@ -796,6 +796,8 @@ function DetailsPanel({
         selectedNode.type === "submachine" ||
         Boolean(selectedNode.data.src);
     const isSkillClone = Boolean(selectedNode.data?.isSkillClone);
+    const isStateClone = Boolean(selectedNode.data?.isStateClone);
+    const isEditorClone = isSkillClone || isStateClone;
     const isContainerState =
         selectedNode.type === "compound" ||
         selectedNode.type === "parallel";
@@ -827,6 +829,11 @@ function DetailsPanel({
 
     const [openTargetSelector, setOpenTargetSelector] = useState(null);
     const [targetQueries, setTargetQueries] = useState({});
+    const [activeTargetSuggestion, setActiveTargetSuggestion] = useState({
+        key: null,
+        index: -1,
+    });
+    const targetSuggestionRefs = useRef(new Map());
 
     const handledParameterFocusRequestRef = useRef(null);
 
@@ -1004,12 +1011,12 @@ function DetailsPanel({
 
     useEffect(() => {
         const hiddenStandardTab =
-            (hidesParameterAndSlots || isSkillClone) &&
+            (hidesParameterAndSlots || isEditorClone) &&
             (activeTab === "parameter" || activeTab === "slots");
         const invalidSendTab =
-            activeTab === "send" && (!isNopSkill || isSkillClone);
+            activeTab === "send" && (!isNopSkill || isEditorClone);
         const hiddenActionsTab =
-            activeTab === "actions" && (hidesEntryExit || isSkillClone);
+            activeTab === "actions" && (hidesEntryExit || isEditorClone);
 
         if (hiddenStandardTab || invalidSendTab || hiddenActionsTab) {
             setActiveTab("allgemein");
@@ -1019,7 +1026,7 @@ function DetailsPanel({
         hidesParameterAndSlots,
         hidesEntryExit,
         isNopSkill,
-        isSkillClone,
+        isEditorClone,
         selectedNode.id,
         setActiveTab,
     ]);
@@ -1040,7 +1047,7 @@ function DetailsPanel({
         );
     }
 
-    if (isSkillClone) {
+    if (isEditorClone) {
         const sourceIdentity = cloneSourceNode
             ? String(
                 cloneSourceNode.data?.fullSkillName ||
@@ -1049,11 +1056,11 @@ function DetailsPanel({
             )
                 .split(".")
                 .pop()
-            : "Original skill not found";
+            : "Original state not found";
 
         return (
             <aside className="details-panel">
-                <h3>Details: {selectedNode.data?.label || "Skill Clone"}</h3>
+                <h3>Details: {selectedNode.data?.label || "State Clone"}</h3>
 
                 <div className="tabs">
                     <div className="tab active-tab">Overall</div>
@@ -1062,7 +1069,7 @@ function DetailsPanel({
                 <div className="tab-content">
                     <div className="allgemein-container">
                         <div className="description-header">
-                            <h3>Skill Clone</h3>
+                            <h3>{isSkillClone ? "Skill Clone" : "State Clone"}</h3>
                         </div>
 
                         <div className="skill-clone-detail-card">
@@ -1077,15 +1084,15 @@ function DetailsPanel({
                                 }
                                 title={
                                     cloneSourceNode
-                                        ? "Go to the original skill node"
-                                        : "The original skill node no longer exists"
+                                        ? "Go to the original state"
+                                        : "The original state no longer exists"
                                 }
                             >
                                 {sourceIdentity}
                             </button>
                             <div className="detail-description">
                                 This is an editor-only inbound alias. Incoming
-                                transitions target the original skill in SCXML;
+                                transitions target the original state in SCXML;
                                 outgoing transitions remain on the original node.
                             </div>
                         </div>
@@ -1199,7 +1206,18 @@ function DetailsPanel({
         }));
 
         setOpenTargetSelector(null);
+        setActiveTargetSuggestion({ key: null, index: -1 });
         onSetEventTarget?.(event, option.id);
+    };
+
+    const activateTargetSuggestion = (key, suggestionIndex) => {
+        setActiveTargetSuggestion({ key, index: suggestionIndex });
+        window.requestAnimationFrame(() => {
+            const element = targetSuggestionRefs.current.get(
+                `${key}:${suggestionIndex}`
+            );
+            element?.scrollIntoView({ block: "nearest" });
+        });
     };
 
     const handleTargetKeyDown = (
@@ -1207,15 +1225,60 @@ function DetailsPanel({
         event,
         index
     ) => {
+        const selectorKey = getTargetSelectorKey(event, index);
+        const query = getTargetQuery(event, index);
+        const matches = getMatchingTargetNodes(query);
+        const activeIndex =
+            activeTargetSuggestion.key === selectorKey
+                ? activeTargetSuggestion.index
+                : -1;
+
+        if (keyboardEvent.key === "ArrowDown") {
+            if (matches.length === 0) return;
+            keyboardEvent.preventDefault();
+            setOpenTargetSelector(selectorKey);
+            activateTargetSuggestion(
+                selectorKey,
+                activeIndex < matches.length - 1 ? activeIndex + 1 : 0
+            );
+            return;
+        }
+
+        if (keyboardEvent.key === "ArrowUp") {
+            if (matches.length === 0) return;
+            keyboardEvent.preventDefault();
+            setOpenTargetSelector(selectorKey);
+            activateTargetSuggestion(
+                selectorKey,
+                activeIndex > 0 ? activeIndex - 1 : matches.length - 1
+            );
+            return;
+        }
+
+        if (keyboardEvent.key === "Escape") {
+            setOpenTargetSelector(null);
+            setActiveTargetSuggestion({ key: null, index: -1 });
+            return;
+        }
+
         if (keyboardEvent.key !== "Enter") {
             return;
         }
 
         keyboardEvent.preventDefault();
 
-        const query = getTargetQuery(event, index).trim();
+        if (
+            openTargetSelector === selectorKey &&
+            activeIndex >= 0 &&
+            activeIndex < matches.length
+        ) {
+            selectExistingTarget(event, index, matches[activeIndex]);
+            return;
+        }
 
-        if (!query) return;
+        const trimmedQuery = query.trim();
+
+        if (!trimmedQuery) return;
 
         const exactMatch = targetNodeOptions.find((option) =>
             [
@@ -1228,7 +1291,7 @@ function DetailsPanel({
             ].some(
                 (value) =>
                     String(value || "").toLowerCase() ===
-                    query.toLowerCase()
+                    trimmedQuery.toLowerCase()
             )
         );
 
@@ -1236,8 +1299,6 @@ function DetailsPanel({
             selectExistingTarget(event, index, exactMatch);
             return;
         }
-
-        const matches = getMatchingTargetNodes(query);
 
         if (matches.length === 1) {
             selectExistingTarget(event, index, matches[0]);
@@ -1664,6 +1725,12 @@ function DetailsPanel({
                                                             openTargetSelector ===
                                                             selectorKey;
 
+                                                        const activeSuggestionIndex =
+                                                            activeTargetSuggestion.key ===
+                                                            selectorKey
+                                                                ? activeTargetSuggestion.index
+                                                                : -1;
+
                                                         return (
                                                             <div className="exit-target-selector">
                                                                 <div className="exit-target-input-row">
@@ -1674,11 +1741,15 @@ function DetailsPanel({
                                                                         value={query}
                                                                         placeholder="Type or select an existing node..."
                                                                         autoComplete="off"
-                                                                        onFocus={() =>
+                                                                        onFocus={() => {
                                                                             setOpenTargetSelector(
                                                                                 selectorKey
-                                                                            )
-                                                                        }
+                                                                            );
+                                                                            setActiveTargetSuggestion({
+                                                                                key: selectorKey,
+                                                                                index: -1,
+                                                                            });
+                                                                        }}
                                                                         onChange={(e) => {
                                                                             setTargetQueries(
                                                                                 (
@@ -1695,6 +1766,10 @@ function DetailsPanel({
                                                                             setOpenTargetSelector(
                                                                                 selectorKey
                                                                             );
+                                                                            setActiveTargetSuggestion({
+                                                                                key: selectorKey,
+                                                                                index: -1,
+                                                                            });
                                                                         }}
                                                                         onKeyDown={(
                                                                             keyboardEvent
@@ -1707,7 +1782,7 @@ function DetailsPanel({
                                                                         }
                                                                         onBlur={() =>
                                                                             window.setTimeout(
-                                                                                () =>
+                                                                                () => {
                                                                                     setOpenTargetSelector(
                                                                                         (
                                                                                             current
@@ -1716,7 +1791,14 @@ function DetailsPanel({
                                                                                             selectorKey
                                                                                                 ? null
                                                                                                 : current
-                                                                                    ),
+                                                                                    );
+                                                                                    setActiveTargetSuggestion(
+                                                                                        (current) =>
+                                                                                            current.key === selectorKey
+                                                                                                ? { key: null, index: -1 }
+                                                                                                : current
+                                                                                    );
+                                                                                },
                                                                                 120
                                                                             )
                                                                         }
@@ -1751,7 +1833,8 @@ function DetailsPanel({
                                                                         0 ? (
                                                                             matches.map(
                                                                                 (
-                                                                                    option
+                                                                                    option,
+                                                                                    matchIndex
                                                                                 ) => (
                                                                                     <button
                                                                                         type="button"
@@ -1760,9 +1843,33 @@ function DetailsPanel({
                                                                                             event.target
                                                                                                 ? "selected"
                                                                                                 : ""
+                                                                                        } ${
+                                                                                            matchIndex ===
+                                                                                            activeSuggestionIndex
+                                                                                                ? "active"
+                                                                                                : ""
                                                                                         }`}
                                                                                         key={
                                                                                             option.id
+                                                                                        }
+                                                                                        ref={(element) => {
+                                                                                            const refKey = `${selectorKey}:${matchIndex}`;
+                                                                                            if (element) {
+                                                                                                targetSuggestionRefs.current.set(
+                                                                                                    refKey,
+                                                                                                    element
+                                                                                                );
+                                                                                            } else {
+                                                                                                targetSuggestionRefs.current.delete(
+                                                                                                    refKey
+                                                                                                );
+                                                                                            }
+                                                                                        }}
+                                                                                        onMouseEnter={() =>
+                                                                                            setActiveTargetSuggestion({
+                                                                                                key: selectorKey,
+                                                                                                index: matchIndex,
+                                                                                            })
                                                                                         }
                                                                                         onMouseDown={(
                                                                                             e
