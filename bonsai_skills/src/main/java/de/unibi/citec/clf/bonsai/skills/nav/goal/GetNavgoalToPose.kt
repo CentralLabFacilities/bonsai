@@ -68,20 +68,23 @@ class GetNavgoalToPose : AbstractSkill() {
 
     @Throws(SkillConfigurationException::class)
     override fun configure(configurator: ISkillConfigurator) {
-        tokenSuccessNM = configurator.requestExitToken(ExitStatus.SUCCESS().ps("need_move"))
-        tokenSuccessAT = configurator.requestExitToken(ExitStatus.SUCCESS().ps("already_there"))
+        tokenSuccessNM = configurator.requestExitToken(
+            ExitStatus.SUCCESS().ps("need_move"),
+            "Successfully generated a NavGoal"
+        )
+        tokenSuccessAT = configurator.requestExitToken( ExitStatus.SUCCESS().ps("already_there"), "Successfully generated a NavGoal, but robot is close enough" )
 
         targetDistance = configurator.requestOptionalDouble("target_distance", targetDistance)
 
-        tokenError = configurator.requestExitToken(ExitStatus.ERROR())
+        tokenError = configurator.requestExitToken( ExitStatus.ERROR(), "Could not read or write to slot" )
 
-        poseReader = configurator.getReadSlot("Pose", Pose3D::class.java)
-        goalSlot = configurator.getWriteSlot("NavigationGoalData", NavigationGoalData::class.java)
+        poseReader = configurator.getReadSlot( "Pose", Pose3D::class.java, "The Pose3D to which a NavGoal should be generated" )
+        goalSlot = configurator.getWriteSlot( "NavigationGoalData", NavigationGoalData::class.java, "The resulting NavGoal" )
 
         robotPositionSensor = configurator.getSensor<Pose2D>("PositionSensor", Pose2D::class.java)
 
-        targetDistance = configurator.requestOptionalDouble(TARGET_DIST, targetDistance)
-        maxDistance = configurator.requestOptionalDouble(KEY_MAX_DIST, targetDistance)
+        targetDistance = configurator.requestOptionalDouble( TARGET_DIST, targetDistance, "Distance of generated navigation goal to target" )
+        maxDistance = configurator.requestOptionalDouble( KEY_MAX_DIST, targetDistance, "Max Distance to finish with already_there" )
 
         if (configurator.getTransform() != null)
             coordTransformer = configurator.getTransform() as CoordinateTransformer

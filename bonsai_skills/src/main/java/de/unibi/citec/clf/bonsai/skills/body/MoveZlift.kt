@@ -65,13 +65,13 @@ class MoveZlift: AbstractSkill() {
 
         jointcontroller = configurator.getActuator("ZLiftActuator", JointControllerActuator::class.java)
 
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
+        tokenSuccess = configurator.requestExitToken( ExitStatus.SUCCESS(), "z-lift movement completed successfully" )
         tokenError = configurator.requestExitToken(ExitStatus.ERROR())
 
         speed = configurator.requestOptionalDouble(KEY_SPEED, speed)
-        timeout = configurator.requestOptionalInt(KEY_TIMEOUT, timeout.toInt()).toLong()
+        timeout = configurator.requestOptionalInt( KEY_TIMEOUT, timeout.toInt(), "Amount of time robot waits for actuator to be done in milliseconds" ).toLong()
 
-        pos = configurator.requestOptionalDouble(KEY_POSITION, pos.toDouble()).toFloat()
+        pos = configurator.requestOptionalDouble( KEY_POSITION, pos.toDouble(), "Z lift position, range depending on the robot (Tiago: 0.0-0.35)" ).toFloat()
         if (!configurator.hasConfigurationKey(KEY_POSITION)) {
             heightSlot = configurator.getReadSlot("ZLiftHeight", Double::class.java)
         }

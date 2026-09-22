@@ -79,18 +79,18 @@ class TimeoutNoPerson : AbstractSkill() {
         personSensor = configurator.getSensor("PersonSensor", PersonDataList::class.java)
         positionSensor = configurator.getSensor("PositionSensor", Pose2D::class.java)
 
-        maxTimeout = configurator.requestOptionalInt(KEY_TIMEOUT, maxTimeout)
-        maxDist = configurator.requestOptionalDouble(KEY_DIST, maxDist)
-        maxAngle = configurator.requestOptionalDouble(KEY_ANGLE, maxAngle)
+        maxTimeout = configurator.requestOptionalInt( KEY_TIMEOUT, maxTimeout, "enable timeout after x ms." )
+        maxDist = configurator.requestOptionalDouble( KEY_DIST, maxDist, "max person distance in meter" )
+        maxAngle = configurator.requestOptionalDouble( KEY_ANGLE, maxAngle, "max Person Angle in radiant(in both directions)" )
 
         if (maxTimeout <= 0) {
           throw ConfigurationException("Timeout needs to be >0")
         }
-        tokenTimeout = configurator.requestExitToken(ExitStatus.ERROR().ps("timeout"))
+        tokenTimeout = configurator.requestExitToken( ExitStatus.ERROR().ps("timeout"), "timeout" )
 
         if (configurator.hasConfigurationKey(KEY_NAME)) {
             tokenName = configurator.requestExitToken(ExitStatus.ERROR().ps("missing"))
-            name = configurator.requestValue(KEY_NAME)
+            name = configurator.requestValue( KEY_NAME, "look for a specific name" )
         }
     }
 
