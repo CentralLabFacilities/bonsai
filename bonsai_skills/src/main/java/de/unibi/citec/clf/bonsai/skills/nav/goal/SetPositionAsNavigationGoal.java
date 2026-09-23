@@ -17,24 +17,6 @@ import de.unibi.citec.clf.btl.units.LengthUnit;
  *
  * <pre>
  *
- * Options:
- *  #_X:    [double] Optional (default: NaN)
- *              -> Map position x in m
- *  #_Y:    [double] Optional (default: NaN)
- *              -> Map position y in m
- *  #_YAW   [double] Optional (default: NaN)
- *              -> Map position yaw in rad
- *
- * Slots:
- *  NavigationGoalDataSlot: [NavigationGoalData] [Write]
- *      -> The navigation goal based on the given position
- *  PositionDataSlot:       [PositionData] [Read]
- *      -> If either #_X, #_Y or #_YAW is not set use this slot to set navigation goal
- *
- * ExitTokens:
- *  success:    Navigation goal computed and stored successfully
- *  error:      Navigation goal could not be computed or saved
- *
  * Sensors:
  *
  * Actuators:
@@ -68,18 +50,22 @@ public class SetPositionAsNavigationGoal extends AbstractSkill {
     @Override
     public void configure(ISkillConfigurator configurator) {
 
-        x = configurator.requestOptionalDouble(KEY_X, x);
-        y = configurator.requestOptionalDouble(KEY_Y, y);
-        yaw = configurator.requestOptionalDouble(KEY_YAW, yaw);
+        x = configurator.requestOptionalDouble(KEY_X, x, "Map position x in m");
+        y = configurator.requestOptionalDouble(KEY_Y, y, "Map position y in m");
+        yaw = configurator.requestOptionalDouble(KEY_YAW, yaw, "Map position yaw in rad");
         relative = configurator.requestOptionalBool(KEY_USE_RELATIVE,relative);
 
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
-        tokenError = configurator.requestExitToken(ExitStatus.ERROR());
-        navigationMemorySlot = configurator.getWriteSlot("NavigationGoalDataSlot", NavigationGoalData.class);
+        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS(),
+                "Navigation goal computed and stored successfully");
+        tokenError = configurator.requestExitToken(ExitStatus.ERROR(),
+                "Navigation goal could not be computed or saved");
+        navigationMemorySlot = configurator.getWriteSlot("NavigationGoalDataSlot", NavigationGoalData.class,
+                "The navigation goal based on the given position");
 
         if (Double.isNaN(x) || Double.isNaN(y) || Double.isNaN(yaw)) {
             logger.debug("At least on of x,y and yaw is missing. using slot");
-            positionSlot = configurator.getReadSlot("PositionDataSlot", Pose2D.class);
+            positionSlot = configurator.getReadSlot("PositionDataSlot", Pose2D.class,
+                    "If either #_X, #_Y or #_YAW is not set use this slot to set navigation goal");
         }
     }
 

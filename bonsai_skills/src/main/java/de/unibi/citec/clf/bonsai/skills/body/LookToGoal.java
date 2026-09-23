@@ -22,19 +22,6 @@ import java.util.concurrent.Future;
  *
  * <pre>
  *
- * Options:
- *  #_BLOCKING:     [boolean] Optional (default: true)
- *                      -> If true skill ends after gaze was completed
- *  #_HEIGHT        [double] Optional (default: 0.0)
- *                      -> The height to look at
- *
- * Slots:
- *  NavigationGoalDataSlot: [NavigationGoalData] [Read]
- *      -> The Navigation Goal to look towards to
- *
- * ExitTokens:
- *  success:    Turned head to goal
- *
  * Sensors:
  *  PositionSensor: [PositionData]
  *      -> Read current robot position to determine relation of robot to goal
@@ -71,12 +58,13 @@ public class LookToGoal extends AbstractSkill {
     @Override
     public void configure(ISkillConfigurator configurator) {
 
-        blocking = configurator.requestOptionalBool(KEY_BLOCKING, blocking);
-        z = configurator.requestOptionalDouble(KEY_Z, z);
+        blocking = configurator.requestOptionalBool(KEY_BLOCKING, blocking, "If true skill ends after gaze was completed");
+        z = configurator.requestOptionalDouble(KEY_Z, z, "The height to look at");
 
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
+        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS(), "Turned head to goal");
 
-        navigationMemorySlot = configurator.getReadSlot("NavigationGoalDataSlot", NavigationGoalData.class);
+        navigationMemorySlot = configurator.getReadSlot("NavigationGoalDataSlot", NavigationGoalData.class,
+                "The Navigation Goal to look towards to");
 
         gazeActuator = configurator.getActuator("GazeActuator", GazeActuator.class);
 

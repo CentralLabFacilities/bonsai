@@ -13,18 +13,6 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
  *
  * <pre>
  *
- * Slots:
- *  StringSlot: [String] [Write]
- *      -> Target Memory slot
- *
- * Options:
- *  #_WRITE [String]
- *      -> the String to be written
- *
- * ExitTokens:
- *  success:    Write was successful
- *  error:      Could not access slot
- *
  * </pre>
  */
 
@@ -45,13 +33,16 @@ public class SlotIO extends AbstractSkill {
     public void configure(ISkillConfigurator configurator) {
 
         // request all tokens that you plan to return from other methods
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
-        String w = configurator.requestOptionalValue(KEY_WRITE, "null");
+        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS(),
+                "Write was successful");
+        String w = configurator.requestOptionalValue(KEY_WRITE, "null",
+                "the String to be written");
         if (configurator.hasConfigurationKey(KEY_WRITE)) {
             write = w;
         }
 
-        stringSlot = configurator.getReadWriteSlot("StringSlot", String.class);
+        stringSlot = configurator.getReadWriteSlot("StringSlot", String.class,
+                "Target Memory slot");
 
     }
 

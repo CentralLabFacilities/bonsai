@@ -17,26 +17,6 @@ import java.util.concurrent.Future;
  *
  * <pre>
  *
- * Options:
- *  #_HORIZONTAL:   [String] Optional (Default: 0)
- *                      -> Horizontal direction to look to in rad (right - left) (Tiago: -1.24 to 1.24)
- *  #_VERTICAL:     [String] Optional (Default: 0)
- *                      -> Vertical direction to look to in rad (down - up) (Tiago: -0.98 to 0.79)
- *  #_MOVE_DURATION:[Integer] Optional (Default: 2000)
- *                      -> Minimal Time the head takes to move to the position in milliseconds
- *  #_MAX_VELOCITY: [double] Optional (Default 1.0)
- *                      -> Max Velocity the head moves
- *  #_BLOCKING:     [boolean] Optional (default: true)
- *                      -> If true skill ends after head movement was completed
- *  #_TIMEOUT:     [integer] Optional (default: 5000)
- *                      -> Amount of time robot waits for actuator to be done in milliseconds
- *
- * Slots:
- *
- * ExitTokens:
- *  success:    Head movement completed successfully
- *  success.timeout
- *
  * Sensors:
  *
  * Actuators:
@@ -77,16 +57,23 @@ public class SetGaze extends AbstractSkill {
     @Override
     public void configure(ISkillConfigurator configurator) throws SkillConfigurationException {
 
-        blocking = configurator.requestOptionalBool(KEY_BLOCKING, blocking);
-        horizontal = configurator.requestOptionalDouble(KEY_HORIZONTAL, horizontal); // TODO check if angles are in range?
-        vertical = configurator.requestOptionalDouble(KEY_VERTICAL, vertical);
-        minDuration = configurator.requestOptionalInt(KEY_MOVE_DURATION, minDuration);
-        timeout = configurator.requestOptionalInt(KEY_TIMEOUT, (int) timeout);
-        maxVelocity = configurator.requestOptionalDouble(KEY_VELOCITY,maxVelocity);
+        blocking = configurator.requestOptionalBool(KEY_BLOCKING, blocking,
+                "If true skill ends after head movement was completed");
+        horizontal = configurator.requestOptionalDouble(KEY_HORIZONTAL, horizontal,
+                "Horizontal direction to look to in rad (right - left) (Tiago: -1.24 to 1.24)"); // TODO check if angles are in range?
+        vertical = configurator.requestOptionalDouble(KEY_VERTICAL, vertical,
+                "Vertical direction to look to in rad (down - up) (Tiago: -0.98 to 0.79)");
+        minDuration = configurator.requestOptionalInt(KEY_MOVE_DURATION, minDuration,
+                "Minimal Time the head takes to move to the position in milliseconds");
+        timeout = configurator.requestOptionalInt(KEY_TIMEOUT, (int) timeout,
+                "Amount of time robot waits for actuator to be done in milliseconds");
+        maxVelocity = configurator.requestOptionalDouble(KEY_VELOCITY,maxVelocity,
+                "Max Velocity the head moves");
 
         gazeActuator = configurator.getActuator("GazeActuator", GazeActuator.class);
 
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
+        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS(),
+                "Head movement completed successfully");
 
         if (timeout > 0) {
             tokenErrorTimeout = configurator.requestExitToken(ExitStatus.ERROR().ps("timeout"));

@@ -25,22 +25,6 @@ import java.util.concurrent.Future;
  *
  * <pre>
  *
- * Options:
- *  #_MAX_ANGLE:        [double]
- *      -> Maximum horizontal angle in rad for the head movement.
- *  #_MIN_ANGLE:        [double]
- *      -> Minimum horizontal angle in rad for the head movement.
- *  #_MIN_TURNING_ANGLE:        [double]
- *      -> Minimum horizontal angle in rad for the head movements turning.
- *  #_TIMEOUT           [long] Optional (default: 7000)
- *      -> Amount of time robot searches for a person before notFound is sent in ms
- *
- * Slots:
- *  TargetPersonSlot:   [PersonData] [Read]
- *      -> Read in person to look towards
- *
- * ExitTokens:
- *  error.notFound:      person to follow was lost
  *
  * Sensors:
  *  PersonSensor:       [PersonDataList]
@@ -97,14 +81,20 @@ public class LookToPerson extends AbstractSkill {
     @Override
     public void configure(ISkillConfigurator configurator) {
 
-        tokenErrorNotFound = configurator.requestExitToken(ExitStatus.ERROR().ps("notFound"));
+        tokenErrorNotFound = configurator.requestExitToken(ExitStatus.ERROR().ps("notFound"),
+                "person to follow was lost");
 
-        maxAngle = configurator.requestOptionalDouble(KEY_MAX_ANGLE, maxAngle);
-        minAngle = configurator.requestOptionalDouble(KEY_MIN_ANGLE, minAngle);
-        minTurningAngle = configurator.requestOptionalDouble(KEY_MIN_TURNING_ANGLE, minTurningAngle);
-        initialTimeout = configurator.requestOptionalInt(KEY_TIMEOUT, (int)initialTimeout);
+        maxAngle = configurator.requestOptionalDouble(KEY_MAX_ANGLE, maxAngle,
+                "Maximum horizontal angle in rad for the head movement.");
+        minAngle = configurator.requestOptionalDouble(KEY_MIN_ANGLE, minAngle,
+                "Minimum horizontal angle in rad for the head movement.");
+        minTurningAngle = configurator.requestOptionalDouble(KEY_MIN_TURNING_ANGLE, minTurningAngle,
+                "Minimum horizontal angle in rad for the head movements turning.");
+        initialTimeout = configurator.requestOptionalInt(KEY_TIMEOUT, (int)initialTimeout,
+                "Amount of time robot searches for a person before notFound is sent in ms");
 
-        targetPersonSlot = configurator.getReadSlot("TargetPersonSlot", PersonData.class);
+        targetPersonSlot = configurator.getReadSlot("TargetPersonSlot", PersonData.class,
+                "Read in person to look towards");
 
         gazeActuator = configurator.getActuator("GazeActuator", GazeActuator.class);
 

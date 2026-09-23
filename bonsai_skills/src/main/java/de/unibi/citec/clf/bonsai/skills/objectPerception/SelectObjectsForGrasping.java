@@ -19,9 +19,6 @@ import de.unibi.citec.clf.btl.data.object.ObjectShapeList;
  * run this skill after recognizeObjects to select canditates for grasping.
  * can filter by
  *      - ";" seperated string of labels (e.g "apple;milk")
- *      - closest to objectPosition (#_BY_POSITION)
- *      - additional filtering by plane
- *
  * </pre>
  *
  * @author lruegeme
@@ -66,8 +63,10 @@ public class SelectObjectsForGrasping extends AbstractSkill {
         objectsRecognizedSlot = configurator.getSlot("ObjectShapeListSlot", ObjectShapeList.class);
         targetObjectsSlot = configurator.getSlot("TargetObjectsSlot", ObjectShapeList.class);
 
-        byPlane = configurator.requestOptionalBool(KEY_BY_PLANE, byPlane);
-        byPosition = configurator.requestOptionalBool(KEY_BY_POSITION, byPosition);
+        byPlane = configurator.requestOptionalBool(KEY_BY_PLANE, byPlane,
+                "additional filtering by plane");
+        byPosition = configurator.requestOptionalBool(KEY_BY_POSITION, byPosition,
+                "closest to objectPosition ");
         bestOnly = configurator.requestOptionalBool(KEY_BEST, bestOnly);
         minRel = configurator.requestOptionalDouble(KEY_MINREL, minRel);
         pattern = configurator.requestOptionalValue(KEY_DEBUG, pattern);

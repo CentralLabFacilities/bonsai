@@ -12,14 +12,6 @@ import java.util.concurrent.Future;
 /**
  * Clear the planning scene.
  *
- * Options:
- *  #_KEEP_ATTACHED: [boolean] Optional (Default: false)
- *                    -> Specify whether collision objects attached to the robot should also be deleted or kept
- *
- * ExitTokens:
- *  success:    Clearing successful
- *  error       Clearing not successful
- *
  * Sensors:
  *
  * Actuators:
@@ -42,10 +34,10 @@ public class ClearPlanningScene extends AbstractSkill {
 
     @Override
     public void configure(ISkillConfigurator configurator) {
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
-        tokenError = configurator.requestExitToken(ExitStatus.ERROR());
+        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS(), "Clearing successful");
+        tokenError = configurator.requestExitToken(ExitStatus.ERROR(), "Clearing not successful");
 
-        keepAttached = configurator.requestOptionalBool(KEY_KEEP_ATTACHED, false);
+        keepAttached = configurator.requestOptionalBool(KEY_KEEP_ATTACHED, false, "Specify whether collision objects attached to the robot should also be deleted or kept");
 
         graspAct = configurator.getActuator("PlanningSceneActuator", PlanningSceneActuator.class);
     }

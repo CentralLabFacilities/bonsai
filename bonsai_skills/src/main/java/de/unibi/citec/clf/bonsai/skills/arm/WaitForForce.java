@@ -16,19 +16,6 @@ import java.util.concurrent.Future;
  * Waits until a force greater than the given threshold is detected at the gripper.
  *
  * <pre>
- * Options:
- *  #_THRESHOLD:    [double] Optional (default: 2)
- *                      -> Threshold to distinguish noise
- *  #_TIMEOUT:      [long] Optional (default: -1)
- *                      -> Maximum waiting time
- *
- * Slots:
- *
- * ExitTokens:
- *  success:            A force greater than the threshold was detected
- *  success.timeout:    No force was detected during the timeout time
- *  error:              Waiting for force failed
- *
  * Actuators:
  *  Handover: [HandOverActuator]
  *      -> Called to measure the force at the gripper
@@ -59,15 +46,16 @@ public class WaitForForce extends AbstractSkill {
     @Override
     public void configure(ISkillConfigurator configurator) {
 
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
+        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS(), "A force greater than the threshold was detected");
         hand = configurator.getActuator("HandOver", HandOverActuator.class);
 
-        threshold = configurator.requestOptionalDouble(KEY_THRESHOLD, threshold);
-        timeout = configurator.requestOptionalInt(KEY_TIMEOUT, (int)timeout);
+        threshold = configurator.requestOptionalDouble(KEY_THRESHOLD, threshold, "Threshold to distinguish noise");
+        timeout = configurator.requestOptionalInt(KEY_TIMEOUT, (int)timeout, "Maximum waiting time");
         group = configurator.requestOptionalValue(KEY_GROUP, group);
 
         if (timeout > 0) {
-            tokenErrorPsTimeout = configurator.requestExitToken(ExitStatus.ERROR().ps("timeout"));
+            tokenErrorPsTimeout = configurator.requestExitToken(ExitStatus.ERROR().ps("timeout"),
+                    "Waiting for force failed");
         }
     }
 

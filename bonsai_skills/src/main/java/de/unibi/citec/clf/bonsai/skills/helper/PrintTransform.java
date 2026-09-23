@@ -41,11 +41,11 @@ public class PrintTransform extends AbstractSkill {
     @Override
     public void configure(ISkillConfigurator configurator) {
 
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
+        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS(), "Transform lookup was successful during initialization.");
         transform = (CoordinateTransformer) configurator.getTransform();
 
-        from = configurator.requestValue(KEY_FROM);
-        to = configurator.requestValue(KEY_TO);
+        from = configurator.requestValue(KEY_FROM, "Source coordinate frame.");
+        to = configurator.requestValue(KEY_TO, "Target coordinate frame.");
     }
 
     @Override

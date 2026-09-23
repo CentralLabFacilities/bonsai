@@ -16,15 +16,6 @@ import java.io.IOException;
  * 
  * <pre>
  *
- * Options:
- *
- * Slots:
- *  PositionDataSlot: [PositionData] [Write]
- *      -> Memory slot to store position
- *
- * ExitTokens:
- *  success:    Position saved successfully
- *
  * Sensors:
  *  PositionSensor: [PositionData]
  *      -> Used to read the current robot position
@@ -47,9 +38,11 @@ public class StoreCurrentPosition extends AbstractSkill {
     @Override
     public void configure(ISkillConfigurator configurator) {
 
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
+        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS(),
+                "Position saved successfully");
 
-        positionSlot = configurator.getWriteSlot("PositionDataSlot", Pose2D.class);
+        positionSlot = configurator.getWriteSlot("PositionDataSlot", Pose2D.class,
+                "Memory slot to store position");
         positionSensor = configurator.getSensor("PositionSensor", Pose2D.class);
     }
 

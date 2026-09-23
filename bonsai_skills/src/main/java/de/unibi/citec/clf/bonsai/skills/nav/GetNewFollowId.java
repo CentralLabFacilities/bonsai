@@ -25,18 +25,6 @@ import java.io.IOException;
  *
  * <pre>
  *
- * Options:
- *  #_MAX_DIST:    [double] Optional (default: 500)
- *                      -> Max distance a person can have to the old person to be considered a new follow target in mm
- *
- * Slots:
- *  PersonDataSlot: [PersonData] [Read and Write]
- *      -> Read in last followed person. Write new person to follow.
- *
- * ExitTokens:
- *  success:    Found new person in range to follow
- *  error:      Could not find new person to follow
- *
  * Sensors:
  *  PersonSensor :  [PersonDataList]
  *      -> Read currently seen persons
@@ -73,21 +61,27 @@ public class GetNewFollowId extends AbstractSkill {
     @Override
     public void configure(ISkillConfigurator configurator) throws SkillConfigurationException {
 
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
-        tokenError = configurator.requestExitToken(ExitStatus.ERROR());
+        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS(),
+                "Found new person in range to follow");
+        tokenError = configurator.requestExitToken(ExitStatus.ERROR(),
+                "Could not find new person to follow");
 
         if (configurator.requestOptionalBool(KEY_USE_PERSON_SLOT, false)) {
-            followPersonRead = configurator.getReadSlot("PersonInput", PersonData.class);
+            followPersonRead = configurator.getReadSlot("PersonInput", PersonData.class,
+                    "Read in last followed person.");
         } else {
-            positionSlotRead = configurator.getReadSlot("LastPersonPositionSlot", Pose2D.class);
+            positionSlotRead = configurator.getReadSlot("LastPersonPositionSlot", Pose2D.class,
+                    "Read in last followed persons position.");
         }
 
         personSensor = configurator.getSensor("PersonSensor", PersonDataList.class);
 
 
-        followPersonSlotWrite = configurator.getWriteSlot("PersonDataSlot", PersonData.class);
+        followPersonSlotWrite = configurator.getWriteSlot("PersonDataSlot", PersonData.class,
+                "Write new person to follow.");
 
-        maxDist = configurator.requestOptionalDouble(KEY_MAX_DISTANCE, maxDist);
+        maxDist = configurator.requestOptionalDouble(KEY_MAX_DISTANCE, maxDist,
+                "Max distance a person can have to the old person to be considered a new follow target in mm");
         timeout = configurator.requestOptionalInt(KEY_TIMEOUT, (int) timeout);
     }
 

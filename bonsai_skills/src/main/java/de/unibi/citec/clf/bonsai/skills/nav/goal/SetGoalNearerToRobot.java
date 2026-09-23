@@ -24,18 +24,6 @@ import java.io.IOException;
  * <p>
  * <pre>
  *
- * Options:
- *  #_CLOSER:         [double] Optional (default: 500)
- *                      -> Set navigation goal this much closer in mm
- *
- * Slots:
- *  NavigationGoalDataSlot: [NavigationGoalData] [Read and Write]
- *      -> Navigation goal to modify
- *
- * ExitTokens:
- *  success:    New navigation goal computed and saved successfully
- *  error:      Navigation goal could not by saved
- *
  * Sensors:
  *  PositionSensor: [PositionData]
  *      -> Get the current robot position
@@ -66,15 +54,19 @@ public class SetGoalNearerToRobot extends AbstractSkill {
     @Override
     public void configure(ISkillConfigurator configurator) throws SkillConfigurationException {
 
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
-        tokenError = configurator.requestExitToken(ExitStatus.ERROR());
+        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS(),
+                "New navigation goal computed and saved successfully");
+        tokenError = configurator.requestExitToken(ExitStatus.ERROR(),
+                "Navigation goal could not by saved");
 
-        navigationGoalDataSlotWrite = configurator.getWriteSlot("NavigationGoalDataSlot", NavigationGoalData.class);
-        navigationGoalDataSlotRead = configurator.getReadSlot("NavigationGoalDataSlot", NavigationGoalData.class);
+        navigationGoalDataSlotWrite = configurator.getWriteSlot("NavigationGoalDataSlot", NavigationGoalData.class,
+                "Navigation goal to modify");
+        navigationGoalDataSlotRead = configurator.getReadSlot("NavigationGoalDataSlot", NavigationGoalData.class,
+                "Navigation goal to modify");
 
         robotPositionSensor = configurator.getSensor("PositionSensor", Pose2D.class);
 
-        closer = configurator.requestOptionalDouble(KEY_CLOSER, closer);
+        closer = configurator.requestOptionalDouble(KEY_CLOSER, closer, "Set navigation goal this much closer in mm");
     }
 
     @Override

@@ -12,15 +12,6 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
  *
  * <pre>
  *
- * Slots:
- *  StringSlot: [String] [Read]
- *      -> Memory slot the content will be read from
- *
- * ExitTokens:
- *  success.empty:      Entry was empty
- *  success.notEmpty:   Entry was not empty
- *  error:              StringSlot was empty
- *
  * </pre>
  *
  * @author pvonneumanncosel
@@ -36,10 +27,13 @@ public class IsSlotEmpty extends AbstractSkill {
 
     @Override
     public void configure(ISkillConfigurator configurator) {
-        tokenEmpty = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus("empty"));
-        tokenNotEmpty = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus("notEmpty"));
+        tokenEmpty = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus("empty"),
+                "Entry was empty");
+        tokenNotEmpty = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus("notEmpty"),
+                "Entry was not empty");
 
-        stringSlot = configurator.getReadSlot("StringSlot", String.class);
+        stringSlot = configurator.getReadSlot("StringSlot", String.class,
+                "Memory slot the content will be read from");
     }
 
     @Override
