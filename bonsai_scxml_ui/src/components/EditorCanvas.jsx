@@ -232,6 +232,11 @@ export default function EditorCanvas({
                     }
                     nodes={visibleNodes}
                     edges={visibleEdges}
+                    // Keep the complete graph loaded/cached, but only mount
+                    // React Flow elements that are actually inside the viewport.
+                    // This significantly reduces DOM/SVG work on large state
+                    // machines without changing the semantic graph in memory.
+                    onlyRenderVisibleElements
                     onNodesChange={handleNodesChange}
                     onEdgesChange={handleVisibleEdgesChange}
                     onSelectionChange={onSelectionChange}
