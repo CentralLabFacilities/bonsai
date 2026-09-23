@@ -111,26 +111,43 @@ export function useEditorDisplay({
     );
 
     const cloneGroupByNodeId = useMemo(() => {
-        const clonesByOriginalId = new Map();
+        const visualNodes = [...(nodes || []), ...(injectedSlotNodes || [])];
+        const visualNodeById = new Map(
+            visualNodes.map((node) => [node.id, node])
+        );
+        const groupsByOriginalId = new Map();
 
-        [...(nodes || []), ...(injectedSlotNodes || [])].forEach((node) => {
-            const isVisualClone = Boolean(
-                node.data?.isSkillClone ||
-                node.data?.isStateClone ||
-                node.data?.isSlotClone
-            );
-            if (!isVisualClone || !node.data?.cloneOfNodeId) return;
+        const resolveOriginalId = (node) => {
+            let originalId = node?.data?.cloneOfNodeId;
+            const visited = new Set([node?.id]);
 
-            const originalId = node.data.cloneOfNodeId;
-            if (!clonesByOriginalId.has(originalId)) {
-                clonesByOriginalId.set(originalId, []);
+            while (originalId && !visited.has(originalId)) {
+                visited.add(originalId);
+                const originalNode = visualNodeById.get(originalId);
+                const nextOriginalId = originalNode?.data?.cloneOfNodeId;
+                if (!nextOriginalId) break;
+                originalId = nextOriginalId;
             }
-            clonesByOriginalId.get(originalId).push(node.id);
+
+            return originalId || null;
+        };
+
+        visualNodes.forEach((node) => {
+            // cloneOfNodeId is the authoritative editor-alias relationship.
+            // Do not depend on a particular clone flag here: imported or older
+            // Sub-SM/Compound/Parallel aliases may still be valid visual clones
+            // even if their presentation flag differs.
+            const originalId = resolveOriginalId(node);
+            if (!originalId || !visualNodeById.has(originalId)) return;
+
+            if (!groupsByOriginalId.has(originalId)) {
+                groupsByOriginalId.set(originalId, new Set([originalId]));
+            }
+            groupsByOriginalId.get(originalId).add(node.id);
         });
 
         const groups = new Map();
-        clonesByOriginalId.forEach((cloneIds, originalId) => {
-            const group = new Set([originalId, ...cloneIds]);
+        groupsByOriginalId.forEach((group) => {
             group.forEach((nodeId) => groups.set(nodeId, group));
         });
 

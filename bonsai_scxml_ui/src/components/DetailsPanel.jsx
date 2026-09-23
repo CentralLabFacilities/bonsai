@@ -788,6 +788,8 @@ function DetailsPanel({
                           transitionFocusRequest,
                           cloneSourceNode,
                           onNavigateCloneSource,
+                          cloneNodes = [],
+                          onNavigateClone,
                           containerOutgoingTransitions = [],
                           onNavigateTransitionNode,
                           onHoverTransitionNode,
@@ -799,6 +801,7 @@ function DetailsPanel({
     const isSkillClone = Boolean(selectedNode.data?.isSkillClone);
     const isStateClone = Boolean(selectedNode.data?.isStateClone);
     const isEditorClone = isSkillClone || isStateClone;
+    const hasClones = Array.isArray(cloneNodes) && cloneNodes.length > 0;
     const isContainerState =
         selectedNode.type === "compound" ||
         selectedNode.type === "parallel";
@@ -1017,12 +1020,19 @@ function DetailsPanel({
             activeTab === "send" && (!isNopSkill || isEditorClone);
         const hiddenActionsTab =
             activeTab === "actions" && (hidesEntryExit || isEditorClone);
+        const invalidClonesTab = activeTab === "clones" && !hasClones;
 
-        if (hiddenStandardTab || invalidSendTab || hiddenActionsTab) {
+        if (
+            hiddenStandardTab ||
+            invalidSendTab ||
+            hiddenActionsTab ||
+            invalidClonesTab
+        ) {
             setActiveTab("allgemein");
         }
     }, [
         activeTab,
+        hasClones,
         hidesParameterAndSlots,
         hidesEntryExit,
         isNopSkill,
@@ -1292,6 +1302,17 @@ function DetailsPanel({
                 >
                     Overall
                 </div>
+
+                {hasClones && (
+                    <div
+                        className={`tab ${
+                            activeTab === "clones" ? "active-tab" : ""
+                        }`}
+                        onClick={() => setActiveTab("clones")}
+                    >
+                        Clones
+                    </div>
+                )}
 
                 {!isSubMachine && !hidesParameterAndSlots && (
                     <>
@@ -1839,6 +1860,35 @@ function DetailsPanel({
                                 </div>
                             </div>
                         )}
+                    </div>
+                )}
+
+                {activeTab === "clones" && hasClones && (
+                    <div className="allgemein-container">
+                        <div className="description-header">
+                            <h3>Clones</h3>
+                        </div>
+
+                        <div className="skill-clone-detail-card">
+                            <div className="detail-description">
+                                Select a clone to move the editor view to it.
+                            </div>
+
+                            {cloneNodes.map((cloneNode, index) => (
+                                <button
+                                    key={cloneNode.id}
+                                    type="button"
+                                    className="skill-clone-source-button"
+                                    onClick={() => onNavigateClone?.(cloneNode.id)}
+                                    title="Go to this clone"
+                                >
+                                    <FiLayers /> Clone {index + 1}
+                                    {cloneNode.data?.label
+                                        ? ` · ${cloneNode.data.label}`
+                                        : ""}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 )}
 

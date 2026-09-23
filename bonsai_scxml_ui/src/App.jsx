@@ -1685,6 +1685,16 @@ function AppContent() {
         ) || null;
     }, [selectedNode, semanticNodes]);
 
+    const selectedNodeClones = useMemo(() => {
+        if (!selectedNode || isEditorCloneNode(selectedNode)) return [];
+
+        return semanticNodes.filter(
+            (node) =>
+                node.id !== selectedNode.id &&
+                node.data?.cloneOfNodeId === selectedNode.id
+        );
+    }, [selectedNode, semanticNodes]);
+
     const selectedContainerOutgoingTransitions = useMemo(() => {
         if (
             !selectedNode ||
@@ -2781,8 +2791,8 @@ function AppContent() {
                         copiedSlotNode.id;
                     const copiedPath = normalizeSlotPath(
                         copiedSlotNode.data?.clipboardCanonicalSlotPath ||
-                        copiedSlotNode.data?.path ||
-                        ""
+                            copiedSlotNode.data?.path ||
+                            ""
                     );
 
                     // Resolve by canonical id first, then by semantic path.
@@ -4894,6 +4904,8 @@ function AppContent() {
                                 selectedNode={selectedNode}
                                 cloneSourceNode={selectedCloneSourceNode}
                                 onNavigateCloneSource={handleNavigateCloneSource}
+                                cloneNodes={selectedNodeClones}
+                                onNavigateClone={handleNavigateCloneSource}
                                 containerOutgoingTransitions={selectedContainerOutgoingTransitions}
                                 onNavigateTransitionNode={handleNavigateCloneSource}
                                 onHoverTransitionNode={(nodeId) =>
