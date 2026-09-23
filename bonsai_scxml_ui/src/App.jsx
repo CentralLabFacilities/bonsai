@@ -3886,8 +3886,8 @@ function AppContent() {
     );
 
     // Reconfigure a skill after one of its parameters changes. The Bonsai skill
-    // endpoint can expose a different set of events, sensors/actuators and slot
-    // requests depending on the current parameter values.
+    // endpoint can expose a different set of events, sensors/actuators, parameters
+    // and slot requests depending on the current parameter values.
     const skillConfigurationRequestVersionsRef = useRef(new Map());
 
     const reconcileDynamicSlots = (currentSlots = [], requestedSlots = []) =>
@@ -3912,6 +3912,32 @@ function AppContent() {
                 inherited: existingSlot?.inherited || null,
             };
         });
+
+    const reconcileDynamicParameters = (currentParams = [], requestedParams = []) =>
+        (Array.isArray(requestedParams) ? requestedParams : []).map(
+            (requestedParam) => {
+                const existingParam = (currentParams || []).find(
+                    (param) => param?.key === requestedParam?.key
+                );
+
+                return {
+                    ...requestedParam,
+                    key: requestedParam?.key || "",
+                    type: requestedParam?.type || existingParam?.type || "Unknown",
+                    required: Boolean(requestedParam?.required),
+                    default: requestedParam?.default,
+                    description:
+                        requestedParam?.description ??
+                        existingParam?.description ??
+                        "",
+                    // Parameter requests can depend on other parameter values.
+                    // Keep the value the user already entered when a parameter
+                    // is still requested, while newly requested parameters start
+                    // empty and parameters no longer requested disappear.
+                    expr: existingParam?.expr ?? "",
+                };
+            }
+        );
 
     const updateEventsFromParameters = async (nodeId, parameterOverride = null) => {
         const node = nodes.find((candidate) => candidate.id === nodeId);
@@ -4021,6 +4047,14 @@ function AppContent() {
                         )
                         : currentNode.data?.outSlots || [];
 
+                const nextParams =
+                    data.params !== undefined
+                        ? reconcileDynamicParameters(
+                            currentNode.data?.params || [],
+                            data.params
+                        )
+                        : currentNode.data?.params || [];
+
                 const updatedNodes = currentNodes.map((candidate) => {
                     if (candidate.id !== nodeId) return candidate;
 
@@ -4041,6 +4075,7 @@ function AppContent() {
                                         : candidate.data?.actuators || [],
                             inSlots: nextInSlots,
                             outSlots: nextOutSlots,
+                            params: nextParams,
                         },
                     };
                 });

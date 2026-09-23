@@ -80,6 +80,24 @@ export function useScxmlDocument({
                     [],
                     parsed.editorSlotNodes || []
                 );
+
+                if ((parsed.parameterErrors || []).length > 0) {
+                    const visibleErrors = parsed.parameterErrors.slice(0, 10);
+                    const lines = visibleErrors.map((error) =>
+                        `• ${error.state}.${error.parameter}: ${error.message}`
+                    );
+                    const remaining =
+                        parsed.parameterErrors.length - visibleErrors.length;
+
+                    if (remaining > 0) {
+                        lines.push(`• …and ${remaining} more parameter type error${remaining === 1 ? "" : "s"}.`);
+                    }
+
+                    alert(
+                        `Imported with ${parsed.parameterErrors.length} parameter type error${parsed.parameterErrors.length === 1 ? "" : "s"}:\n\n${lines.join("\n")}\n\nThe workflow was loaded. These errors are also listed under Problems → Parameters.`
+                    );
+                }
+
                 window.setTimeout(
                     () => fitView({ padding: 0.2, duration: 400 }),
                     150

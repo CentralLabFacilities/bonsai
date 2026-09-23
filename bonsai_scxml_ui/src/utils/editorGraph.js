@@ -1,4 +1,5 @@
 import { isCompoundInitialChildCandidate } from "./editorGeometry";
+import { normalizeTypedValue, normalizeValueType } from "./valueTypes";
 
 export const withSmartTransitionRouting = (transitionEdges) =>
     transitionEdges.map((edge) => ({
@@ -839,20 +840,61 @@ export const buildEditorProblems = (
             });
     });
 
-    // Required parameters
+    // Parameters: required values and type compatibility. This is also run
+    // immediately after SCXML import, so a stale/wrongly typed value from a
+    // file is surfaced in Problems without requiring the user to edit it first.
     (nodes || []).forEach((node) => {
-        (node.data?.params || []).forEach((parameter, index) => {
-            if (!parameter?.required) return;
+        const nodeParameters = node.data?.params || [];
+        const parameterVariables = [
+            ...(globalDataModel || []),
+            ...nodeParameters
+                .filter((parameter) => parameter?.key)
+                .map((parameter) => ({
+                    id: parameter.key,
+                    type: parameter.type,
+                    valueType: parameter.type,
+                    expr: parameter.expr ?? parameter.default ?? "",
+                })),
+        ];
 
+        nodeParameters.forEach((parameter, index) => {
             const value = String(parameter.expr ?? "").trim();
             const defaultValue = String(parameter.default ?? "").trim();
+            const parameterName =
+                parameter.key || `parameter ${index + 1}`;
 
-            if (!value && !defaultValue) {
+            if (parameter?.required && !value && !defaultValue) {
                 addProblem({
                     id: `parameter-required-${node.id}-${index}`,
                     category: "Parameters",
                     title: "Required parameter is missing",
-                    message: `${nodeLabel(node)}.${parameter.key || `parameter ${index + 1}`} needs a value.`,
+                    message: `${nodeLabel(node)}.${parameterName} needs a value.`,
+                    nodeId: node.id,
+                    detailTab: "parameter",
+                    mode: "event",
+                });
+                return;
+            }
+
+            const effectiveValue = value || defaultValue;
+            if (!effectiveValue) return;
+
+            const normalizedParameterType = normalizeValueType(parameter.type);
+            if (!normalizedParameterType) return;
+
+            const validation = normalizeTypedValue(
+                effectiveValue,
+                normalizedParameterType,
+                parameterVariables,
+                { allowEmpty: true }
+            );
+
+            if (!validation.valid) {
+                addProblem({
+                    id: `parameter-type-${node.id}-${index}`,
+                    category: "Parameters",
+                    title: "Invalid parameter type",
+                    message: `${nodeLabel(node)}.${parameterName}: ${validation.error || `expected ${parameter.type || "the configured type"}.`}`,
                     nodeId: node.id,
                     detailTab: "parameter",
                     mode: "event",

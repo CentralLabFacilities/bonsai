@@ -6,6 +6,8 @@ import {
     deserializeScxmlConditionForEditor,
     deserializeScxmlValueForEditor,
     deserializeStateDatamodelValueForEditor,
+    normalizeTypedValue,
+    normalizeValueType,
 } from "./valueTypes.js";
 import {
     COMPOUND_PADDING_X,
@@ -686,6 +688,7 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
     // 2. Globales Datamodel & Slots parsen (Originaler Code)
     const globalDataEntries = [];
     const parsedSlots = [];
+    const parameterErrors = [];
 
     const directChildren = Array.from(scxmlElem.children);
     const editorEdgeTargets = parseEditorEdgeTargets(scxmlElem);
@@ -956,17 +959,60 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             ).values()
         );
 
-        const params = parameterDefinitions.map((param) => ({
-            key: param.key,
-            type: param.type,
-            required: param.required,
-            default: param.default,
-            description: param.description || "",
-            expr:
+        const parameterValidationVariables = [
+            ...globalDataEntries,
+            ...parameterDefinitions.map((param) => ({
+                id: param.key,
+                type: param.type,
+                valueType: param.type,
+                expr:
+                    stateDatamodelValues[param.key] !== undefined
+                        ? stateDatamodelValues[param.key]
+                        : param.default ?? "",
+            })),
+        ];
+
+        const params = parameterDefinitions.map((param) => {
+            const expr =
                 stateDatamodelValues[param.key] !== undefined
                     ? stateDatamodelValues[param.key]
-                    : "",
-        }));
+                    : "";
+
+            // SCXML is allowed to contain values that no longer match the
+            // current skill definition (for example after a parameter type was
+            // changed in the Java skill). Detect that while importing instead
+            // of waiting for the user to edit the field. The graph still loads;
+            // the caller receives a parameterErrors entry and the normal
+            // Problems analysis keeps reporting it until the value is fixed.
+            const normalizedParameterType = normalizeValueType(param.type);
+            if (String(expr || "").trim() && normalizedParameterType) {
+                const validation = normalizeTypedValue(
+                    expr,
+                    normalizedParameterType,
+                    parameterValidationVariables,
+                    { allowEmpty: true }
+                );
+
+                if (!validation.valid) {
+                    parameterErrors.push({
+                        state: fullSkillName,
+                        parameter: param.key,
+                        expectedType: param.type || "Unknown",
+                        value: expr,
+                        message: validation.error || "Invalid parameter value.",
+                    });
+                }
+            }
+
+            return {
+                key: param.key,
+                type: param.type,
+                required: param.required,
+                default: param.default,
+                description: param.description || "",
+                expr,
+            };
+        });
 
         const events = behaviorExit
             ? []
@@ -2305,5 +2351,10 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
         });
     }
 
-    return { nodes: finalNodes, edges: finalEdges, globalDataModel: globalDataEntries };
+    return {
+        nodes: finalNodes,
+        edges: finalEdges,
+        globalDataModel: globalDataEntries,
+        parameterErrors,
+    };
 };
