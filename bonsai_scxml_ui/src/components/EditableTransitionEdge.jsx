@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import {
     BaseEdge,
     EdgeLabelRenderer,
@@ -835,7 +835,7 @@ function AutoEditableTransitionEdge(props) {
     );
 }
 
-export default function EditableTransitionEdge(props) {
+function EditableTransitionEdge(props) {
     const hasManualControlPoints =
         Array.isArray(props.data?.controlPoints) &&
         props.data.controlPoints.length > 0;
@@ -846,4 +846,9 @@ export default function EditableTransitionEdge(props) {
         <AutoEditableTransitionEdge {...props} />
     );
 }
+
+// React Flow can re-render its edge layer for unrelated UI state changes.
+// Keep routed transition components stable when their actual edge props did not
+// change so toggling visibility remains a paint-only operation.
+export default memo(EditableTransitionEdge);
 

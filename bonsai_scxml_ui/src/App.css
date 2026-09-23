@@ -7160,3 +7160,17 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+
+/*
+ * Transition visibility is intentionally paint-only.
+ *
+ * All transition edge components stay mounted after a state machine is loaded,
+ * so turning transitions back on does not mount and smart-route every edge in a
+ * single frame. When transitions are hidden (or Slot Mode is active), only the
+ * already-cached edges connected to the hovered/selected context are painted.
+ */
+.react-flow.editor-transitions-context-only
+    .react-flow__edge.editor-transition-edge:not(.editor-edge-context-visible):not(.selected) {
+    visibility: hidden;
+    pointer-events: none;
+}

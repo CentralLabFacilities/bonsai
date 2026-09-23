@@ -112,6 +112,19 @@ const collectIndexedEdges = (edgeList, indexByNodeId, nodeIds) => {
         .filter(Boolean);
 };
 
+const withEdgeClassName = (edge, className) => {
+    const classNames = String(edge?.className || "")
+        .split(/\s+/)
+        .filter(Boolean);
+
+    if (!classNames.includes(className)) classNames.push(className);
+
+    const nextClassName = classNames.join(" ");
+    if (nextClassName === String(edge?.className || "")) return edge;
+
+    return { ...edge, className: nextClassName };
+};
+
 export function useEditorDisplay({
     hoveredEditorNodeId,
     hoveredEditorEdgeId,
@@ -226,10 +239,10 @@ export function useEditorDisplay({
         return ids;
     }, [activeCanvasFocusNodeId, cloneGroupByNodeId, selectedNodeIdSet]);
 
-    // Edge visibility toggles are applied before routing/styling. This matters
-    // for large state machines: when a category is hidden we only send edges
-    // connected to the hovered/selected visual node through the expensive
-    // smart-edge pipeline instead of routing every edge and hiding it later.
+    // Keep an index of the visual/semantic nodes connected to each edge.
+    // Transition visibility itself is paint-only: all transitions stay mounted
+    // and routed after load, while this focus set marks the cached subset that
+    // should remain visible when global transition visibility is disabled.
     const edgeFocusNodeIds = useMemo(() => {
         const ids = new Set([
             ...selectedNodes.map((node) => node.id),
@@ -528,7 +541,10 @@ export function useEditorDisplay({
         const focusedEdges = [];
 
         smartTransitionEdges.forEach((rawEdge) => {
-            const edge = clearTransientTransitionHighlight(rawEdge);
+            const edge = withEdgeClassName(
+                clearTransientTransitionHighlight(rawEdge),
+                "editor-transition-edge"
+            );
             const semanticHandle =
                 edge.data?.boundaryOriginalSourceHandle ||
                 edge.data?.compoundOriginalSourceHandle ||
@@ -551,7 +567,10 @@ export function useEditorDisplay({
 
             baseEdges.push(selectedBaseEdge);
             focusedEdges.push({
-                ...selectedBaseEdge,
+                ...withEdgeClassName(
+                    selectedBaseEdge,
+                    "editor-edge-context-visible"
+                ),
                 animated: true,
                 style: {
                     ...(selectedBaseEdge.style || {}),
@@ -585,32 +604,22 @@ export function useEditorDisplay({
             );
         });
 
-        // Slot mode always treats transitions as contextual information.
-        const showAllForMode =
-            showTransitionEdges && activeMode !== "slots";
-
-        if (!showAllForMode) {
-            return [...focusedIndexes]
-                .sort((a, b) => a - b)
-                .map((edgeIndex) => focusedEdges[edgeIndex])
-                .filter(Boolean);
-        }
-
+        // Keep every transition mounted after load. The visibility toggle is
+        // implemented by a CSS class on React Flow instead of removing edges
+        // from the array. This is critical for large workflows: showing
+        // transitions again must not mount thousands of smart-edge components
+        // and rerun their routing in one frame.
         if (focusedIndexes.size === 0) return baseEdges;
 
         // Copy only the array shell; all edge objects are cached. Replace just
-        // the connected entries with their prebuilt animated variants.
+        // connected entries with prebuilt focused variants. CSS uses the
+        // editor-edge-context-visible class when transitions are globally hidden.
         const displayed = baseEdges.slice();
         focusedIndexes.forEach((edgeIndex) => {
             displayed[edgeIndex] = focusedEdges[edgeIndex];
         });
         return displayed;
-    }, [
-        activeMode,
-        showTransitionEdges,
-        transitionRenderCache,
-        edgeFocusNodeIds,
-    ]);
+    }, [activeMode, transitionRenderCache, edgeFocusNodeIds]);
 
     const highlightedTransitionEdges = transitionEdgesForDisplay;
 
@@ -1013,10 +1022,17 @@ export function useEditorDisplay({
         const structuralTransitionEdges = [
             ...compoundInitialEdges,
             ...parallelEntryEdges,
-        ].filter((edge) => {
-            const showAllForMode =
-                showTransitionEdges && activeMode !== "slots";
-            return showAllForMode || transitionEdgeMatchesFocus(edge);
+        ].map((edge) => {
+            const transitionEdge = withEdgeClassName(
+                edge,
+                "editor-transition-edge"
+            );
+            return transitionEdgeMatchesFocus(edge)
+                ? withEdgeClassName(
+                      transitionEdge,
+                      "editor-edge-context-visible"
+                  )
+                : transitionEdge;
         });
 
         let nextVisibleEdges = [
@@ -1067,7 +1083,29 @@ export function useEditorDisplay({
             return nextVisibleEdges;
         }
 
+        const transitionsAreContextOnly =
+            !showTransitionEdges || activeMode === "slots";
+
         return nextVisibleEdges.map((edge) => {
+            const isTransitionEdge = String(edge.className || "")
+                .split(/\s+/)
+                .includes("editor-transition-edge");
+            const isContextVisibleTransition = String(edge.className || "")
+                .split(/\s+/)
+                .includes("editor-edge-context-visible");
+
+            // When transitions are context-only, unrelated transitions are
+            // already hidden by CSS. Preserve their cached object identity
+            // instead of creating thousands of dimmed edge objects on hover.
+            if (
+                transitionsAreContextOnly &&
+                isTransitionEdge &&
+                !isContextVisibleTransition &&
+                !edge.selected
+            ) {
+                return edge;
+            }
+
             const isCanvasHoverConnection = Boolean(
                 activeCanvasFocusNodeId &&
                     (edge.source === activeCanvasFocusNodeId ||
