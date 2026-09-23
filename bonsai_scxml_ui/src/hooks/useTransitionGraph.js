@@ -22,7 +22,7 @@ import {
     getSkillPackageName,
     getStoredTransitionAssignments,
 } from "../utils/editorScxml";
-import { rebuildBoundaryTransitions } from "../utils/boundaryTransitions";
+import { rebuildBoundaryTransitionsIncremental } from "../utils/boundaryTransitions";
 
 const getSemanticTransitionTarget = (targetNode, allNodes = []) => {
     if (!(targetNode?.data?.isSkillClone || targetNode?.data?.isStateClone)) {
@@ -1943,16 +1943,18 @@ export function useTransitionGraph({
             };
         });
 
-        const normalized = rebuildBoundaryTransitions(
+        const normalized = rebuildBoundaryTransitionsIncremental(
             semanticNodes,
-            [...untouchedEdges, ...semanticEdges]
+            [...untouchedEdges, ...semanticEdges],
+            {
+                previousEdges: edges,
+                sourceIds: [sourceId],
+            }
         );
         setNodes(normalized.nodes);
         setEdges(normalized.edges);
-        normalized.nodes.forEach((node) => {
-            if (["compound", "parallelLane"].includes(node.type)) {
-                requestAnimationFrame(() => updateNodeInternals(node.id));
-            }
+        (normalized.affectedNodeIds || []).forEach((nodeId) => {
+            requestAnimationFrame(() => updateNodeInternals(nodeId));
         });
 
         setDrawerData((previous) => ({ ...previous, isOpen: false }));
@@ -2046,13 +2048,23 @@ export function useTransitionGraph({
             };
         });
 
-        const normalized = rebuildBoundaryTransitions(nextNodes, nextEdges);
+        const normalized = rebuildBoundaryTransitionsIncremental(
+            nextNodes,
+            nextEdges,
+            {
+                previousEdges: edges,
+                sourceKeys: [
+                    {
+                        sourceId: selectedNode.id,
+                        sourceHandle: event.id,
+                    },
+                ],
+            }
+        );
         setNodes(normalized.nodes);
         setEdges(normalized.edges);
-        normalized.nodes.forEach((node) => {
-            if (["compound", "parallelLane"].includes(node.type)) {
-                requestAnimationFrame(() => updateNodeInternals(node.id));
-            }
+        (normalized.affectedNodeIds || []).forEach((nodeId) => {
+            requestAnimationFrame(() => updateNodeInternals(nodeId));
         });
     };
 

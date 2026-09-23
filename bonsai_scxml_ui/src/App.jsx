@@ -86,7 +86,7 @@ import { useNodeDrag } from "./hooks/useNodeDrag";
 import { useSubStateMachines } from "./hooks/useSubStateMachines";
 import { useTransitionGraph } from "./hooks/useTransitionGraph";
 import { useContainerCreation } from "./hooks/useContainerCreation";
-import { rebuildBoundaryTransitions } from "./utils/boundaryTransitions";
+import { rebuildBoundaryTransitionsIncremental } from "./utils/boundaryTransitions";
 import { getOverviewLayoutNodeSize } from "./utils/layoutUtils";
 import "./App.css";
 
@@ -2707,22 +2707,23 @@ function AppContent() {
                         transitionChanges,
                         edges
                     );
-                    const normalized = rebuildBoundaryTransitions(
+                    const normalized = rebuildBoundaryTransitionsIncremental(
                         nodes,
-                        changedEdges
+                        changedEdges,
+                        {
+                            previousEdges: edges,
+                            changedEdgeIds: transitionChanges
+                                .filter((change) => change.type === "remove")
+                                .map((change) => change.id),
+                        }
                     );
 
                     setNodes(normalized.nodes);
                     setEdges(normalized.edges);
-                    normalized.nodes.forEach((node) => {
-                        if (
-                            node.type === "compound" ||
-                            node.type === "parallelLane"
-                        ) {
-                            requestAnimationFrame(() =>
-                                updateNodeInternals(node.id)
-                            );
-                        }
+                    (normalized.affectedNodeIds || []).forEach((nodeId) => {
+                        requestAnimationFrame(() =>
+                            updateNodeInternals(nodeId)
+                        );
                     });
                 } else {
                     onEdgesChange(transitionChanges);
