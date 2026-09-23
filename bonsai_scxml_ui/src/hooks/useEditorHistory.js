@@ -18,17 +18,51 @@ const cloneGraphValue = (value) => {
     return value;
 };
 
+const HISTORY_NODE_VOLATILE_KEYS = new Set([
+    "selected",
+    "dragging",
+    "measured",
+]);
+const HISTORY_EDGE_VOLATILE_KEYS = new Set(["selected"]);
+
+const historyValueEqual = (a, b, ignoredKeys = null) => {
+    if (Object.is(a, b)) return true;
+    if (!a || !b || typeof a !== "object" || typeof b !== "object") {
+        return false;
+    }
+
+    const aIsArray = Array.isArray(a);
+    const bIsArray = Array.isArray(b);
+    if (aIsArray !== bIsArray) return false;
+
+    if (aIsArray) {
+        if (a.length !== b.length) return false;
+        for (let index = 0; index < a.length; index += 1) {
+            if (!historyValueEqual(a[index], b[index])) return false;
+        }
+        return true;
+    }
+
+    const aKeys = Object.keys(a).filter((key) => !ignoredKeys?.has(key));
+    const bKeys = Object.keys(b).filter((key) => !ignoredKeys?.has(key));
+    if (aKeys.length !== bKeys.length) return false;
+
+    for (const key of aKeys) {
+        if (!Object.prototype.hasOwnProperty.call(b, key)) return false;
+        if (!historyValueEqual(a[key], b[key])) return false;
+    }
+    return true;
+};
+
 const sanitizeNodeForHistory = (node) => {
     const copy = cloneGraphValue(node);
-    delete copy.selected;
-    delete copy.dragging;
-    delete copy.measured;
+    HISTORY_NODE_VOLATILE_KEYS.forEach((key) => delete copy[key]);
     return copy;
 };
 
 const sanitizeEdgeForHistory = (edge) => {
     const copy = cloneGraphValue(edge);
-    delete copy.selected;
+    HISTORY_EDGE_VOLATILE_KEYS.forEach((key) => delete copy[key]);
     return copy;
 };
 
@@ -38,6 +72,28 @@ const isUndoRedoEditableTarget = (target) => {
         target.closest(
             'input, textarea, select, [contenteditable="true"], [role="textbox"], .monaco-editor, .cm-editor'
         )
+    );
+};
+
+const collectionsEqualByIdentity = (a = [], b = []) => {
+    if (a === b) return true;
+    if (a.length !== b.length) return false;
+    for (let index = 0; index < a.length; index += 1) {
+        if (a[index] !== b[index]) return false;
+    }
+    return true;
+};
+
+const snapshotsEqual = (a, b) => {
+    if (a === b) return true;
+    if (!a || !b) return false;
+    return (
+        a.nodes === b.nodes &&
+        a.edges === b.edges &&
+        a.slotNodes === b.slotNodes &&
+        a.slotEdges === b.slotEdges &&
+        a.manualSlots === b.manualSlots &&
+        a.globalDataModel === b.globalDataModel
     );
 };
 
@@ -67,6 +123,22 @@ export function useEditorHistory({
     const historyTabRef = useRef(activeTabId);
     const applyingHistoryRef = useRef(false);
     const liveHistoryStateRef = useRef(null);
+
+    // History used to deep-clone the complete graph, JSON.stringify it, and
+    // deep-clone it a second time for every commit. Large state machines pay
+    // that cost even if only one node changed. These caches canonicalize the
+    // history representation per node/edge and let snapshots structurally
+    // share every unchanged object with previous entries. The snapshot objects
+    // are detached clones and are never mutated; undo/redo clones only when a
+    // snapshot is actually restored.
+    const nodeHistoryCacheRef = useRef(new Map());
+    const edgeHistoryCacheRef = useRef(new Map());
+    const slotNodeHistoryCacheRef = useRef(new Map());
+    const slotEdgeHistoryCacheRef = useRef(new Map());
+    const manualSlotsHistoryCacheRef = useRef({ source: null, snapshot: [] });
+    const dataModelHistoryCacheRef = useRef({ source: null, snapshot: [] });
+    const lastCreatedSnapshotRef = useRef(null);
+
     liveHistoryStateRef.current = {
         nodes,
         edges,
@@ -76,17 +148,125 @@ export function useEditorHistory({
         globalDataModel,
     };
 
+    const resetSnapshotCaches = useCallback(() => {
+        nodeHistoryCacheRef.current = new Map();
+        edgeHistoryCacheRef.current = new Map();
+        slotNodeHistoryCacheRef.current = new Map();
+        slotEdgeHistoryCacheRef.current = new Map();
+        manualSlotsHistoryCacheRef.current = { source: null, snapshot: [] };
+        dataModelHistoryCacheRef.current = { source: null, snapshot: [] };
+        lastCreatedSnapshotRef.current = null;
+    }, []);
+
+    const canonicalizeGraphCollection = useCallback((
+        sourceItems,
+        cacheRef,
+        sanitize,
+        ignoredKeys,
+        previousCollection
+    ) => {
+        const cache = cacheRef.current;
+        const seenIds = new Set();
+        const canonicalItems = (sourceItems || []).map((item, index) => {
+            const cacheKey = item?.id ?? `__index_${index}`;
+            seenIds.add(cacheKey);
+            const cached = cache.get(cacheKey);
+
+            if (cached?.source === item) return cached.snapshot;
+
+            if (
+                cached &&
+                historyValueEqual(cached.source, item, ignoredKeys)
+            ) {
+                // React Flow frequently replaces a node/edge object only to
+                // change selection state. Keep the already-sanitized history
+                // object in that case so selection/hover cannot create a new
+                // history snapshot or duplicate large graph data.
+                cached.source = item;
+                return cached.snapshot;
+            }
+
+            const snapshot = sanitize(item);
+            cache.set(cacheKey, { source: item, snapshot });
+            return snapshot;
+        });
+
+        // Prevent deleted graph objects from being retained forever by the
+        // canonicalization cache.
+        for (const cacheKey of cache.keys()) {
+            if (!seenIds.has(cacheKey)) cache.delete(cacheKey);
+        }
+
+        return collectionsEqualByIdentity(previousCollection, canonicalItems)
+            ? previousCollection
+            : canonicalItems;
+    }, []);
+
+    const canonicalizeValueCollection = useCallback((source, cacheRef) => {
+        const normalizedSource = source || [];
+        const cached = cacheRef.current;
+        if (cached.source === normalizedSource) return cached.snapshot;
+
+        if (
+            cached.source &&
+            historyValueEqual(cached.source, normalizedSource)
+        ) {
+            cached.source = normalizedSource;
+            return cached.snapshot;
+        }
+
+        const snapshot = cloneGraphValue(normalizedSource);
+        cacheRef.current = { source: normalizedSource, snapshot };
+        return snapshot;
+    }, []);
+
     const createHistorySnapshot = useCallback(() => {
         const current = liveHistoryStateRef.current || {};
-        return {
-            nodes: (current.nodes || []).map(sanitizeNodeForHistory),
-            edges: (current.edges || []).map(sanitizeEdgeForHistory),
-            slotNodes: (current.slotNodes || []).map(sanitizeNodeForHistory),
-            slotEdges: (current.slotEdges || []).map(sanitizeEdgeForHistory),
-            manualSlots: cloneGraphValue(current.manualSlots || []),
-            globalDataModel: cloneGraphValue(current.globalDataModel || []),
+        const previous = lastCreatedSnapshotRef.current || {};
+
+        const snapshot = {
+            nodes: canonicalizeGraphCollection(
+                current.nodes || [],
+                nodeHistoryCacheRef,
+                sanitizeNodeForHistory,
+                HISTORY_NODE_VOLATILE_KEYS,
+                previous.nodes
+            ),
+            edges: canonicalizeGraphCollection(
+                current.edges || [],
+                edgeHistoryCacheRef,
+                sanitizeEdgeForHistory,
+                HISTORY_EDGE_VOLATILE_KEYS,
+                previous.edges
+            ),
+            slotNodes: canonicalizeGraphCollection(
+                current.slotNodes || [],
+                slotNodeHistoryCacheRef,
+                sanitizeNodeForHistory,
+                HISTORY_NODE_VOLATILE_KEYS,
+                previous.slotNodes
+            ),
+            slotEdges: canonicalizeGraphCollection(
+                current.slotEdges || [],
+                slotEdgeHistoryCacheRef,
+                sanitizeEdgeForHistory,
+                HISTORY_EDGE_VOLATILE_KEYS,
+                previous.slotEdges
+            ),
+            manualSlots: canonicalizeValueCollection(
+                current.manualSlots || [],
+                manualSlotsHistoryCacheRef
+            ),
+            globalDataModel: canonicalizeValueCollection(
+                current.globalDataModel || [],
+                dataModelHistoryCacheRef
+            ),
         };
-    }, []);
+
+        if (snapshotsEqual(previous, snapshot)) return previous;
+        lastCreatedSnapshotRef.current = snapshot;
+        return snapshot;
+    }, [canonicalizeGraphCollection, canonicalizeValueCollection]);
 
     // Collapse all geometry churn to one dependency value while dragging.
     // The effect runs once when the drag starts and once again with the final
@@ -100,12 +280,13 @@ export function useEditorHistory({
 
     const commitHistorySnapshot = useCallback((snapshot) => {
         if (!snapshot) return false;
-        const hash = JSON.stringify(snapshot);
         const currentEntry = historyRef.current[historyIndexRef.current];
-        if (currentEntry?.hash === hash) return false;
+        if (snapshotsEqual(currentEntry?.snapshot, snapshot)) return false;
 
         const nextHistory = historyRef.current.slice(0, historyIndexRef.current + 1);
-        nextHistory.push({ hash, snapshot: cloneGraphValue(snapshot) });
+        // Snapshot data is already detached from live React state and uses
+        // structural sharing. Do not clone it again here.
+        nextHistory.push({ snapshot });
         if (nextHistory.length > 20) {
             nextHistory.splice(0, nextHistory.length - 20);
         }
@@ -128,6 +309,7 @@ export function useEditorHistory({
             historyRef.current = [];
             historyIndexRef.current = -1;
             applyingHistoryRef.current = false;
+            resetSnapshotCaches();
             if (historyTimerRef.current) {
                 clearTimeout(historyTimerRef.current);
                 historyTimerRef.current = null;
@@ -169,6 +351,7 @@ export function useEditorHistory({
         historyDataModelDependency,
         createHistorySnapshot,
         commitHistorySnapshot,
+        resetSnapshotCaches,
     ]);
 
     const applyHistorySnapshot = useCallback((snapshot) => {
