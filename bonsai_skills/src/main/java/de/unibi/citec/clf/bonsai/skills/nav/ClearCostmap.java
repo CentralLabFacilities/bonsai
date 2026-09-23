@@ -13,14 +13,6 @@ import java.io.IOException;
  *
  * <pre>
  *
- * Options:
- *
- * Slots:
- *
- * ExitTokens:
- *  success:    Clear costmap called successfully
- *  error:      Could not clear costmap
- *
  * Sensors:
  *
  *
@@ -41,7 +33,7 @@ public class ClearCostmap extends AbstractSkill {
     @Override
     public void configure(ISkillConfigurator configurator) throws SkillConfigurationException {
 
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
+        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS(), "Clear costmap called successfully");
 
         navActuator = configurator.getActuator("NavigationActuator", NavigationActuator.class);
     }

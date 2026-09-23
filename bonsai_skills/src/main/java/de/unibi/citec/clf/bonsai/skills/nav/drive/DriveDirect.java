@@ -27,32 +27,6 @@ import java.util.concurrent.Future;
  *
  * <pre>
  *
- * Options:
- *  #_DIST:         [double] Optional (default: NaN)
- *                      -> Distance to drive in m
- *  #_MOVE_SPEED:   [double] Optional (default: 0.5)
- *                      -> Move speed in m/s
- *  #_ROT_SPEED:    [double] Optional (default: 0.5)
- *                      -> Turn speed in rad/s
- *  #_ANGLE:        [double] Optional (default: NaN)
- *                      -> Angle to turn in rad
- *  #_TIMEOUT:      [long] Optional (default: -1)
- *                      -> Skill timeout in ms
- *  #_DIR_X:        [double] Optional (default: 1.0)
- *                      -> X component of drive direction
- *  #_DIR_Y:        [double] Optional (default: 0.0)
- *                      -> Y component of drive direction
- *
- * Slots:
- *  NavigationGoalDataSlot: [NavigationGoalData] [Read]
- *      -> If neither #_DIST nor #_TURN is set use this slot to drive to
- *
- * ExitTokens:
- *  success:            Drive successful
- *  error.timeout:    Timeout reached (only used when #_TIMEOUT is set)
- *  error.cancelled:    Drive was cancelled by NavigationActuator
- *  error.unknownResult: Drive was failed with unknown result
- *
  * Sensors:
  *
  * Actuators:
@@ -99,27 +73,31 @@ public class DriveDirect extends AbstractSkill {
     @Override
     public void configure(ISkillConfigurator configurator) {
 
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
-        tokenErrorResultErrorUnhandled = configurator.requestExitToken(ExitStatus.ERROR().withProcessingStatus(RESULT_ERROR_UNHANDLED));
-        tokenErrorCancelled = configurator.requestExitToken(ExitStatus.ERROR().withProcessingStatus("cancelled"));
+        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS(), "Drive successful");
+        tokenErrorResultErrorUnhandled = configurator.requestExitToken(ExitStatus.ERROR().withProcessingStatus(RESULT_ERROR_UNHANDLED),
+                "Drive was failed with unknown result");
+        tokenErrorCancelled = configurator.requestExitToken(ExitStatus.ERROR().withProcessingStatus("cancelled"),
+                "Drive was cancelled by NavigationActuator");
 
         navActuator = configurator.getActuator("NavigationActuator", NavigationActuator.class);
 
-        timeout = configurator.requestOptionalInt(KEY_TIMEOUT, (int) timeout);
-        dist = configurator.requestOptionalDouble(KEY_DIST, dist);
-        moveSpeed = configurator.requestOptionalDouble(KEY_MOVE_SPEED, moveSpeed);
-        angle = configurator.requestOptionalDouble(KEY_ANGLE, angle);
-        rotationSpeed = configurator.requestOptionalDouble(KEY_ROTATION_SPEED, rotationSpeed);
-        dir_x = configurator.requestOptionalDouble(KEY_DIR_X, dir_x);
-        dir_y = configurator.requestOptionalDouble(KEY_DIR_Y, dir_y);
+        timeout = configurator.requestOptionalInt(KEY_TIMEOUT, (int) timeout, "Skill timeout in ms");
+        dist = configurator.requestOptionalDouble(KEY_DIST, dist, "Distance to drive in m");
+        moveSpeed = configurator.requestOptionalDouble(KEY_MOVE_SPEED, moveSpeed, "Move speed in m/s");
+        angle = configurator.requestOptionalDouble(KEY_ANGLE, angle, "Angle to turn in rad");
+        rotationSpeed = configurator.requestOptionalDouble(KEY_ROTATION_SPEED, rotationSpeed, "Turn speed in rad/s");
+        dir_x = configurator.requestOptionalDouble(KEY_DIR_X, dir_x, "X component of drive direction");
+        dir_y = configurator.requestOptionalDouble(KEY_DIR_Y, dir_y, "Y component of drive direction");
 
         if (Double.isNaN(dist) && Double.isNaN(angle)) {
             logger.debug("dist and angle missing, using slot");
-            navigationGoalDataSlot = configurator.getReadSlot("NavigationGoalDataSlot", NavigationGoalData.class);
+            navigationGoalDataSlot = configurator.getReadSlot("NavigationGoalDataSlot", NavigationGoalData.class,
+                    "If neither #_DIST nor #_TURN is set use this slot to drive to");
         }
 
         if (timeout > 0) {
-            tokenErrorTimeout = configurator.requestExitToken(ExitStatus.ERROR().ps("timeout"));
+            tokenErrorTimeout = configurator.requestExitToken(ExitStatus.ERROR().ps("timeout"),
+                    "Timeout reached (only used when #_TIMEOUT is set)");
         }
     }
 

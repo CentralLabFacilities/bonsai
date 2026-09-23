@@ -53,10 +53,14 @@ public class CopySlot extends AbstractSkill {
 
     @Override
     public void configure(ISkillConfigurator configurator) {
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
-        tokenError = configurator.requestExitToken(ExitStatus.ERROR());
+        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS(),
+                "Copy was successful");
+        tokenError = configurator.requestExitToken(ExitStatus.ERROR(),
+                "Copy was not successful");
 
-        typeString = configurator.requestOptionalValue(KEY_DATA_TYPE, typeString);
+        typeString = configurator.requestOptionalValue(KEY_DATA_TYPE, typeString,
+                "full class-path of the Slot-Type (default: java.lang.String)\n" +
+                        "e.g. \"de.unibi.citec.clf.btl.data.geometry.Point2D\"");
 
         try {
             type = Class.forName(typeString);
@@ -64,8 +68,10 @@ public class CopySlot extends AbstractSkill {
             logger.error(e);
             throw new ConfigurationException(e);
         }
-        readSlot = configurator.getReadSlot("ReadSlot", type);
-        writeSlot = configurator.getWriteSlot("WriteSlot", type);
+        readSlot = configurator.getReadSlot("ReadSlot", type,
+                "Memory slot the content will be read from");
+        writeSlot = configurator.getWriteSlot("WriteSlot", type,
+                "Memory slot the content will be written to");
     }
 
     @Override

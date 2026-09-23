@@ -18,14 +18,6 @@ import java.util.concurrent.Future;
  * Robot recognizes a surface in front of him e.g. table
  * <pre>
  *
- * Slots:
- *  TableBox: [BoundingBox3D] [Write]
- *      -> Memory slot the detected surface will be written to
- *
- * ExitTokens:
- *  success:            Successfully detected table
- *  error:              An error occurred, e.g. no table was found
- *
  * Sensors:
  *
  * Actuators:
@@ -52,10 +44,13 @@ public class DetectSurface extends AbstractSkill {
     @Override
     public void configure(ISkillConfigurator configurator) {
 
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
-        tokenError = configurator.requestExitToken(ExitStatus.ERROR());
+        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS(),
+                "Successfully detected table");
+        tokenError = configurator.requestExitToken(ExitStatus.ERROR(),
+                "An error occurred, e.g. no table was found");
 
-        tableSlot = configurator.getWriteSlot("TableBox", BoundingBox3D.class);
+        tableSlot = configurator.getWriteSlot("TableBox", BoundingBox3D.class,
+                "Memory slot the detected surface will be written to");
         detectObjectsActuator = configurator.getActuator("ObjectDetectionActuator", ObjectDetectionActuator.class);
     }
 

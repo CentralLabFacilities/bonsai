@@ -17,18 +17,6 @@ import java.io.IOException;
  *
  * <pre>
  *
- * Options:
- *  #_GOAL_DISTANCE:      [double] Optional (default: 2.0)
- *                          -> Distance to check in m
- *
- * Slots:
- *  NavigationGoalDataSlot: [NavigationGoalData] [Read]
- *      -> Navigation goal to check distance to
- *
- * ExitTokens:
- *  success.WithinDistance: Robot is within #_GOAL_DISTANCE of the goal
- *  success.OutOfDistance:  Robot is out of #_GOAL_DISTANCE of the goal
- *
  * Sensors:
  *  PositionSensor: [PositionData]
  *      -> Get current robot position
@@ -57,13 +45,17 @@ public class CheckGoalDistance extends AbstractSkill {
     @Override
     public void configure(ISkillConfigurator configurator) {
 
-        tokenSuccessPositiveResponse = configurator.requestExitToken(ExitStatus.SUCCESS().ps(POSITIVE_RESPONSE));
-        tokenSuccessNegativeResponse = configurator.requestExitToken(ExitStatus.SUCCESS().ps(NEGATIVE_RESPONSE));
+        tokenSuccessPositiveResponse = configurator.requestExitToken(ExitStatus.SUCCESS().ps(POSITIVE_RESPONSE),
+                "Robot is within #_GOAL_DISTANCE of the goal");
+        tokenSuccessNegativeResponse = configurator.requestExitToken(ExitStatus.SUCCESS().ps(NEGATIVE_RESPONSE),
+                "Robot is out of #_GOAL_DISTANCE of the goal");
 
         positionSensor = configurator.getSensor("PositionSensor", Pose2D.class);
-        navigationGoalDataSlot = configurator.getReadSlot("NavigationGoalDataSlot", NavigationGoalData.class);
+        navigationGoalDataSlot = configurator.getReadSlot("NavigationGoalDataSlot", NavigationGoalData.class,
+                "Navigation goal to check distance to");
 
-        minGoalDistance = configurator.requestOptionalDouble(KEY_DISTANCE, minGoalDistance);
+        minGoalDistance = configurator.requestOptionalDouble(KEY_DISTANCE, minGoalDistance,
+                "Distance to check in m");
     }
 
     @Override

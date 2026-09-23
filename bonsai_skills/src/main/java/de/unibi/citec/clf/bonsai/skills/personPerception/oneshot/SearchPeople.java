@@ -37,34 +37,6 @@ import java.util.concurrent.Future;
  * ONESHOT
  * <pre>
  *
- * Options:
- *  #_MAX_DIST:         [double] Optional (default: Double.MAX_VALUE)
- *                          -> How far the person can be away from the robot in meter
- *  #_MAX_ANGLE:        [double] Optional (default: Double.MAX_VALUE)
- *                          -> Person must be inside this angle cone in front of the robot in rad
- *  #_DO_FACE_ID:       [int] DEPRECATED! Optional (default: 0)
- *                          -> Whether face id gets called or not [0 = false, 1 = true]
- *  #_DO_GENDER_AGE:    [int] DEPRECATED! Optional (default: 0)
- *                          -> Whether gender and age gets called or not [0 = false, 1 = true]
- *  #_RESIZE_OUT_RATION:[double] DEPRECATED! Optional (default: 8.0)
- *                          -> Affects the speed and the quality of the person detection; values to use:
- *                          4.0 -> quick (approx 2 secs)
- *                          8.0 -> better quality (approx 4 secs)
- *  #_TIMEOUT           [long] Optional (default: -1)
- *                          -> Amount of time robot searches for a person in ms
- *  #_ACTUATOR_TIMEOUT  [long] Optional (default: 30000)
- *                          -> Timeout for a single actuator call in ms
- *
- * Slots:
- *  PersonDataListSlot:             [PersonDataList] [Write]
- *      -> All found persons in a list
- *
- * ExitTokens:
- *  success.people:         There has been at least one person perceived in the given timeout interval satisfying the optional given angle and distance parameters.
- *  success.noPeople:       There has been no person perceived in the given timeout interval satisfying the optional given angle and distance parameters..
- *                           Only if #_TIMEOUT is greater than 0
- *  error:                  There has been an exception while writing to slot or calling the actuator.
- *
  * Sensors:
  *  PositionSensor: [PositionData]
  *      -> Used to read the current robot position
@@ -117,19 +89,33 @@ public class SearchPeople extends AbstractSkill {
 
     @Override
     public void configure(ISkillConfigurator configurator) {
-        searchRadius = configurator.requestOptionalDouble(KEY_DISTANCE, searchRadius);
-        searchAngle = configurator.requestOptionalDouble(KEY_ANGLE, searchAngle);
-        do_face_id = configurator.requestOptionalInt(KEY_DO_FACE_ID, do_face_id);
-        do_gender_age = configurator.requestOptionalInt(KEY_DO_GENDER_AGE, do_gender_age);
-        resize_out_ratio = (float) configurator.requestOptionalDouble(KEY_RESIZE_OUT_RATION, (double) resize_out_ratio);
-        search_timeout = configurator.requestOptionalInt(KEY_TIMEOUT, (int) search_timeout);
-        actuator_timeout = configurator.requestOptionalInt(KEY_ACTUATOR_TIMEOUT, (int) actuator_timeout);
+        searchRadius = configurator.requestOptionalDouble(KEY_DISTANCE, searchRadius,
+                "How far the person can be away from the robot in meter");
+        searchAngle = configurator.requestOptionalDouble(KEY_ANGLE, searchAngle,
+                "Person must be inside this angle cone in front of the robot in rad");
+        do_face_id = configurator.requestOptionalInt(KEY_DO_FACE_ID, do_face_id,
+                "Whether face id gets called or not [0 = false, 1 = true]");
+        do_gender_age = configurator.requestOptionalInt(KEY_DO_GENDER_AGE, do_gender_age,
+                "Whether gender and age gets called or not [0 = false, 1 = true]");
+        resize_out_ratio = (float) configurator.requestOptionalDouble(KEY_RESIZE_OUT_RATION, (double) resize_out_ratio,
+                "Affects the speed and the quality of the person detection; values to use:\n" +
+                        " 4.0 -> quick (approx 2 secs)\n" +
+                        " 8.0 -> better quality (approx 4 secs)");
+        search_timeout = configurator.requestOptionalInt(KEY_TIMEOUT, (int) search_timeout,
+                "Amount of time robot searches for a person in ms");
+        actuator_timeout = configurator.requestOptionalInt(KEY_ACTUATOR_TIMEOUT, (int) actuator_timeout,
+                "Timeout for a single actuator call in ms");
 
-        tokenSuccessNoPeople = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus("noPeople"));
-        tokenSuccessPeople = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus("people"));
-        tokenError = configurator.requestExitToken(ExitStatus.ERROR());
+        tokenSuccessNoPeople = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus("noPeople"),
+                "There has been no person perceived in the given timeout interval satisfying the optional given angle and distance parameters..\n" +
+                        " Only if #_TIMEOUT is greater than 0");
+        tokenSuccessPeople = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus("people"),
+                "There has been at least one person perceived in the given timeout interval satisfying the optional given angle and distance parameters.");
+        tokenError = configurator.requestExitToken(ExitStatus.ERROR(),
+                "There has been an exception while writing to slot or calling the actuator.");
 
-        personDataListSlot = configurator.getWriteSlot("PersonDataListSlot", PersonDataList.class);
+        personDataListSlot = configurator.getWriteSlot("PersonDataListSlot", PersonDataList.class,
+                "All found persons in a list");
 
 
         peopleActuator = configurator.getActuator("PeopleActuator", DetectPeopleActuator.class);

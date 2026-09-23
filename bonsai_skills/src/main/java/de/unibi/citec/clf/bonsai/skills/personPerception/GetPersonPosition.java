@@ -15,18 +15,6 @@ import de.unibi.citec.clf.btl.data.person.PersonData;
  * This Skill is used for retrieving the PositionData of a Person.
  * <pre>
  *
- * Options:
- *
- * Slots:
- *  PersonDataSlot: [PersonData] [Read]
- *      -> Memory slot the person is contained in
- *  PositionDataSlot: [PositionData] [Write]
- *      -> Memory slot with the position of the person
- *
- * ExitTokens:
- *  success:                PositionData of the PersonData successfully retrieved
- *  error:                  PositionData of the PersonData could not be retrieved
- *
  * Sensors:
  *
  * Actuators:
@@ -51,11 +39,15 @@ public class GetPersonPosition extends AbstractSkill{
 
     @Override
     public void configure(ISkillConfigurator configurator) throws SkillConfigurationException {
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
-        tokenError = configurator.requestExitToken(ExitStatus.ERROR());
+        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS(),
+                "PositionData of the PersonData successfully retrieved");
+        tokenError = configurator.requestExitToken(ExitStatus.ERROR(),
+                "PositionData of the PersonData could not be retrieved");
 
-        personDataSlot = configurator.getReadSlot("PersonDataSlot", PersonData.class);
-        positionDataSlot = configurator.getWriteSlot("PositionDataSlot", Pose2D.class);
+        personDataSlot = configurator.getReadSlot("PersonDataSlot", PersonData.class,
+                "Memory slot the person is contained in");
+        positionDataSlot = configurator.getWriteSlot("PositionDataSlot", Pose2D.class,
+                "Memory slot with the position of the person");
     }
 
     @Override

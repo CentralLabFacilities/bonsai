@@ -19,15 +19,6 @@ import java.util.concurrent.Future;
  * Robot detects objects
  * <pre>
  *
- * Slots:
- *  ObjectShapeListSlot: [ObjectShapeList] [Write]
- *      -> Memory slot the detected objects will be written to
- *
- * ExitTokens:
- *  success:                Successfully detected at least one Object
- *  success.noObjects:      Successfully detected no object (i.e. there was no error and no object)
- *  error:                  Could not successfully detect
- *
  * Sensors:
  *
  * Actuators:
@@ -59,13 +50,17 @@ public class DetectObjects extends AbstractSkill {
     @Override
     public void configure(ISkillConfigurator configurator) {
 
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
-        tokenSuccessNoObjects = configurator.requestExitToken(ExitStatus.SUCCESS().ps("noObjects"));
-        tokenError = configurator.requestExitToken(ExitStatus.ERROR());
+        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS(),
+                "Successfully detected at least one Object");
+        tokenSuccessNoObjects = configurator.requestExitToken(ExitStatus.SUCCESS().ps("noObjects"),
+                "Successfully detected no object (i.e. there was no error and no object)");
+        tokenError = configurator.requestExitToken(ExitStatus.ERROR(),
+                "Could not successfully detect");
 
         minRel = configurator.requestOptionalDouble(KEY_MINREL, minRel);
 
-        objectsRecognizedSlot = configurator.getWriteSlot("ObjectShapeListSlot", ObjectShapeList.class);
+        objectsRecognizedSlot = configurator.getWriteSlot("ObjectShapeListSlot", ObjectShapeList.class,
+                "Memory slot the detected objects will be written to");
         detectObjectsActuator = configurator.getActuator("ObjectDetectionActuator", ObjectDetectionActuator.class);
     }
 

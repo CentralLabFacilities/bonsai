@@ -27,18 +27,6 @@ import java.io.IOException;
  *
  * <pre>
  *
- * Options:
- *  #_STRATEGY: [String] Optional (default: NearestToTarget)
- *                  -> Strategy used for drive
- *
- * Slots:
- *  NavigationGoalDataSlot: [NavigationGoalData] [Read]
- *      -> Navigation goal to drive to
- *
- * ExitTokens:
- *  success:    Drive finished successfully
- *  error:      Drive failed
- *
  * Sensors:
  *
  *
@@ -74,20 +62,25 @@ public class NavigateTo extends AbstractSkill {
     @Override
     public void configure(ISkillConfigurator configurator) throws SkillConfigurationException {
 
-        strategy = configurator.requestOptionalValue(KEY_STRATEGY, strategy);
+        strategy = configurator.requestOptionalValue(KEY_STRATEGY, strategy,
+                "Strategy used for drive");
         timeout = configurator.requestOptionalInt(KEY_TIMEOUT, (int) timeout);
         if(timeout > 0) {
             tokenErrorTimeout = configurator.requestExitToken(ExitStatus.ERROR().ps("timeout"));
         }
 
-        tokenErrorOther = configurator.requestExitToken(ExitStatus.ERROR().ps("other"));
-        tokenErrorNotMoved = configurator.requestExitToken(ExitStatus.ERROR().ps("not_moved"));
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
+        tokenErrorOther = configurator.requestExitToken(ExitStatus.ERROR().ps("other"),
+                "Drive failed");
+        tokenErrorNotMoved = configurator.requestExitToken(ExitStatus.ERROR().ps("not_moved"),
+                "Drive failed");
+        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS(),
+                "Drive finished successfully");
 
         navActuator = configurator.getActuator("NavigationActuator", NavigationActuator.class);
         robotPositionSensor = configurator.getSensor("PositionSensor", Pose2D.class);
 
-        navigationGoalDataSlot = configurator.getReadSlot("NavigationGoalDataSlot", NavigationGoalData.class);
+        navigationGoalDataSlot = configurator.getReadSlot("NavigationGoalDataSlot", NavigationGoalData.class,
+                "Navigation goal to drive to");
         driveStrategy = DriveStrategyBuilder.createStrategy(strategy, configurator, navActuator, robotPositionSensor);
     }
 

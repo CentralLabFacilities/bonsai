@@ -21,26 +21,6 @@ import java.util.logging.Logger;
  * Grasp an object from the list.
  * <pre>
  *
- * Options:
- *  #_TRY_ALL:      [boolean] Optional (Default: false)
- *                      -> Specify whether the robot should only try to grasp the first object of the targets or try all of them
- *  #_CHOOSE_GROUP: [boolean] Optional (Default: false)
- *                      -> If true, read the name of the planning group to use from GroupSlot, else use the default group
- *
- * Slots:
- *  ObjectShapeListSlot: [ObjectShapeList] [Read]
- *      -> A list of previously detected objects
- *  TargetObjectsSlot: [ObjectShapeList] [Read]
- *      -> A list of objects the robots should try to grasp
- *  GraspObjectSlot: [ObjectShapeData] [Write]
- *      -> The object that the robot tried to grasp last (whether that was successful or not)
- *  GroupSlot: [String] [Read]
- *      -> The name of the planning group to use. Only read if CHOOSE_GROUP is true
- *
- * ExitTokens:
- *  success:            Successfully grasped objects
- *  error.cantGrasp:    Cannot grasp
- *
  * Sensors:
  *
  * Actuators:
@@ -83,20 +63,25 @@ public class GraspObjects extends AbstractSkill {
     @Override
     public void configure(ISkillConfigurator configurator) {
 
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
-        tokenErrorCantGrasp = configurator.requestExitToken(ExitStatus.ERROR().ps("cantGrasp"));
+        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS(), "Successfully grasped objects");
+        tokenErrorCantGrasp = configurator.requestExitToken(ExitStatus.ERROR().ps("cantGrasp"), "Cannot grasp");
 
         graspAct = configurator.getActuator("GraspActuator", ManipulationActuator.class);
 
-        firstOrTarget = configurator.getWriteSlot("GraspObjectSlot", ObjectShapeData.class);
-        targetsSlot = configurator.getReadSlot("TargetObjectsSlot", ObjectShapeList.class);
-        objectsRecognizedSlot = configurator.getReadSlot("ObjectShapeListSlot", ObjectShapeList.class);
+        firstOrTarget = configurator.getWriteSlot("GraspObjectSlot", ObjectShapeData.class,
+                "The object that the robot tried to grasp last (whether that was successful or not)");
+        targetsSlot = configurator.getReadSlot("TargetObjectsSlot", ObjectShapeList.class,
+                "A list of objects the robots should try to grasp");
+        objectsRecognizedSlot = configurator.getReadSlot("ObjectShapeListSlot", ObjectShapeList.class,
+                "A list of previously detected objects");
 
-        tryAll = configurator.requestOptionalBool(KEY_TRY_ALL, tryAll);
-        overrideGroup = configurator.requestOptionalBool(KEY_CHOOSE_GROUP, overrideGroup);
+        tryAll = configurator.requestOptionalBool(KEY_TRY_ALL, tryAll,
+                "Specify whether the robot should only try to grasp the first object of the targets or try all of them");
+        overrideGroup = configurator.requestOptionalBool(KEY_CHOOSE_GROUP, overrideGroup,
+                "If true, read the name of the planning group to use from GroupSlot, else use the default group");
 
         if (overrideGroup) {
-            groupSlot = configurator.getReadSlot("GroupSlot", String.class);
+            groupSlot = configurator.getReadSlot("GroupSlot", String.class, "The name of the planning group to use. Only read if CHOOSE_GROUP is true");
             logger.info("using group slot!");
         }
 
