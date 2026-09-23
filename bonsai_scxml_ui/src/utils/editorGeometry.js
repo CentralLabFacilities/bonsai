@@ -71,6 +71,88 @@ export const withNodeDimensions = (node, width, height) => ({
     },
 });
 
+// Container fitting used to repeatedly scan the complete node array with
+// find()/filter()/map() for every nested Compound/Parallel. Build one small
+// geometry context per fit pass instead. The semantic graph remains unchanged;
+// this only gives layout code O(1) node lookup and direct child lists.
+const createContainerGeometryContext = (allNodes = []) => {
+    const byId = new Map();
+    const indexById = new Map();
+    const childrenByParent = new Map();
+
+    (allNodes || []).forEach((node, index) => {
+        byId.set(node.id, node);
+        indexById.set(node.id, index);
+        if (!node.parentId) return;
+        if (!childrenByParent.has(node.parentId)) {
+            childrenByParent.set(node.parentId, []);
+        }
+        childrenByParent.get(node.parentId).push(node.id);
+    });
+
+    const context = {
+        nodes: allNodes || [],
+        byId,
+        indexById,
+        childrenByParent,
+        changed: false,
+    };
+
+    context.replaceNode = (nodeId, nextNode) => {
+        const index = context.indexById.get(nodeId);
+        if (index == null || !nextNode) return;
+
+        const previous = context.byId.get(nodeId);
+        if (previous === nextNode) return;
+
+        if (!context.changed) {
+            context.nodes = [...context.nodes];
+            context.changed = true;
+        }
+
+        context.nodes[index] = nextNode;
+        context.byId.set(nodeId, nextNode);
+    };
+
+    context.getChildren = (parentId) =>
+        (context.childrenByParent.get(parentId) || [])
+            .map((id) => context.byId.get(id))
+            .filter(Boolean);
+
+    return context;
+};
+
+const getLaneForNodeFromContext = (node, context) => {
+    let current = node;
+    const visited = new Set();
+
+    while (current?.parentId && !visited.has(current.parentId)) {
+        visited.add(current.parentId);
+        const parent = context.byId.get(current.parentId);
+        if (!parent) return null;
+        if (parent.type === "parallelLane") return parent;
+        current = parent;
+    }
+
+    return null;
+};
+
+const getNodeNestingDepthFromContext = (node, context) => {
+    let depth = 0;
+    let parentId = node?.parentId;
+    const visited = new Set();
+
+    while (parentId && !visited.has(parentId)) {
+        visited.add(parentId);
+        const parent = context.byId.get(parentId);
+        if (!parent) break;
+        depth += 1;
+        parentId = parent.parentId;
+    }
+
+    return depth;
+};
+
 export const getDirectCompoundForNode = (node, allNodes) => {
     if (!node?.parentId) return null;
     const parent = allNodes.find((candidate) => candidate.id === node.parentId);
@@ -78,10 +160,16 @@ export const getDirectCompoundForNode = (node, allNodes) => {
 };
 
 export const fitCompoundToChildren = (allNodes, compoundId) => {
-    const compound = (allNodes || []).find((node) => node.id === compoundId);
-    if (!compound || compound.type !== "compound") return allNodes;
+    const context = createContainerGeometryContext(allNodes);
+    fitCompoundToChildrenInContext(context, compoundId);
+    return context.nodes;
+};
 
-    const members = allNodes.filter((node) => node.parentId === compoundId);
+const fitCompoundToChildrenInContext = (context, compoundId) => {
+    const compound = context.byId.get(compoundId);
+    if (!compound || compound.type !== "compound") return;
+
+    const members = context.getChildren(compoundId);
 
     let right = COMPOUND_PADDING_X;
     let bottom = COMPOUND_HEADER_HEIGHT;
@@ -109,78 +197,78 @@ export const fitCompoundToChildren = (allNodes, compoundId) => {
         bottom + COMPOUND_BOTTOM_PADDING
     );
 
-    return allNodes.map((node) => {
-        if (node.id !== compoundId) return node;
+    const currentSize = getNodeSize(compound);
 
-        const currentSize = getNodeSize(node);
+    if (compound.data?.isCollapsed) {
+        const savedExpanded = compound.data?.expandedContainerSize || {};
+        const expandedWidth = Math.max(
+            Number(savedExpanded.width) || 0,
+            currentSize.width,
+            requiredWidth
+        );
+        const expandedHeight = Math.max(
+            Number(savedExpanded.height) || 0,
+            requiredHeight
+        );
 
-        if (node.data?.isCollapsed) {
-            const savedExpanded = node.data?.expandedContainerSize || {};
-            const expandedWidth = Math.max(
-                Number(savedExpanded.width) || 0,
-                currentSize.width,
-                requiredWidth
-            );
-            const expandedHeight = Math.max(
-                Number(savedExpanded.height) || 0,
-                requiredHeight
-            );
-
-            // Keep the compact collapsed footprint on screen in both
-            // dimensions, but remember a large enough expanded size for all
-            // children. Auto-fit must not visually re-expand a collapsed node.
-            return {
-                ...withNodeDimensions(
-                    node,
-                    COLLAPSED_CONTAINER_WIDTH,
-                    COLLAPSED_CONTAINER_HEIGHT
-                ),
-                data: {
-                    ...(node.data || {}),
-                    expandedContainerSize: {
-                        ...savedExpanded,
-                        width: expandedWidth,
-                        height: expandedHeight,
-                    },
+        // Keep the compact collapsed footprint on screen in both dimensions,
+        // but remember a large enough expanded size for all children.
+        context.replaceNode(compound.id, {
+            ...withNodeDimensions(
+                compound,
+                COLLAPSED_CONTAINER_WIDTH,
+                COLLAPSED_CONTAINER_HEIGHT
+            ),
+            data: {
+                ...(compound.data || {}),
+                expandedContainerSize: {
+                    ...savedExpanded,
+                    width: expandedWidth,
+                    height: expandedHeight,
                 },
-            };
-        }
+            },
+        });
+        return;
+    }
 
-        const width = Math.max(currentSize.width, requiredWidth);
-        const height = Math.max(currentSize.height, requiredHeight);
-
-        return withNodeDimensions(node, width, height);
-    });
+    context.replaceNode(
+        compound.id,
+        withNodeDimensions(
+            compound,
+            Math.max(currentSize.width, requiredWidth),
+            Math.max(currentSize.height, requiredHeight)
+        )
+    );
 };
 
 export const fitCompoundAndAncestorCompounds = (allNodes, compoundId) => {
-    let nextNodes = allNodes;
+    const context = createContainerGeometryContext(allNodes);
     let currentId = compoundId;
     const visited = new Set();
 
     while (currentId && !visited.has(currentId)) {
         visited.add(currentId);
-        nextNodes = fitCompoundToChildren(nextNodes, currentId);
+        fitCompoundToChildrenInContext(context, currentId);
 
-        const current = nextNodes.find((node) => node.id === currentId);
+        const current = context.byId.get(currentId);
         if (!current?.parentId) break;
 
-        const parent = nextNodes.find((node) => node.id === current.parentId);
+        const parent = context.byId.get(current.parentId);
         currentId = parent?.type === "compound" ? parent.id : null;
     }
 
     // A compound can itself live in a parallel lane. If it grows, the lane
     // and enclosing parallel must grow too instead of clipping the compound.
-    const fittedCompound = nextNodes.find((node) => node.id === compoundId);
+    const fittedCompound = context.byId.get(compoundId);
     const lane = fittedCompound
-        ? getLaneForNode(fittedCompound, nextNodes)
+        ? getLaneForNodeFromContext(fittedCompound, context)
         : null;
 
     if (lane?.parentId) {
-        nextNodes = growParallelToLaneContents(nextNodes, lane.parentId);
+        growParallelToLaneContentsInContext(context, lane.parentId);
     }
 
-    return nextNodes;
+    return context.nodes;
 };
 
 export const getAbsoluteNodePosition = (node, allNodes) => {
@@ -431,56 +519,51 @@ export const normalizeContainerAutoExpansion = (allNodes) => {
 // user resize is preserved while automatic layout may still make the state
 // larger later.
 export const growParallelToLaneContents = (allNodes, parallelId) => {
-    let nextNodes = allNodes;
-    const parallel = nextNodes.find((node) => node.id === parallelId);
-    if (!parallel || parallel.type !== "parallel") return nextNodes;
+    const context = createContainerGeometryContext(allNodes);
+    growParallelToLaneContentsInContext(context, parallelId);
+    return context.nodes;
+};
 
-    const parallelLanes = nextNodes
-        .filter(
-            (node) =>
-                node.type === "parallelLane" &&
-                node.parentId === parallel.id
-        )
+const growParallelToLaneContentsInContext = (context, parallelId) => {
+    const parallel = context.byId.get(parallelId);
+    if (!parallel || parallel.type !== "parallel") return;
+
+    const parallelLanes = context
+        .getChildren(parallel.id)
+        .filter((node) => node.type === "parallelLane")
         .sort(
             (a, b) =>
                 Number(a.position?.y || 0) -
                 Number(b.position?.y || 0)
         );
 
-    if (parallelLanes.length === 0) return nextNodes;
+    if (parallelLanes.length === 0) return;
 
     // Fit automatic lane compounds first, because their required dimensions
     // determine how large the surrounding lane and parallel must become.
     parallelLanes.forEach((lane) => {
-        const wrapper = nextNodes.find(
-            (node) =>
-                node.parentId === lane.id &&
-                isAutoParallelLaneCompound(node)
-        );
+        const wrapper = context
+            .getChildren(lane.id)
+            .find(isAutoParallelLaneCompound);
 
         if (wrapper) {
-            nextNodes = fitCompoundToChildren(nextNodes, wrapper.id);
+            fitCompoundToChildrenInContext(context, wrapper.id);
         }
     });
 
-    const currentParallelSize = getNodeSize(
-        nextNodes.find((node) => node.id === parallel.id) || parallel
-    );
+    const liveParallel = context.byId.get(parallel.id) || parallel;
+    const currentParallelSize = getNodeSize(liveParallel);
 
     let requiredParallelWidth = Math.max(420, currentParallelSize.width);
     const laneHeights = new Map();
 
     parallelLanes.forEach((originalLane) => {
-        const lane =
-            nextNodes.find((node) => node.id === originalLane.id) ||
-            originalLane;
+        const lane = context.byId.get(originalLane.id) || originalLane;
         const currentLaneSize = getNodeSize(lane);
-        const laneChildren = nextNodes.filter(
-            (node) => node.parentId === lane.id
-        );
+        const laneChildren = context.getChildren(lane.id);
         const wrapper = laneChildren.find(isAutoParallelLaneCompound);
         const laneMembers = wrapper
-            ? [wrapper]
+            ? [context.byId.get(wrapper.id) || wrapper]
             : laneChildren.filter(isParallelLaneSkillCandidate);
 
         let maxRight = 0;
@@ -539,81 +622,84 @@ export const growParallelToLaneContents = (allNodes, parallelId) => {
         nextLaneY + 35
     );
 
-    return nextNodes.map((node) => {
-        if (node.id === parallel.id) {
-            if (node.data?.isCollapsed) {
-                const savedExpanded = node.data?.expandedContainerSize || {};
-                return {
-                    ...withNodeDimensions(
-                        node,
-                        COLLAPSED_CONTAINER_WIDTH,
-                        COLLAPSED_CONTAINER_HEIGHT
+    if (liveParallel.data?.isCollapsed) {
+        const savedExpanded = liveParallel.data?.expandedContainerSize || {};
+        context.replaceNode(liveParallel.id, {
+            ...withNodeDimensions(
+                liveParallel,
+                COLLAPSED_CONTAINER_WIDTH,
+                COLLAPSED_CONTAINER_HEIGHT
+            ),
+            data: {
+                ...(liveParallel.data || {}),
+                expandedContainerSize: {
+                    ...savedExpanded,
+                    width: Math.max(
+                        Number(savedExpanded.width) || 0,
+                        requiredParallelWidth
                     ),
-                    data: {
-                        ...(node.data || {}),
-                        expandedContainerSize: {
-                            ...savedExpanded,
-                            width: Math.max(
-                                Number(savedExpanded.width) || 0,
-                                requiredParallelWidth
-                            ),
-                            height: Math.max(
-                                Number(savedExpanded.height) || 0,
-                                requiredParallelHeight
-                            ),
-                        },
-                    },
-                };
-            }
-
-            return withNodeDimensions(
-                node,
+                    height: Math.max(
+                        Number(savedExpanded.height) || 0,
+                        requiredParallelHeight
+                    ),
+                },
+            },
+        });
+    } else {
+        context.replaceNode(
+            liveParallel.id,
+            withNodeDimensions(
+                liveParallel,
                 requiredParallelWidth,
                 requiredParallelHeight
-            );
-        }
+            )
+        );
+    }
 
-        const geometry = laneGeometry.get(node.id);
-        if (geometry) {
-            return {
-                ...withNodeDimensions(
-                    node,
-                    geometry.width,
-                    geometry.height
-                ),
-                position: {
-                    ...node.position,
-                    x: 0,
-                    y: geometry.y,
-                },
-                expandParent: true,
-            };
-        }
+    laneGeometry.forEach((geometry, laneId) => {
+        const lane = context.byId.get(laneId);
+        if (!lane) return;
+        context.replaceNode(lane.id, {
+            ...withNodeDimensions(
+                lane,
+                geometry.width,
+                geometry.height
+            ),
+            position: {
+                ...lane.position,
+                x: 0,
+                y: geometry.y,
+            },
+            expandParent: true,
+        });
+    });
 
-        if (
-            isAutoParallelLaneCompound(node) &&
-            laneGeometry.has(node.parentId)
-        ) {
-            const laneSize = laneGeometry.get(node.parentId);
-            return {
-                ...withNodeDimensions(
-                    node,
-                    laneSize.width,
-                    laneSize.height
-                ),
-                expandParent: true,
-            };
-        }
-
-        return node;
+    parallelLanes.forEach((lane) => {
+        const geometry = laneGeometry.get(lane.id);
+        if (!geometry) return;
+        context
+            .getChildren(lane.id)
+            .filter(isAutoParallelLaneCompound)
+            .forEach((wrapper) => {
+                const liveWrapper = context.byId.get(wrapper.id) || wrapper;
+                context.replaceNode(liveWrapper.id, {
+                    ...withNodeDimensions(
+                        liveWrapper,
+                        geometry.width,
+                        geometry.height
+                    ),
+                    expandParent: true,
+                });
+            });
     });
 };
 
-// Re-evaluate all nested state containers from the inside out. Because the
-// individual fit functions are grow-only, this is stable and lets a resize of
-// any child propagate through Compound -> Parallel -> Compound chains.
+// Re-evaluate nested state containers from the inside out using one shared
+// geometry context. Previously every container pass rescanned and remapped the
+// complete node array, which made Compound/Parallel-heavy graphs approach
+// O(containers * nodes).
 export const growAllStateContainersToContents = (allNodes) => {
-    let nextNodes = allNodes;
+    const context = createContainerGeometryContext(allNodes);
 
     const containers = (allNodes || [])
         .filter(
@@ -623,22 +709,19 @@ export const growAllStateContainersToContents = (allNodes) => {
         )
         .sort(
             (a, b) =>
-                getNodeNestingDepth(b, allNodes) -
-                getNodeNestingDepth(a, allNodes)
+                getNodeNestingDepthFromContext(b, context) -
+                getNodeNestingDepthFromContext(a, context)
         );
 
     containers.forEach((container) => {
         if (container.type === "compound") {
-            nextNodes = fitCompoundToChildren(nextNodes, container.id);
+            fitCompoundToChildrenInContext(context, container.id);
         } else {
-            nextNodes = growParallelToLaneContents(
-                nextNodes,
-                container.id
-            );
+            growParallelToLaneContentsInContext(context, container.id);
         }
     });
 
-    return nextNodes;
+    return context.nodes;
 };
 
 export const NODE_COLLISION_OPTIONS = {
