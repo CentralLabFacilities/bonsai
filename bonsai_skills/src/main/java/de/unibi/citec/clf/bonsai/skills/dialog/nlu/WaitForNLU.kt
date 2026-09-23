@@ -73,9 +73,7 @@ class WaitForNLU : AbstractSkill() {
         )
 
         if (!any) {
-            required_entities = configurator.requestOptionalValue(
-                KEY_ENTITY,
-            ).split(";")
+            required_entities = configurator.requestOptionalValue(KEY_ENTITY, "").split(";")
 
             if (!configurator.hasConfigurationKey(KEY_ENTITY)) {
                 required_entities = listOf()
