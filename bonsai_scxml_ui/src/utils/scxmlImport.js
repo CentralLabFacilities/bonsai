@@ -10,6 +10,8 @@ import {
     normalizeValueType,
 } from "./valueTypes.js";
 import {
+    COLLAPSED_CONTAINER_HEIGHT,
+    COLLAPSED_CONTAINER_WIDTH,
     COMPOUND_PADDING_X,
     getCompoundChildrenRight,
     getCompoundExitGutterWidth,
@@ -2350,6 +2352,55 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             }
         });
     }
+
+    // Compound and Parallel states start collapsed after import. The complete
+    // hierarchy, transitions and child geometry remain loaded in memory; only
+    // the React Flow footprint/rendering is compact until the user expands the
+    // container. Preserve the fully calculated size so expansion is immediate
+    // and does not need to re-run child layout merely to recover dimensions.
+    //
+    // autoParallelLaneCompound is an editor-only structural wrapper for a
+    // Parallel branch, not a user-facing Compound state. Leave it expanded so
+    // expanding the surrounding Parallel immediately reveals its lane content.
+    finalNodes = finalNodes.map((node) => {
+        const shouldCollapseByDefault =
+            (node.type === "compound" || node.type === "parallel") &&
+            !node.data?.autoParallelLaneCompound;
+
+        if (!shouldCollapseByDefault) return node;
+
+        const expandedWidth =
+            Number(node.width) ||
+            Number(node.style?.width) ||
+            Number(node.measured?.width) ||
+            (node.type === "compound" ? 320 : 420);
+        const expandedHeight =
+            Number(node.height) ||
+            Number(node.style?.height) ||
+            Number(node.measured?.height) ||
+            (node.type === "compound" ? 220 : 295);
+
+        return {
+            ...node,
+            width: COLLAPSED_CONTAINER_WIDTH,
+            height: COLLAPSED_CONTAINER_HEIGHT,
+            style: {
+                ...(node.style || {}),
+                width: COLLAPSED_CONTAINER_WIDTH,
+                height: COLLAPSED_CONTAINER_HEIGHT,
+                minHeight: COLLAPSED_CONTAINER_HEIGHT,
+            },
+            data: {
+                ...(node.data || {}),
+                isCollapsed: true,
+                expandedContainerSize: {
+                    width: expandedWidth,
+                    height: expandedHeight,
+                    minHeight: node.style?.minHeight ?? null,
+                },
+            },
+        };
+    });
 
     return {
         nodes: finalNodes,
