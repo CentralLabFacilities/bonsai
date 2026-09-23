@@ -11,7 +11,51 @@ const escapeXmlAttribute = (value) => String(value)
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;");
 
-const buildEditorMetadataXml = (node, indent, isLane) => {
+
+const buildEditorEdgeRoutingByTarget = (nodes, edges) => {
+    const nodeById = new Map((nodes || []).map((node) => [node.id, node]));
+    const occurrenceByKey = new Map();
+    const routesByTargetId = new Map();
+
+    (edges || []).forEach((edge) => {
+        const targetInstanceId = String(
+            edge.data?.editorTargetInstanceId || ""
+        ).trim();
+        if (!targetInstanceId) return;
+
+        const sourceNode = nodeById.get(edge.source);
+        const targetNode = nodeById.get(edge.target);
+        if (!sourceNode || !targetNode) return;
+
+        const sourceSkillName = String(
+            sourceNode.data?.fullSkillName || sourceNode.data?.label || ""
+        ).trim();
+        const targetStateName = String(
+            targetNode.data?.fullSkillName || targetNode.data?.label || ""
+        ).trim();
+        if (!sourceSkillName || !targetStateName) return;
+
+        const rawHandle = edge.sourceHandle || edge.label || "success";
+        const eventName = getScxmlTransitionEvent(rawHandle, sourceSkillName);
+        const routeKey = `${eventName}\u0000${targetStateName}`;
+        const occurrence = occurrenceByKey.get(routeKey) || 0;
+        occurrenceByKey.set(routeKey, occurrence + 1);
+
+        if (!routesByTargetId.has(edge.target)) {
+            routesByTargetId.set(edge.target, []);
+        }
+        routesByTargetId.get(edge.target).push({
+            eventName,
+            targetStateName,
+            occurrence,
+            targetInstanceId,
+        });
+    });
+
+    return routesByTargetId;
+};
+
+const buildEditorMetadataXml = (node, indent, isLane, edgeRoutes = []) => {
     if (isLane) return "";
 
     const clonePositions = Array.isArray(node.data?.editorClonePositions)
@@ -19,7 +63,7 @@ const buildEditorMetadataXml = (node, indent, isLane) => {
         : [];
 
     const positionLines = clonePositions.length > 0
-        ? clonePositions.map((position, index) => {
+        ? clonePositions.map((position) => {
             const x = Math.round(Number(position?.x || 0));
             const y = Math.round(Number(position?.y || 0));
             const instanceId = String(position?.instanceId || "").trim();
@@ -39,44 +83,19 @@ const buildEditorMetadataXml = (node, indent, isLane) => {
             `${indent}        <editor:position x="${Math.round(node.position?.x || 0)}" y="${Math.round(node.position?.y || 0)}"/>`,
         ];
 
-    return `${indent}    <metadata>\n${positionLines.join("\n")}\n${indent}    </metadata>`;
-};
+    const edgeRouteLines = (edgeRoutes || []).map((route) =>
+        `${indent}        <editor:edgeTarget event="${escapeXmlAttribute(route.eventName)}" target="${escapeXmlAttribute(route.targetStateName)}" occurrence="${route.occurrence}" instance="${escapeXmlAttribute(route.targetInstanceId)}"/>`
+    );
+    const metadataLines = [...positionLines, ...edgeRouteLines];
 
-const buildEditorSlotMetadataXml = (slotNodes = []) => {
-    const positionLines = (slotNodes || [])
-        .filter((node) => node?.type === "slot")
-        .map((node) => {
-            const path = String(
-                node.data?.path || node.data?.label || ""
-            ).trim();
-            if (!path) return null;
-
-            const x = Math.round(Number(node.position?.x || 0));
-            const y = Math.round(Number(node.position?.y || 0));
-            const cloneAttr = node.data?.isSlotClone
-                ? ' clone="true"'
-                : "";
-
-            return `        <editor:slotPosition path="${escapeXmlAttribute(path)}"${cloneAttr} x="${x}" y="${y}"/>`;
-        })
-        .filter(Boolean);
-
-    if (positionLines.length === 0) return "";
-
-    return `    <metadata>\n${positionLines.join("\n")}\n    </metadata>`;
+    return `${indent}    <metadata>\n${metadataLines.join("\n")}\n${indent}    </metadata>`;
 };
 
 /**
  * Generiert den SCXML-Code-String inklusive <metadata> Positionen, Slots,
  * Sub-State-Machines und Condition/Assign-Transitions.
  */
-export const generateXmlString = (
-    nodes,
-    edgesOrDataModel = [],
-    maybeDataModel = [],
-    extraSlotDeclarations = [],
-    editorSlotNodes = []
-) => {
+export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel = [], extraSlotDeclarations = []) => {
     if (!nodes || nodes.length === 0) return "";
 
     // Parameter-Flexibilität (edges vs. globalDataModel)
@@ -170,6 +189,7 @@ export const generateXmlString = (
         globalDataLines.splice(1, 0, slotsXml);
     }
     const globalDataXml = globalDataLines.join("\n");
+    const editorEdgeRoutesByTarget = buildEditorEdgeRoutingByTarget(nodes, edges);
 
     const isDescendantOf = (childNodeId, ancestorNodeId) => {
         let current = nodes.find((n) => n.id === childNodeId);
@@ -324,7 +344,12 @@ export const generateXmlString = (
             : [];
         const onentryBlock = buildStateActionXml("onentry", onEntryAssignments, indent + "    ");
         const onexitBlock = buildStateActionXml("onexit", onExitAssignments, indent + "    ");
-        const metadataXml = buildEditorMetadataXml(node, indent, isLane);
+        const metadataXml = buildEditorMetadataXml(
+            node,
+            indent,
+            isLane,
+            editorEdgeRoutesByTarget.get(node.id) || []
+        );
 
         if (isFinal && !isSubMachine && children.length === 0) {
             const finalBlocks = [metadataXml, onentryBlock, onexitBlock].filter(Boolean);
@@ -577,7 +602,6 @@ export const generateXmlString = (
     };
 
     const statesXml = topLevelNodes.map((node) => renderNode(node, 1)).join("\n\n");
-    const editorSlotMetadataXml = buildEditorSlotMetadataXml(editorSlotNodes);
 
     return `<?xml version="1.0" encoding="UTF-8"?>
 <scxml xmlns="http://www.w3.org/2005/07/scxml"
@@ -589,7 +613,7 @@ export const generateXmlString = (
 ${globalDataXml}
     </datamodel>
 
-${editorSlotMetadataXml ? `${editorSlotMetadataXml}\n\n` : ""}${statesXml}
+${statesXml}
 
 </scxml>\n`;
 };

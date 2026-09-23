@@ -372,6 +372,10 @@ export const prepareGraphForScxml = (sourceNodes = [], sourceEdges = []) => {
 
     const aliasToCanonicalId = new Map();
     const clonePositionsByCanonicalId = new Map();
+    // Stable visual instance ids let editor-only edge routing survive a
+    // save/reload. They are meaningful only to the editor; SCXML semantics
+    // still target the canonical state id.
+    const visualInstanceIdByNodeId = new Map();
 
     // Normal skill clones explicitly point to their real node. Store their
     // visual positions in metadata on that real state so the aliases survive a
@@ -394,19 +398,29 @@ export const prepareGraphForScxml = (sourceNodes = [], sourceEdges = []) => {
             original,
             normalizedNodes
         );
+        const originalInstanceId =
+            String(original.data?.editorInstanceId || "").trim() || "original";
+        visualInstanceIdByNodeId.set(original.id, originalInstanceId);
+
         const positions = [
             {
+                instanceId: originalInstanceId,
                 x: Number(originalPosition.x || 0),
                 y: Number(originalPosition.y || 0),
                 isSkillClone: false,
                 cloneType: "",
             },
-            ...clones.map((cloneNode) => {
+            ...clones.map((cloneNode, cloneIndex) => {
                 const absolutePosition = getAbsoluteNodePosition(
                     cloneNode,
                     normalizedNodes
                 );
+                const instanceId =
+                    String(cloneNode.data?.editorInstanceId || "").trim() ||
+                    `clone-${cloneIndex + 1}`;
+                visualInstanceIdByNodeId.set(cloneNode.id, instanceId);
                 return {
+                    instanceId,
                     x: Number(absolutePosition.x || 0),
                     y: Number(absolutePosition.y || 0),
                     isSkillClone: Boolean(cloneNode.data?.isSkillClone),
@@ -431,11 +445,13 @@ export const prepareGraphForScxml = (sourceNodes = [], sourceEdges = []) => {
                     node,
                     normalizedNodes
                 );
+                const instanceId =
+                    String(node.data?.editorInstanceId || "").trim() ||
+                    String(index + 1);
+                visualInstanceIdByNodeId.set(node.id, instanceId);
 
                 return {
-                    instanceId:
-                        String(node.data?.editorInstanceId || "").trim() ||
-                        String(index + 1),
+                    instanceId,
                     x: Number(absolutePosition.x || 0),
                     y: Number(absolutePosition.y || 0),
                 };
@@ -534,12 +550,30 @@ export const prepareGraphForScxml = (sourceNodes = [], sourceEdges = []) => {
                 edge.data?.compoundOriginalTarget ||
                 edge.data?.parallelOriginalTarget ||
                 edge.target;
+            const visualTargetId = [
+                edge.data?.boundaryOriginalTarget,
+                edge.data?.compoundOriginalTarget,
+                edge.data?.parallelOriginalTarget,
+                edge.target,
+                semanticTarget,
+            ].find((candidateId) =>
+                candidateId && visualInstanceIdByNodeId.has(candidateId)
+            );
+            const editorTargetInstanceId = visualTargetId
+                ? visualInstanceIdByNodeId.get(visualTargetId)
+                : "";
 
             return {
                 ...edge,
                 source: semanticSource,
                 sourceHandle: semanticSourceHandle,
                 target: semanticTarget,
+                data: {
+                    ...(edge.data || {}),
+                    ...(editorTargetInstanceId
+                        ? { editorTargetInstanceId }
+                        : {}),
+                },
             };
         })
         // Skill clones are inbound-only editor aliases. Even if stale graph
