@@ -26,33 +26,6 @@ import kotlin.math.max
  * The Place Task will sample goal positions starting from the center of the area
  *
  * <pre>
- * Options:
- *  upright:        [Boolean] (Default: false)
- *      -> keep the object upright during movement
- *  flip:           [Boolean] (Default: false)
- *      -> place the object upside down
- *  useSpirit:      [Boolean] (Default: false)
- *      -> use Spirit slot to read entity and storage
- *  maxSize:        [Double] (Default 0.25)
- *      -> maximum size of the target sampling area (if storage is bigger)
- *  padding         [Double] (default 0.04)
- *      -> padding for target sampling (avoids placing at the edges)
- *
- * Slots:
- *  GraspEntity: [Entity] (Read)
- *      -> the entity to be placed. Must be previously attached to gripper.
- *  Spirit: [Spirit] (Optional, Read)
- *      -> only if 'useSpirit' is true
- *  Storage [StorageArea] (Optional, Read)
- *      -> Placing Area, if !'useSpirit'
- *  Entity [Entity] (Optional, Read)
- *      -> Entity to place into, if !'useSpirit'
- *
- * ExitTokens:
- *  success:                    placing was successfully
- *  error.no_plan:              motion planning failed
- *  error.other:                other error while placing
- *
  * Actuator:
  *  ECWMGrasping: [de.unibi.citec.clf.bonsai.actuators.ECWMGrasping]
  *
@@ -135,11 +108,11 @@ class PlaceInsideStorage : AbstractSkill() {
         )
 
         if (useSpirit) {
-            spiritSlot = configurator.getReadSlot("Spirit", Spirit::class.java)
+            spiritSlot = configurator.getReadSlot("Spirit", Spirit::class.java, "only if 'useSpirit' is true")
             ecwmSpirit = configurator.getActuator("ECWMSpirit", ECWMSpirit::class.java)
         } else {
-            storageAreaSlot = configurator.getReadSlot("Storage", StorageArea::class.java)
-            targetEntitySlot = configurator.getReadSlot("Entity", Entity::class.java)
+            storageAreaSlot = configurator.getReadSlot("Storage", StorageArea::class.java, "Placing Area, if !'useSpirit'")
+            targetEntitySlot = configurator.getReadSlot("Entity", Entity::class.java, "Entity to place into, if !'useSpirit'")
         }
 
         padding = configurator.requestOptionalDouble(

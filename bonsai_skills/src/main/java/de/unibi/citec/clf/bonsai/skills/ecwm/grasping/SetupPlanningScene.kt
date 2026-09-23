@@ -95,8 +95,7 @@ class SetupPlanningScene : AbstractSkill() {
                 KEY_SAFETY,
                 false,
                 "read Spirit from slot and add a plane at height z-0.01\n" +
-                        "where z is from the transform of\n" +
-                        "(0,0,0) frame=${spirit.entity.id}/${spirit.storage} -> map"
+                        "where z is from the transform of\n"
             )) {
             spirit = configurator.getReadSlot(
                 "Spirit",

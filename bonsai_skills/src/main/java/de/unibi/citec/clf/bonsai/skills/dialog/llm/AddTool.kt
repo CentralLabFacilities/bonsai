@@ -12,25 +12,6 @@ import de.unibi.citec.clf.btl.data.speech.llm.ToolParameter
 /**
  * Add a tool to a list of available tools.
  *
- * <pre>
- *
- * Options:
- * #_NAME                [String] Required
- *      -> The name of the tool to be added.
- * #_DESCRIPTION         [String] Optional
- *      -> The description of the tool.
- * #_PARAM_<name>        [String] Optional
- *      -> Description of a tool parameter.
- *      -> Prefix the description with "!" to mark the parameter as required.
- *
- * Slots:
- * tools: [ToolList] (Read, Write)
- *      -> Memory slot containing the list of available tools.
- *      -> The configured tool is added to this list.
- *
- * ExitTokens:
- * success:              Tool successfully added to the tool list
- * </pre>
  *
  * @author
  */
@@ -52,18 +33,38 @@ class AddTool : AbstractSkill() {
     private var params: MutableList<ToolParameter> = mutableListOf()
 
     override fun configure(configurator: ISkillConfigurator) {
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
-        slotTools = configurator.getSlot("tools", ToolList::class.java)
+        tokenSuccess = configurator.requestExitToken(
+            ExitStatus.SUCCESS(),
+            "Tool successfully added to the tool list"
+        )
 
-        name = configurator.requestValue(KEY_NAME).replace("[^\\S\\r\\n]+".toRegex(), " ")
-        desc = configurator.requestOptionalValue(KEY_DESCRIPTION, desc)
+        slotTools = configurator.getSlot(
+            "tools",
+            ToolList::class.java,
+            "Memory slot containing the list of available tools. The configured tool is added to this list."
+        )
+
+        name = configurator.requestValue(
+            KEY_NAME,
+            "The name of the tool to be added."
+        ).replace("[^\\S\\r\\n]+".toRegex(), " ")
+
+        desc = configurator.requestOptionalValue(
+            KEY_DESCRIPTION,
+            desc,
+            "The description of the tool."
+        )
 
         params.clear()
         for (key in configurator.configurationKeys) {
             if (!key.startsWith(KEY_PARAM_PREFIX)) continue
             val paramName = key.removePrefix(KEY_PARAM_PREFIX)
 
-            var description = configurator.requestValue(key).replace("[^\\S\\r\\n]+".toRegex(), " ")
+            var description = configurator.requestValue(
+                key,
+                "Description of a tool parameter. Prefix the description with \"!\" to mark the parameter as required."
+            ).replace("[^\\S\\r\\n]+".toRegex(), " ")
+
             var required = false
             if (description.startsWith("!")) {
                 description = description.removePrefix("!")

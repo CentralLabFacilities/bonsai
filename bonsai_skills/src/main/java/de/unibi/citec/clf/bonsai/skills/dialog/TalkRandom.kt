@@ -19,23 +19,7 @@ import java.util.concurrent.Future
  * Use this state to let the robot talk a random phrase of a semicolon-separated choice of messages.
  * 
  * <pre>
- * 
- * Options:
- * #_MESSAGE:      [String] Required
- *      -> Texts said by the robot, separated by ;
- * #_BLOCKING:     [Boolean] Optional (default: true)
- *      -> If true skill ends after talk was completed
- * #_USE_LANGUAGE: [Boolean] Optional (default: true)
- *      -> Read Language slot to determine speak language
- * #_LANG:  [Language] text language (default: EN)
- *      -> Use the given language to speak the (same language) #_MESSAGE.
- *         !! Setting this changes the default of #_USE_LANGUAGE to false, letting the robot always speak in #_LANG !!
- *         set #_USE_LANGUAGE to enable translation of #_MESSAGE from #_LANG to current slot language
- * Slots:
- * 
- * ExitTokens:
- * success:    Talk completed successfully
- * 
+ *
  * Sensors:
  * 
  * Actuators:
@@ -64,18 +48,18 @@ class TalkRandom : AbstractSkill() {
     override fun configure(configurator: ISkillConfigurator) {
         text = configurator.requestValue(
             KEY_MESSAGE,
-            "Texts said by the robot, separated by ';'."
+            "Texts said by the robot, separated by ;"
         )
 
         blocking = configurator.requestOptionalBool(
             KEY_BLOCKING,
             blocking,
-            "If true, the skill ends after the speech has been completed."
+            "If true skill ends after talk was completed"
         )
 
         tokenSuccess = configurator.requestExitToken(
             ExitStatus.SUCCESS(),
-            "The message was spoken successfully."
+            "Talk completed successfully"
         )
 
         speechActuator = configurator.getActuator(
@@ -87,8 +71,7 @@ class TalkRandom : AbstractSkill() {
 
         val input = configurator.requestOptionalValue(
             KEY_TEXT_LANGUAGE,
-            "",
-            "Language of the configured messages. Defaults to EN. If #_USE_LANGUAGE is enabled, messages are translated to the current language."
+            ""
         )
 
         if (configurator.hasConfigurationKey(KEY_TEXT_LANGUAGE)) {
@@ -104,25 +87,23 @@ class TalkRandom : AbstractSkill() {
             if (configurator.requestOptionalBool(
                     KEY_USE_LANGUAGE,
                     false,
-                    "Read the Language slot to determine the language in which the message should be spoken."
+                    "Read Language slot to determine speak language"
                 )
             ) {
                 langSlot = configurator.getReadSlot(
                     LANG_SLOT_NAME,
-                    LanguageType::class.java,
-                    "Memory slot containing the current language to use for speech."
+                    LanguageType::class.java
                 )
             }
         } else if (configurator.requestOptionalBool(
                 KEY_USE_LANGUAGE,
                 true,
-                "Read the Language slot to determine the language in which the message should be spoken."
+                "Read Language slot to determine speak language"
             )
         ) {
             langSlot = configurator.getReadSlot(
                 LANG_SLOT_NAME,
-                LanguageType::class.java,
-                "Memory slot containing the current language to use for speech."
+                LanguageType::class.java
             )
         }
     }

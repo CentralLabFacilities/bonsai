@@ -28,38 +28,6 @@ import de.unibi.citec.clf.btl.units.LengthUnit
  *
  * <pre>
  *
- * Options:
- * #_DO_GESTURE_FILTERING  [boolean] Optional (default: false)
- *      -> Filter by gesture using option or slot
- * #_DO_POSTURE_FILTERING  [boolean] Optional (default: false)
- *      -> Filter by person posture using option or slot
- * #_DO_ROOM_FILTERING     [boolean] Optional (default: false)
- *      -> Filter by room using option or slot
- * #_GESTURES              [String] Optional
- *      -> The gestures to filter for. Also, sets DO_GESTURE_FILTERING
- * #_POSTURE               [String] Optional
- *      -> The postures to filter for. Also, sets DO_POSTURE_FILTERING
- * #_ROOMS                 [String] Optional
- *      -> The rooms to filter for. Also, sets DO_ROOM_FILTERING
- *
- * Slots:
- * PersonDataListReadSlot: [PersonDataList] (Read)
- *      -> Memory slot the unfiltered list of persons will be read from
- * PersonDataListWriteSlot: [PersonDataList] (Write)
- *      -> Memory slot the filtered list of persons will be written to
- *
- * GestureReadSlot: [String] (Optional, Read)
- *      -> Memory Slot for the Gesture by that shall be filtered
- * PostureReadSlot: [String] (Optional, Read)
- *      -> Memory Slot for the Posture by that shall be filtered
- * RoomReadSlot: [String] (Optional, Read)
- *      -> Memory Slot for the Room by that shall be filtered
- *
- * ExitTokens:
- * success.notEmpty:        List successfully filtered, at least one PersonData remaining
- * success.empty:           List successfully filtered, but no Person remaining / List empty
- * error:                   Name of the Location could not be retrieved
- *
  * Sensors:
  *
  * Actuators:

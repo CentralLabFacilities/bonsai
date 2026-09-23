@@ -14,25 +14,6 @@ import java.util.concurrent.Future
  *
  *
  * <pre>
- *
- * Options:
- * #_TIMEOUT             [Integer] Optional (default: 5000)
- *      -> Maximum time in milliseconds to wait for the LLM response
- *         in blocking mode.
- * #_BLOCKING            [boolean] Optional (default: true)
- *      -> Whether to wait for the LLM response.
- * #_PROMPT              [String] Required
- *      -> The query to send to the LLM.
- *
- * Slots:
- * reply: [String] (Write, Optional)
- *      -> Memory slot where the LLM response is stored.
- *      -> Used only when #_BLOCKING is true.
- *
- * ExitTokens:
- * success:              LLM query successfully completed
- * error.timeout:        LLM did not respond within the configured timeout
- *
  * Sensors:
  *
  * Actuators:
@@ -87,7 +68,7 @@ class LLMQuery : AbstractSkill() {
                 ExitStatus.ERROR().ps("timeout"),
                 "LLM did not respond within the configured timeout"
             )
-            slot = configurator.getWriteSlot("reply", String::class.java)
+            slot = configurator.getWriteSlot("reply", String::class.java, "Memory slot where the LLM response is stored. Used only when #_BLOCKING is true.")
         }
 
     }

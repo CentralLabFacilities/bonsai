@@ -38,32 +38,6 @@ import java.util.concurrent.TimeUnit
  *
  * <pre>
  *
- * Options:
- *  #_USE_DEFAULT   [Boolean] Optional (default true)
- *                          -> use the default mapping (otherwise send error.unlisted)
- *  #_MESSAGE:      [String] Optional (default: "YOU want ME to: #M?")
- *                          -> Text said by the robot before waiting for confirmation
- *  #_TIMEOUT       [long] Optional (default: -1)
- *                          -> Amount of time robot waits for confirmation in ms
- *  #_REPEAT_AFTER: [long] Optional (default: 5000)
- *                          -> Time between the robot asking #_TEXT again in ms
- *  #_REPEATS:      [int] Optional (default: 1)
- *                          -> Amount of times #_TEXT is asked
- *  #_INTENT_MAPPING:    [String[]] Optional (default: "")
- *                          -> List of intent mappings 'intent=mapping' separated by ';'
- *  #_DO_REPLACEMENTS:   [Boolean] Optional (default true)
- *                          -> replace some words like 'me' -> 'you'
- *  #_USE_LANGUAGE: [Boolean] Optional (default: false)
- *                          -> Read Language slot to determine speak language else it defaults to "EN"
- * Slots:
- *
- * ExitTokens:
- *  success.confirmYes: Received confirmation
- *  success.confirmNo:  Received denial
- *  error.timeout:    Timeout reached (only used when #_TIMEOUT is set to positive value)
- *  error.compute:    Some entity is missing or duplicate (e.g. '#E:object' while nlu has multiple object entities)
- *  error.unlisted:   The intent is not mapped (only when #_USE_DEFAULT is false)
- *
 </pre> *
  *
  * @author lruegeme

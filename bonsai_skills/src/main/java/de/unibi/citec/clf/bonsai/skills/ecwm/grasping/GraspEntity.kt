@@ -14,22 +14,6 @@ import java.util.concurrent.Future
  * Will try to pick up an object.
  * <pre>
  *
- * Options:
- *  entity:         [String] Optional
- *                           -> the name of the entity to be grasped
- *  add_fallback:    [Boolean] Optional, default false
- *                           -> add top grasp fallback if classic grasp fails
- * Slots:
- *  Entity: [Entity] (Read optional)
- *      -> the entity to be grasped. Will be used if option "entity" is not set
- *
- * ExitTokens:
- * success:                The object should be successfully grasped
- * success.maybe:          The environment changed during grasping, plan could've been invalid and failed
- * error.no_plan:          Could not plan a grasping motion
- * error.other:            Grasping failed.
- * fatal:                  MoveIt generated an invalid plan or could not execute it
- *
  * Actuators:
  *  ECWMGrasping: [ECWMGraspingActuator]
  *

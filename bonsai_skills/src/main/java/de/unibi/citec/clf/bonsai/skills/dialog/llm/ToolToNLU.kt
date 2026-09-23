@@ -19,23 +19,6 @@ import java.lang.StringBuilder
  *
  * <pre>
  *
- * Options:
- * #_SPLIT_PARAMETER      [boolean] Optional (default: true)
- *      -> Whether to split tool parameter names at the first underscore.
- *      -> The part before the underscore is used as the entity key.
- *      -> The part after the underscore is used as the entity role.
- *
- * Slots:
- * replyMessage: [Message] (Read)
- *      -> Memory slot containing the tool call Message.
- *      -> The Message must have the TOOL_CALL role.
- *
- * NLUSlot: [NLU] (Write)
- *      -> Memory slot where the resulting NLU object is stored.
- *
- * ExitTokens:
- * success:              Tool call successfully converted to an NLU object
-
  * </pre>
  *
  * @author lruegeme
@@ -58,12 +41,13 @@ class ToolToNLU : AbstractSkill() {
             splitParameterRole,
             "Whether to split tool parameter names at the first underscore. The part before the underscore is used as the entity key, the part after as the entity role."
         )
-        nluSlot = configurator.getWriteSlot("NLUSlot", NLU::class.java)
+        nluSlot = configurator.getWriteSlot("NLUSlot", NLU::class.java, "Memory slot where the resulting NLU object is stored.")
         tokenSuccess = configurator.requestExitToken(
             ExitStatus.SUCCESS(),
             "Tool call successfully converted to an NLU object"
         )
-        messageSlot = configurator.getReadSlot("replyMessage", Message::class.java)
+        messageSlot = configurator.getReadSlot("replyMessage", Message::class.java, "Memory slot containing the tool call Message.\n" +
+                " The Message must have the TOOL_CALL role.")
     }
 
     override fun init(): Boolean {

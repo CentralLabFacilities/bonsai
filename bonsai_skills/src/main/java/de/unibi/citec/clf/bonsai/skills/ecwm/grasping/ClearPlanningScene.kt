@@ -14,10 +14,6 @@ import java.util.concurrent.Future
  *
  * <pre>
  *
- * Options:
- *  clear_attached:     [Boolean] (Default: false)
- *                  -> Also clear attached objects
- *
  * </pre>
  *
  * @author lruegeme, jzilke

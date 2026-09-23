@@ -18,22 +18,6 @@ import java.util.logging.Logger
  *
  * <pre>
  *
- * Options:
- *  #_POSITION:      [Double] Optional (Default: 0)
- *                      -> Z lift position, range depending on the robot (Tiago: 0.0-0.35)
- *  #_MOVE_DURATION: [Integer] Optional (Default: 4000)
- *                      -> Time the lift takes to move to the position in milliseconds
- *  #_TIMEOUT:       [Integer] Optional (default: 7000)
- *                      -> Amount of time robot waits for actuator to be done in milliseconds
- *  #_SLOT:          [boolean] Optional (default: false)
- *                      -> If true the position is read from a slot
- *
- * Slots:
- *
- * ExitTokens:
- *  success:    z-lift movement completed successfully
- *  error
- *
  * Sensors:
  *
  * Actuators:

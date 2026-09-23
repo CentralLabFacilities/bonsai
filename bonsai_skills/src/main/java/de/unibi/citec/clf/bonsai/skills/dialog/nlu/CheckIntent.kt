@@ -11,18 +11,6 @@ import de.unibi.citec.clf.btl.data.speech.NLU
  * Check if NLU has one of the given intents
  *
  * <pre>
- *
- * Options:
- *  #_INTENTS:              [String[]] Required
- *                              -> List of allowed intents separated by ';'
- *
- * Slots:
- *  NLUSlot:                [NLU] (Read)
- *
- * ExitTokens:
- *  success.{intent}:       NLU has the specified intent
- *  error.other:            intent is not listed
- *
  * </pre>
  *
  * @author lruegeme
@@ -59,7 +47,6 @@ class CheckIntent : AbstractSkill() {
         nluSlot = configurator.getReadSlot<NLU>(
             "NLUSlot",
             NLU::class.java,
-            "Memory slot containing the NLU result to check the intent of."
         )
     }
 

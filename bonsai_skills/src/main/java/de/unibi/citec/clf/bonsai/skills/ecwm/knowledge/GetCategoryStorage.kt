@@ -23,29 +23,6 @@ import java.util.regex.Matcher
  *
  * <pre>
  *
- * Options:
- *  MSG:                    [String] (Optional)  Message to say. variables: #S=storage #C=category #E=entity(container) #N=giveName
- *  USE_CATEGORY_SLOT       [Boolean] Read from `Category` Slot (default: false)
- *  USE_MODEL_SLOT          [Boolean] Read from `Model` Slot (default: false)
- *  CATEGORY                [String] (Optional) Category which default storage should be found. If given, no slot will be used.
- *
- * Slots:
- *  Entity:                 [Entity] (Read, Optional)
- *                              -> The Entity to get the category from
- *  Model:                  [Entity] (Read, Optional)
- *                              -> The Entity to get the category from
- *  Storage:                [String] (Write)
- *                              -> The default storage of this object
- *  Container:              [Entity] (Write)
- *                              -> Which entity this storage belongs to
- *  Category:               [String] (Read or Write)
- *                              -> What category this object has
- *
- * ExitTokens:
- *  success.storage:        Found the Container Entity and known storage location for the objects category,
- *  success.no_storage:     Found the Container Entity but no storage
- *  error                   No Known Storage for the category found
- *
  * </pre>
  *
  * @author lruegeme, lgraesner

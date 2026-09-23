@@ -19,29 +19,6 @@ import kotlin.collections.iterator
  *
  * <pre>
  *
- * Options:
- *  entity:             [String] Optional
- *                          -> Entity Name to fetch goals from
- *  spirit:             [String]
- *                          -> Name of the Spirit to get
- *  storage:            [String] Optional (default "")
- *                          -> Storage of the spirit, if this parameter is set 'use_storage' is set to true
- *  use_storage:        [Boolean] Optional (default false)
- *                          -> if use_storage is false, finds the first matching one if multiple exists
- *  use_storage_string: [Boolean] Optional (default false)
- *                          -> use String slot to get storage name
- *
- * Slots:
- *  Entity:   [Entity] (Optional)
- *                  -> Entity to fetch goals from, is used if the 'entity' option is not set
- *  Spirit:   [Spirit] (Write)
- *                  -> The Spirit
- *  Storage:  [StorageArea] (Read, Optional)
- *                  -> The Storage, only read if use_storage is set
- *
- * ExitTokens:
- *  success:        Spirit exists
- *
  * Sensors:
  *
  * Actuators:
@@ -104,7 +81,7 @@ class GetSpirit : AbstractSkill() {
             entity = configurator.getReadSlot(
                 "Entity",
                 Entity::class.java,
-                "Entity to fetch the Spirit from, used if the 'entity' option is not set"
+                "Entity to fetch goals from, is used if the 'entity' option is not set"
             )
         }
 
@@ -142,7 +119,7 @@ class GetSpirit : AbstractSkill() {
                 storage = configurator.getReadSlot(
                     "Storage",
                     StorageArea::class.java,
-                    "Storage used to find the Spirit"
+                    "The Storage, only read if use_storage is set"
                 )
             }
         }

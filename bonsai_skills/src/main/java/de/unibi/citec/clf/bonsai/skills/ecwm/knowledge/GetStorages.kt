@@ -16,21 +16,6 @@ import java.util.concurrent.Future
  *
  * <pre>
  *
- * Options:
- *  entity:     [String] Optional
- *                  -> Entity id to fetch goals from
- *
- * Slots:
- *  Entity:   [de.unibi.citec.clf.btl.data.world.Entity] Optional
- *                  -> Entity to retrieve storages from, used if the 'entity' option is not set
- *  Storages [de.unibi.citec.clf.btl.data.ecwm.StorageList]
- *                  -> A list of present storages
- *
- * ExitTokens:
- *  success:        Wrote a list of storages to the slot.
- *  error.none:     The Entity has no storages - wrote an empty list.
- *
- *
  * Actuators:
  *  ECWMCoreActuator: [ECWMCORE]
  *      -> Used to get the current World Model

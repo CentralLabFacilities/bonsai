@@ -15,14 +15,6 @@ import java.lang.reflect.InvocationTargetException
  *
  * <pre>
  *
- * Slots:
- * StringSlot: [String] [Read/Write]
- * -> Memory slot the content will be cleared from
- *
- * ExitTokens:
- * success:            Cleared slot successfully
- * fatal:              Error while writing to memory
- *
  * Sensors:
  *
  * Actuators:

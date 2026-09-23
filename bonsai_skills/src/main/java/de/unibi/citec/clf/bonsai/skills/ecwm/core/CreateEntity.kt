@@ -22,17 +22,6 @@ import de.unibi.citec.clf.btl.units.LengthUnit
  *
  * <pre>
  *
- * Options:
- *  name:               [String] Entity name
- *  type:               [String] Optional (default: "unknown")
- *  frame_id            [String] Optional (default: "map")
- *  x:                  [double] Optional (default: 0)
- *  y:                  [double] Optional (default: 0)
- *  z:                  [double] Optional (default: 0)
- *
- * Slots:
- *  Entity: [Entity]
- *
  * </pre>
  *
  * @author lruegeme
@@ -67,8 +56,8 @@ class CreateEntity : AbstractSkill() {
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
         entitySlot = configurator.getWriteSlot("Entity", Entity::class.java)
 
-        frameId = configurator.requestOptionalValue(KEY_FRAMEID, frameId)
-        type = configurator.requestOptionalValue(KEY_TYPE, type)
+        frameId = configurator.requestOptionalValue(KEY_FRAMEID, frameId, "Optional (default: \"map\")")
+        type = configurator.requestOptionalValue(KEY_TYPE, type, "Optional (default: \"unknown\")")
         usePositionData = configurator.requestOptionalBool(KEY_USE_POSITION, usePositionData)
 
         name = configurator.requestOptionalValue(

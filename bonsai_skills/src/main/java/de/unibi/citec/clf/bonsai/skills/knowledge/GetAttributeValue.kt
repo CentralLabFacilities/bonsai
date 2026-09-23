@@ -14,18 +14,6 @@ import java.util.concurrent.ExecutionException
  *
  * <pre>
  *
- * Options:
- *  error_on_multiple   [Boolean] Error if values.size()>1, else we just get the first (default: True)
- *  attribute:          [String] The attribute key
- *
- * Slots:
- *  Attributes  [Attributes] Attributes
- *  Value:      [String] The Attribute Value
- *
- * ExitTokens:
- *  Error.missing:        does not have the requested attribute
- *  Error.multiple:       does have multiple values for the requested attribute
- *
  * </pre>
  *
  * @author lruegeme

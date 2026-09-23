@@ -27,20 +27,6 @@ import de.unibi.citec.clf.btl.data.speech.NLU
  *
  * <pre>
  *
- * Options:
- *  #_INTENT:               [String] (optional)
- *                              -> check for matching intent, use ';' for multiple ("intentA;intentB..")
- *  #'ENTITY[:ROLE][:GROUP]':
- *                              -> Entities to unpack (see example)
- * Slots:
- *  all defined Parameters as WriteSlot [String]
- *                              -> value of the entity
- *
- * ExitTokens:
- *  success
- *  error.missing.entity.role.group     Specific Entity is missing from NLU
- *  error.wrongIntent:                  Intent is not #_INTENT (if defined)
- *
  * </pre>
  *
  * @author lruegeme
@@ -95,7 +81,7 @@ class UnpackNLU : AbstractSkill() {
             slotMapping[item] = configurator.getWriteSlot(
                 item,
                 String::class.java,
-                "Memory slot where the value of the entity '$item' is stored."
+                "value of the entity."
             )
             val status = item.replace(':', '.')
             tokenMap[item] = configurator.requestExitToken(

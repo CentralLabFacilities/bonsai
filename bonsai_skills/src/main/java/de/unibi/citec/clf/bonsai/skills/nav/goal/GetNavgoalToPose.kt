@@ -21,24 +21,6 @@ import de.unibi.citec.clf.btl.units.LengthUnit
 /**
  * Generates a NavGoal on a straight line to a position.
  *
- * Options:
- *
- * #_TARGET_DIST:   [Double] Optional (default: 1.0)
- *                      -> Distance of generated navigation goal to target
- * #_MAX_DIST:      [Double] Optional (default #_TARGET_DIST)
- *                      -> Max Distance to finish with already_there
- *
- * Slots:
- *  Pose: [Pose3D] [Read]
- *      -> The Pose3D to which a NavGoal should be generated
- *  NavigationGoalData [NavigationGoalData] [Write]
- *      -> The resulting NavGoal
- *
- * ExitTokens:
- * success.need_move:      Successfully generated a NavGoal
- * success.already_there:  Successfully generated a NavGoal, but robot is close enough
- * fatal:                  Could not read or write to slot
- *
  * @author lruegeme
  * </pre>
  */

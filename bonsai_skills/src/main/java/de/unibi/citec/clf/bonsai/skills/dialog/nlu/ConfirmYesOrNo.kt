@@ -20,33 +20,6 @@ import java.util.concurrent.Future
  *
  * <pre>
  *
- * Options:
- *  #_MESSAGE:             [String] Optional (default: "Was that correct?")
- *                          -> Text said by the robot before waiting for confirmation
- *  #_USESIMPLE:        [boolean] Optional (default: true)
- *                          -> If true: the robot only listens for confirmation (no talks)
- *  #_TIMEOUT           [long] Optional (default: -1)
- *                          -> Amount of time robot waits for confirmation in ms
- *  #_REPEAT_AFTER:     [long] Optional (default: 5000)
- *                          -> Time between the robot asking #_TEXT again in ms
- *  #_REPEATS:          [int] Optional (default: 1)
- *                          -> Amount of times #_TEXT is asked
- *  #_INTENT_NO:   [String] Optional (default: "confirm_no")
- *                          -> Name of intent that signals no
- *  #_INTENT_YES:  [String] Optional (default: "confirm_yes")
- *                          -> Name of intent that signals yes
- *  #_SPEECH_SENSOR:    [String] Optional (default: "NLUSensor")
- *                          -> Which sensor to use for new understandings
- *  #_USE_LANGUAGE: [Boolean] Optional (default: false)
- *                          -> Read Language slot to determine speak language else it defaults to "EN"
- *
- * Slots:
- *
- * ExitTokens:
- *  success.confirmYes: Received confirmation
- *  success.confirmNo:  Received denial
- *  success.timeout:    Timeout reached (only used when #_TIMEOUT is set to positive value)
- *
  * Sensors:
  *  #_SPEECH_SENSOR: [NLU]
  *      -> Used to listen for confirmation
@@ -152,12 +125,10 @@ class ConfirmYesOrNo : AbstractSkill() {
         speechSensor = configurator.getSensor(
             speechSensorName,
             NLU::class.java,
-            "Used to listen for confirmation"
         )
         speechActuator = configurator.getActuator(
             ACTUATOR_SPEECHACTUATOR,
             SpeechActuator::class.java,
-            "Used to ask #_TEXT for confirmation"
         )
     }
 

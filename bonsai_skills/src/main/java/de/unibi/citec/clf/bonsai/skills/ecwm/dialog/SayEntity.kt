@@ -17,23 +17,6 @@ import java.util.concurrent.Future
  *
  * <pre>
  *
- * Options:
- *  #_MESSAGE:      [String] Optional (default: "$S")
- *                      -> Text said by the robot. $S will be replaced by entity/type
- *  #_BLOCKING:     [boolean] Optional (default: true)
- *                      -> If true skill ends after talk was completed
- *  #_USE_NAME:     [boolean] Optional (default: true)
- *                      -> If true use the GIVEN_NAME attribute of the entity
- *  #_USE_TYPE:     [boolean] Optional (default: true)
- *                      -> use the modelName of the entity (prefer GIVEN_NAME)
- *
- * Slots:
- *  Entity: [de.unibi.citec.clf.btl.data.world.Entity] [Read]
- *      -> Entity to incorporate into talk
- *
- * ExitTokens:
- *  success:    Talk completed successfully
- *
  * Sensors:
  *
  * Actuators:

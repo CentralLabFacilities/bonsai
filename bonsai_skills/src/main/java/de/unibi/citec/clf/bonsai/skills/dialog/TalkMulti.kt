@@ -18,18 +18,6 @@ import java.util.concurrent.Future
  *
  * <pre>
  *
- * Options:
- * #_MSG_<LANG>:      [String]
- *      -> Text said by the robot for the <LANG>
- * #_BLOCKING:     [boolean] Optional (default: true)
- *      -> If true skill ends after talk was completed
- * #_DEFAULT:      [String] Optional (default: EN)
- *      -> default msg if #_MSG_<LANG> is not defined
- * Slots:
- *
- * ExitTokens:
- * success:    Talk completed successfully
- *
  * Sensors:
  *
  * Actuators:
@@ -78,7 +66,6 @@ class TalkMulti : AbstractSkill() {
         langSlot = configurator.getReadSlot(
             "Language",
             LanguageType::class.java,
-            "Memory slot containing the language to use for selecting and speaking the message."
         )
 
         default = Language.valueOf(

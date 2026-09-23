@@ -13,29 +13,6 @@ import de.unibi.citec.clf.btl.data.world.EntityList
  *
  * <pre>
  *
- * Options:
- *  #_PATTERN   [String] (Optional):
- *      -> (RegEx) for the entity types
- *  #_INVERT    [Boolean] (default: False):
- *      -> invert matches
- *  #_REGEX     [Boolean] (default True):
- *      -> use Regex to match
- *
- * Slots:
- *  Pattern         [String] (Optional, Read):
- *      -> RegEx for the entity types, used if #_PATTERN is not set
- *  EntityList            [EntityList] (Read):
- *      -> Slot for the list that should be filtered
- *  FilteredEntities    [EntityList] (Write):
- *      -> The Filtered Output
- *
- *
- * ExitTokens:
- *  success.empty:
- *      -> Filtered is empty
- *  success.notEmpty:
- *      -> Filtered is not empty
- *
  * </pre>
  * @author lruegeme, lgraesner
  */

@@ -23,23 +23,6 @@ import java.util.concurrent.TimeUnit
  *
  * <pre>
  *
- * Options:
- *  #_ANY:                [Boolean] (default: false)
- *                          -> Listen to any NLU, disables #_INTENTS
- *  #_INTENTS:            [String] Required (when not #_ANY)
- *                          -> List of intents to listen for separated by ';'
- *  #_TIMEOUT:            [Long] Optional (default: -1)
- *                          -> Amount of time waited to understand something
- *
- * Slots:
- *  NLUSlot: [NLU] (Write)
- *      -> Save the understood NLU
- *
- * ExitTokens:
- *  success:                something was understood (if ANY is true)
- *  success.{understood}:   intent {understood} given in intents was understood
- *  error.timeout:          Timeout reached (only used when timeout is set to a positive value)
- *
  * </pre>
  *
  * @author lruegeme
@@ -80,21 +63,18 @@ class WaitForNLU : AbstractSkill() {
     override fun configure(configurator: ISkillConfigurator) {
         sensorkey = configurator.requestOptionalValue(
             KEY_SENSOR,
-            sensorkey,
-            "Sensor key of the NLU sensor to listen to."
+            sensorkey
         )
 
         any = configurator.requestOptionalBool(
             KEY_ANY,
             any,
-            "Listen to any NLU and disable #_INTENTS and #_ENTITIES."
+            "Listen to any NLU, disables #_INTENTS"
         )
 
         if (!any) {
             required_entities = configurator.requestOptionalValue(
                 KEY_ENTITY,
-                "",
-                "List of entity keys that must be present in the understood NLU, separated by ';'."
             ).split(";")
 
             if (!configurator.hasConfigurationKey(KEY_ENTITY)) {
@@ -103,31 +83,29 @@ class WaitForNLU : AbstractSkill() {
 
             possible_intents = configurator.requestValue(
                 KEY_DEFAULT,
-                "List of intents to listen for, separated by ';'."
+                "List of intents to listen for separated by ';'"
             ).split(";")
 
             for (nt in possible_intents) {
                 if (nt.isBlank()) continue
                 tokenMap[nt] = configurator.requestExitToken(
                     ExitStatus.SUCCESS().ps(nt),
-                    "The intent '$nt' was understood."
+                    "intent {understood} given in intents was understood"
                 )
             }
         } else if (configurator.hasConfigurationKey(KEY_DEFAULT)) {
             throw SkillConfigurationException("cant use $KEY_ANY and $KEY_DEFAULT together")
-        } else if (configurator.hasConfigurationKey(KEY_ENTITY)) {
-            throw SkillConfigurationException("cant use $KEY_ANY and $KEY_ENTITY together")
         } else {
             tokenMap["any"] = configurator.requestExitToken(
                 ExitStatus.SUCCESS(),
-                "An NLU was understood."
+                "something was understood (if ANY is true)"
             )
         }
 
         timeout = configurator.requestOptionalInt(
             KEY_TIMEOUT,
             timeout.toInt(),
-            "Amount of time to wait for a matching NLU in milliseconds. A positive value enables the timeout."
+            "Amount of time waited to understand something"
         ).toLong()
 
         speechSensor = configurator.getSensor(
@@ -138,26 +116,20 @@ class WaitForNLU : AbstractSkill() {
         nluSlot = configurator.getWriteSlot(
             "NLUSlot",
             NLU::class.java,
-            "Memory slot where the understood NLU is stored."
+            "Save the understood NLU"
         )
 
         if (timeout > 0) {
             tokenSuccessPsTimeout = configurator.requestExitToken(
                 ExitStatus.ERROR().ps("timeout"),
-                "The configured timeout was reached without understanding a matching NLU."
+                "Timeout reached (only used when timeout is set to a positive value)"
             )
         }
 
-        if (configurator.requestOptionalBool(
-                KEY_SET_LANGUAGE,
-                false,
-                "Store the language of the understood NLU in the Language slot."
-            )
-        ) {
+        if (configurator.requestOptionalBool(KEY_SET_LANGUAGE, false)) {
             langSlot = configurator.getWriteSlot(
                 "Language",
-                LanguageType::class.java,
-                "Memory slot where the language of the understood NLU is stored."
+                LanguageType::class.java
             )
         }
 
@@ -170,8 +142,7 @@ class WaitForNLU : AbstractSkill() {
         if (any) {
             langs = configurator.requestOptionalValue(
                 KEY_ALLOWED_LANGUAGES,
-                "",
-                "Allowed NLU languages, separated by ';'. Only used when #_ANY is enabled."
+                ""
             )
         }
 
@@ -183,8 +154,7 @@ class WaitForNLU : AbstractSkill() {
             }
 
             tokenErrorLanguage = configurator.requestExitToken(
-                ExitStatus.ERROR().ps("language"),
-                "The understood NLU uses a language that is not allowed."
+                ExitStatus.ERROR().ps("language")
             )
         }
     }
