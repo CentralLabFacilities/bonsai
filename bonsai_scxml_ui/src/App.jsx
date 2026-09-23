@@ -7,6 +7,7 @@ import {
     useEdgesState,
     useReactFlow,
     useUpdateNodeInternals,
+    applyEdgeChanges,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
@@ -43,6 +44,8 @@ import {
 } from "./utils/editorGraph";
 import {
     getNodeId,
+    COLLAPSED_CONTAINER_WIDTH,
+    COLLAPSED_CONTAINER_HEIGHT,
     PARALLEL_EXIT_GUTTER,
     PARALLEL_NODE_GAP,
     PARALLEL_HEADER_HEIGHT,
@@ -83,6 +86,7 @@ import { useNodeDrag } from "./hooks/useNodeDrag";
 import { useSubStateMachines } from "./hooks/useSubStateMachines";
 import { useTransitionGraph } from "./hooks/useTransitionGraph";
 import { useContainerCreation } from "./hooks/useContainerCreation";
+import { rebuildBoundaryTransitions } from "./utils/boundaryTransitions";
 import { getOverviewLayoutNodeSize } from "./utils/layoutUtils";
 import "./App.css";
 
@@ -1156,31 +1160,18 @@ function AppContent() {
                             Number(node.measured?.height) ||
                             Number(node.style?.height) ||
                             (node.type === "compound" ? 220 : 295);
-                        const collapsedHeight =
-                            node.type === "compound"
-                                ? Math.max(
-                                    48,
-                                    28 +
-                                    (Array.isArray(node.data?.events)
-                                        ? node.data.events.length
-                                        : 0) *
-                                    22
-                                )
-                                : 44;
-
                         return {
                             ...node,
-                            // NodeResizer stores the current size on the node's
-                            // top-level width/height fields. Those values take
-                            // precedence over style.width/style.height in React
-                            // Flow, so collapse has to update both places.
-                            width: expandedWidth,
-                            height: collapsedHeight,
+                            // A collapsed Compound/Parallel uses the same
+                            // footprint as a regular state node. Preserve the
+                            // expanded dimensions separately for restoration.
+                            width: COLLAPSED_CONTAINER_WIDTH,
+                            height: COLLAPSED_CONTAINER_HEIGHT,
                             style: {
                                 ...(node.style || {}),
-                                width: expandedWidth,
-                                height: collapsedHeight,
-                                minHeight: collapsedHeight,
+                                width: COLLAPSED_CONTAINER_WIDTH,
+                                height: COLLAPSED_CONTAINER_HEIGHT,
+                                minHeight: COLLAPSED_CONTAINER_HEIGHT,
                             },
                             data: {
                                 ...(node.data || {}),
@@ -1742,6 +1733,58 @@ function AppContent() {
         const seen = new Set();
         const result = [];
 
+        const appendOutgoingTransition = ({
+            edgeId,
+            sourceId,
+            sourceHandle,
+            targetId,
+            rawEvent = "",
+            isFallback = false,
+        }) => {
+            if (
+                !sourceId ||
+                !targetId ||
+                !isInsideSelectedContainer(sourceId) ||
+                isInsideSelectedContainer(targetId)
+            ) {
+                return;
+            }
+
+            const normalizedHandle = String(sourceHandle || "success");
+            const semanticKey = `${sourceId}::${normalizedHandle}::${targetId}`;
+
+            // Every real edge is a real SCXML transition and must stay visible
+            // even when two transitions share the same event/target but differ
+            // by condition. The managed boundary-event pass below is only a
+            // fallback and must never add a second copy of an already-live edge.
+            if (isFallback && seen.has(semanticKey)) return;
+            seen.add(semanticKey);
+
+            const sourceNode = nodeById.get(sourceId);
+            const targetNode = nodeById.get(targetId);
+            const sourceSkillBase = String(
+                sourceNode?.data?.fullSkillName || sourceNode?.data?.label || ""
+            )
+                .split("#")[0]
+                .split(".")
+                .filter(Boolean)
+                .pop();
+            const semanticEventName = String(rawEvent || "").trim() ||
+                `${sourceSkillBase || displayNameFor(sourceNode)}.${normalizedHandle}`;
+
+            result.push({
+                edgeId,
+                sourceNodeId: sourceId,
+                sourceDisplayName: displayNameFor(sourceNode),
+                eventId: normalizedHandle,
+                eventDisplayName: semanticEventName,
+                targetNodeId: targetId,
+                targetDisplayName: displayNameFor(targetNode),
+            });
+        };
+
+        // Prefer the actual transition edges. These preserve duplicate /
+        // conditional transitions and are the canonical live graph state.
         edges.forEach((edge) => {
             if (
                 edge.data?.boundaryInternalEdge ||
@@ -1754,50 +1797,159 @@ function AppContent() {
                 return;
             }
 
-            const sourceId =
-                edge.data?.boundaryOriginalSource ||
-                edge.data?.compoundOriginalSource ||
-                edge.data?.parallelOriginalSource ||
-                edge.source;
-            const sourceHandle = String(
-                edge.data?.boundaryOriginalSourceHandle ||
-                edge.data?.compoundOriginalSourceHandle ||
-                edge.data?.parallelOriginalSourceHandle ||
-                edge.sourceHandle ||
-                edge.label ||
-                "success"
-            );
-            const targetId =
-                edge.data?.compoundOriginalTarget ||
-                edge.data?.parallelOriginalTarget ||
-                edge.target;
-
-            if (
-                !isInsideSelectedContainer(sourceId) ||
-                isInsideSelectedContainer(targetId)
-            ) {
-                return;
-            }
-
-            const key = `${sourceId}::${sourceHandle}::${targetId}`;
-            if (seen.has(key)) return;
-            seen.add(key);
-
-            const sourceNode = nodeById.get(sourceId);
-            const targetNode = nodeById.get(targetId);
-            result.push({
+            appendOutgoingTransition({
                 edgeId: edge.id,
-                sourceNodeId: sourceId,
-                sourceDisplayName: displayNameFor(sourceNode),
-                eventId: sourceHandle,
-                eventDisplayName: `${displayNameFor(sourceNode)}.${sourceHandle}`,
-                targetNodeId: targetId,
-                targetDisplayName: displayNameFor(targetNode),
+                sourceId:
+                    edge.data?.boundaryOriginalSource ||
+                    edge.data?.compoundOriginalSource ||
+                    edge.data?.parallelOriginalSource ||
+                    edge.source,
+                sourceHandle:
+                    edge.data?.boundaryOriginalSourceHandle ||
+                    edge.data?.compoundOriginalSourceHandle ||
+                    edge.data?.parallelOriginalSourceHandle ||
+                    edge.sourceHandle ||
+                    edge.label ||
+                    "success",
+                targetId:
+                    edge.data?.boundaryOriginalTarget ||
+                    edge.data?.compoundOriginalTarget ||
+                    edge.data?.parallelOriginalTarget ||
+                    edge.target,
+                rawEvent: edge.data?.boundaryImportedRawEvent || "",
             });
         });
 
+        // Managed boundary events are regenerated from the same transitions by
+        // rebuildBoundaryTransitions(). Use them as a fallback as well. This
+        // makes the Compound/Parallel Exit Tokens overview robust for imported
+        // graphs and legacy edge shapes where the visual edge itself may not
+        // carry all boundary metadata yet.
+        const boundaryAnchors =
+            selectedNode.type === "compound"
+                ? [selectedNode]
+                : semanticNodes.filter(
+                    (node) =>
+                        node.type === "parallelLane" &&
+                        isInsideSelectedContainer(node.id)
+                );
+
+        boundaryAnchors.forEach((anchor) => {
+            (anchor.data?.events || []).forEach((event, index) => {
+                if (!(event?.sourceNodeId && event?.transitionHandleId && event?.target)) {
+                    return;
+                }
+
+                // Only trust managed metadata while its boundary segment still
+                // exists in the live graph. This avoids resurrecting a stale
+                // border event in the details panel after its transition was
+                // deleted.
+                const boundaryEdge = edges.find(
+                    (edge) =>
+                        edge.source === anchor.id &&
+                        String(edge.sourceHandle || "") ===
+                            String(event.id || "")
+                );
+                if (!boundaryEdge) return;
+
+                appendOutgoingTransition({
+                    edgeId:
+                        boundaryEdge.id ||
+                        `boundary-${anchor.id}-${event.id || index}`,
+                    sourceId: event.sourceNodeId,
+                    sourceHandle: event.transitionHandleId,
+                    targetId: event.target,
+                    rawEvent: event.rawEvent || event.name || "",
+                    isFallback: true,
+                });
+            });
+        });
+
+        const storedOrder = Array.isArray(selectedNode.data?.containerTransitionOrder)
+            ? selectedNode.data.containerTransitionOrder
+            : [];
+        if (storedOrder.length > 0) {
+            const orderRank = new Map(
+                storedOrder.map((edgeId, index) => [String(edgeId), index])
+            );
+            result.sort((a, b) => {
+                const aRank = orderRank.has(String(a.edgeId))
+                    ? orderRank.get(String(a.edgeId))
+                    : Number.MAX_SAFE_INTEGER;
+                const bRank = orderRank.has(String(b.edgeId))
+                    ? orderRank.get(String(b.edgeId))
+                    : Number.MAX_SAFE_INTEGER;
+                return aRank - bRank;
+            });
+        }
+
         return result;
     }, [selectedNode, semanticNodes, edges]);
+
+    const handleMoveContainerTransition = useCallback((edgeId, direction) => {
+        if (
+            !selectedNode ||
+            (selectedNode.type !== "compound" && selectedNode.type !== "parallel") ||
+            !edgeId
+        ) {
+            return;
+        }
+
+        const orderedIds = selectedContainerOutgoingTransitions
+            .map((transition) => transition.edgeId)
+            .filter(Boolean);
+        const currentIndex = orderedIds.indexOf(edgeId);
+        if (currentIndex < 0) return;
+
+        const delta = direction === "up" ? -1 : direction === "down" ? 1 : 0;
+        const nextIndex = currentIndex + delta;
+        if (delta === 0 || nextIndex < 0 || nextIndex >= orderedIds.length) return;
+
+        const nextOrder = [...orderedIds];
+        [nextOrder[currentIndex], nextOrder[nextIndex]] = [
+            nextOrder[nextIndex],
+            nextOrder[currentIndex],
+        ];
+
+        // Keep the explicit UI order on the container. The SCXML exporter uses
+        // this exact order for the container-level <transition> elements, so a
+        // specific event such as Talk.error can be placed before Talk.*.
+        setNodes((currentNodes) =>
+            currentNodes.map((node) =>
+                node.id === selectedNode.id
+                    ? {
+                        ...node,
+                        data: {
+                            ...(node.data || {}),
+                            containerTransitionOrder: nextOrder,
+                        },
+                    }
+                    : node
+            )
+        );
+
+        // Reorder the matching semantic edges as well. This keeps the live
+        // graph/boundary rebuild order aligned with the order shown in the
+        // Exit Tokens panel instead of only changing export-time presentation.
+        setEdges((currentEdges) => {
+            const byId = new Map(currentEdges.map((edge) => [edge.id, edge]));
+            const orderedEdges = nextOrder.map((id) => byId.get(id)).filter(Boolean);
+            let orderedIndex = 0;
+            const orderedSet = new Set(nextOrder);
+
+            return currentEdges.map((edge) => {
+                if (!orderedSet.has(edge.id)) return edge;
+                const replacement = orderedEdges[orderedIndex];
+                orderedIndex += 1;
+                return replacement || edge;
+            });
+        });
+    }, [
+        selectedNode,
+        selectedContainerOutgoingTransitions,
+        setNodes,
+        setEdges,
+    ]);
 
     const handleNavigateCloneSource = useCallback((nodeId) => {
         if (!nodeId) return;
@@ -2392,7 +2544,40 @@ function AppContent() {
             );
 
             if (transitionChanges.length > 0) {
-                onEdgesChange(transitionChanges);
+                const removesTransition = transitionChanges.some(
+                    (change) => change.type === "remove"
+                );
+
+                if (removesTransition) {
+                    // Removing the visible external part of a boundary
+                    // transition must also remove its editor-only helper edge
+                    // and Compound/Parallel border event. Otherwise stale
+                    // exits such as Skill.* remain visible even though no
+                    // semantic transition exists anymore.
+                    const changedEdges = applyEdgeChanges(
+                        transitionChanges,
+                        edges
+                    );
+                    const normalized = rebuildBoundaryTransitions(
+                        nodes,
+                        changedEdges
+                    );
+
+                    setNodes(normalized.nodes);
+                    setEdges(normalized.edges);
+                    normalized.nodes.forEach((node) => {
+                        if (
+                            node.type === "compound" ||
+                            node.type === "parallelLane"
+                        ) {
+                            requestAnimationFrame(() =>
+                                updateNodeInternals(node.id)
+                            );
+                        }
+                    });
+                } else {
+                    onEdgesChange(transitionChanges);
+                }
             }
 
             if (slotChanges.length === 0) {
@@ -2468,9 +2653,13 @@ function AppContent() {
         },
         [
             slotEdges,
+            edges,
+            nodes,
             onEdgesChange,
             onSlotEdgesChange,
             setNodes,
+            setEdges,
+            updateNodeInternals,
         ]
     );
 
@@ -4907,6 +5096,7 @@ function AppContent() {
                                 cloneNodes={selectedNodeClones}
                                 onNavigateClone={handleNavigateCloneSource}
                                 containerOutgoingTransitions={selectedContainerOutgoingTransitions}
+                                onMoveContainerTransition={handleMoveContainerTransition}
                                 onNavigateTransitionNode={handleNavigateCloneSource}
                                 onHoverTransitionNode={(nodeId) =>
                                     setHoveredEditorNodeId(nodeId || null)

@@ -200,6 +200,34 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
         return false;
     };
 
+    const semanticSourceIdOf = (edge) =>
+        edge?.data?.boundaryOriginalSource ||
+        edge?.data?.compoundOriginalSource ||
+        edge?.data?.parallelOriginalSource ||
+        edge?.source;
+
+    const semanticSourceHandleOf = (edge) =>
+        edge?.data?.boundaryOriginalSourceHandle ||
+        edge?.data?.compoundOriginalSourceHandle ||
+        edge?.data?.parallelOriginalSourceHandle ||
+        edge?.sourceHandle ||
+        edge?.label ||
+        "success";
+
+    const semanticTargetIdOf = (edge) =>
+        edge?.data?.boundaryOriginalTarget ||
+        edge?.data?.compoundOriginalTarget ||
+        edge?.data?.parallelOriginalTarget ||
+        edge?.target;
+
+    const isBoundaryHelperEdge = (edge) =>
+        edge?.data?.boundaryInternalEdge ||
+        edge?.data?.compoundInternalEdge ||
+        edge?.data?.parallelInternalEdge ||
+        edge?.data?.compoundInitialEdge ||
+        edge?.data?.parallelEntryEdge ||
+        String(edge?.id || "").startsWith("edge-internal-");
+
     const buildStateActionXml = (actionName, assignments, indent) => {
         const configuredAssignments = getConfiguredAssignments(assignments);
         if (configuredAssignments.length === 0) return "";
@@ -426,156 +454,176 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
                 transitionsXml = `${indent}    <transition event="${escapeXmlAttribute(configuredSend.triggerEvent)}">\n${indent}        <send event="${escapeXmlAttribute(configuredSend.sendEvent)}"/>\n${indent}    </transition>`;
             }
         } else if (isContainer) {
+            /*
+             * Compound transition order is semantically significant in SCXML.
+             * For example, Talk.* must not be written before Talk.error when
+             * Talk.error is intended to handle the specific error first. The
+             * Exit Tokens panel stores its explicit order as edge ids on the
+             * container, and this exporter writes transitions in that order.
+             */
+            const explicitOrder = Array.isArray(node.data?.containerTransitionOrder)
+                ? node.data.containerTransitionOrder.map(String)
+                : [];
+            const orderRank = new Map(
+                explicitOrder.map((edgeId, index) => [edgeId, index])
+            );
+
+            const leavingEdges = edges
+                .map((edge, edgeIndex) => {
+                    if (isBoundaryHelperEdge(edge)) return null;
+
+                    const sourceId = semanticSourceIdOf(edge);
+                    const sourceHandle = String(semanticSourceHandleOf(edge));
+                    const targetNodeId = semanticTargetIdOf(edge);
+                    const sourceInside =
+                        sourceId === node.id || isDescendantOf(sourceId, node.id);
+                    const targetInside =
+                        targetNodeId === node.id ||
+                        isDescendantOf(targetNodeId, node.id);
+
+                    if (!sourceInside || targetInside) return null;
+
+                    return {
+                        edge,
+                        edgeIndex,
+                        sourceId,
+                        sourceHandle,
+                        targetNodeId,
+                    };
+                })
+                .filter(Boolean)
+                .sort((a, b) => {
+                    const aRank = orderRank.has(String(a.edge.id))
+                        ? orderRank.get(String(a.edge.id))
+                        : Number.MAX_SAFE_INTEGER;
+                    const bRank = orderRank.has(String(b.edge.id))
+                        ? orderRank.get(String(b.edge.id))
+                        : Number.MAX_SAFE_INTEGER;
+
+                    return aRank - bRank || a.edgeIndex - b.edgeIndex;
+                });
+
             const leavingTransitions = [];
 
-            // 1. Eigene Parent-Transitions erfassen (z. B. Fallback 'Succeeder.*')
-            const directParentTransitions = buildTransitionsXml(node, indent + "    ", null);
-            if (directParentTransitions) {
-                leavingTransitions.push(directParentTransitions);
-            }
+            const appendTransitionXml = ({
+                edgeId,
+                rawEvent,
+                targetNodeId,
+                cond = "",
+                assignments = [],
+            }) => {
+                const targetNode = nodes.find((candidate) => candidate.id === targetNodeId);
+                const targetId = targetNode
+                    ? targetNode.data?.fullSkillName || targetNode.data?.label
+                    : targetNodeId;
+                if (!targetId || !rawEvent) return;
 
-            // 2. Transitions aller Kindknoten erfassen, die nach DRAUSSEN führen
-            nodes.forEach((n) => {
-                if (isDescendantOf(n.id, node.id)) {
-                    const outgoing = edges.filter(
-                        (e) =>
-                            e.source === n.id &&
-                            !e.id.startsWith("edge-internal-") &&
-                            !isDescendantOf(e.target, node.id)
+                const scxmlCondition = serializeEditorConditionForScxml(cond);
+                const condAttr = scxmlCondition
+                    ? ` cond="${escapeXmlAttribute(scxmlCondition)}"`
+                    : "";
+                const assignmentLines = (assignments || [])
+                    .filter(
+                        (assignment) =>
+                            assignment?.location && assignment?.expr !== undefined
+                    )
+                    .map((assignment) => {
+                        const location = String(assignment.location)
+                            .trim()
+                            .replace(/^@/, "");
+                        const expr = serializeEditorValueForScxml(assignment.expr);
+                        return (
+                            `${indent}        ` +
+                            `<assign location="${escapeXmlAttribute(location)}" ` +
+                            `expr="${escapeXmlAttribute(expr)}"/>`
+                        );
+                    });
+
+                const xml = assignmentLines.length > 0
+                    ? `${indent}    <transition event="${escapeXmlAttribute(rawEvent)}" target="${escapeXmlAttribute(targetId)}"${condAttr}>\n${assignmentLines.join("\n")}\n${indent}    </transition>`
+                    : `${indent}    <transition event="${escapeXmlAttribute(rawEvent)}" target="${escapeXmlAttribute(targetId)}"${condAttr}/>`;
+
+                leavingTransitions.push({ edgeId, xml });
+            };
+
+            leavingEdges.forEach(
+                ({ edge, sourceId, sourceHandle, targetNodeId }) => {
+                    const sourceNode = nodes.find(
+                        (candidate) => candidate.id === sourceId
                     );
+                    const sourceSkillName =
+                        sourceNode?.data?.fullSkillName ||
+                        sourceNode?.data?.label ||
+                        "";
+                    const importedRawEvent = String(
+                        edge.data?.boundaryImportedRawEvent || ""
+                    ).trim();
 
-                    outgoing.forEach((e) => {
-                        const targetNode = nodes.find(
-                            (tn) => tn.id === e.target
-                        );
-
-                        const targetId = targetNode
-                            ? targetNode.data.fullSkillName ||
-                              targetNode.data.label
-                            : e.target;
-
-                        /*
-                         * Bei einer Parallel-Transition ist e.source
-                         * möglicherweise die Lane.
-                         *
-                         * Die tatsächliche Source steckt dann in
-                         * parallelOriginalSource.
-                         */
-                        const actualSourceId =
-                            e.data?.parallelOriginalSource ||
-                            e.source;
-
-                        const actualSourceNode = nodes.find(
-                            (candidate) =>
-                                candidate.id === actualSourceId
-                        );
-
-                        const rawHandle =
-                            e.sourceHandle ||
-                            e.label ||
-                            "success";
-
-                        /*
-                         * Wichtig:
-                         * Den tatsächlichen Skillnamen verwenden,
-                         * NICHT Lane_1.
-                         */
-                        const sourceSkillName =
-                            actualSourceNode?.data?.fullSkillName ||
-                            actualSourceNode?.data?.label ||
-                            "";
-
-                        const fullEvent =
-                            getScxmlTransitionEvent(
-                                rawHandle,
+                    // Imported compound events such as Talk.* are preserved
+                    // verbatim. For newly-created exits, reconstruct the full
+                    // SCXML event from the logical child skill + exit token.
+                    const fullEvent = importedRawEvent ||
+                        (sourceId === node.id && sourceHandle.includes(".")
+                            ? sourceHandle
+                            : getScxmlTransitionEvent(
+                                sourceHandle,
                                 sourceSkillName
-                            );
+                            ));
 
-                        const condAttr =
-                            e.data?.cond
-                                ? ` cond="${escapeXmlAttribute(
-                                      e.data.cond
-                                  )}"`
-                                : "";
-
-                        const assignments =
-                            Array.isArray(
-                                e.data?.assignments
-                            )
-                                ? e.data.assignments
-                                : e.data?.assign?.location
-                                  ? [e.data.assign]
-                                  : [];
-
-                        if (assignments.length > 0) {
-                            const assignmentLines =
-                                assignments
-                                    .filter(
-                                        (assignment) =>
-                                            assignment?.location &&
-                                            assignment?.expr !==
-                                                undefined
-                                    )
-                                    .map((assignment) => {
-                                        const location =
-                                            String(
-                                                assignment.location
-                                            )
-                                                .trim()
-                                                .replace(/^@/, "");
-
-                                        const expr =
-                                            serializeEditorValueForScxml(
-                                                assignment.expr
-                                            );
-
-                                        return (
-                                            `${indent}        ` +
-                                            `<assign location="${escapeXmlAttribute(
-                                                location
-                                            )}" ` +
-                                            `expr="${escapeXmlAttribute(
-                                                expr
-                                            )}"/>`
-                                        );
-                                    });
-
-                            if (assignmentLines.length > 0) {
-                                leavingTransitions.push(
-                                    `${indent}    <transition event="${escapeXmlAttribute(
-                                        fullEvent
-                                    )}" target="${escapeXmlAttribute(
-                                        targetId
-                                    )}"${condAttr}>\n` +
-                                    `${assignmentLines.join(
-                                        "\n"
-                                    )}\n` +
-                                    `${indent}    </transition>`
-                                );
-                            } else {
-                                leavingTransitions.push(
-                                    `${indent}    <transition event="${escapeXmlAttribute(
-                                        fullEvent
-                                    )}" target="${escapeXmlAttribute(
-                                        targetId
-                                    )}"${condAttr}/>`
-                                );
-                            }
-                        } else {
-                            leavingTransitions.push(
-                                `${indent}    <transition event="${escapeXmlAttribute(
-                                    fullEvent
-                                )}" target="${escapeXmlAttribute(
-                                    targetId
-                                )}"${condAttr}/>`
-                            );
-                        }
+                    appendTransitionXml({
+                        edgeId: edge.id,
+                        rawEvent: fullEvent,
+                        targetNodeId,
+                        cond: edge.data?.cond || "",
+                        assignments: Array.isArray(edge.data?.assignments)
+                            ? edge.data.assignments
+                            : edge.data?.assign?.location
+                                ? [edge.data.assign]
+                                : [],
                     });
                 }
+            );
+
+            // Keep genuine container-level transitions which do not currently
+            // have a visual edge. Managed boundary events are already covered
+            // by leavingEdges above and must not be emitted a second time.
+            (node.data?.events || []).forEach((event, eventIndex) => {
+                if (!event?.target) return;
+                if (event?.sourceNodeId && event?.transitionHandleId) return;
+
+                const rawEvent = String(
+                    event.rawEvent || event.name || event.id || ""
+                ).trim();
+                if (!rawEvent) return;
+
+                appendTransitionXml({
+                    edgeId: `event-${eventIndex}`,
+                    rawEvent,
+                    targetNodeId: event.target,
+                    cond: event.cond || "",
+                    assignments: Array.isArray(event.assignments)
+                        ? event.assignments
+                        : event.assignLocation
+                            ? [
+                                {
+                                    location: event.assignLocation,
+                                    expr: event.assignExpr || "",
+                                },
+                            ]
+                            : [],
+                });
             });
 
-            // Doppelte Einträge vermeiden
-            transitionsXml = Array.from(new Set(leavingTransitions)).join("\n");
+            // Preserve order while removing exact duplicate XML transitions.
+            const seenTransitionXml = new Set();
+            transitionsXml = leavingTransitions
+                .filter(({ xml }) => {
+                    if (seenTransitionXml.has(xml)) return false;
+                    seenTransitionXml.add(xml);
+                    return true;
+                })
+                .map(({ xml }) => xml)
+                .join("\n");
         } else if (!isLane) {
             transitionsXml = buildTransitionsXml(node, indent + "    ", activeContainerId);
         }

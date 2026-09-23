@@ -993,11 +993,21 @@
 /* Events & Slots Containers */
 .events-container,
 .slots-container {
-    overflow-y: auto;
     padding: 10px;
     margin-top: 10px;
     border: 1px solid var(--secondary-color);
     border-radius: 8px;
+}
+
+/* Exit Tokens are part of the Details tab's normal document flow. The tab
+   itself owns vertical scrolling; a nested scrollbar here made the token list
+   awkward to use and clipped dropdowns/references. */
+.events-container {
+    overflow: visible;
+}
+
+.slots-container {
+    overflow-y: auto;
     scrollbar-width: thin;
     scrollbar-color: var(--secondary-color) transparent;
 }
@@ -5275,17 +5285,6 @@
     stroke-width: 2.2;
 }
 
-.slot-node-clone-badge {
-    padding: 1px 4px;
-    border-radius: 999px;
-    background: rgba(165, 180, 252, 0.16);
-    border: 1px solid rgba(165, 180, 252, 0.32);
-    color: #e0e7ff;
-    font-size: 7.5px;
-    font-weight: 850;
-    letter-spacing: 0.45px;
-}
-
 .slot-node-type {
     min-width: 0;
     max-width: 150px;
@@ -7070,23 +7069,50 @@
     color: #dbeafe;
 }
 
-
-/* State-container header clearance ---------------------------------------
-   Keep the visible top border slightly above the colored type/name strip,
-   and reserve a real content gap so nested state action badges cannot intrude
-   into the Compound/Parallel header area. */
-.compound-frame-node:not(.collapsed-container):not(.parallel-lane-auto-compound) > .compound-frame-header {
-    top: 8px;
+.exit-token-order-controls {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
 }
 
-.parallel-group-container:not(.collapsed-container) > .parallel-group-header {
-    margin-top: 8px;
+.exit-token-order-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    border-radius: 4px;
+    background: rgba(15, 23, 42, 0.32);
+    color: #cbd5e1;
+    cursor: pointer;
 }
 
-.compound-frame-node.collapsed-container > .compound-frame-header {
-    top: 0;
+.exit-token-order-button:hover:not(:disabled) {
+    border-color: rgba(96, 165, 250, 0.58);
+    background: rgba(59, 130, 246, 0.14);
+    color: #dbeafe;
 }
 
-.parallel-group-container.collapsed-container > .parallel-group-header {
-    margin-top: 0;
+.exit-token-order-button:disabled {
+    opacity: 0.28;
+    cursor: default;
+}
+
+
+
+/* Compact collapsed state containers ------------------------------------ */
+.compound-frame-node.collapsed-container .compound-collapsed-source-handle {
+    top: 50% !important;
+    right: -6px !important;
+    pointer-events: auto;
+}
+
+.parallel-group-container.collapsed-container .parallel-title,
+.compound-frame-node.collapsed-container .compound-frame-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }

@@ -20,42 +20,121 @@ const makeImportedSelfLoopControlPoints = () => [
     { id: `cp-${crypto.randomUUID()}`, anchor: "target", dx: -76, dy: -92 },
 ];
 
-const getImportedBoundaryLogicalSource = (sourceNode, sourceHandle, allNodes) => {
+const getImportedBoundaryLogicalSources = (sourceNode, sourceHandle, allNodes) => {
     if (!sourceNode || !["compound", "parallelLane"].includes(sourceNode.type)) {
-        return null;
+        return [];
     }
 
-    const event = (sourceNode.data?.events || []).find(
+    const sourceEvents = (sourceNode.data?.events || []).filter(
         (candidate) => String(candidate?.id || "") === String(sourceHandle || "")
     );
-    if (!event) return null;
+    if (sourceEvents.length === 0) return [];
 
-    const rawEvent = String(event.rawEvent || event.name || "").trim();
-    const separatorIndex = rawEvent.lastIndexOf(".");
-    if (separatorIndex <= 0) return null;
-
-    const skillName = rawEvent.slice(0, separatorIndex);
-    const transitionHandleId = rawEvent.slice(separatorIndex + 1) || sourceHandle;
-    const candidates = allNodes.filter((node) => {
+    const nestedSkills = allNodes.filter((node) => {
         if (node.type !== "custom" && node.type !== "submachine") return false;
-        const full = String(node.data?.fullSkillName || "");
-        const label = String(node.data?.label || "");
-        const matches =
-            full === skillName ||
-            full.split("#")[0] === skillName ||
-            full.split("#")[0].split(".").pop() === skillName ||
-            label === skillName;
-        if (!matches) return false;
+        if (node.data?.isSkillClone || node.data?.isStateClone) return false;
 
         return sourceNode.type === "parallelLane"
             ? getLaneForNode(node, allNodes)?.id === sourceNode.id
             : isNodeInsideContainer(node, sourceNode.id, allNodes);
     });
 
-    if (candidates.length !== 1) return null;
-    return {
-        logicalSourceNode: candidates[0],
-        logicalHandle: transitionHandleId,
+    /*
+     * IMPORTANT: transitions declared directly on a Compound are event
+     * handlers for events emitted by skills inside that Compound. For example
+     *
+     *   <transition event="Talk.*" target="ExecSpeech"/>
+     *
+     * on ExecSetup must be matched back to every nested Talk skill such as
+     * dialog.Talk#setup or dialog.Talk#gripper. SCXML does not encode which
+     * Talk instance emitted the event; while each instance is active it may
+     * emit Talk.*. Therefore the editor must connect ALL matching nested skill
+     * instances to the SAME Compound boundary transition. Do not require a
+     * unique skill match here or the border transition will be rendered
+     * without its internal skill -> boundary connection.
+     *
+     * Match by the longest available skill-name prefix rather than splitting
+     * on the last dot, because exit-token ids may themselves contain dots.
+     */
+    const matches = [];
+    sourceEvents.forEach((event) => {
+        const rawEvent = String(event.rawEvent || event.name || "").trim();
+        if (!rawEvent) return;
+
+        nestedSkills.forEach((node) => {
+            const fullName = String(node.data?.fullSkillName || "").trim();
+            const withoutInstance = fullName.split("#")[0];
+            const simpleName =
+                withoutInstance.split(".").filter(Boolean).pop() || "";
+            const label = String(node.data?.label || "").trim();
+            const prefixes = Array.from(
+                new Set(
+                    [fullName, withoutInstance, simpleName, label]
+                        .map((value) => String(value || "").trim())
+                        .filter(Boolean)
+                )
+            ).sort((a, b) => b.length - a.length);
+
+            const matchedPrefix = prefixes.find(
+                (prefix) => rawEvent.startsWith(`${prefix}.`)
+            );
+            if (!matchedPrefix) return;
+
+            matches.push({
+                logicalSourceNode: node,
+                logicalHandle: getTransitionExitToken(rawEvent, matchedPrefix),
+                rawEvent,
+                matchedPrefix,
+            });
+        });
+    });
+
+    const uniqueByNodeAndHandle = new Map();
+    matches.forEach((match) => {
+        const key = `${match.logicalSourceNode.id}|${match.logicalHandle}`;
+        const current = uniqueByNodeAndHandle.get(key);
+        if (!current || match.matchedPrefix.length > current.matchedPrefix.length) {
+            uniqueByNodeAndHandle.set(key, match);
+        }
+    });
+
+    return [...uniqueByNodeAndHandle.values()];
+};
+
+const ensureImportedBoundarySourceHandle = (boundarySource) => {
+    const logicalSourceNode = boundarySource?.logicalSourceNode;
+    const logicalHandle = String(boundarySource?.logicalHandle || "").trim();
+    if (!logicalSourceNode || !logicalHandle) return;
+
+    const events = Array.isArray(logicalSourceNode.data?.events)
+        ? logicalSourceNode.data.events
+        : [];
+    if (events.some((event) => String(event?.id || "") === logicalHandle)) {
+        return;
+    }
+
+    // A compound wildcard such as Talk.* may not be part of the skill API's
+    // declared ExitTokens. Add an editor-only source handle so the reconstructed
+    // skill -> compound-boundary edge has a real React Flow handle to attach to.
+    // It has no target of its own, so it does not create an extra SCXML
+    // transition when the graph is saved.
+    logicalSourceNode.data = {
+        ...(logicalSourceNode.data || {}),
+        events: [
+            ...events,
+            {
+                id: logicalHandle,
+                name: logicalHandle,
+                rawEvent: boundarySource.rawEvent || logicalHandle,
+                description: "",
+                target: null,
+                cond: "",
+                assignments: [],
+                assignLocation: "",
+                assignExpr: "",
+                editorBoundarySynthetic: true,
+            },
+        ],
     };
 };
 
@@ -135,22 +214,33 @@ const materializeImportedBoundaryTransitions = (allNodes, sourceEdges) => {
             return;
         }
 
-        const boundarySource = getImportedBoundaryLogicalSource(
+        const boundarySources = getImportedBoundaryLogicalSources(
             sourceNode,
             edge.sourceHandle,
             allNodes
         );
-        const logicalSourceNode = boundarySource?.logicalSourceNode || sourceNode;
+        boundarySources.forEach(ensureImportedBoundarySourceHandle);
+
+        const primaryBoundarySource = boundarySources[0] || null;
+        const logicalSourceNode =
+            primaryBoundarySource?.logicalSourceNode || sourceNode;
         const logicalHandle = String(
-            boundarySource?.logicalHandle || edge.sourceHandle || edge.label || "success"
+            primaryBoundarySource?.logicalHandle ||
+            edge.sourceHandle ||
+            edge.label ||
+            "success"
         );
-        const steps = getImportedExitedBoundaries(
+        const importedRawEvent = String(
+            primaryBoundarySource?.rawEvent || edge.sourceHandle || edge.label || ""
+        ).trim();
+
+        const primarySteps = getImportedExitedBoundaries(
             logicalSourceNode,
             targetNode,
             allNodes
         );
 
-        if (steps.length === 0 && !boundarySource) {
+        if (primarySteps.length === 0 && boundarySources.length === 0) {
             result.push(edge);
             return;
         }
@@ -161,57 +251,92 @@ const materializeImportedBoundaryTransitions = (allNodes, sourceEdges) => {
                 .split("#")[0]
                 .split(".")
                 .pop();
-        const exitLabel = `${baseName}.${logicalHandle}`;
-        const exitId = `${logicalSourceNode.id}-${logicalHandle}`;
+        const exitLabel = primaryBoundarySource
+            ? importedRawEvent
+            : `${baseName}.${logicalHandle}`;
+        // Multiple nested instances (e.g. Talk#setup and Talk#gripper) must
+        // converge on one visual Compound boundary point because SCXML has one
+        // compound-level <transition event="Talk.*" .../>.
+        const exitId = primaryBoundarySource
+            ? `imported-${sourceNode.id}-${importedRawEvent}`
+            : `${logicalSourceNode.id}-${logicalHandle}`;
+        const crossedKinds = new Set();
+        const helperKeys = new Set();
         let currentSourceId = logicalSourceNode.id;
         let currentSourceHandle = logicalHandle;
-        const crossedKinds = new Set();
 
-        steps.forEach((step) => {
-            crossedKinds.add(step.kind);
-            ensureBoundaryEvent(
-                step.anchor,
-                exitId,
-                exitLabel,
-                logicalSourceNode,
-                logicalHandle,
-                edge.target
-            );
-            result.push({
-                id:
-                    `edge-internal-boundary-${logicalSourceNode.id}-` +
-                    `${logicalHandle}-${step.anchor.id}-${crypto.randomUUID()}`,
-                source: currentSourceId,
-                target: step.anchor.id,
-                sourceHandle: currentSourceHandle,
-                targetHandle: `target-${exitId}`,
-                type: "smoothstep",
-                selectable: false,
-                focusable: false,
-                style: {
-                    strokeDasharray: "4 4",
-                    stroke: "#0284c7",
-                    strokeWidth: 1.5,
-                },
-                data: {
-                    boundaryInternalEdge: true,
-                    boundaryKind: step.kind,
-                    boundaryExitId: exitId,
-                    boundaryOriginalSource: logicalSourceNode.id,
-                    boundaryOriginalSourceHandle: logicalHandle,
-                    ...(step.kind === "compound"
-                        ? { compoundInternalEdge: true, compoundExitId: exitId }
-                        : { parallelInternalEdge: true, parallelExitId: exitId }),
-                },
+        const sourcesToMaterialize = boundarySources.length > 0
+            ? boundarySources
+            : [{ logicalSourceNode, logicalHandle, rawEvent: exitLabel }];
+
+        sourcesToMaterialize.forEach((boundarySource) => {
+            const source = boundarySource.logicalSourceNode;
+            const sourceHandle = String(boundarySource.logicalHandle || logicalHandle);
+            const steps = getImportedExitedBoundaries(source, targetNode, allNodes);
+            let pathSourceId = source.id;
+            let pathSourceHandle = sourceHandle;
+
+            steps.forEach((step) => {
+                crossedKinds.add(step.kind);
+                ensureBoundaryEvent(
+                    step.anchor,
+                    exitId,
+                    exitLabel,
+                    logicalSourceNode,
+                    logicalHandle,
+                    edge.target
+                );
+
+                const helperKey =
+                    `${pathSourceId}|${pathSourceHandle}|${step.anchor.id}|${exitId}`;
+                if (!helperKeys.has(helperKey)) {
+                    helperKeys.add(helperKey);
+                    result.push({
+                        id:
+                            `edge-internal-boundary-${source.id}-` +
+                            `${sourceHandle}-${step.anchor.id}-${crypto.randomUUID()}`,
+                        source: pathSourceId,
+                        target: step.anchor.id,
+                        sourceHandle: pathSourceHandle,
+                        targetHandle: `target-${exitId}`,
+                        type: "smoothstep",
+                        selectable: false,
+                        focusable: false,
+                        style: {
+                            strokeDasharray: "4 4",
+                            stroke: "#0284c7",
+                            strokeWidth: 1.5,
+                        },
+                        data: {
+                            boundaryInternalEdge: true,
+                            boundaryKind: step.kind,
+                            boundaryExitId: exitId,
+                            boundaryOriginalSource: source.id,
+                            boundaryOriginalSourceHandle: sourceHandle,
+                            ...(step.kind === "compound"
+                                ? { compoundInternalEdge: true, compoundExitId: exitId }
+                                : { parallelInternalEdge: true, parallelExitId: exitId }),
+                        },
+                    });
+                }
+
+                pathSourceId = step.anchor.id;
+                pathSourceHandle = exitId;
             });
-            currentSourceId = step.anchor.id;
-            currentSourceHandle = exitId;
+
+            // Use the primary path for the one semantic edge that continues
+            // from the shared boundary to the outside target.
+            if (source.id === logicalSourceNode.id) {
+                currentSourceId = pathSourceId;
+                currentSourceHandle = pathSourceHandle;
+            }
         });
 
-        // Imported legacy parallel edges may already start on the lane border.
-        // If no new step was required, keep that border as the visual source
-        // but migrate its handle to the unique skill.event exit point.
-        if (steps.length === 0 && boundarySource) {
+        // Imported legacy boundary edges can already start on the border.
+        // In that case there is no containment step to materialize, but every
+        // matching nested skill still needs a helper edge into the one shared
+        // boundary handle.
+        if (primarySteps.length === 0 && primaryBoundarySource) {
             currentSourceId = sourceNode.id;
             currentSourceHandle = exitId;
             ensureBoundaryEvent(
@@ -223,32 +348,42 @@ const materializeImportedBoundaryTransitions = (allNodes, sourceEdges) => {
                 edge.target
             );
             crossedKinds.add(sourceNode.type === "compound" ? "compound" : "parallel");
-            result.push({
-                id:
-                    `edge-internal-boundary-${logicalSourceNode.id}-` +
-                    `${logicalHandle}-${sourceNode.id}-${crypto.randomUUID()}`,
-                source: logicalSourceNode.id,
-                target: sourceNode.id,
-                sourceHandle: logicalHandle,
-                targetHandle: `target-${exitId}`,
-                type: "smoothstep",
-                selectable: false,
-                focusable: false,
-                style: {
-                    strokeDasharray: "4 4",
-                    stroke: "#0284c7",
-                    strokeWidth: 1.5,
-                },
-                data: {
-                    boundaryInternalEdge: true,
-                    boundaryKind: sourceNode.type === "compound" ? "compound" : "parallel",
-                    boundaryExitId: exitId,
-                    boundaryOriginalSource: logicalSourceNode.id,
-                    boundaryOriginalSourceHandle: logicalHandle,
-                    ...(sourceNode.type === "compound"
-                        ? { compoundInternalEdge: true, compoundExitId: exitId }
-                        : { parallelInternalEdge: true, parallelExitId: exitId }),
-                },
+
+            boundarySources.forEach((boundarySource) => {
+                const source = boundarySource.logicalSourceNode;
+                const sourceHandle = String(boundarySource.logicalHandle || logicalHandle);
+                const helperKey = `${source.id}|${sourceHandle}|${sourceNode.id}|${exitId}`;
+                if (helperKeys.has(helperKey)) return;
+                helperKeys.add(helperKey);
+
+                result.push({
+                    id:
+                        `edge-internal-boundary-${source.id}-` +
+                        `${sourceHandle}-${sourceNode.id}-${crypto.randomUUID()}`,
+                    source: source.id,
+                    target: sourceNode.id,
+                    sourceHandle,
+                    targetHandle: `target-${exitId}`,
+                    type: "smoothstep",
+                    selectable: false,
+                    focusable: false,
+                    style: {
+                        strokeDasharray: "4 4",
+                        stroke: "#0284c7",
+                        strokeWidth: 1.5,
+                    },
+                    data: {
+                        boundaryInternalEdge: true,
+                        boundaryKind:
+                            sourceNode.type === "compound" ? "compound" : "parallel",
+                        boundaryExitId: exitId,
+                        boundaryOriginalSource: source.id,
+                        boundaryOriginalSourceHandle: sourceHandle,
+                        ...(sourceNode.type === "compound"
+                            ? { compoundInternalEdge: true, compoundExitId: exitId }
+                            : { parallelInternalEdge: true, parallelExitId: exitId }),
+                    },
+                });
             });
         }
 
@@ -262,6 +397,17 @@ const materializeImportedBoundaryTransitions = (allNodes, sourceEdges) => {
                 ...(edge.data || {}),
                 boundaryOriginalSource: logicalSourceNode.id,
                 boundaryOriginalSourceHandle: logicalHandle,
+                ...(boundarySources.length > 1
+                    ? {
+                        boundaryOriginalSources: boundarySources.map((source) => ({
+                            sourceId: source.logicalSourceNode.id,
+                            sourceHandle: String(source.logicalHandle),
+                        })),
+                    }
+                    : {}),
+                ...(primaryBoundarySource
+                    ? { boundaryImportedRawEvent: importedRawEvent }
+                    : {}),
                 boundaryExitId: exitId,
                 ...(crossedKinds.has("compound") || sourceNode.type === "compound"
                     ? {
@@ -1262,7 +1408,20 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             const parentTransitionElems = Array.from(stateElem.children).filter((c) => c.localName === "transition");
             const parentEvents = parentTransitionElems.map((tr) => {
                 const rawEvent = tr.getAttribute("event") || "";
-                const handleId = getTransitionExitToken(rawEvent, fullSkillName);
+
+                /*
+                 * IMPORTANT: A transition declared on a Compound belongs to a
+                 * nested skill event, not to the Compound name itself. For
+                 * example, `Talk.*` on `ExecSetup` must first be matched to the
+                 * `dialog.Talk#...` skill inside ExecSetup. Do NOT normalize
+                 * `Talk.*` with getTransitionExitToken(..., "ExecSetup") here:
+                 * doing so turns every `SomeSkill.*` transition into the same
+                 * `*` handle and makes it impossible to identify which nested
+                 * skill must connect to the Compound boundary. Keep the raw
+                 * event as the temporary Compound handle; after matching, the
+                 * child-side handle is normalized correctly (e.g. to `*`).
+                 */
+                const handleId = rawEvent || "*";
 
                 return {
                     id: handleId,
@@ -1581,12 +1740,19 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
 
         if (!targetNode) return;
 
-        const eventHandleId = getTransitionExitToken(
-            trans.eventId,
-            sourceNode.data.fullSkillName || trans.sourceSkillName
-        );
-
         const isFromCompound = sourceNode.type === "compound";
+
+        // Compound-level SCXML transitions such as `Talk.*` are temporary
+        // boundary declarations. Keep their complete raw event until
+        // materializeImportedBoundaryTransitions() has matched `Talk` to the
+        // actual nested skill. Normalizing against the Compound name here
+        // would collapse `Talk.*`, `MoveToStart.*`, etc. all to `*`.
+        const eventHandleId = isFromCompound
+            ? String(trans.eventId || "*").trim() || "*"
+            : getTransitionExitToken(
+                trans.eventId,
+                sourceNode.data.fullSkillName || trans.sourceSkillName
+            );
         const hasCond = Boolean(trans.cond && trans.cond.trim() !== "");
         const labelText = isFromCompound
             ? (hasCond ? `[${trans.cond}]` : "")

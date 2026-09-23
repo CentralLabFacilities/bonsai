@@ -1,17 +1,16 @@
 import { resolveCollisionScope } from "./nodeCollisions";
-import { getOverviewLayoutNodeSize } from "./layoutUtils";
 
 export const getNodeId = () => `skill-node-${crypto.randomUUID()}`;
 
+export const COLLAPSED_CONTAINER_WIDTH = 210;
+export const COLLAPSED_CONTAINER_HEIGHT = 80;
 export const PARALLEL_EXIT_GUTTER = 150;
 export const PARALLEL_NODE_GAP = 30;
-export const COMPOUND_NODE_GAP = 30;
-export const COMPOUND_PADDING_X = 30;
-// Reserve the visible header plus enough vertical clearance for child state
-// action badges, which extend above the child node itself.
-export const COMPOUND_HEADER_HEIGHT = 72;
 export const PARALLEL_HEADER_HEIGHT = 64;
 export const PARALLEL_LANE_CHILD_TOP_INSET = 30;
+export const COMPOUND_NODE_GAP = 30;
+export const COMPOUND_PADDING_X = 30;
+export const COMPOUND_HEADER_HEIGHT = 45;
 export const COMPOUND_BOTTOM_PADDING = 30;
 export const COMPOUND_EXIT_GUTTER_MIN = 220;
 export const COMPOUND_EXIT_GUTTER_MAX = 420;
@@ -88,7 +87,7 @@ export const fitCompoundToChildren = (allNodes, compoundId) => {
     let bottom = COMPOUND_HEADER_HEIGHT;
 
     members.forEach((member) => {
-        const size = getOverviewLayoutNodeSize(member);
+        const size = getNodeSize(member);
         right = Math.max(
             right,
             Number(member.position?.x || 0) + size.width
@@ -127,11 +126,15 @@ export const fitCompoundToChildren = (allNodes, compoundId) => {
                 requiredHeight
             );
 
-            // Keep the compact collapsed height on screen, but remember a
-            // large enough expanded size for all children. Manual resizing
-            // therefore becomes a minimum size rather than disabling auto-grow.
+            // Keep the compact collapsed footprint on screen in both
+            // dimensions, but remember a large enough expanded size for all
+            // children. Auto-fit must not visually re-expand a collapsed node.
             return {
-                ...withNodeDimensions(node, expandedWidth, currentSize.height),
+                ...withNodeDimensions(
+                    node,
+                    COLLAPSED_CONTAINER_WIDTH,
+                    COLLAPSED_CONTAINER_HEIGHT
+                ),
                 data: {
                     ...(node.data || {}),
                     expandedContainerSize: {
@@ -484,7 +487,7 @@ export const growParallelToLaneContents = (allNodes, parallelId) => {
         let maxBottom = 0;
 
         laneMembers.forEach((member) => {
-            const size = getOverviewLayoutNodeSize(member);
+            const size = getNodeSize(member);
             maxRight = Math.max(
                 maxRight,
                 Number(member.position?.x || 0) + size.width
@@ -500,7 +503,7 @@ export const growParallelToLaneContents = (allNodes, parallelId) => {
             : Math.max(420, 15 + maxRight + PARALLEL_EXIT_GUTTER);
         const requiredLaneHeight = wrapper
             ? Math.max(140, maxBottom)
-            : Math.max(130, maxBottom + 30);
+            : Math.max(110, maxBottom + 20);
 
         requiredParallelWidth = Math.max(
             requiredParallelWidth,
@@ -514,8 +517,8 @@ export const growParallelToLaneContents = (allNodes, parallelId) => {
     });
 
     const firstLaneY = Math.max(
-        PARALLEL_HEADER_HEIGHT,
-        Number(parallelLanes[0]?.position?.y || PARALLEL_HEADER_HEIGHT)
+        40,
+        Number(parallelLanes[0]?.position?.y || 40)
     );
     let nextLaneY = firstLaneY;
     const laneGeometry = new Map();
@@ -538,6 +541,31 @@ export const growParallelToLaneContents = (allNodes, parallelId) => {
 
     return nextNodes.map((node) => {
         if (node.id === parallel.id) {
+            if (node.data?.isCollapsed) {
+                const savedExpanded = node.data?.expandedContainerSize || {};
+                return {
+                    ...withNodeDimensions(
+                        node,
+                        COLLAPSED_CONTAINER_WIDTH,
+                        COLLAPSED_CONTAINER_HEIGHT
+                    ),
+                    data: {
+                        ...(node.data || {}),
+                        expandedContainerSize: {
+                            ...savedExpanded,
+                            width: Math.max(
+                                Number(savedExpanded.width) || 0,
+                                requiredParallelWidth
+                            ),
+                            height: Math.max(
+                                Number(savedExpanded.height) || 0,
+                                requiredParallelHeight
+                            ),
+                        },
+                    },
+                };
+            }
+
             return withNodeDimensions(
                 node,
                 requiredParallelWidth,
@@ -647,11 +675,7 @@ export const resolveNodeCollisionsAndRefit = (
     const minContentX =
         parent?.type === "compound" ? COMPOUND_PADDING_X : 20;
     const minContentY =
-        parent?.type === "compound"
-            ? COMPOUND_HEADER_HEIGHT
-            : parent?.type === "parallelLane"
-                ? PARALLEL_LANE_CHILD_TOP_INSET
-                : 20;
+        parent?.type === "compound" ? COMPOUND_HEADER_HEIGHT : 20;
     const siblings = nextNodes.filter(
         (node) =>
             (node.parentId || null) === (focusNode.parentId || null) &&

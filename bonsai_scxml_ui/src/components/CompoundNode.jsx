@@ -11,7 +11,19 @@ function CompoundNode({ id, data = {}, selected = false }) {
 
     events.forEach((event) => {
         const id = String(event?.id || "").trim();
-        if (!id || id === "compound-entry" || seen.has(id)) return;
+        // Compound events without a target are retained by the transition
+        // editor as reusable event choices after their last transition is
+        // deleted. They are not real visual exits, so do not render a border
+        // label/source handle for them. Boundary exits and real compound-level
+        // transitions always carry a target.
+        if (
+            !id ||
+            id === "compound-entry" ||
+            !event?.target ||
+            seen.has(id)
+        ) {
+            return;
+        }
         seen.add(id);
         uniqueEvents.push({ ...event, id });
     });
@@ -92,7 +104,7 @@ function CompoundNode({ id, data = {}, selected = false }) {
                 </strong>
             </div>
 
-            {uniqueEvents.length > 0 && (
+            {!isCollapsed && uniqueEvents.length > 0 && (
                 <div className="compound-frame-exits">
                     {uniqueEvents.map((event) => {
                         const label =
@@ -145,6 +157,17 @@ function CompoundNode({ id, data = {}, selected = false }) {
                     })}
                 </div>
             )}
+            {isCollapsed && uniqueEvents.map((event) => (
+                <Handle
+                    key={`collapsed-source-${event.id}`}
+                    id={event.id}
+                    type="source"
+                    position={Position.Right}
+                    className="compound-frame-source-handle compound-collapsed-source-handle"
+                    isConnectableStart={true}
+                    isConnectableEnd={false}
+                />
+            ))}
         </div>
     );
 }

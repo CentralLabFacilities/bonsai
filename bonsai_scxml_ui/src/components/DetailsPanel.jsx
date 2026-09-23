@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
     FiActivity,
     FiChevronDown,
+    FiChevronUp,
     FiDatabase,
     FiExternalLink,
     FiLayers,
@@ -791,6 +792,7 @@ function DetailsPanel({
                           cloneNodes = [],
                           onNavigateClone,
                           containerOutgoingTransitions = [],
+                          onMoveContainerTransition,
                           onNavigateTransitionNode,
                           onHoverTransitionNode,
                           onOpenTransitionPanel,
@@ -1568,7 +1570,7 @@ function DetailsPanel({
 
                                 <div className="event-list">
                                     {isContainerState &&
-                                        containerOutgoingTransitions.map((transition) => (
+                                        containerOutgoingTransitions.map((transition, transitionIndex) => (
                                             <div
                                                 className={`slot-text-field compact-slot-card exit-token-card exit-token-${getExitTokenType(
                                                     transition.eventId
@@ -1589,6 +1591,45 @@ function DetailsPanel({
                                                     </span>
 
                                                     <div className="exit-token-header-actions">
+                                                        <div
+                                                            className="exit-token-order-controls"
+                                                            title="SCXML transition order"
+                                                        >
+                                                            <button
+                                                                type="button"
+                                                                className="exit-token-order-button"
+                                                                disabled={transitionIndex === 0}
+                                                                aria-label={`Move ${transition.eventDisplayName} earlier`}
+                                                                title="Move earlier (higher SCXML priority)"
+                                                                onClick={() =>
+                                                                    onMoveContainerTransition?.(
+                                                                        transition.edgeId,
+                                                                        "up"
+                                                                    )
+                                                                }
+                                                            >
+                                                                <FiChevronUp size={13} />
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                className="exit-token-order-button"
+                                                                disabled={
+                                                                    transitionIndex ===
+                                                                    containerOutgoingTransitions.length - 1
+                                                                }
+                                                                aria-label={`Move ${transition.eventDisplayName} later`}
+                                                                title="Move later (lower SCXML priority)"
+                                                                onClick={() =>
+                                                                    onMoveContainerTransition?.(
+                                                                        transition.edgeId,
+                                                                        "down"
+                                                                    )
+                                                                }
+                                                            >
+                                                                <FiChevronDown size={13} />
+                                                            </button>
+                                                        </div>
+
                                                         <span
                                                             className={`detail-badge exit-token-badge exit-token-badge-${getExitTokenType(
                                                                 transition.eventId
@@ -1620,7 +1661,7 @@ function DetailsPanel({
                                             </div>
                                         ))}
 
-                                    {editableExitTokens.map((event, index) => (
+                                    {!isContainerState && editableExitTokens.map((event, index) => (
                                             <div
                                                 className={`slot-text-field compact-slot-card exit-token-card exit-token-${getExitTokenType(
                                                     event.id
