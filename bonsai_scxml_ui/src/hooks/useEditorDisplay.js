@@ -96,22 +96,6 @@ const buildEdgeIndexByNodeId = (edgeList, getNodeIds) => {
     return index;
 };
 
-const collectIndexedEdges = (edgeList, indexByNodeId, nodeIds) => {
-    if (!nodeIds || nodeIds.size === 0) return [];
-
-    const indexes = new Set();
-    nodeIds.forEach((nodeId) => {
-        (indexByNodeId.get(nodeId) || []).forEach((edgeIndex) =>
-            indexes.add(edgeIndex)
-        );
-    });
-
-    return [...indexes]
-        .sort((a, b) => a - b)
-        .map((edgeIndex) => edgeList[edgeIndex])
-        .filter(Boolean);
-};
-
 const withEdgeClassName = (edge, className) => {
     const classNames = String(edge?.className || "")
         .split(/\s+/)
@@ -709,39 +693,69 @@ export function useEditorDisplay({
         [slotStructureEdges, updatePersistentEdgeControlPoints]
     );
 
-    const slotRenderEdgeCache = useMemo(
-        () =>
-            routedSlotEdgeCache.map((edge) =>
-                selectedSlotEdgeIds.has(edge.id)
-                    ? { ...edge, selected: true }
-                    : edge
-            ),
-        [routedSlotEdgeCache, selectedSlotEdgeIds]
-    );
+    // Keep every slot edge mounted while Slot/Overview mode is active. Just as
+    // with transitions, the visibility toggle must be paint-only; otherwise
+    // enabling slot edges mounts every smart-edge component in one frame and
+    // forces the router to run for the complete slot graph at once.
+    //
+    // Both base and contextual variants are cached here. Hover/selection only
+    // swaps references at the indexed connected positions below.
+    const slotRenderCache = useMemo(() => {
+        const baseEdges = [];
+        const contextEdges = [];
 
-    const slotEdgeIndexByNodeId = useMemo(
-        () => buildEdgeIndexByNodeId(slotRenderEdgeCache, getSlotEdgeNodeIds),
-        [slotRenderEdgeCache]
-    );
+        routedSlotEdgeCache.forEach((rawEdge) => {
+            const selectedEdge = selectedSlotEdgeIds.has(rawEdge.id)
+                ? { ...rawEdge, selected: true }
+                : rawEdge;
+            const edge = withEdgeClassName(selectedEdge, "editor-slot-edge");
+
+            baseEdges.push(edge);
+            contextEdges.push(
+                withEdgeClassName(edge, "editor-edge-context-visible")
+            );
+        });
+
+        return {
+            baseEdges,
+            contextEdges,
+            indexByNodeId: buildEdgeIndexByNodeId(
+                baseEdges,
+                getSlotEdgeNodeIds
+            ),
+        };
+    }, [routedSlotEdgeCache, selectedSlotEdgeIds]);
+
+    const slotFocusedIndexes = useMemo(() => {
+        const indexes = new Set();
+        edgeFocusNodeIds.forEach((nodeId) => {
+            (slotRenderCache.indexByNodeId.get(nodeId) || []).forEach(
+                (edgeIndex) => indexes.add(edgeIndex)
+            );
+        });
+        return indexes;
+    }, [slotRenderCache, edgeFocusNodeIds]);
 
     const routedSlotEdges = useMemo(() => {
         if (activeMode !== "slots" && activeMode !== "overview") {
             return [];
         }
 
-        if (showSlotEdges) return slotRenderEdgeCache;
+        const { baseEdges, contextEdges } = slotRenderCache;
+        if (slotFocusedIndexes.size === 0) return baseEdges;
 
-        return collectIndexedEdges(
-            slotRenderEdgeCache,
-            slotEdgeIndexByNodeId,
-            edgeFocusNodeIds
-        );
+        // Keep the complete edge set mounted. Replace only connected entries
+        // with cached contextual variants; CSS decides whether the remaining
+        // edges are painted when global slot-edge visibility is disabled.
+        const displayed = baseEdges.slice();
+        slotFocusedIndexes.forEach((edgeIndex) => {
+            displayed[edgeIndex] = contextEdges[edgeIndex];
+        });
+        return displayed;
     }, [
         activeMode,
-        showSlotEdges,
-        slotRenderEdgeCache,
-        slotEdgeIndexByNodeId,
-        edgeFocusNodeIds,
+        slotRenderCache,
+        slotFocusedIndexes,
     ]);
 
     const editableSlotEdges = useMemo(() => {
@@ -750,6 +764,18 @@ export function useEditorDisplay({
         }
 
         return routedSlotEdges.map((edge) => {
+            const isContextVisibleSlotEdge = String(edge.className || "")
+                .split(/\s+/)
+                .includes("editor-edge-context-visible");
+
+            // With slot edges globally hidden, unrelated edges are already
+            // invisible through CSS. Preserve their cached object identity
+            // instead of rebuilding dimmed variants for the entire graph on
+            // every hover/selection change.
+            if (!showSlotEdges && !isContextVisibleSlotEdge && !edge.selected) {
+                return edge;
+            }
+
             const access = edge.data?.access === "write" ? "write" : "read";
             const semanticColor = SLOT_CONNECTION_COLORS[access];
 
@@ -827,6 +853,7 @@ export function useEditorDisplay({
         hasSelectedSlotContext,
         selectedSlotContextId,
         cloneGroupByNodeId,
+        showSlotEdges,
     ]);
 
     const compoundInitialEdges = useMemo(

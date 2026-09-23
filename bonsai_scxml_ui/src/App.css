@@ -7174,3 +7174,14 @@
     visibility: hidden;
     pointer-events: none;
 }
+
+/*
+ * Slot-edge visibility is paint-only for the same reason as transitions.
+ * Slot edges stay mounted/routed in Slot and Overview modes, so enabling them
+ * does not create and smart-route the complete slot graph in one frame.
+ */
+.react-flow.editor-slots-context-only
+    .react-flow__edge.editor-slot-edge:not(.editor-edge-context-visible):not(.selected) {
+    visibility: hidden;
+    pointer-events: none;
+}

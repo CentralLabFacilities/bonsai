@@ -218,9 +218,13 @@ export default function EditorCanvas({
             <SmartEdgeProvider nodes={smartRoutingNodes}>
                 <ReactFlow
                     className={
-                        !showTransitionEdges || activeMode === "slots"
-                            ? "editor-transitions-context-only"
-                            : undefined
+                        [
+                            (!showTransitionEdges || activeMode === "slots") &&
+                                "editor-transitions-context-only",
+                            !showSlotEdges && "editor-slots-context-only",
+                        ]
+                            .filter(Boolean)
+                            .join(" ") || undefined
                     }
                     nodes={visibleNodes}
                     edges={visibleEdges}
