@@ -1313,6 +1313,11 @@ function AppContent() {
     // showing/highlighting one transition could therefore wake up every skill.
     // Keep the full transition graph loaded, but expose only this tiny derived
     // per-skill dependency to the node renderer.
+    const outgoingTransitionHandlesCacheRef = useRef({
+        byNodeId: new Map(),
+        signaturesByNodeId: new Map(),
+    });
+
     const outgoingTransitionHandlesByNodeId = useMemo(() => {
         const handlesByNodeId = new Map();
 
@@ -1327,14 +1332,43 @@ function AppContent() {
             handlesByNodeId.get(edge.source).add(String(handle));
         });
 
-        const result = new Map();
+        const previous = outgoingTransitionHandlesCacheRef.current;
+        const nextSignatures = new Map();
         handlesByNodeId.forEach((handles, nodeId) => {
-            const sorted = [...handles].sort();
+            nextSignatures.set(nodeId, [...handles].sort().join("\u001f"));
+        });
+
+        // React Flow changes edge object identity for selection and other
+        // presentation-only updates. Those changes must not invalidate every
+        // skill node. Keep this derived map referentially stable unless the
+        // semantic set of source handles actually changed.
+        const topologyUnchanged =
+            previous.signaturesByNodeId.size === nextSignatures.size &&
+            [...nextSignatures].every(
+                ([nodeId, signature]) =>
+                    previous.signaturesByNodeId.get(nodeId) === signature
+            );
+
+        if (topologyUnchanged) return previous.byNodeId;
+
+        const result = new Map();
+        nextSignatures.forEach((signature, nodeId) => {
+            const previousEntry = previous.byNodeId.get(nodeId);
+            if (previousEntry?.signature === signature) {
+                result.set(nodeId, previousEntry);
+                return;
+            }
+
             result.set(nodeId, {
-                handles: sorted,
-                signature: sorted.join("\u001f"),
+                handles: signature ? signature.split("\u001f") : [],
+                signature,
             });
         });
+
+        outgoingTransitionHandlesCacheRef.current = {
+            byNodeId: result,
+            signaturesByNodeId: nextSignatures,
+        };
         return result;
     }, [edges]);
 
