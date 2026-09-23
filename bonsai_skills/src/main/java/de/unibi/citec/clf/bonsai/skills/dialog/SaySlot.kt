@@ -46,7 +46,7 @@ class SaySlot : AbstractSkill() {
         sayText = configurator.requestOptionalValue(
             SAY_TEXT,
             sayText,
-            "Text said by the robot. $S will be replaced by memory slot content"
+            "Text said by the robot."
         )
 
         if (sayText.contains(REPLACE_STRING)) {
