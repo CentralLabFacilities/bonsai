@@ -3,6 +3,12 @@ import { MarkerType } from "@xyflow/react";
 import { SLOT_CONNECTION_COLORS, normalizeSlotPath } from "../utils/editorGraph";
 import { getAbsoluteNodePosition, getNodeSize } from "../utils/editorGeometry";
 
+const isSlotCloneNode = (node) => Boolean(
+    node?.type === "slot" &&
+    node?.data?.isSlotClone &&
+    node?.data?.cloneOfNodeId
+);
+
 export function useSlotGraph({
                                  nodes,
                                  manualSlots,
@@ -11,10 +17,17 @@ export function useSlotGraph({
                                  setSlotNodes,
                                  setSlotEdges,
                              }) {
-    const checkSlotConnection = useCallback((customNodes = null, customManualSlots = null) => {
+    const checkSlotConnection = useCallback((
+        customNodes = null,
+        customManualSlots = null,
+        customSlotNodes = null
+    ) => {
         const targetNodes = Array.isArray(customNodes) ? customNodes : nodes;
         const activeManualSlots =
             customManualSlots !== null ? customManualSlots : manualSlots;
+        const activeSlotNodes = Array.isArray(customSlotNodes)
+            ? customSlotNodes
+            : slotNodes;
         if (!targetNodes || targetNodes.length === 0) {
             setSlotNodes([]);
             setSlotEdges([]);
@@ -148,7 +161,7 @@ export function useSlotGraph({
         const generatedSlotNodes = [];
         let index = 0;
         const existingSlotNodeById = new Map(
-            (slotNodes || []).map((node) => [node.id, node])
+            (activeSlotNodes || []).map((node) => [node.id, node])
         );
         const existingSlotEdgeByKey = new Map();
         (slotEdges || []).forEach((edge) => {
@@ -290,6 +303,48 @@ export function useSlotGraph({
             }
         );
 
+        // Slot clones are visual aliases of the same semantic slot. Keep them
+        // whenever their canonical slot still exists and refresh their display
+        // data from that canonical node so path/type/inheritance stay in sync.
+        const canonicalSlotNodeById = new Map(
+            generatedSlotNodes.map((node) => [node.id, node])
+        );
+        const existingSlotClones = (activeSlotNodes || []).filter(isSlotCloneNode);
+
+        existingSlotClones.forEach((cloneNode) => {
+            const canonicalNode = canonicalSlotNodeById.get(
+                cloneNode.data?.cloneOfNodeId
+            );
+            if (!canonicalNode) return;
+
+            generatedSlotNodes.push({
+                ...cloneNode,
+                type: "slot",
+                data: {
+                    ...canonicalNode.data,
+                    isSlotClone: true,
+                    cloneOfNodeId: canonicalNode.id,
+                },
+            });
+        });
+
+        const resolveVisualSlotNodeId = (existingEdge, canonicalSlotNodeId) => {
+            const existingTargetId = existingEdge?.target;
+            if (!existingTargetId || existingTargetId === canonicalSlotNodeId) {
+                return canonicalSlotNodeId;
+            }
+
+            const existingTarget = existingSlotNodeById.get(existingTargetId);
+            if (
+                isSlotCloneNode(existingTarget) &&
+                existingTarget.data?.cloneOfNodeId === canonicalSlotNodeId
+            ) {
+                return existingTargetId;
+            }
+
+            return canonicalSlotNodeId;
+        };
+
         // Reuse unchanged slot-node objects instead of replacing the complete
         // slot graph every time one skill/parameter changes. React Flow can then
         // rerender only the paths whose declaration/type actually changed.
@@ -334,6 +389,9 @@ export function useSlotGraph({
                     current.data?.inheritedFrom === generated.data?.inheritedFrom &&
                     Boolean(current.data?.requiredByChild) ===
                     Boolean(generated.data?.requiredByChild) &&
+                    Boolean(current.data?.isSlotClone) ===
+                    Boolean(generated.data?.isSlotClone) &&
+                    current.data?.cloneOfNodeId === generated.data?.cloneOfNodeId &&
                     requirementsEqual;
 
                 if (equivalent) return current;
@@ -354,12 +412,17 @@ export function useSlotGraph({
                         `skill:${node.id}:read:${inIndex}`
                     );
 
+                    const visualSlotNodeId = resolveVisualSlotNodeId(
+                        existingReadEdge,
+                        slotNodeId
+                    );
+
                     newSlotEdges.push({
                         id:
                             existingReadEdge?.id ||
                             `edge-read-${slotNodeId}-${node.id}-${inIndex}`,
                         source: node.id,
-                        target: slotNodeId,
+                        target: visualSlotNodeId,
                         sourceHandle: `slot-skill-read-${inIndex}`,
                         targetHandle: "slot-node-read",
                         type: "smartTransition",
@@ -379,7 +442,8 @@ export function useSlotGraph({
                             slotIndex: inIndex,
                             path: cleanPath,
                             skillNodeId: node.id,
-                            slotNodeId,
+                            slotNodeId: visualSlotNodeId,
+                            canonicalSlotNodeId: slotNodeId,
                             controlPoints:
                                 existingReadEdge?.data?.controlPoints || [],
                         },
@@ -395,12 +459,17 @@ export function useSlotGraph({
                         `skill:${node.id}:write:${outIndex}`
                     );
 
+                    const visualSlotNodeId = resolveVisualSlotNodeId(
+                        existingWriteEdge,
+                        slotNodeId
+                    );
+
                     newSlotEdges.push({
                         id:
                             existingWriteEdge?.id ||
                             `edge-write-${node.id}-${slotNodeId}-${outIndex}`,
                         source: node.id,
-                        target: slotNodeId,
+                        target: visualSlotNodeId,
                         sourceHandle: `slot-skill-write-${outIndex}`,
                         targetHandle: "slot-node-write",
                         type: "smartTransition",
@@ -420,7 +489,8 @@ export function useSlotGraph({
                             slotIndex: outIndex,
                             path: cleanPath,
                             skillNodeId: node.id,
-                            slotNodeId,
+                            slotNodeId: visualSlotNodeId,
+                            canonicalSlotNodeId: slotNodeId,
                             controlPoints:
                                 existingWriteEdge?.data?.controlPoints || [],
                         },
@@ -447,12 +517,17 @@ export function useSlotGraph({
                         `sub:${node.id}:${access}:${inheritIndex}`
                     );
 
+                    const visualSlotNodeId = resolveVisualSlotNodeId(
+                        existingInheritedEdge,
+                        slotNodeId
+                    );
+
                     newSlotEdges.push({
                         id:
                             existingInheritedEdge?.id ||
                             `edge-inherited-${access}-${node.id}-${inheritIndex}-${slotNodeId}`,
                         source: node.id,
-                        target: slotNodeId,
+                        target: visualSlotNodeId,
                         sourceHandle: handleId,
                         targetHandle:
                             access === "read"
@@ -473,7 +548,8 @@ export function useSlotGraph({
                             edgeKind: "slot",
                             access,
                             path: cleanPath,
-                            slotNodeId,
+                            slotNodeId: visualSlotNodeId,
+                            canonicalSlotNodeId: slotNodeId,
                             subMachineInherited: true,
                             subMachineNodeId: node.id,
                             inheritIndex,
@@ -527,6 +603,8 @@ export function useSlotGraph({
                     current.data?.path === generated.data?.path &&
                     current.data?.skillNodeId === generated.data?.skillNodeId &&
                     current.data?.slotNodeId === generated.data?.slotNodeId &&
+                    current.data?.canonicalSlotNodeId ===
+                    generated.data?.canonicalSlotNodeId &&
                     Boolean(current.data?.subMachineInherited) ===
                     Boolean(generated.data?.subMachineInherited) &&
                     current.data?.subMachineNodeId ===

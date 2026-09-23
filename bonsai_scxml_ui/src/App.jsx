@@ -45,6 +45,8 @@ import {
     getNodeId,
     PARALLEL_EXIT_GUTTER,
     PARALLEL_NODE_GAP,
+    PARALLEL_HEADER_HEIGHT,
+    PARALLEL_LANE_CHILD_TOP_INSET,
     COMPOUND_NODE_GAP,
     COMPOUND_PADDING_X,
     COMPOUND_HEADER_HEIGHT,
@@ -81,6 +83,7 @@ import { useNodeDrag } from "./hooks/useNodeDrag";
 import { useSubStateMachines } from "./hooks/useSubStateMachines";
 import { useTransitionGraph } from "./hooks/useTransitionGraph";
 import { useContainerCreation } from "./hooks/useContainerCreation";
+import { getOverviewLayoutNodeSize } from "./utils/layoutUtils";
 import "./App.css";
 
 // Initialize API proxy for Tauri desktop mode (intercepts /api/* fetch calls)
@@ -93,7 +96,11 @@ const IS_DESKTOP = isTauri();
 
 const isEditorCloneNode = (node) => Boolean(
     node?.data?.cloneOfNodeId &&
-    (node.data?.isSkillClone || node.data?.isStateClone)
+    (
+        node.data?.isSkillClone ||
+        node.data?.isStateClone ||
+        node.data?.isSlotClone
+    )
 );
 
 const isCloneableSkillNode = (node) => {
@@ -118,13 +125,27 @@ const isCloneableSkillNode = (node) => {
 const isCloneableEditorNode = (node) => Boolean(
     isCloneableSkillNode(node) ||
     (node &&
-        ["submachine", "compound", "parallel"].includes(node.type) &&
+        ["submachine", "compound", "parallel", "slot"].includes(node.type) &&
         !isEditorCloneNode(node) &&
         !node.data?.autoParallelLaneCompound)
 );
 
 const buildEditorCloneNode = (sourceNode, position) => {
     if (!isCloneableEditorNode(sourceNode)) return null;
+
+    if (sourceNode.type === "slot") {
+        return {
+            id: `slot-clone-${crypto.randomUUID()}`,
+            position,
+            type: "slot",
+            selected: true,
+            data: {
+                ...(sourceNode.data || {}),
+                cloneOfNodeId: sourceNode.id,
+                isSlotClone: true,
+            },
+        };
+    }
 
     const commonData = {
         label: sourceNode.data?.label || sourceNode.data?.fullSkillName || "State",
@@ -283,6 +304,11 @@ function AppContent() {
     // Reading `node.selected` from the controlled nodes array can lag behind
     // the interaction by a render, especially when Ctrl/Meta multi-selecting.
     const graphSelectionRef = useRef(new Set());
+    // When a visual slot clone is deleted, its connected semantic slot edges
+    // are retargeted to the canonical slot instead of disconnecting the skill.
+    // React Flow may still emit remove changes for the old visual edges; keep
+    // those edge IDs here so that follow-up removal events can be ignored.
+    const remappedSlotCloneEdgeIdsRef = useRef(new Set());
     const handleGraphSelectionChange = useCallback(({ nodes: selectedFlowNodes = [] }) => {
         graphSelectionRef.current = new Set(
             selectedFlowNodes.map((node) => node.id)
@@ -300,7 +326,7 @@ function AppContent() {
     const [isShortcutHelpOpen, setIsShortcutHelpOpen] = useState(false);
     const [isHintPageOpen, setIsHintPageOpen] = useState(false);
 
-    const [activeMode, setActiveMode] = useState("event");
+    const [activeMode, setActiveMode] = useState("overview");
     const [manualSlots, setManualSlots] = useState([]);
     const [isCreateSlotModalOpen, setIsCreateSlotModalOpen] = useState(false);
     const [pendingSkillPaste, setPendingSkillPaste] = useState(null);
@@ -864,12 +890,30 @@ function AppContent() {
         event.stopPropagation();
 
         if (clickedNode && !clickedNode.selected) {
-            setNodes((nds) =>
-                nds.map((n) => ({
-                    ...n,
-                    selected: n.id === clickedNode.id,
-                }))
-            );
+            if (clickedNode.type === "slot") {
+                setNodes((nds) =>
+                    nds.map((node) => ({ ...node, selected: false }))
+                );
+                setSlotNodes((currentSlotNodes) =>
+                    currentSlotNodes.map((node) => ({
+                        ...node,
+                        selected: node.id === clickedNode.id,
+                    }))
+                );
+            } else {
+                setNodes((nds) =>
+                    nds.map((node) => ({
+                        ...node,
+                        selected: node.id === clickedNode.id,
+                    }))
+                );
+                setSlotNodes((currentSlotNodes) =>
+                    currentSlotNodes.map((node) => ({
+                        ...node,
+                        selected: false,
+                    }))
+                );
+            }
             setSelectedNodeId(clickedNode.id);
         }
 
@@ -879,19 +923,27 @@ function AppContent() {
             y: event.clientY,
             flowPosition: flowPos,
         });
-    }, [screenToFlowPosition, setNodes]);
+    }, [screenToFlowPosition, setNodes, setSlotNodes, setSelectedNodeId]);
 
-    const canCreateEditorClone =
-        selectedNodes.length === 1 &&
-        isCloneableEditorNode(selectedNodes[0]);
+    const selectedSlotNodes = slotNodes.filter((node) => node.selected);
+    const editorCloneSelection = [
+        ...selectedNodes,
+        ...selectedSlotNodes,
+    ];
+    const editorCloneSourceNode =
+        editorCloneSelection.length === 1
+            ? editorCloneSelection[0]
+            : null;
+    const canCreateEditorClone = isCloneableEditorNode(editorCloneSourceNode);
+    const editorCloneActionLabel =
+        editorCloneSourceNode?.type === "slot"
+            ? "Clone Selected Slot"
+            : "Clone Selected State";
 
     const handleCreateEditorClone = useCallback(() => {
         if (!contextMenu?.flowPosition) return;
 
-        const sourceNode = selectedNodes.length === 1
-            ? selectedNodes[0]
-            : null;
-
+        const sourceNode = editorCloneSourceNode;
         if (!isCloneableEditorNode(sourceNode)) return;
 
         const cloneNode = buildEditorCloneNode(sourceNode, {
@@ -900,20 +952,38 @@ function AppContent() {
         });
         if (!cloneNode) return;
 
-        setNodes((currentNodes) => [
-            ...currentNodes.map((node) => ({
-                ...node,
-                selected: false,
-            })),
-            cloneNode,
-        ]);
+        if (sourceNode.type === "slot") {
+            setNodes((currentNodes) =>
+                currentNodes.map((node) => ({ ...node, selected: false }))
+            );
+            setSlotNodes((currentSlotNodes) => [
+                ...currentSlotNodes.map((node) => ({
+                    ...node,
+                    selected: false,
+                })),
+                cloneNode,
+            ]);
+        } else {
+            setSlotNodes((currentSlotNodes) =>
+                currentSlotNodes.map((node) => ({ ...node, selected: false }))
+            );
+            setNodes((currentNodes) => [
+                ...currentNodes.map((node) => ({
+                    ...node,
+                    selected: false,
+                })),
+                cloneNode,
+            ]);
+        }
+
         setSelectedNodeId(cloneNode.id);
         setRightPanelTab("details");
-        setActiveTab("allgemein");
+        setActiveTab(sourceNode.type === "slot" ? "slots" : "allgemein");
     }, [
         contextMenu,
-        selectedNodes,
+        editorCloneSourceNode,
         setNodes,
+        setSlotNodes,
         setSelectedNodeId,
         setRightPanelTab,
         setActiveTab,
@@ -1462,7 +1532,11 @@ function AppContent() {
                 setGlobalDataModel(parsed.globalDataModel);
                 setInheritedGlobalDataModel([]);
                 setSelectedNodeId(null);
-                checkSlotConnection(parsedNodes);
+                checkSlotConnection(
+                    parsedNodes,
+                    [],
+                    parsed.editorSlotNodes || []
+                );
 
                 setTimeout(
                     () =>
@@ -2222,6 +2296,48 @@ function AppContent() {
                 }
             }
             if (slotChanges.length > 0) {
+                const removedSlotCloneIds = new Map();
+                slotChanges
+                    .filter((change) => change.type === "remove")
+                    .forEach((change) => {
+                        const removedNode = slotNodes.find(
+                            (node) => node.id === change.id
+                        );
+                        if (
+                            removedNode?.data?.isSlotClone &&
+                            removedNode.data?.cloneOfNodeId
+                        ) {
+                            removedSlotCloneIds.set(
+                                removedNode.id,
+                                removedNode.data.cloneOfNodeId
+                            );
+                        }
+                    });
+
+                if (removedSlotCloneIds.size > 0) {
+                    setSlotEdges((currentEdges) =>
+                        currentEdges.map((edge) => {
+                            const canonicalSlotNodeId =
+                                removedSlotCloneIds.get(edge.target);
+                            if (!canonicalSlotNodeId) return edge;
+
+                            remappedSlotCloneEdgeIdsRef.current.add(edge.id);
+
+                            return {
+                                ...edge,
+                                id: `${edge.id}-clone-remap-${crypto.randomUUID()}`,
+                                target: canonicalSlotNodeId,
+                                data: {
+                                    ...(edge.data || {}),
+                                    slotNodeId: canonicalSlotNodeId,
+                                    canonicalSlotNodeId,
+                                    controlPoints: [],
+                                },
+                            };
+                        })
+                    );
+                }
+
                 onSlotNodesChange(slotChanges);
             }
         },
@@ -2232,19 +2348,31 @@ function AppContent() {
             onSlotNodesChange,
             setEdges,
             setNodes,
+            slotNodes,
+            setSlotEdges,
         ]
     );
 
     const handleVisibleEdgesChange = useCallback(
         (changes) => {
+            const ignoredRemapIds = remappedSlotCloneEdgeIdsRef.current;
+            const effectiveChanges = changes.filter((change) => {
+                const shouldIgnore =
+                    change.type === "remove" && ignoredRemapIds.has(change.id);
+                if (shouldIgnore) {
+                    ignoredRemapIds.delete(change.id);
+                }
+                return !shouldIgnore;
+            });
+
             const slotEdgeIds = new Set(
                 (slotEdges || []).map((edge) => edge.id)
             );
 
-            const slotChanges = changes.filter((change) =>
+            const slotChanges = effectiveChanges.filter((change) =>
                 slotEdgeIds.has(change.id)
             );
-            const transitionChanges = changes.filter(
+            const transitionChanges = effectiveChanges.filter(
                 (change) => !slotEdgeIds.has(change.id)
             );
 
@@ -2409,10 +2537,42 @@ function AppContent() {
             };
         });
 
+        const oldCanonicalSlotNodeId = `slot-${oldPath}`;
+        const newCanonicalSlotNodeId = `slot-${newPath}`;
+        const updatedSlotNodes = slotNodes.map((slotNode) => {
+            const isCanonical = slotNode.id === oldCanonicalSlotNodeId;
+            const isClone =
+                slotNode.data?.isSlotClone &&
+                slotNode.data?.cloneOfNodeId === oldCanonicalSlotNodeId;
+
+            if (!isCanonical && !isClone) return slotNode;
+
+            return {
+                ...slotNode,
+                ...(isCanonical ? { id: newCanonicalSlotNodeId } : {}),
+                data: {
+                    ...(slotNode.data || {}),
+                    path: formattedPath,
+                    label: formattedPath,
+                    ...(isClone
+                        ? { cloneOfNodeId: newCanonicalSlotNodeId }
+                        : {}),
+                },
+            };
+        });
+
         setNodes(updatedNodes);
         setManualSlots(updatedManualSlots);
-        setSelectedNodeId(`slot-${newPath}`);
-        checkSlotConnection(updatedNodes, updatedManualSlots);
+        setSelectedNodeId(
+            selectedRawNode.data?.isSlotClone
+                ? selectedRawNode.id
+                : newCanonicalSlotNodeId
+        );
+        checkSlotConnection(
+            updatedNodes,
+            updatedManualSlots,
+            updatedSlotNodes
+        );
     };
 
     const handleUpdateSelectedSlotInherited = (shouldInherit) => {
@@ -3399,6 +3559,7 @@ function AppContent() {
         isDesktop: IS_DESKTOP,
         nodes,
         edges,
+        slotNodes,
         globalDataModel,
         tabs,
         setTabs,
@@ -4033,19 +4194,10 @@ function AppContent() {
                                 { x: 0, y: 0 }
                             );
 
-                            const labelLen =
-                                (newNode.data?.label || "").length +
-                                (newNode.data?.fullSkillName || "").length;
-                            const estimatedNodeWidth = Math.max(
-                                210,
-                                Math.min(300, 160 + labelLen * 3)
-                            );
-                            const eventCount =
-                                newNode.data?.events?.length || 0;
-                            const estimatedNodeHeight = Math.max(
-                                70,
-                                50 + eventCount * 18
-                            );
+                            const {
+                                width: estimatedNodeWidth,
+                                height: estimatedNodeHeight,
+                            } = getOverviewLayoutNodeSize(newNode);
 
                             if (targetCompound) {
                                 let newX = COMPOUND_PADDING_X;
@@ -4057,7 +4209,7 @@ function AppContent() {
                                             targetCompound.id
                                     )
                                     .forEach((member) => {
-                                        const size = getNodeSize(member);
+                                        const size = getOverviewLayoutNodeSize(member);
                                         newX = Math.max(
                                             newX,
                                             Number(member.position?.x || 0) +
@@ -4126,10 +4278,7 @@ function AppContent() {
                                 let newX = 25;
                                 existingMembers.forEach((member) => {
                                     const memberWidth =
-                                        Number(member.measured?.width) ||
-                                        Number(member.width) ||
-                                        Number(member.style?.width) ||
-                                        210;
+                                        getOverviewLayoutNodeSize(member).width;
                                     newX = Math.max(
                                         newX,
                                         Number(member.position?.x || 0) +
@@ -4141,7 +4290,10 @@ function AppContent() {
                                 const isFirstLaneState = existingMembers.length === 0;
                                 newNode.parentId = targetLane.id;
                                 newNode.extent = "parent";
-                                newNode.position = { x: newX, y: 20 };
+                                newNode.position = {
+                                    x: newX,
+                                    y: PARALLEL_LANE_CHILD_TOP_INSET,
+                                };
                                 newNode.data = {
                                     ...(newNode.data || {}),
                                     isInitial: isFirstLaneState,
@@ -4199,14 +4351,7 @@ function AppContent() {
                                             const memberWidth =
                                                 member.id === newNode.id
                                                     ? estimatedNodeWidth
-                                                    : Number(
-                                                        member.measured?.width
-                                                    ) ||
-                                                    Number(member.width) ||
-                                                    Number(
-                                                        member.style?.width
-                                                    ) ||
-                                                    210;
+                                                    : getOverviewLayoutNodeSize(member).width;
                                             maxRight = Math.max(
                                                 maxRight,
                                                 Number(
@@ -4224,10 +4369,14 @@ function AppContent() {
                                     const laneLayouts = new Map();
                                     const headerHeight =
                                         lanes.length > 0
-                                            ? Number(
-                                                lanes[0].position?.y || 40
+                                            ? Math.max(
+                                                PARALLEL_HEADER_HEIGHT,
+                                                Number(
+                                                    lanes[0].position?.y ||
+                                                    PARALLEL_HEADER_HEIGHT
+                                                )
                                             )
-                                            : 40;
+                                            : PARALLEL_HEADER_HEIGHT;
                                     let currentY = headerHeight;
 
                                     lanes.forEach((lane) => {
@@ -4241,14 +4390,7 @@ function AppContent() {
                                             const memberHeight =
                                                 member.id === newNode.id
                                                     ? estimatedNodeHeight
-                                                    : Number(
-                                                        member.measured?.height
-                                                    ) ||
-                                                    Number(member.height) ||
-                                                    Number(
-                                                        member.style?.height
-                                                    ) ||
-                                                    70;
+                                                    : getOverviewLayoutNodeSize(member).height;
                                             maxBottom = Math.max(
                                                 maxBottom,
                                                 Number(
@@ -4258,8 +4400,8 @@ function AppContent() {
                                         });
 
                                         const requiredHeight = Math.max(
-                                            110,
-                                            maxBottom + 20
+                                            130,
+                                            maxBottom + 30
                                         );
                                         laneLayouts.set(lane.id, {
                                             y: currentY,
@@ -4338,14 +4480,17 @@ function AppContent() {
                             setActiveMode={setActiveMode}
                             nodes={nodes}
                             edges={edges}
+                            slotNodes={slotNodes}
                             globalDataModel={globalDataModel}
                             visibleNodes={visibleNodes}
                             visibleEdges={visibleEdges}
                             smartRoutingNodes={smartRoutingNodes}
                             selectedNodes={selectedNodes}
+                            contextSelectionCount={editorCloneSelection.length}
                             contextMenu={contextMenu}
                             handleSelectAction={handleSelectAction}
                             canCreateEditorClone={canCreateEditorClone}
+                            editorCloneActionLabel={editorCloneActionLabel}
                             setIsCreateSlotModalOpen={setIsCreateSlotModalOpen}
                             isDraggingNode={isDraggingNode}
                             isOverTrash={isOverTrash}

@@ -113,8 +113,14 @@ export function useEditorDisplay({
     const cloneGroupByNodeId = useMemo(() => {
         const clonesByOriginalId = new Map();
 
-        (nodes || []).forEach((node) => {
-            if (!node.data?.isSkillClone || !node.data?.cloneOfNodeId) return;
+        [...(nodes || []), ...(injectedSlotNodes || [])].forEach((node) => {
+            const isVisualClone = Boolean(
+                node.data?.isSkillClone ||
+                node.data?.isStateClone ||
+                node.data?.isSlotClone
+            );
+            if (!isVisualClone || !node.data?.cloneOfNodeId) return;
+
             const originalId = node.data.cloneOfNodeId;
             if (!clonesByOriginalId.has(originalId)) {
                 clonesByOriginalId.set(originalId, []);
@@ -129,7 +135,7 @@ export function useEditorDisplay({
         });
 
         return groups;
-    }, [nodes]);
+    }, [nodes, injectedSlotNodes]);
 
     const selectedVisualNodeIdSet = useMemo(() => {
         const ids = new Set(selectedNodeIdSet);
@@ -357,6 +363,10 @@ export function useEditorDisplay({
     );
 
     const selectedSlotContextId = activeCanvasFocusNodeId || selectedNodeId;
+    const selectedSlotContextNodeIds = selectedSlotContextId
+        ? cloneGroupByNodeId.get(selectedSlotContextId) ||
+          new Set([selectedSlotContextId])
+        : new Set();
     const hasSelectedSlotContext = Boolean(
         selectedSlotContextId &&
             (nodeById.has(selectedSlotContextId) ||
@@ -410,16 +420,16 @@ export function useEditorDisplay({
                 (skillNodeId === hoveredSlotAccessNodeId ||
                     edge.source === hoveredSlotAccessNodeId ||
                     edge.target === hoveredSlotAccessNodeId) &&
-                (slotNodeId === selectedNodeId ||
-                    edge.source === selectedNodeId ||
-                    edge.target === selectedNodeId);
+                (selectedSlotContextNodeIds.has(slotNodeId) ||
+                    selectedSlotContextNodeIds.has(edge.source) ||
+                    selectedSlotContextNodeIds.has(edge.target));
 
             const isConnectedToSelection = isSlotDetailsConnectionPreview
                 ? isHoveredSlotDetailsConnection
-                : skillNodeId === selectedSlotContextId ||
-                  slotNodeId === selectedSlotContextId ||
-                  edge.source === selectedSlotContextId ||
-                  edge.target === selectedSlotContextId;
+                : selectedSlotContextNodeIds.has(skillNodeId) ||
+                  selectedSlotContextNodeIds.has(slotNodeId) ||
+                  selectedSlotContextNodeIds.has(edge.source) ||
+                  selectedSlotContextNodeIds.has(edge.target);
 
             if (isConnectedToSelection && !isHoveredSlotDetailsConnection) {
                 return edge;
@@ -476,6 +486,7 @@ export function useEditorDisplay({
         selectedNodeId,
         hasSelectedSlotContext,
         selectedSlotContextId,
+        cloneGroupByNodeId,
     ]);
 
     const compoundInitialEdges = useMemo(

@@ -18,6 +18,7 @@ export function useScxmlDocument({
     isDesktop,
     nodes,
     edges,
+    slotNodes,
     globalDataModel,
     tabs,
     setTabs,
@@ -74,7 +75,11 @@ export function useScxmlDocument({
                     )
                 );
 
-                checkSlotConnection(parsedNodes);
+                checkSlotConnection(
+                    parsedNodes,
+                    [],
+                    parsed.editorSlotNodes || []
+                );
                 window.setTimeout(
                     () => fitView({ padding: 0.2, duration: 400 }),
                     150
@@ -155,7 +160,9 @@ export function useScxmlDocument({
             const xml = generateXmlString(
                 exportGraph.nodes,
                 exportGraph.edges,
-                globalDataModel
+                globalDataModel,
+                [],
+                slotNodes
             );
             const defaultName =
                 currentActiveTab?.fileName ||
@@ -211,6 +218,7 @@ export function useScxmlDocument({
         [
             nodes,
             edges,
+            slotNodes,
             globalDataModel,
             tabs,
             activeTabId,

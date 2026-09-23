@@ -5275,6 +5275,17 @@
     stroke-width: 2.2;
 }
 
+.slot-node-clone-badge {
+    padding: 1px 4px;
+    border-radius: 999px;
+    background: rgba(165, 180, 252, 0.16);
+    border: 1px solid rgba(165, 180, 252, 0.32);
+    color: #e0e7ff;
+    font-size: 7.5px;
+    font-weight: 850;
+    letter-spacing: 0.45px;
+}
+
 .slot-node-type {
     min-width: 0;
     max-width: 150px;

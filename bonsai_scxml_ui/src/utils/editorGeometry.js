@@ -4,8 +4,8 @@ import { getOverviewLayoutNodeSize } from "./layoutUtils";
 export const getNodeId = () => `skill-node-${crypto.randomUUID()}`;
 
 export const PARALLEL_EXIT_GUTTER = 150;
-export const PARALLEL_NODE_GAP = 50;
-export const COMPOUND_NODE_GAP = 50;
+export const PARALLEL_NODE_GAP = 30;
+export const COMPOUND_NODE_GAP = 30;
 export const COMPOUND_PADDING_X = 30;
 // Reserve the visible header plus enough vertical clearance for child state
 // action badges, which extend above the child node itself.

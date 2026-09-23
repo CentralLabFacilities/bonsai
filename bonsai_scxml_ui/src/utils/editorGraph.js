@@ -218,6 +218,8 @@ export const getAncestorSlotSourcesByPath = (
         });
 
         (tab?.slotNodes || []).forEach((slotNode) => {
+            if (slotNode?.data?.isSlotClone) return;
+
             const slotPath = normalizeSlotPath(
                 slotNode?.data?.path || slotNode?.data?.label
             );
@@ -270,6 +272,8 @@ export const getAncestorSlotSourcesByPath = (
         });
 
         (tab?.slotNodes || []).forEach((slotNode) => {
+            if (slotNode?.data?.isSlotClone) return;
+
             if (slotNode?.data?.currentMachineInherited) {
                 addPath(slotNode?.data?.path || slotNode?.data?.label);
             }

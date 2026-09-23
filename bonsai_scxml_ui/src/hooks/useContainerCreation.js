@@ -1,6 +1,9 @@
 import { useCallback, useMemo, useRef } from "react";
 import {
     COMPOUND_PADDING_X,
+    COMPOUND_HEADER_HEIGHT,
+    PARALLEL_HEADER_HEIGHT,
+    PARALLEL_LANE_CHILD_TOP_INSET,
     PARALLEL_NODE_GAP,
     getCompoundExitGutterWidth,
     getNodeId,
@@ -8,6 +11,7 @@ import {
     resolveNodeCollisionsAndRefit,
 } from "../utils/editorGeometry";
 import { rebuildBoundaryTransitions } from "../utils/boundaryTransitions";
+import { getOverviewLayoutNodeSize } from "../utils/layoutUtils";
 
 
 export function useContainerCreation({
@@ -49,8 +53,8 @@ export function useContainerCreation({
                 .sort((a, b) => a.position.y - b.position.y);
 
             const laneIndex = existingLanes.length;
-            const laneHeight = 140;
-            const headerHeight = 45;
+            const laneHeight = 150;
+            const headerHeight = PARALLEL_HEADER_HEIGHT;
             const buttonReserve = 35;
 
             const newLaneId = getNodeId();
@@ -160,8 +164,8 @@ export function useContainerCreation({
     const handleCreateEmptyParallel = (pos) => {
         const parallelId = getNodeId();
         const parallelName = `parallel_${nodes.filter((n) => n.type === "parallel").length + 1}`;
-        const laneHeight = 110;
-        const headerHeight = 40;
+        const laneHeight = 130;
+        const headerHeight = PARALLEL_HEADER_HEIGHT;
         const containerWidth = 420;
         const containerHeight = headerHeight + 2 * laneHeight + 35;
 
@@ -224,8 +228,7 @@ export function useContainerCreation({
         selectedList.forEach((n) => {
             const x = n.position.x;
             const y = n.position.y;
-            const w = n.style?.width || 180;
-            const h = n.style?.height || 80;
+            const { width: w, height: h } = getOverviewLayoutNodeSize(n);
 
             if (x < minX) minX = x;
             if (y < minY) minY = y;
@@ -247,7 +250,7 @@ export function useContainerCreation({
         } = getSelectionBoundingBox(selectedNodes);
 
         const padding = 40;
-        const headerOffset = 50;
+        const headerOffset = COMPOUND_HEADER_HEIGHT;
 
         const contentWidth =
             maxX - minX + padding * 2;
@@ -635,19 +638,12 @@ export function useContainerCreation({
             groups.push(currentGroup);
         });
 
-        // 2. Präzise Breiten & Höhen pro Gruppe berechnen
-        // Eine CustomNode mit langem Label oder Instance-ID benötigt ca. 220-250px
-        const getNodeWidth = (node) => {
-            const labelLen = (node.data?.label || "").length + (node.data?.fullSkillName || "").length;
-            return Math.max(210, Math.min(300, 160 + labelLen * 3));
-        };
+        // 2. Use the same dimensions automatic Overview placement reserves.
+        // This includes parameters and slot docks, not only transition rows.
+        const getNodeWidth = (node) => getOverviewLayoutNodeSize(node).width;
+        const getNodeHeight = (node) => getOverviewLayoutNodeSize(node).height;
 
-        const getNodeHeight = (node) => {
-            const eventCount = node.data?.events?.length || 0;
-            return Math.max(node.style?.height || 70, 50 + eventCount * 18);
-        };
-
-        const headerHeight = 45;
+        const headerHeight = PARALLEL_HEADER_HEIGHT;
         const buttonReserve = 40;
         const laneHeights = [];
         const groupWidths = [];
@@ -819,7 +815,7 @@ export function useContainerCreation({
 
                     position: {
                         x: currentX,
-                        y: 20,
+                        y: PARALLEL_LANE_CHILD_TOP_INSET,
                     },
 
                     selected: false,

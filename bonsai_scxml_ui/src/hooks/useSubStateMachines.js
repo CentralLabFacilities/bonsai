@@ -414,7 +414,11 @@ export function useSubStateMachines({
             setGlobalDataModel(parsed.globalDataModel);
             setInheritedGlobalDataModel(inheritedForChild);
             setSelectedNodeId(null);
-            checkSlotConnection(parsedNodes);
+            checkSlotConnection(
+                parsedNodes,
+                [],
+                parsed.editorSlotNodes || []
+            );
 
             setTimeout(
                 () => fitView({ padding: 0.2, duration: 300 }),

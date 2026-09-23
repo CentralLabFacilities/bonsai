@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { resolveCollisionScope } from "../utils/nodeCollisions";
 import { rebuildBoundaryTransitions } from "../utils/boundaryTransitions";
+import { getOverviewLayoutNodeSize } from "../utils/layoutUtils";
 import {
     COMPOUND_HEADER_HEIGHT,
     COMPOUND_PADDING_X,
     COMPOUND_BOTTOM_PADDING,
     NODE_COLLISION_OPTIONS,
     PARALLEL_NODE_GAP,
+    PARALLEL_LANE_CHILD_TOP_INSET,
     fitCompoundAndAncestorCompounds,
     getAbsoluteNodePosition,
     getDirectCompoundForNode,
@@ -1176,7 +1178,7 @@ export function useNodeDrag({
                         );
                         const newX =
                             25 + existingMembers.reduce((x, member) => {
-                                const size = getNodeSize(member);
+                                const size = getOverviewLayoutNodeSize(member);
                                 return x + size.width + PARALLEL_NODE_GAP;
                             }, 0);
 
@@ -1187,7 +1189,10 @@ export function useNodeDrag({
                                     parentId: currentLane.id,
                                     extent: "parent",
                                     expandParent: true,
-                                    position: { x: newX, y: 20 },
+                                    position: {
+                                        x: newX,
+                                        y: PARALLEL_LANE_CHILD_TOP_INSET,
+                                    },
                                 }
                                 : candidate
                         );

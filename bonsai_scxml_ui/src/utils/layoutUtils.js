@@ -194,8 +194,8 @@ export const getLayoutedElements = (nodesToLayout, edgesToLayout) => {
         // dimensions rather than on a fixed 180x80 placeholder.
         dagreGraph.setGraph({
             rankdir: "LR",
-            nodesep: 90,
-            ranksep: 170,
+            nodesep: 60,
+            ranksep: 120,
         });
 
         nodesToLayout.forEach((node) => {

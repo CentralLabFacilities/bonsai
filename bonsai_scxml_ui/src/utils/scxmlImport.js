@@ -716,6 +716,51 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
     const directChildren = Array.from(scxmlElem.children);
     const rootDataModel = directChildren.find((c) => c.localName === "datamodel");
 
+    // Root-level editor metadata stores visual slot positions separately from
+    // semantic #_SLOTS declarations. A clone is therefore only another visual
+    // position for the same slot path and never becomes a second SCXML slot.
+    const editorSlotNodes = [];
+    const rootMetadata = directChildren.find((c) => c.localName === "metadata");
+    if (rootMetadata) {
+        Array.from(rootMetadata.children || [])
+            .filter((element) => element.localName === "slotPosition")
+            .forEach((element) => {
+                const cleanPath = String(
+                    element.getAttribute("path") || ""
+                ).trim().replace(/^\/+/, "");
+                if (!cleanPath) return;
+
+                const x = Number(element.getAttribute("x"));
+                const y = Number(element.getAttribute("y"));
+                const isClone =
+                    String(element.getAttribute("clone") || "")
+                        .trim()
+                        .toLowerCase() === "true";
+                const canonicalSlotNodeId = `slot-${cleanPath}`;
+
+                editorSlotNodes.push({
+                    id: isClone
+                        ? `slot-clone-${crypto.randomUUID()}`
+                        : canonicalSlotNodeId,
+                    position: {
+                        x: Number.isFinite(x) ? x : 0,
+                        y: Number.isFinite(y) ? y : 0,
+                    },
+                    type: "slot",
+                    data: {
+                        path: `/${cleanPath}`,
+                        label: `/${cleanPath}`,
+                        ...(isClone
+                            ? {
+                                isSlotClone: true,
+                                cloneOfNodeId: canonicalSlotNodeId,
+                            }
+                            : {}),
+                    },
+                });
+            });
+    }
+
     if (rootDataModel) {
         const dataTags = Array.from(rootDataModel.children).filter((c) => c.localName === "data");
         dataTags.forEach((dataTag) => {
@@ -1843,5 +1888,10 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
         });
     }
 
-    return { nodes: finalNodes, edges: finalEdges, globalDataModel: globalDataEntries };
+    return {
+        nodes: finalNodes,
+        edges: finalEdges,
+        globalDataModel: globalDataEntries,
+        editorSlotNodes,
+    };
 };

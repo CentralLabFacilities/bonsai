@@ -39,14 +39,17 @@ export default function EditorCanvas({
     setActiveMode,
     nodes,
     edges,
+    slotNodes,
     globalDataModel,
     visibleNodes,
     visibleEdges,
     smartRoutingNodes,
     selectedNodes,
+    contextSelectionCount,
     contextMenu,
     handleSelectAction,
     canCreateEditorClone,
+    editorCloneActionLabel,
     setIsCreateSlotModalOpen,
     isDraggingNode,
     isOverTrash,
@@ -78,9 +81,11 @@ export default function EditorCanvas({
         return generateXmlString(
             exportGraph.nodes,
             exportGraph.edges,
-            globalDataModel
+            globalDataModel,
+            [],
+            slotNodes
         );
-    }, [activeMode, nodes, edges, globalDataModel]);
+    }, [activeMode, nodes, edges, slotNodes, globalDataModel]);
 
     if (activeMode === "code") {
         return (
@@ -138,8 +143,8 @@ export default function EditorCanvas({
                     onClick={(event) => event.stopPropagation()}
                 >
                     <div className="context-menu-header">
-                        {selectedNodes.length > 0
-                            ? `change ${selectedNodes.length} node(s) in:`
+                        {contextSelectionCount > 0
+                            ? `change ${contextSelectionCount} node(s) in:`
                             : "Create new element"}
                     </div>
                     {canCreateEditorClone && (
@@ -147,7 +152,7 @@ export default function EditorCanvas({
                             className="context-menu-item"
                             onClick={() => handleSelectAction("clone")}
                         >
-                            Clone Selected State
+                            {editorCloneActionLabel || "Clone Selected State"}
                         </button>
                     )}
                     <button

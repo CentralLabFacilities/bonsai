@@ -42,11 +42,41 @@ const buildEditorMetadataXml = (node, indent, isLane) => {
     return `${indent}    <metadata>\n${positionLines.join("\n")}\n${indent}    </metadata>`;
 };
 
+const buildEditorSlotMetadataXml = (slotNodes = []) => {
+    const positionLines = (slotNodes || [])
+        .filter((node) => node?.type === "slot")
+        .map((node) => {
+            const path = String(
+                node.data?.path || node.data?.label || ""
+            ).trim();
+            if (!path) return null;
+
+            const x = Math.round(Number(node.position?.x || 0));
+            const y = Math.round(Number(node.position?.y || 0));
+            const cloneAttr = node.data?.isSlotClone
+                ? ' clone="true"'
+                : "";
+
+            return `        <editor:slotPosition path="${escapeXmlAttribute(path)}"${cloneAttr} x="${x}" y="${y}"/>`;
+        })
+        .filter(Boolean);
+
+    if (positionLines.length === 0) return "";
+
+    return `    <metadata>\n${positionLines.join("\n")}\n    </metadata>`;
+};
+
 /**
  * Generiert den SCXML-Code-String inklusive <metadata> Positionen, Slots,
  * Sub-State-Machines und Condition/Assign-Transitions.
  */
-export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel = [], extraSlotDeclarations = []) => {
+export const generateXmlString = (
+    nodes,
+    edgesOrDataModel = [],
+    maybeDataModel = [],
+    extraSlotDeclarations = [],
+    editorSlotNodes = []
+) => {
     if (!nodes || nodes.length === 0) return "";
 
     // Parameter-Flexibilität (edges vs. globalDataModel)
@@ -547,6 +577,7 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
     };
 
     const statesXml = topLevelNodes.map((node) => renderNode(node, 1)).join("\n\n");
+    const editorSlotMetadataXml = buildEditorSlotMetadataXml(editorSlotNodes);
 
     return `<?xml version="1.0" encoding="UTF-8"?>
 <scxml xmlns="http://www.w3.org/2005/07/scxml"
@@ -558,7 +589,7 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
 ${globalDataXml}
     </datamodel>
 
-${statesXml}
+${editorSlotMetadataXml ? `${editorSlotMetadataXml}\n\n` : ""}${statesXml}
 
 </scxml>\n`;
 };
