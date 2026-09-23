@@ -13,7 +13,6 @@ import {
 } from "../utils/editorGeometry";
 
 const SLOT_EDGE_INACTIVE_COLOR = "#64748b";
-const HOVER_INACTIVE_EDGE_COLOR = "#94a3b8";
 
 const pointInsideRect = (point, rect) =>
     point.x >= rect.left &&
@@ -393,6 +392,41 @@ export function useEditorDisplay({
         return nodes;
     }, [nodes, isDraggingNode]);
 
+    // Smart/manual edge routing only depends on node geometry, not display-only
+    // node data such as selection/hover highlighting. Keep one stable obstacle
+    // array so those UI interactions do not invalidate every routed edge.
+    // Slot nodes are included only in modes where they are actually rendered.
+    const manualRoutingNodesRef = useRef([]);
+    const manualRoutingNodes = useMemo(() => {
+        const requestedNodes =
+            activeMode === "slots" || activeMode === "overview"
+                ? [...injectedNodes, ...injectedSlotNodes]
+                : injectedNodes;
+        const previous = manualRoutingNodesRef.current;
+        const geometryUnchanged =
+            previous.length === requestedNodes.length &&
+            requestedNodes.every((node, index) => {
+                const oldNode = previous[index];
+                return (
+                    oldNode?.id === node.id &&
+                    oldNode?.type === node.type &&
+                    oldNode?.parentId === node.parentId &&
+                    oldNode?.hidden === node.hidden &&
+                    oldNode?.position?.x === node.position?.x &&
+                    oldNode?.position?.y === node.position?.y &&
+                    oldNode?.style?.width === node.style?.width &&
+                    oldNode?.style?.height === node.style?.height &&
+                    Boolean(oldNode?.data?.isCollapsed) ===
+                        Boolean(node.data?.isCollapsed)
+                );
+            });
+
+        if (geometryUnchanged) return previous;
+
+        manualRoutingNodesRef.current = requestedNodes;
+        return requestedNodes;
+    }, [activeMode, injectedNodes, injectedSlotNodes]);
+
     const compoundAvoidanceNodesDependency = routingGeometryNodes;
     const compoundAvoidanceByEdgeId = useMemo(() => {
         const liveNodes = compoundAvoidanceNodesDependency;
@@ -501,6 +535,9 @@ export function useEditorDisplay({
                         ...(compoundAvoidanceByEdgeId.has(edge.id)
                             ? { forceObstacleRouting: true }
                             : {}),
+                        // ManualEditableTransitionEdge consumes this stable
+                        // geometry cache instead of subscribing to useNodes().
+                        routingNodes: manualRoutingNodes,
                         onControlPointsChange: (controlPoints) =>
                             updatePersistentEdgeControlPoints(
                                 edge.id,
@@ -513,6 +550,7 @@ export function useEditorDisplay({
         [
             normalizedTransitionEdges,
             compoundAvoidanceByEdgeId,
+            manualRoutingNodes,
             updatePersistentEdgeControlPoints,
         ]
     );
@@ -552,8 +590,11 @@ export function useEditorDisplay({
             baseEdges.push(selectedBaseEdge);
             focusedEdges.push({
                 ...withEdgeClassName(
-                    selectedBaseEdge,
-                    "editor-edge-context-visible"
+                    withEdgeClassName(
+                        selectedBaseEdge,
+                        "editor-edge-context-visible"
+                    ),
+                    "editor-edge-focus-active"
                 ),
                 animated: true,
                 style: {
@@ -573,13 +614,16 @@ export function useEditorDisplay({
                 baseEdges,
                 getTransitionEdgeNodeIds
             ),
+            indexByEdgeId: new Map(
+                baseEdges.map((edge, index) => [edge.id, index])
+            ),
         };
     }, [smartTransitionEdges, selectedTransitionEdgeIds]);
 
     const transitionEdgesForDisplay = useMemo(() => {
         if (activeMode === "code") return [];
 
-        const { baseEdges, focusedEdges, indexByNodeId } =
+        const { baseEdges, focusedEdges, indexByNodeId, indexByEdgeId } =
             transitionRenderCache;
         const focusedIndexes = new Set();
         edgeFocusNodeIds.forEach((nodeId) => {
@@ -587,6 +631,11 @@ export function useEditorDisplay({
                 focusedIndexes.add(edgeIndex)
             );
         });
+
+        if (activeHoveredEditorEdgeId) {
+            const hoveredIndex = indexByEdgeId.get(activeHoveredEditorEdgeId);
+            if (hoveredIndex !== undefined) focusedIndexes.add(hoveredIndex);
+        }
 
         // Keep every transition mounted after load. The visibility toggle is
         // implemented by a CSS class on React Flow instead of removing edges
@@ -603,7 +652,12 @@ export function useEditorDisplay({
             displayed[edgeIndex] = focusedEdges[edgeIndex];
         });
         return displayed;
-    }, [activeMode, transitionRenderCache, edgeFocusNodeIds]);
+    }, [
+        activeMode,
+        transitionRenderCache,
+        edgeFocusNodeIds,
+        activeHoveredEditorEdgeId,
+    ]);
 
     const highlightedTransitionEdges = transitionEdgesForDisplay;
 
@@ -681,6 +735,9 @@ export function useEditorDisplay({
                     data: {
                         ...(edge.data || {}),
                         access,
+                        // Slot edges use the same geometry-only obstacle cache;
+                        // in Slot/Overview mode it already includes slot nodes.
+                        routingNodes: manualRoutingNodes,
                         onControlPointsChange: (controlPoints) =>
                             updatePersistentEdgeControlPoints(
                                 edge.id,
@@ -690,7 +747,11 @@ export function useEditorDisplay({
                     },
                 };
             }),
-        [slotStructureEdges, updatePersistentEdgeControlPoints]
+        [
+            slotStructureEdges,
+            manualRoutingNodes,
+            updatePersistentEdgeControlPoints,
+        ]
     );
 
     // Keep every slot edge mounted while Slot/Overview mode is active. Just as
@@ -1011,7 +1072,7 @@ export function useEditorDisplay({
     const hasSmartRoutedEdges =
         highlightedTransitionEdges.length > 0 || editableSlotEdges.length > 0;
     const requestedSmartRoutingNodes = hasSmartRoutedEdges
-        ? baseVisibleNodes
+        ? manualRoutingNodes
         : [];
     const [smartRoutingNodes, setSmartRoutingNodes] = useState(
         requestedSmartRoutingNodes
@@ -1035,7 +1096,6 @@ export function useEditorDisplay({
         );
     }, [smartRoutingNodesDependency]);
 
-    const dimmedHoverEdgeCacheRef = useRef(new WeakMap());
     const dimmedHoverNodeCacheRef = useRef(new WeakMap());
     const highlightedHoverNodeCacheRef = useRef(new WeakMap());
 
@@ -1045,21 +1105,37 @@ export function useEditorDisplay({
             slotNodeIdSet.has(selectedNodeId)
     );
 
+    const edgeFocusMode = Boolean(
+        activeCanvasFocusNodeId ||
+            activeHoveredEditorEdgeId ||
+            isSlotDetailsFocus
+    );
+
     const visibleEdges = useMemo(() => {
         const structuralTransitionEdges = [
             ...compoundInitialEdges,
             ...parallelEntryEdges,
         ].map((edge) => {
-            const transitionEdge = withEdgeClassName(
+            let transitionEdge = withEdgeClassName(
                 edge,
                 "editor-transition-edge"
             );
-            return transitionEdgeMatchesFocus(edge)
-                ? withEdgeClassName(
-                      transitionEdge,
-                      "editor-edge-context-visible"
-                  )
-                : transitionEdge;
+            const isFocused =
+                transitionEdgeMatchesFocus(edge) ||
+                edge.id === activeHoveredEditorEdgeId;
+
+            if (isFocused) {
+                transitionEdge = withEdgeClassName(
+                    transitionEdge,
+                    "editor-edge-context-visible"
+                );
+                transitionEdge = withEdgeClassName(
+                    transitionEdge,
+                    "editor-edge-focus-active"
+                );
+            }
+
+            return transitionEdge;
         });
 
         let nextVisibleEdges = [
@@ -1067,13 +1143,7 @@ export function useEditorDisplay({
             ...structuralTransitionEdges,
         ];
 
-        if (activeMode === "slots") {
-            nextVisibleEdges = [
-                ...highlightedTransitionEdges,
-                ...structuralTransitionEdges,
-                ...editableSlotEdges,
-            ];
-        } else if (activeMode === "overview") {
+        if (activeMode === "slots" || activeMode === "overview") {
             nextVisibleEdges = [
                 ...highlightedTransitionEdges,
                 ...structuralTransitionEdges,
@@ -1081,8 +1151,8 @@ export function useEditorDisplay({
             ];
         }
 
-        // This pass now runs once when dragging starts/stops instead of once per
-        // node position update because it no longer shares a memo with nodes.
+        // This pass runs only when dragging starts/stops. Hover focus is now
+        // handled by CSS classes, so it no longer clones every visible edge.
         if (isDraggingNode) {
             nextVisibleEdges = nextVisibleEdges.map((edge) =>
                 edge.animated ? { ...edge, animated: false } : edge
@@ -1097,146 +1167,17 @@ export function useEditorDisplay({
             );
         }
 
-        const hoveredEditorEdge = activeHoveredEditorEdgeId
-            ? nextVisibleEdges.find(
-                  (edge) => edge.id === activeHoveredEditorEdgeId
-              )
-            : null;
-        const hasHoverFocus = Boolean(
-            activeCanvasFocusNodeId || hoveredEditorEdge || isSlotDetailsFocus
-        );
-
-        if (!hasHoverFocus) {
-            return nextVisibleEdges;
-        }
-
-        const transitionsAreContextOnly =
-            !showTransitionEdges || activeMode === "slots";
-
-        return nextVisibleEdges.map((edge) => {
-            const isTransitionEdge = String(edge.className || "")
-                .split(/\s+/)
-                .includes("editor-transition-edge");
-            const isContextVisibleTransition = String(edge.className || "")
-                .split(/\s+/)
-                .includes("editor-edge-context-visible");
-
-            // When transitions are context-only, unrelated transitions are
-            // already hidden by CSS. Preserve their cached object identity
-            // instead of creating thousands of dimmed edge objects on hover.
-            if (
-                transitionsAreContextOnly &&
-                isTransitionEdge &&
-                !isContextVisibleTransition &&
-                !edge.selected
-            ) {
-                return edge;
-            }
-
-            const isCanvasHoverConnection = Boolean(
-                activeCanvasFocusNodeId &&
-                    (edge.source === activeCanvasFocusNodeId ||
-                        edge.target === activeCanvasFocusNodeId)
-            );
-            const isHoveredEditorEdge = Boolean(
-                activeHoveredEditorEdgeId &&
-                    edge.id === activeHoveredEditorEdgeId
-            );
-            const isSlotDetailsConnection = Boolean(
-                isSlotDetailsFocus &&
-                    ((edge.source === hoveredSlotAccessNodeId &&
-                        edge.target === selectedNodeId) ||
-                        (edge.target === hoveredSlotAccessNodeId &&
-                            edge.source === selectedNodeId))
-            );
-            const isSelectedTransition = Boolean(
-                edge.selected && edge.data?.edgeKind !== "slot"
-            );
-
-            // Hover focus is additive to real transition selection. A hovered
-            // transition gets the same semantic colour + flow emphasis as a
-            // selected transition, while already-selected transitions remain
-            // highlighted independently.
-            if (isHoveredEditorEdge && edge.data?.edgeKind !== "slot") {
-                const color = getTransitionHighlightColor(
-                    edge.data?.semanticSourceHandle ||
-                        edge.data?.originalSourceHandle ||
-                        edge.sourceHandle ||
-                        edge.label
-                );
-
-                return {
-                    ...edge,
-                    animated: true,
-                    style: {
-                        ...(edge.style || {}),
-                        stroke: color,
-                        opacity: 1,
-                    },
-                    markerEnd: edge.markerEnd
-                        ? { ...edge.markerEnd, color }
-                        : edge.markerEnd,
-                    labelStyle: {
-                        ...(edge.labelStyle || {}),
-                        opacity: 1,
-                    },
-                };
-            }
-
-            if (
-                isSelectedTransition ||
-                isCanvasHoverConnection ||
-                isHoveredEditorEdge ||
-                isSlotDetailsConnection
-            ) {
-                return edge;
-            }
-
-            const existingOpacity = Number(edge.style?.opacity);
-            const dimmedOpacity = Number.isFinite(existingOpacity)
-                ? Math.min(existingOpacity, 0.22)
-                : 0.22;
-
-            const cachedDimmedEdge = dimmedHoverEdgeCacheRef.current.get(edge);
-            if (cachedDimmedEdge) return cachedDimmedEdge;
-
-            const dimmedEdge = {
-                ...edge,
-                animated: false,
-                style: {
-                    ...(edge.style || {}),
-                    stroke: HOVER_INACTIVE_EDGE_COLOR,
-                    opacity: dimmedOpacity,
-                },
-                markerEnd: edge.markerEnd
-                    ? {
-                          ...edge.markerEnd,
-                          color: HOVER_INACTIVE_EDGE_COLOR,
-                      }
-                    : edge.markerEnd,
-                labelStyle: {
-                    ...(edge.labelStyle || {}),
-                    opacity: 0.42,
-                },
-            };
-            dimmedHoverEdgeCacheRef.current.set(edge, dimmedEdge);
-            return dimmedEdge;
-        });
+        return nextVisibleEdges;
     }, [
         highlightedTransitionEdges,
         compoundInitialEdges,
         parallelEntryEdges,
-        showTransitionEdges,
         edgeFocusNodeIds,
         activeMode,
-        activeCanvasFocusNodeId,
         editableSlotEdges,
         isDraggingNode,
         hiddenNodeIds,
         activeHoveredEditorEdgeId,
-        isSlotDetailsFocus,
-        hoveredSlotAccessNodeId,
-        selectedNodeId,
     ]);
 
     const hoveredEditorEdge = useMemo(
@@ -1466,5 +1407,6 @@ export function useEditorDisplay({
         visibleNodes,
         visibleEdges,
         smartRoutingNodes,
+        edgeFocusMode,
     };
 }

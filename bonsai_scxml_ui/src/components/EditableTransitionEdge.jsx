@@ -4,7 +4,6 @@ import {
     EdgeLabelRenderer,
     Position,
     getBezierPath,
-    useNodes,
     useReactFlow,
 } from "@xyflow/react";
 import {
@@ -211,7 +210,12 @@ function ManualEditableTransitionEdge(
         interactionWidth = 20,
     } = props;
 
-    const nodes = useNodes();
+    // Obstacle geometry is injected from useEditorDisplay as a stable cache.
+    // Do not subscribe every manual edge to React Flow's complete node store:
+    // selection/hover-only node updates would otherwise wake every manual edge.
+    const routingNodes = Array.isArray(data?.routingNodes)
+        ? data.routingNodes
+        : [];
 
     const {
         setEdges,
@@ -464,107 +468,79 @@ function ManualEditableTransitionEdge(
             ]
         );
 
-    const routePoints = [
-        sourcePoint,
-        ...controlPoints,
-        targetPoint,
-    ];
+    const routePoints = useMemo(
+        () => [sourcePoint, ...controlPoints, targetPoint],
+        [sourcePoint, controlPoints, targetPoint]
+    );
 
-    const routedSegments = [];
+    // Manual smart routing is expensive. Cache the complete geometry result so
+    // display-only updates (selection, hover, edge visibility, animation/style)
+    // do not rerun A* routing for every segment. The common routingNodes array
+    // changes only when actual node/slot geometry changes.
+    const { combinedPath, segmentMidpoints, labelPoint } = useMemo(() => {
+        const routedSegments = [];
 
-    for (
-        let index = 0;
-        index < routePoints.length - 1;
-        index += 1
-    ) {
-        const isFirstSegment =
-            index === 0;
+        for (
+            let index = 0;
+            index < routePoints.length - 1;
+            index += 1
+        ) {
+            const isFirstSegment = index === 0;
+            const isLastSegment = index === routePoints.length - 2;
 
-        const isLastSegment =
-            index ===
-            routePoints.length - 2;
+            routedSegments.push(
+                getRoutedSegmentPath(
+                    routePoints[index],
+                    routePoints[index + 1],
+                    routingNodes,
+                    isFirstSegment ? sourcePosition : null,
+                    isLastSegment ? targetPosition : null
+                )
+            );
+        }
 
-        routedSegments.push(
-            getRoutedSegmentPath(
-                routePoints[index],
-                routePoints[index + 1],
-                nodes,
-                isFirstSegment
-                    ? sourcePosition
-                    : null,
-                isLastSegment
-                    ? targetPosition
-                    : null
-            )
-        );
-    }
-
-    const combinedPath =
-        routedSegments
-            .map(
-                (
-                    segmentPath,
-                    index
-                ) => {
-                    if (index === 0) {
-                        return segmentPath;
-                    }
-
-                    const remainder =
-                        stripMoveCommand(
-                            segmentPath
-                        );
-
-                    return remainder
-                        ? remainder
-                        : segmentPath;
-                }
-            )
+        const nextCombinedPath = routedSegments
+            .map((segmentPath, index) => {
+                if (index === 0) return segmentPath;
+                const remainder = stripMoveCommand(segmentPath);
+                return remainder || segmentPath;
+            })
             .join(" ");
 
-    const segmentMidpoints =
-        routePoints
+        const nextSegmentMidpoints = routePoints
             .slice(0, -1)
-            .map(
-                (point, index) => {
-                    const nextPoint =
-                        routePoints[
-                        index + 1
-                            ];
+            .map((point, index) => {
+                const nextPoint = routePoints[index + 1];
+                return {
+                    x: (point.x + nextPoint.x) / 2,
+                    y: (point.y + nextPoint.y) / 2,
+                    insertIndex: index,
+                };
+            });
 
-                    return {
-                        x:
-                            (
-                                point.x +
-                                nextPoint.x
-                            ) / 2,
-                        y:
-                            (
-                                point.y +
-                                nextPoint.y
-                            ) / 2,
-                        insertIndex:
-                        index,
-                    };
-                }
-            );
-
-    const labelPoint =
-        segmentMidpoints[
-            Math.floor(
-                segmentMidpoints.length /
-                2
-            )
+        const nextLabelPoint =
+            nextSegmentMidpoints[
+                Math.floor(nextSegmentMidpoints.length / 2)
             ] || {
-            x:
-                (sourceX +
-                    targetX) /
-                2,
-            y:
-                (sourceY +
-                    targetY) /
-                2,
+                x: (sourceX + targetX) / 2,
+                y: (sourceY + targetY) / 2,
+            };
+
+        return {
+            combinedPath: nextCombinedPath,
+            segmentMidpoints: nextSegmentMidpoints,
+            labelPoint: nextLabelPoint,
         };
+    }, [
+        routePoints,
+        routingNodes,
+        sourcePosition,
+        targetPosition,
+        sourceX,
+        sourceY,
+        targetX,
+        targetY,
+    ]);
 
     return (
         <>

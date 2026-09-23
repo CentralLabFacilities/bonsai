@@ -1307,6 +1307,38 @@ function AppContent() {
     }, [semanticNodes, semanticChildrenByParent]);
 
 
+    // Cache the transition handles used by each skill for its local validation
+    // badge. CustomNode used to call React Flow's useEdges(), which subscribed
+    // every skill node to the entire edge array. With a large state machine,
+    // showing/highlighting one transition could therefore wake up every skill.
+    // Keep the full transition graph loaded, but expose only this tiny derived
+    // per-skill dependency to the node renderer.
+    const outgoingTransitionHandlesByNodeId = useMemo(() => {
+        const handlesByNodeId = new Map();
+
+        edges.forEach((edge) => {
+            if (!edge?.source) return;
+            const handle = edge.sourceHandle;
+            if (handle === undefined || handle === null) return;
+
+            if (!handlesByNodeId.has(edge.source)) {
+                handlesByNodeId.set(edge.source, new Set());
+            }
+            handlesByNodeId.get(edge.source).add(String(handle));
+        });
+
+        const result = new Map();
+        handlesByNodeId.forEach((handles, nodeId) => {
+            const sorted = [...handles].sort();
+            result.set(nodeId, {
+                handles: sorted,
+                signature: sorted.join("\u001f"),
+            });
+        });
+        return result;
+    }, [edges]);
+
+
     // Keep the injected React Flow node objects stable whenever the source
     // node itself did not change. During a drag React Flow normally replaces
     // only the moved node; recreating wrappers for every other node forces
@@ -1320,6 +1352,10 @@ function AppContent() {
 
         const result = nodes.map((n) => {
             const hidden = hiddenNodeIds.has(n.id);
+            const outgoingTransitionInfo =
+                outgoingTransitionHandlesByNodeId.get(n.id) || null;
+            const outgoingTransitionSignature =
+                outgoingTransitionInfo?.signature || "";
             let childTab = null;
 
             if (n.type === "submachine") {
@@ -1351,6 +1387,8 @@ function AppContent() {
                 cached &&
                 cached.sourceNode === n &&
                 cached.hidden === hidden &&
+                cached.outgoingTransitionSignature ===
+                    outgoingTransitionSignature &&
                 cached.activeMode === activeMode &&
                 cached.slotConnectionDrag === slotConnectionDrag &&
                 cached.childGlobalDataModel === childGlobalDataModel &&
@@ -1373,6 +1411,8 @@ function AppContent() {
             const injectedData = {
                 ...n.data,
                 mode: activeMode,
+                outgoingTransitionHandles:
+                    outgoingTransitionInfo?.handles || [],
                 onOpenStateActions: handleOpenStateActions,
                 onOpenParameter: handleOpenParameter,
                 onOpenSlot: handleOpenSlot,
@@ -1404,6 +1444,7 @@ function AppContent() {
             nextCache.set(n.id, {
                 sourceNode: n,
                 hidden,
+                outgoingTransitionSignature,
                 activeMode,
                 slotConnectionDrag,
                 childGlobalDataModel,
@@ -1424,6 +1465,7 @@ function AppContent() {
         return result;
     }, [
         nodes,
+        outgoingTransitionHandlesByNodeId,
         tabs,
         activeTabId,
         activeMode,
@@ -2256,7 +2298,12 @@ function AppContent() {
         [setEdges, setSlotEdges]
     );
 
-    const { visibleNodes, visibleEdges, smartRoutingNodes } = useEditorDisplay({
+    const {
+        visibleNodes,
+        visibleEdges,
+        smartRoutingNodes,
+        edgeFocusMode,
+    } = useEditorDisplay({
         hoveredEditorNodeId,
         hoveredEditorEdgeId,
         selectedNodes,
@@ -5032,6 +5079,7 @@ function AppContent() {
                             visibleNodes={visibleNodes}
                             visibleEdges={visibleEdges}
                             smartRoutingNodes={smartRoutingNodes}
+                            edgeFocusMode={edgeFocusMode}
                             selectedNodes={selectedNodes}
                             contextSelectionCount={editorCloneSelection.length}
                             contextMenu={contextMenu}

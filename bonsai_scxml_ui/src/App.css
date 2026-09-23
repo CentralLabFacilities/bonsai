@@ -7185,3 +7185,23 @@
     visibility: hidden;
     pointer-events: none;
 }
+
+/*
+ * Large-graph hover focus must stay paint-only. Previously useEditorDisplay
+ * cloned/restyled every visible transition whenever the pointer moved onto a
+ * node/edge. With thousands of transitions that O(E) React update dominated
+ * interaction time. Connected transitions now receive
+ * .editor-edge-focus-active, while the canvas class dims all other mounted
+ * transition SVG groups directly in CSS.
+ */
+.react-flow.editor-edge-focus-mode
+    .react-flow__edge.editor-transition-edge:not(.editor-edge-focus-active):not(.selected) {
+    opacity: 0.22;
+}
+
+.react-flow.editor-edge-focus-mode
+    .react-flow__edge.editor-transition-edge.editor-edge-focus-active,
+.react-flow.editor-edge-focus-mode
+    .react-flow__edge.editor-transition-edge.selected {
+    opacity: 1;
+}

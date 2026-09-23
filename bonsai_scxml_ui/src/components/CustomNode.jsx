@@ -2,7 +2,6 @@ import { useEffect, useMemo } from "react";
 import {
     Handle,
     Position,
-    useEdges,
     useUpdateNodeInternals,
 } from "@xyflow/react";
 import { FiAlertCircle } from "react-icons/fi";
@@ -56,7 +55,6 @@ const getParameterDefaultValue = (parameter) => {
 };
 
 function CustomNode({ id, data, selected }) {
-    const edges = useEdges();
     const updateNodeInternals = useUpdateNodeInternals();
 
     const instanceId = String(data.editorInstanceId || "").trim()
@@ -257,11 +255,12 @@ function CustomNode({ id, data, selected }) {
             return value === "" && defaultValue === "";
         });
 
-        const outgoingHandles = new Set(
-            edges
-                .filter((edge) => edge.source === id)
-                .map((edge) => edge.sourceHandle)
-        );
+        // Do not subscribe every skill node to React Flow's complete edge
+        // array. App.jsx precomputes this small per-node handle list whenever
+        // the semantic transition graph actually changes. On large workflows
+        // this prevents every skill from re-rendering when unrelated edges are
+        // shown/hidden, selected, highlighted, or otherwise repainted.
+        const outgoingHandles = new Set(data.outgoingTransitionHandles || []);
 
         const hasWildcard = outgoingHandles.has("*");
         let missingTransitions = false;
@@ -297,7 +296,6 @@ function CustomNode({ id, data, selected }) {
         };
     }, [
         data,
-        edges,
         id,
         showEvents,
         showSlots,
