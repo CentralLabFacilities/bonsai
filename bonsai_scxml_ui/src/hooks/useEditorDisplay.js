@@ -660,12 +660,16 @@ export function useEditorDisplay({
         ]
     );
 
-    // Cache both the normal and focused/animated variants. Hover/selection
-    // therefore swaps object references from this cache instead of rebuilding
-    // styles/markers/animation state for every interaction.
+    // Cache all presentation variants independently from React Flow selection.
+    // Selecting one edge used to rebuild base/focused objects for the complete
+    // transition graph. With large workflows that meant O(E) object churn for
+    // a one-edge interaction. Selection now only swaps the indexed entries
+    // below, while this cache changes only when transition structure changes.
     const transitionRenderCache = useMemo(() => {
         const baseEdges = [];
         const focusedEdges = [];
+        const selectedEdges = [];
+        const selectedFocusedEdges = [];
 
         smartTransitionEdges.forEach((rawEdge) => {
             const edge = withEdgeClassName(
@@ -680,41 +684,53 @@ export function useEditorDisplay({
                 edge.label;
             const color = getTransitionHighlightColor(semanticHandle);
 
-            const isEdgeSelected = selectedTransitionEdgeIds.has(edge.id);
-            const selectedBaseEdge = isEdgeSelected
-                ? {
-                      ...edge,
-                      selected: true,
-                      style: { ...(edge.style || {}), stroke: color },
-                      markerEnd: edge.markerEnd
-                          ? { ...edge.markerEnd, color }
-                          : edge.markerEnd,
-                  }
-                : edge;
-
-            baseEdges.push(selectedBaseEdge);
-            focusedEdges.push({
+            const selectedEdge = {
+                ...edge,
+                selected: true,
+                style: { ...(edge.style || {}), stroke: color },
+                markerEnd: edge.markerEnd
+                    ? { ...edge.markerEnd, color }
+                    : edge.markerEnd,
+            };
+            const focusedEdge = {
                 ...withEdgeClassName(
                     withEdgeClassName(
-                        selectedBaseEdge,
+                        edge,
                         "editor-edge-context-visible"
                     ),
                     "editor-edge-focus-active"
                 ),
                 animated: true,
                 style: {
-                    ...(selectedBaseEdge.style || {}),
+                    ...(edge.style || {}),
                     stroke: color,
                 },
-                markerEnd: selectedBaseEdge.markerEnd
-                    ? { ...selectedBaseEdge.markerEnd, color }
-                    : selectedBaseEdge.markerEnd,
-            });
+                markerEnd: edge.markerEnd
+                    ? { ...edge.markerEnd, color }
+                    : edge.markerEnd,
+            };
+            const selectedFocusedEdge = {
+                ...withEdgeClassName(
+                    withEdgeClassName(
+                        selectedEdge,
+                        "editor-edge-context-visible"
+                    ),
+                    "editor-edge-focus-active"
+                ),
+                animated: true,
+            };
+
+            baseEdges.push(edge);
+            focusedEdges.push(focusedEdge);
+            selectedEdges.push(selectedEdge);
+            selectedFocusedEdges.push(selectedFocusedEdge);
         });
 
         return {
             baseEdges,
             focusedEdges,
+            selectedEdges,
+            selectedFocusedEdges,
             indexByNodeId: buildEdgeIndexByNodeId(
                 baseEdges,
                 getTransitionEdgeNodeIds
@@ -723,13 +739,19 @@ export function useEditorDisplay({
                 baseEdges.map((edge, index) => [edge.id, index])
             ),
         };
-    }, [smartTransitionEdges, selectedTransitionEdgeIds]);
+    }, [smartTransitionEdges]);
 
     const transitionEdgesForDisplay = useMemo(() => {
         if (activeMode === "code") return [];
 
-        const { baseEdges, focusedEdges, indexByNodeId, indexByEdgeId } =
-            transitionRenderCache;
+        const {
+            baseEdges,
+            focusedEdges,
+            selectedEdges,
+            selectedFocusedEdges,
+            indexByNodeId,
+            indexByEdgeId,
+        } = transitionRenderCache;
         const focusedIndexes = new Set();
         edgeFocusNodeIds.forEach((nodeId) => {
             (indexByNodeId.get(nodeId) || []).forEach((edgeIndex) =>
@@ -744,22 +766,36 @@ export function useEditorDisplay({
 
         // Keep every transition mounted after load. The visibility toggle is
         // implemented by a CSS class on React Flow instead of removing edges
-        // from the array. This is critical for large workflows: showing
-        // transitions again must not mount thousands of smart-edge components
-        // and rerun their routing in one frame.
-        if (focusedIndexes.size === 0) return baseEdges;
+        // from the array. Selection/focus only replaces the indexed cached
+        // variants instead of rebuilding the complete edge cache.
+        if (
+            focusedIndexes.size === 0 &&
+            selectedTransitionEdgeIds.size === 0
+        ) {
+            return baseEdges;
+        }
 
-        // Copy only the array shell; all edge objects are cached. Replace just
-        // connected entries with prebuilt focused variants. CSS uses the
-        // editor-edge-context-visible class when transitions are globally hidden.
         const displayed = baseEdges.slice();
-        focusedIndexes.forEach((edgeIndex) => {
-            displayed[edgeIndex] = focusedEdges[edgeIndex];
+
+        selectedTransitionEdgeIds.forEach((edgeId) => {
+            const edgeIndex = indexByEdgeId.get(edgeId);
+            if (edgeIndex === undefined) return;
+            displayed[edgeIndex] = selectedEdges[edgeIndex];
         });
+
+        focusedIndexes.forEach((edgeIndex) => {
+            const edgeId = baseEdges[edgeIndex]?.id;
+            displayed[edgeIndex] =
+                edgeId && selectedTransitionEdgeIds.has(edgeId)
+                    ? selectedFocusedEdges[edgeIndex]
+                    : focusedEdges[edgeIndex];
+        });
+
         return displayed;
     }, [
         activeMode,
         transitionRenderCache,
+        selectedTransitionEdgeIds,
         edgeFocusNodeIds,
         activeHoveredEditorEdgeId,
     ]);
@@ -869,22 +905,32 @@ export function useEditorDisplay({
     const slotRenderCache = useMemo(() => {
         const baseEdges = [];
         const contextEdges = [];
+        const selectedEdges = [];
+        const selectedContextEdges = [];
 
         routedSlotEdgeCache.forEach((rawEdge) => {
-            const selectedEdge = selectedSlotEdgeIds.has(rawEdge.id)
-                ? { ...rawEdge, selected: true }
-                : rawEdge;
-            const edge = withEdgeClassName(selectedEdge, "editor-slot-edge");
+            const edge = withEdgeClassName(rawEdge, "editor-slot-edge");
+            const contextEdge = withEdgeClassName(
+                edge,
+                "editor-edge-context-visible"
+            );
+            const selectedEdge = { ...edge, selected: true };
+            const selectedContextEdge = {
+                ...contextEdge,
+                selected: true,
+            };
 
             baseEdges.push(edge);
-            contextEdges.push(
-                withEdgeClassName(edge, "editor-edge-context-visible")
-            );
+            contextEdges.push(contextEdge);
+            selectedEdges.push(selectedEdge);
+            selectedContextEdges.push(selectedContextEdge);
         });
 
         return {
             baseEdges,
             contextEdges,
+            selectedEdges,
+            selectedContextEdges,
             indexByNodeId: buildEdgeIndexByNodeId(
                 baseEdges,
                 getSlotEdgeNodeIds
@@ -893,7 +939,7 @@ export function useEditorDisplay({
                 baseEdges.map((edge, index) => [edge.id, index])
             ),
         };
-    }, [routedSlotEdgeCache, selectedSlotEdgeIds]);
+    }, [routedSlotEdgeCache]);
 
     const slotFocusedIndexes = useMemo(() => {
         const indexes = new Set();
@@ -910,21 +956,44 @@ export function useEditorDisplay({
             return [];
         }
 
-        const { baseEdges, contextEdges } = slotRenderCache;
-        if (slotFocusedIndexes.size === 0) return baseEdges;
+        const {
+            baseEdges,
+            contextEdges,
+            selectedEdges,
+            selectedContextEdges,
+            indexByEdgeId,
+        } = slotRenderCache;
+        if (
+            slotFocusedIndexes.size === 0 &&
+            selectedSlotEdgeIds.size === 0
+        ) {
+            return baseEdges;
+        }
 
-        // Keep the complete edge set mounted. Replace only connected entries
-        // with cached contextual variants; CSS decides whether the remaining
-        // edges are painted when global slot-edge visibility is disabled.
+        // Keep the complete edge set mounted and swap only cached entries that
+        // are selected or contextual. Selecting one slot edge therefore no
+        // longer rebuilds render objects for every slot connection.
         const displayed = baseEdges.slice();
+
+        selectedSlotEdgeIds.forEach((edgeId) => {
+            const edgeIndex = indexByEdgeId.get(edgeId);
+            if (edgeIndex === undefined) return;
+            displayed[edgeIndex] = selectedEdges[edgeIndex];
+        });
+
         slotFocusedIndexes.forEach((edgeIndex) => {
-            displayed[edgeIndex] = contextEdges[edgeIndex];
+            const edgeId = baseEdges[edgeIndex]?.id;
+            displayed[edgeIndex] =
+                edgeId && selectedSlotEdgeIds.has(edgeId)
+                    ? selectedContextEdges[edgeIndex]
+                    : contextEdges[edgeIndex];
         });
         return displayed;
     }, [
         activeMode,
         slotRenderCache,
         slotFocusedIndexes,
+        selectedSlotEdgeIds,
     ]);
 
     const editableSlotEdges = useMemo(() => {
