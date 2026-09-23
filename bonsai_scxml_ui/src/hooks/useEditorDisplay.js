@@ -205,22 +205,7 @@ export function useEditorDisplay({
         return ids;
     }, [cloneGroupByNodeId, selectedNodeIdSet]);
 
-    const cloneLinkedHighlightIds = useMemo(() => {
-        const ids = new Set();
-        selectedNodeIdSet.forEach((nodeId) => {
-            cloneGroupByNodeId.get(nodeId)?.forEach((linkedId) => {
-                if (linkedId !== nodeId) ids.add(linkedId);
-            });
-        });
 
-        if (activeCanvasFocusNodeId) {
-            cloneGroupByNodeId
-                .get(activeCanvasFocusNodeId)
-                ?.forEach((linkedId) => ids.add(linkedId));
-        }
-
-        return ids;
-    }, [activeCanvasFocusNodeId, cloneGroupByNodeId, selectedNodeIdSet]);
 
     // Keep an index of the visual/semantic nodes connected to each edge.
     // Transition visibility itself is paint-only: all transitions stay mounted
@@ -784,6 +769,9 @@ export function useEditorDisplay({
                 baseEdges,
                 getSlotEdgeNodeIds
             ),
+            indexByEdgeId: new Map(
+                baseEdges.map((edge, index) => [edge.id, index])
+            ),
         };
     }, [routedSlotEdgeCache, selectedSlotEdgeIds]);
 
@@ -1096,9 +1084,6 @@ export function useEditorDisplay({
         );
     }, [smartRoutingNodesDependency]);
 
-    const dimmedHoverNodeCacheRef = useRef(new WeakMap());
-    const highlightedHoverNodeCacheRef = useRef(new WeakMap());
-
     const isSlotDetailsFocus = Boolean(
         hoveredSlotAccessNodeId &&
             selectedNodeId &&
@@ -1180,15 +1165,35 @@ export function useEditorDisplay({
         activeHoveredEditorEdgeId,
     ]);
 
-    const hoveredEditorEdge = useMemo(
-        () =>
-            activeHoveredEditorEdgeId
-                ? visibleEdges.find(
-                      (edge) => edge.id === activeHoveredEditorEdgeId
-                  ) || null
-                : null,
-        [activeHoveredEditorEdgeId, visibleEdges]
-    );
+    const structuralEdgeById = useMemo(() => {
+        const byId = new Map();
+        compoundInitialEdges.forEach((edge) => byId.set(edge.id, edge));
+        parallelEntryEdges.forEach((edge) => byId.set(edge.id, edge));
+        return byId;
+    }, [compoundInitialEdges, parallelEntryEdges]);
+
+    const hoveredEditorEdge = useMemo(() => {
+        if (!activeHoveredEditorEdgeId) return null;
+
+        const transitionIndex =
+            transitionRenderCache.indexByEdgeId.get(activeHoveredEditorEdgeId);
+        if (transitionIndex !== undefined) {
+            return transitionRenderCache.baseEdges[transitionIndex] || null;
+        }
+
+        const slotIndex =
+            slotRenderCache.indexByEdgeId.get(activeHoveredEditorEdgeId);
+        if (slotIndex !== undefined) {
+            return slotRenderCache.baseEdges[slotIndex] || null;
+        }
+
+        return structuralEdgeById.get(activeHoveredEditorEdgeId) || null;
+    }, [
+        activeHoveredEditorEdgeId,
+        transitionRenderCache,
+        slotRenderCache,
+        structuralEdgeById,
+    ]);
 
     const hasHoverFocus = Boolean(
         activeCanvasFocusNodeId || hoveredEditorEdge || isSlotDetailsFocus
@@ -1197,38 +1202,114 @@ export function useEditorDisplay({
     const hoverFocusNodeIds = useMemo(() => {
         if (!hasHoverFocus) return null;
 
-        const ids = new Set();
-        if (activeCanvasFocusNodeId) {
-            ids.add(activeCanvasFocusNodeId);
+        const ids = new Set(selectedVisualNodeIdSet);
+
+        const addCloneGroup = (nodeId) => {
+            if (!nodeId) return;
+            ids.add(nodeId);
             cloneGroupByNodeId
-                .get(activeCanvasFocusNodeId)
+                .get(nodeId)
                 ?.forEach((linkedId) => ids.add(linkedId));
-            visibleEdges.forEach((edge) => {
+        };
+
+        const addEdgeEndpoints = (edge) => {
+            if (!edge) return;
+            addCloneGroup(edge.source);
+            addCloneGroup(edge.target);
+            getTransitionEdgeNodeIds(edge).forEach(addCloneGroup);
+            getSlotEdgeNodeIds(edge).forEach(addCloneGroup);
+        };
+
+        if (activeCanvasFocusNodeId) {
+            addCloneGroup(activeCanvasFocusNodeId);
+
+            // Use the prebuilt edge indexes instead of scanning every visible
+            // edge on each mouse move. Large workflows can have thousands of
+            // mounted edges, while a single node normally touches only a few.
+            const transitionIndexes =
+                transitionRenderCache.indexByNodeId.get(activeCanvasFocusNodeId) ||
+                [];
+            transitionIndexes.forEach((edgeIndex) =>
+                addEdgeEndpoints(transitionRenderCache.baseEdges[edgeIndex])
+            );
+
+            const slotIndexes =
+                slotRenderCache.indexByNodeId.get(activeCanvasFocusNodeId) || [];
+            slotIndexes.forEach((edgeIndex) =>
+                addEdgeEndpoints(slotRenderCache.baseEdges[edgeIndex])
+            );
+
+            // Structural entry/initial edges are comparatively few and are not
+            // part of the semantic transition cache.
+            compoundInitialEdges.forEach((edge) => {
                 if (
                     edge.source === activeCanvasFocusNodeId ||
                     edge.target === activeCanvasFocusNodeId
                 ) {
-                    ids.add(edge.source);
-                    ids.add(edge.target);
+                    addEdgeEndpoints(edge);
+                }
+            });
+            parallelEntryEdges.forEach((edge) => {
+                if (
+                    edge.source === activeCanvasFocusNodeId ||
+                    edge.target === activeCanvasFocusNodeId
+                ) {
+                    addEdgeEndpoints(edge);
                 }
             });
         }
 
         if (hoveredEditorEdge) {
-            ids.add(hoveredEditorEdge.source);
-            ids.add(hoveredEditorEdge.target);
+            addEdgeEndpoints(hoveredEditorEdge);
         }
 
         if (isSlotDetailsFocus) {
-            ids.add(hoveredSlotAccessNodeId);
-            ids.add(selectedNodeId);
+            addCloneGroup(hoveredSlotAccessNodeId);
+            addCloneGroup(selectedNodeId);
         }
 
         return ids;
     }, [
         hasHoverFocus,
         activeCanvasFocusNodeId,
-        visibleEdges,
+        hoveredEditorEdge,
+        isSlotDetailsFocus,
+        hoveredSlotAccessNodeId,
+        selectedNodeId,
+        selectedVisualNodeIdSet,
+        cloneGroupByNodeId,
+        transitionRenderCache,
+        slotRenderCache,
+        compoundInitialEdges,
+        parallelEntryEdges,
+    ]);
+
+    const hoverHighlightNodeIds = useMemo(() => {
+        if (!hasHoverFocus) return null;
+
+        const ids = new Set();
+        const addCloneGroup = (nodeId) => {
+            if (!nodeId) return;
+            ids.add(nodeId);
+            cloneGroupByNodeId
+                .get(nodeId)
+                ?.forEach((linkedId) => ids.add(linkedId));
+        };
+
+        if (activeCanvasFocusNodeId) addCloneGroup(activeCanvasFocusNodeId);
+        if (hoveredEditorEdge) {
+            addCloneGroup(hoveredEditorEdge.source);
+            addCloneGroup(hoveredEditorEdge.target);
+        }
+        if (isSlotDetailsFocus) {
+            addCloneGroup(hoveredSlotAccessNodeId);
+            addCloneGroup(selectedNodeId);
+        }
+
+        return ids;
+    }, [
+        hasHoverFocus,
+        activeCanvasFocusNodeId,
         hoveredEditorEdge,
         isSlotDetailsFocus,
         hoveredSlotAccessNodeId,
@@ -1236,110 +1317,86 @@ export function useEditorDisplay({
         cloneGroupByNodeId,
     ]);
 
+    const nodeIndexById = useMemo(
+        () =>
+            new Map(
+                baseVisibleNodes.map((node, index) => [node.id, index])
+            ),
+        [baseVisibleNodes]
+    );
+
+    const contextVisibleNodeCacheRef = useRef(new WeakMap());
+    const highlightedContextNodeCacheRef = useRef(new WeakMap());
+
+    const withNodeFocusClass = (node, highlighted) => {
+        const cache = highlighted
+            ? highlightedContextNodeCacheRef.current
+            : contextVisibleNodeCacheRef.current;
+        const cached = cache.get(node);
+        if (cached) return cached;
+
+        const classNames = String(node.className || "")
+            .split(/\s+/)
+            .filter(Boolean);
+        if (!classNames.includes("editor-node-context-visible")) {
+            classNames.push("editor-node-context-visible");
+        }
+        if (highlighted && !classNames.includes("editor-hover-highlight")) {
+            classNames.push("editor-hover-highlight");
+        }
+
+        const nextNode = {
+            ...node,
+            className: classNames.join(" "),
+        };
+        cache.set(node, nextNode);
+        return nextNode;
+    };
+
     const visibleNodes = useMemo(() => {
-        if (!hasHoverFocus && !parallelDropTargetId && !compoundDropTargetId) {
+        const needsFocusPresentation = Boolean(
+            hasHoverFocus && hoverFocusNodeIds?.size
+        );
+        const needsDropPresentation = Boolean(
+            parallelDropTargetId || compoundDropTargetId
+        );
+
+        if (!needsFocusPresentation && !needsDropPresentation) {
             return baseVisibleNodes;
         }
 
-        const activeParallelLane = parallelDropTargetId
-            ? baseVisibleNodes.find((node) => node.id === parallelDropTargetId)
-            : null;
-        const activeParallelId =
-            activeParallelLane?.type === "parallelLane"
-                ? activeParallelLane.parentId
-                : null;
+        // Copy only the array shell, then replace the handful of nodes whose
+        // presentation really changes. Previously every mouse move mapped over
+        // the complete graph and rebuilt opacity/filter decisions for every
+        // node, which was costly on large workflows.
+        const displayed = baseVisibleNodes.slice();
 
-        return baseVisibleNodes.map((visibleNode) => {
-            const isCanvasHoverHighlight =
-                visibleNode.id === activeCanvasFocusNodeId;
-            const isSlotDetailsSkillHoverHighlight =
-                visibleNode.id === hoveredSlotAccessNodeId &&
-                visibleNode.type === "custom";
-            const isSlotDetailsSelectedSlot =
-                isSlotDetailsFocus && visibleNode.id === selectedNodeId;
-            const isHoveredEdgeEndpoint = Boolean(
-                hoveredEditorEdge &&
-                    (visibleNode.id === hoveredEditorEdge.source ||
-                        visibleNode.id === hoveredEditorEdge.target)
-            );
-            const isConnectedHoverFocusNode =
-                hasHoverFocus && hoverFocusNodeIds?.has(visibleNode.id);
-            const isSelectedNode =
-                visibleNode.selected || selectedVisualNodeIdSet.has(visibleNode.id);
-            const isCloneLinkedHighlight =
-                cloneLinkedHighlightIds.has(visibleNode.id);
-            const isDimmedByHoverFocus =
-                hasHoverFocus &&
-                !isSelectedNode &&
-                !isConnectedHoverFocusNode &&
-                !isCanvasHoverHighlight &&
-                !isSlotDetailsSkillHoverHighlight &&
-                !isSlotDetailsSelectedSlot;
-
-            if (isDimmedByHoverFocus) {
-                const cachedDimmedNode =
-                    dimmedHoverNodeCacheRef.current.get(visibleNode);
-                if (cachedDimmedNode) return cachedDimmedNode;
-
-                const dimmedNode = {
-                    ...visibleNode,
-                    style: {
-                        ...(visibleNode.style || {}),
-                        opacity: 0.42,
-                        filter: "grayscale(0.72)",
-                        transition:
-                            visibleNode.style?.transition ||
-                            "opacity 120ms ease, filter 120ms ease",
-                    },
-                };
-                dimmedHoverNodeCacheRef.current.set(visibleNode, dimmedNode);
-                return dimmedNode;
-            }
-
-            if (
-                isCanvasHoverHighlight ||
-                isHoveredEdgeEndpoint ||
-                isSlotDetailsSkillHoverHighlight ||
-                isCloneLinkedHighlight
-            ) {
-                // Hover highlighting must never mutate React Flow's real
-                // selection state. Setting `selected: true` here made a mere
-                // mouse hover replace Ctrl/Meta multi-selection and then clear
-                // it again on mouse leave. Use a presentation-only class
-                // instead, while preserving an already selected node as-is.
-                if (visibleNode.selected) return visibleNode;
-
-                const cachedHighlightedNode =
-                    highlightedHoverNodeCacheRef.current.get(visibleNode);
-                if (cachedHighlightedNode) return cachedHighlightedNode;
-
-                const classNames = String(visibleNode.className || "")
-                    .split(/\s+/)
-                    .filter(Boolean);
-                if (!classNames.includes("editor-hover-highlight")) {
-                    classNames.push("editor-hover-highlight");
-                }
-
-                const highlightedNode = {
-                    ...visibleNode,
-                    className: classNames.join(" "),
-                };
-                highlightedHoverNodeCacheRef.current.set(
-                    visibleNode,
-                    highlightedNode
+        if (needsFocusPresentation) {
+            hoverFocusNodeIds.forEach((nodeId) => {
+                const index = nodeIndexById.get(nodeId);
+                if (index === undefined) return;
+                const node = displayed[index];
+                displayed[index] = withNodeFocusClass(
+                    node,
+                    Boolean(hoverHighlightNodeIds?.has(nodeId))
                 );
-                return highlightedNode;
-            }
+            });
+        }
 
-            if (visibleNode.type === "parallelLane") {
-                const isLaneDropTarget =
-                    visibleNode.id === parallelDropTargetId;
-                if (!isLaneDropTarget) return visibleNode;
+        if (parallelDropTargetId) {
+            const laneIndex = nodeIndexById.get(parallelDropTargetId);
+            const activeParallelLane =
+                laneIndex !== undefined ? displayed[laneIndex] : null;
+            const activeParallelId =
+                activeParallelLane?.type === "parallelLane"
+                    ? activeParallelLane.parentId
+                    : null;
 
-                return {
-                    ...visibleNode,
+            if (laneIndex !== undefined && activeParallelLane) {
+                displayed[laneIndex] = {
+                    ...activeParallelLane,
                     style: {
-                        ...visibleNode.style,
+                        ...activeParallelLane.style,
                         outline: "3px solid #0284c7",
                         outlineOffset: "-3px",
                         backgroundColor: "rgba(2, 132, 199, 0.12)",
@@ -1348,65 +1405,63 @@ export function useEditorDisplay({
                         borderRadius: 4,
                     },
                     data: {
-                        ...visibleNode.data,
+                        ...activeParallelLane.data,
                         isDropTarget: true,
                     },
                 };
             }
 
-            if (visibleNode.type === "parallel") {
-                const isDropTarget = visibleNode.id === activeParallelId;
-                if (Boolean(visibleNode.data?.isDropTarget) === isDropTarget) {
-                    return visibleNode;
+            if (activeParallelId) {
+                const parallelIndex = nodeIndexById.get(activeParallelId);
+                if (parallelIndex !== undefined) {
+                    const parallelNode = displayed[parallelIndex];
+                    if (!parallelNode.data?.isDropTarget) {
+                        displayed[parallelIndex] = {
+                            ...parallelNode,
+                            data: {
+                                ...parallelNode.data,
+                                isDropTarget: true,
+                            },
+                        };
+                    }
                 }
-
-                return {
-                    ...visibleNode,
-                    data: {
-                        ...visibleNode.data,
-                        isDropTarget,
-                    },
-                };
             }
+        }
 
-            if (visibleNode.type === "compound") {
-                const isDropTarget = visibleNode.id === compoundDropTargetId;
-                if (
-                    Boolean(visibleNode.data?.isDropTarget) === isDropTarget
-                ) {
-                    return visibleNode;
+        if (compoundDropTargetId) {
+            const compoundIndex = nodeIndexById.get(compoundDropTargetId);
+            if (compoundIndex !== undefined) {
+                const compoundNode = displayed[compoundIndex];
+                if (!compoundNode.data?.isDropTarget) {
+                    displayed[compoundIndex] = {
+                        ...compoundNode,
+                        data: {
+                            ...compoundNode.data,
+                            isDropTarget: true,
+                        },
+                    };
                 }
-
-                return {
-                    ...visibleNode,
-                    data: {
-                        ...visibleNode.data,
-                        isDropTarget,
-                    },
-                };
             }
+        }
 
-            return visibleNode;
-        });
+        return displayed;
     }, [
         baseVisibleNodes,
         hasHoverFocus,
         hoverFocusNodeIds,
-        activeCanvasFocusNodeId,
-        hoveredSlotAccessNodeId,
-        isSlotDetailsFocus,
-        selectedNodeId,
-        selectedVisualNodeIdSet,
-        cloneLinkedHighlightIds,
-        hoveredEditorEdge,
+        hoverHighlightNodeIds,
+        nodeIndexById,
         parallelDropTargetId,
         compoundDropTargetId,
     ]);
+
+    const nodeFocusMode = Boolean(hasHoverFocus);
 
     return {
         visibleNodes,
         visibleEdges,
         smartRoutingNodes,
         edgeFocusMode,
+        nodeFocusMode,
     };
 }

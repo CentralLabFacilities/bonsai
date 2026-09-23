@@ -7205,3 +7205,24 @@
     .react-flow__edge.editor-transition-edge.selected {
     opacity: 1;
 }
+
+
+/*
+ * Node focus is paint-only for large graphs. The display hook marks only the
+ * handful of context nodes; CSS dims the rest. This avoids mapping and cloning
+ * every node whenever the pointer moves across a large state machine.
+ */
+.react-flow.editor-node-focus-mode
+    .react-flow__node:not(.editor-node-context-visible):not(.selected) {
+    opacity: 0.42;
+    filter: grayscale(0.72);
+    transition: opacity 120ms ease, filter 120ms ease;
+}
+
+.react-flow.editor-node-focus-mode
+    .react-flow__node.editor-node-context-visible,
+.react-flow.editor-node-focus-mode
+    .react-flow__node.selected {
+    opacity: 1;
+    filter: none;
+}

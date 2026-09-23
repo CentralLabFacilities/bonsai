@@ -2303,6 +2303,7 @@ function AppContent() {
         visibleEdges,
         smartRoutingNodes,
         edgeFocusMode,
+        nodeFocusMode,
     } = useEditorDisplay({
         hoveredEditorNodeId,
         hoveredEditorEdgeId,
@@ -5080,6 +5081,7 @@ function AppContent() {
                             visibleEdges={visibleEdges}
                             smartRoutingNodes={smartRoutingNodes}
                             edgeFocusMode={edgeFocusMode}
+                            nodeFocusMode={nodeFocusMode}
                             selectedNodes={selectedNodes}
                             contextSelectionCount={editorCloneSelection.length}
                             contextMenu={contextMenu}

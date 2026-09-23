@@ -48,6 +48,7 @@ export default function EditorCanvas({
     visibleEdges,
     smartRoutingNodes,
     edgeFocusMode,
+    nodeFocusMode,
     selectedNodes,
     contextMenu,
     handleSelectAction,
@@ -224,6 +225,7 @@ export default function EditorCanvas({
                                 "editor-transitions-context-only",
                             !showSlotEdges && "editor-slots-context-only",
                             edgeFocusMode && "editor-edge-focus-mode",
+                            nodeFocusMode && "editor-node-focus-mode",
                         ]
                             .filter(Boolean)
                             .join(" ") || undefined
