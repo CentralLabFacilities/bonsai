@@ -135,7 +135,9 @@ the 'src' attribute of states. - Appends a suffix to all sourced 'id' and
 
     <xsl:template match="data/slots/inheritSlot/@xpath">
 
-        <xsl:param name="inheritSlots" tunnel="yes"/>
+        <xsl:variable name="inheritSlot"
+                      select="$inheritSlots/*
+                          [@xpath = $xpath][1]"/>
         <xsl:param name="parentSuffix" tunnel="yes"/>
 
         <xsl:variable name="xpath" select="."/>
