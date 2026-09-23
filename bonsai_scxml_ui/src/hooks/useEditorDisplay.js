@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { MarkerType } from "@xyflow/react";
 import {
     SLOT_CONNECTION_COLORS,
+    clearTransientTransitionHighlight,
     getTransitionHighlightColor,
-    highlightSelectedTransitions,
     withSmartTransitionRouting,
 } from "../utils/editorGraph";
 import {
@@ -53,6 +53,65 @@ const segmentIntersectsRect = (start, end, rect) => {
     );
 };
 
+const getTransitionEdgeNodeIds = (edge) => {
+    const ids = [
+        edge.source,
+        edge.target,
+        edge.data?.boundaryOriginalSource,
+        edge.data?.boundaryOriginalTarget,
+        edge.data?.compoundOriginalSource,
+        edge.data?.compoundOriginalTarget,
+        edge.data?.parallelOriginalSource,
+        edge.data?.parallelOriginalTarget,
+    ];
+
+    if (Array.isArray(edge.data?.boundaryOriginalSources)) {
+        edge.data.boundaryOriginalSources.forEach((source) => {
+            ids.push(source?.sourceId || source?.nodeId || source?.id);
+        });
+    }
+
+    return ids.filter(Boolean);
+};
+
+const getSlotEdgeNodeIds = (edge) =>
+    [
+        edge.source,
+        edge.target,
+        edge.data?.skillNodeId,
+        edge.data?.slotNodeId,
+        edge.data?.canonicalSlotNodeId,
+    ].filter(Boolean);
+
+const buildEdgeIndexByNodeId = (edgeList, getNodeIds) => {
+    const index = new Map();
+
+    edgeList.forEach((edge, edgeIndex) => {
+        new Set(getNodeIds(edge)).forEach((nodeId) => {
+            if (!index.has(nodeId)) index.set(nodeId, []);
+            index.get(nodeId).push(edgeIndex);
+        });
+    });
+
+    return index;
+};
+
+const collectIndexedEdges = (edgeList, indexByNodeId, nodeIds) => {
+    if (!nodeIds || nodeIds.size === 0) return [];
+
+    const indexes = new Set();
+    nodeIds.forEach((nodeId) => {
+        (indexByNodeId.get(nodeId) || []).forEach((edgeIndex) =>
+            indexes.add(edgeIndex)
+        );
+    });
+
+    return [...indexes]
+        .sort((a, b) => a - b)
+        .map((edgeIndex) => edgeList[edgeIndex])
+        .filter(Boolean);
+};
+
 export function useEditorDisplay({
     hoveredEditorNodeId,
     hoveredEditorEdgeId,
@@ -85,20 +144,6 @@ export function useEditorDisplay({
     const activeHoveredEditorEdgeId = isDraggingNode
         ? null
         : hoveredEditorEdgeId;
-
-    const selectedTransitionNodeIdKey = useMemo(
-        () =>
-            [
-                ...new Set([
-                    ...selectedNodes.map((node) => node.id),
-                    ...(selectedNodeId ? [selectedNodeId] : []),
-                    ...(activeCanvasFocusNodeId ? [activeCanvasFocusNodeId] : []),
-                ]),
-            ]
-                .sort()
-                .join("\u0001"),
-        [selectedNodes, selectedNodeId, activeCanvasFocusNodeId]
-    );
 
     // Keep true editor selection visually independent from hover focus. A
     // hovered node may dim unrelated context, but it must never fade nodes the
@@ -210,79 +255,60 @@ export function useEditorDisplay({
 
     const transitionEdgeMatchesFocus = (edge) => {
         if (edgeFocusNodeIds.size === 0) return false;
-
-        const semanticIds = [
-            edge.source,
-            edge.target,
-            edge.data?.boundaryOriginalSource,
-            edge.data?.boundaryOriginalTarget,
-            edge.data?.compoundOriginalSource,
-            edge.data?.compoundOriginalTarget,
-            edge.data?.parallelOriginalSource,
-            edge.data?.parallelOriginalTarget,
-        ];
-
-        if (Array.isArray(edge.data?.boundaryOriginalSources)) {
-            edge.data.boundaryOriginalSources.forEach((source) => {
-                semanticIds.push(source?.sourceId || source?.nodeId || source?.id);
-            });
-        }
-
-        return semanticIds.some(
-            (id) => id && edgeFocusNodeIds.has(id)
+        return getTransitionEdgeNodeIds(edge).some((id) =>
+            edgeFocusNodeIds.has(id)
         );
     };
 
-    const transitionEdgesForDisplay = useMemo(() => {
-        if (activeMode === "code") return [];
+    // React Flow stores selection on the edge object itself. Ignore that
+    // display-only flag for routing-cache invalidation: clicking an edge must
+    // not make the whole workflow normalize/re-route again.
+    const transitionStructureEdgesRef = useRef([]);
+    const transitionStructureEdges = useMemo(() => {
+        const previous = transitionStructureEdgesRef.current;
+        const structurallyUnchanged =
+            previous.length === edges.length &&
+            edges.every((edge, index) => {
+                const oldEdge = previous[index];
+                return (
+                    oldEdge?.id === edge.id &&
+                    oldEdge?.source === edge.source &&
+                    oldEdge?.target === edge.target &&
+                    oldEdge?.sourceHandle === edge.sourceHandle &&
+                    oldEdge?.targetHandle === edge.targetHandle &&
+                    oldEdge?.label === edge.label &&
+                    oldEdge?.type === edge.type &&
+                    oldEdge?.data === edge.data &&
+                    oldEdge?.style === edge.style &&
+                    oldEdge?.markerEnd === edge.markerEnd
+                );
+            });
 
-        // Slot mode has always treated transitions as contextual information.
-        // Keep that behavior even when the global transition toggle is on.
-        const showAllForMode =
-            showTransitionEdges && activeMode !== "slots";
+        if (structurallyUnchanged) return previous;
 
-        return showAllForMode
-            ? edges
-            : edges.filter(transitionEdgeMatchesFocus);
-    }, [
-        activeMode,
-        showTransitionEdges,
-        edges,
-        edgeFocusNodeIds,
-    ]);
+        const next = edges.map((edge) =>
+            edge.selected ? { ...edge, selected: false } : edge
+        );
+        transitionStructureEdgesRef.current = next;
+        return next;
+    }, [edges]);
 
-    const slotEdgeMatchesFocus = (edge) => {
-        if (edgeFocusNodeIds.size === 0) return false;
+    const selectedTransitionEdgeIds = useMemo(
+        () =>
+            new Set(
+                edges
+                    .filter((edge) => edge.selected)
+                    .map((edge) => edge.id)
+            ),
+        [edges]
+    );
 
-        return [
-            edge.source,
-            edge.target,
-            edge.data?.skillNodeId,
-            edge.data?.slotNodeId,
-        ].some((id) => id && edgeFocusNodeIds.has(id));
-    };
-
-    const slotEdgesForDisplay = useMemo(() => {
-        if (
-            activeMode !== "slots" &&
-            activeMode !== "overview"
-        ) {
-            return [];
-        }
-
-        return showSlotEdges
-            ? slotEdges
-            : slotEdges.filter(slotEdgeMatchesFocus);
-    }, [
-        activeMode,
-        showSlotEdges,
-        slotEdges,
-        edgeFocusNodeIds,
-    ]);
-
+    // Build the complete transition render model once for the loaded graph.
+    // Visibility/hover changes must never force normalization or routing to run
+    // again; those interactions only select entries from this cache below.
     const normalizedTransitionEdges = useMemo(
         () =>
-            transitionEdgesForDisplay.map((edge) => {
+            transitionStructureEdges.map((edge) => {
                 let normalizedEdge = edge;
 
                 if (!normalizedEdge.targetHandle) {
@@ -302,8 +328,8 @@ export function useEditorDisplay({
                 }
 
                 // Loaded/older self loops may not have editor control points.
-                // Give them a deterministic two-point route so they visibly
-                // leave the node and return around its top edge.
+                // Cache their deterministic loop route once instead of rebuilding
+                // it whenever the edge visibility/focus state changes.
                 if (
                     normalizedEdge.source === normalizedEdge.target &&
                     !(
@@ -335,16 +361,43 @@ export function useEditorDisplay({
 
                 return normalizedEdge;
             }),
-        [transitionEdgesForDisplay, nodeById]
+        [transitionStructureEdges, nodeById]
     );
 
     const compoundAvoidanceCacheRef = useRef(new Map());
-    const compoundAvoidanceNodesDependency = isDraggingNode ? null : nodes;
-    const compoundAvoidanceByEdgeId = useMemo(() => {
-        if (!compoundAvoidanceNodesDependency) {
-            return compoundAvoidanceCacheRef.current;
+    const routingGeometryNodesRef = useRef([]);
+    const routingGeometryNodes = useMemo(() => {
+        if (isDraggingNode && routingGeometryNodesRef.current.length > 0) {
+            return routingGeometryNodesRef.current;
         }
 
+        const previous = routingGeometryNodesRef.current;
+        const geometryUnchanged =
+            previous.length === nodes.length &&
+            nodes.every((node, index) => {
+                const oldNode = previous[index];
+                return (
+                    oldNode?.id === node.id &&
+                    oldNode?.type === node.type &&
+                    oldNode?.parentId === node.parentId &&
+                    oldNode?.hidden === node.hidden &&
+                    oldNode?.position?.x === node.position?.x &&
+                    oldNode?.position?.y === node.position?.y &&
+                    oldNode?.style?.width === node.style?.width &&
+                    oldNode?.style?.height === node.style?.height &&
+                    Boolean(oldNode?.data?.isCollapsed) ===
+                        Boolean(node.data?.isCollapsed)
+                );
+            });
+
+        if (geometryUnchanged) return previous;
+
+        routingGeometryNodesRef.current = nodes;
+        return nodes;
+    }, [nodes, isDraggingNode]);
+
+    const compoundAvoidanceNodesDependency = routingGeometryNodes;
+    const compoundAvoidanceByEdgeId = useMemo(() => {
         const liveNodes = compoundAvoidanceNodesDependency;
         const liveNodeById = new Map(
             liveNodes.map((node) => [node.id, node])
@@ -467,18 +520,99 @@ export function useEditorDisplay({
         ]
     );
 
-    const highlightedTransitionEdges = useMemo(
-        () =>
-            highlightSelectedTransitions(
-                smartTransitionEdges,
-                new Set(
-                    selectedTransitionNodeIdKey
-                        ? selectedTransitionNodeIdKey.split("\u0001")
-                        : []
-                )
+    // Cache both the normal and focused/animated variants. Hover/selection
+    // therefore swaps object references from this cache instead of rebuilding
+    // styles/markers/animation state for every interaction.
+    const transitionRenderCache = useMemo(() => {
+        const baseEdges = [];
+        const focusedEdges = [];
+
+        smartTransitionEdges.forEach((rawEdge) => {
+            const edge = clearTransientTransitionHighlight(rawEdge);
+            const semanticHandle =
+                edge.data?.boundaryOriginalSourceHandle ||
+                edge.data?.compoundOriginalSourceHandle ||
+                edge.data?.parallelOriginalSourceHandle ||
+                edge.sourceHandle ||
+                edge.label;
+            const color = getTransitionHighlightColor(semanticHandle);
+
+            const isEdgeSelected = selectedTransitionEdgeIds.has(edge.id);
+            const selectedBaseEdge = isEdgeSelected
+                ? {
+                      ...edge,
+                      selected: true,
+                      style: { ...(edge.style || {}), stroke: color },
+                      markerEnd: edge.markerEnd
+                          ? { ...edge.markerEnd, color }
+                          : edge.markerEnd,
+                  }
+                : edge;
+
+            baseEdges.push(selectedBaseEdge);
+            focusedEdges.push({
+                ...selectedBaseEdge,
+                animated: true,
+                style: {
+                    ...(selectedBaseEdge.style || {}),
+                    stroke: color,
+                },
+                markerEnd: selectedBaseEdge.markerEnd
+                    ? { ...selectedBaseEdge.markerEnd, color }
+                    : selectedBaseEdge.markerEnd,
+            });
+        });
+
+        return {
+            baseEdges,
+            focusedEdges,
+            indexByNodeId: buildEdgeIndexByNodeId(
+                baseEdges,
+                getTransitionEdgeNodeIds
             ),
-        [smartTransitionEdges, selectedTransitionNodeIdKey]
-    );
+        };
+    }, [smartTransitionEdges, selectedTransitionEdgeIds]);
+
+    const transitionEdgesForDisplay = useMemo(() => {
+        if (activeMode === "code") return [];
+
+        const { baseEdges, focusedEdges, indexByNodeId } =
+            transitionRenderCache;
+        const focusedIndexes = new Set();
+        edgeFocusNodeIds.forEach((nodeId) => {
+            (indexByNodeId.get(nodeId) || []).forEach((edgeIndex) =>
+                focusedIndexes.add(edgeIndex)
+            );
+        });
+
+        // Slot mode always treats transitions as contextual information.
+        const showAllForMode =
+            showTransitionEdges && activeMode !== "slots";
+
+        if (!showAllForMode) {
+            return [...focusedIndexes]
+                .sort((a, b) => a - b)
+                .map((edgeIndex) => focusedEdges[edgeIndex])
+                .filter(Boolean);
+        }
+
+        if (focusedIndexes.size === 0) return baseEdges;
+
+        // Copy only the array shell; all edge objects are cached. Replace just
+        // the connected entries with their prebuilt animated variants.
+        const displayed = baseEdges.slice();
+        focusedIndexes.forEach((edgeIndex) => {
+            displayed[edgeIndex] = focusedEdges[edgeIndex];
+        });
+        return displayed;
+    }, [
+        activeMode,
+        showTransitionEdges,
+        transitionRenderCache,
+        edgeFocusNodeIds,
+    ]);
+
+    const highlightedTransitionEdges = transitionEdgesForDisplay;
 
     const selectedSlotContextId = activeCanvasFocusNodeId || selectedNodeId;
     const selectedSlotContextNodeIds = selectedSlotContextId
@@ -499,9 +633,53 @@ export function useEditorDisplay({
     const inactiveSlotEdgeCacheRef = useRef(new WeakMap());
     const hoveredSlotEdgeCacheRef = useRef(new WeakMap());
 
-    const routedSlotEdges = useMemo(
+    // Slot-edge selection is display-only too. Keep it out of the structural
+    // cache so selecting a slot connection does not rebuild every routed edge.
+    const slotStructureEdgesRef = useRef([]);
+    const slotStructureEdges = useMemo(() => {
+        const previous = slotStructureEdgesRef.current;
+        const structurallyUnchanged =
+            previous.length === slotEdges.length &&
+            slotEdges.every((edge, index) => {
+                const oldEdge = previous[index];
+                return (
+                    oldEdge?.id === edge.id &&
+                    oldEdge?.source === edge.source &&
+                    oldEdge?.target === edge.target &&
+                    oldEdge?.sourceHandle === edge.sourceHandle &&
+                    oldEdge?.targetHandle === edge.targetHandle &&
+                    oldEdge?.data === edge.data &&
+                    oldEdge?.style === edge.style &&
+                    oldEdge?.markerEnd === edge.markerEnd
+                );
+            });
+
+        if (structurallyUnchanged) return previous;
+
+        const next = slotEdges.map((edge) =>
+            edge.selected ? { ...edge, selected: false } : edge
+        );
+        slotStructureEdgesRef.current = next;
+        return next;
+    }, [slotEdges]);
+
+    const selectedSlotEdgeIds = useMemo(
         () =>
-            slotEdgesForDisplay.map((edge) => {
+            new Set(
+                slotEdges
+                    .filter((edge) => edge.selected)
+                    .map((edge) => edge.id)
+            ),
+        [slotEdges]
+    );
+
+    // Slot edges follow the same cache-first rule as transitions: make every
+    // render-ready edge once when the slot graph changes, then visibility only
+    // chooses cached entries. No edge objects/routing callbacks are rebuilt on
+    // hover or toggle changes.
+    const routedSlotEdgeCache = useMemo(
+        () =>
+            slotStructureEdges.map((edge) => {
                 const access = edge.data?.access === "write" ? "write" : "read";
 
                 return {
@@ -519,8 +697,43 @@ export function useEditorDisplay({
                     },
                 };
             }),
-        [slotEdgesForDisplay, updatePersistentEdgeControlPoints]
+        [slotStructureEdges, updatePersistentEdgeControlPoints]
     );
+
+    const slotRenderEdgeCache = useMemo(
+        () =>
+            routedSlotEdgeCache.map((edge) =>
+                selectedSlotEdgeIds.has(edge.id)
+                    ? { ...edge, selected: true }
+                    : edge
+            ),
+        [routedSlotEdgeCache, selectedSlotEdgeIds]
+    );
+
+    const slotEdgeIndexByNodeId = useMemo(
+        () => buildEdgeIndexByNodeId(slotRenderEdgeCache, getSlotEdgeNodeIds),
+        [slotRenderEdgeCache]
+    );
+
+    const routedSlotEdges = useMemo(() => {
+        if (activeMode !== "slots" && activeMode !== "overview") {
+            return [];
+        }
+
+        if (showSlotEdges) return slotRenderEdgeCache;
+
+        return collectIndexedEdges(
+            slotRenderEdgeCache,
+            slotEdgeIndexByNodeId,
+            edgeFocusNodeIds
+        );
+    }, [
+        activeMode,
+        showSlotEdges,
+        slotRenderEdgeCache,
+        slotEdgeIndexByNodeId,
+        edgeFocusNodeIds,
+    ]);
 
     const editableSlotEdges = useMemo(() => {
         if (!hasSelectedSlotContext && !isSlotDetailsConnectionPreview) {
