@@ -1120,45 +1120,101 @@ function AppContent() {
         return next;
     }, [semanticSlotNodesDependency]);
 
-    // Shared graph indexes replace repeated nodes.find()/nodes.filter() scans
-    // in display-only edge construction and hover/normalization helpers.
-    const nodeById = useMemo(
-        () => new Map(semanticNodes.map((node) => [node.id, node])),
-        [semanticNodes]
-    );
+    // Build the semantic hierarchy once per real topology/data change. Compound
+    // and Parallel operations used to construct several independent maps and
+    // then rediscover collapsed descendants by repeatedly traversing the same
+    // subtrees. Large workflows with many nested containers paid that cost over
+    // and over even though parent/child membership had not changed.
+    //
+    // Keep all hierarchy-derived data together so every consumer shares the
+    // same cached topology snapshot. Collapsed visibility is propagated in one
+    // tree walk: each semantic node is visited at most once, even when several
+    // collapsed containers are nested inside one another.
+    const semanticHierarchy = useMemo(() => {
+        const nodeById = new Map();
+        const parentByNodeId = new Map();
+        const childIdsByParent = new Map();
+        const childrenByParent = new Map();
+
+        semanticNodes.forEach((node) => {
+            nodeById.set(node.id, node);
+
+            if (!node.parentId) return;
+            parentByNodeId.set(node.id, node.parentId);
+
+            if (!childIdsByParent.has(node.parentId)) {
+                childIdsByParent.set(node.parentId, []);
+                childrenByParent.set(node.parentId, []);
+            }
+
+            childIdsByParent.get(node.parentId).push(node.id);
+            childrenByParent.get(node.parentId).push(node);
+        });
+
+        const hiddenNodeIds = new Set();
+        const visitedNodeIds = new Set();
+        const stack = [];
+
+        // Start with semantic roots. Children of a collapsed Compound/Parallel
+        // inherit hidden=true, but the container itself remains visible.
+        semanticNodes.forEach((node) => {
+            if (!node.parentId || !nodeById.has(node.parentId)) {
+                stack.push({ node, hiddenByAncestor: false });
+            }
+        });
+
+        const walk = () => {
+            while (stack.length > 0) {
+                const { node, hiddenByAncestor } = stack.pop();
+                if (!node || visitedNodeIds.has(node.id)) continue;
+                visitedNodeIds.add(node.id);
+
+                if (hiddenByAncestor) hiddenNodeIds.add(node.id);
+
+                const hidesChildren =
+                    hiddenByAncestor ||
+                    ((node.type === "compound" || node.type === "parallel") &&
+                        Boolean(node.data?.isCollapsed));
+
+                const children = childrenByParent.get(node.id) || [];
+                for (let index = children.length - 1; index >= 0; index -= 1) {
+                    stack.push({
+                        node: children[index],
+                        hiddenByAncestor: hidesChildren,
+                    });
+                }
+            }
+        };
+
+        walk();
+
+        // Malformed/imported graphs can contain orphaned parent cycles or
+        // disconnected islands. Process them as additional roots so the index
+        // remains total without risking an infinite traversal.
+        semanticNodes.forEach((node) => {
+            if (visitedNodeIds.has(node.id)) return;
+            stack.push({ node, hiddenByAncestor: false });
+            walk();
+        });
+
+        return {
+            nodeById,
+            parentByNodeId,
+            childIdsByParent,
+            childrenByParent,
+            hiddenNodeIds,
+        };
+    }, [semanticNodes]);
+
+    const nodeById = semanticHierarchy.nodeById;
+    const childIdsByParent = semanticHierarchy.childIdsByParent;
+    const semanticChildrenByParent = semanticHierarchy.childrenByParent;
+    const hiddenNodeIds = semanticHierarchy.hiddenNodeIds;
 
     const slotNodeIdSet = useMemo(
         () => new Set(semanticSlotNodes.map((node) => node.id)),
         [semanticSlotNodes]
     );
-
-    // Parent/child membership is semantic and does not change while a node is
-    // merely moving. Store child IDs from the semantic snapshot so the index is
-    // not rebuilt on every drag frame. Layout code can resolve those IDs to the
-    // current node objects only when it actually needs geometry.
-    const childIdsByParent = useMemo(() => {
-        const index = new Map();
-        semanticNodes.forEach((node) => {
-            if (!node.parentId) return;
-            if (!index.has(node.parentId)) {
-                index.set(node.parentId, []);
-            }
-            index.get(node.parentId).push(node.id);
-        });
-        return index;
-    }, [semanticNodes]);
-
-    const semanticChildrenByParent = useMemo(() => {
-        const index = new Map();
-        semanticNodes.forEach((node) => {
-            if (!node.parentId) return;
-            if (!index.has(node.parentId)) {
-                index.set(node.parentId, []);
-            }
-            index.get(node.parentId).push(node);
-        });
-        return index;
-    }, [semanticNodes]);
 
     // Hilfsfunktion: Bounding Box um alle ausgewählten Nodes berechnen
 
@@ -1278,34 +1334,6 @@ function AppContent() {
         },
         [setNodes, updateNodeInternals]
     );
-
-    const hiddenNodeIds = useMemo(() => {
-        const hidden = new Set();
-
-        semanticNodes
-            .filter(
-                (node) =>
-                    (node.type === "compound" || node.type === "parallel") &&
-                    Boolean(node.data?.isCollapsed)
-            )
-            .forEach((container) => {
-                const queue = [
-                    ...(semanticChildrenByParent.get(container.id) || []),
-                ];
-
-                while (queue.length > 0) {
-                    const child = queue.shift();
-                    if (!child || hidden.has(child.id)) continue;
-                    hidden.add(child.id);
-                    queue.push(
-                        ...(semanticChildrenByParent.get(child.id) || [])
-                    );
-                }
-            });
-
-        return hidden;
-    }, [semanticNodes, semanticChildrenByParent]);
-
 
     // Cache the transition handles used by each skill for its local validation
     // badge. CustomNode used to call React Flow's useEdges(), which subscribed
