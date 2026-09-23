@@ -264,6 +264,11 @@ const cloneGraphValue = (value) => {
     return value;
 };
 
+// Keep the editor clipboard outside AppContent. Selection changes, workflow
+// focus changes, or an AppContent remount must not invalidate something the
+// user already copied. This is intentionally session-only editor state.
+let persistentGraphClipboard = null;
+
 function AppContent() {
     const {
         skills,
@@ -299,7 +304,7 @@ function AppContent() {
     // Internal graph clipboard. This intentionally does not use the system
     // clipboard: Ctrl+C copies the current React Flow selection and
     // Ctrl+V recreates it with fresh graph IDs.
-    const graphClipboardRef = useRef(null);
+    const graphClipboardRef = useRef(persistentGraphClipboard);
     // Keep an authoritative snapshot of React Flow's current selection.
     // Reading `node.selected` from the controlled nodes array can lag behind
     // the interaction by a render, especially when Ctrl/Meta multi-selecting.
@@ -2656,34 +2661,60 @@ function AppContent() {
         };
 
         const captureSelection = () => {
-            const selectedIds = graphSelectionRef.current;
+            // Merge React Flow's selection callback with the controlled node
+            // flags. This makes a just-clicked slot copyable even if the
+            // selection callback has not propagated yet.
+            const selectedIds = new Set(graphSelectionRef.current);
+            nodes.forEach((node) => {
+                if (node.selected) selectedIds.add(node.id);
+            });
+            slotNodes.forEach((node) => {
+                if (node.selected) selectedIds.add(node.id);
+            });
+
             let nodesToCopy = nodes.filter(
                 (node) =>
                     selectedIds.has(node.id) &&
                     node.type !== "parallelLane"
             );
+            let slotNodesToCopy = slotNodes.filter((node) =>
+                selectedIds.has(node.id)
+            );
 
-            // React Flow's onSelectionChange is the authoritative source for
-            // multi-selection. Only fall back to the explicitly focused node
-            // when there is no usable Flow selection (or a single stale node
-            // from the previous click). This keeps the original stale-click
-            // fix without collapsing a genuine Ctrl/Meta selection to one node.
-            if (selectedNodeId && nodesToCopy.length <= 1) {
-                const focusedNode = nodes.find(
-                    (node) =>
-                        node.id === selectedNodeId &&
-                        node.type !== "parallelLane"
-                );
-                const focusedNodeIsSelected = nodesToCopy.some(
-                    (node) => node.id === selectedNodeId
-                );
+            // A normal click also records the focused node in selectedNodeId.
+            // Use it as the final fallback so slot copying does not depend on
+            // React Flow's selection-event ordering.
+            if (
+                selectedNodeId &&
+                nodesToCopy.length + slotNodesToCopy.length <= 1
+            ) {
+                const focusedNode =
+                    nodes.find(
+                        (node) =>
+                            node.id === selectedNodeId &&
+                            node.type !== "parallelLane"
+                    ) ||
+                    slotNodes.find((node) => node.id === selectedNodeId);
+                const focusedNodeIsSelected =
+                    nodesToCopy.some((node) => node.id === selectedNodeId) ||
+                    slotNodesToCopy.some(
+                        (node) => node.id === selectedNodeId
+                    );
 
                 if (focusedNode && !focusedNodeIsSelected) {
-                    nodesToCopy = [focusedNode];
+                    if (focusedNode.type === "slot") {
+                        nodesToCopy = [];
+                        slotNodesToCopy = [focusedNode];
+                    } else {
+                        nodesToCopy = [focusedNode];
+                        slotNodesToCopy = [];
+                    }
                 }
             }
 
-            if (nodesToCopy.length === 0) return false;
+            if (nodesToCopy.length === 0 && slotNodesToCopy.length === 0) {
+                return false;
+            }
 
             const copiedNodeIds = new Set(
                 nodesToCopy.map((node) => node.id)
@@ -2695,13 +2726,38 @@ function AppContent() {
                     copiedNodeIds.has(edge.target)
             );
 
-            graphClipboardRef.current = {
+            const clipboard = {
                 nodes: nodesToCopy.map((node) =>
                     cloneGraphValue({
                         ...node,
                         selected: false,
                     })
                 ),
+                slotNodes: slotNodesToCopy.map((node) => {
+                    const canonicalSlotNodeId =
+                        node.data?.cloneOfNodeId || node.id;
+                    const canonicalSlotNode =
+                        slotNodes.find(
+                            (candidate) =>
+                                candidate.id === canonicalSlotNodeId &&
+                                !candidate.data?.isSlotClone
+                        ) || node;
+
+                    return cloneGraphValue({
+                        ...node,
+                        selected: false,
+                        data: {
+                            ...(node.data || {}),
+                            clipboardCanonicalSlotNodeId:
+                                canonicalSlotNode.id ||
+                                canonicalSlotNodeId,
+                            clipboardCanonicalSlotPath:
+                                canonicalSlotNode.data?.path ||
+                                node.data?.path ||
+                                "",
+                        },
+                    });
+                }),
                 edges: copiedEdges.map((edge) =>
                     cloneGraphValue({
                         ...edge,
@@ -2710,17 +2766,135 @@ function AppContent() {
                 ),
             };
 
+            graphClipboardRef.current = clipboard;
+            persistentGraphClipboard = clipboard;
             pasteSequenceRef.current = 0;
             return true;
         };
 
+        const buildPastedSlotAliases = (copiedSlotNodes, offset) =>
+            (copiedSlotNodes || [])
+                .map((copiedSlotNode) => {
+                    const copiedCanonicalId =
+                        copiedSlotNode.data?.clipboardCanonicalSlotNodeId ||
+                        copiedSlotNode.data?.cloneOfNodeId ||
+                        copiedSlotNode.id;
+                    const copiedPath = normalizeSlotPath(
+                        copiedSlotNode.data?.clipboardCanonicalSlotPath ||
+                        copiedSlotNode.data?.path ||
+                        ""
+                    );
+
+                    // Resolve by canonical id first, then by semantic path.
+                    // Pasting therefore no longer depends on whichever visual
+                    // slot happens to be selected after Ctrl+C.
+                    const canonicalSlotNode =
+                        slotNodes.find(
+                            (node) =>
+                                !node.data?.isSlotClone &&
+                                node.id === copiedCanonicalId
+                        ) ||
+                        slotNodes.find(
+                            (node) =>
+                                !node.data?.isSlotClone &&
+                                copiedPath &&
+                                normalizeSlotPath(
+                                    node.data?.path || ""
+                                ) === copiedPath
+                        );
+
+                    if (!canonicalSlotNode) return null;
+
+                    return {
+                        id: `slot-clone-${crypto.randomUUID()}`,
+                        position: {
+                            x:
+                                Number(
+                                    copiedSlotNode.position?.x || 0
+                                ) + offset,
+                            y:
+                                Number(
+                                    copiedSlotNode.position?.y || 0
+                                ) + offset,
+                        },
+                        type: "slot",
+                        selected: true,
+                        data: {
+                            ...(canonicalSlotNode.data || {}),
+                            cloneOfNodeId: canonicalSlotNode.id,
+                            isSlotClone: true,
+                        },
+                    };
+                })
+                .filter(Boolean);
+
         const pasteClipboard = (pasteMode = "copy") => {
-            const clipboard = graphClipboardRef.current;
-            if (!clipboard?.nodes?.length) return false;
+            const clipboard =
+                graphClipboardRef.current || persistentGraphClipboard;
+            if (clipboard && graphClipboardRef.current !== clipboard) {
+                graphClipboardRef.current = clipboard;
+            }
+            const copiedStateNodes = clipboard?.nodes || [];
+            const copiedSlotNodes = clipboard?.slotNodes || [];
+            const copiedNodeCount =
+                copiedStateNodes.length + copiedSlotNodes.length;
+
+            if (copiedNodeCount === 0) return false;
 
             if (pasteMode === "clone") {
+                if (copiedNodeCount !== 1) return false;
+
                 const copiedNode =
-                    clipboard.nodes.length === 1 ? clipboard.nodes[0] : null;
+                    copiedStateNodes[0] || copiedSlotNodes[0] || null;
+
+                if (copiedNode?.type === "slot") {
+                    pasteSequenceRef.current += 1;
+                    const offset = 40 * pasteSequenceRef.current;
+                    const pastedSlotAliases = buildPastedSlotAliases(
+                        [copiedNode],
+                        offset
+                    );
+                    const cloneNode = pastedSlotAliases[0];
+                    if (!cloneNode) return false;
+
+                    const nextSlotNodes = [
+                        ...slotNodes.map((node) => ({
+                            ...node,
+                            selected: false,
+                        })),
+                        cloneNode,
+                    ];
+
+                    setNodes((currentNodes) =>
+                        currentNodes.map((node) => ({
+                            ...node,
+                            selected: false,
+                        }))
+                    );
+                    setSlotNodes(nextSlotNodes);
+                    setEdges((currentEdges) =>
+                        currentEdges.map((edge) => ({
+                            ...edge,
+                            selected: false,
+                        }))
+                    );
+                    setSlotEdges((currentEdges) =>
+                        currentEdges.map((edge) => ({
+                            ...edge,
+                            selected: false,
+                        }))
+                    );
+                    setSelectedNodeId(cloneNode.id);
+                    setRightPanelTab("details");
+                    setActiveTab("slots");
+
+                    requestAnimationFrame(() => {
+                        updateNodeInternals(cloneNode.id);
+                    });
+
+                    return true;
+                }
+
                 const sourceNode = copiedNode
                     ? nodes.find((node) => node.id === copiedNode.id)
                     : null;
@@ -2739,6 +2913,12 @@ function AppContent() {
                 });
                 if (!cloneNode) return false;
 
+                setSlotNodes((currentNodes) =>
+                    currentNodes.map((node) => ({
+                        ...node,
+                        selected: false,
+                    }))
+                );
                 setNodes((currentNodes) => [
                     ...currentNodes.map((node) => ({
                         ...node,
@@ -2758,6 +2938,60 @@ function AppContent() {
 
                 requestAnimationFrame(() => {
                     updateNodeInternals(cloneNode.id);
+                });
+
+                return true;
+            }
+
+            // Slot declarations are unique semantic SCXML objects. Copy/paste
+            // therefore creates visual aliases for selected slots instead of a
+            // second declaration with the same path.
+            if (copiedStateNodes.length === 0 && copiedSlotNodes.length > 0) {
+                pasteSequenceRef.current += 1;
+                const offset = 40 * pasteSequenceRef.current;
+                const pastedSlotAliases = buildPastedSlotAliases(
+                    copiedSlotNodes,
+                    offset
+                );
+                if (pastedSlotAliases.length === 0) return false;
+
+                const nextSlotNodes = [
+                    ...slotNodes.map((node) => ({
+                        ...node,
+                        selected: false,
+                    })),
+                    ...pastedSlotAliases,
+                ];
+
+                setNodes((currentNodes) =>
+                    currentNodes.map((node) => ({
+                        ...node,
+                        selected: false,
+                    }))
+                );
+                setSlotNodes(nextSlotNodes);
+                setEdges((currentEdges) =>
+                    currentEdges.map((edge) => ({
+                        ...edge,
+                        selected: false,
+                    }))
+                );
+                setSlotEdges((currentEdges) =>
+                    currentEdges.map((edge) => ({
+                        ...edge,
+                        selected: false,
+                    }))
+                );
+
+                const firstPastedSlot = pastedSlotAliases[0];
+                setSelectedNodeId(firstPastedSlot.id);
+                setRightPanelTab("details");
+                setActiveTab("slots");
+
+                requestAnimationFrame(() => {
+                    pastedSlotAliases.forEach((node) =>
+                        updateNodeInternals(node.id)
+                    );
                 });
 
                 return true;
@@ -3007,8 +3241,20 @@ function AppContent() {
                 })),
                 ...pastedNodes,
             ]);
+            const pastedSlotAliases = buildPastedSlotAliases(
+                copiedSlotNodes,
+                offset
+            );
+            const nextSlotNodes = [
+                ...slotNodes.map((node) => ({
+                    ...node,
+                    selected: false,
+                })),
+                ...pastedSlotAliases,
+            ];
 
             setNodes(nextNodes);
+            setSlotNodes(nextSlotNodes);
             setEdges([
                 ...edges.map((edge) => ({
                     ...edge,
@@ -3019,17 +3265,21 @@ function AppContent() {
 
             const firstPastedNode = pastedNodes.find(
                 (node) => !node.parentId
-            ) || pastedNodes[0];
+            ) || pastedNodes[0] || pastedSlotAliases[0];
 
             setSelectedNodeId(firstPastedNode?.id || null);
 
             // Slot paths live on the skill nodes. Rebuild the slot-view edges
-            // so copied skills immediately retain their slot connections too.
+            // so copied skills immediately retain their slot connections too,
+            // while preserving any visual slot aliases pasted with the group.
             requestAnimationFrame(() => {
-                checkSlotConnection(nextNodes);
+                checkSlotConnection(nextNodes, null, nextSlotNodes);
 
                 pastedIds.forEach((nodeId) => {
                     updateNodeInternals(nodeId);
+                });
+                pastedSlotAliases.forEach((node) => {
+                    updateNodeInternals(node.id);
                 });
             });
 
@@ -3039,11 +3289,25 @@ function AppContent() {
         const requestPasteClipboard = () => {
             if (pendingSkillPasteActionRef.current) return true;
 
-            const clipboard = graphClipboardRef.current;
-            if (!clipboard?.nodes?.length) return false;
+            const clipboard =
+                graphClipboardRef.current || persistentGraphClipboard;
+            if (clipboard && graphClipboardRef.current !== clipboard) {
+                graphClipboardRef.current = clipboard;
+            }
+            const copiedStateNodes = clipboard?.nodes || [];
+            const copiedSlotNodes = clipboard?.slotNodes || [];
+            const copiedNodeCount =
+                copiedStateNodes.length + copiedSlotNodes.length;
+            if (copiedNodeCount === 0) return false;
+
+            // Slots have one semantic declaration per path, so normal
+            // copy/paste directly creates another visual alias.
+            if (copiedNodeCount === 1 && copiedSlotNodes.length === 1) {
+                return pasteClipboard("copy");
+            }
 
             const copiedNode =
-                clipboard.nodes.length === 1 ? clipboard.nodes[0] : null;
+                copiedNodeCount === 1 ? copiedStateNodes[0] || null : null;
             const sourceNode = copiedNode
                 ? nodes.find((node) => node.id === copiedNode.id)
                 : null;
@@ -3106,7 +3370,7 @@ function AppContent() {
             }
 
             if (key === "v") {
-                if (graphClipboardRef.current) {
+                if (graphClipboardRef.current || persistentGraphClipboard) {
                     event.preventDefault();
                     requestPasteClipboard();
                 }
@@ -3138,10 +3402,16 @@ function AppContent() {
         selectedNodeId,
         nodes,
         edges,
+        slotNodes,
         setNodes,
         setEdges,
         setSlotNodes,
+        setSlotEdges,
+        setSelectedNodeId,
+        setRightPanelTab,
+        setActiveTab,
         clearAllEdgeSelection,
+        checkSlotConnection,
         updateNodeInternals,
     ]);
 

@@ -216,13 +216,25 @@ export function useEditorHistory({
         updateNodeInternals,
     ]);
 
+    const flushPendingHistorySnapshot = useCallback(() => {
+        // Only flush a snapshot when the normal debounced history writer still
+        // has an edit waiting to be committed. Re-committing on every undo can
+        // add the just-restored state back to the history and trap Ctrl+Z on a
+        // single entry.
+        if (!historyTimerRef.current) return false;
+
+        clearTimeout(historyTimerRef.current);
+        historyTimerRef.current = null;
+        return commitHistorySnapshot(createHistorySnapshot());
+    }, [commitHistorySnapshot, createHistorySnapshot]);
+
     const undo = useCallback(() => {
-        commitHistorySnapshot(createHistorySnapshot());
+        flushPendingHistorySnapshot();
         if (historyIndexRef.current <= 0) return false;
         historyIndexRef.current -= 1;
         applyHistorySnapshot(historyRef.current[historyIndexRef.current]?.snapshot);
         return true;
-    }, [applyHistorySnapshot, commitHistorySnapshot, createHistorySnapshot]);
+    }, [applyHistorySnapshot, flushPendingHistorySnapshot]);
 
     const redo = useCallback(() => {
         if (historyIndexRef.current >= historyRef.current.length - 1) return false;
