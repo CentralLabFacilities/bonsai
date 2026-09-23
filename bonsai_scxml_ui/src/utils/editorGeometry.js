@@ -844,51 +844,127 @@ export const normalizeParallelLaneCompounds = (allNodes) => {
         return allNodes;
     }
 
-    let nextNodes = allNodes;
+    /*
+     * This normalization runs after every semantic node change. Parallel-heavy
+     * graphs used to rebuild a full node-id map and repeatedly filter the whole
+     * node array once per lane. Keep one mutable hierarchy index for the entire
+     * pass instead. Reparenting a state updates only the affected parent buckets,
+     * while all lane/compound membership lookups stay O(1) + direct children.
+     */
+    const originalOrder = allNodes.map((node) => node.id);
+    const byId = new Map(allNodes.map((node) => [node.id, node]));
+    const childrenByParent = new Map();
+    const addedIds = [];
+    const removedIds = new Set();
     let changed = false;
 
-    const lanes = allNodes.filter((node) => node.type === "parallelLane");
+    const addChildId = (parentId, nodeId) => {
+        if (!parentId) return;
+        if (!childrenByParent.has(parentId)) {
+            childrenByParent.set(parentId, []);
+        }
+        const children = childrenByParent.get(parentId);
+        if (!children.includes(nodeId)) children.push(nodeId);
+    };
 
-    lanes.forEach((lane) => {
-        const currentById = new Map(nextNodes.map((node) => [node.id, node]));
-        const currentLane = currentById.get(lane.id);
+    const removeChildId = (parentId, nodeId) => {
+        if (!parentId) return;
+        const children = childrenByParent.get(parentId);
+        if (!children) return;
+        const index = children.indexOf(nodeId);
+        if (index >= 0) children.splice(index, 1);
+    };
+
+    allNodes.forEach((node) => addChildId(node.parentId, node.id));
+
+    const getChildren = (parentId) =>
+        (childrenByParent.get(parentId) || [])
+            .map((id) => byId.get(id))
+            .filter(Boolean);
+
+    const replaceNode = (nodeId, nextNode) => {
+        const previous = byId.get(nodeId);
+        if (!previous || !nextNode || previous === nextNode) return;
+
+        if (previous.parentId !== nextNode.parentId) {
+            removeChildId(previous.parentId, nodeId);
+            addChildId(nextNode.parentId, nodeId);
+        }
+
+        byId.set(nodeId, nextNode);
+        changed = true;
+    };
+
+    const addNode = (node) => {
+        if (!node?.id || byId.has(node.id)) return;
+        byId.set(node.id, node);
+        addChildId(node.parentId, node.id);
+        addedIds.push(node.id);
+        changed = true;
+    };
+
+    const removeNode = (nodeId) => {
+        const node = byId.get(nodeId);
+        if (!node) return;
+        removeChildId(node.parentId, nodeId);
+        byId.delete(nodeId);
+        removedIds.add(nodeId);
+        changed = true;
+    };
+
+    // Allocate automatic lane-compound names without rescanning every node for
+    // every lane that needs a wrapper.
+    const usedNames = new Set(
+        allNodes
+            .flatMap((node) => [node.data?.label, node.data?.fullSkillName])
+            .filter(Boolean)
+            .map(String)
+    );
+    let nextLaneNameIndex = 1;
+    const allocateLaneCompoundName = () => {
+        while (usedNames.has(`lane_${nextLaneNameIndex}`)) {
+            nextLaneNameIndex += 1;
+        }
+        const name = `lane_${nextLaneNameIndex}`;
+        usedNames.add(name);
+        nextLaneNameIndex += 1;
+        return name;
+    };
+
+    const laneIds = allNodes
+        .filter((node) => node.type === "parallelLane")
+        .map((node) => node.id);
+
+    laneIds.forEach((laneId) => {
+        const currentLane = byId.get(laneId);
         if (!currentLane) return;
 
-        const directChildren = nextNodes.filter(
-            (node) => node.parentId === currentLane.id
-        );
-
-        const wrappers = directChildren.filter(
-            (node) => isAutoParallelLaneCompound(node)
-        );
+        const directChildren = getChildren(currentLane.id);
+        const wrappers = directChildren.filter(isAutoParallelLaneCompound);
 
         // There should only ever be one automatic lane compound. If an old
         // file contains more than one, the first is kept and the others are
         // merged into it below.
         let wrapper = wrappers[0] || null;
-        const extraWrapperIds = new Set(wrappers.slice(1).map((node) => node.id));
+        const extraWrappers = wrappers.slice(1);
+        const extraWrapperIds = new Set(extraWrappers.map((node) => node.id));
 
         const directSkills = directChildren.filter(isParallelLaneSkillCandidate);
         const wrappedSkills = wrapper
-            ? nextNodes.filter(
-                (node) =>
-                    node.parentId === wrapper.id &&
-                    isParallelLaneSkillCandidate(node)
-            )
+            ? getChildren(wrapper.id).filter(isParallelLaneSkillCandidate)
             : [];
-        const extraWrappedSkills = nextNodes.filter(
-            (node) =>
-                extraWrapperIds.has(node.parentId) &&
-                isParallelLaneSkillCandidate(node)
+        const extraWrappedSkills = extraWrappers.flatMap((extraWrapper) =>
+            getChildren(extraWrapper.id).filter(isParallelLaneSkillCandidate)
         );
 
-        const allSkills = [
-            ...wrappedSkills,
-            ...extraWrappedSkills,
-            ...directSkills,
-        ].filter(
-            (node, index, values) =>
-                values.findIndex((candidate) => candidate.id === node.id) === index
+        const allSkills = [];
+        const seenSkillIds = new Set();
+        [...wrappedSkills, ...extraWrappedSkills, ...directSkills].forEach(
+            (node) => {
+                if (!node || seenSkillIds.has(node.id)) return;
+                seenSkillIds.add(node.id);
+                allSkills.push(node);
+            }
         );
 
         // A lane with zero/one direct state does not need an automatically
@@ -897,11 +973,6 @@ export const normalizeParallelLaneCompounds = (allNodes) => {
             return;
         }
 
-        // The automatically managed Compound represents the lane itself in
-        // SCXML. Its editor geometry must therefore be an exact overlay of
-        // the visible Parallel lane, not merely "at least" as large. Using
-        // getNodeSize also covers measured/imported dimensions that may live
-        // on width/height instead of style.
         const laneSize = getNodeSize(currentLane);
         const laneWidth = Math.max(1, Number(laneSize.width) || 420);
         const laneHeight = Math.max(1, Number(laneSize.height) || 140);
@@ -909,14 +980,7 @@ export const normalizeParallelLaneCompounds = (allNodes) => {
         /*
          * If the lane already contains a normal compound and another sibling
          * state is added, that existing compound becomes the lane compound.
-         * Do NOT create another compound around it. This keeps the region
-         * structure flat:
-         *
-         *   lane -> compound -> states
-         *
-         * instead of:
-         *
-         *   lane -> auto compound -> existing compound -> states
+         * Do NOT create another compound around it.
          */
         if (!wrapper && allSkills.length > 1) {
             const existingDirectCompound = directSkills.find(
@@ -928,23 +992,19 @@ export const normalizeParallelLaneCompounds = (allNodes) => {
                     x: 0,
                     y: 0,
                 };
-                const existingChildren = nextNodes.filter(
-                    (node) =>
-                        node.parentId === existingDirectCompound.id &&
-                        isCompoundInitialChildCandidate(node)
-                );
+                const existingChildren = getChildren(
+                    existingDirectCompound.id
+                ).filter(isCompoundInitialChildCandidate);
                 const siblingsToAbsorb = directSkills.filter(
                     (node) => node.id !== existingDirectCompound.id
                 );
-                const compoundChildren = [
-                    ...existingChildren,
-                    ...siblingsToAbsorb,
-                ].filter(
-                    (node, index, values) =>
-                        values.findIndex(
-                            (candidate) => candidate.id === node.id
-                        ) === index
-                );
+                const compoundChildren = [];
+                const compoundChildIds = new Set();
+                [...existingChildren, ...siblingsToAbsorb].forEach((node) => {
+                    if (!node || compoundChildIds.has(node.id)) return;
+                    compoundChildIds.add(node.id);
+                    compoundChildren.push(node);
+                });
 
                 const storedInitialId =
                     existingDirectCompound.data?.initialChildId;
@@ -956,75 +1016,61 @@ export const normalizeParallelLaneCompounds = (allNodes) => {
                     compoundChildren[0] ||
                     null;
                 const desiredInitialId = initialChild?.id || null;
-                const siblingIds = new Set(
-                    siblingsToAbsorb.map((node) => node.id)
-                );
 
-                const promotedWidth = laneWidth;
-                const promotedHeight = laneHeight;
-
-                nextNodes = nextNodes.map((node) => {
-                    if (node.id === existingDirectCompound.id) {
-                        return {
-                            ...node,
-                            position: { x: 0, y: 0 },
-                            parentId: currentLane.id,
-                            extent: "parent",
-                            expandParent: true,
-                            draggable: false,
-                            selectable: false,
-                            width: promotedWidth,
-                            height: promotedHeight,
-                            style: {
-                                ...node.style,
-                                width: promotedWidth,
-                                height: promotedHeight,
-                            },
-                            data: {
-                                ...node.data,
-                                initialChildId: desiredInitialId,
-                                autoParallelLaneCompound: true,
-                            },
-                        };
-                    }
-
-                    // Moving the compound itself to the lane origin must not
-                    // visually move children it already contained.
-                    if (node.parentId === existingDirectCompound.id) {
-                        return {
-                            ...node,
-                            position: {
-                                x:
-                                    Number(oldWrapperPosition.x || 0) +
-                                    Number(node.position?.x || 0),
-                                y:
-                                    Number(oldWrapperPosition.y || 0) +
-                                    Number(node.position?.y || 0),
-                            },
-                            data: {
-                                ...node.data,
-                                isInitial: node.id === desiredInitialId,
-                            },
-                        };
-                    }
-
-                    if (siblingIds.has(node.id)) {
-                        return {
-                            ...node,
-                            parentId: existingDirectCompound.id,
-                            extent: "parent",
-                            expandParent: true,
-                            data: {
-                                ...node.data,
-                                isInitial: node.id === desiredInitialId,
-                            },
-                        };
-                    }
-
-                    return node;
+                replaceNode(existingDirectCompound.id, {
+                    ...existingDirectCompound,
+                    position: { x: 0, y: 0 },
+                    parentId: currentLane.id,
+                    extent: "parent",
+                    expandParent: true,
+                    draggable: false,
+                    selectable: false,
+                    width: laneWidth,
+                    height: laneHeight,
+                    style: {
+                        ...existingDirectCompound.style,
+                        width: laneWidth,
+                        height: laneHeight,
+                    },
+                    data: {
+                        ...existingDirectCompound.data,
+                        initialChildId: desiredInitialId,
+                        autoParallelLaneCompound: true,
+                    },
                 });
 
-                changed = true;
+                existingChildren.forEach((child) => {
+                    replaceNode(child.id, {
+                        ...child,
+                        position: {
+                            x:
+                                Number(oldWrapperPosition.x || 0) +
+                                Number(child.position?.x || 0),
+                            y:
+                                Number(oldWrapperPosition.y || 0) +
+                                Number(child.position?.y || 0),
+                        },
+                        data: {
+                            ...child.data,
+                            isInitial: child.id === desiredInitialId,
+                        },
+                    });
+                });
+
+                siblingsToAbsorb.forEach((sibling) => {
+                    const liveSibling = byId.get(sibling.id) || sibling;
+                    replaceNode(sibling.id, {
+                        ...liveSibling,
+                        parentId: existingDirectCompound.id,
+                        extent: "parent",
+                        expandParent: true,
+                        data: {
+                            ...liveSibling.data,
+                            isInitial: sibling.id === desiredInitialId,
+                        },
+                    });
+                });
+
                 return;
             }
         }
@@ -1033,10 +1079,7 @@ export const normalizeParallelLaneCompounds = (allNodes) => {
             const wrapperId = getNodeId();
             const initialSkill =
                 allSkills.find((node) => node.data?.isInitial) || allSkills[0];
-
-            // This is the compound that represents the parallel region/lane,
-            // so its default name should make that role explicit.
-            const compoundName = getNextParallelLaneCompoundName(nextNodes);
+            const compoundName = allocateLaneCompoundName();
 
             const autoWrapper = {
                 id: wrapperId,
@@ -1065,38 +1108,33 @@ export const normalizeParallelLaneCompounds = (allNodes) => {
                 },
             };
 
-            nextNodes = [
-                ...nextNodes,
-                autoWrapper,
-            ].map((node) => {
-                if (!allSkills.some((skill) => skill.id === node.id)) {
-                    return node;
-                }
+            addNode(autoWrapper);
+            wrapper = autoWrapper;
 
-                return {
-                    ...node,
+            allSkills.forEach((skill) => {
+                const liveSkill = byId.get(skill.id) || skill;
+                replaceNode(skill.id, {
+                    ...liveSkill,
                     parentId: wrapperId,
                     extent: "parent",
                     expandParent: true,
-                    // Wrapper starts at the lane origin, so the visual position
-                    // stays exactly where the skill was before wrapping.
                     position: {
-                        x: Number(node.position?.x || 0),
-                        y: Number(node.position?.y || 0),
+                        x: Number(liveSkill.position?.x || 0),
+                        y: Number(liveSkill.position?.y || 0),
                     },
                     data: {
-                        ...node.data,
-                        isInitial: node.id === initialSkill.id,
+                        ...liveSkill.data,
+                        isInitial: liveSkill.id === initialSkill.id,
                     },
-                };
+                });
             });
 
-            changed = true;
             return;
         }
 
         // Existing lane compound: keep it as the single region compound and
         // absorb direct lane states or children of duplicate wrappers into it.
+        wrapper = byId.get(wrapper.id) || wrapper;
         const wrapperPosition = wrapper.position || { x: 0, y: 0 };
         const currentInitialId = wrapper.data?.initialChildId;
         const initialSkill =
@@ -1137,107 +1175,124 @@ export const normalizeParallelLaneCompounds = (allNodes) => {
             return;
         }
 
-        nextNodes = nextNodes
-            .filter((node) => !extraWrapperIds.has(node.id))
-            .map((node) => {
-                if (node.id === wrapper.id) {
-                    const { className: _legacyClassName, ...normalCompound } = node;
+        const { className: _legacyClassName, ...normalCompound } = wrapper;
+        replaceNode(wrapper.id, {
+            ...normalCompound,
+            position: { x: 0, y: 0 },
+            draggable: false,
+            selectable: false,
+            width: desiredWrapperWidth,
+            height: desiredWrapperHeight,
+            style: {
+                ...wrapper.style,
+                width: desiredWrapperWidth,
+                height: desiredWrapperHeight,
+            },
+            data: {
+                ...wrapper.data,
+                initialChildId: desiredInitialId,
+                autoParallelLaneCompound: true,
+            },
+        });
 
-                    return {
-                        ...normalCompound,
-                        position: { x: 0, y: 0 },
-                        draggable: false,
-                        selectable: false,
-                        width: desiredWrapperWidth,
-                        height: desiredWrapperHeight,
-                        style: {
-                            ...node.style,
-                            width: desiredWrapperWidth,
-                            height: desiredWrapperHeight,
-                        },
-                        data: {
-                            ...node.data,
-                            initialChildId: desiredInitialId,
-                            autoParallelLaneCompound: true,
-                        },
-                    };
-                }
+        const allSkillIds = new Set(allSkills.map((skill) => skill.id));
+        allSkillIds.forEach((skillId) => {
+            const node = byId.get(skillId);
+            if (!node) return;
 
-                if (!allSkills.some((skill) => skill.id === node.id)) {
-                    return node;
-                }
-
-                if (node.parentId === wrapper.id) {
-                    return {
-                        ...node,
-                        position: needsPositionReset
-                            ? {
-                                  x:
-                                      Number(wrapperPosition.x || 0) +
-                                      Number(node.position?.x || 0),
-                                  y:
-                                      Number(wrapperPosition.y || 0) +
-                                      Number(node.position?.y || 0),
-                              }
-                            : node.position,
-                        data: {
-                            ...node.data,
-                            isInitial: node.id === desiredInitialId,
-                        },
-                    };
-                }
-
-                const oldParent = currentById.get(node.parentId);
-                const oldParentPosition =
-                    isAutoParallelLaneCompound(oldParent)
-                        ? oldParent.position || { x: 0, y: 0 }
-                        : { x: 0, y: 0 };
-
-                const laneX =
-                    Number(oldParentPosition.x || 0) +
-                    Number(node.position?.x || 0);
-                const laneY =
-                    Number(oldParentPosition.y || 0) +
-                    Number(node.position?.y || 0);
-
-                return {
+            if (node.parentId === wrapper.id) {
+                replaceNode(node.id, {
                     ...node,
-                    parentId: wrapper.id,
-                    extent: "parent",
-                    expandParent: true,
-                    position: {
-                        x: laneX - Number(wrapperPosition.x || 0),
-                        y: laneY - Number(wrapperPosition.y || 0),
-                    },
+                    position: needsPositionReset
+                        ? {
+                              x:
+                                  Number(wrapperPosition.x || 0) +
+                                  Number(node.position?.x || 0),
+                              y:
+                                  Number(wrapperPosition.y || 0) +
+                                  Number(node.position?.y || 0),
+                          }
+                        : node.position,
                     data: {
                         ...node.data,
                         isInitial: node.id === desiredInitialId,
                     },
-                };
-            });
+                });
+                return;
+            }
 
-        changed = true;
+            const oldParent = byId.get(node.parentId);
+            const oldParentPosition = isAutoParallelLaneCompound(oldParent)
+                ? oldParent.position || { x: 0, y: 0 }
+                : { x: 0, y: 0 };
+            const laneX =
+                Number(oldParentPosition.x || 0) +
+                Number(node.position?.x || 0);
+            const laneY =
+                Number(oldParentPosition.y || 0) +
+                Number(node.position?.y || 0);
+
+            replaceNode(node.id, {
+                ...node,
+                parentId: wrapper.id,
+                extent: "parent",
+                expandParent: true,
+                position: {
+                    x: laneX - Number(wrapperPosition.x || 0),
+                    y: laneY - Number(wrapperPosition.y || 0),
+                },
+                data: {
+                    ...node.data,
+                    isInitial: node.id === desiredInitialId,
+                },
+            });
+        });
+
+        extraWrapperIds.forEach((extraWrapperId) => removeNode(extraWrapperId));
     });
 
-    return changed ? orderNodesParentsFirst(nextNodes) : allNodes;
+    if (!changed) return allNodes;
+
+    const normalized = [
+        ...originalOrder
+            .filter((id) => !removedIds.has(id))
+            .map((id) => byId.get(id))
+            .filter(Boolean),
+        ...addedIds.map((id) => byId.get(id)).filter(Boolean),
+    ];
+
+    return orderNodesParentsFirst(normalized);
 };
 
 export const normalizeCompoundInitialStates = (allNodes) => {
-    const compounds = (allNodes || []).filter(
-        (node) => node.type === "compound"
-    );
+    if (!Array.isArray(allNodes) || allNodes.length === 0) {
+        return allNodes;
+    }
+
+    const compounds = [];
+    const childrenByParent = new Map();
+
+    allNodes.forEach((node) => {
+        if (node.type === "compound") compounds.push(node);
+        if (!node.parentId) return;
+        if (!childrenByParent.has(node.parentId)) {
+            childrenByParent.set(node.parentId, []);
+        }
+        childrenByParent.get(node.parentId).push(node);
+    });
 
     if (compounds.length === 0) {
         return allNodes;
     }
 
+    // This pass also runs after every semantic node change. Resolve each
+    // Compound's direct children from the hierarchy index instead of filtering
+    // the complete node array once per Compound.
     const desiredInitialByCompound = new Map();
 
     compounds.forEach((compound) => {
-        const children = (allNodes || []).filter(
-            (node) =>
-                node.parentId === compound.id &&
-                isCompoundInitialChildCandidate(node)
+        const children = (childrenByParent.get(compound.id) || []).filter(
+            isCompoundInitialChildCandidate
         );
 
         if (children.length === 0) {
@@ -1273,7 +1328,7 @@ export const normalizeCompoundInitialStates = (allNodes) => {
 
     let changed = false;
 
-    const normalized = (allNodes || []).map((node) => {
+    const normalized = allNodes.map((node) => {
         if (node.type === "compound") {
             const desiredInitialId =
                 desiredInitialByCompound.get(node.id) || null;
@@ -1325,4 +1380,3 @@ export const normalizeCompoundInitialStates = (allNodes) => {
 
     return changed ? normalized : allNodes;
 };
-
