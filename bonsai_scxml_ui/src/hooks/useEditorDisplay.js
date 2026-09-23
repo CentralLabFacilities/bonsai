@@ -7,12 +7,12 @@ import {
     withSmartTransitionRouting,
 } from "../utils/editorGraph";
 import {
-    getAbsoluteNodePosition,
     getNodeSize,
     isAutoParallelLaneCompound,
 } from "../utils/editorGeometry";
 
 const SLOT_EDGE_INACTIVE_COLOR = "#64748b";
+const COMPOUND_ROUTING_GRID_CELL_SIZE = 640;
 
 const pointInsideRect = (point, rect) =>
     point.x >= rect.left &&
@@ -345,7 +345,6 @@ export function useEditorDisplay({
         [transitionStructureEdges, nodeById]
     );
 
-    const compoundAvoidanceCacheRef = useRef(new Map());
     const routingGeometryNodesRef = useRef([]);
     const routingGeometryNodes = useMemo(() => {
         if (isDraggingNode && routingGeometryNodesRef.current.length > 0) {
@@ -412,15 +411,53 @@ export function useEditorDisplay({
         return requestedNodes;
     }, [activeMode, injectedNodes, injectedSlotNodes]);
 
-    const compoundAvoidanceNodesDependency = routingGeometryNodes;
-    const compoundAvoidanceByEdgeId = useMemo(() => {
-        const liveNodes = compoundAvoidanceNodesDependency;
+    // Build the expensive routing geometry once per real geometry change.
+    // Previously the compound-avoidance pass repeatedly walked parent chains
+    // with Array.find() and then tested every transition against every
+    // Compound. On large graphs that can become O(edges * compounds * nodes).
+    // The cached index below resolves absolute positions/ancestors once and
+    // places Compound rectangles into a simple spatial grid. Each transition
+    // therefore checks only nearby Compound obstacles.
+    const routingGeometryIndex = useMemo(() => {
         const liveNodeById = new Map(
-            liveNodes.map((node) => [node.id, node])
+            routingGeometryNodes.map((node) => [node.id, node])
         );
-        const compounds = liveNodes.filter(
-            (node) => node.type === "compound" && !node.hidden
-        );
+        const absolutePositionByNodeId = new Map();
+        const resolvingPositionIds = new Set();
+
+        const getAbsolutePosition = (node) => {
+            if (!node) return { x: 0, y: 0 };
+            const cached = absolutePositionByNodeId.get(node.id);
+            if (cached) return cached;
+
+            const local = {
+                x: node.position?.x || 0,
+                y: node.position?.y || 0,
+            };
+
+            // Guard malformed/cyclic parent relationships without making the
+            // normal tree path more expensive.
+            if (resolvingPositionIds.has(node.id)) return local;
+            resolvingPositionIds.add(node.id);
+
+            const parent = node.parentId
+                ? liveNodeById.get(node.parentId)
+                : null;
+            const parentPosition = parent
+                ? getAbsolutePosition(parent)
+                : { x: 0, y: 0 };
+            const absolute = {
+                x: local.x + parentPosition.x,
+                y: local.y + parentPosition.y,
+            };
+
+            resolvingPositionIds.delete(node.id);
+            absolutePositionByNodeId.set(node.id, absolute);
+            return absolute;
+        };
+
+        routingGeometryNodes.forEach((node) => getAbsolutePosition(node));
+
         const ancestorIdsByNodeId = new Map();
         const getAncestorIds = (node) => {
             if (!node) return new Set();
@@ -440,6 +477,69 @@ export function useEditorDisplay({
             ancestorIdsByNodeId.set(node.id, ancestors);
             return ancestors;
         };
+
+        const compoundEntries = routingGeometryNodes
+            .filter((node) => node.type === "compound" && !node.hidden)
+            .map((compound) => {
+                const position = absolutePositionByNodeId.get(compound.id) ||
+                    getAbsolutePosition(compound);
+                const size = getNodeSize(compound);
+                const padding = 18;
+
+                return {
+                    id: compound.id,
+                    rect: {
+                        left: position.x - padding,
+                        right: position.x + size.width + padding,
+                        top: position.y - padding,
+                        bottom: position.y + size.height + padding,
+                    },
+                };
+            });
+
+        const compoundGrid = new Map();
+        compoundEntries.forEach((entry) => {
+            const { rect } = entry;
+            const minCellX = Math.floor(
+                rect.left / COMPOUND_ROUTING_GRID_CELL_SIZE
+            );
+            const maxCellX = Math.floor(
+                rect.right / COMPOUND_ROUTING_GRID_CELL_SIZE
+            );
+            const minCellY = Math.floor(
+                rect.top / COMPOUND_ROUTING_GRID_CELL_SIZE
+            );
+            const maxCellY = Math.floor(
+                rect.bottom / COMPOUND_ROUTING_GRID_CELL_SIZE
+            );
+
+            for (let cellX = minCellX; cellX <= maxCellX; cellX += 1) {
+                for (let cellY = minCellY; cellY <= maxCellY; cellY += 1) {
+                    const key = `${cellX}:${cellY}`;
+                    if (!compoundGrid.has(key)) compoundGrid.set(key, []);
+                    compoundGrid.get(key).push(entry);
+                }
+            }
+        });
+
+        return {
+            liveNodeById,
+            absolutePositionByNodeId,
+            ancestorIdsByNodeId,
+            compoundEntries,
+            compoundGrid,
+            getAncestorIds,
+        };
+    }, [routingGeometryNodes]);
+
+    const compoundAvoidanceByEdgeId = useMemo(() => {
+        const {
+            liveNodeById,
+            absolutePositionByNodeId,
+            compoundEntries,
+            compoundGrid,
+            getAncestorIds,
+        } = routingGeometryIndex;
         const next = new Map();
 
         normalizedTransitionEdges.forEach((edge) => {
@@ -456,14 +556,10 @@ export function useEditorDisplay({
             const targetNode = liveNodeById.get(edge.target);
             if (!sourceNode || !targetNode) return;
 
-            const sourcePosition = getAbsoluteNodePosition(
-                sourceNode,
-                liveNodes
-            );
-            const targetPosition = getAbsoluteNodePosition(
-                targetNode,
-                liveNodes
-            );
+            const sourcePosition = absolutePositionByNodeId.get(sourceNode.id);
+            const targetPosition = absolutePositionByNodeId.get(targetNode.id);
+            if (!sourcePosition || !targetPosition) return;
+
             const sourceSize = getNodeSize(sourceNode);
             const targetSize = getNodeSize(targetNode);
             const start = {
@@ -478,37 +574,61 @@ export function useEditorDisplay({
             const sourceAncestorIds = getAncestorIds(sourceNode);
             const targetAncestorIds = getAncestorIds(targetNode);
 
-            const crossesCompound = compounds.some((compound) => {
+            let candidates = compoundEntries;
+            if (compoundEntries.length > 8) {
+                const minX = Math.min(start.x, end.x);
+                const maxX = Math.max(start.x, end.x);
+                const minY = Math.min(start.y, end.y);
+                const maxY = Math.max(start.y, end.y);
+                const minCellX = Math.floor(
+                    minX / COMPOUND_ROUTING_GRID_CELL_SIZE
+                );
+                const maxCellX = Math.floor(
+                    maxX / COMPOUND_ROUTING_GRID_CELL_SIZE
+                );
+                const minCellY = Math.floor(
+                    minY / COMPOUND_ROUTING_GRID_CELL_SIZE
+                );
+                const maxCellY = Math.floor(
+                    maxY / COMPOUND_ROUTING_GRID_CELL_SIZE
+                );
+                const seenIds = new Set();
+                const nearby = [];
+
+                for (let cellX = minCellX; cellX <= maxCellX; cellX += 1) {
+                    for (let cellY = minCellY; cellY <= maxCellY; cellY += 1) {
+                        const entries = compoundGrid.get(`${cellX}:${cellY}`);
+                        if (!entries) continue;
+
+                        entries.forEach((entry) => {
+                            if (seenIds.has(entry.id)) return;
+                            seenIds.add(entry.id);
+                            nearby.push(entry);
+                        });
+                    }
+                }
+
+                candidates = nearby;
+            }
+
+            const crossesCompound = candidates.some((entry) => {
                 if (
-                    compound.id === sourceNode.id ||
-                    compound.id === targetNode.id ||
-                    sourceAncestorIds.has(compound.id) ||
-                    targetAncestorIds.has(compound.id)
+                    entry.id === sourceNode.id ||
+                    entry.id === targetNode.id ||
+                    sourceAncestorIds.has(entry.id) ||
+                    targetAncestorIds.has(entry.id)
                 ) {
                     return false;
                 }
 
-                const position = getAbsoluteNodePosition(compound, liveNodes);
-                const size = getNodeSize(compound);
-                const padding = 18;
-                const rect = {
-                    left: position.x - padding,
-                    right: position.x + size.width + padding,
-                    top: position.y - padding,
-                    bottom: position.y + size.height + padding,
-                };
-
-                return segmentIntersectsRect(start, end, rect);
+                return segmentIntersectsRect(start, end, entry.rect);
             });
 
-            if (crossesCompound) {
-                next.set(edge.id, true);
-            }
+            if (crossesCompound) next.set(edge.id, true);
         });
 
-        compoundAvoidanceCacheRef.current = next;
         return next;
-    }, [compoundAvoidanceNodesDependency, normalizedTransitionEdges]);
+    }, [routingGeometryIndex, normalizedTransitionEdges]);
 
     const smartTransitionEdges = useMemo(
         () =>
