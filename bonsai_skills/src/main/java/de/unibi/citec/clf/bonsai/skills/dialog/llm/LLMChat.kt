@@ -23,56 +23,6 @@ import java.util.concurrent.Future
  *
  * <pre>
  *
- * Options:
- * #_TIMEOUT             [Integer] Optional (default: 5000)
- *      -> Maximum time in milliseconds to wait for the LLM response in blocking mode.
- * #_BLOCKING            [boolean] Optional (default: true)
- *      -> Whether to wait for the LLM response.
- * #_PROMPT              [String] Optional
- *      -> The prompt to send to the LLM.
- *      -> If not provided, the prompt is read from the "prompt" slot.
- * #_ADD_REPLY           [boolean] Optional (default: true)
- *      -> Whether to add the LLM reply to the conversation history.
- *      -> Only available in blocking mode.
- * #_MEMORIZE_MSG        [boolean] Optional (default: false)
- *      -> Whether to store the LLM reply as a Message.
- *      -> If false, the reply content is stored as a String.
- *      -> Automatically enabled when tool usage is enabled.
- * #_USE_TOOLS           [boolean] Optional (default: false)
- *      -> Whether to provide tools to the LLM.
- * #_REQUIRE_TOOL        [boolean] Optional (default: false)
- *      -> Require the LLM to call a tool.
- *      -> If enabled and no tool is called, the "noTool" error exit token is returned.
- *
- * Slots:
- * prompt: [String] (Optional, Read)
- *      -> Memory slot containing the prompt to send to the LLM.
- *      -> Used only if #_PROMPT is not configured.
- *
- * history: [MessageList] (Read, Write)
- *      -> Memory slot containing the conversation history.
- *      -> The user prompt is added to the history before sending the request.
- *      -> The LLM reply is added to the history if #_ADD_REPLY is enabled.
- *
- * tools: [ToolList] (Optional, Read)
- *      -> Memory slot containing the tools available to the LLM.
- *      -> Used when #_USE_TOOLS is enabled.
- *
- * reply: [String] (Write)
- *      -> Memory slot where the content of the LLM reply is stored.
- *      -> Used when #_MEMORIZE_MSG is false.
- *
- * replyMessage: [Message] (Write)
- *      -> Memory slot where the complete LLM reply message is stored.
- *      -> Used when #_MEMORIZE_MSG is true.
- *
- * ExitTokens:
- * success:              LLM request successfully completed
- * success.agent:        LLM returned a normal agent reply when tool usage is enabled
- * success.tool:         LLM returned a tool call
- * error.timeout:        LLM did not respond within the configured timeout
- * error.noTool:         #_REQUIRE_TOOL is enabled but the LLM did not call a tool
- *
  * Sensors:
  *
  * Actuators:
@@ -131,10 +81,13 @@ class LLMChat : AbstractSkill() {
             "The prompt to send to the LLM. If not provided, the prompt is read from the \"prompt\" slot."
         )
         if(!configurator.hasConfigurationKey(KEY_PROMPT)) {
-            slotPrompt = configurator.getReadSlot("prompt", String::class.java)
+            slotPrompt = configurator.getReadSlot("prompt", String::class.java,
+                "Memory slot containing the prompt to send to the LLM. Used only if #_PROMPT is not configured.")
         }
 
-        slotHistory = configurator.getSlot("history", MessageList::class.java)
+        slotHistory = configurator.getSlot("history", MessageList::class.java,
+            "Memory slot containing the conversation history. The user prompt is added to the history before sending the request.\n. " +
+                    "The LLM reply is added to the history if #_ADD_REPLY is enabled.")
 
         blocking = configurator.requestOptionalBool(
             KEY_BLOCKING,
@@ -172,7 +125,10 @@ class LLMChat : AbstractSkill() {
                 logger.warn("$KEY_STORE_MESSAGE is required for tool use, automatically set to true")
                 memorizeMsg = true
             }
-            slotTools = configurator.getReadSlot("tools", ToolList::class.java)
+            slotTools = configurator.getReadSlot("tools", ToolList::class.java,
+                "Memory slot containing the tools available to the LLM.\n" +
+                        "Used when #_USE_TOOLS is enabled.")
+
             requireToolUse = configurator.requestOptionalBool(
                 KEY_REQUIRE_TOOL,
                 requireToolUse,
@@ -200,9 +156,13 @@ class LLMChat : AbstractSkill() {
         }
 
         if(memorizeMsg) {
-            slotMsg = configurator.getWriteSlot("replyMessage", Message::class.java)
+            slotMsg = configurator.getWriteSlot("replyMessage", Message::class.java,
+                "Memory slot where the complete LLM reply message is stored.\n" +
+                        " Used when #_MEMORIZE_MSG is true.")
         } else {
-            slot = configurator.getWriteSlot("reply", String::class.java)
+            slot = configurator.getWriteSlot("reply", String::class.java,
+                "Memory slot where the content of the LLM reply is stored.\n" +
+                        "Used when #_MEMORIZE_MSG is false.")
         }
 
     }

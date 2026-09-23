@@ -15,30 +15,6 @@ import java.util.concurrent.Future
  *
  * <pre>
  *
- * Options:
- *  #_store:              [String] Optional (default: false)
- *                              -> will add detected objects to the world model
- *  #_min_prob            [String] Optional (default: 0.5)
- *                              -> the minimal probability for an object to be recognized as such
- *  #_fast_pose:          [Boolean] Optional (default: false)
- *                              -> do fast but unprecise pose estimate (bad for grasping)
- *  #_safety_height       [Double] Optional (default: 0.0)
- *                              -> may move some recognized objects above the given height to avoid them being stuck
- *  #_height_from_slot    [Boolean] Optional (default: false)
- *                              -> use slot for #_safety_height
- *
- * Slots:
- *  RecognizedEntities: [EntityList] (Write)
- *      -> a list of objects detected inside the storage.
- *  SafetyHeight:       [Double] (Read Optional)
- *      -> #_safety_height parameter.
- *          Will only be used if option "#_height_from_slot" is not set.
- *
- * ExitTokens:
- * success:                Detected one or more objects inside the target storage
- * success.none            No objects could be found
- * error:                  No objects could be found
- *
  * Actuators:
  *  ECWMGrasping: [ECWMGraspingActuator]
  *
@@ -130,7 +106,8 @@ class RecognizeAllEntities : AbstractSkill() {
             slotIn = configurator.getReadSlot(
                 "SafetyHeight",
                 Float::class.java,
-                "#_safety_height parameter."
+                "#_safety_height parameter.\n" +
+                        " Will only be used if option \"#_height_from_slot\" is not set."
             )
         }
     }

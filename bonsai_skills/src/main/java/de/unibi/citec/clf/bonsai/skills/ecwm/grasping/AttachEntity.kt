@@ -17,25 +17,6 @@ import java.util.concurrent.Future
  *
  * <pre>
  *
- * Options:
- *  entity:     [String] Optional
- *                  -> Name of the attached entity
- *  type:       [String] Optional
- *                  -> Type of the attached entity
- *  use_slot:   [Boolean] Optional
- *                  -> read the entity from the specified slot instead of creating a new one
- *  create:     [Boolean] Optional
- *                  -> create a new entity with the given data, fails if the entity already exists
- *
- * Slots:
- *  Entity:   [Entity] Read/Write
- *                  -> Read: Entity to be attached
- *                  -> Write: Attached Entity
- *
- * ExitTokens:
- *  success:    Attached entity to the gripper
- *
- *
  * Actuators:
  *  ECWMGrasping: [ECWMGrasping]
  *
@@ -68,7 +49,8 @@ class AttachEntity : AbstractSkill() {
             "Attached entity to the gripper"
         )
 
-        slot = configurator.getReadWriteSlot("Entity", Entity::class.java)
+        slot = configurator.getReadWriteSlot("Entity", Entity::class.java, "Read: Entity to be attached\n" +
+                "Write: Attached Entity")
 
         useSlot = configurator.requestOptionalBool(
             KEY_USE_SLOT,

@@ -32,31 +32,6 @@ import java.util.concurrent.Future
  *
  * <pre>
  *
- * Options:
- *  #_USE_DEFAULT   [Boolean] Optional (default true)
- *                          -> use default if the intent is not mapped (otherwise send error.unlisted)
- *  #_MESSAGE:      [String] Optional (default: "#M?")
- *                          -> Text said by the robot
- *  #_INTENT_MAPPING:    [String[]] Optional (default: "")
- *                          -> List of intent mappings 'intent=mapping' separated by ';'
- *  #_DEFAULT:      [String] Optional (default: "#T")
- *                          -> Default mapping if no mapping for the intent is found
- *  #_DO_REPLACEMENTS: [Boolean] Optional (default true)
- *                          some additional regex replacements in the final message:
- *                              '\bme\b' -> 'YOU'
- *                              '\byou\b' -> 'ME'
- *  #_USE_LANGUAGE: [Boolean] Optional (default: false)
- *                          -> Read Language slot to determine speak language else it defaults to "EN"
- *  #_INTERRUPTIBLE:[Boolean] Optional (default: false)
- *      -> Talking can be interrupted (by someone speaking)
- *
- * Slots:
- *
- * ExitTokens:
- *  success:
- *  error.unlisted:   Intent is not in the mappings (if USE_DEFAULT==false)
- *  error.compute:    Some entity is missing or duplicate (e.g. '#E:object' while nlu has multiple object entities)
- *
 </pre> *
  *
  * @author lruegeme
@@ -142,8 +117,7 @@ class TalkNLURegex : AbstractSkill() {
         )
         speechActuator = configurator.getActuator(
             ACTUATOR_SPEECHACTUATOR,
-            SpeechActuator::class.java,
-            "Used to say the constructed message"
+            SpeechActuator::class.java
         )
 
         val mappings = configurator.requestOptionalValue(
@@ -174,9 +148,7 @@ class TalkNLURegex : AbstractSkill() {
             )
             someoneSpeaking = configurator.getSensor(
                 "SomeoneTalkingSensor",
-                Boolean::class.java,
-                "Used to detect whether someone is speaking, to allow interrupting the robot's talking"
-            )
+                Boolean::class.java)
         }
     }
 

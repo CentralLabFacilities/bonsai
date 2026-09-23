@@ -16,17 +16,6 @@ import javax.naming.CommunicationException
  *
  * <pre>
  *
- * Options:
- *  id:   [String] (optional) Entity id
- *
- * Slots:
- *  StringSlot: [String] [Read]
- *  Entity: [Entity] [Write]
- *
- * ExitTokens:
- *  success:    Got Entities
- *  error:      No Matching Entities found
- *
  * </pre>
  *
  * @author lruegeme
@@ -43,8 +32,8 @@ class GetEntity : AbstractSkill() {
     private var exp: String = ""
 
     override fun configure(configurator: ISkillConfigurator) {
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
-        tokenError = configurator.requestExitToken(ExitStatus.ERROR())
+        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS(), "Got Entities")
+        tokenError = configurator.requestExitToken(ExitStatus.ERROR(), "No Matching Entities found")
 
         slot = configurator.getWriteSlot("Entity", Entity::class.java)
 

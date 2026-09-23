@@ -20,19 +20,6 @@ import java.util.concurrent.Future
  * <pre>
  *
  *
- * Slots:
- *  PersonDataSlot:      [PersonData] [Read]
- *                          -> Person whose position shall be used as the
- *                             tracking target.
- *
- * ExitTokens:
- *  success:
- *      Person tracking was started successfully.
- *
- *  error:
- *      The tracking actuator could not find a person close to the
- *      specified tracking position.
- *
  * Sensors:
  *
  * Actuators:

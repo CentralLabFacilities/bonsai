@@ -23,19 +23,6 @@ import java.util.concurrent.Future
  *
  * <pre>
  *
- * Options:
- * #_TIMEOUT:      [long] Optional (default: -1)
- * -> Skill timeout in ms
- *
- * Slots:
- * NavigationGoalDataSlot: [NavigationGoalData] [Read]
- * -> Navigation goal to turn towards to
- *
- * ExitTokens:
- * success:            Turn successful
- * success.timeout:    Timeout reached (only used when #_TIMEOUT is set)
- * error:              Turn failed or cancelled
- *
  * Sensors:
  * PositionSensor: [Pose2D]
  * -> Get current robot position

@@ -27,20 +27,6 @@ import kotlin.math.abs
  * This skill loops till the robot recognized a person in front.
  * <pre>
  *
- * Options:
- *  #_TIMEOUT:          [long] Optional (default: -1)
- *                          -> enable timeout after x ms. -1 means not time out
- * #_MAX_DIST:          [double] Optional (default: 2.0)
- *                          -> max person distance in meter
- * #_MAX_ANGLE:         [double] Optional (default: 0.4)
- *                            -> max Person Angle in radiant(in both directions)
- * #_NAME:              [String] Optional (default: Null)
- *                            -> look for a specific name
- *
- * Slots:
- * PersonDataSlot: [PersonData] [Write]
- *      -> saves the found person to this slot
- *
  * ExitTokens:
  *  success:             -> person found
  *  success.timeout:     -> timeout

@@ -29,22 +29,6 @@ import java.util.concurrent.Future
  *
  * <pre>
  *
- * Options:
- *  #_ALWAYS:               [Boolean] Optional (Default: false)
- *                              -> Look at Target even if outside spirit area.
- *  #_FALLBACK_Z            []
- *  #_FALLBACK_STORAGE      []
- *  #_Z_OFFSET              []
- *  #_TIMEOUT               []
- *  #_TIMEOUT_Z             []
- *
- * Slots:
- *  Spirit                  [Spirit]
- *                              -> The Spirit
- *
- * ExitTokens:
- *  success:        Spirit exists
- *
  * </pre>
  *
  */

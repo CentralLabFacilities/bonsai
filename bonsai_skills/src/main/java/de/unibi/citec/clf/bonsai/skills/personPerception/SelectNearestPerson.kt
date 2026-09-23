@@ -16,18 +16,6 @@ import de.unibi.citec.clf.btl.units.LengthUnit
  *
  * <pre>
  *
- * Slots:
- * PersonDataListSlot:             [PersonDataList] [Read]
- * -> All found persons in a list
- * PositionSlot:                   [Position] [Read]
- * -> the robot position to calculate relative distance.
- * PersonDataSlot:             [PersonData] [Write]
- * -> The nearest person
- *
- * ExitTokens:
- * success:         The nearest Person has been written to memory.
- * error:           The nearest Person has not been written to memory.
- *
 </pre> *
  *
  * @author pvonneumanncosel

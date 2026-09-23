@@ -13,16 +13,6 @@ import java.util.concurrent.Future
 /**
  * Remove entities from the world
  *
- * Slots:
- *  Entity:     [Entity] Optional (Read)
- *                  -> Entity to be removed, used if LIST is not set
- *  EntitiesIn: [EntityList] Optional (Read)
- *                  -> Entities to be removed, used if LIST is set
- *
- * Options:
- *  LIST:    [Boolean] Optional (default: false)
- *                  -> Uses a List
- *
  * @author lgraesner
 */
 class RemoveEntities : AbstractSkill() {
@@ -44,18 +34,18 @@ class RemoveEntities : AbstractSkill() {
 
         ecwm = configurator.getActuator("ECWMCore", WorldModel::class.java)
 
-        all = configurator.requestOptionalBool("LIST", all, "Use a list of entities instead of a single entity.")
+        all = configurator.requestOptionalBool("LIST", all, "Use a list")
         if (all) {
             entityListSlot = configurator.getReadSlot(
                 "EntitiesIn",
                 EntityList::class.java,
-                "Memory slot containing the entities to be removed."
+                "Entity to be removed, used if LIST is not set"
             )
         } else {
             entitySlot = configurator.getReadSlot(
                 "Entity",
                 Entity::class.java,
-                "Memory slot containing the entity to be removed."
+                "Entity to be removed, used if LIST is not set"
             )
         }
 

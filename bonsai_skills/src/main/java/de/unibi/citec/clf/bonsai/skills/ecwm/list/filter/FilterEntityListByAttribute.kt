@@ -15,25 +15,6 @@ import de.unibi.citec.clf.btl.data.world.EntityList
  *
  * <pre>
  *
- * Options:
- *  #_ATTRIBUTE:        [String]
- *                          -> What attribute should be compared (category, given_name, ect.)
- *  #_VALUE:            [String] Optional
- *                          -> the value the attribute needs to contain
- *  #_INVERT:           [Boolean] Optional Default: false
- *                          -> remove entities of this category from the list
- *  #_REGEX             [Boolean] (default True):
- *                          -> use Regex to match
- * Slots:
- *  EntityList: [EntityList] [Read] [Write]
- *      -> the list to be filtered
- *  Value: [String] (Read, Optional)
- *      -> value of the designated attribute to act as a filter, if not set as an option
- *
- * ExitTokens:
- * success.notEmpty:                 Filtered the list
- * success.empty:           Filtered the list, which is empty now
- *
  * </pre>
  *
  * @author lruegeme
@@ -91,7 +72,7 @@ class FilterEntityListByAttribute : AbstractSkill() {
         value = configurator.requestOptionalValue(
             KEY_VALUE,
             value,
-            "The value the attribute needs to contain"
+            "the value the attribute needs to contain"
         )
 
         if (!configurator.hasConfigurationKey(KEY_VALUE)) {
@@ -105,7 +86,7 @@ class FilterEntityListByAttribute : AbstractSkill() {
         invert = configurator.requestOptionalBool(
             KEY_INVERT,
             invert,
-            "Remove entities matching the selected attribute instead of keeping them"
+            "remove entities of this category from the list"
         )
 
         useRegex = configurator.requestOptionalBool(

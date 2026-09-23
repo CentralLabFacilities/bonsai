@@ -19,28 +19,6 @@ import java.util.concurrent.Future
  * Will try to place an object somewhere.
  * <pre>
  *
- * Options:
- *      pose_x: target position x
- *      pose_y: target position y
- *      pose_z: target position z
- *      frame_id: The frame id in which the object should be placed.
- *      upright: default is false, otherwise the object is placed such that it wont spill anything
- *      acceptable_margin: acceptable margin of error for the placement. Default is 0.15m
- *      keep_scene: do not update planning scene
- *
- * Slots:
- *  AttachedEntity: [Entity] (Read)
- *      -> the entity to be placed. Should be previously attached to gripper. Can be Null
- *
- *  TargetPose: [TargetPose] (Optional, Read)
- *      -> the target pose in which the entity should be placed
- *
- * ExitTokens:
- * success:                The object should be successfully placed
- * error.no_plan:          Could not plan a placing motion
- * error.other:            Placing failed.
- * fatal:                  MoveIt generated an invalid plan or could not execute it
- *
  * Actuators:
  *  ECWMGrasping: [ECWMGraspingActuator]
  *
@@ -116,10 +94,10 @@ class PlaceEntity : AbstractSkill() {
         if (configurator.hasConfigurationKey(KEY_POSE_X) ||
             configurator.hasConfigurationKey(KEY_POSE_Y)
         ) {
-            pose_x = configurator.requestDouble(KEY_POSE_X)
-            pose_y = configurator.requestDouble(KEY_POSE_Y)
-            frame_id = configurator.requestValue(KEY_FRAME_ID)
-            pose_z = configurator.requestOptionalDouble(KEY_POSE_Z, pose_z)
+            pose_x = configurator.requestDouble(KEY_POSE_X, "target position x")
+            pose_y = configurator.requestDouble(KEY_POSE_Y, "target position y")
+            frame_id = configurator.requestValue(KEY_FRAME_ID, "The frame id in which the object should be placed.")
+            pose_z = configurator.requestOptionalDouble(KEY_POSE_Z, pose_z, "target position z")
         } else {
             slotTargetPose = configurator.getReadSlot(
                 "TargetPose",
@@ -141,7 +119,7 @@ class PlaceEntity : AbstractSkill() {
             throw ConfigurationException("max_z only with own margins")
         }
 
-        upright = configurator.requestOptionalBool(KEY_UPRIGHT, upright)
+        upright = configurator.requestOptionalBool(KEY_UPRIGHT, upright, "default is false, otherwise the object is placed such that it wont spill anything")
         flip = configurator.requestOptionalBool(KEY_UPSIDE_DOWN, flip)
 
         if (upright && flip) {

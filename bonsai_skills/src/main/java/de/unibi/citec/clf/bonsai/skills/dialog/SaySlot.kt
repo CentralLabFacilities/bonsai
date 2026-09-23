@@ -18,26 +18,6 @@ import java.util.concurrent.Future
  *
  * <pre>
  *
- * Options:
- *  #_MESSAGE:      [String] Optional (default: "$S")
- *                      -> Text said by the robot. $S will be replaced by memory slot content
- *  #_BLOCKING:     [boolean] Optional (default: true)
- *                      -> If true skill ends after talk was completed
- * #_USE_LANGUAGE:  [boolean] Optional (default: true)
- *                      -> Read Language slot to determine speak language
- * #_LANG:          [Language] text language (default: EN)
- *                      -> Use the given language to speak the (same language) #_MESSAGE.
- *                         This Defaults #_USE_LANGUAGE to false, set it to enable translation to current language
- * #_INTERRUPTIBLE: [boolean] Optional (default: false)
- *      -> Talking can be interrupted (by someone speaking)
- *
- * Slots:
- *  StringSlot: [String] [Read]
- *      -> String to incorporate into talk
- *
- * ExitTokens:
- *  success:    Talk completed successfully
- *
  * Sensors:
  *
  * Actuators:
@@ -66,26 +46,26 @@ class SaySlot : AbstractSkill() {
         sayText = configurator.requestOptionalValue(
             SAY_TEXT,
             sayText,
-            "Text said by the robot. '$REPLACE_STRING' is replaced by the content of the StringSlot."
+            "Text said by the robot. $S will be replaced by memory slot content"
         )
 
         if (sayText.contains(REPLACE_STRING)) {
             stringSlot = configurator.getReadSlot(
                 "StringSlot",
                 String::class.java,
-                "Memory slot containing the string to incorporate into the message."
+                "String to incorporate into talk"
             )
         }
 
         blocking = configurator.requestOptionalBool(
             KEY_BLOCKING,
             blocking,
-            "If true, the skill ends after the speech has been completed."
+            "If true skill ends after talk was completed"
         )
 
         tokenSuccess = configurator.requestExitToken(
             ExitStatus.SUCCESS(),
-            "The message was spoken successfully."
+            "Talk completed successfully"
         )
 
         speechActuator = configurator.getActuator(
@@ -95,8 +75,7 @@ class SaySlot : AbstractSkill() {
 
         val input = configurator.requestOptionalValue(
             KEY_TEXT_LANGUAGE,
-            "",
-            "Language of the configured message. Defaults to EN. If #_USE_LANGUAGE is enabled, the message is translated to the current language."
+            ""
         )
 
         if (configurator.hasConfigurationKey(KEY_TEXT_LANGUAGE)) {
@@ -110,32 +89,30 @@ class SaySlot : AbstractSkill() {
             if (configurator.requestOptionalBool(
                     KEY_USE_LANGUAGE,
                     false,
-                    "Read the Language slot to determine the language in which the message should be spoken."
+                    "Read Language slot to determine speak language"
                 )
             ) {
                 langSlot = configurator.getReadSlot(
                     "Language",
-                    LanguageType::class.java,
-                    "Memory slot containing the current language to use for speech."
+                    LanguageType::class.java
                 )
             }
         } else if (configurator.requestOptionalBool(
                 KEY_USE_LANGUAGE,
                 true,
-                "Read the Language slot to determine the language in which the message should be spoken."
+                "Read Language slot to determine speak language"
             )
         ) {
             langSlot = configurator.getReadSlot(
                 "Language",
-                LanguageType::class.java,
-                "Memory slot containing the current language to use for speech."
+                LanguageType::class.java
             )
         }
 
         if (configurator.requestOptionalBool(
                 KEY_INTERRUPT,
                 false,
-                "Allow the speech to be interrupted when someone starts speaking."
+                "Talking can be interrupted (by someone speaking)"
             )
         ) {
             if (!blocking) {
@@ -143,8 +120,7 @@ class SaySlot : AbstractSkill() {
             }
 
             tokenInt = configurator.requestExitToken(
-                ExitStatus.ERROR().ps("interrupted"),
-                "Speech was interrupted because someone started speaking."
+                ExitStatus.ERROR().ps("interrupted")
             )
 
             someoneSpeaking = configurator.getSensor(

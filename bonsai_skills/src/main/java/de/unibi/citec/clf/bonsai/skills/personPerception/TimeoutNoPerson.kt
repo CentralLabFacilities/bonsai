@@ -26,21 +26,6 @@ import kotlin.math.abs
  * This skill loops till the robot does not recognize a person in front for #_TIMEOUT.
  * <pre>
  *
- * Options:
- *  #_TIMEOUT:          [long] (>0) Optional (default: 5000)
- *                          -> enable timeout after x ms.
- * #_MAX_DIST:          [double] Optional (default: 2.0)
- *                          -> max person distance in meter
- * #_MAX_ANGLE:         [double] Optional (default: 0.4)
- *                            -> max Person Angle in radiant(in both directions)
- * #_NAME:              [String] Optional (default: Null)
- *                            -> look for a specific name
- *
- *
- * ExitTokens:
- *  success.timeout:     -> timeout
- *  fatal:               -> a hard error occurred e.g. Slot communication error
- *
  * Sensors:
  *  PersonSensor: [PersonDataList]
  *      -> Used to detect people

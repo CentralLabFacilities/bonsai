@@ -20,23 +20,6 @@ import java.util.concurrent.Future
  *
  * <pre>
  *
- * Options:
- *  error_on_multiple   [Boolean] Error if values.size()>1, else we just get the first (default: True)
- *  attribute:          [String] The attribute key
- *  type:               [String] Optional (default: "")
- *  type_from_string:   [Boolean] Read the modeltype from a String Slot (default: False)
- *  use_model_slot:     [Boolean] Use Model instead of Entity (default: False)
- *
- * Slots:
- *  Entity      [Entity] Optional, Uses this slot to get the entity if `type` option is not set
- *  Model       [Model] Optional, Uses this slot to get the modeltype if `use_model_slot` is set
- *  Type        [String] Optional, Use this if option `type_from_string` is set
- *  Value:      [String] The Attribute Value
- *
- * ExitTokens:
- *  Error.missing:        does not have the requested attribute
- *  Error.multiple:       does have multiple values for the requested attribute
- *
  * </pre>
  *
  * @author lruegeme
@@ -83,7 +66,7 @@ class GetAttributeValue : AbstractSkill() {
         )
 
         ecwm = configurator.getActuator("ECWMRobocup", ECWMRobocup::class.java)
-        attribute = configurator.getWriteSlot("Value", String::class.java)
+        attribute = configurator.getWriteSlot("Value", String::class.java, "The Attribute Value")
 
         if (configurator.hasConfigurationKey(KEY_TYPE)) {
             if (configurator.hasConfigurationKey(KEY_FROM_STRING))
@@ -96,19 +79,19 @@ class GetAttributeValue : AbstractSkill() {
                 type = configurator.getReadSlot(
                     "Type",
                     String::class.java,
-                    "Use this if option `type_from_string` is set"
+                    "Optional, Use this if option `type_from_string` is set"
                 )
             } else if (configurator.hasConfigurationKey(KEY_MODEL_SLOT)) {
                 model = configurator.getReadSlot(
                     "Model",
                     Model::class.java,
-                    "Uses this slot to get the modeltype if `use_model_slot` is set"
+                    "Optional, Uses this slot to get the modeltype if `use_model_slot` is set"
                 )
             } else {
                 entity = configurator.getReadSlot(
                     "Entity",
                     Entity::class.java,
-                    "Uses this slot to get the entity if `type` option is not set"
+                    "Optional, Uses this slot to get the entity if `type` option is not set"
                 )
             }
         }

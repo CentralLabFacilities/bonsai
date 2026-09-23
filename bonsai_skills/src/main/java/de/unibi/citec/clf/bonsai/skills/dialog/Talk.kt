@@ -17,24 +17,6 @@ import java.util.concurrent.Future
  *
  * <pre>
  *
- * Options:
- * #_MESSAGE:      [String] Required
- *      -> Text said by the robot
- * #_BLOCKING:     [boolean] Optional (default: true)
- *      -> If true skill ends after talk was completed
- * #_USE_LANGUAGE: [boolean] Optional (default: true)
- *      -> Read Language slot to determine speak language
- * #_LANG:          [Language] text language (default: EN)
- *      -> Use the given language to speak the (same language) #_MESSAGE.
- *         !! Setting this changes the default of #_USE_LANGUAGE to false, letting the robot always speak in #_LANG !!
- *         set #_USE_LANGUAGE to enable translation of #_MESSAGE from #_LANG to current slot language
- * #_INTERRUPTIBLE: [boolean] Optional (default: false)
- *      -> Talking can be interrupted (by someone speaking)
- * Slots:
- *
- * ExitTokens:
- * success:    Talk completed successfully
- *
  * Sensors:
  *
  * Actuators:

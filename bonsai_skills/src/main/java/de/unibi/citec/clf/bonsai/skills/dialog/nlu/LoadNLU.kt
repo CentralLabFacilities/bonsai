@@ -13,29 +13,7 @@ import de.unibi.citec.clf.btl.data.speech.NLUEntity
  *
  *  Takes Parametes of the form #ENTITY:ROLE:GROUP" to create entities
  *
- *  example:
  *  <pre>
- *      <datamodel>
- *             <data id="#object" expr="'apple'"/>
- *             <data id="#location:destination" expr="'me'"/>
- *             <data id="#location:departure" expr="'table'"/>
- *             <data id="#_INTENT" expr="'pick_place'"/>
- *      </datamodel>
- *  </pre>
- *
- * <pre>
- *
- * Options:
- *  #_INTENT:               [String]
- *                              -> the intent
- *  'ENTITY[:ROLE][:GROUP]':
- *                              -> Entities to create (see example)
- *
- * Slots:
- *  NLUSlot
- *
- * ExitTokens:
- *  success
  *
  * </pre>
  *

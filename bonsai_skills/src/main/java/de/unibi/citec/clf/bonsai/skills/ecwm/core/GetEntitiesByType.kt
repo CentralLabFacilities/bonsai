@@ -14,16 +14,6 @@ import java.util.concurrent.Future
  *
  * <pre>
  *
- * Options:
- *  expr:               [String] Type name
- *
- * Slots:
- *  Entities: [EntityList]
- *
- * ExitTokens:
- *  success:    Got Entities
- *  error:      No Matching Entities found
- *
  * </pre>
  *
  * @author lruegeme

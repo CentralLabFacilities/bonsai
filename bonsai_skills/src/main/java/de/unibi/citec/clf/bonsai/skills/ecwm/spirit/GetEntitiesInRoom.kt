@@ -17,19 +17,6 @@ import java.util.concurrent.Future
  *
  * <pre>
  *
- * Options:
- *  room:               [String] Optional (default: "")
- *  objects:            [Boolean] Optional include GraspeableObjects (default: False)
- *  rooms:              [Boolean] Optional include Rooms (default: False)
- *
- * Slots:
- *  RoomEntity          [de.unibi.citec.clf.btl.data.world.Entity] Uses this slot to get room if not set with datamodel
- *  EntityList:         [de.unibi.citec.clf.btl.data.world.EntityList]
- *
- * ExitTokens:
- *  success:        Got Entities
- *  error.empty:    No Matching Entities found
- *
  * </pre>
  *
  * @author lruegeme
@@ -84,7 +71,7 @@ class GetEntitiesInRoom : AbstractSkill() {
             entity = configurator.getReadSlot(
                 "RoomEntity",
                 Entity::class.java,
-                "Uses this slot to get the room if not set with the room option"
+                "Uses this slot to get room if not set with datamodel"
             )
         }
 

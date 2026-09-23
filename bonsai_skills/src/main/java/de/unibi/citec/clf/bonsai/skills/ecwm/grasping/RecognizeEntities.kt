@@ -17,42 +17,6 @@ import java.util.concurrent.Future
  *
  * <pre>
  *
- * Options:
- *  #_store:            [String] Optional (default: true)
- *                              -> will add detected objects to the world model
- *  #_clear:            [String] Optional (default: true)
- *                              -> will clear objects from the world if they aren't present at their supposed location
- *  #_min_prob          [String] Optional (default: 0.5)
- *                              -> the minimal probability for an object to be recognized as such
- *  #_entity:           [String] Optional
- *                              -> the entity the storage belongs to
- *  #_storage:          [String] Optional
- *                              -> the storage in which the detected objects have to be present
- *  #_fast_pose:        [Boolean] Optional (default: false)
- *                              -> do fast but unprecise pose estimate (bad for grasping)
- *  #_spirit:           [Boolean] Optional (default: false)
- *                              -> use Spirit instead of entity/storage
- *  #_padding           [Double] Optional (default: 0.05)
- *                              -> Padding around storage (x/y)
- *  #_add_plane:        [String] Optional (default: false)
- *                              -> Add a Plane at storage bottom to planning scene
- *
- * Slots:
- *  Entity: [Entity] (Read Optional)
- *      -> the entity the storage belongs to.
- *          Will only be used if option "#_entity" or #_spirit is not set.
- *  Storage: [String] (Read Optional)
- *      -> the storage in which the detected objects have to be present.
- *          Will only be used if option "#_storage" or #_spirit is not set.
- *  Spirit: [Spirit] (Read Optional)
- *      -> Entity + Storage, only used if #_spirit is True
- *  RecognizedEntities: [EntityList] (Write)
- *      -> a list of objects detected inside the storage.
- *
- * ExitTokens:
- * success:                Detected one or more objects inside the target storage
- * error:                  No objects could be found
- *
  * Actuators:
  *  ECWMGrasping: [ECWMGraspingActuator]
  *
