@@ -69,6 +69,8 @@ export function useEditorDisplay({
     nodes,
     childIdsByParent,
     activeMode,
+    showTransitionEdges,
+    showSlotEdges,
     injectedNodes,
     injectedSlotNodes,
     isDraggingNode,
@@ -179,9 +181,108 @@ export function useEditorDisplay({
         return ids;
     }, [activeCanvasFocusNodeId, cloneGroupByNodeId, selectedNodeIdSet]);
 
+    // Edge visibility toggles are applied before routing/styling. This matters
+    // for large state machines: when a category is hidden we only send edges
+    // connected to the hovered/selected visual node through the expensive
+    // smart-edge pipeline instead of routing every edge and hiding it later.
+    const edgeFocusNodeIds = useMemo(() => {
+        const ids = new Set([
+            ...selectedNodes.map((node) => node.id),
+            ...(selectedNodeId ? [selectedNodeId] : []),
+            ...(activeCanvasFocusNodeId ? [activeCanvasFocusNodeId] : []),
+            ...(hoveredSlotAccessNodeId ? [hoveredSlotAccessNodeId] : []),
+        ]);
+
+        [...ids].forEach((nodeId) => {
+            cloneGroupByNodeId
+                .get(nodeId)
+                ?.forEach((linkedId) => ids.add(linkedId));
+        });
+
+        return ids;
+    }, [
+        selectedNodes,
+        selectedNodeId,
+        activeCanvasFocusNodeId,
+        hoveredSlotAccessNodeId,
+        cloneGroupByNodeId,
+    ]);
+
+    const transitionEdgeMatchesFocus = (edge) => {
+        if (edgeFocusNodeIds.size === 0) return false;
+
+        const semanticIds = [
+            edge.source,
+            edge.target,
+            edge.data?.boundaryOriginalSource,
+            edge.data?.boundaryOriginalTarget,
+            edge.data?.compoundOriginalSource,
+            edge.data?.compoundOriginalTarget,
+            edge.data?.parallelOriginalSource,
+            edge.data?.parallelOriginalTarget,
+        ];
+
+        if (Array.isArray(edge.data?.boundaryOriginalSources)) {
+            edge.data.boundaryOriginalSources.forEach((source) => {
+                semanticIds.push(source?.sourceId || source?.nodeId || source?.id);
+            });
+        }
+
+        return semanticIds.some(
+            (id) => id && edgeFocusNodeIds.has(id)
+        );
+    };
+
+    const transitionEdgesForDisplay = useMemo(() => {
+        if (activeMode === "code") return [];
+
+        // Slot mode has always treated transitions as contextual information.
+        // Keep that behavior even when the global transition toggle is on.
+        const showAllForMode =
+            showTransitionEdges && activeMode !== "slots";
+
+        return showAllForMode
+            ? edges
+            : edges.filter(transitionEdgeMatchesFocus);
+    }, [
+        activeMode,
+        showTransitionEdges,
+        edges,
+        edgeFocusNodeIds,
+    ]);
+
+    const slotEdgeMatchesFocus = (edge) => {
+        if (edgeFocusNodeIds.size === 0) return false;
+
+        return [
+            edge.source,
+            edge.target,
+            edge.data?.skillNodeId,
+            edge.data?.slotNodeId,
+        ].some((id) => id && edgeFocusNodeIds.has(id));
+    };
+
+    const slotEdgesForDisplay = useMemo(() => {
+        if (
+            activeMode !== "slots" &&
+            activeMode !== "overview"
+        ) {
+            return [];
+        }
+
+        return showSlotEdges
+            ? slotEdges
+            : slotEdges.filter(slotEdgeMatchesFocus);
+    }, [
+        activeMode,
+        showSlotEdges,
+        slotEdges,
+        edgeFocusNodeIds,
+    ]);
+
     const normalizedTransitionEdges = useMemo(
         () =>
-            edges.map((edge) => {
+            transitionEdgesForDisplay.map((edge) => {
                 let normalizedEdge = edge;
 
                 if (!normalizedEdge.targetHandle) {
@@ -234,7 +335,7 @@ export function useEditorDisplay({
 
                 return normalizedEdge;
             }),
-        [edges, nodeById]
+        [transitionEdgesForDisplay, nodeById]
     );
 
     const compoundAvoidanceCacheRef = useRef(new Map());
@@ -400,7 +501,7 @@ export function useEditorDisplay({
 
     const routedSlotEdges = useMemo(
         () =>
-            slotEdges.map((edge) => {
+            slotEdgesForDisplay.map((edge) => {
                 const access = edge.data?.access === "write" ? "write" : "read";
 
                 return {
@@ -418,7 +519,7 @@ export function useEditorDisplay({
                     },
                 };
             }),
-        [slotEdges, updatePersistentEdgeControlPoints]
+        [slotEdgesForDisplay, updatePersistentEdgeControlPoints]
     );
 
     const editableSlotEdges = useMemo(() => {
@@ -658,8 +759,17 @@ export function useEditorDisplay({
         [activeMode, injectedNodes, injectedSlotNodes]
     );
 
-    const [smartRoutingNodes, setSmartRoutingNodes] = useState(baseVisibleNodes);
-    const smartRoutingNodesDependency = isDraggingNode ? null : baseVisibleNodes;
+    const hasSmartRoutedEdges =
+        highlightedTransitionEdges.length > 0 || editableSlotEdges.length > 0;
+    const requestedSmartRoutingNodes = hasSmartRoutedEdges
+        ? baseVisibleNodes
+        : [];
+    const [smartRoutingNodes, setSmartRoutingNodes] = useState(
+        requestedSmartRoutingNodes
+    );
+    const smartRoutingNodesDependency = isDraggingNode
+        ? null
+        : requestedSmartRoutingNodes;
 
     useEffect(() => {
         // Smart-edge obstacle routing is one of the most expensive parts of a
@@ -687,27 +797,30 @@ export function useEditorDisplay({
     );
 
     const visibleEdges = useMemo(() => {
-        let nextVisibleEdges = [
-            ...highlightedTransitionEdges,
+        const structuralTransitionEdges = [
             ...compoundInitialEdges,
             ...parallelEntryEdges,
+        ].filter((edge) => {
+            const showAllForMode =
+                showTransitionEdges && activeMode !== "slots";
+            return showAllForMode || transitionEdgeMatchesFocus(edge);
+        });
+
+        let nextVisibleEdges = [
+            ...highlightedTransitionEdges,
+            ...structuralTransitionEdges,
         ];
 
         if (activeMode === "slots") {
-            const hoveredTransitionEdges = activeCanvasFocusNodeId
-                ? highlightedTransitionEdges.filter(
-                      (edge) =>
-                          edge.source === activeCanvasFocusNodeId ||
-                          edge.target === activeCanvasFocusNodeId
-                  )
-                : [];
-
-            nextVisibleEdges = [...hoveredTransitionEdges, ...editableSlotEdges];
+            nextVisibleEdges = [
+                ...highlightedTransitionEdges,
+                ...structuralTransitionEdges,
+                ...editableSlotEdges,
+            ];
         } else if (activeMode === "overview") {
             nextVisibleEdges = [
                 ...highlightedTransitionEdges,
-                ...compoundInitialEdges,
-                ...parallelEntryEdges,
+                ...structuralTransitionEdges,
                 ...editableSlotEdges,
             ];
         }
@@ -835,6 +948,8 @@ export function useEditorDisplay({
         highlightedTransitionEdges,
         compoundInitialEdges,
         parallelEntryEdges,
+        showTransitionEdges,
+        edgeFocusNodeIds,
         activeMode,
         activeCanvasFocusNodeId,
         editableSlotEdges,

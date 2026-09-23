@@ -336,6 +336,43 @@ function AppContent() {
     const [isHintPageOpen, setIsHintPageOpen] = useState(false);
 
     const [activeMode, setActiveMode] = useState("overview");
+    const [showTransitionEdges, setShowTransitionEdges] = useState(() => {
+        try {
+            return window.localStorage.getItem("bonsai.showTransitionEdges") !== "false";
+        } catch {
+            return true;
+        }
+    });
+    const [showSlotEdges, setShowSlotEdges] = useState(() => {
+        try {
+            return window.localStorage.getItem("bonsai.showSlotEdges") !== "false";
+        } catch {
+            return true;
+        }
+    });
+
+    useEffect(() => {
+        try {
+            window.localStorage.setItem(
+                "bonsai.showTransitionEdges",
+                String(showTransitionEdges)
+            );
+        } catch {
+            // Local storage is optional; the in-memory toggle still works.
+        }
+    }, [showTransitionEdges]);
+
+    useEffect(() => {
+        try {
+            window.localStorage.setItem(
+                "bonsai.showSlotEdges",
+                String(showSlotEdges)
+            );
+        } catch {
+            // Local storage is optional; the in-memory toggle still works.
+        }
+    }, [showSlotEdges]);
+
     const [manualSlots, setManualSlots] = useState([]);
     const [isCreateSlotModalOpen, setIsCreateSlotModalOpen] = useState(false);
     const [pendingSkillPaste, setPendingSkillPaste] = useState(null);
@@ -2235,6 +2272,8 @@ function AppContent() {
         nodes,
         childIdsByParent,
         activeMode,
+        showTransitionEdges,
+        showSlotEdges,
         injectedNodes,
         injectedSlotNodes,
         isDraggingNode,
@@ -4947,6 +4986,10 @@ function AppContent() {
                         <EditorCanvas
                             activeMode={activeMode}
                             setActiveMode={setActiveMode}
+                            showTransitionEdges={showTransitionEdges}
+                            setShowTransitionEdges={setShowTransitionEdges}
+                            showSlotEdges={showSlotEdges}
+                            setShowSlotEdges={setShowSlotEdges}
                             nodes={nodes}
                             edges={edges}
                             slotNodes={slotNodes}

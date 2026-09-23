@@ -471,6 +471,50 @@
     color: #ffffff;
 }
 
+.edge-visibility-toggle-group {
+    position: absolute;
+    top: 58px;
+    left: 15px;
+    z-index: 10;
+    display: flex;
+    gap: 6px;
+}
+
+.edge-visibility-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 2rem;
+    padding: 0 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.94);
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.16);
+    transition:
+        background-color 120ms ease,
+        border-color 120ms ease,
+        color 120ms ease;
+}
+
+.edge-visibility-toggle:hover {
+    border-color: #94a3b8;
+    color: #334155;
+}
+
+.edge-visibility-toggle.active {
+    border-color: var(--secondary-color);
+    background: rgba(37, 150, 240, 0.12);
+    color: var(--secondary-color);
+}
+
+.edge-visibility-toggle svg {
+    flex: 0 0 auto;
+}
+
 /* Inline Code View */
 .inline-code-view {
     position: relative;

@@ -1,5 +1,5 @@
 import { memo, useMemo } from "react";
-import { FiPlus, FiTrash2 } from "react-icons/fi";
+import { FiEye, FiEyeOff, FiPlus, FiTrash2 } from "react-icons/fi";
 import {
     Background,
     ConnectionMode,
@@ -37,19 +37,20 @@ const edgeTypes = {
 export default function EditorCanvas({
     activeMode,
     setActiveMode,
+    showTransitionEdges,
+    setShowTransitionEdges,
+    showSlotEdges,
+    setShowSlotEdges,
     nodes,
     edges,
-    slotNodes,
     globalDataModel,
     visibleNodes,
     visibleEdges,
     smartRoutingNodes,
     selectedNodes,
-    contextSelectionCount,
     contextMenu,
     handleSelectAction,
     canCreateEditorClone,
-    editorCloneActionLabel,
     setIsCreateSlotModalOpen,
     isDraggingNode,
     isOverTrash,
@@ -81,11 +82,9 @@ export default function EditorCanvas({
         return generateXmlString(
             exportGraph.nodes,
             exportGraph.edges,
-            globalDataModel,
-            [],
-            slotNodes
+            globalDataModel
         );
-    }, [activeMode, nodes, edges, slotNodes, globalDataModel]);
+    }, [activeMode, nodes, edges, globalDataModel]);
 
     if (activeMode === "code") {
         return (
@@ -117,6 +116,38 @@ export default function EditorCanvas({
                 ))}
             </div>
 
+            <div className="edge-visibility-toggle-group">
+                <button
+                    type="button"
+                    className={`edge-visibility-toggle ${showTransitionEdges ? "active" : ""}`}
+                    aria-pressed={showTransitionEdges}
+                    title={
+                        showTransitionEdges
+                            ? "Hide transitions except for hovered/selected nodes"
+                            : "Show all transitions"
+                    }
+                    onClick={() => setShowTransitionEdges((value) => !value)}
+                >
+                    {showTransitionEdges ? <FiEye /> : <FiEyeOff />}
+                    <span>Transitions</span>
+                </button>
+
+                <button
+                    type="button"
+                    className={`edge-visibility-toggle ${showSlotEdges ? "active" : ""}`}
+                    aria-pressed={showSlotEdges}
+                    title={
+                        showSlotEdges
+                            ? "Hide slot edges except for hovered/selected skills or slots"
+                            : "Show all slot edges"
+                    }
+                    onClick={() => setShowSlotEdges((value) => !value)}
+                >
+                    {showSlotEdges ? <FiEye /> : <FiEyeOff />}
+                    <span>Slot edges</span>
+                </button>
+            </div>
+
             {(activeMode === "slots" || activeMode === "overview") && (
                 <button
                     type="button"
@@ -143,8 +174,8 @@ export default function EditorCanvas({
                     onClick={(event) => event.stopPropagation()}
                 >
                     <div className="context-menu-header">
-                        {contextSelectionCount > 0
-                            ? `change ${contextSelectionCount} node(s) in:`
+                        {selectedNodes.length > 0
+                            ? `change ${selectedNodes.length} node(s) in:`
                             : "Create new element"}
                     </div>
                     {canCreateEditorClone && (
@@ -152,7 +183,7 @@ export default function EditorCanvas({
                             className="context-menu-item"
                             onClick={() => handleSelectAction("clone")}
                         >
-                            {editorCloneActionLabel || "Clone Selected State"}
+                            Clone Selected State
                         </button>
                     )}
                     <button
