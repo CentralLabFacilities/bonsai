@@ -660,6 +660,14 @@ export function useEditorDisplay({
         ]
     );
 
+    // Rendering every background transition with obstacle-aware smart routing is
+    // disproportionately expensive on large workflows. Keep the complete
+    // semantic graph loaded, but switch only the unfocused presentation to a
+    // cheap Bezier path once the graph crosses this threshold. Focused/selected
+    // transitions still use the full smart-routed, labelled representation.
+    const useLightweightBackgroundTransitions =
+        smartTransitionEdges.length >= 300;
+
     // Cache all presentation variants independently from React Flow selection.
     // Selecting one edge used to rebuild base/focused objects for the complete
     // transition graph. With large workflows that meant O(E) object churn for
@@ -672,10 +680,19 @@ export function useEditorDisplay({
         const selectedFocusedEdges = [];
 
         smartTransitionEdges.forEach((rawEdge) => {
-            const edge = withEdgeClassName(
+            const semanticEdge = withEdgeClassName(
                 clearTransientTransitionHighlight(rawEdge),
                 "editor-transition-edge"
             );
+            const edge = useLightweightBackgroundTransitions
+                ? {
+                      ...semanticEdge,
+                      data: {
+                          ...(semanticEdge.data || {}),
+                          lightweightBackgroundRouting: true,
+                      },
+                  }
+                : semanticEdge;
             const semanticHandle =
                 edge.data?.boundaryOriginalSourceHandle ||
                 edge.data?.compoundOriginalSourceHandle ||
@@ -684,30 +701,39 @@ export function useEditorDisplay({
                 edge.label;
             const color = getTransitionHighlightColor(semanticHandle);
 
+            const fullDetailEdge = useLightweightBackgroundTransitions
+                ? {
+                      ...semanticEdge,
+                      data: {
+                          ...(semanticEdge.data || {}),
+                          lightweightBackgroundRouting: false,
+                      },
+                  }
+                : semanticEdge;
             const selectedEdge = {
-                ...edge,
+                ...fullDetailEdge,
                 selected: true,
-                style: { ...(edge.style || {}), stroke: color },
-                markerEnd: edge.markerEnd
-                    ? { ...edge.markerEnd, color }
-                    : edge.markerEnd,
+                style: { ...(fullDetailEdge.style || {}), stroke: color },
+                markerEnd: fullDetailEdge.markerEnd
+                    ? { ...fullDetailEdge.markerEnd, color }
+                    : fullDetailEdge.markerEnd,
             };
             const focusedEdge = {
                 ...withEdgeClassName(
                     withEdgeClassName(
-                        edge,
+                        fullDetailEdge,
                         "editor-edge-context-visible"
                     ),
                     "editor-edge-focus-active"
                 ),
                 animated: true,
                 style: {
-                    ...(edge.style || {}),
+                    ...(fullDetailEdge.style || {}),
                     stroke: color,
                 },
-                markerEnd: edge.markerEnd
-                    ? { ...edge.markerEnd, color }
-                    : edge.markerEnd,
+                markerEnd: fullDetailEdge.markerEnd
+                    ? { ...fullDetailEdge.markerEnd, color }
+                    : fullDetailEdge.markerEnd,
             };
             const selectedFocusedEdge = {
                 ...withEdgeClassName(
@@ -739,7 +765,7 @@ export function useEditorDisplay({
                 baseEdges.map((edge, index) => [edge.id, index])
             ),
         };
-    }, [smartTransitionEdges]);
+    }, [smartTransitionEdges, useLightweightBackgroundTransitions]);
 
     const transitionEdgesForDisplay = useMemo(() => {
         if (activeMode === "code") return [];

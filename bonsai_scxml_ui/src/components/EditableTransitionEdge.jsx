@@ -716,6 +716,46 @@ function ManualEditableTransitionEdge(
     );
 }
 
+function LightweightBackgroundTransitionEdge(props) {
+    const {
+        id,
+        sourceX,
+        sourceY,
+        targetX,
+        targetY,
+        sourcePosition,
+        targetPosition,
+        markerEnd,
+        markerStart,
+        style,
+        interactionWidth = 12,
+    } = props;
+
+    // Large workflows keep the full semantic transition graph in memory, but
+    // background edges do not need obstacle-aware A* routing or a label DOM
+    // node. A focused/selected edge swaps to the normal smart-routed variant.
+    const [path] = getBezierPath({
+        sourceX,
+        sourceY,
+        targetX,
+        targetY,
+        sourcePosition,
+        targetPosition,
+        curvature: 0.38,
+    });
+
+    return (
+        <BaseEdge
+            id={id}
+            path={path}
+            markerStart={markerStart}
+            markerEnd={markerEnd}
+            style={style}
+            interactionWidth={interactionWidth}
+        />
+    );
+}
+
 function AutoEditableTransitionEdge(props) {
     const {
         id,
@@ -769,10 +809,17 @@ function AutoEditableTransitionEdge(props) {
     const SmartTransitionEdge = data?.forceObstacleRouting
         ? ForcedSmartTransitionEdge
         : AutoSmartTransitionEdge;
+    const useLightweightBackgroundRouting = Boolean(
+        data?.lightweightBackgroundRouting && !selected
+    );
 
     return (
         <>
-            <SmartTransitionEdge {...props} />
+            {useLightweightBackgroundRouting ? (
+                <LightweightBackgroundTransitionEdge {...props} />
+            ) : (
+                <SmartTransitionEdge {...props} />
+            )}
 
             {selected && (
                 <EdgeLabelRenderer>
