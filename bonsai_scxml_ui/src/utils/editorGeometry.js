@@ -1,3 +1,4 @@
+import { measureContainerTask } from "./containerPerf.js";
 import { resolveCollisionScope } from "./nodeCollisions";
 
 export const getNodeId = () => `skill-node-${crypto.randomUUID()}`;
@@ -241,7 +242,7 @@ const fitCompoundToChildrenInContext = (context, compoundId) => {
     );
 };
 
-export const fitCompoundAndAncestorCompounds = (allNodes, compoundId) => {
+const fitCompoundAndAncestorCompoundsImpl = (allNodes, compoundId) => {
     const context = createContainerGeometryContext(allNodes);
     let currentId = compoundId;
     const visited = new Set();
@@ -518,7 +519,7 @@ export const normalizeContainerAutoExpansion = (allNodes) => {
 // to contain the current lane contents. Existing dimensions are floors, so a
 // user resize is preserved while automatic layout may still make the state
 // larger later.
-export const growParallelToLaneContents = (allNodes, parallelId) => {
+const growParallelToLaneContentsImpl = (allNodes, parallelId) => {
     const context = createContainerGeometryContext(allNodes);
     growParallelToLaneContentsInContext(context, parallelId);
     return context.nodes;
@@ -698,7 +699,7 @@ const growParallelToLaneContentsInContext = (context, parallelId) => {
 // geometry context. Previously every container pass rescanned and remapped the
 // complete node array, which made Compound/Parallel-heavy graphs approach
 // O(containers * nodes).
-export const growAllStateContainersToContents = (allNodes) => {
+const growAllStateContainersToContentsImpl = (allNodes) => {
     const context = createContainerGeometryContext(allNodes);
 
     const containers = (allNodes || [])
@@ -839,7 +840,7 @@ export const getNextParallelLaneCompoundName = (allNodes) => {
     return `lane_${index}`;
 };
 
-export const normalizeParallelLaneCompounds = (allNodes) => {
+const normalizeParallelLaneCompoundsImpl = (allNodes) => {
     if (!Array.isArray(allNodes) || allNodes.length === 0) {
         return allNodes;
     }
@@ -1264,7 +1265,7 @@ export const normalizeParallelLaneCompounds = (allNodes) => {
     return orderNodesParentsFirst(normalized);
 };
 
-export const normalizeCompoundInitialStates = (allNodes) => {
+const normalizeCompoundInitialStatesImpl = (allNodes) => {
     if (!Array.isArray(allNodes) || allNodes.length === 0) {
         return allNodes;
     }
@@ -1380,3 +1381,43 @@ export const normalizeCompoundInitialStates = (allNodes) => {
 
     return changed ? normalized : allNodes;
 };
+
+
+// Container-heavy operations are measured at their public boundaries. The
+// semantic graph stays unchanged; only calls exceeding the threshold are
+// logged so large Compound/Parallel workflows can be profiled without
+// flooding the console.
+export const fitCompoundAndAncestorCompounds = (allNodes, compoundId) =>
+    measureContainerTask(
+        "fit compound and ancestors",
+        () => fitCompoundAndAncestorCompoundsImpl(allNodes, compoundId),
+        { nodes: allNodes?.length || 0, compoundId }
+    );
+
+export const growParallelToLaneContents = (allNodes, parallelId) =>
+    measureContainerTask(
+        "grow parallel to lane contents",
+        () => growParallelToLaneContentsImpl(allNodes, parallelId),
+        { nodes: allNodes?.length || 0, parallelId }
+    );
+
+export const growAllStateContainersToContents = (allNodes) =>
+    measureContainerTask(
+        "grow all compound/parallel containers",
+        () => growAllStateContainersToContentsImpl(allNodes),
+        { nodes: allNodes?.length || 0 }
+    );
+
+export const normalizeParallelLaneCompounds = (allNodes) =>
+    measureContainerTask(
+        "normalize parallel lane compounds",
+        () => normalizeParallelLaneCompoundsImpl(allNodes),
+        { nodes: allNodes?.length || 0 }
+    );
+
+export const normalizeCompoundInitialStates = (allNodes) =>
+    measureContainerTask(
+        "normalize compound initial states",
+        () => normalizeCompoundInitialStatesImpl(allNodes),
+        { nodes: allNodes?.length || 0 }
+    );

@@ -1,3 +1,4 @@
+import { measureContainerTask } from "./containerPerf.js";
 import {
     COMPOUND_PADDING_X,
     getCompoundChildrenRight,
@@ -126,7 +127,7 @@ const makeSelfLoopControlPoints = () => [
  * metadata. Call this after reparenting nodes so border points immediately
  * follow the new containment hierarchy.
  */
-export const rebuildBoundaryTransitions = (sourceNodes = [], sourceEdges = []) => {
+const rebuildBoundaryTransitionsImpl = (sourceNodes = [], sourceEdges = []) => {
     const nodes = sourceNodes.map((node) => ({
         ...node,
         data: node.data ? { ...node.data } : node.data,
@@ -366,6 +367,13 @@ export const rebuildBoundaryTransitions = (sourceNodes = [], sourceEdges = []) =
     return { nodes, edges: nextEdges };
 };
 
+export const rebuildBoundaryTransitions = (sourceNodes = [], sourceEdges = []) =>
+    measureContainerTask(
+        "rebuild all boundary transitions",
+        () => rebuildBoundaryTransitionsImpl(sourceNodes, sourceEdges),
+        { nodes: sourceNodes.length, edges: sourceEdges.length }
+    );
+
 const isBoundaryHelperEdge = (edge) =>
     Boolean(
         edge?.data?.boundaryInternalEdge ||
@@ -418,7 +426,7 @@ const eventSourceEntriesOf = (event) => {
  * the changed logical source(s), rebuilds only those semantic transitions, and
  * structurally reuses every unrelated node/edge.
  */
-export const rebuildBoundaryTransitionsIncremental = (
+const rebuildBoundaryTransitionsIncrementalImpl = (
     sourceNodes = [],
     sourceEdges = [],
     {
@@ -607,3 +615,21 @@ export const rebuildBoundaryTransitionsIncremental = (
         affectedNodeIds: [...affectedNodeIds],
     };
 };
+
+
+export const rebuildBoundaryTransitionsIncremental = (
+    sourceNodes = [],
+    sourceEdges = [],
+    options = {}
+) =>
+    measureContainerTask(
+        "rebuild boundary transitions incrementally",
+        () => rebuildBoundaryTransitionsIncrementalImpl(sourceNodes, sourceEdges, options),
+        {
+            nodes: sourceNodes.length,
+            edges: sourceEdges.length,
+            changedEdges: options?.changedEdgeIds?.length || 0,
+            sourceIds: options?.sourceIds?.length || 0,
+            sourceKeys: options?.sourceKeys?.length || 0,
+        }
+    );
