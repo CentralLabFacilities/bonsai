@@ -3203,8 +3203,45 @@ function AppContent() {
                 return false;
             }
 
+            // Copying a container must copy its complete subtree, including
+            // structural parallel lanes. Those lanes are not directly
+            // selectable, but they are required to preserve the hierarchy
+            // and relative positions of the states inside a parallel node.
             const copiedNodeIds = new Set(
                 nodesToCopy.map((node) => node.id)
+            );
+            const childrenByParent = new Map();
+            nodes.forEach((node) => {
+                if (!node.parentId) return;
+                if (!childrenByParent.has(node.parentId)) {
+                    childrenByParent.set(node.parentId, []);
+                }
+                childrenByParent.get(node.parentId).push(node);
+            });
+
+            const descendantQueue = nodesToCopy
+                .filter(
+                    (node) =>
+                        node.type === "compound" ||
+                        node.type === "parallel" ||
+                        node.type === "parallelLane"
+                )
+                .map((node) => node.id);
+
+            while (descendantQueue.length > 0) {
+                const parentId = descendantQueue.shift();
+                (childrenByParent.get(parentId) || []).forEach((child) => {
+                    if (copiedNodeIds.has(child.id)) return;
+                    copiedNodeIds.add(child.id);
+                    descendantQueue.push(child.id);
+                });
+            }
+
+            // Re-read from the canonical node array to keep React Flow's
+            // parent-before-child ordering and to include non-selectable
+            // parallel lane nodes in the clipboard.
+            nodesToCopy = nodes.filter((node) =>
+                copiedNodeIds.has(node.id)
             );
 
             const copiedEdges = edges.filter(
@@ -3688,6 +3725,15 @@ function AppContent() {
                     eventCopy.sourceNodeId = idMap.get(eventCopy.sourceNodeId);
                 }
 
+                if (Array.isArray(eventCopy.sourceNodeIds)) {
+                    eventCopy.sourceNodeIds = eventCopy.sourceNodeIds.map(
+                        (sourceNodeId) =>
+                            idMap.has(sourceNodeId)
+                                ? idMap.get(sourceNodeId)
+                                : sourceNodeId
+                    );
+                }
+
                 if (!eventCopy.target) return eventCopy;
 
                 if (idMap.has(eventCopy.target)) {
@@ -3756,7 +3802,13 @@ function AppContent() {
                                 ? 0
                                 : pasteTranslation.y),
                     },
-                    selected: true,
+                    // Descendants come along because their container was
+                    // copied; keep only clipboard roots selected. Selecting
+                    // both a parent and all of its children can make a drag
+                    // apply the movement twice to nested React Flow nodes.
+                    selected: !(
+                        node.parentId && idMap.has(node.parentId)
+                    ),
                     data,
                 };
             });
@@ -3765,6 +3817,8 @@ function AppContent() {
                 const nextData = cloneGraphValue(edgeData || {});
 
                 [
+                    "boundaryOriginalSource",
+                    "boundaryOriginalTarget",
                     "parallelOriginalSource",
                     "parallelOriginalTarget",
                     "compoundOriginalSource",
@@ -3774,6 +3828,17 @@ function AppContent() {
                         nextData[keyName] = idMap.get(nextData[keyName]);
                     }
                 });
+
+                if (Array.isArray(nextData.boundaryOriginalSources)) {
+                    nextData.boundaryOriginalSources =
+                        nextData.boundaryOriginalSources.map((source) => ({
+                            ...source,
+                            sourceId:
+                                source?.sourceId && idMap.has(source.sourceId)
+                                    ? idMap.get(source.sourceId)
+                                    : source?.sourceId,
+                        }));
+                }
 
                 return nextData;
             };
