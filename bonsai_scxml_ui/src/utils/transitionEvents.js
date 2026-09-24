@@ -11,16 +11,15 @@ const getSkillNameCandidates = (sourceSkillName) => {
         .sort((a, b) => b.length - a.length);
 };
 
+export const isWildcardTransitionEvent = (eventId) =>
+    String(eventId || "").includes("*");
+
 const normalizeExitToken = (token) => {
     const value = String(token || "").trim();
     if (!value) return "success";
-    if (value === "*") return "*";
-
-    // SCXML patterns such as "success.*" represent the main exit token.
-    if (value.endsWith(".*")) {
-        return value.slice(0, -2) || "*";
-    }
-
+    // Wildcards are meaningful SCXML event descriptors. Preserve patterns
+    // such as success.*, error.* and event.** exactly in the editor so saving
+    // the graph does not silently narrow their matching semantics.
     return value;
 };
 
@@ -56,13 +55,8 @@ export const getTransitionExitToken = (rawEvent, sourceSkillName = "") => {
         return normalizeExitToken(parts.slice(typeIndex).join("."));
     }
 
-    // A plain "SomeState.*" is a catch-all transition, not an exit token
-    // called "SomeState".
-    if (eventName.endsWith(".*")) {
-        return "*";
-    }
-
-    // Already-normalized/custom event ids (e.g. failure) are kept unchanged.
+    // Already-normalized/custom event ids and wildcard descriptors are kept
+    // unchanged when no source prefix can be identified safely.
     return eventName;
 };
 

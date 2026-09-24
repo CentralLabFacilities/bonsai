@@ -87,6 +87,7 @@ import { useSubStateMachines } from "./hooks/useSubStateMachines";
 import { useTransitionGraph } from "./hooks/useTransitionGraph";
 import { useContainerCreation } from "./hooks/useContainerCreation";
 import { rebuildBoundaryTransitionsIncremental } from "./utils/boundaryTransitions";
+import { isWildcardTransitionEvent } from "./utils/transitionEvents";
 import { getOverviewLayoutNodeSize } from "./utils/layoutUtils";
 import "./App.css";
 
@@ -2707,8 +2708,123 @@ function AppContent() {
                         transitionChanges,
                         edges
                     );
+
+                    const getLogicalSourceEntries = (edge) => {
+                        const storedEntries = Array.isArray(
+                            edge?.data?.boundaryOriginalSources
+                        )
+                            ? edge.data.boundaryOriginalSources
+                                  .map((entry) => ({
+                                      sourceId: String(entry?.sourceId || ""),
+                                      sourceHandle: String(
+                                          entry?.sourceHandle || ""
+                                      ),
+                                  }))
+                                  .filter(
+                                      (entry) =>
+                                          entry.sourceId && entry.sourceHandle
+                                  )
+                            : [];
+                        if (storedEntries.length > 0) return storedEntries;
+
+                        return [
+                            {
+                                sourceId:
+                                    edge?.data?.boundaryOriginalSource ||
+                                    edge?.data?.compoundOriginalSource ||
+                                    edge?.data?.parallelOriginalSource ||
+                                    edge?.source ||
+                                    "",
+                                sourceHandle: String(
+                                    edge?.data?.boundaryOriginalSourceHandle ||
+                                    edge?.data?.compoundOriginalSourceHandle ||
+                                    edge?.data?.parallelOriginalSourceHandle ||
+                                    edge?.sourceHandle ||
+                                    edge?.label ||
+                                    "success"
+                                ),
+                            },
+                        ];
+                    };
+
+                    const isSemanticTransitionEdge = (edge) =>
+                        !edge?.data?.boundaryInternalEdge &&
+                        !edge?.data?.compoundInternalEdge &&
+                        !edge?.data?.parallelInternalEdge &&
+                        !String(edge?.id || "").startsWith(
+                            "edge-internal-boundary-"
+                        );
+
+                    const removedWildcardEventsByNode = new Map();
+                    transitionChanges
+                        .filter((change) => change.type === "remove")
+                        .forEach((change) => {
+                            const removedEdge = edges.find(
+                                (edge) => edge.id === change.id
+                            );
+                            if (!removedEdge) return;
+
+                            getLogicalSourceEntries(removedEdge).forEach(
+                                ({ sourceId, sourceHandle }) => {
+                                    if (
+                                        !sourceId ||
+                                        !isWildcardTransitionEvent(sourceHandle)
+                                    ) {
+                                        return;
+                                    }
+
+                                    const stillUsed = changedEdges.some(
+                                        (edge) =>
+                                            isSemanticTransitionEdge(edge) &&
+                                            getLogicalSourceEntries(edge).some(
+                                                (entry) =>
+                                                    entry.sourceId === sourceId &&
+                                                    entry.sourceHandle ===
+                                                        sourceHandle
+                                            )
+                                    );
+                                    if (stillUsed) return;
+
+                                    if (
+                                        !removedWildcardEventsByNode.has(
+                                            sourceId
+                                        )
+                                    ) {
+                                        removedWildcardEventsByNode.set(
+                                            sourceId,
+                                            new Set()
+                                        );
+                                    }
+                                    removedWildcardEventsByNode
+                                        .get(sourceId)
+                                        .add(sourceHandle);
+                                }
+                            );
+                        });
+
+                    const cleanedNodes =
+                        removedWildcardEventsByNode.size === 0
+                            ? nodes
+                            : nodes.map((node) => {
+                                const removedHandles =
+                                    removedWildcardEventsByNode.get(node.id);
+                                if (!removedHandles) return node;
+                                return {
+                                    ...node,
+                                    data: {
+                                        ...node.data,
+                                        events: (node.data?.events || []).filter(
+                                            (event) =>
+                                                !removedHandles.has(
+                                                    String(event?.id || "")
+                                                )
+                                        ),
+                                    },
+                                };
+                            });
+
                     const normalized = rebuildBoundaryTransitionsIncremental(
-                        nodes,
+                        cleanedNodes,
                         changedEdges,
                         {
                             previousEdges: edges,

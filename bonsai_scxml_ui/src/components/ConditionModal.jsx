@@ -1012,19 +1012,21 @@ function ConditionModal({
                             </div>
 
                             <div className="transition-add-row">
-                                <select
+                                <input
                                     className="skill-select"
+                                    type="text"
+                                    list="transition-event-options"
                                     value={newTransitionEvent}
+                                    placeholder="success, error.*, success.** ..."
                                     onChange={(event) =>
                                         setNewTransitionEvent(event.target.value)
                                     }
-                                >
+                                />
+                                <datalist id="transition-event-options">
                                     {normalizedEvents.map((event) => (
-                                        <option key={event.id} value={event.id}>
-                                            {event.id}
-                                        </option>
+                                        <option key={event.id} value={event.id} />
                                     ))}
-                                </select>
+                                </datalist>
                                 <button
                                     className="filter-button transition-primary-button transition-add-button"
                                     type="button"

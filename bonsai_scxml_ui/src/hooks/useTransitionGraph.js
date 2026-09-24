@@ -23,6 +23,7 @@ import {
     getStoredTransitionAssignments,
 } from "../utils/editorScxml";
 import { rebuildBoundaryTransitionsIncremental } from "../utils/boundaryTransitions";
+import { isWildcardTransitionEvent } from "../utils/transitionEvents";
 
 const getSemanticTransitionTarget = (targetNode, allNodes = []) => {
     if (!(targetNode?.data?.isSkillClone || targetNode?.data?.isStateClone)) {
@@ -1931,7 +1932,11 @@ export function useTransitionGraph({
             );
 
             const unusedEvents = [...baseEventById.entries()]
-                .filter(([eventId]) => !usedEventIds.has(eventId))
+                .filter(
+                    ([eventId]) =>
+                        !usedEventIds.has(eventId) &&
+                        !isWildcardTransitionEvent(eventId)
+                )
                 .map(([, event]) => event);
 
             return {
