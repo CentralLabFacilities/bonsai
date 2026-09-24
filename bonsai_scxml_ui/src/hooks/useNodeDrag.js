@@ -669,6 +669,20 @@ export function useNodeDrag({
                             parentId: undefined,
                             extent: undefined,
                             position: absolute,
+                            // Initial-state membership is scoped to the
+                            // Compound the node came from. Carrying that flag
+                            // across a reparent can create a second top-level
+                            // initial state or overwrite the target Compound's
+                            // existing initial state. Clear it here; the normal
+                            // Compound initial-state normalization will choose
+                            // the appropriate initial child for the old/new
+                            // container after the drop.
+                            data: sourceCompound
+                                ? {
+                                    ...(c.data || {}),
+                                    isInitial: false,
+                                }
+                                : c.data,
                         }
                         : c
                 );
@@ -1305,6 +1319,17 @@ export function useNodeDrag({
                             y: dropPoint.y,
                         },
                     selected: false,
+                    // Initial-state membership only has meaning inside the
+                    // container that owns that state. A node leaving a
+                    // Parallel lane may also have come from a Compound nested
+                    // inside that lane, so clear the flag here in the final
+                    // top-level drop path as well. Otherwise that nested case
+                    // bypasses the Compound reparenting branch above and the
+                    // node incorrectly remains initial at the root level.
+                    data: {
+                        ...(draggedNode.data || {}),
+                        isInitial: false,
+                    },
                 });
             } else {
                 nextNodes.push({
