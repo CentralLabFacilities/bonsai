@@ -18,6 +18,11 @@ import {
     getLaneForNode,
     isNodeInsideContainer,
 } from "./editorGeometry.js";
+const normalizeLegacyScxmlComments = (xmlText) =>
+    String(xmlText || "")
+        .replace(/<!-->/g, "<!--")
+        .replace(/<\/-->/g, "-->");
+
 
 const makeImportedSelfLoopControlPoints = () => [
     { id: `cp-${crypto.randomUUID()}`, anchor: "source", dx: 76, dy: -92 },
@@ -644,7 +649,7 @@ const parseBehaviorExitForwarding = (stateElem, fullSkillName) => {
 
 export const extractBehaviorExitEventsFromScxml = (xmlText) => {
     const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(xmlText, "application/xml");
+    const xmlDoc = parser.parseFromString(normalizeLegacyScxmlComments(xmlText), "application/xml");
     const parserError = xmlDoc.getElementsByTagName("parsererror")[0];
 
     if (parserError) {
@@ -672,7 +677,7 @@ export const extractBehaviorExitEventsFromScxml = (xmlText) => {
 
 export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
     const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(xmlText, "application/xml");
+    const xmlDoc = parser.parseFromString(normalizeLegacyScxmlComments(xmlText), "application/xml");
 
     // 1. Prüfen auf XML-Syntaxfehler
     const parserError = xmlDoc.getElementsByTagName("parsererror")[0];
@@ -1227,38 +1232,8 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             parentId
         );
 
-        // Keep the established parallel-boundary transition semantics: the
-        // event prefix identifies the branch/lane that owns the exit. A
-        // sourceNodeId of null lets the later resolver bind it by skill name,
-        // while each matching lane receives its concrete boundary transition.
-        const parallelTransElems = Array.from(parallelElem.children).filter(
-            (child) => child.localName === "transition"
-        );
-        parallelTransElems.forEach((transitionElement) => {
-            const eventName = transitionElement.getAttribute("event") || "";
-            const targetState = transitionElement.getAttribute("target");
-            if (!targetState) return;
-
-            const sourcePrefix = eventName.includes(".")
-                ? eventName.split(".")[0]
-                : fullSkillName;
-            const assignments = parseTransitionAssignments(transitionElement);
-            const firstAssignment = assignments[0] || null;
-            rawTransitions.push({
-                sourceNodeId: null,
-                sourceSkillName: sourcePrefix,
-                eventId: eventName,
-                targetStateName: targetState,
-                editorTargetInstanceId:
-                    editorTargetInstanceByTransitionElement.get(
-                        transitionElement
-                    ) || "",
-                cond: (transitionElement.getAttribute("cond") || "").trim(),
-                assignments,
-                assignLocation: firstAssignment?.location || "",
-                assignExpr: firstAssignment?.expr || "",
-            });
-        });
+        // Keep direct transitions on the parallel available for reconstruction.
+        registerDirectTransitions(parallelElem, parallelNodeId, fullSkillName);
 
         for (let laneIdx = 0; laneIdx < branchElements.length; laneIdx++) {
             const branchElem = branchElements[laneIdx];
@@ -1266,20 +1241,18 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             const branchInitial = branchElem.getAttribute("initial") || "";
             const laneNodeId = getNodeId();
             const branchChildren = getDirectStateChildren(branchElem);
-            const matchingTrans = parallelTransElems.filter((transitionElement) =>
-                (transitionElement.getAttribute("event") || "").startsWith(
-                    `${branchId}.`
-                )
-            );
-            const laneEvents = matchingTrans.map((transitionElement) => {
-                const rawEvent = transitionElement.getAttribute("event") || "";
-                return {
-                    id: getTransitionExitToken(rawEvent, branchId),
-                    name: rawEvent,
-                    rawEvent,
-                    target: transitionElement.getAttribute("target"),
-                };
-            });
+
+            const laneEvents = Array.from(branchElem.children)
+                .filter((child) => child.localName === "transition")
+                .map((transitionElement) => {
+                    const rawEvent = transitionElement.getAttribute("event") || "";
+                    return {
+                        id: getTransitionExitToken(rawEvent, branchId),
+                        name: rawEvent,
+                        rawEvent,
+                        target: transitionElement.getAttribute("target"),
+                    };
+                });
 
             newNodes.push({
                 id: laneNodeId,
@@ -1304,28 +1277,6 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                     onEntry: parseStateAssignments(branchElem, "onentry"),
                     onExit: parseStateAssignments(branchElem, "onexit"),
                 },
-            });
-
-            matchingTrans.forEach((transitionElement) => {
-                const targetState = transitionElement.getAttribute("target");
-                if (!targetState) return;
-                const eventName = transitionElement.getAttribute("event") || "";
-                const assignments = parseTransitionAssignments(transitionElement);
-                const firstAssignment = assignments[0] || null;
-                rawTransitions.push({
-                    sourceNodeId: laneNodeId,
-                    sourceSkillName: branchId,
-                    eventId: eventName,
-                    targetStateName: targetState,
-                    editorTargetInstanceId:
-                        editorTargetInstanceByTransitionElement.get(
-                            transitionElement
-                        ) || "",
-                    cond: (transitionElement.getAttribute("cond") || "").trim(),
-                    assignments,
-                    assignLocation: firstAssignment?.location || "",
-                    assignExpr: firstAssignment?.expr || "",
-                });
             });
 
             // A branch state with children is represented by the lane plus its
@@ -1370,35 +1321,6 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                     stateSrc ? "submachine" : "custom",
                     laneNodeId
                 );
-
-                // Parallel-level branch exits visually terminate at the lane
-                // boundary. Keep the same helper edge representation used by
-                // the original importer for atomic branch states.
-                laneEvents.forEach((laneEvent) => {
-                    if (!nodeData.events.some((event) => event.id === laneEvent.id)) {
-                        nodeData.events.push({
-                            id: laneEvent.id,
-                            name: laneEvent.name,
-                            rawEvent: laneEvent.rawEvent,
-                            target: laneNodeId,
-                        });
-                    }
-                    newEdges.push({
-                        id:
-                            `edge-internal-${stateNodeId}-` +
-                            `${laneEvent.id}-${laneNodeId}`,
-                        source: stateNodeId,
-                        target: laneNodeId,
-                        sourceHandle: laneEvent.id,
-                        targetHandle: `target-${laneEvent.id}`,
-                        style: {
-                            strokeDasharray: "4 4",
-                            stroke: "#0284c7",
-                            strokeWidth: 1.5,
-                        },
-                        type: "smoothstep",
-                    });
-                });
             }
         }
 
