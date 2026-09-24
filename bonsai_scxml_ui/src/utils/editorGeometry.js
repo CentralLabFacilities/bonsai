@@ -978,103 +978,10 @@ const normalizeParallelLaneCompoundsImpl = (allNodes) => {
         const laneWidth = Math.max(1, Number(laneSize.width) || 420);
         const laneHeight = Math.max(1, Number(laneSize.height) || 140);
 
-        /*
-         * If the lane already contains a normal compound and another sibling
-         * state is added, that existing compound becomes the lane compound.
-         * Do NOT create another compound around it.
-         */
-        if (!wrapper && allSkills.length > 1) {
-            const existingDirectCompound = directSkills.find(
-                (node) => node.type === "compound"
-            );
-
-            if (existingDirectCompound) {
-                const oldWrapperPosition = existingDirectCompound.position || {
-                    x: 0,
-                    y: 0,
-                };
-                const existingChildren = getChildren(
-                    existingDirectCompound.id
-                ).filter(isCompoundInitialChildCandidate);
-                const siblingsToAbsorb = directSkills.filter(
-                    (node) => node.id !== existingDirectCompound.id
-                );
-                const compoundChildren = [];
-                const compoundChildIds = new Set();
-                [...existingChildren, ...siblingsToAbsorb].forEach((node) => {
-                    if (!node || compoundChildIds.has(node.id)) return;
-                    compoundChildIds.add(node.id);
-                    compoundChildren.push(node);
-                });
-
-                const storedInitialId =
-                    existingDirectCompound.data?.initialChildId;
-                const initialChild =
-                    compoundChildren.find(
-                        (node) => node.id === storedInitialId
-                    ) ||
-                    compoundChildren.find((node) => node.data?.isInitial) ||
-                    compoundChildren[0] ||
-                    null;
-                const desiredInitialId = initialChild?.id || null;
-
-                replaceNode(existingDirectCompound.id, {
-                    ...existingDirectCompound,
-                    position: { x: 0, y: 0 },
-                    parentId: currentLane.id,
-                    extent: "parent",
-                    expandParent: true,
-                    draggable: false,
-                    selectable: false,
-                    width: laneWidth,
-                    height: laneHeight,
-                    style: {
-                        ...existingDirectCompound.style,
-                        width: laneWidth,
-                        height: laneHeight,
-                    },
-                    data: {
-                        ...existingDirectCompound.data,
-                        initialChildId: desiredInitialId,
-                        autoParallelLaneCompound: true,
-                    },
-                });
-
-                existingChildren.forEach((child) => {
-                    replaceNode(child.id, {
-                        ...child,
-                        position: {
-                            x:
-                                Number(oldWrapperPosition.x || 0) +
-                                Number(child.position?.x || 0),
-                            y:
-                                Number(oldWrapperPosition.y || 0) +
-                                Number(child.position?.y || 0),
-                        },
-                        data: {
-                            ...child.data,
-                            isInitial: child.id === desiredInitialId,
-                        },
-                    });
-                });
-
-                siblingsToAbsorb.forEach((sibling) => {
-                    const liveSibling = byId.get(sibling.id) || sibling;
-                    replaceNode(sibling.id, {
-                        ...liveSibling,
-                        parentId: existingDirectCompound.id,
-                        extent: "parent",
-                        expandParent: true,
-                        data: {
-                            ...liveSibling.data,
-                            isInitial: sibling.id === desiredInitialId,
-                        },
-                    });
-                });
-
-                return;
-            }
-        }
+        // Never repurpose a user-created Compound as the editor-only lane
+        // wrapper. Semantic compounds must stay selectable and may themselves
+        // contain compounds/parallels recursively. If a lane needs a structural
+        // wrapper, create a separate automatic wrapper below.
 
         if (!wrapper) {
             const wrapperId = getNodeId();

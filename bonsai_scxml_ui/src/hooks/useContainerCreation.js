@@ -32,9 +32,23 @@ export function useContainerCreation({
             return selectedNodesCacheRef.current;
         }
 
-        const next = selectionNodesDependency.filter(
-            (node) => node.selected && !node.parentId
+        const candidates = selectionNodesDependency.filter(
+            (node) =>
+                node.selected &&
+                node.type !== "parallelLane" &&
+                !node.data?.autoParallelLaneCompound
         );
+
+        // Container creation is scoped to siblings. This allows recursive
+        // compounds/parallels while preventing one new container from trying
+        // to adopt nodes that currently belong to unrelated parents.
+        const groups = new Map();
+        candidates.forEach((node) => {
+            const key = node.parentId || "__root__";
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key).push(node);
+        });
+        const next = [...groups.values()].sort((a, b) => b.length - a.length)[0] || [];
         selectedNodesCacheRef.current = next;
         return next;
     }, [selectionNodesDependency]);
@@ -241,6 +255,8 @@ export function useContainerCreation({
 
     const handleCreateCompoundFromSelected = () => {
         if (selectedNodes.length < 1) return;
+
+        const selectionParentId = selectedNodes[0]?.parentId || null;
 
         const {
             minX,
@@ -488,6 +504,10 @@ export function useContainerCreation({
                     headerOffset,
             },
 
+            ...(selectionParentId
+                ? { parentId: selectionParentId, extent: "parent", expandParent: true }
+                : {}),
+
             style: {
                 width: containerWidth,
                 height: containerHeight,
@@ -563,10 +583,23 @@ export function useContainerCreation({
             }
         );
 
+        const parentAwareNodes = updatedNodes.map((candidate) => {
+            if (candidate.id !== selectionParentId || !compoundNode.data.isInitial) {
+                return candidate;
+            }
+            return {
+                ...candidate,
+                data: {
+                    ...(candidate.data || {}),
+                    initialChildId: compoundId,
+                },
+            };
+        });
+
         const nextNodes =
             orderNodesParentsFirst([
                 compoundNode,
-                ...updatedNodes,
+                ...parentAwareNodes,
             ]);
 
         const normalizedGraph = rebuildBoundaryTransitions(
@@ -597,6 +630,8 @@ export function useContainerCreation({
 
     const handleCreateParallelFromSelected = () => {
         if (selectedNodes.length < 1) return;
+
+        const selectionParentId = selectedNodes[0]?.parentId || null;
 
         const selectedIds = new Set(selectedNodes.map((n) => n.id));
 
@@ -712,6 +747,10 @@ export function useContainerCreation({
                 x: minX - 30,
                 y: minY - 30 - headerHeight,
             },
+
+            ...(selectionParentId
+                ? { parentId: selectionParentId, extent: "parent", expandParent: true }
+                : {}),
 
             style: {
                 width: containerWidth,
@@ -902,16 +941,6 @@ export function useContainerCreation({
                     return false;
                 }
 
-                if (n.type === "compound") {
-                    const hasRemainingChildren = nodes.some(
-                        (child) =>
-                            child.parentId === n.id &&
-                            !selectedIds.has(child.id)
-                    );
-
-                    return hasRemainingChildren;
-                }
-
                 return true;
             })
             .map((node) => {
@@ -921,7 +950,7 @@ export function useContainerCreation({
                  * Kinder eines Compound-/Parallel-/Submachine-Nodes
                  * werden automatisch mit ihrem Parent verschoben.
                  */
-                if (node.parentId) {
+                if ((node.parentId || null) !== selectionParentId) {
                     return node;
                 }
 
@@ -952,9 +981,24 @@ export function useContainerCreation({
 
         const newRootNodes = [...remainingNodes];
         newRootNodes.splice(insertIndex, 0, parallelNode);
+        const parentAwareRootNodes = newRootNodes.map((candidate) => {
+            if (
+                candidate.id !== selectionParentId ||
+                !parallelNode.data.isInitial
+            ) {
+                return candidate;
+            }
+            return {
+                ...candidate,
+                data: {
+                    ...(candidate.data || {}),
+                    initialChildId: parallelId,
+                },
+            };
+        });
 
         const normalizedGraph = rebuildBoundaryTransitions(
-            [...newRootNodes, ...newLanes, ...movedNodes],
+            [...parentAwareRootNodes, ...newLanes, ...movedNodes],
             [...updatedEdges, ...newEdgesToAdd]
         );
         setNodes(normalizedGraph.nodes);

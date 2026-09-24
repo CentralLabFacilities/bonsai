@@ -584,6 +584,30 @@ export function useNodeDrag({
                 targetCompound = sourceCompound;
             }
 
+            const targetLaneAtDrop = draggedNode.type !== "parallel"
+                ? currentNodes
+                    .filter(
+                        (candidate) =>
+                            candidate.type === "parallelLane" &&
+                            !isNodeInsideContainer(
+                                candidate,
+                                draggedNode.id,
+                                currentNodes
+                            )
+                    )
+                    .find((lane) => {
+                        const position = getAbsoluteNodePosition(lane, currentNodes);
+                        const width = Number(lane.style?.width) || 420;
+                        const height = Number(lane.style?.height) || 110;
+                        return (
+                            dropPoint.x >= position.x &&
+                            dropPoint.x <= position.x + width &&
+                            dropPoint.y >= position.y &&
+                            dropPoint.y <= position.y + height
+                        );
+                    }) || null
+                : null;
+
 
             // ---------------------------------------------------------
             // Node befindet sich bereits im selben Compound
@@ -653,8 +677,8 @@ export function useNodeDrag({
             }
 
             if (
-                !getLaneForNode(draggedNode, currentNodes) &&
-                (sourceCompound || targetCompound)
+                (sourceCompound || targetCompound) &&
+                (targetCompound || !targetLaneAtDrop)
             ) {
                 const absolute = getAbsoluteNodePosition(
                     draggedNode,
@@ -1037,36 +1061,7 @@ export function useNodeDrag({
                 currentNodes
             );
 
-            let targetLane = draggedNode.type !== "parallel"
-                ? currentNodes
-                    .filter(
-                        (candidate) =>
-                            candidate.type === "parallelLane" &&
-                            !isNodeInsideContainer(
-                                candidate,
-                                draggedNode.id,
-                                currentNodes
-                            )
-                    )
-                    .find((lane) => {
-                        const position = getAbsoluteNodePosition(
-                            lane,
-                            currentNodes
-                        );
-
-                        const width =
-                            Number(lane.style?.width) || 420;
-                        const height =
-                            Number(lane.style?.height) || 110;
-
-                        return (
-                            dropPoint.x >= position.x &&
-                            dropPoint.x <= position.x + width &&
-                            dropPoint.y >= position.y &&
-                            dropPoint.y <= position.y + height
-                        );
-                    })
-                : null;
+            let targetLane = targetLaneAtDrop;
 
             const resistedLaneDrop = Boolean(
                 !targetLane &&
