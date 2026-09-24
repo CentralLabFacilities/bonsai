@@ -312,6 +312,12 @@ function AppContent() {
     const graphClipboardRef = useRef(persistentGraphClipboard);
     const captureGraphSelectionRef = useRef(null);
     const requestGraphPasteRef = useRef(null);
+    const flowContainerRef = useRef(null);
+    const editorPointerPositionRef = useRef({
+        inside: false,
+        clientX: null,
+        clientY: null,
+    });
     // Keep an authoritative snapshot of React Flow's current selection.
     // Reading `node.selected` from the controlled nodes array can lag behind
     // the interaction by a render, especially when Ctrl/Meta multi-selecting.
@@ -326,7 +332,6 @@ function AppContent() {
             selectedFlowNodes.map((node) => node.id)
         );
     }, []);
-    const pasteSequenceRef = useRef(0);
 
     // Editor-wide Find (Ctrl+F): searches skill/behavior nodes and slot paths
     // in the currently active workflow.
@@ -1043,10 +1048,10 @@ function AppContent() {
         if (type === "copy") {
             captureGraphSelectionRef.current?.();
         } else if (type === "paste") {
-            requestGraphPasteRef.current?.();
+            requestGraphPasteRef.current?.(contextMenu?.flowPosition || null);
         }
         setContextMenu(null);
-    }, []);
+    }, [contextMenu]);
 
     const handleSelectAction = (type) => {
         const hasSelection = selectedNodes.length > 0;
@@ -3250,11 +3255,83 @@ function AppContent() {
 
             graphClipboardRef.current = clipboard;
             persistentGraphClipboard = clipboard;
-            pasteSequenceRef.current = 0;
             return true;
         };
 
-        const buildPastedSlotAliases = (copiedSlotNodes, offset) =>
+        const resolvePasteTargetPosition = (explicitFlowPosition = null) => {
+            if (
+                Number.isFinite(explicitFlowPosition?.x) &&
+                Number.isFinite(explicitFlowPosition?.y)
+            ) {
+                return explicitFlowPosition;
+            }
+
+            const pointer = editorPointerPositionRef.current;
+            if (
+                pointer?.inside &&
+                Number.isFinite(pointer.clientX) &&
+                Number.isFinite(pointer.clientY)
+            ) {
+                return screenToFlowPosition({
+                    x: pointer.clientX,
+                    y: pointer.clientY,
+                });
+            }
+
+            const editorRect = flowContainerRef.current?.getBoundingClientRect();
+            if (editorRect?.width > 0 && editorRect?.height > 0) {
+                return screenToFlowPosition({
+                    x: editorRect.left + editorRect.width / 2,
+                    y: editorRect.top + editorRect.height / 2,
+                });
+            }
+
+            return screenToFlowPosition({
+                x: window.innerWidth / 2,
+                y: window.innerHeight / 2,
+            });
+        };
+
+        const getClipboardPasteTranslation = (clipboard, targetPosition) => {
+            const copiedNodes = clipboard?.nodes || [];
+            const copiedNodeIds = new Set(copiedNodes.map((node) => node.id));
+            const rootNodes = copiedNodes.filter(
+                (node) => !node.parentId || !copiedNodeIds.has(node.parentId)
+            );
+            const layoutNodes = [
+                ...rootNodes,
+                ...(clipboard?.slotNodes || []),
+            ];
+
+            if (layoutNodes.length === 0) {
+                return { x: 0, y: 0 };
+            }
+
+            let minX = Infinity;
+            let minY = Infinity;
+            let maxX = -Infinity;
+            let maxY = -Infinity;
+
+            layoutNodes.forEach((node) => {
+                const x = Number(node.position?.x || 0);
+                const y = Number(node.position?.y || 0);
+                const { width, height } = getNodeSize(node);
+                minX = Math.min(minX, x);
+                minY = Math.min(minY, y);
+                maxX = Math.max(maxX, x + width);
+                maxY = Math.max(maxY, y + height);
+            });
+
+            const centerX = minX + (maxX - minX) / 2;
+            const centerY = minY + (maxY - minY) / 2;
+
+            return {
+                x: Number(targetPosition?.x || 0) - centerX,
+                y: Number(targetPosition?.y || 0) - centerY,
+            };
+        };
+
+        const buildPastedSlotAliases = (copiedSlotNodes, translation) =>
             (copiedSlotNodes || [])
                 .map((copiedSlotNode) => {
                     const copiedCanonicalId =
@@ -3293,11 +3370,11 @@ function AppContent() {
                             x:
                                 Number(
                                     copiedSlotNode.position?.x || 0
-                                ) + offset,
+                                ) + Number(translation?.x || 0),
                             y:
                                 Number(
                                     copiedSlotNode.position?.y || 0
-                                ) + offset,
+                                ) + Number(translation?.y || 0),
                         },
                         type: "slot",
                         selected: true,
@@ -3310,7 +3387,7 @@ function AppContent() {
                 })
                 .filter(Boolean);
 
-        const pasteClipboard = (pasteMode = "copy") => {
+        const pasteClipboard = (pasteMode = "copy", targetPosition = null) => {
             const clipboard =
                 graphClipboardRef.current || persistentGraphClipboard;
             if (clipboard && graphClipboardRef.current !== clipboard) {
@@ -3323,6 +3400,12 @@ function AppContent() {
 
             if (copiedNodeCount === 0) return false;
 
+            const resolvedPasteTarget = resolvePasteTargetPosition(targetPosition);
+            const pasteTranslation = getClipboardPasteTranslation(
+                clipboard,
+                resolvedPasteTarget
+            );
+
             if (pasteMode === "clone") {
                 if (copiedNodeCount !== 1) return false;
 
@@ -3330,11 +3413,9 @@ function AppContent() {
                     copiedStateNodes[0] || copiedSlotNodes[0] || null;
 
                 if (copiedNode?.type === "slot") {
-                    pasteSequenceRef.current += 1;
-                    const offset = 40 * pasteSequenceRef.current;
                     const pastedSlotAliases = buildPastedSlotAliases(
                         [copiedNode],
-                        offset
+                        pasteTranslation
                     );
                     const cloneNode = pastedSlotAliases[0];
                     if (!cloneNode) return false;
@@ -3383,15 +3464,10 @@ function AppContent() {
 
                 if (!isCloneableEditorNode(sourceNode)) return false;
 
-                pasteSequenceRef.current += 1;
-                const offset = 40 * pasteSequenceRef.current;
-                const absoluteSourcePosition = getAbsoluteNodePosition(
-                    sourceNode,
-                    nodes
-                );
+                const { width, height } = getNodeSize(sourceNode);
                 const cloneNode = buildEditorCloneNode(sourceNode, {
-                    x: Number(absoluteSourcePosition.x || 0) + offset,
-                    y: Number(absoluteSourcePosition.y || 0) + offset,
+                    x: Number(resolvedPasteTarget.x || 0) - width / 2,
+                    y: Number(resolvedPasteTarget.y || 0) - height / 2,
                 });
                 if (!cloneNode) return false;
 
@@ -3429,11 +3505,9 @@ function AppContent() {
             // therefore creates visual aliases for selected slots instead of a
             // second declaration with the same path.
             if (copiedStateNodes.length === 0 && copiedSlotNodes.length > 0) {
-                pasteSequenceRef.current += 1;
-                const offset = 40 * pasteSequenceRef.current;
                 const pastedSlotAliases = buildPastedSlotAliases(
                     copiedSlotNodes,
-                    offset
+                    pasteTranslation
                 );
                 if (pastedSlotAliases.length === 0) return false;
 
@@ -3478,9 +3552,6 @@ function AppContent() {
 
                 return true;
             }
-
-            pasteSequenceRef.current += 1;
-            const offset = 40 * pasteSequenceRef.current;
 
             const idMap = new Map();
             clipboard.nodes.forEach((node) => {
@@ -3674,8 +3745,16 @@ function AppContent() {
                             ? node.extent
                             : undefined,
                     position: {
-                        x: Number(node.position?.x || 0) + offset,
-                        y: Number(node.position?.y || 0) + offset,
+                        x:
+                            Number(node.position?.x || 0) +
+                            (node.parentId && idMap.has(node.parentId)
+                                ? 0
+                                : pasteTranslation.x),
+                        y:
+                            Number(node.position?.y || 0) +
+                            (node.parentId && idMap.has(node.parentId)
+                                ? 0
+                                : pasteTranslation.y),
                     },
                     selected: true,
                     data,
@@ -3725,7 +3804,7 @@ function AppContent() {
             ]);
             const pastedSlotAliases = buildPastedSlotAliases(
                 copiedSlotNodes,
-                offset
+                pasteTranslation
             );
             const nextSlotNodes = [
                 ...slotNodes.map((node) => ({
@@ -3768,7 +3847,7 @@ function AppContent() {
             return true;
         };
 
-        const requestPasteClipboard = () => {
+        const requestPasteClipboard = (targetPosition = null) => {
             if (pendingSkillPasteActionRef.current) return true;
 
             const clipboard =
@@ -3785,7 +3864,7 @@ function AppContent() {
             // Slots have one semantic declaration per path, so normal
             // copy/paste directly creates another visual alias.
             if (copiedNodeCount === 1 && copiedSlotNodes.length === 1) {
-                return pasteClipboard("copy");
+                return pasteClipboard("copy", targetPosition);
             }
 
             const copiedNode =
@@ -3799,8 +3878,8 @@ function AppContent() {
                 // avoids copying callback-heavy node data into a dialog state
                 // while still letting the user decide how this paste behaves.
                 pendingSkillPasteActionRef.current = {
-                    clone: () => pasteClipboard("clone"),
-                    copy: () => pasteClipboard("copy"),
+                    clone: () => pasteClipboard("clone", targetPosition),
+                    copy: () => pasteClipboard("copy", targetPosition),
                 };
                 setPendingSkillPaste({
                     label: sourceNode.data?.label || "Skill",
@@ -3812,7 +3891,7 @@ function AppContent() {
                 return true;
             }
 
-            return pasteClipboard("copy");
+            return pasteClipboard("copy", targetPosition);
         };
 
         captureGraphSelectionRef.current = captureSelection;
@@ -3905,6 +3984,7 @@ function AppContent() {
         clearAllEdgeSelection,
         checkSlotConnection,
         updateNodeInternals,
+        screenToFlowPosition,
     ]);
 
     const resolvePendingSkillPaste = useCallback((choice) => {
@@ -4820,7 +4900,22 @@ function AppContent() {
                     />
 
                     <div
+                        ref={flowContainerRef}
                         className="flow-container"
+                        onPointerMove={(event) => {
+                            editorPointerPositionRef.current = {
+                                inside: true,
+                                clientX: event.clientX,
+                                clientY: event.clientY,
+                            };
+                        }}
+                        onPointerLeave={() => {
+                            editorPointerPositionRef.current = {
+                                inside: false,
+                                clientX: null,
+                                clientY: null,
+                            };
+                        }}
                         onDragOver={(e) => {
                             e.preventDefault();
 
