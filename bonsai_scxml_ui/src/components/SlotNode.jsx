@@ -80,7 +80,7 @@ function SlotNode({ id, data, selected = false }) {
                 isInheritedFromParent ? "slot-node-inherited" : ""
             } ${
                 isRequiredByChild ? "slot-node-child-required" : ""
-            } ${selected ? "selected-slot-node" : ""}`}
+            } ${isSlotClone ? "slot-node-reference" : ""} ${selected ? "selected-slot-node" : ""}`}
             style={getSlotTypeStyle(slotType)}
         >
             <Handle
@@ -125,7 +125,7 @@ function SlotNode({ id, data, selected = false }) {
                     />
                     <span>{isInheritedFromParent ? "INHERIT SLOT" : "SLOT"}</span>
                     {isSlotClone && (
-                        <span className="slot-node-clone-badge">CLONE</span>
+                        <span className="slot-node-clone-badge">REFERENCE</span>
                     )}
                 </div>
                 <div className="slot-node-type" title={slotType}>

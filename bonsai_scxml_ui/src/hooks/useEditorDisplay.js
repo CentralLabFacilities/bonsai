@@ -178,10 +178,26 @@ export function useEditorDisplay({
         visualNodes.forEach((node) => {
             // cloneOfNodeId is the authoritative editor-alias relationship.
             // Do not depend on a particular clone flag here: imported or older
-            // Sub-SM/Compound/Parallel aliases may still be valid visual clones
-            // even if their presentation flag differs.
+            // aliases may still be valid visual references even if their
+            // presentation flag differs.
             const originalId = resolveOriginalId(node);
             if (!originalId || !visualNodeById.has(originalId)) return;
+
+            const originalNode = visualNodeById.get(originalId);
+
+            // Compound/Parallel references are intentionally lightweight. A
+            // reference must not make the full source container participate in
+            // hover/selection focus propagation: large containers can own many
+            // nested nodes and structural edges, which turns a simple reference
+            // interaction into an expensive graph-wide presentation update.
+            // The semantic transition code still resolves the reference to the
+            // original container when it is used as a transition target.
+            if (
+                originalNode?.type === "compound" ||
+                originalNode?.type === "parallel"
+            ) {
+                return;
+            }
 
             if (!groupsByOriginalId.has(originalId)) {
                 groupsByOriginalId.set(originalId, new Set([originalId]));

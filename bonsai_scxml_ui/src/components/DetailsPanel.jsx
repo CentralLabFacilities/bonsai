@@ -1072,7 +1072,7 @@ function DetailsPanel({
 
         return (
             <aside className="details-panel">
-                <h3>Details: {selectedNode.data?.label || "State Clone"}</h3>
+                <h3>Details: {selectedNode.data?.label || "State Reference"}</h3>
 
                 <div className="tabs">
                     <div className="tab active-tab">Overall</div>
@@ -1081,11 +1081,11 @@ function DetailsPanel({
                 <div className="tab-content">
                     <div className="allgemein-container">
                         <div className="description-header">
-                            <h3>{isSkillClone ? "Skill Clone" : "State Clone"}</h3>
+                            <h3>{isSkillClone ? "Skill Reference" : "State Reference"}</h3>
                         </div>
 
                         <div className="skill-clone-detail-card">
-                            <div className="detail-card-title">Cloned from</div>
+                            <div className="detail-card-title">Reference target</div>
                             <button
                                 type="button"
                                 className="skill-clone-source-button"
@@ -1103,7 +1103,7 @@ function DetailsPanel({
                                 {sourceIdentity}
                             </button>
                             <div className="detail-description">
-                                This is an editor-only inbound alias. Incoming
+                                This is an editor-only inbound reference. Incoming
                                 transitions target the original state in SCXML;
                                 outgoing transitions remain on the original node.
                             </div>
@@ -1312,7 +1312,7 @@ function DetailsPanel({
                         }`}
                         onClick={() => setActiveTab("clones")}
                     >
-                        Clones
+                        References
                     </div>
                 )}
 
@@ -1907,12 +1907,12 @@ function DetailsPanel({
                 {activeTab === "clones" && hasClones && (
                     <div className="allgemein-container">
                         <div className="description-header">
-                            <h3>Clones</h3>
+                            <h3>References</h3>
                         </div>
 
                         <div className="skill-clone-detail-card">
                             <div className="detail-description">
-                                Select a clone to move the editor view to it.
+                                Select a reference to move the editor view to it.
                             </div>
 
                             {cloneNodes.map((cloneNode, index) => (
@@ -1921,9 +1921,9 @@ function DetailsPanel({
                                     type="button"
                                     className="skill-clone-source-button"
                                     onClick={() => onNavigateClone?.(cloneNode.id)}
-                                    title="Go to this clone"
+                                    title="Go to this reference"
                                 >
-                                    <FiLayers /> Clone {index + 1}
+                                    <FiLink2 /> Reference {index + 1}
                                     {cloneNode.data?.label
                                         ? ` · ${cloneNode.data.label}`
                                         : ""}

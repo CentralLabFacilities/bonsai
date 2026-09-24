@@ -53,6 +53,7 @@ export default function EditorCanvas({
     contextMenu,
     handleSelectAction,
     canCreateEditorClone,
+    editorCloneActionLabel,
     setIsCreateSlotModalOpen,
     isDraggingNode,
     isOverTrash,
@@ -201,7 +202,7 @@ export default function EditorCanvas({
                             className="context-menu-item"
                             onClick={() => handleSelectAction("clone")}
                         >
-                            Clone Selected State
+                            {editorCloneActionLabel || "Reference Selected State"}
                         </button>
                     )}
                     <button

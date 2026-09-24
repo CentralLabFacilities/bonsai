@@ -5309,6 +5309,50 @@
             0 8px 20px rgba(9, 15, 28, 0.36);
 }
 
+/* Slot references use the same ghosted visual language as state references. */
+.slot-node.slot-node-reference {
+    background:
+            linear-gradient(145deg, rgba(32, 42, 67, 0.72), rgba(20, 30, 48, 0.66)),
+            repeating-linear-gradient(
+                    135deg,
+                    rgba(255, 255, 255, 0.025) 0,
+                    rgba(255, 255, 255, 0.025) 5px,
+                    transparent 5px,
+                    transparent 11px
+            );
+    border-style: dashed;
+    border-color: rgba(148, 163, 184, 0.62);
+    box-shadow: 0 4px 14px rgba(9, 15, 28, 0.24);
+}
+
+.slot-node.slot-node-reference::before {
+    background: linear-gradient(90deg, rgba(125, 211, 252, 0.78), rgba(129, 140, 248, 0.58));
+    opacity: 0.72;
+}
+
+.slot-node.slot-node-reference:hover {
+    border-color: rgba(186, 199, 216, 0.78);
+}
+
+.slot-node.slot-node-reference.selected-slot-node {
+    border-color: #7dd3fc;
+    box-shadow:
+            0 0 0 3px rgba(125, 211, 252, 0.18),
+            0 6px 16px rgba(9, 15, 28, 0.30);
+}
+
+.slot-node-clone-badge {
+    margin-left: 2px;
+    padding: 2px 5px;
+    border: 1px solid rgba(125, 211, 252, 0.34);
+    border-radius: 999px;
+    background: rgba(14, 116, 144, 0.12);
+    color: #bae6fd;
+    font-size: 7.5px;
+    font-weight: 850;
+    letter-spacing: 0.45px;
+}
+
 .slot-node-header {
     min-height: 34px;
     padding: 7px 10px 6px;
@@ -6394,9 +6438,9 @@
     flex-direction: column;
     gap: 8px;
     padding: 12px;
-    border: 1px solid #506c71;
+    border: 1px dashed #5e7780;
     border-radius: 8px;
-    background: #1f3034;
+    background: linear-gradient(145deg, rgba(31, 48, 52, 0.88), rgba(24, 38, 43, 0.82));
 }
 
 .skill-clone-source-button {
@@ -7039,55 +7083,110 @@
     font-size: 8px;
 }
 
-/* Editor-only aliases for Sub-SMs and container states. */
+/* Editor-only references to existing states.
+   Keep reference rendering deliberately cheap: no gradients, filters, whole-node
+   opacity, or animated shadows. React Flow may paint many of these while
+   panning/zooming, so the reference identity is expressed with borders, solid
+   fills and typography only. */
 .state-clone-node {
-    min-width: 165px;
-    max-width: 260px;
-    border: 1.5px solid #94a3b8;
-    border-left-width: 4px;
-    border-radius: 8px;
-    background: #f8fafc;
-    color: #0f172a;
-    box-shadow: 0 3px 10px rgba(15, 23, 42, 0.12);
+    position: relative;
+    min-width: 150px;
+    max-width: 240px;
+    --reference-accent: #64748b;
+    --reference-accent-soft: #94a3b8;
+    --reference-accent-text: #cbd5e1;
+    --reference-header-bg: #172033;
+    border: 1px dashed #94a3b8;
+    border-left: 3px solid var(--reference-accent);
+    border-radius: 7px;
+    background: #1e293b;
+    color: #d1d5db;
+    box-shadow: none;
     overflow: visible;
 }
 
+.state-clone-node:hover {
+    border-color: #cbd5e1;
+    border-left-color: var(--reference-accent);
+    background: #273346;
+}
+
 .state-clone-node.selected-node {
-    outline: 3px solid rgba(56, 189, 248, 0.72);
+    outline: 2px solid #7dd3fc;
     outline-offset: 3px;
 }
 
-.state-clone-submachine { border-left-color: #9333ea; }
-.state-clone-compound { border-left-color: #475569; }
-.state-clone-parallel { border-left-color: #0284c7; }
+/* Use the same primary accents as the real source node families. */
+.state-clone-submachine {
+    --reference-accent: #9333ea;
+    --reference-accent-soft: #c084fc;
+    --reference-accent-text: #e9d5ff;
+    --reference-header-bg: #2a183a;
+}
+
+.state-clone-compound {
+    --reference-accent: #000000;
+    --reference-accent-soft: #94a3b8;
+    --reference-accent-text: #e2e8f0;
+    --reference-header-bg: #111827;
+}
+
+.state-clone-parallel {
+    --reference-accent: #0284c7;
+    --reference-accent-soft: #38bdf8;
+    --reference-accent-text: #bae6fd;
+    --reference-header-bg: #102b3b;
+}
 
 .state-clone-header {
-    display: flex;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
     align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    padding: 5px 8px 3px;
+    gap: 6px;
+    min-height: 27px;
+    padding: 4px 7px;
+    border-bottom: 1px dashed var(--reference-accent-soft);
+    background: var(--reference-header-bg);
+}
+
+.state-clone-reference-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border: 1px solid var(--reference-accent-soft);
+    border-radius: 5px;
+    background: #1e293b;
+    color: var(--reference-accent-text);
+    font-size: 11px;
 }
 
 .state-clone-type,
 .state-clone-badge {
-    font-size: 9px;
+    font-size: 8px;
     font-weight: 800;
-    letter-spacing: 0.45px;
+    letter-spacing: 0.62px;
 }
 
-.state-clone-type { color: #475569; }
+.state-clone-type {
+    color: var(--reference-accent-text);
+    text-transform: uppercase;
+}
+
 .state-clone-badge {
-    padding: 1px 5px;
+    padding: 2px 6px;
+    border: 1px solid var(--reference-accent-soft);
     border-radius: 999px;
-    background: #e2e8f0;
-    color: #334155;
+    background: #1e293b;
+    color: var(--reference-accent-text);
 }
 
 .state-clone-label {
-    padding: 3px 10px 8px;
-    font-size: 13px;
-    font-weight: 700;
+    padding: 8px 10px 9px;
+    color: #e2e8f0;
+    font-size: 12px;
+    font-weight: 600;
     text-align: center;
     overflow-wrap: anywhere;
 }

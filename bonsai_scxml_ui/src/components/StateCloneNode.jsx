@@ -1,4 +1,5 @@
 import { Handle, Position } from "@xyflow/react";
+import { FiLink2 } from "react-icons/fi";
 
 const TYPE_LABELS = {
     submachine: "SUB-SM",
@@ -26,8 +27,11 @@ export default function StateCloneNode({ data = {}, selected = false }) {
             />
 
             <div className="state-clone-header">
+                <span className="state-clone-reference-mark" aria-hidden="true">
+                    <FiLink2 />
+                </span>
                 <span className="state-clone-type">{typeLabel}</span>
-                <span className="state-clone-badge">CLONE</span>
+                <span className="state-clone-badge">REF</span>
             </div>
 
             <div className="state-clone-label">

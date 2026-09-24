@@ -10,7 +10,7 @@ const HINTS = [
     {
         title: "Add skills",
         media: addSkillGif,
-        text: "Drag a skill from the library onto the canvas. Copies get a new instance ID; visual clones are inbound-only aliases.",
+        text: "Drag a skill from the library onto the canvas. Copies get a new instance ID; references are inbound-only aliases.",
     },
     {
         title: "Create transitions",

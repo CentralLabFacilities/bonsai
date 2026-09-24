@@ -990,10 +990,20 @@ function AppContent() {
             ? editorCloneSelection[0]
             : null;
     const canCreateEditorClone = isCloneableEditorNode(editorCloneSourceNode);
-    const editorCloneActionLabel =
-        editorCloneSourceNode?.type === "slot"
-            ? "Clone Selected Slot"
-            : "Clone Selected State";
+    const editorCloneActionLabel = (() => {
+        switch (editorCloneSourceNode?.type) {
+            case "slot":
+                return "Reference Selected Slot";
+            case "compound":
+                return "Reference Selected Compound";
+            case "parallel":
+                return "Reference Selected Parallel";
+            case "submachine":
+                return "Reference Selected Sub-State-Machine";
+            default:
+                return "Reference Selected State";
+        }
+    })();
 
     const handleCreateEditorClone = useCallback(() => {
         if (!contextMenu?.flowPosition) return;
@@ -3203,6 +3213,15 @@ function AppContent() {
                 return false;
             }
 
+            // Remember which single node the user explicitly copied before
+            // recursively adding container descendants. This lets a copied
+            // compound/parallel still be pasted as one editor reference even
+            // though its clipboard payload contains the complete subtree.
+            const explicitReferenceSourceNodeId =
+                nodesToCopy.length === 1 && slotNodesToCopy.length === 0
+                    ? nodesToCopy[0].id
+                    : null;
+
             // Copying a container must copy its complete subtree, including
             // structural parallel lanes. Those lanes are not directly
             // selectable, but they are required to preserve the hierarchy
@@ -3251,6 +3270,7 @@ function AppContent() {
             );
 
             const clipboard = {
+                explicitReferenceSourceNodeId,
                 nodes: nodesToCopy.map((node) =>
                     cloneGraphValue({
                         ...node,
@@ -3444,10 +3464,15 @@ function AppContent() {
             );
 
             if (pasteMode === "clone") {
-                if (copiedNodeCount !== 1) return false;
+                const explicitSourceId =
+                    clipboard?.explicitReferenceSourceNodeId || null;
+                const copiedNode = explicitSourceId
+                    ? copiedStateNodes.find((node) => node.id === explicitSourceId) || null
+                    : copiedNodeCount === 1
+                        ? copiedStateNodes[0] || copiedSlotNodes[0] || null
+                        : null;
 
-                const copiedNode =
-                    copiedStateNodes[0] || copiedSlotNodes[0] || null;
+                if (!copiedNode) return false;
 
                 if (copiedNode?.type === "slot") {
                     const pastedSlotAliases = buildPastedSlotAliases(
@@ -3501,10 +3526,18 @@ function AppContent() {
 
                 if (!isCloneableEditorNode(sourceNode)) return false;
 
-                const { width, height } = getNodeSize(sourceNode);
+                // References have their own compact visual size. Do not use
+                // the source container dimensions here: a large compound or
+                // parallel would otherwise place its small reference far away
+                // from the requested paste position.
+                const referenceSize = { width: 180, height: 58 };
                 const cloneNode = buildEditorCloneNode(sourceNode, {
-                    x: Number(resolvedPasteTarget.x || 0) - width / 2,
-                    y: Number(resolvedPasteTarget.y || 0) - height / 2,
+                    x:
+                        Number(resolvedPasteTarget.x || 0) -
+                        referenceSize.width / 2,
+                    y:
+                        Number(resolvedPasteTarget.y || 0) -
+                        referenceSize.height / 2,
                 });
                 if (!cloneNode) return false;
 
@@ -3932,8 +3965,13 @@ function AppContent() {
                 return pasteClipboard("copy", targetPosition);
             }
 
-            const copiedNode =
-                copiedNodeCount === 1 ? copiedStateNodes[0] || null : null;
+            const explicitSourceId =
+                clipboard?.explicitReferenceSourceNodeId || null;
+            const copiedNode = explicitSourceId
+                ? copiedStateNodes.find((node) => node.id === explicitSourceId) || null
+                : copiedNodeCount === 1
+                    ? copiedStateNodes[0] || null
+                    : null;
             const sourceNode = copiedNode
                 ? nodes.find((node) => node.id === copiedNode.id)
                 : null;
@@ -3946,12 +3984,22 @@ function AppContent() {
                     clone: () => pasteClipboard("clone", targetPosition),
                     copy: () => pasteClipboard("copy", targetPosition),
                 };
+                const sourceTypeLabel =
+                    sourceNode.type === "compound"
+                        ? "Compound"
+                        : sourceNode.type === "parallel"
+                            ? "Parallel"
+                            : sourceNode.type === "submachine"
+                                ? "Sub-State-Machine"
+                                : "State";
+
                 setPendingSkillPaste({
-                    label: sourceNode.data?.label || "Skill",
+                    label: sourceNode.data?.label || sourceTypeLabel,
                     fullSkillName:
                         sourceNode.data?.fullSkillName ||
                         sourceNode.data?.label ||
-                        "Skill",
+                        sourceTypeLabel,
+                    sourceTypeLabel,
                 });
                 return true;
             }
@@ -4858,7 +4906,9 @@ function AppContent() {
                         aria-modal="true"
                         aria-labelledby="skill-paste-choice-title"
                     >
-                        <h3 id="skill-paste-choice-title">Paste state</h3>
+                        <h3 id="skill-paste-choice-title">
+                            Paste {pendingSkillPaste.sourceTypeLabel || "State"}
+                        </h3>
                         <p>
                             How should <strong>{pendingSkillPaste.label}</strong> be pasted?
                         </p>
@@ -4868,9 +4918,9 @@ function AppContent() {
                                 className="skill-paste-choice-option"
                                 onClick={() => resolvePendingSkillPaste("clone")}
                             >
-                                <span className="skill-paste-choice-option-title">Clone</span>
+                                <span className="skill-paste-choice-option-title">Reference</span>
                                 <span className="skill-paste-choice-option-description">
-                                    Inbound-only visual alias of the original state.
+                                    Inbound-only reference to the original state.
                                 </span>
                             </button>
                             <button

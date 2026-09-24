@@ -4,7 +4,7 @@ import {
     Position,
     useUpdateNodeInternals,
 } from "@xyflow/react";
-import { FiAlertCircle } from "react-icons/fi";
+import { FiAlertCircle, FiLink2 } from "react-icons/fi";
 import StateActionBadges from "./StateActionBadges";
 
 const normalizeSlotType = (type) =>
@@ -322,8 +322,11 @@ function CustomNode({ id, data, selected }) {
                 />
 
                 <div className="state-clone-header">
+                    <span className="state-clone-reference-mark" aria-hidden="true">
+                        <FiLink2 />
+                    </span>
                     <span className="state-clone-type">SKILL</span>
-                    <span className="state-clone-badge">CLONE</span>
+                    <span className="state-clone-badge">REF</span>
                 </div>
 
                 <div className="state-clone-label">
@@ -405,7 +408,7 @@ function CustomNode({ id, data, selected }) {
                 {data.label}
 
                 {isSkillClone && (
-                    <span className="skill-clone-badge">CLONE</span>
+                    <span className="skill-clone-badge">REFERENCE</span>
                 )}
 
                 {instanceId && (
