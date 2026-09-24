@@ -1932,11 +1932,24 @@ export function useTransitionGraph({
             );
 
             const unusedEvents = [...baseEventById.entries()]
-                .filter(
-                    ([eventId]) =>
-                        !usedEventIds.has(eventId) &&
-                        !isWildcardTransitionEvent(eventId)
-                )
+                .filter(([eventId, event]) => {
+                    if (usedEventIds.has(eventId)) return false;
+                    if (eventId === "*") return true;
+                    if (isWildcardTransitionEvent(eventId)) return false;
+
+                    // Imported SCXML can contain transitions for exit tokens
+                    // the skill does not actually expose. Such handles exist
+                    // only so the imported edge can be represented and must
+                    // disappear when its last transition is removed.
+                    if (
+                        event?.editorImportedSynthetic ||
+                        event?.editorBoundarySynthetic
+                    ) {
+                        return false;
+                    }
+
+                    return true;
+                })
                 .map(([, event]) => event);
 
             return {

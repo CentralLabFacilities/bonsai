@@ -216,10 +216,40 @@ export function useSubStateMachines({
                             event,
                         ])
                     );
-                    const events = behaviorExitEvents.map((eventId) => ({
+                    const confirmedEventIds = new Set(
+                        behaviorExitEvents.map((eventId) => String(eventId))
+                    );
+                    const confirmedEvents = behaviorExitEvents.map((eventId) => ({
                         ...(existingEventsById.get(String(eventId)) || {}),
                         id: eventId,
+                        // This event is confirmed by a forwarding Nop inside
+                        // the referenced state machine. It may have been added
+                        // provisionally while importing the parent SCXML, but
+                        // it is now part of the real Sub-SM interface.
+                        editorImportedSynthetic: false,
+                        editorBoundarySynthetic: false,
                     }));
+                    const unresolvedImportedEvents = (node.data?.events || [])
+                        .filter((event) => {
+                            const eventId = String(event?.id || "");
+                            if (!eventId || confirmedEventIds.has(eventId)) {
+                                return false;
+                            }
+
+                            // Keep editor-only handles for invalid transitions
+                            // so React Flow can still render those edges. The
+                            // Problems panel deliberately ignores these handles
+                            // as exposed exits, and deletion prunes them once
+                            // their last transition disappears.
+                            return Boolean(
+                                event?.editorImportedSynthetic ||
+                                event?.editorBoundarySynthetic
+                            );
+                        });
+                    const events = [
+                        ...confirmedEvents,
+                        ...unresolvedImportedEvents,
+                    ];
 
                     return {
                         ...node,
@@ -339,12 +369,47 @@ export function useSubStateMachines({
                         ...node.data,
                         events:
                             discoveredBehaviorExitEvents.length > 0
-                                ? discoveredBehaviorExitEvents.map(
-                                    (eventId) => ({
-                                        ...(existingEventsById.get(eventId) || {}),
-                                        id: eventId,
-                                    })
-                                )
+                                ? (() => {
+                                    const confirmedEventIds = new Set(
+                                        discoveredBehaviorExitEvents.map(
+                                            (eventId) => String(eventId)
+                                        )
+                                    );
+                                    const confirmedEvents =
+                                        discoveredBehaviorExitEvents.map(
+                                            (eventId) => ({
+                                                ...(existingEventsById.get(eventId) || {}),
+                                                id: eventId,
+                                                // Opening the child machine confirms
+                                                // that this exit is genuinely exposed
+                                                // by a forwarding Nop. Do not retain a
+                                                // provisional imported-handle marker.
+                                                editorImportedSynthetic: false,
+                                                editorBoundarySynthetic: false,
+                                            })
+                                        );
+                                    const unresolvedImportedEvents = (
+                                        node.data?.events || []
+                                    ).filter((event) => {
+                                        const eventId = String(event?.id || "");
+                                        if (
+                                            !eventId ||
+                                            confirmedEventIds.has(eventId)
+                                        ) {
+                                            return false;
+                                        }
+
+                                        return Boolean(
+                                            event?.editorImportedSynthetic ||
+                                            event?.editorBoundarySynthetic
+                                        );
+                                    });
+
+                                    return [
+                                        ...confirmedEvents,
+                                        ...unresolvedImportedEvents,
+                                    ];
+                                })()
                                 : node.data?.events || [],
                         inheritedSlots: discoveredInheritedSlots,
                         localDataModel: getLocalDataModelEntries(

@@ -774,8 +774,12 @@ export const buildEditorProblems = (
 
         if (
             edge.sourceHandle &&
+            edge.sourceHandle !== "*" &&
             !(source.data?.events || []).some(
-                (event) => event?.id === edge.sourceHandle
+                (event) =>
+                    event?.id === edge.sourceHandle &&
+                    !event?.editorImportedSynthetic &&
+                    !event?.editorBoundarySynthetic
             )
         ) {
             addProblem({
@@ -804,6 +808,11 @@ export const buildEditorProblems = (
         const exposedEventIds = [
             ...new Set(
                 (node.data?.events || [])
+                    .filter(
+                        (event) =>
+                            !event?.editorImportedSynthetic &&
+                            !event?.editorBoundarySynthetic
+                    )
                     .map((event) => String(event?.id || "").trim())
                     .filter(Boolean)
             ),

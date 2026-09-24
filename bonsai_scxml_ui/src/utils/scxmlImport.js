@@ -1903,6 +1903,14 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                 id: eventHandleId,
                 description: baseEvent?.description || "",
                 ...transitionData,
+                // A transition from the SCXML may refer to an event which is
+                // not part of the skill API. Keep a handle while that imported
+                // transition exists so the graph can represent it, but mark
+                // the handle as editor-only. Once the last such transition is
+                // deleted the handle must disappear as well.
+                ...(!baseEvent && eventHandleId !== "*"
+                    ? { editorImportedSynthetic: true }
+                    : {}),
             });
         }
     });

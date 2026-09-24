@@ -264,8 +264,50 @@ const cloneGraphValue = (value) => {
         return clone;
     }
 
-    // Keep functions and primitives as-is. Node data contains callbacks that
-    // must remain callable after an internal copy/paste.
+    // Keep functions and primitives as-is for normal in-memory graph copies.
+    return value;
+};
+
+// The graph clipboard outlives the currently displayed graph. It must never
+// retain render callbacks or routing caches from copied nodes/edges: those
+// objects can close over an entire previous workflow and keep it alive even
+// after every visible node has been removed.
+const CLIPBOARD_TRANSIENT_KEYS = new Set([
+    "routingNodes",
+    "slotConnectionDrag",
+    "outgoingTransitionHandles",
+    "isDropTarget",
+    "mode",
+]);
+
+const cloneClipboardValue = (value, ancestors = new WeakSet()) => {
+    if (typeof value === "function") return undefined;
+
+    if (Array.isArray(value)) {
+        if (ancestors.has(value)) return undefined;
+        ancestors.add(value);
+        const clone = [];
+        value.forEach((entry) => {
+            const copiedEntry = cloneClipboardValue(entry, ancestors);
+            if (copiedEntry !== undefined) clone.push(copiedEntry);
+        });
+        ancestors.delete(value);
+        return clone;
+    }
+
+    if (value && typeof value === "object") {
+        if (ancestors.has(value)) return undefined;
+        ancestors.add(value);
+        const clone = {};
+        Object.entries(value).forEach(([key, entry]) => {
+            if (CLIPBOARD_TRANSIENT_KEYS.has(key)) return;
+            const copiedEntry = cloneClipboardValue(entry, ancestors);
+            if (copiedEntry !== undefined) clone[key] = copiedEntry;
+        });
+        ancestors.delete(value);
+        return clone;
+    }
+
     return value;
 };
 
@@ -309,7 +351,16 @@ function AppContent() {
     // Internal graph clipboard. This intentionally does not use the system
     // clipboard: Ctrl+C copies the current React Flow selection and
     // Ctrl+V recreates it with fresh graph IDs.
-    const graphClipboardRef = useRef(persistentGraphClipboard);
+    const graphClipboardRef = useRef(null);
+    useEffect(() => {
+        // Also sanitize a clipboard created by an older/hot-reloaded version
+        // so stale callback closures are released immediately.
+        const sanitizedClipboard = persistentGraphClipboard
+            ? cloneClipboardValue(persistentGraphClipboard)
+            : null;
+        graphClipboardRef.current = sanitizedClipboard;
+        persistentGraphClipboard = sanitizedClipboard;
+    }, []);
     const captureGraphSelectionRef = useRef(null);
     const requestGraphPasteRef = useRef(null);
     const flowContainerRef = useRef(null);
@@ -2787,7 +2838,7 @@ function AppContent() {
                             "edge-internal-boundary-"
                         );
 
-                    const removedWildcardEventsByNode = new Map();
+                    const removedTransientEventsByNode = new Map();
                     transitionChanges
                         .filter((change) => change.type === "remove")
                         .forEach((change) => {
@@ -2798,9 +2849,31 @@ function AppContent() {
 
                             getLogicalSourceEntries(removedEdge).forEach(
                                 ({ sourceId, sourceHandle }) => {
+                                    if (!sourceId || !sourceHandle) return;
+
+                                    const sourceNode = nodes.find(
+                                        (node) => node.id === sourceId
+                                    );
+                                    const matchingEvents = (
+                                        sourceNode?.data?.events || []
+                                    ).filter(
+                                        (event) =>
+                                            String(event?.id || "") ===
+                                            sourceHandle
+                                    );
+                                    const isImportedOnlyHandle =
+                                        matchingEvents.length > 0 &&
+                                        matchingEvents.every(
+                                            (event) =>
+                                                event?.editorImportedSynthetic ||
+                                                event?.editorBoundarySynthetic
+                                        );
+
+                                    if (sourceHandle === "*") return;
+
                                     if (
-                                        !sourceId ||
-                                        !isWildcardTransitionEvent(sourceHandle)
+                                        !isWildcardTransitionEvent(sourceHandle) &&
+                                        !isImportedOnlyHandle
                                     ) {
                                         return;
                                     }
@@ -2818,16 +2891,16 @@ function AppContent() {
                                     if (stillUsed) return;
 
                                     if (
-                                        !removedWildcardEventsByNode.has(
+                                        !removedTransientEventsByNode.has(
                                             sourceId
                                         )
                                     ) {
-                                        removedWildcardEventsByNode.set(
+                                        removedTransientEventsByNode.set(
                                             sourceId,
                                             new Set()
                                         );
                                     }
-                                    removedWildcardEventsByNode
+                                    removedTransientEventsByNode
                                         .get(sourceId)
                                         .add(sourceHandle);
                                 }
@@ -2835,11 +2908,11 @@ function AppContent() {
                         });
 
                     const cleanedNodes =
-                        removedWildcardEventsByNode.size === 0
+                        removedTransientEventsByNode.size === 0
                             ? nodes
                             : nodes.map((node) => {
                                 const removedHandles =
-                                    removedWildcardEventsByNode.get(node.id);
+                                    removedTransientEventsByNode.get(node.id);
                                 if (!removedHandles) return node;
                                 return {
                                     ...node,
@@ -3272,7 +3345,7 @@ function AppContent() {
             const clipboard = {
                 explicitReferenceSourceNodeId,
                 nodes: nodesToCopy.map((node) =>
-                    cloneGraphValue({
+                    cloneClipboardValue({
                         ...node,
                         selected: false,
                     })
@@ -3287,7 +3360,7 @@ function AppContent() {
                                 !candidate.data?.isSlotClone
                         ) || node;
 
-                    return cloneGraphValue({
+                    return cloneClipboardValue({
                         ...node,
                         selected: false,
                         data: {
@@ -3303,7 +3376,7 @@ function AppContent() {
                     });
                 }),
                 edges: copiedEdges.map((edge) =>
-                    cloneGraphValue({
+                    cloneClipboardValue({
                         ...edge,
                         selected: false,
                     })
