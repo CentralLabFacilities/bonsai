@@ -7226,3 +7226,9 @@
     opacity: 1;
     filter: none;
 }
+
+.context-menu-divider {
+    height: 1px;
+    margin: 2px 6px;
+    background-color: #1e293b;
+}

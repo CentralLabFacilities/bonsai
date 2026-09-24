@@ -180,6 +180,22 @@ export default function EditorCanvas({
                             ? `change ${selectedNodes.length} node(s) in:`
                             : "Create new element"}
                     </div>
+                    {contextMenu.nodeId ? (
+                        <button
+                            className="context-menu-item"
+                            onClick={() => handleSelectAction("copy")}
+                        >
+                            Copy
+                        </button>
+                    ) : (
+                        <button
+                            className="context-menu-item"
+                            onClick={() => handleSelectAction("paste")}
+                        >
+                            Paste
+                        </button>
+                    )}
+                    <div className="context-menu-divider" aria-hidden="true" />
                     {canCreateEditorClone && (
                         <button
                             className="context-menu-item"
@@ -245,7 +261,6 @@ export default function EditorCanvas({
                     onConnectEnd={handleConnectEnd}
                     isValidConnection={isValidConnection}
                     connectionMode={ConnectionMode.Loose}
-                    multiSelectionKeyCode={["Control", "Meta"]}
                     onEdgeClick={(event, edge) => {
                         if (
                             edge.data?.compoundInitialEdge ||
@@ -338,8 +353,8 @@ export default function EditorCanvas({
                     onNodeContextMenu={(event, node) =>
                         handleContextMenuOpen(event, node)
                     }
-                    multiSelectionKeyCode={["Control", "Meta"]}
-                    selectionKeyCode={["Control", "Meta"]}
+                    multiSelectionKeyCode={["Shift", "Control", "Meta"]}
+                    selectionKeyCode={["Shift"]}
                     deleteKeyCode={["Delete"]}
                     minZoom={0.08}
                     onlyRenderVisibleElements

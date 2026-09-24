@@ -310,6 +310,8 @@ function AppContent() {
     // clipboard: Ctrl+C copies the current React Flow selection and
     // Ctrl+V recreates it with fresh graph IDs.
     const graphClipboardRef = useRef(persistentGraphClipboard);
+    const captureGraphSelectionRef = useRef(null);
+    const requestGraphPasteRef = useRef(null);
     // Keep an authoritative snapshot of React Flow's current selection.
     // Reading `node.selected` from the controlled nodes array can lag behind
     // the interaction by a render, especially when Ctrl/Meta multi-selecting.
@@ -969,6 +971,7 @@ function AppContent() {
             x: event.clientX,
             y: event.clientY,
             flowPosition: flowPos,
+            nodeId: clickedNode?.id || null,
         });
     }, [screenToFlowPosition, setNodes, setSlotNodes, setSelectedNodeId]);
 
@@ -1036,8 +1039,22 @@ function AppContent() {
         setActiveTab,
     ]);
 
+    const handleGraphClipboardContextAction = useCallback((type) => {
+        if (type === "copy") {
+            captureGraphSelectionRef.current?.();
+        } else if (type === "paste") {
+            requestGraphPasteRef.current?.();
+        }
+        setContextMenu(null);
+    }, []);
+
     const handleSelectAction = (type) => {
         const hasSelection = selectedNodes.length > 0;
+
+        if (type === "copy" || type === "paste") {
+            handleGraphClipboardContextAction(type);
+            return;
+        }
 
         if (type === "clone") {
             handleCreateEditorClone();
@@ -3798,6 +3815,9 @@ function AppContent() {
             return pasteClipboard("copy");
         };
 
+        captureGraphSelectionRef.current = captureSelection;
+        requestGraphPasteRef.current = requestPasteClipboard;
+
         const handleGraphClipboardShortcut = (event) => {
             if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
             if (activeMode === "code" || isTypingTarget(event.target)) return;
@@ -3856,12 +3876,19 @@ function AppContent() {
             handleGraphClipboardShortcut,
             true
         );
-        return () =>
+        return () => {
+            if (captureGraphSelectionRef.current === captureSelection) {
+                captureGraphSelectionRef.current = null;
+            }
+            if (requestGraphPasteRef.current === requestPasteClipboard) {
+                requestGraphPasteRef.current = null;
+            }
             window.removeEventListener(
                 "keydown",
                 handleGraphClipboardShortcut,
                 true
             );
+        };
     }, [
         activeMode,
         selectedNodeId,
