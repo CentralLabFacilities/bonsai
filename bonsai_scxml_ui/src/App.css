@@ -1446,6 +1446,15 @@
     transform: translateY(-1px);
 }
 
+.submachine-node.selected-node {
+    border-color: #38bdf8 !important;
+    border-top-color: #38bdf8 !important;
+    box-shadow:
+        0 0 0 3px rgba(56, 189, 248, 0.30),
+        0 8px 20px rgba(76, 29, 149, 0.18) !important;
+    transform: translateY(-2px);
+}
+
 .submachine-header {
     display: flex;
     justify-content: space-between;
