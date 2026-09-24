@@ -2358,6 +2358,71 @@ function AppContent() {
                 setActiveMode(problem.mode);
             }
 
+            const liveNodes = getNodes();
+            const liveNodeById = new Map(
+                liveNodes.map((node) => [node.id, node])
+            );
+            const focusIds = (
+                problem.focusNodeIds?.length
+                    ? problem.focusNodeIds
+                    : problem.nodeId
+                        ? [problem.nodeId]
+                        : []
+            ).filter((id) => liveNodeById.has(id));
+
+            // Problems can point at nodes hidden inside one or more collapsed
+            // Compound/Parallel states. Reveal the complete ancestor chain
+            // before focusing; otherwise React Flow may fit the viewport to a
+            // hidden child's stale/internal bounds and jump somewhere else.
+            const collapsedAncestors = new Set();
+            focusIds.forEach((focusId) => {
+                let parentId = liveNodeById.get(focusId)?.parentId;
+                const visited = new Set();
+
+                while (parentId && !visited.has(parentId)) {
+                    visited.add(parentId);
+                    const parent = liveNodeById.get(parentId);
+                    if (!parent) break;
+
+                    if (
+                        (parent.type === "compound" ||
+                            parent.type === "parallel") &&
+                        parent.data?.isCollapsed
+                    ) {
+                        collapsedAncestors.add(parent.id);
+                    }
+
+                    parentId = parent.parentId;
+                }
+            });
+
+            // Expand outside-in so nested children become measurable in the
+            // same order they become visible. Parallel lane wrapper nodes are
+            // deliberately skipped; their Parallel parent is what collapses.
+            const getAncestorDepth = (nodeId) => {
+                let depth = 0;
+                let parentId = liveNodeById.get(nodeId)?.parentId;
+                const visited = new Set();
+
+                while (parentId && !visited.has(parentId)) {
+                    visited.add(parentId);
+                    depth += 1;
+                    parentId = liveNodeById.get(parentId)?.parentId;
+                }
+
+                return depth;
+            };
+
+            [...collapsedAncestors]
+                .sort(
+                    (leftId, rightId) =>
+                        getAncestorDepth(leftId) -
+                        getAncestorDepth(rightId)
+                )
+                .forEach((containerId) =>
+                    handleToggleContainerCollapse(containerId)
+                );
+
             setEdges((currentEdges) =>
                 currentEdges.map((edge) => ({
                     ...edge,
@@ -2383,28 +2448,68 @@ function AppContent() {
                 setRightPanelTab("datamodel");
             }
 
-            const focusIds = (
-                problem.focusNodeIds?.length
-                    ? problem.focusNodeIds
-                    : problem.nodeId
-                        ? [problem.nodeId]
-                        : []
-            ).filter((id) =>
-                nodes.some((node) => node.id === id)
-            );
-
             if (focusIds.length > 0) {
-                window.setTimeout(() => {
-                    fitView({
-                        nodes: focusIds.map((id) => ({ id })),
-                        padding: 0.55,
-                        maxZoom: 1.25,
-                        duration: 300,
+                const primaryFocusId =
+                    problem.nodeId && liveNodeById.has(problem.nodeId)
+                        ? problem.nodeId
+                        : focusIds.length === 1
+                            ? focusIds[0]
+                            : null;
+
+                // Give React Flow two frames to apply the expanded container
+                // dimensions and remeasure nested nodes before navigating.
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        const currentNodes = getNodes();
+
+                        if (primaryFocusId) {
+                            const focusNode = currentNodes.find(
+                                (node) => node.id === primaryFocusId
+                            );
+
+                            if (focusNode) {
+                                const position = getAbsoluteNodePosition(
+                                    focusNode,
+                                    currentNodes
+                                );
+                                const width =
+                                    Number(focusNode.measured?.width) ||
+                                    Number(focusNode.width) ||
+                                    Number(focusNode.style?.width) ||
+                                    220;
+                                const height =
+                                    Number(focusNode.measured?.height) ||
+                                    Number(focusNode.height) ||
+                                    Number(focusNode.style?.height) ||
+                                    90;
+
+                                setCenter(
+                                    position.x + width / 2,
+                                    position.y + height / 2,
+                                    { zoom: 1, duration: 300 }
+                                );
+                                return;
+                            }
+                        }
+
+                        fitView({
+                            nodes: focusIds.map((id) => ({ id })),
+                            padding: 0.55,
+                            maxZoom: 1.25,
+                            duration: 300,
+                        });
                     });
-                }, 0);
+                });
             }
         },
-        [nodes, setNodes, setEdges, fitView]
+        [
+            fitView,
+            getNodes,
+            handleToggleContainerCollapse,
+            setCenter,
+            setEdges,
+            setNodes,
+        ]
     );
 
     const {
