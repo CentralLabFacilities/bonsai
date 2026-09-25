@@ -251,6 +251,7 @@ export default function EditorCanvas({
                             !showSlotEdges && "editor-slots-context-only",
                             edgeFocusMode && "editor-edge-focus-mode",
                             nodeFocusMode && "editor-node-focus-mode",
+                            isDraggingNode && "editor-node-drag-active",
                         ]
                             .filter(Boolean)
                             .join(" ") || undefined

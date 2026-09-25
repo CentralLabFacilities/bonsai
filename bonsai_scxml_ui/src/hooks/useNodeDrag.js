@@ -47,6 +47,7 @@ export function useNodeDrag({
     const [parallelDropTargetId, setParallelDropTargetId] = useState(null);
     const [compoundDropTargetId, setCompoundDropTargetId] = useState(null);
     const [isDraggingNode, setIsDraggingNode] = useState(false);
+    const [draggingNodeId, setDraggingNodeId] = useState(null);
     const [isOverTrash, setIsOverTrash] = useState(false);
 
     const dragFrameRef = useRef(null);
@@ -171,6 +172,7 @@ export function useNodeDrag({
             dragOriginContainerRef.current = null;
         }
 
+        setDraggingNodeId(node.id);
         setIsDraggingNode(true);
         setHoveredEditorEdgeId(null);
 
@@ -467,6 +469,7 @@ export function useNodeDrag({
                     });
             });
 
+            setDraggingNodeId(null);
             setIsDraggingNode(false);
             setIsOverTrash(false);
             setParallelDropTargetId(null);
@@ -477,6 +480,7 @@ export function useNodeDrag({
         // Parallel-lane helper nodes themselves are not draggable between
         // containers. Compound and parallel states are intentionally allowed.
         if (node.type === "parallelLane") {
+            setDraggingNodeId(null);
             setIsDraggingNode(false);
             setIsOverTrash(false);
             setParallelDropTargetId(null);
@@ -512,6 +516,7 @@ export function useNodeDrag({
                 );
             });
 
+            setDraggingNodeId(null);
             setIsDraggingNode(false);
             setIsOverTrash(false);
             setParallelDropTargetId(null);
@@ -1651,6 +1656,7 @@ export function useNodeDrag({
             });
         }
 
+        setDraggingNodeId(null);
         setIsDraggingNode(false);
         setIsOverTrash(false);
         setParallelDropTargetId(null);
@@ -1672,6 +1678,7 @@ export function useNodeDrag({
         compoundDropTargetId,
         setCompoundDropTargetId,
         isDraggingNode,
+        draggingNodeId,
         isOverTrash,
         handleNodeDragStart,
         handleNodeDrag,

@@ -7387,3 +7387,30 @@
     background-color: #1e293b;
 }
 
+
+
+/*
+ * Keep inactive user transitions visually stable without mutating edge data.
+ * React Flow's animated edge class uses a dashed SVG stroke; imported edges
+ * may also carry a dash pattern. While an edge is not focused or selected,
+ * render it as one solid, non-animated line. Structural helper edges keep
+ * their intentional dashed presentation.
+ */
+.react-flow__edge.editor-user-transition-edge:not(.editor-edge-focus-active):not(.selected)
+    .react-flow__edge-path {
+    stroke-dasharray: none !important;
+    animation: none !important;
+}
+
+
+/*
+ * Node dragging must never trigger React Flow's animated transition stroke.
+ * Keep highlight colour/opacity active, but force user transitions to remain
+ * solid and stationary for the complete drag gesture.
+ */
+.react-flow.editor-node-drag-active
+.react-flow__edge.editor-user-transition-edge
+.react-flow__edge-path {
+    stroke-dasharray: none !important;
+    animation: none !important;
+}

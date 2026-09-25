@@ -129,6 +129,7 @@ export function useEditorDisplay({
     injectedNodes,
     injectedSlotNodes,
     isDraggingNode,
+    draggingNodeId,
     hiddenNodeIds,
     parallelDropTargetId,
     compoundDropTargetId,
@@ -178,26 +179,10 @@ export function useEditorDisplay({
         visualNodes.forEach((node) => {
             // cloneOfNodeId is the authoritative editor-alias relationship.
             // Do not depend on a particular clone flag here: imported or older
-            // aliases may still be valid visual references even if their
-            // presentation flag differs.
+            // Sub-SM/Compound/Parallel aliases may still be valid visual clones
+            // even if their presentation flag differs.
             const originalId = resolveOriginalId(node);
             if (!originalId || !visualNodeById.has(originalId)) return;
-
-            const originalNode = visualNodeById.get(originalId);
-
-            // Compound/Parallel references are intentionally lightweight. A
-            // reference must not make the full source container participate in
-            // hover/selection focus propagation: large containers can own many
-            // nested nodes and structural edges, which turns a simple reference
-            // interaction into an expensive graph-wide presentation update.
-            // The semantic transition code still resolves the reference to the
-            // original container when it is used as a transition target.
-            if (
-                originalNode?.type === "compound" ||
-                originalNode?.type === "parallel"
-            ) {
-                return;
-            }
 
             if (!groupsByOriginalId.has(originalId)) {
                 groupsByOriginalId.set(originalId, new Set([originalId]));
@@ -228,12 +213,18 @@ export function useEditorDisplay({
     // and routed after load, while this focus set marks the cached subset that
     // should remain visible when global transition visibility is disabled.
     const edgeFocusNodeIds = useMemo(() => {
-        const ids = new Set([
-            ...selectedNodes.map((node) => node.id),
-            ...(selectedNodeId ? [selectedNodeId] : []),
-            ...(activeCanvasFocusNodeId ? [activeCanvasFocusNodeId] : []),
-            ...(hoveredSlotAccessNodeId ? [hoveredSlotAccessNodeId] : []),
-        ]);
+        // While a node is being dragged, its connections are the only node-based
+        // transition context that should be highlighted. The persistent editor
+        // selection must not keep unrelated transitions highlighted during the
+        // drag. This is display-only and does not change actual node selection.
+        const ids = isDraggingNode && draggingNodeId
+            ? new Set([draggingNodeId])
+            : new Set([
+                  ...selectedNodes.map((node) => node.id),
+                  ...(selectedNodeId ? [selectedNodeId] : []),
+                  ...(activeCanvasFocusNodeId ? [activeCanvasFocusNodeId] : []),
+                  ...(hoveredSlotAccessNodeId ? [hoveredSlotAccessNodeId] : []),
+              ]);
 
         [...ids].forEach((nodeId) => {
             cloneGroupByNodeId
@@ -243,6 +234,8 @@ export function useEditorDisplay({
 
         return ids;
     }, [
+        isDraggingNode,
+        draggingNodeId,
         selectedNodes,
         selectedNodeId,
         activeCanvasFocusNodeId,
@@ -696,10 +689,24 @@ export function useEditorDisplay({
         const selectedFocusedEdges = [];
 
         smartTransitionEdges.forEach((rawEdge) => {
-            const semanticEdge = withEdgeClassName(
-                clearTransientTransitionHighlight(rawEdge),
+            const clearedEdge = clearTransientTransitionHighlight(rawEdge);
+            const isInternalHelper = Boolean(
+                clearedEdge.data?.boundaryInternalEdge ||
+                clearedEdge.data?.compoundInternalEdge ||
+                clearedEdge.data?.parallelInternalEdge ||
+                clearedEdge.data?.compoundInitialEdge ||
+                clearedEdge.data?.parallelEntryEdge
+            );
+            let semanticEdge = withEdgeClassName(
+                clearedEdge,
                 "editor-transition-edge"
             );
+            if (!isInternalHelper) {
+                semanticEdge = withEdgeClassName(
+                    semanticEdge,
+                    "editor-user-transition-edge"
+                );
+            }
             const edge = useLightweightBackgroundTransitions
                 ? {
                       ...semanticEdge,
