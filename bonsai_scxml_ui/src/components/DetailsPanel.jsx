@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
     FiActivity,
     FiChevronDown,
-    FiChevronUp,
     FiDatabase,
     FiExternalLink,
     FiLayers,
@@ -839,6 +838,13 @@ function DetailsPanel({
         exposesImplicitFatal
     );
     const firstEditableExitToken = editableExitTokens[0] || null;
+    const transitionButtonSourceId = selectedNode.id;
+    const transitionButtonEventId = isContainerState
+        ? ""
+        : firstEditableExitToken?.id || null;
+    const canOpenTransitionPanel =
+        isContainerState ||
+        Boolean(transitionButtonSourceId && transitionButtonEventId);
     const usesEditorInstanceId =
         !isSubMachine &&
         ["nop", "fatal", "end"].includes(selectedSkillType);
@@ -1193,6 +1199,11 @@ function DetailsPanel({
         return option?.id || null;
     };
 
+    const transitionButtonTargetId =
+        !isContainerState && firstEditableExitToken
+            ? resolveEventTargetNodeId(firstEditableExitToken)
+            : null;
+
     const getTargetSelectorKey = (event, index) =>
         `${selectedNode.id}:${event.id}:${index}`;
 
@@ -1421,15 +1432,15 @@ function DetailsPanel({
                                     selectedNode.data.isInitial
                                         ? "This state is initial"
                                         : hasInitialNode
-                                          ? "Replace the current initial state"
-                                          : "Set as initial state"
+                                            ? "Replace the current initial state"
+                                            : "Set as initial state"
                                 }
                             >
                                 {selectedNode.data.isInitial
                                     ? "Initial set"
                                     : hasInitialNode
-                                      ? "Set initial instead"
-                                      : "Set initial"}
+                                        ? "Set initial instead"
+                                        : "Set initial"}
                             </button>
                         </div>
 
@@ -1556,7 +1567,7 @@ function DetailsPanel({
                                             usesEditorInstanceId
                                                 ? selectedNode.data.editorInstanceId || ""
                                                 : selectedNode.data.fullSkillName
-                                                    ?.split("#")[1] || ""
+                                                ?.split("#")[1] || ""
                                         }
                                         onChange={(e) =>
                                             onUpdateName(e.target.value)
@@ -1591,20 +1602,32 @@ function DetailsPanel({
                                 <div className="compact-slot-header">
                                     <h3>Exit Tokens</h3>
 
-                                    {!isContainerState && firstEditableExitToken && (
+                                    {canOpenTransitionPanel && (
                                         <button
                                             type="button"
                                             className="exit-token-transition-button"
                                             title="Open transition editor"
-                                            onClick={() =>
+                                            onClick={() => {
+                                                if (isContainerState) {
+                                                    onOpenTransitionPanel?.(
+                                                        selectedNode.id,
+                                                        "",
+                                                        null,
+                                                        {
+                                                            containerMode: true,
+                                                            containerTransitions:
+                                                            containerOutgoingTransitions,
+                                                        }
+                                                    );
+                                                    return;
+                                                }
+
                                                 onOpenTransitionPanel?.(
-                                                    selectedNode.id,
-                                                    firstEditableExitToken.id,
-                                                    resolveEventTargetNodeId(
-                                                        firstEditableExitToken
-                                                    )
-                                                )
-                                            }
+                                                    transitionButtonSourceId,
+                                                    transitionButtonEventId,
+                                                    transitionButtonTargetId
+                                                );
+                                            }}
                                         >
                                             <FiActivity size={12} />
                                             Transitions
@@ -1614,7 +1637,7 @@ function DetailsPanel({
 
                                 <div className="event-list">
                                     {isContainerState &&
-                                        containerOutgoingTransitions.map((transition, transitionIndex) => (
+                                        containerOutgoingTransitions.map((transition) => (
                                             <div
                                                 className={`slot-text-field compact-slot-card exit-token-card exit-token-${getExitTokenType(
                                                     transition.eventId
@@ -1635,45 +1658,6 @@ function DetailsPanel({
                                                     </span>
 
                                                     <div className="exit-token-header-actions">
-                                                        <div
-                                                            className="exit-token-order-controls"
-                                                            title="SCXML transition order"
-                                                        >
-                                                            <button
-                                                                type="button"
-                                                                className="exit-token-order-button"
-                                                                disabled={transitionIndex === 0}
-                                                                aria-label={`Move ${transition.eventDisplayName} earlier`}
-                                                                title="Move earlier (higher SCXML priority)"
-                                                                onClick={() =>
-                                                                    onMoveContainerTransition?.(
-                                                                        transition.edgeId,
-                                                                        "up"
-                                                                    )
-                                                                }
-                                                            >
-                                                                <FiChevronUp size={13} />
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                className="exit-token-order-button"
-                                                                disabled={
-                                                                    transitionIndex ===
-                                                                    containerOutgoingTransitions.length - 1
-                                                                }
-                                                                aria-label={`Move ${transition.eventDisplayName} later`}
-                                                                title="Move later (lower SCXML priority)"
-                                                                onClick={() =>
-                                                                    onMoveContainerTransition?.(
-                                                                        transition.edgeId,
-                                                                        "down"
-                                                                    )
-                                                                }
-                                                            >
-                                                                <FiChevronDown size={13} />
-                                                            </button>
-                                                        </div>
-
                                                         <span
                                                             className={`detail-badge exit-token-badge exit-token-badge-${getExitTokenType(
                                                                 transition.eventId

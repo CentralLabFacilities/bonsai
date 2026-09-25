@@ -135,6 +135,21 @@ function hydrateTransition(transition, index, variables, fallbackEvent = "") {
             "",
         target: transition.target || "",
         targetLabel: transition.targetLabel || transition.target || "",
+        originalTarget: transition.originalTarget || transition.target || "",
+        sourceNodeId: transition.sourceNodeId || null,
+        sourceNodeName: transition.sourceNodeName || "",
+        eventDisplayName:
+            transition.eventDisplayName ||
+            transition.displayEvent ||
+            transition.event ||
+            transition.eventId ||
+            transition.sourceHandle ||
+            fallbackEvent ||
+            "",
+        availableTargetIds: Array.isArray(transition.availableTargetIds)
+            ? transition.availableTargetIds
+            : null,
+        rawCondition: transition.cond || "",
 
         conditionEnabled: Boolean(parsedCondition),
         conditionVariable,
@@ -167,6 +182,7 @@ function ConditionModal({
                             availableTargets = [],
                             initialTransitionId = null,
                             initialTargetId = null,
+                            targetOnlyMode = false,
                         }) {
     const drawerRef = useRef(null);
 
@@ -346,7 +362,17 @@ function ConditionModal({
         const query = String(targetQuery || "").trim().toLowerCase();
         if (!query) return [];
 
+        const allowedTargetIds =
+            targetOnlyMode &&
+            Array.isArray(selectedTransition?.availableTargetIds)
+                ? new Set(selectedTransition.availableTargetIds)
+                : null;
+
         return (availableTargets || [])
+            .filter(
+                (target) =>
+                    !allowedTargetIds || allowedTargetIds.has(target.id)
+            )
             .filter((target) =>
                 [
                     target.displayName,
@@ -366,7 +392,12 @@ function ConditionModal({
                 return aStarts - bStarts || aName.localeCompare(bName);
             })
             .slice(0, 8);
-    }, [targetQuery, availableTargets]);
+    }, [
+        targetQuery,
+        availableTargets,
+        targetOnlyMode,
+        selectedTransition?.availableTargetIds,
+    ]);
 
     useEffect(() => {
         if (activeTargetSuggestionIndex >= matchingTargets.length) {
@@ -611,6 +642,8 @@ function ConditionModal({
     };
 
     const handleAddTransition = () => {
+        if (targetOnlyMode) return;
+
         const eventId = newTransitionEvent || normalizedEvents[0]?.id || "";
         if (!eventId) {
             setErrorMessage("No possible event is available for a new transition.");
@@ -716,6 +749,52 @@ function ConditionModal({
 
     const handleSave = () => {
         setErrorMessage("");
+
+        if (targetOnlyMode) {
+            const normalizedTransitions = [];
+
+            for (let index = 0; index < transitionsState.length; index += 1) {
+                const transition = transitionsState[index];
+
+                if (!transition.target) {
+                    setSelectedTransitionId(transition.transitionId);
+                    setErrorMessage(
+                        `Transition #${index + 1} needs a target.`
+                    );
+                    return;
+                }
+
+                normalizedTransitions.push({
+                    transitionId: transition.transitionId,
+                    edgeId: transition.edgeId,
+                    sourceNodeId: transition.sourceNodeId,
+                    sourceNodeName: transition.sourceNodeName,
+                    event: transition.event,
+                    eventDisplayName: transition.eventDisplayName,
+                    originalTarget: transition.originalTarget,
+                    target: transition.target,
+                    targetLabel:
+                        transition.targetLabel ||
+                        getTargetDisplayName(
+                            transition.target,
+                            availableTargets
+                        ),
+                    cond: transition.rawCondition || "",
+                    assignments: (transition.assignments || []).map(
+                        (assignment) => ({
+                            location: assignment.location,
+                            expr: assignment.expr,
+                        })
+                    ),
+                });
+            }
+
+            onConfirm({
+                updatedTransitions: normalizedTransitions,
+                newGlobalVars: [],
+            });
+            return;
+        }
 
         const newVariablesById = new Map();
         const allVariables = [...usableVars];
@@ -885,10 +964,18 @@ function ConditionModal({
                 <div className="bottom-drawer-header">
                     <div className="transition-drawer-heading">
                         <span className="transition-drawer-title">
-                            Transitions: <span>{sourceNodeName}</span>
+                            {targetOnlyMode ? (
+                                <>Outgoing transitions</>
+                            ) : (
+                                <>
+                                    Transitions: <span>{sourceNodeName}</span>
+                                </>
+                            )}
                         </span>
                         <span className="transition-drawer-subtitle">
-                            Order is evaluated from top to bottom.
+                            {targetOnlyMode
+                                ? "Only transition targets can be reassigned."
+                                : "Order is evaluated from top to bottom."}
                         </span>
                     </div>
                     <button className="modal-close-button" onClick={onClose}>
@@ -903,7 +990,11 @@ function ConditionModal({
                     </div>
                 )}
 
-                <div className="bottom-drawer-grid-layout transition-editor-grid">
+                <div
+                    className={`bottom-drawer-grid-layout transition-editor-grid ${
+                        targetOnlyMode ? "transition-container-target-only" : ""
+                    }`}
+                >
                     <div className="step-card transition-list-step">
                         <div className="step-card-header">
                             <span className="step-number">1</span>
@@ -941,7 +1032,9 @@ function ConditionModal({
                                                             #{index + 1}
                                                         </span>
                                                         <span className="transition-event-name">
-                                                            {transition.event || "No event"}
+                                                            {transition.eventDisplayName ||
+                                                                transition.event ||
+                                                                "No event"}
                                                         </span>
                                                     </div>
 
@@ -967,7 +1060,9 @@ function ConditionModal({
                                                 >
                                                     <button
                                                         className="order-btn"
-                                                        disabled={index === 0}
+                                                        disabled={
+                                                            targetOnlyMode || index === 0
+                                                        }
                                                         onClick={(event) =>
                                                             handleMove(index, -1, event)
                                                         }
@@ -978,6 +1073,7 @@ function ConditionModal({
                                                     <button
                                                         className="order-btn"
                                                         disabled={
+                                                            targetOnlyMode ||
                                                             index ===
                                                             transitionsState.length - 1
                                                         }
@@ -990,6 +1086,7 @@ function ConditionModal({
                                                     </button>
                                                     <button
                                                         className="transition-delete-button"
+                                                        disabled={targetOnlyMode}
                                                         onClick={(event) =>
                                                             handleDeleteTransition(
                                                                 transition.transitionId,
@@ -1012,24 +1109,29 @@ function ConditionModal({
                             </div>
 
                             <div className="transition-add-row">
-                                <input
+                                <select
                                     className="skill-select"
-                                    type="text"
-                                    list="transition-event-options"
                                     value={newTransitionEvent}
-                                    placeholder="success, error.*, success.** ..."
+                                    disabled={targetOnlyMode}
                                     onChange={(event) =>
                                         setNewTransitionEvent(event.target.value)
                                     }
-                                />
-                                <datalist id="transition-event-options">
+                                >
                                     {normalizedEvents.map((event) => (
-                                        <option key={event.id} value={event.id} />
+                                        <option key={event.id} value={event.id}>
+                                            {event.id}
+                                        </option>
                                     ))}
-                                </datalist>
+                                </select>
                                 <button
                                     className="filter-button transition-primary-button transition-add-button"
                                     type="button"
+                                    disabled={targetOnlyMode}
+                                    title={
+                                        targetOnlyMode
+                                            ? "Container exit events are fixed."
+                                            : "Add transition"
+                                    }
                                     onClick={handleAddTransition}
                                 >
                                     <FiPlus /> Add
@@ -1038,10 +1140,20 @@ function ConditionModal({
                         </div>
                     </div>
 
-                    <div className="step-card">
+                    <div
+                        className={`step-card ${
+                            targetOnlyMode ? "transition-step-locked" : ""
+                        }`}
+                        inert={targetOnlyMode ? "" : undefined}
+                    >
                         <div className="step-card-header">
                             <span className="step-number">2</span>
                             <span className="step-title">Condition</span>
+                            {targetOnlyMode && (
+                                <span className="transition-locked-label">
+                                    Disabled
+                                </span>
+                            )}
                         </div>
 
                         <div className="step-card-body transition-step-body">
@@ -1246,10 +1358,20 @@ function ConditionModal({
                         </div>
                     </div>
 
-                    <div className="step-card">
+                    <div
+                        className={`step-card ${
+                            targetOnlyMode ? "transition-step-locked" : ""
+                        }`}
+                        inert={targetOnlyMode ? "" : undefined}
+                    >
                         <div className="step-card-header transition-assignment-header">
                             <span className="step-number">3</span>
                             <span className="step-title">Assignments</span>
+                            {targetOnlyMode && (
+                                <span className="transition-locked-label">
+                                    Disabled
+                                </span>
+                            )}
                             {selectedTransition && editorVariables.length > 0 && (
                                 <button
                                     className="transition-secondary-button transition-primary-button transition-add-assignment-button"

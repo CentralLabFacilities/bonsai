@@ -7403,14 +7403,46 @@
 }
 
 
-/*
- * Node dragging must never trigger React Flow's animated transition stroke.
- * Keep highlight colour/opacity active, but force user transitions to remain
- * solid and stationary for the complete drag gesture.
- */
-.react-flow.editor-node-drag-active
-.react-flow__edge.editor-user-transition-edge
-.react-flow__edge-path {
-    stroke-dasharray: none !important;
-    animation: none !important;
+/* Container transition editor: Compound/Parallel transitions are target-only. */
+.transition-container-target-only .transition-add-row .skill-select:disabled,
+.transition-container-target-only .transition-add-button:disabled {
+    background: #1e293b !important;
+    border-color: #475569 !important;
+    color: #64748b !important;
+    cursor: not-allowed !important;
+    box-shadow: none !important;
+}
+
+.transition-container-target-only .transition-add-button:disabled:hover {
+    background: #1e293b !important;
+    border-color: #475569 !important;
+    color: #64748b !important;
+}
+
+.transition-container-target-only .transition-delete-button:disabled {
+    border-color: #334155;
+    background: rgba(51, 65, 85, 0.24);
+    color: #64748b;
+    cursor: not-allowed;
+}
+
+.transition-step-locked {
+    opacity: 0.58;
+}
+
+.transition-step-locked :is(button, input, select, textarea) {
+    cursor: not-allowed !important;
+}
+
+.transition-locked-label {
+    margin-left: auto;
+    padding: 2px 6px;
+    border: 1px solid #475569;
+    border-radius: 999px;
+    background: #1e293b;
+    color: #94a3b8;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
 }

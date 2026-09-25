@@ -137,6 +137,7 @@ function CompoundNode({ id, data = {}, selected = false }) {
                                     isConnectableEnd={false}
                                 />
 
+
                                 <span
                                     className="compound-frame-exit-label"
                                     title={label}

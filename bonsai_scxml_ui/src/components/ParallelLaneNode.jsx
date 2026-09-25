@@ -68,6 +68,7 @@ export default function ParallelLaneNode({ data = {} }) {
                                     isConnectableEnd={false}
                                 />
 
+
                                 <span
                                     className="compound-frame-exit-label"
                                     title={label}

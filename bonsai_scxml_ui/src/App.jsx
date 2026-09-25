@@ -88,7 +88,10 @@ import { useSubStateMachines } from "./hooks/useSubStateMachines";
 import { useTransitionGraph } from "./hooks/useTransitionGraph";
 import { useContainerCreation } from "./hooks/useContainerCreation";
 import { rebuildBoundaryTransitionsIncremental } from "./utils/boundaryTransitions";
-import { isWildcardTransitionEvent } from "./utils/transitionEvents";
+import {
+    getTransitionExitToken,
+    isWildcardTransitionEvent,
+} from "./utils/transitionEvents";
 import { getOverviewLayoutNodeSize } from "./utils/layoutUtils";
 import "./App.css";
 
@@ -2184,15 +2187,27 @@ function AppContent() {
 
             const sourceNode = nodeById.get(sourceId);
             const targetNode = nodeById.get(targetId);
+            // Container exits are semantic transitions from the actual skill
+            // inside the container. Mirror SCXML export naming here instead of
+            // prefixing the event with the Compound/Parallel container name.
             const sourceSkillBase = String(
-                sourceNode?.data?.fullSkillName || sourceNode?.data?.label || ""
+                sourceNode?.data?.label ||
+                    sourceNode?.data?.fullSkillName ||
+                    sourceNode?.id ||
+                    ""
             )
                 .split("#")[0]
                 .split(".")
                 .filter(Boolean)
                 .pop();
-            const semanticEventName = String(rawEvent || "").trim() ||
-                `${sourceSkillBase || displayNameFor(sourceNode)}.${normalizedHandle}`;
+            const rawEventName = String(rawEvent || normalizedHandle).trim();
+            const eventSuffix = getTransitionExitToken(
+                rawEventName || normalizedHandle,
+                sourceSkillBase
+            );
+            const semanticEventName = `${
+                sourceSkillBase || displayNameFor(sourceNode)
+            }.${eventSuffix || normalizedHandle}`;
 
             result.push({
                 edgeId,
@@ -6153,12 +6168,21 @@ function AppContent() {
                                 onHoverTransitionNode={(nodeId) =>
                                     setHoveredEditorNodeId(nodeId || null)
                                 }
-                                onOpenTransitionPanel={(sourceNodeId, eventId, targetNodeId = null) => {
-                                    if (!sourceNodeId || !eventId) return;
+                                onOpenTransitionPanel={(
+                                    sourceNodeId,
+                                    eventId,
+                                    targetNodeId = null,
+                                    options = null
+                                ) => {
+                                    if (!sourceNodeId) return;
+                                    if (!options?.containerMode && !eventId) return;
+
                                     openConditionDrawer(
                                         sourceNodeId,
                                         eventId,
-                                        targetNodeId || null
+                                        targetNodeId || null,
+                                        null,
+                                        options
                                     );
                                 }}
                                 hasInitialNode={hasInitialNode}
@@ -6860,6 +6884,7 @@ function AppContent() {
                 availableTargets={drawerData.availableTargets}
                 initialTransitionId={drawerData.initialTransitionId}
                 initialTargetId={drawerData.initialTargetId}
+                targetOnlyMode={drawerData.targetOnlyMode}
             />
 
             <CreateSlotModal
