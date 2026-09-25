@@ -513,7 +513,7 @@ function CustomNode({ id, data, selected }) {
                                     }
                                     style={
                                         mode === "overview"
-                                            ? { cursor: "text" }
+                                            ? { cursor: "pointer" }
                                             : undefined
                                     }
                                 >
@@ -586,7 +586,7 @@ function CustomNode({ id, data, selected }) {
                                     minWidth: 0,
                                     fontSize: "10px",
                                     lineHeight: 1.35,
-                                    cursor: "text",
+                                    cursor: "pointer",
                                 }}
                             >
                                 <span
@@ -749,7 +749,7 @@ function CustomNode({ id, data, selected }) {
                                             }
                                             style={
                                                 mode === "overview"
-                                                    ? { cursor: "text" }
+                                                    ? { cursor: "pointer" }
                                                     : undefined
                                             }
                                         >
