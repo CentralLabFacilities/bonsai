@@ -35,54 +35,54 @@ const edgeTypes = {
 };
 
 export default function EditorCanvas({
-    activeMode,
-    setActiveMode,
-    showTransitionEdges,
-    setShowTransitionEdges,
-    showSlotEdges,
-    setShowSlotEdges,
-    nodes,
-    edges,
-    globalDataModel,
-    visibleNodes,
-    visibleEdges,
-    smartRoutingNodes,
-    edgeFocusMode,
-    nodeFocusMode,
-    selectedNodes,
-    contextMenu,
-    handleSelectAction,
-    hasGraphClipboard,
-    canCreateEditorClone,
-    editorCloneActionLabel,
-    setIsCreateSlotModalOpen,
-    isDraggingNode,
-    isOverTrash,
-    handleNodesChange,
-    handleVisibleEdgesChange,
-    onSelectionChange,
-    onConnect,
-    handleConnectStart,
-    handleConnectEnd,
-    onReconnect,
-    handleReconnectStart,
-    handleReconnectEnd,
-    isValidConnection,
-    selectSlotEdge,
-    selectTransitionEdge,
-    onEdgeDoubleClick,
-    clearAllEdgeSelection,
-    setSelectedNodeId,
-    setActiveTab,
-    setRightPanelTab,
-    setHoveredEditorNodeId,
-    setHoveredEditorEdgeId,
-    handleContextMenuOpen,
-    handleOpenSubMachine,
-    handleNodeDragStart,
-    handleNodeDrag,
-    handleNodeDragStop,
-}) {
+                                         activeMode,
+                                         setActiveMode,
+                                         showTransitionEdges,
+                                         setShowTransitionEdges,
+                                         showSlotEdges,
+                                         setShowSlotEdges,
+                                         nodes,
+                                         edges,
+                                         globalDataModel,
+                                         visibleNodes,
+                                         visibleEdges,
+                                         smartRoutingNodes,
+                                         edgeFocusMode,
+                                         nodeFocusMode,
+                                         selectedNodes,
+                                         contextMenu,
+                                         handleSelectAction,
+                                         hasGraphClipboard,
+                                         canCreateEditorClone,
+                                         editorCloneActionLabel,
+                                         setIsCreateSlotModalOpen,
+                                         isDraggingNode,
+                                         isOverTrash,
+                                         handleNodesChange,
+                                         handleVisibleEdgesChange,
+                                         onSelectionChange,
+                                         onConnect,
+                                         handleConnectStart,
+                                         handleConnectEnd,
+                                         onReconnect,
+                                         handleReconnectStart,
+                                         handleReconnectEnd,
+                                         isValidConnection,
+                                         selectSlotEdge,
+                                         selectTransitionEdge,
+                                         onEdgeDoubleClick,
+                                         clearAllEdgeSelection,
+                                         setSelectedNodeId,
+                                         setActiveTab,
+                                         setRightPanelTab,
+                                         setHoveredEditorNodeId,
+                                         setHoveredEditorEdgeId,
+                                         handleContextMenuOpen,
+                                         handleOpenSubMachine,
+                                         handleNodeDragStart,
+                                         handleNodeDrag,
+                                         handleNodeDragStop,
+                                     }) {
     const codeString = useMemo(() => {
         if (activeMode !== "code") return "";
         const exportGraph = prepareGraphForScxml(nodes, edges);
@@ -250,7 +250,7 @@ export default function EditorCanvas({
                     className={
                         [
                             (!showTransitionEdges || activeMode === "slots") &&
-                                "editor-transitions-context-only",
+                            "editor-transitions-context-only",
                             !showSlotEdges && "editor-slots-context-only",
                             edgeFocusMode && "editor-edge-focus-mode",
                             nodeFocusMode && "editor-node-focus-mode",
@@ -370,11 +370,11 @@ export default function EditorCanvas({
                         handleContextMenuOpen(event, node)
                     }
                     multiSelectionKeyCode={["Shift", "Control", "Meta"]}
-                    // Left-drag is reserved for box selection. Panning remains
-                    // available with the middle mouse button and the controls.
+                    // Left-drag is reserved for box selection. Pan the viewport
+                    // with either the middle or right mouse button.
                     selectionOnDrag
                     selectionKeyCode={null}
-                    panOnDrag={[1]}
+                    panOnDrag={[1, 2]}
                     deleteKeyCode={["Delete"]}
                     minZoom={0.08}
                     onlyRenderVisibleElements
