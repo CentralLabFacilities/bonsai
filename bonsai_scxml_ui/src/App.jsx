@@ -41,6 +41,7 @@ import {
     getSlotPathFromNode,
     EDITOR_SHORTCUTS,
     FIND_SHORTCUTS,
+    getCollapsedTransitionSource,
 } from "./utils/editorGraph";
 import {
     getNodeId,
@@ -559,6 +560,7 @@ function AppContent() {
         compoundDropTargetId,
         setCompoundDropTargetId,
         isDraggingNode,
+        draggingNodeId,
         isOverTrash,
         handleNodeDragStart,
         handleNodeDrag,
@@ -1565,6 +1567,47 @@ function AppContent() {
         return result;
     }, [nodes, outgoingTransitionHandlesByNodeId]);
 
+    const collapsedParallelTransitionHandlesByNodeId = useMemo(() => {
+        const result = new Map();
+
+        edges.forEach((edge) => {
+            if (
+                edge.data?.boundaryInternalEdge ||
+                edge.data?.compoundInternalEdge ||
+                edge.data?.parallelInternalEdge ||
+                edge.data?.compoundInitialEdge ||
+                edge.data?.parallelEntryEdge
+            ) {
+                return;
+            }
+
+            const collapsedSource = getCollapsedTransitionSource(edge, nodeById);
+            if (!collapsedSource) return;
+            if (nodeById.get(collapsedSource.nodeId)?.type !== "parallel") return;
+
+            if (!result.has(collapsedSource.nodeId)) {
+                result.set(collapsedSource.nodeId, new Map());
+            }
+
+            const byHandle = result.get(collapsedSource.nodeId);
+            if (!byHandle.has(collapsedSource.sourceHandle)) {
+                byHandle.set(collapsedSource.sourceHandle, {
+                    id: collapsedSource.sourceHandle,
+                    name: collapsedSource.label,
+                    sourceNodeId: collapsedSource.logicalSourceId,
+                    transitionHandleId: collapsedSource.logicalHandle,
+                });
+            }
+        });
+
+        return new Map(
+            [...result.entries()].map(([nodeId, byHandle]) => [
+                nodeId,
+                [...byHandle.values()],
+            ])
+        );
+    }, [edges, nodeById]);
+
 
     // Keep the injected React Flow node objects stable whenever the source
     // node itself did not change. During a drag React Flow normally replaces
@@ -1587,6 +1630,11 @@ function AppContent() {
                 unexposedTransitionHandlesByNodeId.get(n.id) || [];
             const unexposedTransitionSignature =
                 unexposedTransitionHandles.join("\u001f");
+            const collapsedTransitionHandles =
+                collapsedParallelTransitionHandlesByNodeId.get(n.id) || [];
+            const collapsedTransitionSignature = collapsedTransitionHandles
+                .map((event) => `${event.id}:${event.sourceNodeId}:${event.transitionHandleId}`)
+                .join("\u001f");
             let childTab = null;
 
             if (n.type === "submachine") {
@@ -1622,6 +1670,8 @@ function AppContent() {
                     outgoingTransitionSignature &&
                 cached.unexposedTransitionSignature ===
                     unexposedTransitionSignature &&
+                cached.collapsedTransitionSignature ===
+                    collapsedTransitionSignature &&
                 cached.activeMode === activeMode &&
                 cached.slotConnectionDrag === slotConnectionDrag &&
                 cached.childGlobalDataModel === childGlobalDataModel &&
@@ -1647,6 +1697,7 @@ function AppContent() {
                 outgoingTransitionHandles:
                     outgoingTransitionInfo?.handles || [],
                 unexposedTransitionHandles,
+                collapsedTransitionHandles,
                 onOpenStateActions: handleOpenStateActions,
                 onOpenParameter: handleOpenParameter,
                 onOpenSlot: handleOpenSlot,
@@ -1680,6 +1731,7 @@ function AppContent() {
                 hidden,
                 outgoingTransitionSignature,
                 unexposedTransitionSignature,
+                collapsedTransitionSignature,
                 activeMode,
                 slotConnectionDrag,
                 childGlobalDataModel,
@@ -1702,6 +1754,7 @@ function AppContent() {
         nodes,
         outgoingTransitionHandlesByNodeId,
         unexposedTransitionHandlesByNodeId,
+        collapsedParallelTransitionHandlesByNodeId,
         tabs,
         activeTabId,
         activeMode,
@@ -2798,6 +2851,7 @@ function AppContent() {
         injectedNodes,
         injectedSlotNodes,
         isDraggingNode,
+        draggingNodeId,
         hiddenNodeIds,
         parallelDropTargetId,
         compoundDropTargetId,

@@ -51,6 +51,63 @@ export const FIND_SHORTCUTS = [
     { keys: "Esc", action: "Close search" },
 ];
 
+export const getCollapsedTransitionSource = (edge, nodeById) => {
+    if (!edge || !nodeById) return null;
+
+    let current = nodeById.get(edge.source);
+    let collapsedAncestor = null;
+    const visited = new Set();
+
+    while (current?.parentId && !visited.has(current.id)) {
+        visited.add(current.id);
+        const parent = nodeById.get(current.parentId);
+        if (!parent) break;
+
+        if (
+            (parent.type === "compound" || parent.type === "parallel") &&
+            parent.data?.isCollapsed
+        ) {
+            // When collapsed containers are nested, only the outermost one is
+            // visible and can own the temporary transition handle.
+            collapsedAncestor = parent;
+        }
+
+        current = parent;
+    }
+
+    if (!collapsedAncestor) return null;
+
+    const logicalSourceId =
+        edge.data?.boundaryOriginalSource ||
+        edge.data?.compoundOriginalSource ||
+        edge.data?.parallelOriginalSource ||
+        edge.source;
+    const logicalHandle = String(
+        edge.data?.boundaryOriginalSourceHandle ||
+        edge.data?.compoundOriginalSourceHandle ||
+        edge.data?.parallelOriginalSourceHandle ||
+        edge.sourceHandle ||
+        edge.label ||
+        "success"
+    );
+    const visualSourceNode = nodeById.get(edge.source);
+    const existingBoundaryHandle =
+        visualSourceNode?.type === "parallelLane" ||
+        visualSourceNode?.type === "compound"
+            ? String(edge.sourceHandle || "").trim()
+            : "";
+    const sourceHandle =
+        existingBoundaryHandle || `${logicalSourceId}-${logicalHandle}`;
+
+    return {
+        nodeId: collapsedAncestor.id,
+        sourceHandle,
+        logicalSourceId,
+        logicalHandle,
+        label: String(edge.label || logicalHandle || sourceHandle),
+    };
+};
+
 export const getTransitionHighlightColor = (sourceHandle) => {
     const parts = String(sourceHandle || "")
         .trim()

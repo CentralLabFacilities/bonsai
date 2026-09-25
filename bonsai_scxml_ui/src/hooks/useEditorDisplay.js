@@ -3,6 +3,7 @@ import { MarkerType } from "@xyflow/react";
 import {
     SLOT_CONNECTION_COLORS,
     clearTransientTransitionHighlight,
+    getCollapsedTransitionSource,
     getTransitionHighlightColor,
     withSmartTransitionRouting,
 } from "../utils/editorGraph";
@@ -300,6 +301,21 @@ export function useEditorDisplay({
         () =>
             transitionStructureEdges.map((edge) => {
                 let normalizedEdge = edge;
+
+                const collapsedSource = getCollapsedTransitionSource(
+                    normalizedEdge,
+                    nodeById
+                );
+                if (
+                    collapsedSource &&
+                    nodeById.get(collapsedSource.nodeId)?.type === "parallel"
+                ) {
+                    normalizedEdge = {
+                        ...normalizedEdge,
+                        source: collapsedSource.nodeId,
+                        sourceHandle: collapsedSource.sourceHandle,
+                    };
+                }
 
                 if (!normalizedEdge.targetHandle) {
                     const targetNode = nodeById.get(normalizedEdge.target);
