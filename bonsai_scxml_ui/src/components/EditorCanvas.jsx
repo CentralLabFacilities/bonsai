@@ -251,7 +251,6 @@ export default function EditorCanvas({
                             !showSlotEdges && "editor-slots-context-only",
                             edgeFocusMode && "editor-edge-focus-mode",
                             nodeFocusMode && "editor-node-focus-mode",
-                            isDraggingNode && "editor-node-drag-active",
                         ]
                             .filter(Boolean)
                             .join(" ") || undefined
@@ -364,7 +363,11 @@ export default function EditorCanvas({
                         handleContextMenuOpen(event, node)
                     }
                     multiSelectionKeyCode={["Shift", "Control", "Meta"]}
-                    selectionKeyCode={["Shift"]}
+                    // Left-drag is reserved for box selection. Panning remains
+                    // available with the middle mouse button and the controls.
+                    selectionOnDrag
+                    selectionKeyCode={null}
+                    panOnDrag={[1]}
                     deleteKeyCode={["Delete"]}
                     minZoom={0.08}
                     onlyRenderVisibleElements
