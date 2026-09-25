@@ -803,6 +803,9 @@ function DetailsPanel({
     const isSkillClone = Boolean(selectedNode.data?.isSkillClone);
     const isStateClone = Boolean(selectedNode.data?.isStateClone);
     const isEditorClone = isSkillClone || isStateClone;
+    const selectedReferenceId = isEditorClone
+        ? String(selectedNode.data?.editorInstanceId || selectedNode.id || "").trim()
+        : "";
     const hasClones = Array.isArray(cloneNodes) && cloneNodes.length > 0;
     const isContainerState =
         selectedNode.type === "compound" ||
@@ -1086,6 +1089,10 @@ function DetailsPanel({
 
                         <div className="skill-clone-detail-card">
                             <div className="detail-card-title">Reference target</div>
+                            <MetadataRow
+                                label="Reference ID"
+                                value={selectedReferenceId || "—"}
+                            />
                             <button
                                 type="button"
                                 className="skill-clone-source-button"
@@ -1119,7 +1126,13 @@ function DetailsPanel({
         const editorInstanceId = String(
             node.data?.editorInstanceId || ""
         ).trim();
-        const stateName = editorInstanceId
+        const isReference = Boolean(
+            node.data?.isSkillClone || node.data?.isStateClone
+        );
+        const referenceId = isReference
+            ? editorInstanceId || String(node.id || "")
+            : "";
+        const stateName = editorInstanceId && !isReference
             ? `#${editorInstanceId}`
             : fullSkillName.includes("#")
                 ? fullSkillName.split("#").pop()
@@ -1130,11 +1143,13 @@ function DetailsPanel({
             fullSkillName.split(".").pop().split("#")[0] ||
             node.id;
 
-        const displayName = editorInstanceId
-            ? `${skillName}#${editorInstanceId}`
-            : stateName && stateName !== skillName
-                ? `${skillName}${stateName.startsWith("#") ? "" : "#"}${stateName}`
-                : skillName;
+        const displayName = isReference
+            ? `${skillName} [${referenceId}]`
+            : editorInstanceId
+                ? `${skillName}#${editorInstanceId}`
+                : stateName && stateName !== skillName
+                    ? `${skillName}${stateName.startsWith("#") ? "" : "#"}${stateName}`
+                    : skillName;
 
         return {
             id: node.id,
@@ -1143,6 +1158,8 @@ function DetailsPanel({
             stateName,
             fullSkillName,
             editorInstanceId,
+            isReference,
+            referenceId,
             packageName: getSkillPackageName(fullSkillName),
         };
     });
@@ -1201,6 +1218,7 @@ function DetailsPanel({
                 option.fullSkillName,
                 option.packageName,
                 option.id,
+                option.referenceId,
             ].some((value) =>
                 String(value || "")
                     .toLowerCase()
@@ -1244,6 +1262,7 @@ function DetailsPanel({
                 option.fullSkillName,
                 option.packageName,
                 option.id,
+                option.referenceId,
             ].some(
                 (value) =>
                     String(value || "").toLowerCase() ===
@@ -1877,9 +1896,11 @@ function DetailsPanel({
                                                                                         </span>
 
                                                                                         <span className="exit-target-suggestion-path">
-                                                                                            {option.packageName
-                                                                                                ? `${option.packageName}.${option.skillName}`
-                                                                                                : option.fullSkillName}
+                                                                                            {option.isReference
+                                                                                                ? `Reference ID: ${option.referenceId}`
+                                                                                                : option.packageName
+                                                                                                    ? `${option.packageName}.${option.skillName}`
+                                                                                                    : option.fullSkillName}
                                                                                         </span>
                                                                                     </button>
                                                                                 )
@@ -1924,6 +1945,9 @@ function DetailsPanel({
                                     title="Go to this reference"
                                 >
                                     <FiLink2 /> Reference {index + 1}
+                                    {cloneNode.data?.editorInstanceId
+                                        ? ` · ${cloneNode.data.editorInstanceId}`
+                                        : ""}
                                     {cloneNode.data?.label
                                         ? ` · ${cloneNode.data.label}`
                                         : ""}

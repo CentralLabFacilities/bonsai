@@ -156,7 +156,9 @@ export function useSubStateMachines({
     setSlotNodes,
     setSlotEdges,
     setManualSlots,
+    selectedNodeId,
     setSelectedNodeId,
+    getViewport,
     setActiveTab,
     setContextMenu,
     fitView,
@@ -164,6 +166,14 @@ export function useSubStateMachines({
     onStateMachineLoadStart,
     onStateMachineLoadEnd,
 }) {
+    const captureCurrentViewport = () => {
+        try {
+            return getViewport?.() || null;
+        } catch {
+            return null;
+        }
+    };
+
     const hydrateSubMachineInheritedSlots = async (
         targetNodes,
         parentFilePath = null
@@ -448,10 +458,13 @@ export function useSubStateMachines({
                 slotEdges: [],
                 manualSlots: [],
                 parentTabId: activeTabId,
+                selectedNodeId: null,
+                viewport: null,
                 inheritedGlobalDataModel: inheritedForChild,
                 globalDataModel: parsed.globalDataModel,
             };
 
+            const parentViewport = captureCurrentViewport();
             setTabs((prev) => [
                 ...prev.map((tab) =>
                     tab.id === activeTabId
@@ -464,6 +477,8 @@ export function useSubStateMachines({
                             manualSlots,
                             globalDataModel,
                             inheritedGlobalDataModel,
+                            selectedNodeId: selectedNodeId || null,
+                            viewport: parentViewport || tab.viewport || null,
                         }
                         : tab
                 ),
@@ -557,6 +572,8 @@ export function useSubStateMachines({
                 slotEdges: [],
                 manualSlots: [],
                 parentTabId: activeTabId,
+                selectedNodeId: null,
+                viewport: null,
                 inheritedGlobalDataModel: inheritedForChild,
                 globalDataModel: DEFAULT_CHILD_DATA_MODEL,
             };
@@ -564,6 +581,7 @@ export function useSubStateMachines({
             // Save the new Sub-SM node in the parent tab before switching to
             // the child. Otherwise returning to the parent can restore the old
             // snapshot without the freshly created node.
+            const parentViewport = captureCurrentViewport();
             setTabs((prevTabs) => [
                 ...prevTabs.map((tab) =>
                     tab.id === activeTabId
@@ -576,6 +594,8 @@ export function useSubStateMachines({
                             manualSlots,
                             globalDataModel,
                             inheritedGlobalDataModel,
+                            selectedNodeId: selectedNodeId || null,
+                            viewport: parentViewport || tab.viewport || null,
                         }
                         : tab
                 ),
@@ -723,10 +743,13 @@ export function useSubStateMachines({
                 slotEdges: [],
                 manualSlots: [],
                 parentTabId: activeTabId,
+                selectedNodeId: null,
+                viewport: null,
                 inheritedGlobalDataModel: inheritedForChild,
                 globalDataModel: DEFAULT_CHILD_DATA_MODEL,
             };
 
+            const parentViewport = captureCurrentViewport();
             setTabs((prevTabs) => [
                 ...prevTabs.map((tab) =>
                     tab.id === activeTabId
@@ -739,6 +762,8 @@ export function useSubStateMachines({
                             manualSlots,
                             globalDataModel,
                             inheritedGlobalDataModel,
+                            selectedNodeId: selectedNodeId || null,
+                            viewport: parentViewport || tab.viewport || null,
                         }
                         : tab
                 ),

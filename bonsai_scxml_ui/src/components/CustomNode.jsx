@@ -78,6 +78,9 @@ function CustomNode({ id, data, selected }) {
 
     const isBehaviorExit = Boolean(data.isBehaviorExit);
     const isSkillClone = Boolean(data.isSkillClone);
+    const referenceId = isSkillClone
+        ? String(data.editorInstanceId || id || "").trim()
+        : "";
 
     // "event"    -> transitions only
     // "slots"    -> slots only
@@ -341,22 +344,16 @@ function CustomNode({ id, data, selected }) {
                         <FiLink2 />
                     </span>
                     <span className="state-clone-type">SKILL</span>
-                    <span className="state-clone-badge">REF</span>
+                    <span
+                        className="state-clone-badge"
+                        title={referenceId ? `Reference ID: ${referenceId}` : "Reference"}
+                    >
+                        {referenceId ? `REF · ${referenceId}` : "REF"}
+                    </span>
                 </div>
 
                 <div className="state-clone-label">
                     {data.label || data.fullSkillName || "Skill"}
-                    {instanceId && (
-                        <span
-                            style={{
-                                marginLeft: "3px",
-                                color: "#64748b",
-                                fontWeight: 600,
-                            }}
-                        >
-                            {instanceId}
-                        </span>
-                    )}
                 </div>
             </div>
         );

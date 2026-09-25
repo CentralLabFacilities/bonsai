@@ -40,6 +40,9 @@ function SlotNode({ id, data, selected = false }) {
         : `/${displayPath}`;
     const slotType = data.slotType || "Unknown";
     const isSlotClone = Boolean(data.isSlotClone);
+    const referenceId = isSlotClone
+        ? String(data.editorInstanceId || id || "").trim()
+        : "";
 
     // Two different inheritance directions must stay visible independently:
     // 1) current workflow declares <inheritSlot> -> inherited from its parent
@@ -125,7 +128,12 @@ function SlotNode({ id, data, selected = false }) {
                     />
                     <span>{isInheritedFromParent ? "INHERIT SLOT" : "SLOT"}</span>
                     {isSlotClone && (
-                        <span className="slot-node-clone-badge">REFERENCE</span>
+                        <span
+                            className="slot-node-clone-badge"
+                            title={referenceId ? `Reference ID: ${referenceId}` : "Reference"}
+                        >
+                            {referenceId ? `REF · ${referenceId}` : "REFERENCE"}
+                        </span>
                     )}
                 </div>
                 <div className="slot-node-type" title={slotType}>

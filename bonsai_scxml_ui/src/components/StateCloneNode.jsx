@@ -7,7 +7,8 @@ const TYPE_LABELS = {
     parallel: "PARALLEL",
 };
 
-export default function StateCloneNode({ data = {}, selected = false }) {
+export default function StateCloneNode({ id, data = {}, selected = false }) {
+    const referenceId = String(data.editorInstanceId || id || "").trim();
     const sourceType = String(data.sourceNodeType || "state");
     const typeLabel = TYPE_LABELS[sourceType] || "STATE";
 
@@ -31,7 +32,12 @@ export default function StateCloneNode({ data = {}, selected = false }) {
                     <FiLink2 />
                 </span>
                 <span className="state-clone-type">{typeLabel}</span>
-                <span className="state-clone-badge">REF</span>
+                <span
+                    className="state-clone-badge"
+                    title={referenceId ? `Reference ID: ${referenceId}` : "Reference"}
+                >
+                    {referenceId ? `REF · ${referenceId}` : "REF"}
+                </span>
             </div>
 
             <div className="state-clone-label">

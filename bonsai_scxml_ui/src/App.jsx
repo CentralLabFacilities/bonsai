@@ -135,6 +135,9 @@ const isCloneableEditorNode = (node) => Boolean(
         !node.data?.autoParallelLaneCompound)
 );
 
+const createReferenceId = () =>
+    `ref-${crypto.randomUUID().replace(/-/g, "").slice(0, 8)}`;
+
 const buildEditorCloneNode = (sourceNode, position) => {
     if (!isCloneableEditorNode(sourceNode)) return null;
 
@@ -147,6 +150,7 @@ const buildEditorCloneNode = (sourceNode, position) => {
             data: {
                 ...(sourceNode.data || {}),
                 cloneOfNodeId: sourceNode.id,
+                editorInstanceId: createReferenceId(),
                 isSlotClone: true,
             },
         };
@@ -159,6 +163,7 @@ const buildEditorCloneNode = (sourceNode, position) => {
             sourceNode.data?.label ||
             "State",
         cloneOfNodeId: sourceNode.id,
+        editorInstanceId: createReferenceId(),
         isInitial: false,
         isFinal: false,
         events: [],
@@ -494,7 +499,14 @@ function AppContent() {
         setSlotEdges,
     });
 
-    const { screenToFlowPosition, fitView, getNodes, setCenter } = useReactFlow();
+    const {
+        screenToFlowPosition,
+        fitView,
+        getNodes,
+        setCenter,
+        getViewport,
+        setViewport,
+    } = useReactFlow();
     const previousActiveModeRef = useRef(activeMode);
 
     useEffect(() => {
@@ -790,8 +802,11 @@ function AppContent() {
         setManualSlots,
         setGlobalDataModel,
         setInheritedGlobalDataModel,
+        selectedNodeId,
         setSelectedNodeId,
         fitView,
+        getViewport,
+        setViewport,
     });
 
     const {
@@ -839,7 +854,9 @@ function AppContent() {
         setSlotNodes,
         setSlotEdges,
         setManualSlots,
+        selectedNodeId,
         setSelectedNodeId,
+        getViewport,
         setActiveTab,
         setContextMenu,
         fitView,
@@ -1780,9 +1797,18 @@ function AppContent() {
                     slotEdges: [],
                     manualSlots: [],
                     parentTabId: null,
+                    selectedNodeId: null,
+                    viewport: null,
                     inheritedGlobalDataModel: [],
                     globalDataModel: parsed.globalDataModel,
                 };
+
+                let currentViewport = null;
+                try {
+                    currentViewport = getViewport?.() || null;
+                } catch {
+                    // Keep the previous saved viewport if React Flow is not mounted.
+                }
 
                 setTabs((previousTabs) => [
                     ...previousTabs.map((tab) =>
@@ -1796,6 +1822,8 @@ function AppContent() {
                                 manualSlots,
                                 globalDataModel,
                                 inheritedGlobalDataModel,
+                                selectedNodeId: selectedNodeId || null,
+                                viewport: currentViewport || tab.viewport || null,
                             }
                             : tab
                     ),
@@ -1848,6 +1876,8 @@ function AppContent() {
             manualSlots,
             globalDataModel,
             inheritedGlobalDataModel,
+            selectedNodeId,
+            getViewport,
             fitView,
             beginStateMachineLoad,
             endStateMachineLoad,
@@ -3794,6 +3824,7 @@ function AppContent() {
                         data: {
                             ...(canonicalSlotNode.data || {}),
                             cloneOfNodeId: canonicalSlotNode.id,
+                            editorInstanceId: createReferenceId(),
                             isSlotClone: true,
                         },
                     };
@@ -4159,6 +4190,13 @@ function AppContent() {
                     idMap.has(data.cloneOfNodeId)
                 ) {
                     data.cloneOfNodeId = idMap.get(data.cloneOfNodeId);
+                }
+
+                if (data?.isSkillClone || data?.isStateClone) {
+                    // Each visual Reference needs its own stable route identity
+                    // so transition targeting can distinguish multiple aliases
+                    // of the same underlying SCXML state.
+                    data.editorInstanceId = createReferenceId();
                 }
 
                 data = allocateFullSkillName(node, data);
