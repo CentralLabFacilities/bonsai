@@ -364,8 +364,8 @@ function AppContent() {
     const [hasGraphClipboard, setHasGraphClipboard] = useState(() =>
         Boolean(
             persistentGraphClipboard &&
-                ((persistentGraphClipboard.nodes?.length || 0) > 0 ||
-                    (persistentGraphClipboard.slotNodes?.length || 0) > 0)
+            ((persistentGraphClipboard.nodes?.length || 0) > 0 ||
+                (persistentGraphClipboard.slotNodes?.length || 0) > 0)
         )
     );
     useEffect(() => {
@@ -1707,11 +1707,11 @@ function AppContent() {
                 cached.sourceNode === n &&
                 cached.hidden === hidden &&
                 cached.outgoingTransitionSignature ===
-                    outgoingTransitionSignature &&
+                outgoingTransitionSignature &&
                 cached.unexposedTransitionSignature ===
-                    unexposedTransitionSignature &&
+                unexposedTransitionSignature &&
                 cached.collapsedTransitionSignature ===
-                    collapsedTransitionSignature &&
+                collapsedTransitionSignature &&
                 cached.reconnectIncomingEdgeId === reconnectIncomingEdgeId &&
                 cached.activeMode === activeMode &&
                 cached.slotConnectionDrag === slotConnectionDrag &&
@@ -2159,13 +2159,13 @@ function AppContent() {
         const result = [];
 
         const appendOutgoingTransition = ({
-            edgeId,
-            sourceId,
-            sourceHandle,
-            targetId,
-            rawEvent = "",
-            isFallback = false,
-        }) => {
+                                              edgeId,
+                                              sourceId,
+                                              sourceHandle,
+                                              targetId,
+                                              rawEvent = "",
+                                              isFallback = false,
+                                          }) => {
             if (
                 !sourceId ||
                 !targetId ||
@@ -2192,9 +2192,9 @@ function AppContent() {
             // prefixing the event with the Compound/Parallel container name.
             const sourceSkillBase = String(
                 sourceNode?.data?.label ||
-                    sourceNode?.data?.fullSkillName ||
-                    sourceNode?.id ||
-                    ""
+                sourceNode?.data?.fullSkillName ||
+                sourceNode?.id ||
+                ""
             )
                 .split("#")[0]
                 .split(".")
@@ -2285,7 +2285,7 @@ function AppContent() {
                     (edge) =>
                         edge.source === anchor.id &&
                         String(edge.sourceHandle || "") ===
-                            String(event.id || "")
+                        String(event.id || "")
                 );
                 if (!boundaryEdge) return;
 
@@ -2322,6 +2322,91 @@ function AppContent() {
 
         return result;
     }, [selectedNode, semanticNodes, edges]);
+
+    const selectedSkillOutgoingTransitions = useMemo(() => {
+        if (
+            !selectedNode ||
+            selectedNode.type === "slot" ||
+            selectedNode.type === "compound" ||
+            selectedNode.type === "parallel"
+        ) {
+            return [];
+        }
+
+        const result = [];
+        const seen = new Set();
+
+        edges.forEach((edge) => {
+            if (
+                edge.data?.boundaryInternalEdge ||
+                edge.data?.compoundInternalEdge ||
+                edge.data?.parallelInternalEdge ||
+                edge.data?.compoundInitialEdge ||
+                edge.data?.parallelEntryEdge ||
+                String(edge.id || "").startsWith("edge-internal-")
+            ) {
+                return;
+            }
+
+            const storedSources = Array.isArray(edge.data?.boundaryOriginalSources)
+                ? edge.data.boundaryOriginalSources
+                    .map((entry) => ({
+                        sourceId: String(
+                            entry?.sourceId || entry?.nodeId || entry?.id || ""
+                        ),
+                        sourceHandle: String(
+                            entry?.sourceHandle || entry?.handle || ""
+                        ),
+                    }))
+                    .filter((entry) => entry.sourceId && entry.sourceHandle)
+                : [];
+
+            const sourceEntries =
+                storedSources.length > 0
+                    ? storedSources
+                    : [
+                        {
+                            sourceId:
+                                edge.data?.boundaryOriginalSource ||
+                                edge.data?.compoundOriginalSource ||
+                                edge.data?.parallelOriginalSource ||
+                                edge.source,
+                            sourceHandle: String(
+                                edge.data?.boundaryOriginalSourceHandle ||
+                                edge.data?.compoundOriginalSourceHandle ||
+                                edge.data?.parallelOriginalSourceHandle ||
+                                edge.sourceHandle ||
+                                edge.label ||
+                                "success"
+                            ),
+                        },
+                    ];
+
+            const targetNodeId =
+                edge.data?.boundaryOriginalTarget ||
+                edge.data?.compoundOriginalTarget ||
+                edge.data?.parallelOriginalTarget ||
+                edge.target;
+            if (!targetNodeId) return;
+
+            sourceEntries.forEach((entry) => {
+                if (entry.sourceId !== selectedNode.id) return;
+
+                const semanticKey = `${entry.sourceId}::${entry.sourceHandle}::${targetNodeId}`;
+                if (seen.has(semanticKey)) return;
+                seen.add(semanticKey);
+
+                result.push({
+                    edgeId: edge.id,
+                    sourceNodeId: entry.sourceId,
+                    eventId: entry.sourceHandle,
+                    targetNodeId,
+                });
+            });
+        });
+
+        return result;
+    }, [selectedNode, edges]);
 
     const handleMoveContainerTransition = useCallback((edgeId, direction) => {
         if (
@@ -2581,9 +2666,9 @@ function AppContent() {
             const transitionSourceId =
                 problem.category === "Transitions" && problemEdge
                     ? problemEdge.data?.boundaryOriginalSource ||
-                      problemEdge.data?.compoundOriginalSource ||
-                      problemEdge.data?.parallelOriginalSource ||
-                      problemEdge.source
+                    problemEdge.data?.compoundOriginalSource ||
+                    problemEdge.data?.parallelOriginalSource ||
+                    problemEdge.source
                     : null;
             const selectedProblemNodeId =
                 transitionSourceId && liveNodeById.has(transitionSourceId)
@@ -3234,16 +3319,16 @@ function AppContent() {
                             edge?.data?.boundaryOriginalSources
                         )
                             ? edge.data.boundaryOriginalSources
-                                  .map((entry) => ({
-                                      sourceId: String(entry?.sourceId || ""),
-                                      sourceHandle: String(
-                                          entry?.sourceHandle || ""
-                                      ),
-                                  }))
-                                  .filter(
-                                      (entry) =>
-                                          entry.sourceId && entry.sourceHandle
-                                  )
+                                .map((entry) => ({
+                                    sourceId: String(entry?.sourceId || ""),
+                                    sourceHandle: String(
+                                        entry?.sourceHandle || ""
+                                    ),
+                                }))
+                                .filter(
+                                    (entry) =>
+                                        entry.sourceId && entry.sourceHandle
+                                )
                             : [];
                         if (storedEntries.length > 0) return storedEntries;
 
@@ -3322,7 +3407,7 @@ function AppContent() {
                                                 (entry) =>
                                                     entry.sourceId === sourceId &&
                                                     entry.sourceHandle ===
-                                                        sourceHandle
+                                                    sourceHandle
                                             )
                                     );
                                     if (stillUsed) return;
@@ -3908,8 +3993,8 @@ function AppContent() {
                         copiedSlotNode.id;
                     const copiedPath = normalizeSlotPath(
                         copiedSlotNode.data?.clipboardCanonicalSlotPath ||
-                            copiedSlotNode.data?.path ||
-                            ""
+                        copiedSlotNode.data?.path ||
+                        ""
                     );
 
                     // Resolve by canonical id first, then by semantic path.
@@ -6163,6 +6248,7 @@ function AppContent() {
                                 cloneNodes={selectedNodeClones}
                                 onNavigateClone={handleNavigateCloneSource}
                                 containerOutgoingTransitions={selectedContainerOutgoingTransitions}
+                                skillOutgoingTransitions={selectedSkillOutgoingTransitions}
                                 onMoveContainerTransition={handleMoveContainerTransition}
                                 onNavigateTransitionNode={handleNavigateCloneSource}
                                 onHoverTransitionNode={(nodeId) =>

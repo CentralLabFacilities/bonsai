@@ -800,6 +800,7 @@ function DetailsPanel({
                           cloneNodes = [],
                           onNavigateClone,
                           containerOutgoingTransitions = [],
+                          skillOutgoingTransitions = [],
                           onMoveContainerTransition,
                           onNavigateTransitionNode,
                           onHoverTransitionNode,
@@ -1188,16 +1189,37 @@ function DetailsPanel({
         };
     });
 
-    const resolveEventTargetNodeId = (event) => {
-        if (!event?.target) return null;
-        const option = targetNodeOptions.find(
-            (candidate) =>
-                candidate.id === event.target ||
-                candidate.fullSkillName === event.target ||
-                candidate.displayName === event.target
-        );
-        return option?.id || null;
+    const getSemanticTargetNodeIds = (event) => {
+        const targetIds = [];
+        const addTarget = (targetId) => {
+            if (!targetId || targetIds.includes(targetId)) return;
+            targetIds.push(targetId);
+        };
+
+        if (event?.target) {
+            const option = targetNodeOptions.find(
+                (candidate) =>
+                    candidate.id === event.target ||
+                    candidate.fullSkillName === event.target ||
+                    candidate.displayName === event.target
+            );
+            addTarget(option?.id || event.target);
+        }
+
+        (skillOutgoingTransitions || [])
+            .filter(
+                (transition) =>
+                    transition?.sourceNodeId === selectedNode.id &&
+                    String(transition?.eventId || "") ===
+                    String(event?.id || "")
+            )
+            .forEach((transition) => addTarget(transition.targetNodeId));
+
+        return targetIds;
     };
+
+    const resolveEventTargetNodeId = (event) =>
+        getSemanticTargetNodeIds(event)[0] || null;
 
     const transitionButtonTargetId =
         !isContainerState && firstEditableExitToken
@@ -1208,13 +1230,14 @@ function DetailsPanel({
         `${selectedNode.id}:${event.id}:${index}`;
 
     const getCurrentTargetDisplayName = (event) => {
-        if (!event.target) return "";
+        const targetNodeId = resolveEventTargetNodeId(event);
+        if (!targetNodeId) return "";
 
         const option = targetNodeOptions.find(
-            (candidate) => candidate.id === event.target
+            (candidate) => candidate.id === targetNodeId
         );
 
-        return option?.displayName || event.target;
+        return option?.displayName || targetNodeId;
     };
 
     const getTargetQuery = (event, index) => {
@@ -1265,7 +1288,13 @@ function DetailsPanel({
         }));
 
         setOpenTargetSelector(null);
-        onSetEventTarget?.(event, option.id);
+        onSetEventTarget?.(
+            {
+                ...event,
+                target: resolveEventTargetNodeId(event) || event.target,
+            },
+            option.id
+        );
     };
 
     const handleTargetKeyDown = (
@@ -1727,33 +1756,40 @@ function DetailsPanel({
                                                 )}
 
                                                 {(() => {
-                                                    const targetNodeId =
-                                                        resolveEventTargetNodeId(event);
-                                                    if (!targetNodeId) return null;
-
-                                                    const targetOption =
-                                                        targetNodeOptions.find(
-                                                            (option) =>
-                                                                option.id === targetNodeId
-                                                        );
+                                                    const targetNodeIds =
+                                                        getSemanticTargetNodeIds(event);
+                                                    if (targetNodeIds.length === 0) {
+                                                        return null;
+                                                    }
 
                                                     return (
                                                         <div className="exit-token-node-references">
-                                                            <NodeReferenceCard
-                                                                nodeId={targetNodeId}
-                                                                name={
-                                                                    targetOption?.displayName ||
-                                                                    event.target
-                                                                }
-                                                                badge="Target"
-                                                                onNavigate={
-                                                                    onNavigateTransitionNode
-                                                                }
-                                                                onHover={
-                                                                    onHoverTransitionNode
-                                                                }
-                                                                hoverFallbackId={targetNodeId}
-                                                            />
+                                                            {targetNodeIds.map((targetNodeId) => {
+                                                                const targetOption =
+                                                                    targetNodeOptions.find(
+                                                                        (option) =>
+                                                                            option.id === targetNodeId
+                                                                    );
+
+                                                                return (
+                                                                    <NodeReferenceCard
+                                                                        key={`${event.id}-${targetNodeId}`}
+                                                                        nodeId={targetNodeId}
+                                                                        name={
+                                                                            targetOption?.displayName ||
+                                                                            targetNodeId
+                                                                        }
+                                                                        badge="Target"
+                                                                        onNavigate={
+                                                                            onNavigateTransitionNode
+                                                                        }
+                                                                        onHover={
+                                                                            onHoverTransitionNode
+                                                                        }
+                                                                        hoverFallbackId={targetNodeId}
+                                                                    />
+                                                                );
+                                                            })}
                                                         </div>
                                                     );
                                                 })()}
