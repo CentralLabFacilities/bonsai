@@ -4,7 +4,7 @@ import {
     Position,
     useUpdateNodeInternals,
 } from "@xyflow/react";
-import { FiExternalLink } from "react-icons/fi";
+import { FiAlertCircle, FiExternalLink } from "react-icons/fi";
 import StateActionBadges from "./StateActionBadges";
 
 const normalizeSlotType = (type) =>
@@ -216,6 +216,15 @@ export default function SubMachineNode({ id, data, selected }) {
 
     const hasEvents = showEvents && eventIds.length > 0;
     const hasSlots = showSlots && slotEntries.length > 0;
+    const unexposedTransitionHandles = useMemo(
+        () =>
+            [...new Set(
+                (data.unexposedTransitionHandles || [])
+                    .map((handle) => String(handle || "").trim())
+                    .filter(Boolean)
+            )],
+        [data.unexposedTransitionHandles]
+    );
 
     return (
         <div
@@ -239,6 +248,17 @@ export default function SubMachineNode({ id, data, selected }) {
                 onEntryClick={() => data.onOpenStateActions?.(id)}
                 onExitClick={() => data.onOpenStateActions?.(id)}
             />
+
+            {unexposedTransitionHandles.length > 0 && (
+                <div
+                    className="node-warning-badge"
+                    title={`Transition uses unexposed exit token${
+                        unexposedTransitionHandles.length === 1 ? "" : "s"
+                    }: ${unexposedTransitionHandles.join(", ")}`}
+                >
+                    <FiAlertCircle />
+                </div>
+            )}
 
             {showEvents && (
                 <Handle

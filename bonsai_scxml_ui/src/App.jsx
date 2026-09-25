@@ -1484,6 +1484,48 @@ function AppContent() {
         return result;
     }, [edges]);
 
+    // Track outgoing transitions whose event handle is not actually exposed by
+    // the source state. Imported SCXML can legitimately contain such edges: we
+    // keep them visible and report them in Problems, but the source skill/Sub-SM
+    // should also carry the small warning badge. Derive this from the same
+    // semantic event metadata used by the Problems validator.
+    const unexposedTransitionHandlesByNodeId = useMemo(() => {
+        const result = new Map();
+
+        nodes.forEach((node) => {
+            const outgoingHandles =
+                outgoingTransitionHandlesByNodeId.get(node.id)?.handles || [];
+            if (outgoingHandles.length === 0) return;
+
+            const exposedHandles = new Set(
+                (node.data?.events || [])
+                    .filter(
+                        (event) =>
+                            !event?.editorImportedSynthetic &&
+                            !event?.editorBoundarySynthetic
+                    )
+                    .map((event) => String(event?.id || "").trim())
+                    .filter(Boolean)
+            );
+
+            const unexposedHandles = outgoingHandles
+                .map((handle) => String(handle || "").trim())
+                .filter(
+                    (handle) =>
+                        handle &&
+                        handle !== "*" &&
+                        !exposedHandles.has(handle)
+                )
+                .sort();
+
+            if (unexposedHandles.length > 0) {
+                result.set(node.id, unexposedHandles);
+            }
+        });
+
+        return result;
+    }, [nodes, outgoingTransitionHandlesByNodeId]);
+
 
     // Keep the injected React Flow node objects stable whenever the source
     // node itself did not change. During a drag React Flow normally replaces
@@ -1502,6 +1544,10 @@ function AppContent() {
                 outgoingTransitionHandlesByNodeId.get(n.id) || null;
             const outgoingTransitionSignature =
                 outgoingTransitionInfo?.signature || "";
+            const unexposedTransitionHandles =
+                unexposedTransitionHandlesByNodeId.get(n.id) || [];
+            const unexposedTransitionSignature =
+                unexposedTransitionHandles.join("\u001f");
             let childTab = null;
 
             if (n.type === "submachine") {
@@ -1535,6 +1581,8 @@ function AppContent() {
                 cached.hidden === hidden &&
                 cached.outgoingTransitionSignature ===
                     outgoingTransitionSignature &&
+                cached.unexposedTransitionSignature ===
+                    unexposedTransitionSignature &&
                 cached.activeMode === activeMode &&
                 cached.slotConnectionDrag === slotConnectionDrag &&
                 cached.childGlobalDataModel === childGlobalDataModel &&
@@ -1559,6 +1607,7 @@ function AppContent() {
                 mode: activeMode,
                 outgoingTransitionHandles:
                     outgoingTransitionInfo?.handles || [],
+                unexposedTransitionHandles,
                 onOpenStateActions: handleOpenStateActions,
                 onOpenParameter: handleOpenParameter,
                 onOpenSlot: handleOpenSlot,
@@ -1591,6 +1640,7 @@ function AppContent() {
                 sourceNode: n,
                 hidden,
                 outgoingTransitionSignature,
+                unexposedTransitionSignature,
                 activeMode,
                 slotConnectionDrag,
                 childGlobalDataModel,
@@ -1612,6 +1662,7 @@ function AppContent() {
     }, [
         nodes,
         outgoingTransitionHandlesByNodeId,
+        unexposedTransitionHandlesByNodeId,
         tabs,
         activeTabId,
         activeMode,
@@ -2362,13 +2413,41 @@ function AppContent() {
             const liveNodeById = new Map(
                 liveNodes.map((node) => [node.id, node])
             );
-            const focusIds = (
-                problem.focusNodeIds?.length
-                    ? problem.focusNodeIds
-                    : problem.nodeId
-                        ? [problem.nodeId]
-                        : []
-            ).filter((id) => liveNodeById.has(id));
+
+            const problemEdge = problem.edgeId
+                ? edges.find((edge) => edge.id === problem.edgeId)
+                : null;
+            const transitionSourceId =
+                problem.category === "Transitions" && problemEdge
+                    ? problemEdge.data?.boundaryOriginalSource ||
+                      problemEdge.data?.compoundOriginalSource ||
+                      problemEdge.data?.parallelOriginalSource ||
+                      problemEdge.source
+                    : null;
+            const selectedProblemNodeId =
+                transitionSourceId && liveNodeById.has(transitionSourceId)
+                    ? transitionSourceId
+                    : problem.nodeId && liveNodeById.has(problem.nodeId)
+                        ? problem.nodeId
+                        : null;
+
+            const requestedFocusIds = problem.focusNodeIds?.length
+                ? [...problem.focusNodeIds]
+                : selectedProblemNodeId
+                    ? [selectedProblemNodeId]
+                    : [];
+
+            if (
+                transitionSourceId &&
+                liveNodeById.has(transitionSourceId) &&
+                !requestedFocusIds.includes(transitionSourceId)
+            ) {
+                requestedFocusIds.unshift(transitionSourceId);
+            }
+
+            const focusIds = requestedFocusIds.filter((id) =>
+                liveNodeById.has(id)
+            );
 
             // Problems can point at nodes hidden inside one or more collapsed
             // Compound/Parallel states. Reveal the complete ancestor chain
@@ -2507,6 +2586,12 @@ function AppContent() {
                 });
             }
 
+            if (problem.category === "Transitions" && problem.edgeId) {
+                // A transition problem should always reveal the transition it
+                // refers to, even when the user previously hid transition edges.
+                setShowTransitionEdges(true);
+            }
+
             setEdges((currentEdges) =>
                 currentEdges.map((edge) => ({
                     ...edge,
@@ -2517,14 +2602,17 @@ function AppContent() {
                 }))
             );
 
-            if (problem.nodeId) {
+            if (selectedProblemNodeId) {
+                // For transition problems select the semantic source skill as
+                // well as the edge. Boundary-routed edges can visually start at
+                // a container, but the actual problem belongs to the nested state.
                 setNodes((currentNodes) =>
                     currentNodes.map((node) => ({
                         ...node,
-                        selected: node.id === problem.nodeId,
+                        selected: node.id === selectedProblemNodeId,
                     }))
                 );
-                setSelectedNodeId(problem.nodeId);
+                setSelectedNodeId(selectedProblemNodeId);
                 setActiveTab(problem.detailTab || "allgemein");
                 setRightPanelTab("details");
             } else if (problem.category === "Datamodel") {
@@ -2534,11 +2622,8 @@ function AppContent() {
 
             if (focusIds.length > 0) {
                 const primaryFocusId =
-                    problem.nodeId && liveNodeById.has(problem.nodeId)
-                        ? problem.nodeId
-                        : focusIds.length === 1
-                            ? focusIds[0]
-                            : null;
+                    selectedProblemNodeId ||
+                    (focusIds.length === 1 ? focusIds[0] : null);
 
                 // Give React Flow two frames to apply the expanded container
                 // dimensions and remeasure nested nodes before navigating.
@@ -2587,6 +2672,7 @@ function AppContent() {
             }
         },
         [
+            edges,
             fitView,
             getNodes,
             setCenter,

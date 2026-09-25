@@ -281,14 +281,29 @@ function CustomNode({ id, data, selected }) {
         }
 
         const hasMissingSlots = showSlots ? missingSlots : false;
+        const unexposedTransitionHandles = (
+            data.unexposedTransitionHandles || []
+        ).filter(Boolean);
+        const hasUnexposedTransition =
+            unexposedTransitionHandles.length > 0;
         const hasError =
             !isSkillClone &&
-            (hasMissingSlots || missingParams || missingTransitions);
+            (hasMissingSlots ||
+                missingParams ||
+                missingTransitions ||
+                hasUnexposedTransition);
 
         const reasons = [];
         if (hasMissingSlots) reasons.push("Not every slot has a path");
         if (missingParams) reasons.push("Required parameters are missing");
         if (missingTransitions) reasons.push("Not every transition is set");
+        if (hasUnexposedTransition) {
+            reasons.push(
+                `Transition uses unexposed exit token${
+                    unexposedTransitionHandles.length === 1 ? "" : "s"
+                }: ${unexposedTransitionHandles.join(", ")}`
+            );
+        }
 
         return {
             hasError,
