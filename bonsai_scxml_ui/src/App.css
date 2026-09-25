@@ -495,9 +495,9 @@
     cursor: pointer;
     box-shadow: 0 2px 6px rgba(15, 23, 42, 0.16);
     transition:
-        background-color 120ms ease,
-        border-color 120ms ease,
-        color 120ms ease;
+            background-color 120ms ease,
+            border-color 120ms ease,
+            color 120ms ease;
 }
 
 .edge-visibility-toggle:hover {
@@ -1450,8 +1450,8 @@
     border-color: #38bdf8 !important;
     border-top-color: #38bdf8 !important;
     box-shadow:
-        0 0 0 3px rgba(56, 189, 248, 0.30),
-        0 8px 20px rgba(76, 29, 149, 0.18) !important;
+            0 0 0 3px rgba(56, 189, 248, 0.30),
+            0 8px 20px rgba(76, 29, 149, 0.18) !important;
     transform: translateY(-2px);
 }
 
@@ -6142,8 +6142,8 @@
     width: 36px;
     height: 36px;
     border-radius: 10px;
-    background: var(--surface-secondary, rgba(127, 127, 127, 0.10));
-    border: 1px solid var(--border-color, rgba(127, 127, 127, 0.18));
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border);
     font-size: 17px;
 }
 
@@ -6171,8 +6171,8 @@
 .nop-send-card {
     padding: 14px;
     border-radius: 12px;
-    border: 1px solid var(--border-color, rgba(127, 127, 127, 0.18));
-    background: var(--surface-secondary, rgba(127, 127, 127, 0.055));
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.045);
 }
 
 .nop-send-card-header {
@@ -6234,8 +6234,8 @@
     min-height: 38px;
     padding: 9px 36px 9px 10px;
     border-radius: 8px;
-    border: 1px solid var(--border-color, rgba(127, 127, 127, 0.22));
-    background: var(--input-background, rgba(127, 127, 127, 0.045));
+    border: 1px solid var(--border);
+    background: var(--background);
     color: inherit;
     outline: none;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
@@ -6246,7 +6246,7 @@
 .nop-send-input:focus {
     border-color: currentColor;
     box-shadow: 0 0 0 2px rgba(127, 127, 127, 0.10);
-    background: var(--input-background-focus, rgba(127, 127, 127, 0.075));
+    background: #1e293b;
 }
 
 .nop-send-clear {
@@ -6282,8 +6282,8 @@
     overflow: hidden;
     padding: 4px;
     border-radius: 9px;
-    border: 1px solid var(--border-color, rgba(127, 127, 127, 0.2));
-    background: var(--panel-background, var(--background-color, #fff));
+    border: 1px solid var(--border);
+    background: var(--background);
     box-shadow: 0 10px 28px rgba(0, 0, 0, 0.14);
 }
 
@@ -6335,7 +6335,7 @@
 .nop-send-preset {
     padding: 5px 8px;
     border-radius: 999px;
-    border: 1px solid var(--border-color, rgba(127, 127, 127, 0.18));
+    border: 1px solid var(--border);
     background: transparent;
     color: inherit;
     cursor: pointer;
@@ -6902,8 +6902,8 @@
     outline: 3px solid #38bdf8 !important;
     outline-offset: -3px;
     box-shadow:
-        inset 0 0 0 2px rgba(56, 189, 248, 0.28),
-        0 0 0 4px rgba(56, 189, 248, 0.12) !important;
+            inset 0 0 0 2px rgba(56, 189, 248, 0.28),
+            0 0 0 4px rgba(56, 189, 248, 0.12) !important;
 }
 
 
@@ -6915,7 +6915,7 @@
 }
 
 .container-transition-card {
-    border: 1px solid var(--border-color, #d5dbe3);
+    border: 1px solid var(--border);
     border-radius: 8px;
     padding: 9px 10px;
     background: rgba(2, 132, 199, 0.04);
@@ -7096,31 +7096,50 @@
 }
 
 /* Editor-only references to existing states.
-   Keep reference rendering deliberately cheap: no gradients, filters, whole-node
-   opacity, or animated shadows. React Flow may paint many of these while
-   panning/zooming, so the reference identity is expressed with borders, solid
-   fills and typography only. */
+   References keep the source node family accent, but use a lighter, muted
+   neutral surface so they remain visually secondary to real workflow nodes.
+   Avoid whole-node opacity so labels, handles and selection states stay readable. */
 .state-clone-node {
     position: relative;
     min-width: 150px;
     max-width: 240px;
     --reference-accent: #64748b;
-    --reference-accent-soft: #94a3b8;
-    --reference-accent-text: #cbd5e1;
-    --reference-header-bg: #172033;
-    border: 1px dashed #94a3b8;
+    --reference-accent-soft: #7f8b96;
+    --reference-accent-text: #52606d;
+
+    /* Regular skill references: use the dark blue of the normal skill surface. */
+    --reference-fade-start: rgba(35, 52, 67, 0.58);
+    --reference-fade-middle: rgba(35, 52, 67, 0.30);
+    --reference-fade-end: rgba(35, 52, 67, 0.08);
+    border: 1.5px dashed #8d99a6;
     border-left: 3px solid var(--reference-accent);
     border-radius: 7px;
-    background: #1e293b;
-    color: #d1d5db;
+    background:
+            linear-gradient(
+                    90deg,
+                    var(--reference-fade-start) 0%,
+                    var(--reference-fade-middle) 34%,
+                    var(--reference-fade-end) 68%,
+                    transparent 100%
+            ),
+            #e4e9ed;
+    color: #4b5563;
     box-shadow: none;
     overflow: visible;
 }
 
 .state-clone-node:hover {
-    border-color: #cbd5e1;
+    border-color: #6f7d89;
     border-left-color: var(--reference-accent);
-    background: #273346;
+    background:
+            linear-gradient(
+                    90deg,
+                    var(--reference-fade-start) 0%,
+                    var(--reference-fade-middle) 36%,
+                    var(--reference-fade-end) 72%,
+                    transparent 100%
+            ),
+            #edf1f4;
 }
 
 .state-clone-node.selected-node {
@@ -7128,26 +7147,33 @@
     outline-offset: 3px;
 }
 
-/* Use the same primary accents as the real source node families. */
+/* Keep the source node family's accent color, while the reference surface stays neutral. */
 .state-clone-submachine {
     --reference-accent: #9333ea;
-    --reference-accent-soft: #c084fc;
-    --reference-accent-text: #e9d5ff;
-    --reference-header-bg: #2a183a;
+    --reference-accent-soft: #a970d4;
+    --reference-accent-text: #7e22ce;
+    --reference-fade-start: rgba(147, 51, 234, 0.42);
+    --reference-fade-middle: rgba(147, 51, 234, 0.20);
+    --reference-fade-end: rgba(147, 51, 234, 0.05);
 }
 
 .state-clone-compound {
     --reference-accent: #000000;
-    --reference-accent-soft: #94a3b8;
-    --reference-accent-text: #e2e8f0;
-    --reference-header-bg: #111827;
+    --reference-accent-soft: #7b8490;
+    --reference-accent-text: #475569;
+    /* Compound references stay neutral: gray fade instead of blue. */
+    --reference-fade-start: rgba(100, 116, 139, 0.50);
+    --reference-fade-middle: rgba(100, 116, 139, 0.24);
+    --reference-fade-end: rgba(100, 116, 139, 0.06);
 }
 
 .state-clone-parallel {
     --reference-accent: #0284c7;
-    --reference-accent-soft: #38bdf8;
-    --reference-accent-text: #bae6fd;
-    --reference-header-bg: #102b3b;
+    --reference-accent-soft: #5f98b5;
+    --reference-accent-text: #036b9a;
+    --reference-fade-start: rgba(2, 132, 199, 0.42);
+    --reference-fade-middle: rgba(2, 132, 199, 0.20);
+    --reference-fade-end: rgba(2, 132, 199, 0.05);
 }
 
 .state-clone-header {
@@ -7157,8 +7183,16 @@
     gap: 6px;
     min-height: 27px;
     padding: 4px 7px;
-    border-bottom: 1px dashed var(--reference-accent-soft);
-    background: var(--reference-header-bg);
+    border-bottom: 1.5px dashed #9aa5af;
+    background:
+            linear-gradient(
+                    90deg,
+                    var(--reference-fade-start) 0%,
+                    var(--reference-fade-middle) 34%,
+                    var(--reference-fade-end) 68%,
+                    transparent 100%
+            ),
+            #d8dfe4;
 }
 
 .state-clone-reference-mark {
@@ -7169,7 +7203,7 @@
     height: 18px;
     border: 1px solid var(--reference-accent-soft);
     border-radius: 5px;
-    background: #1e293b;
+    background: #eef2f4;
     color: var(--reference-accent-text);
     font-size: 11px;
 }
@@ -7182,7 +7216,7 @@
 }
 
 .state-clone-type {
-    color: var(--reference-accent-text);
+    color: #69747f;
     text-transform: uppercase;
 }
 
@@ -7190,13 +7224,13 @@
     padding: 2px 6px;
     border: 1px solid var(--reference-accent-soft);
     border-radius: 999px;
-    background: #1e293b;
+    background: #eef2f4;
     color: var(--reference-accent-text);
 }
 
 .state-clone-label {
     padding: 8px 10px 9px;
-    color: #e2e8f0;
+    color: #46515c;
     font-size: 12px;
     font-weight: 600;
     text-align: center;
@@ -7290,7 +7324,7 @@
  * already-cached edges connected to the hovered/selected context are painted.
  */
 .react-flow.editor-transitions-context-only
-    .react-flow__edge.editor-transition-edge:not(.editor-edge-context-visible):not(.selected) {
+.react-flow__edge.editor-transition-edge:not(.editor-edge-context-visible):not(.selected) {
     visibility: hidden;
     pointer-events: none;
 }
@@ -7301,7 +7335,7 @@
  * does not create and smart-route the complete slot graph in one frame.
  */
 .react-flow.editor-slots-context-only
-    .react-flow__edge.editor-slot-edge:not(.editor-edge-context-visible):not(.selected) {
+.react-flow__edge.editor-slot-edge:not(.editor-edge-context-visible):not(.selected) {
     visibility: hidden;
     pointer-events: none;
 }
@@ -7315,14 +7349,14 @@
  * transition SVG groups directly in CSS.
  */
 .react-flow.editor-edge-focus-mode
-    .react-flow__edge.editor-transition-edge:not(.editor-edge-focus-active):not(.selected) {
+.react-flow__edge.editor-transition-edge:not(.editor-edge-focus-active):not(.selected) {
     opacity: 0.22;
 }
 
 .react-flow.editor-edge-focus-mode
-    .react-flow__edge.editor-transition-edge.editor-edge-focus-active,
+.react-flow__edge.editor-transition-edge.editor-edge-focus-active,
 .react-flow.editor-edge-focus-mode
-    .react-flow__edge.editor-transition-edge.selected {
+.react-flow__edge.editor-transition-edge.selected {
     opacity: 1;
 }
 
@@ -7333,16 +7367,16 @@
  * every node whenever the pointer moves across a large state machine.
  */
 .react-flow.editor-node-focus-mode
-    .react-flow__node:not(.editor-node-context-visible):not(.selected) {
+.react-flow__node:not(.editor-node-context-visible):not(.selected) {
     opacity: 0.42;
     filter: grayscale(0.72);
     transition: opacity 120ms ease, filter 120ms ease;
 }
 
 .react-flow.editor-node-focus-mode
-    .react-flow__node.editor-node-context-visible,
+.react-flow__node.editor-node-context-visible,
 .react-flow.editor-node-focus-mode
-    .react-flow__node.selected {
+.react-flow__node.selected {
     opacity: 1;
     filter: none;
 }
@@ -7352,3 +7386,4 @@
     margin: 2px 6px;
     background-color: #1e293b;
 }
+
