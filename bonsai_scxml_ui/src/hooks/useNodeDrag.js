@@ -231,17 +231,21 @@ export function useNodeDrag({
             entry.id !== nodeId && !entry.ancestorIds.has(nodeId);
 
         const dragContainerIndex = dragContainerIndexRef.current;
-        const hoveredCompound = dragContainerIndex.compounds.find(
-            (entry) => canUseTarget(entry) && containsPointer(entry)
-        );
+        const hoveredContainer = [
+            ...dragContainerIndex.compounds,
+            ...(nodeType !== "parallel" ? dragContainerIndex.lanes : []),
+        ]
+            .filter((entry) => canUseTarget(entry) && containsPointer(entry))
+            .sort((a, b) => b.depth - a.depth)[0] || null;
 
         let hoveredLane =
-            !hoveredCompound && nodeType !== "parallel"
-                ? dragContainerIndex.lanes.find(
-                      (entry) => canUseTarget(entry) && containsPointer(entry)
-                  )
+            hoveredContainer?.type === "parallelLane"
+                ? hoveredContainer
                 : null;
-        let effectiveCompound = hoveredCompound;
+        let effectiveCompound =
+            hoveredContainer?.type === "compound"
+                ? hoveredContainer
+                : null;
 
         // A node already inside a container is "sticky" at the border. The
         // source container remains highlighted for a small margin outside its
@@ -569,8 +573,59 @@ export function useNodeDrag({
                         getNodeNestingDepth(a, currentNodes)
                 )[0] || null;
 
+            let targetLaneAtDrop = draggedNode.type !== "parallel"
+                ? currentNodes
+                    .filter(
+                        (candidate) =>
+                            candidate.type === "parallelLane" &&
+                            !isNodeInsideContainer(
+                                candidate,
+                                draggedNode.id,
+                                currentNodes
+                            )
+                    )
+                    .filter((lane) => {
+                        const position = getAbsoluteNodePosition(lane, currentNodes);
+                        const width = Number(lane.style?.width) || 420;
+                        const height = Number(lane.style?.height) || 110;
+                        return (
+                            dropPoint.x >= position.x &&
+                            dropPoint.x <= position.x + width &&
+                            dropPoint.y >= position.y &&
+                            dropPoint.y <= position.y + height
+                        );
+                    })
+                    .sort(
+                        (a, b) =>
+                            getNodeNestingDepth(b, currentNodes) -
+                            getNodeNestingDepth(a, currentNodes)
+                    )[0] || null
+                : null;
+
+            // A point can be inside both an outer Compound and a nested
+            // Parallel lane (or vice versa). Always assign the drop to the
+            // deepest container under the cursor instead of giving one
+            // container type implicit priority.
+            if (targetCompound && targetLaneAtDrop) {
+                const compoundDepth = getNodeNestingDepth(
+                    targetCompound,
+                    currentNodes
+                );
+                const laneDepth = getNodeNestingDepth(
+                    targetLaneAtDrop,
+                    currentNodes
+                );
+
+                if (laneDepth > compoundDepth) {
+                    targetCompound = null;
+                } else {
+                    targetLaneAtDrop = null;
+                }
+            }
+
             const resistedCompoundDrop = Boolean(
                 !targetCompound &&
+                !targetLaneAtDrop &&
                 sourceCompound &&
                 dragOriginContainer?.kind === "compound" &&
                 dragOriginContainer.id === sourceCompound.id &&
@@ -583,30 +638,6 @@ export function useNodeDrag({
             if (resistedCompoundDrop) {
                 targetCompound = sourceCompound;
             }
-
-            const targetLaneAtDrop = draggedNode.type !== "parallel"
-                ? currentNodes
-                    .filter(
-                        (candidate) =>
-                            candidate.type === "parallelLane" &&
-                            !isNodeInsideContainer(
-                                candidate,
-                                draggedNode.id,
-                                currentNodes
-                            )
-                    )
-                    .find((lane) => {
-                        const position = getAbsoluteNodePosition(lane, currentNodes);
-                        const width = Number(lane.style?.width) || 420;
-                        const height = Number(lane.style?.height) || 110;
-                        return (
-                            dropPoint.x >= position.x &&
-                            dropPoint.x <= position.x + width &&
-                            dropPoint.y >= position.y &&
-                            dropPoint.y <= position.y + height
-                        );
-                    }) || null
-                : null;
 
 
             // ---------------------------------------------------------
