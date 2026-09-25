@@ -121,17 +121,20 @@ function CustomNode({ id, data, selected }) {
     );
 
     const eventIds = useMemo(
-        () =>
-            isSkillClone
-                ? []
-                : [
-                    ...new Set(
-                        (data.events || [])
-                            .map((event) => event.id)
-                            .filter(Boolean)
-                    ),
-                ],
-        [data.events, isSkillClone]
+        () => {
+            if (isSkillClone) return [];
+
+            const ids = (data.events || [])
+                .map((event) => event.id)
+                .filter(Boolean);
+
+            // `fatal` is implicit for normal executable skills only. Terminal
+            // states and behavior exits do not expose outgoing skill events.
+            if (!isFinalState && !isBehaviorExit) ids.push("fatal");
+
+            return [...new Set(ids)];
+        },
+        [data.events, isBehaviorExit, isFinalState, isSkillClone]
     );
 
     const parameterEntries = useMemo(

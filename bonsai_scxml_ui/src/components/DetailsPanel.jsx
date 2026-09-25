@@ -747,12 +747,21 @@ function sortExitTokens(events) {
         .map(({ event }) => event);
 }
 
-function getEditableExitTokens(events) {
-    return sortExitTokens(
-        (events || []).filter(
-            (event) => !(event?.sourceNodeId && event?.transitionHandleId)
-        )
+function getEditableExitTokens(events, includeImplicitFatal = false) {
+    const editable = (events || []).filter(
+        (event) => !(event?.sourceNodeId && event?.transitionHandleId)
     );
+
+    // `fatal` is implicit only for normal executable skills. Sub-state
+    // machines expose exactly the exits declared by their referenced behavior.
+    if (
+        includeImplicitFatal &&
+        !editable.some((event) => String(event?.id || "").trim() === "fatal")
+    ) {
+        editable.push({ id: "fatal", description: "" });
+    }
+
+    return sortExitTokens(editable);
 }
 
 function DetailsPanel({
@@ -815,13 +824,19 @@ function DetailsPanel({
         .split(".")
         .pop()
         .toLowerCase();
+    const exposesImplicitFatal =
+        selectedNode.type === "custom" &&
+        !["fatal", "end"].includes(selectedSkillType) &&
+        !selectedNode.data?.isFinal &&
+        !selectedNode.data?.isBehaviorExit;
     const isNopSkill = !isSubMachine && selectedSkillType === "nop";
     const hasNopSend =
         isNopSkill &&
         Array.isArray(selectedNode.data?.behaviorExitEvents) &&
         String(selectedNode.data.behaviorExitEvents[0] || "").trim().length > 0;
     const editableExitTokens = getEditableExitTokens(
-        selectedNode.data?.events || []
+        selectedNode.data?.events || [],
+        exposesImplicitFatal
     );
     const firstEditableExitToken = editableExitTokens[0] || null;
     const usesEditorInstanceId =
@@ -974,7 +989,10 @@ function DetailsPanel({
             return;
         }
 
-        const sortedEvents = getEditableExitTokens(selectedNode.data?.events || []);
+        const sortedEvents = getEditableExitTokens(
+            selectedNode.data?.events || [],
+            exposesImplicitFatal
+        );
         const eventIndex = sortedEvents.findIndex(
             (event) =>
                 String(event?.id || "") ===

@@ -212,7 +212,27 @@ export function useTransitionGraph({
                 !edge.data?.parallelInternalEdge &&
                 getLogicalEdgeSourceId(edge) === sourceId
         );
-        const sourceEvents = sourceNode.data.events || [];
+        const sourceEvents = [...(sourceNode.data.events || [])];
+        const baseStateName = String(
+            sourceNode.data?.fullSkillName || sourceNode.data?.label || ""
+        )
+            .split("#")[0]
+            .split(".")
+            .pop()
+            .toLowerCase();
+        const exposesImplicitFatal =
+            sourceNode.type === "custom" &&
+            !sourceNode.data?.isFinal &&
+            !sourceNode.data?.isBehaviorExit &&
+            baseStateName !== "end" &&
+            baseStateName !== "fatal";
+
+        if (
+            exposesImplicitFatal &&
+            !sourceEvents.some((event) => String(event?.id || "").trim() === "fatal")
+        ) {
+            sourceEvents.push({ id: "fatal", description: "" });
+        }
 
         // Edges preserve the SCXML transition order, so they are the primary
         // source for the ordered transition list shown in step 1.

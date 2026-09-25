@@ -631,6 +631,9 @@ export const buildEditorProblems = (
         );
     };
 
+    const exposesImplicitFatal = (node) =>
+        node?.type === "custom" && !isValidBehaviorTerminal(node);
+
     const addProblem = (problem) => {
         problems.push({
             severity: "error",
@@ -775,6 +778,10 @@ export const buildEditorProblems = (
         if (
             edge.sourceHandle &&
             edge.sourceHandle !== "*" &&
+            !(
+                edge.sourceHandle === "fatal" &&
+                exposesImplicitFatal(source)
+            ) &&
             !(source.data?.events || []).some(
                 (event) =>
                     event?.id === edge.sourceHandle &&
@@ -806,16 +813,17 @@ export const buildEditorProblems = (
         if (isValidBehaviorTerminal(node)) return;
 
         const exposedEventIds = [
-            ...new Set(
-                (node.data?.events || [])
+            ...new Set([
+                ...(node.data?.events || [])
                     .filter(
                         (event) =>
                             !event?.editorImportedSynthetic &&
                             !event?.editorBoundarySynthetic
                     )
                     .map((event) => String(event?.id || "").trim())
-                    .filter(Boolean)
-            ),
+                    .filter(Boolean),
+                ...(exposesImplicitFatal(node) ? ["fatal"] : []),
+            ]),
         ];
 
         if (exposedEventIds.length === 0) return;

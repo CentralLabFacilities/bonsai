@@ -559,7 +559,6 @@ function AppContent() {
         compoundDropTargetId,
         setCompoundDropTargetId,
         isDraggingNode,
-        draggingNodeId,
         isOverTrash,
         handleNodeDragStart,
         handleNodeDrag,
@@ -1532,6 +1531,21 @@ function AppContent() {
                     .map((event) => String(event?.id || "").trim())
                     .filter(Boolean)
             );
+            const baseStateName = String(
+                node.data?.fullSkillName || node.data?.label || ""
+            )
+                .split("#")[0]
+                .split(".")
+                .pop()
+                .toLowerCase();
+            const exposesImplicitFatal =
+                node.type === "custom" &&
+                !node.data?.isFinal &&
+                !node.data?.isBehaviorExit &&
+                baseStateName !== "end" &&
+                baseStateName !== "fatal";
+
+            if (exposesImplicitFatal) exposedHandles.add("fatal");
 
             const unexposedHandles = outgoingHandles
                 .map((handle) => String(handle || "").trim())
@@ -2784,7 +2798,6 @@ function AppContent() {
         injectedNodes,
         injectedSlotNodes,
         isDraggingNode,
-        draggingNodeId,
         hiddenNodeIds,
         parallelDropTargetId,
         compoundDropTargetId,
