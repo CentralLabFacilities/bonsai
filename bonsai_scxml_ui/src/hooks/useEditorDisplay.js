@@ -655,11 +655,49 @@ export function useEditorDisplay({
         return next;
     }, [routingGeometryIndex, normalizedTransitionEdges]);
 
+
+    const reconnectableTransitionEdgeIds = useMemo(() => {
+        const incomingByTarget = new Map();
+
+        normalizedTransitionEdges.forEach((edge) => {
+            if (
+                edge.data?.boundaryInternalEdge ||
+                edge.data?.compoundInternalEdge ||
+                edge.data?.parallelInternalEdge ||
+                edge.data?.compoundInitialEdge ||
+                edge.data?.parallelEntryEdge
+            ) {
+                return;
+            }
+
+            const targetNode = nodeById.get(edge.target);
+            if (!targetNode || !["custom", "submachine"].includes(targetNode.type)) {
+                return;
+            }
+
+            if (!incomingByTarget.has(edge.target)) {
+                incomingByTarget.set(edge.target, []);
+            }
+            incomingByTarget.get(edge.target).push(edge.id);
+        });
+
+        return new Set(
+            [...incomingByTarget.values()]
+                .filter((edgeIds) => edgeIds.length === 1)
+                .map((edgeIds) => edgeIds[0])
+        );
+    }, [normalizedTransitionEdges, nodeById]);
+
     const smartTransitionEdges = useMemo(
         () =>
             withSmartTransitionRouting(normalizedTransitionEdges).map(
                 (edge) => ({
                     ...edge,
+                    // React Flow's native target reconnect handle re-drags the
+                    // existing edge instead of creating a second connection.
+                    reconnectable: reconnectableTransitionEdgeIds.has(edge.id)
+                        ? "target"
+                        : false,
                     data: {
                         ...(edge.data || {}),
                         ...(compoundAvoidanceByEdgeId.has(edge.id)
@@ -679,6 +717,7 @@ export function useEditorDisplay({
             ),
         [
             normalizedTransitionEdges,
+            reconnectableTransitionEdgeIds,
             compoundAvoidanceByEdgeId,
             manualRoutingNodes,
             updatePersistentEdgeControlPoints,

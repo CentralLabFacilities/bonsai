@@ -64,6 +64,9 @@ export default function EditorCanvas({
     onConnect,
     handleConnectStart,
     handleConnectEnd,
+    onReconnect,
+    handleReconnectStart,
+    handleReconnectEnd,
     isValidConnection,
     selectSlotEdge,
     selectTransitionEdge,
@@ -268,6 +271,10 @@ export default function EditorCanvas({
                     onConnect={onConnect}
                     onConnectStart={handleConnectStart}
                     onConnectEnd={handleConnectEnd}
+                    onReconnect={onReconnect}
+                    onReconnectStart={handleReconnectStart}
+                    onReconnectEnd={handleReconnectEnd}
+                    edgesReconnectable
                     isValidConnection={isValidConnection}
                     connectionMode={ConnectionMode.Loose}
                     onEdgeClick={(event, edge) => {

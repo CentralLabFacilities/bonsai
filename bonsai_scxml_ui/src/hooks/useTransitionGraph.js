@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { addEdge, MarkerType } from "@xyflow/react";
 import {
     SLOT_CONNECTION_COLORS,
@@ -188,6 +188,7 @@ export function useTransitionGraph({
     updateNodeInternals,
 }) {
     const [slotConnectionDrag, setSlotConnectionDrag] = useState(null);
+    const reconnectingEdgeRef = useRef(null);
     const [drawerData, setDrawerData] = useState({
         isOpen: false,
         sourceNodeId: null,
@@ -457,6 +458,23 @@ export function useTransitionGraph({
             );
         }
 
+        const reconnectingEdge = reconnectingEdgeRef.current;
+        if (reconnectingEdge) {
+            const destinationNode = nodes.find(
+                (node) => node.id === connection.target
+            );
+            const logicalSourceNode = nodes.find(
+                (node) => node.id === getLogicalEdgeSourceId(reconnectingEdge)
+            );
+
+            return Boolean(
+                destinationNode &&
+                logicalSourceNode &&
+                ["transition-target", "target"].includes(connection.targetHandle) &&
+                canTargetVisualNode(logicalSourceNode, destinationNode, nodes)
+            );
+        }
+
         const sourceNode = nodes.find(
             (node) => node.id === connection.source
         );
@@ -497,7 +515,7 @@ export function useTransitionGraph({
             !normalTransitionTargetHandles.has(connection.sourceHandle) &&
             normalTransitionTargetHandles.has(connection.targetHandle)
         );
-    }, [nodes, slotNodes]);
+    }, [nodes, slotNodes, edges]);
 
     const handleConnectStart = useCallback((_, params) => {
         const slotHandle = parseSlotConnectionHandle(params?.handleId);
@@ -539,6 +557,144 @@ export function useTransitionGraph({
     const handleConnectEnd = useCallback(() => {
         setSlotConnectionDrag(null);
     }, []);
+
+    const handleReconnectStart = useCallback((_, edge) => {
+        // Only target-end transition reconnects are exposed. React Flow reports
+        // the fixed opposite handle here, so keep the edge itself regardless
+        // of that handleType value for validation during the drag.
+        reconnectingEdgeRef.current = edge;
+        setSlotConnectionDrag(null);
+    }, []);
+
+    const handleReconnectEnd = useCallback(() => {
+        reconnectingEdgeRef.current = null;
+    }, []);
+
+    const onReconnect = useCallback(
+        (oldEdge, connection) => {
+            reconnectingEdgeRef.current = null;
+
+            const existingEdge = edges.find((edge) => edge.id === oldEdge?.id);
+            if (
+                !existingEdge ||
+                existingEdge.data?.boundaryInternalEdge ||
+                existingEdge.data?.compoundInternalEdge ||
+                existingEdge.data?.parallelInternalEdge ||
+                existingEdge.data?.compoundInitialEdge ||
+                existingEdge.data?.parallelEntryEdge
+            ) {
+                return;
+            }
+
+            // Only an edge entering a state with exactly one semantic incoming
+            // transition may be re-targeted. This mirrors the visible reconnect
+            // handle configured by useEditorDisplay.
+            const incomingEdges = edges.filter(
+                (edge) =>
+                    edge.target === existingEdge.target &&
+                    !edge.data?.boundaryInternalEdge &&
+                    !edge.data?.compoundInternalEdge &&
+                    !edge.data?.parallelInternalEdge &&
+                    !edge.data?.compoundInitialEdge &&
+                    !edge.data?.parallelEntryEdge
+            );
+            if (incomingEdges.length !== 1 || incomingEdges[0].id !== existingEdge.id) {
+                return;
+            }
+
+            const destinationNode = nodes.find(
+                (node) => node.id === connection.target
+            );
+            const logicalSourceId = getLogicalEdgeSourceId(existingEdge);
+            const logicalSourceHandle = getLogicalEdgeSourceHandle(existingEdge);
+            const logicalSourceNode = nodes.find(
+                (node) => node.id === logicalSourceId
+            );
+
+            if (
+                !destinationNode ||
+                !logicalSourceNode ||
+                !["transition-target", "target"].includes(
+                    connection.targetHandle || getTransitionTargetHandleForNode(destinationNode)
+                ) ||
+                !canTargetVisualNode(logicalSourceNode, destinationNode, nodes)
+            ) {
+                return;
+            }
+
+            let updatedMatchingEvent = false;
+            const nextNodes = nodes.map((node) => {
+                if (node.id !== logicalSourceId) return node;
+
+                const events = (node.data?.events || []).map((event) => {
+                    const matchesEvent =
+                        String(event?.id || "") === String(logicalSourceHandle);
+                    const matchesOldTarget =
+                        !event.target || String(event.target) === String(existingEdge.target || "");
+
+                    if (updatedMatchingEvent || !matchesEvent || !matchesOldTarget) {
+                        return event;
+                    }
+
+                    updatedMatchingEvent = true;
+                    return {
+                        ...event,
+                        target: destinationNode.id,
+                        selectedPackage: getSkillPackageName(
+                            destinationNode.data?.fullSkillName
+                        ),
+                        selectedSkill:
+                            destinationNode.data?.fullSkillName?.split("#")[0] ||
+                            destinationNode.data?.label ||
+                            "",
+                    };
+                });
+
+                return updatedMatchingEvent
+                    ? { ...node, data: { ...node.data, events } }
+                    : node;
+            });
+
+            const nextEdges = edges.map((edge) =>
+                edge.id === existingEdge.id
+                    ? {
+                          ...edge,
+                          target: destinationNode.id,
+                          targetHandle:
+                              connection.targetHandle ||
+                              getTransitionTargetHandleForNode(destinationNode),
+                          data: {
+                              ...(edge.data || {}),
+                              editorTargetInstanceId:
+                                  destinationNode.data?.editorInstanceId || "",
+                          },
+                      }
+                    : edge
+            );
+
+            const normalized = rebuildBoundaryTransitionsIncremental(
+                nextNodes,
+                nextEdges,
+                {
+                    previousEdges: edges,
+                    sourceKeys: [
+                        {
+                            sourceId: logicalSourceId,
+                            sourceHandle: logicalSourceHandle,
+                        },
+                    ],
+                }
+            );
+
+            setNodes(normalized.nodes);
+            setEdges(normalized.edges);
+            (normalized.affectedNodeIds || []).forEach((nodeId) =>
+                requestAnimationFrame(() => updateNodeInternals(nodeId))
+            );
+            requestAnimationFrame(() => updateNodeInternals(destinationNode.id));
+        },
+        [edges, nodes, setEdges, setNodes, updateNodeInternals]
+    );
 
     const onConnect = useCallback(
         (params) => {
@@ -2115,6 +2271,9 @@ export function useTransitionGraph({
         isValidConnection,
         handleConnectStart,
         handleConnectEnd,
+        handleReconnectStart,
+        handleReconnectEnd,
+        onReconnect,
         onConnect,
         clearTransitionSelection,
         clearSlotEdgeSelection,

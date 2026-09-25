@@ -731,6 +731,9 @@ function AppContent() {
         isValidConnection,
         handleConnectStart,
         handleConnectEnd,
+        handleReconnectStart,
+        handleReconnectEnd,
+        onReconnect,
         onConnect,
         clearTransitionSelection,
         clearAllEdgeSelection,
@@ -1510,6 +1513,36 @@ function AppContent() {
         return result;
     }, [edges]);
 
+    // Expose the single semantic incoming transition to the target node so the
+    // visible entry handle can hand the drag off to React Flow's native edge
+    // reconnect anchor. With zero or multiple incoming transitions the entry
+    // handle remains a normal target only.
+    const reconnectableIncomingEdgeByNodeId = useMemo(() => {
+        const incoming = new Map();
+
+        edges.forEach((edge) => {
+            if (
+                edge.data?.boundaryInternalEdge ||
+                edge.data?.compoundInternalEdge ||
+                edge.data?.parallelInternalEdge ||
+                edge.data?.compoundInitialEdge ||
+                edge.data?.parallelEntryEdge
+            ) {
+                return;
+            }
+            if (!edge.target) return;
+
+            if (!incoming.has(edge.target)) incoming.set(edge.target, []);
+            incoming.get(edge.target).push(edge);
+        });
+
+        return new Map(
+            [...incoming.entries()]
+                .filter(([, incomingEdges]) => incomingEdges.length === 1)
+                .map(([nodeId, incomingEdges]) => [nodeId, incomingEdges[0].id])
+        );
+    }, [edges]);
+
     // Track outgoing transitions whose event handle is not actually exposed by
     // the source state. Imported SCXML can legitimately contain such edges: we
     // keep them visible and report them in Problems, but the source skill/Sub-SM
@@ -1632,6 +1665,10 @@ function AppContent() {
                 unexposedTransitionHandles.join("\u001f");
             const collapsedTransitionHandles =
                 collapsedParallelTransitionHandlesByNodeId.get(n.id) || [];
+            const reconnectIncomingEdgeId =
+                (n.type === "custom" || n.type === "submachine")
+                    ? reconnectableIncomingEdgeByNodeId.get(n.id) || null
+                    : null;
             const collapsedTransitionSignature = collapsedTransitionHandles
                 .map((event) => `${event.id}:${event.sourceNodeId}:${event.transitionHandleId}`)
                 .join("\u001f");
@@ -1672,6 +1709,7 @@ function AppContent() {
                     unexposedTransitionSignature &&
                 cached.collapsedTransitionSignature ===
                     collapsedTransitionSignature &&
+                cached.reconnectIncomingEdgeId === reconnectIncomingEdgeId &&
                 cached.activeMode === activeMode &&
                 cached.slotConnectionDrag === slotConnectionDrag &&
                 cached.childGlobalDataModel === childGlobalDataModel &&
@@ -1698,6 +1736,7 @@ function AppContent() {
                     outgoingTransitionInfo?.handles || [],
                 unexposedTransitionHandles,
                 collapsedTransitionHandles,
+                reconnectIncomingEdgeId,
                 onOpenStateActions: handleOpenStateActions,
                 onOpenParameter: handleOpenParameter,
                 onOpenSlot: handleOpenSlot,
@@ -1732,6 +1771,7 @@ function AppContent() {
                 outgoingTransitionSignature,
                 unexposedTransitionSignature,
                 collapsedTransitionSignature,
+                reconnectIncomingEdgeId,
                 activeMode,
                 slotConnectionDrag,
                 childGlobalDataModel,
@@ -1755,6 +1795,7 @@ function AppContent() {
         outgoingTransitionHandlesByNodeId,
         unexposedTransitionHandlesByNodeId,
         collapsedParallelTransitionHandlesByNodeId,
+        reconnectableIncomingEdgeByNodeId,
         tabs,
         activeTabId,
         activeMode,
@@ -5977,6 +6018,9 @@ function AppContent() {
                             onConnect={onConnect}
                             handleConnectStart={handleConnectStart}
                             handleConnectEnd={handleConnectEnd}
+                            onReconnect={onReconnect}
+                            handleReconnectStart={handleReconnectStart}
+                            handleReconnectEnd={handleReconnectEnd}
                             isValidConnection={isValidConnection}
                             selectSlotEdge={selectSlotEdge}
                             selectTransitionEdge={selectTransitionEdge}

@@ -7,6 +7,8 @@ import {
 import { FiAlertCircle, FiLink2 } from "react-icons/fi";
 import StateActionBadges from "./StateActionBadges";
 
+import { startTargetEdgeReconnectFromEntry } from "../utils/edgeReconnect";
+
 const normalizeSlotType = (type) =>
     String(type || "").trim().toLowerCase();
 
@@ -340,6 +342,17 @@ function CustomNode({ id, data, selected }) {
                     className="target-handle"
                     isConnectableStart={false}
                     isConnectableEnd={true}
+                    onMouseDown={(event) =>
+                        startTargetEdgeReconnectFromEntry(
+                            event,
+                            data.reconnectIncomingEdgeId
+                        )
+                    }
+                    title={
+                        data.reconnectIncomingEdgeId
+                            ? "Drag to reconnect the incoming transition"
+                            : undefined
+                    }
                 />
 
                 <div className="state-clone-header">
@@ -406,6 +419,17 @@ function CustomNode({ id, data, selected }) {
                     className="target-handle"
                     isConnectableStart={false}
                     isConnectableEnd={true}
+                    onMouseDown={(event) =>
+                        startTargetEdgeReconnectFromEntry(
+                            event,
+                            data.reconnectIncomingEdgeId
+                        )
+                    }
+                    title={
+                        data.reconnectIncomingEdgeId
+                            ? "Drag to reconnect the incoming transition"
+                            : undefined
+                    }
                 />
             )}
 

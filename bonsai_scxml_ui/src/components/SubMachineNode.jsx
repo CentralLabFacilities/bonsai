@@ -7,6 +7,8 @@ import {
 import { FiAlertCircle, FiExternalLink } from "react-icons/fi";
 import StateActionBadges from "./StateActionBadges";
 
+import { startTargetEdgeReconnectFromEntry } from "../utils/edgeReconnect";
+
 const normalizeSlotType = (type) =>
     String(type || "").trim().toLowerCase();
 
@@ -268,6 +270,17 @@ export default function SubMachineNode({ id, data, selected }) {
                     className="target-handle"
                     isConnectableStart={false}
                     isConnectableEnd={true}
+                    onMouseDown={(event) =>
+                        startTargetEdgeReconnectFromEntry(
+                            event,
+                            data.reconnectIncomingEdgeId
+                        )
+                    }
+                    title={
+                        data.reconnectIncomingEdgeId
+                            ? "Drag to reconnect the incoming transition"
+                            : undefined
+                    }
                 />
             )}
 
