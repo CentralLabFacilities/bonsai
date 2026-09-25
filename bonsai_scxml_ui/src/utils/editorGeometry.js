@@ -5,14 +5,18 @@ export const getNodeId = () => `skill-node-${crypto.randomUUID()}`;
 
 export const COLLAPSED_CONTAINER_WIDTH = 210;
 export const COLLAPSED_CONTAINER_HEIGHT = 80;
-export const PARALLEL_EXIT_GUTTER = 150;
-export const PARALLEL_NODE_GAP = 30;
+export const PARALLEL_EXIT_GUTTER = 170;
+export const PARALLEL_NODE_GAP = 45;
 export const PARALLEL_HEADER_HEIGHT = 64;
-export const PARALLEL_LANE_CHILD_TOP_INSET = 30;
-export const COMPOUND_NODE_GAP = 30;
-export const COMPOUND_PADDING_X = 30;
+export const PARALLEL_LANE_CHILD_LEFT_INSET = 40;
+export const PARALLEL_LANE_CHILD_TOP_INSET = 40;
+export const PARALLEL_LANE_CHILD_RIGHT_INSET = 45;
+export const PARALLEL_LANE_CHILD_BOTTOM_INSET = 40;
+export const PARALLEL_BOTTOM_PADDING = 45;
+export const COMPOUND_NODE_GAP = 40;
+export const COMPOUND_PADDING_X = 45;
 export const COMPOUND_HEADER_HEIGHT = 45;
-export const COMPOUND_BOTTOM_PADDING = 30;
+export const COMPOUND_BOTTOM_PADDING = 45;
 export const COMPOUND_EXIT_GUTTER_MIN = 220;
 export const COMPOUND_EXIT_GUTTER_MAX = 420;
 
@@ -447,35 +451,20 @@ export const orderNodesParentsFirst = (allNodes) => {
         .map(({ node }) => node);
 };
 
-const isEditorReferenceNode = (node) =>
-    Boolean(
-        node?.data?.cloneOfNodeId &&
-        (
-            node.data?.isSkillClone ||
-            node.data?.isStateClone ||
-            node.data?.isSlotClone
-        )
-    );
-
 export const isCompoundInitialChildCandidate = (node) =>
     Boolean(
         node &&
-        !isEditorReferenceNode(node) &&
         node.type !== "slot" &&
         node.type !== "parallelLane"
     );
 
 // Any real SCXML state can be a branch state in a parallel lane. Structural
-// states (compound/parallel) therefore participate exactly like skills. Editor
-// references are visual aliases only: treating a Compound/Parallel reference
-// as a real lane state makes the lane normalizer repeatedly restructure the
-// graph around an object that is intentionally not part of SCXML semantics.
-// The automatically managed lane wrapper itself is excluded so it never tries
-// to wrap itself.
+// states (compound/parallel) therefore participate exactly like skills. The
+// automatically managed lane wrapper itself is excluded so it never tries to
+// wrap itself.
 export const isParallelLaneSkillCandidate = (node) =>
     Boolean(
         node &&
-        !isEditorReferenceNode(node) &&
         node.type !== "slot" &&
         node.type !== "parallelLane" &&
         !(
@@ -598,11 +587,14 @@ const growParallelToLaneContentsInContext = (context, parallelId) => {
         });
 
         const requiredLaneWidth = wrapper
-            ? Math.max(420, maxRight)
-            : Math.max(420, 15 + maxRight + PARALLEL_EXIT_GUTTER);
+            ? Math.max(420, maxRight + PARALLEL_LANE_CHILD_RIGHT_INSET)
+            : Math.max(
+                  420,
+                  maxRight + PARALLEL_LANE_CHILD_RIGHT_INSET + PARALLEL_EXIT_GUTTER
+              );
         const requiredLaneHeight = wrapper
-            ? Math.max(140, maxBottom)
-            : Math.max(110, maxBottom + 20);
+            ? Math.max(150, maxBottom + PARALLEL_LANE_CHILD_BOTTOM_INSET)
+            : Math.max(130, maxBottom + PARALLEL_LANE_CHILD_BOTTOM_INSET);
 
         requiredParallelWidth = Math.max(
             requiredParallelWidth,
@@ -635,7 +627,7 @@ const growParallelToLaneContentsInContext = (context, parallelId) => {
     const requiredParallelHeight = Math.max(
         180,
         currentParallelSize.height,
-        nextLaneY + 35
+        nextLaneY + PARALLEL_BOTTOM_PADDING
     );
 
     if (liveParallel.data?.isCollapsed) {
@@ -772,9 +764,17 @@ export const resolveNodeCollisionsAndRefit = (
     // Shift the whole resolved sibling group together so its relative spacing
     // stays intact while respecting the container's content inset.
     const minContentX =
-        parent?.type === "compound" ? COMPOUND_PADDING_X : 20;
+        parent?.type === "compound"
+            ? COMPOUND_PADDING_X
+            : parent?.type === "parallelLane"
+              ? PARALLEL_LANE_CHILD_LEFT_INSET
+              : 20;
     const minContentY =
-        parent?.type === "compound" ? COMPOUND_HEADER_HEIGHT : 20;
+        parent?.type === "compound"
+            ? COMPOUND_HEADER_HEIGHT + COMPOUND_PADDING_X
+            : parent?.type === "parallelLane"
+              ? PARALLEL_LANE_CHILD_TOP_INSET
+              : 20;
     const siblings = nextNodes.filter(
         (node) =>
             (node.parentId || null) === (focusNode.parentId || null) &&
@@ -993,103 +993,10 @@ const normalizeParallelLaneCompoundsImpl = (allNodes) => {
         const laneWidth = Math.max(1, Number(laneSize.width) || 420);
         const laneHeight = Math.max(1, Number(laneSize.height) || 140);
 
-        /*
-         * If the lane already contains a normal compound and another sibling
-         * state is added, that existing compound becomes the lane compound.
-         * Do NOT create another compound around it.
-         */
-        if (!wrapper && allSkills.length > 1) {
-            const existingDirectCompound = directSkills.find(
-                (node) => node.type === "compound"
-            );
-
-            if (existingDirectCompound) {
-                const oldWrapperPosition = existingDirectCompound.position || {
-                    x: 0,
-                    y: 0,
-                };
-                const existingChildren = getChildren(
-                    existingDirectCompound.id
-                ).filter(isCompoundInitialChildCandidate);
-                const siblingsToAbsorb = directSkills.filter(
-                    (node) => node.id !== existingDirectCompound.id
-                );
-                const compoundChildren = [];
-                const compoundChildIds = new Set();
-                [...existingChildren, ...siblingsToAbsorb].forEach((node) => {
-                    if (!node || compoundChildIds.has(node.id)) return;
-                    compoundChildIds.add(node.id);
-                    compoundChildren.push(node);
-                });
-
-                const storedInitialId =
-                    existingDirectCompound.data?.initialChildId;
-                const initialChild =
-                    compoundChildren.find(
-                        (node) => node.id === storedInitialId
-                    ) ||
-                    compoundChildren.find((node) => node.data?.isInitial) ||
-                    compoundChildren[0] ||
-                    null;
-                const desiredInitialId = initialChild?.id || null;
-
-                replaceNode(existingDirectCompound.id, {
-                    ...existingDirectCompound,
-                    position: { x: 0, y: 0 },
-                    parentId: currentLane.id,
-                    extent: "parent",
-                    expandParent: true,
-                    draggable: false,
-                    selectable: false,
-                    width: laneWidth,
-                    height: laneHeight,
-                    style: {
-                        ...existingDirectCompound.style,
-                        width: laneWidth,
-                        height: laneHeight,
-                    },
-                    data: {
-                        ...existingDirectCompound.data,
-                        initialChildId: desiredInitialId,
-                        autoParallelLaneCompound: true,
-                    },
-                });
-
-                existingChildren.forEach((child) => {
-                    replaceNode(child.id, {
-                        ...child,
-                        position: {
-                            x:
-                                Number(oldWrapperPosition.x || 0) +
-                                Number(child.position?.x || 0),
-                            y:
-                                Number(oldWrapperPosition.y || 0) +
-                                Number(child.position?.y || 0),
-                        },
-                        data: {
-                            ...child.data,
-                            isInitial: child.id === desiredInitialId,
-                        },
-                    });
-                });
-
-                siblingsToAbsorb.forEach((sibling) => {
-                    const liveSibling = byId.get(sibling.id) || sibling;
-                    replaceNode(sibling.id, {
-                        ...liveSibling,
-                        parentId: existingDirectCompound.id,
-                        extent: "parent",
-                        expandParent: true,
-                        data: {
-                            ...liveSibling.data,
-                            isInitial: sibling.id === desiredInitialId,
-                        },
-                    });
-                });
-
-                return;
-            }
-        }
+        // Never repurpose a user-created Compound as the editor-only lane
+        // wrapper. Semantic compounds must stay selectable and may themselves
+        // contain compounds/parallels recursively. If a lane needs a structural
+        // wrapper, create a separate automatic wrapper below.
 
         if (!wrapper) {
             const wrapperId = getNodeId();

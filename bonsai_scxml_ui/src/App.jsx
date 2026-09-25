@@ -2374,7 +2374,7 @@ function AppContent() {
             // Compound/Parallel states. Reveal the complete ancestor chain
             // before focusing; otherwise React Flow may fit the viewport to a
             // hidden child's stale/internal bounds and jump somewhere else.
-            const collapsedAncestors = new Set();
+            const containerAncestors = new Set();
             focusIds.forEach((focusId) => {
                 let parentId = liveNodeById.get(focusId)?.parentId;
                 const visited = new Set();
@@ -2385,11 +2385,10 @@ function AppContent() {
                     if (!parent) break;
 
                     if (
-                        (parent.type === "compound" ||
-                            parent.type === "parallel") &&
-                        parent.data?.isCollapsed
+                        parent.type === "compound" ||
+                        parent.type === "parallel"
                     ) {
-                        collapsedAncestors.add(parent.id);
+                        containerAncestors.add(parent.id);
                     }
 
                     parentId = parent.parentId;
@@ -2413,15 +2412,100 @@ function AppContent() {
                 return depth;
             };
 
-            [...collapsedAncestors]
-                .sort(
-                    (leftId, rightId) =>
-                        getAncestorDepth(leftId) -
-                        getAncestorDepth(rightId)
-                )
-                .forEach((containerId) =>
-                    handleToggleContainerCollapse(containerId)
+            const containersToExpand = [...containerAncestors].sort(
+                (leftId, rightId) =>
+                    getAncestorDepth(leftId) - getAncestorDepth(rightId)
+            );
+
+            if (containersToExpand.length > 0) {
+                const containerIds = new Set(containersToExpand);
+
+                // Expand all collapsed ancestors explicitly in one state update.
+                // Using the generic toggle handler here only revealed descendants
+                // reliably; nested containers could keep their compact React Flow
+                // dimensions and therefore never render as genuinely opened frames.
+                // Restoring the saved expanded dimensions here makes the actual
+                // Compound/Parallel node open before we navigate to its child.
+                setNodes((currentNodes) =>
+                    currentNodes.map((node) => {
+                        if (!containerIds.has(node.id)) return node;
+                        if (
+                            node.type !== "compound" &&
+                            node.type !== "parallel"
+                        ) {
+                            return node;
+                        }
+
+                        const savedSize =
+                            node.data?.expandedContainerSize || {};
+                        const fallbackWidth =
+                            node.type === "compound" ? 320 : 420;
+                        const fallbackHeight =
+                            node.type === "compound" ? 220 : 295;
+                        const currentWidth =
+                            Number(node.width) ||
+                            Number(node.measured?.width) ||
+                            Number(node.style?.width) ||
+                            0;
+                        const currentHeight =
+                            Number(node.height) ||
+                            Number(node.measured?.height) ||
+                            Number(node.style?.height) ||
+                            0;
+                        const hasCompactFootprint =
+                            currentWidth <= COLLAPSED_CONTAINER_WIDTH + 1 &&
+                            currentHeight <= COLLAPSED_CONTAINER_HEIGHT + 1;
+                        const needsPhysicalExpansion =
+                            Boolean(node.data?.isCollapsed) ||
+                            hasCompactFootprint;
+
+                        if (!needsPhysicalExpansion) {
+                            return node;
+                        }
+
+                        const restoredWidth = Math.max(
+                            Number(savedSize.width) || 0,
+                            fallbackWidth
+                        );
+                        const restoredHeight = Math.max(
+                            Number(savedSize.height) || 0,
+                            fallbackHeight
+                        );
+                        const restoredStyle = {
+                            ...(node.style || {}),
+                            width: restoredWidth,
+                            height: restoredHeight,
+                        };
+
+                        if (savedSize.minHeight == null) {
+                            delete restoredStyle.minHeight;
+                        } else {
+                            restoredStyle.minHeight = savedSize.minHeight;
+                        }
+
+                        return {
+                            ...node,
+                            width: restoredWidth,
+                            height: restoredHeight,
+                            style: restoredStyle,
+                            data: {
+                                ...(node.data || {}),
+                                isCollapsed: false,
+                            },
+                        };
+                    })
                 );
+
+                // React Flow caches node measurements independently of our node
+                // objects. Re-measure every opened ancestor after the state update
+                // so the expanded Compound/Parallel frame is actually painted and
+                // its nested children receive their correct absolute positions.
+                requestAnimationFrame(() => {
+                    containersToExpand.forEach((containerId) =>
+                        updateNodeInternals(containerId)
+                    );
+                });
+            }
 
             setEdges((currentEdges) =>
                 currentEdges.map((edge) => ({
@@ -2505,10 +2589,10 @@ function AppContent() {
         [
             fitView,
             getNodes,
-            handleToggleContainerCollapse,
             setCenter,
             setEdges,
             setNodes,
+            updateNodeInternals,
         ]
     );
 

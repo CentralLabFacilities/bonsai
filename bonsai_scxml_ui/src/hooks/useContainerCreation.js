@@ -3,7 +3,12 @@ import {
     COMPOUND_PADDING_X,
     COMPOUND_HEADER_HEIGHT,
     PARALLEL_HEADER_HEIGHT,
+    PARALLEL_EXIT_GUTTER,
+    PARALLEL_LANE_CHILD_LEFT_INSET,
     PARALLEL_LANE_CHILD_TOP_INSET,
+    PARALLEL_LANE_CHILD_RIGHT_INSET,
+    PARALLEL_LANE_CHILD_BOTTOM_INSET,
+    PARALLEL_BOTTOM_PADDING,
     PARALLEL_NODE_GAP,
     getCompoundExitGutterWidth,
     getNodeId,
@@ -67,9 +72,9 @@ export function useContainerCreation({
                 .sort((a, b) => a.position.y - b.position.y);
 
             const laneIndex = existingLanes.length;
-            const laneHeight = 150;
+            const laneHeight = 170;
             const headerHeight = PARALLEL_HEADER_HEIGHT;
-            const buttonReserve = 35;
+            const buttonReserve = PARALLEL_BOTTOM_PADDING;
 
             const newLaneId = getNodeId();
             const newLaneName = `Lane_${laneIndex + 1}`;
@@ -265,7 +270,7 @@ export function useContainerCreation({
             maxY,
         } = getSelectionBoundingBox(selectedNodes);
 
-        const padding = 40;
+        const padding = COMPOUND_PADDING_X;
         const headerOffset = COMPOUND_HEADER_HEIGHT;
 
         const contentWidth =
@@ -679,7 +684,7 @@ export function useContainerCreation({
         const getNodeHeight = (node) => getOverviewLayoutNodeSize(node).height;
 
         const headerHeight = PARALLEL_HEADER_HEIGHT;
-        const buttonReserve = 40;
+        const buttonReserve = PARALLEL_BOTTOM_PADDING;
         const laneHeights = [];
         const groupWidths = [];
 
@@ -692,20 +697,37 @@ export function useContainerCreation({
             group.forEach((n) => {
                 const h = getNodeHeight(n);
                 if (h > maxH) maxH = h;
-                totalW += getNodeWidth(n) + 40; // 40px Abstand zwischen Nodes
+                totalW += getNodeWidth(n);
             });
 
             if (isCompound) {
                 // Compound-Rahmen: Header (35px) + Node-Höhe + Rand-Padding (40px)
-                laneHeights.push(Math.max(170, maxH + 75));
-                // Breite: Padding links/rechts (60px) + Exit-Handle-Puffer (120px)
-                groupWidths.push(totalW + 160);
-            } else {
-                laneHeights.push(Math.max(130, maxH + 40));
+                laneHeights.push(
+                    Math.max(
+                        190,
+                        maxH + PARALLEL_LANE_CHILD_TOP_INSET + PARALLEL_LANE_CHILD_BOTTOM_INSET
+                    )
+                );
                 groupWidths.push(
-                    group.length > 1
-                        ? totalW + 80
-                        : getNodeWidth(group[0]) + 160
+                    PARALLEL_LANE_CHILD_LEFT_INSET +
+                    totalW +
+                    Math.max(0, group.length - 1) * PARALLEL_NODE_GAP +
+                    PARALLEL_LANE_CHILD_RIGHT_INSET +
+                    PARALLEL_EXIT_GUTTER
+                );
+            } else {
+                laneHeights.push(
+                    Math.max(
+                        150,
+                        maxH + PARALLEL_LANE_CHILD_TOP_INSET + PARALLEL_LANE_CHILD_BOTTOM_INSET
+                    )
+                );
+                groupWidths.push(
+                    PARALLEL_LANE_CHILD_LEFT_INSET +
+                    totalW +
+                    Math.max(0, group.length - 1) * PARALLEL_NODE_GAP +
+                    PARALLEL_LANE_CHILD_RIGHT_INSET +
+                    PARALLEL_EXIT_GUTTER
                 );
             }
         });
@@ -841,7 +863,7 @@ export function useContainerCreation({
             // States DIREKT in die Lane. The lane itself is the single SCXML
             // compound branch; do not create another wrapper compound.
             // Kein Group_X_Part Compound mehr.
-            let currentX = 25;
+            let currentX = PARALLEL_LANE_CHILD_LEFT_INSET;
 
             group.forEach((node) => {
                 const nodeWidth = getNodeWidth(node);
