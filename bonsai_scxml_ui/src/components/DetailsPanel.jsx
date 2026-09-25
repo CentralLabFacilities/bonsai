@@ -1416,13 +1416,20 @@ function DetailsPanel({
 
                             <button
                                 className="initial-button"
-                                disabled={
-                                    hasInitialNode &&
-                                    !selectedNode.data.isInitial
-                                }
                                 onClick={onSetInitial}
+                                title={
+                                    selectedNode.data.isInitial
+                                        ? "This state is initial"
+                                        : hasInitialNode
+                                          ? "Replace the current initial state"
+                                          : "Set as initial state"
+                                }
                             >
-                                Initial set
+                                {selectedNode.data.isInitial
+                                    ? "Initial set"
+                                    : hasInitialNode
+                                      ? "Set initial instead"
+                                      : "Set initial"}
                             </button>
                         </div>
 
