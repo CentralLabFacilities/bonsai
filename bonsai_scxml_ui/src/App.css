@@ -3876,6 +3876,18 @@
     font-weight: 600;
 }
 
+.context-menu-item:disabled {
+    color: #64748b;
+    cursor: default;
+    opacity: 0.6;
+}
+
+.context-menu-item:disabled:hover {
+    background: transparent;
+    color: #64748b;
+    font-weight: 400;
+}
+
 /* ==========================================================================
    CUSTOM NODE: SLOT KEY CHIPS BELOW TRANSITIONS
    ========================================================================== */

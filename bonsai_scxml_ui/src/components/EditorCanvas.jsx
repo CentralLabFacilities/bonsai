@@ -52,6 +52,7 @@ export default function EditorCanvas({
     selectedNodes,
     contextMenu,
     handleSelectAction,
+    hasGraphClipboard,
     canCreateEditorClone,
     editorCloneActionLabel,
     setIsCreateSlotModalOpen,
@@ -192,6 +193,13 @@ export default function EditorCanvas({
                         <button
                             className="context-menu-item"
                             onClick={() => handleSelectAction("paste")}
+                            disabled={!hasGraphClipboard}
+                            aria-disabled={!hasGraphClipboard}
+                            title={
+                                hasGraphClipboard
+                                    ? "Paste copied nodes"
+                                    : "Nothing copied"
+                            }
                         >
                             Paste
                         </button>

@@ -352,6 +352,13 @@ function AppContent() {
     // clipboard: Ctrl+C copies the current React Flow selection and
     // Ctrl+V recreates it with fresh graph IDs.
     const graphClipboardRef = useRef(null);
+    const [hasGraphClipboard, setHasGraphClipboard] = useState(() =>
+        Boolean(
+            persistentGraphClipboard &&
+                ((persistentGraphClipboard.nodes?.length || 0) > 0 ||
+                    (persistentGraphClipboard.slotNodes?.length || 0) > 0)
+        )
+    );
     useEffect(() => {
         // Also sanitize a clipboard created by an older/hot-reloaded version
         // so stale callback closures are released immediately.
@@ -3660,6 +3667,7 @@ function AppContent() {
 
             graphClipboardRef.current = clipboard;
             persistentGraphClipboard = clipboard;
+            setHasGraphClipboard(true);
             return true;
         };
 
@@ -5850,6 +5858,7 @@ function AppContent() {
                             contextSelectionCount={editorCloneSelection.length}
                             contextMenu={contextMenu}
                             handleSelectAction={handleSelectAction}
+                            hasGraphClipboard={hasGraphClipboard}
                             canCreateEditorClone={canCreateEditorClone}
                             editorCloneActionLabel={editorCloneActionLabel}
                             setIsCreateSlotModalOpen={setIsCreateSlotModalOpen}
