@@ -63,6 +63,10 @@ import {
     resolveNodeCollisionsAndRefit,
     normalizeParallelLaneCompounds,
     normalizeCompoundInitialStates,
+    findDropContainerAtPoint,
+    fitCompoundAndAncestorCompounds,
+    growParallelToLaneContents,
+    isAutoParallelLaneCompound,
 } from "./utils/editorGeometry";
 import {
     getForwardingNopScxmlStateId,
@@ -364,8 +368,8 @@ function AppContent() {
     const [hasGraphClipboard, setHasGraphClipboard] = useState(() =>
         Boolean(
             persistentGraphClipboard &&
-            ((persistentGraphClipboard.nodes?.length || 0) > 0 ||
-                (persistentGraphClipboard.slotNodes?.length || 0) > 0)
+                ((persistentGraphClipboard.nodes?.length || 0) > 0 ||
+                    (persistentGraphClipboard.slotNodes?.length || 0) > 0)
         )
     );
     useEffect(() => {
@@ -1094,11 +1098,42 @@ function AppContent() {
         const sourceNode = editorCloneSourceNode;
         if (!isCloneableEditorNode(sourceNode)) return;
 
-        const cloneNode = buildEditorCloneNode(sourceNode, {
+        const desiredAbsolutePosition = {
             x: Number(contextMenu.flowPosition.x || 0) + 220,
             y: Number(contextMenu.flowPosition.y || 0),
-        });
+        };
+
+        let clonePosition = desiredAbsolutePosition;
+        let cloneParent = null;
+
+        // References are visual aliases of the same semantic state. Keep them
+        // in the same semantic scope as their source so a reference to a state
+        // in a Parallel lane stays in that lane.
+        if (sourceNode.type !== "slot" && sourceNode.parentId) {
+            cloneParent = nodes.find(
+                (candidate) => candidate.id === sourceNode.parentId
+            ) || null;
+
+            if (cloneParent) {
+                const parentAbsolute = getAbsoluteNodePosition(
+                    cloneParent,
+                    nodes
+                );
+                clonePosition = {
+                    x: desiredAbsolutePosition.x - parentAbsolute.x,
+                    y: desiredAbsolutePosition.y - parentAbsolute.y,
+                };
+            }
+        }
+
+        const cloneNode = buildEditorCloneNode(sourceNode, clonePosition);
         if (!cloneNode) return;
+
+        if (cloneParent) {
+            cloneNode.parentId = cloneParent.id;
+            cloneNode.extent = "parent";
+            cloneNode.expandParent = true;
+        }
 
         if (sourceNode.type === "slot") {
             setNodes((currentNodes) =>
@@ -1115,13 +1150,31 @@ function AppContent() {
             setSlotNodes((currentSlotNodes) =>
                 currentSlotNodes.map((node) => ({ ...node, selected: false }))
             );
-            setNodes((currentNodes) => [
-                ...currentNodes.map((node) => ({
-                    ...node,
-                    selected: false,
-                })),
-                cloneNode,
-            ]);
+            setNodes((currentNodes) => {
+                let nextNodes = orderNodesParentsFirst([
+                    ...currentNodes.map((node) => ({
+                        ...node,
+                        selected: false,
+                    })),
+                    cloneNode,
+                ]);
+
+                if (cloneParent?.type === "compound") {
+                    nextNodes = fitCompoundAndAncestorCompounds(
+                        nextNodes,
+                        cloneParent.id
+                    );
+                } else if (cloneParent?.type === "parallelLane") {
+                    if (cloneParent.parentId) {
+                        nextNodes = growParallelToLaneContents(
+                            nextNodes,
+                            cloneParent.parentId
+                        );
+                    }
+                }
+
+                return orderNodesParentsFirst(nextNodes);
+            });
         }
 
         setSelectedNodeId(cloneNode.id);
@@ -1130,6 +1183,7 @@ function AppContent() {
     }, [
         contextMenu,
         editorCloneSourceNode,
+        nodes,
         setNodes,
         setSlotNodes,
         setSelectedNodeId,
@@ -1707,11 +1761,11 @@ function AppContent() {
                 cached.sourceNode === n &&
                 cached.hidden === hidden &&
                 cached.outgoingTransitionSignature ===
-                outgoingTransitionSignature &&
+                    outgoingTransitionSignature &&
                 cached.unexposedTransitionSignature ===
-                unexposedTransitionSignature &&
+                    unexposedTransitionSignature &&
                 cached.collapsedTransitionSignature ===
-                collapsedTransitionSignature &&
+                    collapsedTransitionSignature &&
                 cached.reconnectIncomingEdgeId === reconnectIncomingEdgeId &&
                 cached.activeMode === activeMode &&
                 cached.slotConnectionDrag === slotConnectionDrag &&
@@ -2159,13 +2213,13 @@ function AppContent() {
         const result = [];
 
         const appendOutgoingTransition = ({
-                                              edgeId,
-                                              sourceId,
-                                              sourceHandle,
-                                              targetId,
-                                              rawEvent = "",
-                                              isFallback = false,
-                                          }) => {
+            edgeId,
+            sourceId,
+            sourceHandle,
+            targetId,
+            rawEvent = "",
+            isFallback = false,
+        }) => {
             if (
                 !sourceId ||
                 !targetId ||
@@ -2192,9 +2246,9 @@ function AppContent() {
             // prefixing the event with the Compound/Parallel container name.
             const sourceSkillBase = String(
                 sourceNode?.data?.label ||
-                sourceNode?.data?.fullSkillName ||
-                sourceNode?.id ||
-                ""
+                    sourceNode?.data?.fullSkillName ||
+                    sourceNode?.id ||
+                    ""
             )
                 .split("#")[0]
                 .split(".")
@@ -2285,7 +2339,7 @@ function AppContent() {
                     (edge) =>
                         edge.source === anchor.id &&
                         String(edge.sourceHandle || "") ===
-                        String(event.id || "")
+                            String(event.id || "")
                 );
                 if (!boundaryEdge) return;
 
@@ -2322,91 +2376,6 @@ function AppContent() {
 
         return result;
     }, [selectedNode, semanticNodes, edges]);
-
-    const selectedSkillOutgoingTransitions = useMemo(() => {
-        if (
-            !selectedNode ||
-            selectedNode.type === "slot" ||
-            selectedNode.type === "compound" ||
-            selectedNode.type === "parallel"
-        ) {
-            return [];
-        }
-
-        const result = [];
-        const seen = new Set();
-
-        edges.forEach((edge) => {
-            if (
-                edge.data?.boundaryInternalEdge ||
-                edge.data?.compoundInternalEdge ||
-                edge.data?.parallelInternalEdge ||
-                edge.data?.compoundInitialEdge ||
-                edge.data?.parallelEntryEdge ||
-                String(edge.id || "").startsWith("edge-internal-")
-            ) {
-                return;
-            }
-
-            const storedSources = Array.isArray(edge.data?.boundaryOriginalSources)
-                ? edge.data.boundaryOriginalSources
-                    .map((entry) => ({
-                        sourceId: String(
-                            entry?.sourceId || entry?.nodeId || entry?.id || ""
-                        ),
-                        sourceHandle: String(
-                            entry?.sourceHandle || entry?.handle || ""
-                        ),
-                    }))
-                    .filter((entry) => entry.sourceId && entry.sourceHandle)
-                : [];
-
-            const sourceEntries =
-                storedSources.length > 0
-                    ? storedSources
-                    : [
-                        {
-                            sourceId:
-                                edge.data?.boundaryOriginalSource ||
-                                edge.data?.compoundOriginalSource ||
-                                edge.data?.parallelOriginalSource ||
-                                edge.source,
-                            sourceHandle: String(
-                                edge.data?.boundaryOriginalSourceHandle ||
-                                edge.data?.compoundOriginalSourceHandle ||
-                                edge.data?.parallelOriginalSourceHandle ||
-                                edge.sourceHandle ||
-                                edge.label ||
-                                "success"
-                            ),
-                        },
-                    ];
-
-            const targetNodeId =
-                edge.data?.boundaryOriginalTarget ||
-                edge.data?.compoundOriginalTarget ||
-                edge.data?.parallelOriginalTarget ||
-                edge.target;
-            if (!targetNodeId) return;
-
-            sourceEntries.forEach((entry) => {
-                if (entry.sourceId !== selectedNode.id) return;
-
-                const semanticKey = `${entry.sourceId}::${entry.sourceHandle}::${targetNodeId}`;
-                if (seen.has(semanticKey)) return;
-                seen.add(semanticKey);
-
-                result.push({
-                    edgeId: edge.id,
-                    sourceNodeId: entry.sourceId,
-                    eventId: entry.sourceHandle,
-                    targetNodeId,
-                });
-            });
-        });
-
-        return result;
-    }, [selectedNode, edges]);
 
     const handleMoveContainerTransition = useCallback((edgeId, direction) => {
         if (
@@ -2666,9 +2635,9 @@ function AppContent() {
             const transitionSourceId =
                 problem.category === "Transitions" && problemEdge
                     ? problemEdge.data?.boundaryOriginalSource ||
-                    problemEdge.data?.compoundOriginalSource ||
-                    problemEdge.data?.parallelOriginalSource ||
-                    problemEdge.source
+                      problemEdge.data?.compoundOriginalSource ||
+                      problemEdge.data?.parallelOriginalSource ||
+                      problemEdge.source
                     : null;
             const selectedProblemNodeId =
                 transitionSourceId && liveNodeById.has(transitionSourceId)
@@ -3319,16 +3288,16 @@ function AppContent() {
                             edge?.data?.boundaryOriginalSources
                         )
                             ? edge.data.boundaryOriginalSources
-                                .map((entry) => ({
-                                    sourceId: String(entry?.sourceId || ""),
-                                    sourceHandle: String(
-                                        entry?.sourceHandle || ""
-                                    ),
-                                }))
-                                .filter(
-                                    (entry) =>
-                                        entry.sourceId && entry.sourceHandle
-                                )
+                                  .map((entry) => ({
+                                      sourceId: String(entry?.sourceId || ""),
+                                      sourceHandle: String(
+                                          entry?.sourceHandle || ""
+                                      ),
+                                  }))
+                                  .filter(
+                                      (entry) =>
+                                          entry.sourceId && entry.sourceHandle
+                                  )
                             : [];
                         if (storedEntries.length > 0) return storedEntries;
 
@@ -3407,7 +3376,7 @@ function AppContent() {
                                                 (entry) =>
                                                     entry.sourceId === sourceId &&
                                                     entry.sourceHandle ===
-                                                    sourceHandle
+                                                        sourceHandle
                                             )
                                     );
                                     if (stillUsed) return;
@@ -3993,8 +3962,8 @@ function AppContent() {
                         copiedSlotNode.id;
                     const copiedPath = normalizeSlotPath(
                         copiedSlotNode.data?.clipboardCanonicalSlotPath ||
-                        copiedSlotNode.data?.path ||
-                        ""
+                            copiedSlotNode.data?.path ||
+                            ""
                     );
 
                     // Resolve by canonical id first, then by semantic path.
@@ -5639,65 +5608,29 @@ function AppContent() {
                             e.preventDefault();
 
                             const skill = e.dataTransfer.getData("skill");
-                            if (!skill) return;
+                            const behavior = e.dataTransfer.getData("behavior");
+                            if (!skill && !behavior) return;
 
                             const pointerPosition = screenToFlowPosition({
                                 x: e.clientX,
                                 y: e.clientY,
                             });
 
-                            const hoveredCompound = nodes
-                                .filter(
-                                    (node) =>
-                                        node.type === "compound"
-                                )
-                                .find((compound) => {
-                                    const position = getAbsoluteNodePosition(
-                                        compound,
-                                        nodes
-                                    );
-                                    const { width, height } = getNodeSize(compound);
-
-                                    return (
-                                        pointerPosition.x >= position.x &&
-                                        pointerPosition.x <= position.x + width &&
-                                        pointerPosition.y >= position.y &&
-                                        pointerPosition.y <= position.y + height
-                                    );
-                                });
-
-                            const hoveredLane = hoveredCompound
-                                ? null
-                                : nodes
-                                    .filter(
-                                        (node) => node.type === "parallelLane"
-                                    )
-                                    .find((lane) => {
-                                        const lanePosition =
-                                            getAbsoluteNodePosition(lane, nodes);
-                                        const width =
-                                            Number(lane.style?.width) || 420;
-                                        const height =
-                                            Number(lane.style?.height) || 110;
-
-                                        return (
-                                            pointerPosition.x >= lanePosition.x &&
-                                            pointerPosition.x <=
-                                            lanePosition.x + width &&
-                                            pointerPosition.y >= lanePosition.y &&
-                                            pointerPosition.y <=
-                                            lanePosition.y + height
-                                        );
-                                    });
-
-                            setCompoundDropTargetId(
-                                hoveredCompound?.id || null
+                            const hoveredContainer = findDropContainerAtPoint(
+                                pointerPosition,
+                                nodes
                             );
-                            setParallelDropTargetId(
-                                hoveredCompound
-                                    ? null
-                                    : hoveredLane?.id || null
-                            );
+                            const hoveredCompound =
+                                hoveredContainer?.type === "compound"
+                                    ? hoveredContainer
+                                    : null;
+                            const hoveredLane =
+                                hoveredContainer?.type === "parallelLane"
+                                    ? hoveredContainer
+                                    : null;
+
+                            setCompoundDropTargetId(hoveredCompound?.id || null);
+                            setParallelDropTargetId(hoveredLane?.id || null);
                         }}
                         onDragLeave={(e) => {
                             const rect =
@@ -5727,97 +5660,78 @@ function AppContent() {
                                 y: e.clientY,
                             });
 
+                            const targetContainer = findDropContainerAtPoint(
+                                mousePosition,
+                                nodes
+                            );
+                            const targetCompound =
+                                targetContainer?.type === "compound"
+                                    ? targetContainer
+                                    : null;
+                            const targetLane =
+                                targetContainer?.type === "parallelLane"
+                                    ? targetContainer
+                                    : null;
+                            const targetLaneCompound = targetLane
+                                ? nodes.find(
+                                    (candidate) =>
+                                        candidate.parentId === targetLane.id &&
+                                        isAutoParallelLaneCompound(candidate)
+                                ) || null
+                                : null;
+                            const insertionCompound =
+                                targetCompound || targetLaneCompound;
+
                             const behaviorPayload =
                                 e.dataTransfer.getData("behavior");
+                            const skill = e.dataTransfer.getData("skill");
+                            const isBehaviorDrop = Boolean(behaviorPayload);
+
+                            let newNode;
 
                             if (behaviorPayload) {
                                 try {
                                     const behavior = JSON.parse(behaviorPayload);
-                                    const newNode = await createBehaviorNode(
+                                    newNode = await createBehaviorNode(
                                         behavior,
-                                        mousePosition
+                                        { x: 0, y: 0 }
                                     );
-                                    const updatedNodes =
-                                        resolveNodeCollisionsAndRefit(
-                                            [...nodes, newNode],
-                                            newNode.id
-                                        );
-                                    setNodes(updatedNodes);
-                                    checkSlotConnection(updatedNodes);
                                 } catch (error) {
                                     console.error(
                                         "Invalid behavior drag payload:",
                                         error
                                     );
+                                    return;
                                 }
-                                return;
+                            } else {
+                                if (!skill) return;
+                                newNode = await createNode(
+                                    skill.split("skills.")[1],
+                                    getNodeId(),
+                                    { x: 0, y: 0 }
+                                );
                             }
 
-                            const skill = e.dataTransfer.getData("skill");
-                            if (!skill) return;
-
-                            const targetCompound = nodes
-                                .filter(
-                                    (node) =>
-                                        node.type === "compound"
-                                )
-                                .find((compound) => {
-                                    const position = getAbsoluteNodePosition(
-                                        compound,
-                                        nodes
-                                    );
-                                    const { width, height } = getNodeSize(compound);
-                                    return (
-                                        mousePosition.x >= position.x &&
-                                        mousePosition.x <= position.x + width &&
-                                        mousePosition.y >= position.y &&
-                                        mousePosition.y <= position.y + height
-                                    );
+                            const refreshBehaviorSlots = () => {
+                                if (!isBehaviorDrop) return;
+                                requestAnimationFrame(() => {
+                                    checkSlotConnection(getNodes());
                                 });
-
-                            const targetLane = targetCompound
-                                ? null
-                                : nodes
-                                    .filter(
-                                        (node) => node.type === "parallelLane"
-                                    )
-                                    .find((lane) => {
-                                        const lanePosition =
-                                            getAbsoluteNodePosition(lane, nodes);
-                                        const width =
-                                            Number(lane.style?.width) || 420;
-                                        const height =
-                                            Number(lane.style?.height) || 110;
-
-                                        return (
-                                            mousePosition.x >= lanePosition.x &&
-                                            mousePosition.x <=
-                                            lanePosition.x + width &&
-                                            mousePosition.y >= lanePosition.y &&
-                                            mousePosition.y <=
-                                            lanePosition.y + height
-                                        );
-                                    });
-
-                            const newNode = await createNode(
-                                skill.split("skills.")[1],
-                                getNodeId(),
-                                { x: 0, y: 0 }
-                            );
+                            };
 
                             const {
                                 width: estimatedNodeWidth,
                                 height: estimatedNodeHeight,
                             } = getOverviewLayoutNodeSize(newNode);
 
-                            if (targetCompound) {
+                            if (insertionCompound) {
                                 let newX = COMPOUND_PADDING_X;
 
                                 nodes
                                     .filter(
                                         (member) =>
                                             member.parentId ===
-                                            targetCompound.id
+                                            insertionCompound.id
                                     )
                                     .forEach((member) => {
                                         const size = getOverviewLayoutNodeSize(member);
@@ -5829,7 +5743,7 @@ function AppContent() {
                                         );
                                     });
 
-                                newNode.parentId = targetCompound.id;
+                                newNode.parentId = insertionCompound.id;
                                 newNode.extent = "parent";
                                 newNode.position = {
                                     x: newX,
@@ -5845,7 +5759,7 @@ function AppContent() {
 
                                     return orderNodesParentsFirst([
                                         ...currentNodes.map((candidate) =>
-                                            candidate.id === targetCompound.id
+                                            candidate.id === insertionCompound.id
                                                 ? {
                                                     ...candidate,
                                                     style: {
@@ -5858,7 +5772,7 @@ function AppContent() {
                                                             right +
                                                             COMPOUND_PADDING_X +
                                                             getCompoundExitGutterWidth(
-                                                                targetCompound.data?.events || []
+                                                                insertionCompound.data?.events || []
                                                             )
                                                         ),
                                                         height: Math.max(
@@ -5878,6 +5792,7 @@ function AppContent() {
                                 });
 
                                 setSelectedNodeId(newNode.id);
+                                refreshBehaviorSlots();
                                 return;
                             }
 
@@ -6065,6 +5980,7 @@ function AppContent() {
                                 });
 
                                 setSelectedNodeId(newNode.id);
+                                refreshBehaviorSlots();
                                 return;
                             }
 
@@ -6084,6 +6000,7 @@ function AppContent() {
                                 )
                             );
                             setSelectedNodeId(newNode.id);
+                            refreshBehaviorSlots();
                         }}
                     >
                         <EditorCanvas
@@ -6248,7 +6165,6 @@ function AppContent() {
                                 cloneNodes={selectedNodeClones}
                                 onNavigateClone={handleNavigateCloneSource}
                                 containerOutgoingTransitions={selectedContainerOutgoingTransitions}
-                                skillOutgoingTransitions={selectedSkillOutgoingTransitions}
                                 onMoveContainerTransition={handleMoveContainerTransition}
                                 onNavigateTransitionNode={handleNavigateCloneSource}
                                 onHoverTransitionNode={(nodeId) =>

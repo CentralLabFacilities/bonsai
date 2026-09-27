@@ -1241,6 +1241,13 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
             const branchInitial = branchElem.getAttribute("initial") || "";
             const laneNodeId = getNodeId();
             const branchChildren = getDirectStateChildren(branchElem);
+            // A non-empty Parallel lane must always have an initial child in the
+            // editor model. SCXML files can omit `initial` and rely on document
+            // order, and an atomic branch has no nested child id at all. Pick the
+            // first nested state as the semantic default; atomic branches are
+            // handled below once their editor node id is known.
+            const effectiveBranchInitial =
+                branchInitial || branchChildren[0]?.getAttribute("id") || "";
 
             const laneEvents = Array.from(branchElem.children)
                 .filter((child) => child.localName === "transition")
@@ -1273,7 +1280,9 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                 data: {
                     label: branchId,
                     events: laneEvents,
-                    initialChildId: branchInitial || null,
+                    // This is temporarily an SCXML id for nested branches and is
+                    // normalized to the corresponding editor node id after import.
+                    initialChildId: effectiveBranchInitial || null,
                     onEntry: parseStateAssignments(branchElem, "onentry"),
                     onExit: parseStateAssignments(branchElem, "onexit"),
                 },
@@ -1289,7 +1298,7 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                     const result = await appendNestedState(childElem, {
                         parentId: laneNodeId,
                         position: { x: childX, y: 35 },
-                        isInitial: childId === branchInitial,
+                        isInitial: childId === effectiveBranchInitial,
                     });
                     childX += Math.max(210, Number(result?.width) || 210) + 24;
                 }
@@ -1300,11 +1309,18 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                 const stateNodeId = getNodeId();
                 const nodeData = await buildSkillNodeData(
                     branchId,
-                    false,
+                    true,
                     false,
                     stateSrc,
                     branchElem
                 );
+                // The lane wrapper is structural in the editor. For an atomic
+                // Parallel branch this node is its only executable child, so it
+                // is necessarily the lane's initial state.
+                const importedLane = newNodes.find((node) => node.id === laneNodeId);
+                if (importedLane) {
+                    importedLane.data.initialChildId = stateNodeId;
+                }
                 registerDirectTransitions(branchElem, stateNodeId, branchId);
                 newNodes.push({
                     id: stateNodeId,

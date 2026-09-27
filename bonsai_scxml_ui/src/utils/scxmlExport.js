@@ -392,7 +392,17 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
 
         let initialAttr = "";
         if (isCompound || children.length > 0) {
-            const initialChild = children.find((c) => c.data?.isInitial);
+            const storedInitialChild = node.data?.initialChildId
+                ? children.find((child) => child.id === node.data.initialChildId)
+                : null;
+            const initialChild =
+                storedInitialChild ||
+                children.find((child) => child.data?.isInitial) ||
+                // A Parallel lane is exported as a compound SCXML state. It
+                // must never be serialized without an initial state when it has
+                // children, even if stale editor data slipped through.
+                (isLane ? children[0] : null);
+
             if (initialChild) {
                 initialAttr = ` initial="${initialChild.data.fullSkillName || initialChild.data.label}"`;
             } else if (node.data?.initialSubState) {

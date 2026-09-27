@@ -14,11 +14,11 @@ import {
     getDirectCompoundForNode,
     getCompoundExitGutterWidth,
     getLaneForNode,
-    getNodeNestingDepth,
     getNodeSize,
     growParallelToLaneContents,
-    isNodeInsideContainer,
     isParallelLaneSkillCandidate,
+    isAutoParallelLaneCompound,
+    findDropContainerAtPoint,
     resolveNodeCollisionsAndRefit,
 } from "../utils/editorGeometry";
 
@@ -111,7 +111,10 @@ export function useNodeDrag({
         currentNodes.forEach((node) => {
             if (node.type === "parallelLane") {
                 lanes.push(toBounds(node));
-            } else if (node.type === "compound") {
+            } else if (
+                node.type === "compound" &&
+                !isAutoParallelLaneCompound(node)
+            ) {
                 compounds.push(toBounds(node));
             }
         });
@@ -212,8 +215,9 @@ export function useNodeDrag({
 
         setIsOverTrash(isOverTrash);
 
-        // Parallel-lane helper nodes are layout-only and editor-only clones
-        // stay top-level, so neither participates in container drops.
+        // Parallel-lane helper nodes are layout-only. Editor references keep
+        // the semantic scope of their original state, so generic container
+        // drop highlighting does not apply to them.
         if (isOverTrash || nodeType === "parallelLane" || isEditorClone) {
             setParallelDropTargetId(null);
             setCompoundDropTargetId(null);
@@ -488,32 +492,78 @@ export function useNodeDrag({
             return;
         }
 
-        // Editor clones are visual aliases only. Keep them top-level so their
-        // saved absolute editor position has the same meaning after reload.
+        // Editor references are visual aliases only. Their semantic scope is
+        // the scope of the original state. Keep/snap the reference into that
+        // same parent instead of forcing it to the top level. This is important
+        // for references to states in later Parallel lanes and also matches the
+        // way reference metadata is reconstructed on SCXML import.
         if (node.data?.isSkillClone || node.data?.isStateClone) {
             setNodes((currentNodes) => {
                 const liveNode = currentNodes.find(
                     (candidate) => candidate.id === node.id
                 );
+                const sourceNode = currentNodes.find(
+                    (candidate) =>
+                        candidate.id === liveNode?.data?.cloneOfNodeId
+                );
 
-                if (!liveNode?.parentId) return currentNodes;
+                if (!liveNode) return currentNodes;
 
                 const absolute = getAbsoluteNodePosition(
                     liveNode,
                     currentNodes
                 );
+                const sourceParent = sourceNode?.parentId
+                    ? currentNodes.find(
+                        (candidate) => candidate.id === sourceNode.parentId
+                    )
+                    : null;
 
-                return currentNodes.map((candidate) =>
-                    candidate.id === liveNode.id
-                        ? {
+                let nextNodes = currentNodes.map((candidate) => {
+                    if (candidate.id !== liveNode.id) return candidate;
+
+                    if (!sourceParent) {
+                        return {
                             ...candidate,
                             parentId: undefined,
                             extent: undefined,
                             expandParent: undefined,
                             position: absolute,
-                        }
-                        : candidate
-                );
+                        };
+                    }
+
+                    const parentAbsolute = getAbsoluteNodePosition(
+                        sourceParent,
+                        currentNodes
+                    );
+                    return {
+                        ...candidate,
+                        parentId: sourceParent.id,
+                        extent: "parent",
+                        expandParent: true,
+                        position: {
+                            x: absolute.x - parentAbsolute.x,
+                            y: absolute.y - parentAbsolute.y,
+                        },
+                    };
+                });
+
+                if (sourceParent?.type === "compound") {
+                    nextNodes = fitCompoundAndAncestorCompounds(
+                        nextNodes,
+                        sourceParent.id
+                    );
+                } else if (
+                    sourceParent?.type === "parallelLane" &&
+                    sourceParent.parentId
+                ) {
+                    nextNodes = growParallelToLaneContents(
+                        nextNodes,
+                        sourceParent.parentId
+                    );
+                }
+
+                return nextNodes;
             });
 
             setDraggingNodeId(null);
@@ -543,90 +593,42 @@ export function useNodeDrag({
                 currentNodes
             );
 
-            let targetCompound = currentNodes
-                .filter(
-                    (c) =>
-                        c.type === "compound" &&
-                        c.id !== draggedNode.id &&
-                        // Never allow a compound to become a child of one of
-                        // its own descendants. Compound -> Compound itself is
-                        // otherwise fully supported.
-                        !isNodeInsideContainer(
-                            c,
-                            draggedNode.id,
-                            currentNodes
-                        )
-                )
-                .filter((compound) => {
-                    const p = getAbsoluteNodePosition(
-                        compound,
-                        currentNodes
-                    );
+            const targetContainer = findDropContainerAtPoint(
+                dropPoint,
+                currentNodes,
+                {
+                    excludeNodeId: draggedNode.id,
+                    allowParallelLanes: draggedNode.type !== "parallel",
+                }
+            );
 
-                    const z = getNodeSize(compound);
+            let targetCompound =
+                targetContainer?.type === "compound"
+                    ? targetContainer
+                    : null;
+            let targetLaneAtDrop =
+                targetContainer?.type === "parallelLane"
+                    ? targetContainer
+                    : null;
 
-                    return (
-                        dropPoint.x >= p.x &&
-                        dropPoint.x <= p.x + z.width &&
-                        dropPoint.y >= p.y &&
-                        dropPoint.y <= p.y + z.height
-                    );
-                })
-                .sort(
-                    (a, b) =>
-                        getNodeNestingDepth(b, currentNodes) -
-                        getNodeNestingDepth(a, currentNodes)
-                )[0] || null;
-
-            let targetLaneAtDrop = draggedNode.type !== "parallel"
-                ? currentNodes
-                    .filter(
-                        (candidate) =>
-                            candidate.type === "parallelLane" &&
-                            !isNodeInsideContainer(
-                                candidate,
-                                draggedNode.id,
-                                currentNodes
-                            )
-                    )
-                    .filter((lane) => {
-                        const position = getAbsoluteNodePosition(lane, currentNodes);
-                        const width = Number(lane.style?.width) || 420;
-                        const height = Number(lane.style?.height) || 110;
-                        return (
-                            dropPoint.x >= position.x &&
-                            dropPoint.x <= position.x + width &&
-                            dropPoint.y >= position.y &&
-                            dropPoint.y <= position.y + height
-                        );
-                    })
-                    .sort(
-                        (a, b) =>
-                            getNodeNestingDepth(b, currentNodes) -
-                            getNodeNestingDepth(a, currentNodes)
-                    )[0] || null
-                : null;
-
-            // A point can be inside both an outer Compound and a nested
-            // Parallel lane (or vice versa). Always assign the drop to the
-            // deepest container under the cursor instead of giving one
-            // container type implicit priority.
-            if (targetCompound && targetLaneAtDrop) {
-                const compoundDepth = getNodeNestingDepth(
-                    targetCompound,
-                    currentNodes
-                );
-                const laneDepth = getNodeNestingDepth(
-                    targetLaneAtDrop,
-                    currentNodes
+            // A lane with several semantic states may own an editor-managed
+            // Compound wrapper. The lane is the conceptual hit target, but its
+            // wrapper is the actual semantic parent for inserted/moved states.
+            if (targetLaneAtDrop) {
+                const laneWrapper = currentNodes.find(
+                    (candidate) =>
+                        candidate.parentId === targetLaneAtDrop.id &&
+                        isAutoParallelLaneCompound(candidate)
                 );
 
-                if (laneDepth > compoundDepth) {
-                    targetCompound = null;
-                } else {
+                if (laneWrapper) {
+                    targetCompound = laneWrapper;
                     targetLaneAtDrop = null;
                 }
             }
+
+            // The shared drop resolver already chooses the deepest real
+            // user-facing container; automatic lane wrappers are mapped above.
 
             const resistedCompoundDrop = Boolean(
                 !targetCompound &&

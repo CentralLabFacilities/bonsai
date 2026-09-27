@@ -382,6 +382,79 @@ export const getNodeNestingDepth = (node, allNodes = []) => {
     return depth;
 };
 
+// Resolve the actual editor container under a flow-space pointer. This is used
+// for both library drops and existing-node drags so all parallel lanes (not
+// just the first two) follow the same hit-testing rules. Automatic lane
+// compounds are implementation details and are deliberately skipped: dropping
+// onto their area conceptually means dropping into the surrounding lane; the
+// normal lane normalization can then place real states into the wrapper.
+export const findDropContainerAtPoint = (
+    point,
+    allNodes = [],
+    {
+        excludeNodeId = null,
+        allowCompounds = true,
+        allowParallelLanes = true,
+    } = {}
+) => {
+    if (!point) return null;
+
+    const candidates = [];
+
+    (allNodes || []).forEach((node, index) => {
+        const isLane = node.type === "parallelLane";
+        const isCompound = node.type === "compound";
+
+        if (isLane && !allowParallelLanes) return;
+        if (isCompound && !allowCompounds) return;
+        if (!isLane && !isCompound) return;
+
+        // Never expose the editor-created lane wrapper as an independent drop
+        // target. It occupies the full lane and otherwise masks that lane.
+        if (isCompound && isAutoParallelLaneCompound(node)) return;
+
+        if (excludeNodeId) {
+            if (node.id === excludeNodeId) return;
+            if (isNodeInsideContainer(node, excludeNodeId, allNodes)) return;
+        }
+
+        const position = getAbsoluteNodePosition(node, allNodes);
+        const size = isLane
+            ? {
+                  width: Number(node.style?.width) || Number(node.width) || 420,
+                  height: Number(node.style?.height) || Number(node.height) || 110,
+              }
+            : getNodeSize(node);
+
+        if (
+            point.x < position.x ||
+            point.x > position.x + size.width ||
+            point.y < position.y ||
+            point.y > position.y + size.height
+        ) {
+            return;
+        }
+
+        candidates.push({
+            node,
+            depth: getNodeNestingDepth(node, allNodes),
+            index,
+        });
+    });
+
+    candidates.sort((a, b) => {
+        if (a.depth !== b.depth) return b.depth - a.depth;
+        // At an equal depth a real Compound is the more specific semantic
+        // target. Fall back to later-rendered nodes for deterministic overlap.
+        if (a.node.type !== b.node.type) {
+            return a.node.type === "compound" ? -1 : 1;
+        }
+        return b.index - a.index;
+    });
+
+    return candidates[0]?.node || null;
+};
+
 // A normal transition may only target an interior state when its source is
 // already inside every compound/parallel boundary surrounding that target.
 // This prevents transitions from jumping across a state boundary directly to
@@ -451,22 +524,34 @@ export const orderNodesParentsFirst = (allNodes) => {
         .map(({ node }) => node);
 };
 
+export const isEditorReferenceNode = (node) =>
+    Boolean(
+        node?.data?.cloneOfNodeId &&
+        (
+            node.data?.isSkillClone ||
+            node.data?.isStateClone ||
+            node.data?.isSlotClone
+        )
+    );
+
 export const isCompoundInitialChildCandidate = (node) =>
     Boolean(
         node &&
         node.type !== "slot" &&
-        node.type !== "parallelLane"
+        node.type !== "parallelLane" &&
+        !isEditorReferenceNode(node)
     );
 
 // Any real SCXML state can be a branch state in a parallel lane. Structural
-// states (compound/parallel) therefore participate exactly like skills. The
-// automatically managed lane wrapper itself is excluded so it never tries to
-// wrap itself.
+// states (compound/parallel) therefore participate exactly like skills. Editor
+// references are visual aliases only and must never become lane members for
+// initial-state or SCXML-wrapper purposes.
 export const isParallelLaneSkillCandidate = (node) =>
     Boolean(
         node &&
         node.type !== "slot" &&
         node.type !== "parallelLane" &&
+        !isEditorReferenceNode(node) &&
         !(
             node.type === "compound" &&
             (
@@ -567,9 +652,14 @@ const growParallelToLaneContentsInContext = (context, parallelId) => {
         const currentLaneSize = getNodeSize(lane);
         const laneChildren = context.getChildren(lane.id);
         const wrapper = laneChildren.find(isAutoParallelLaneCompound);
+        const directReferences = laneChildren.filter(isEditorReferenceNode);
         const laneMembers = wrapper
-            ? [context.byId.get(wrapper.id) || wrapper]
-            : laneChildren.filter(isParallelLaneSkillCandidate);
+            ? [context.byId.get(wrapper.id) || wrapper, ...directReferences]
+            : laneChildren.filter(
+                  (child) =>
+                      isParallelLaneSkillCandidate(child) ||
+                      isEditorReferenceNode(child)
+              );
 
         let maxRight = 0;
         let maxBottom = 0;
