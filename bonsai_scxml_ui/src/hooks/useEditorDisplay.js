@@ -119,6 +119,8 @@ export function useEditorDisplay({
     slotNodeIdSet,
     slotEdges,
     updatePersistentEdgeControlPoints,
+    controlPointInsertRequest,
+    onControlPointContextMenu,
     hoveredSlotAccessNodeId,
     semanticNodes,
     semanticChildrenByParent,
@@ -712,6 +714,18 @@ export function useEditorDisplay({
                                 controlPoints,
                                 "transition"
                             ),
+                        controlPointInsertRequest:
+                            controlPointInsertRequest?.edgeKind === "transition" &&
+                            controlPointInsertRequest?.edgeId === edge.id
+                                ? controlPointInsertRequest
+                                : null,
+                        onControlPointContextMenu: (event, pointId) =>
+                            onControlPointContextMenu?.(
+                                event,
+                                edge.id,
+                                pointId,
+                                "transition"
+                            ),
                     },
                 })
             ),
@@ -721,6 +735,8 @@ export function useEditorDisplay({
             compoundAvoidanceByEdgeId,
             manualRoutingNodes,
             updatePersistentEdgeControlPoints,
+            controlPointInsertRequest,
+            onControlPointContextMenu,
         ]
     );
 
@@ -989,6 +1005,18 @@ export function useEditorDisplay({
                                 controlPoints,
                                 "slot"
                             ),
+                        controlPointInsertRequest:
+                            controlPointInsertRequest?.edgeKind === "slot" &&
+                            controlPointInsertRequest?.edgeId === edge.id
+                                ? controlPointInsertRequest
+                                : null,
+                        onControlPointContextMenu: (event, pointId) =>
+                            onControlPointContextMenu?.(
+                                event,
+                                edge.id,
+                                pointId,
+                                "slot"
+                            ),
                     },
                 };
             }),
@@ -996,6 +1024,8 @@ export function useEditorDisplay({
             slotStructureEdges,
             manualRoutingNodes,
             updatePersistentEdgeControlPoints,
+            controlPointInsertRequest,
+            onControlPointContextMenu,
         ]
     );
 

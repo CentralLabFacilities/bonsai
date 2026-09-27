@@ -342,6 +342,7 @@ function AppContent() {
     const [activeFilter, setActiveFilter] = useState("Everything");
     const [searchText, setSearchText] = useState("");
     const [contextMenu, setContextMenu] = useState(null);
+    const [controlPointInsertRequest, setControlPointInsertRequest] = useState(null);
     const updateNodeInternals = useUpdateNodeInternals();
     const [leftLibraryTab, setLeftLibraryTab] = useState("skills");
     const [behaviorDirectories, setBehaviorDirectories] = useState(
@@ -1026,46 +1027,242 @@ function AppContent() {
             );
     }, [isFindOpen]);
 
-    const handleContextMenuOpen = useCallback((event, clickedNode = null) => {
+    const getContextNodeLabel = useCallback((node) => {
+        if (!node) return "Node";
+        return (
+            node.data?.label ||
+            node.data?.fullSkillName ||
+            node.data?.path ||
+            node.id ||
+            "Node"
+        );
+    }, []);
+
+    const handleContextMenuOpen = useCallback((event, clickedNode = null, clickedEdge = null) => {
         event.preventDefault();
         event.stopPropagation();
 
-        if (clickedNode && !clickedNode.selected) {
-            if (clickedNode.type === "slot") {
-                setNodes((nds) =>
-                    nds.map((node) => ({ ...node, selected: false }))
-                );
-                setSlotNodes((currentSlotNodes) =>
-                    currentSlotNodes.map((node) => ({
-                        ...node,
-                        selected: node.id === clickedNode.id,
-                    }))
-                );
-            } else {
-                setNodes((nds) =>
-                    nds.map((node) => ({
-                        ...node,
-                        selected: node.id === clickedNode.id,
-                    }))
-                );
-                setSlotNodes((currentSlotNodes) =>
-                    currentSlotNodes.map((node) => ({
-                        ...node,
-                        selected: false,
-                    }))
-                );
+        const flowPos = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+
+        if (clickedEdge) {
+            if (
+                clickedEdge.data?.compoundInitialEdge ||
+                clickedEdge.data?.parallelEntryEdge
+            ) {
+                setContextMenu(null);
+                return;
             }
-            setSelectedNodeId(clickedNode.id);
+
+            const slotConnection = isSlotEdge(clickedEdge);
+            if (slotConnection) {
+                selectSlotEdge(clickedEdge.id);
+            } else {
+                selectTransitionEdge(clickedEdge.id);
+            }
+
+            const storedBoundarySources = Array.isArray(
+                clickedEdge.data?.boundaryOriginalSources
+            )
+                ? clickedEdge.data.boundaryOriginalSources
+                : [];
+            const firstBoundarySource = storedBoundarySources.find(
+                (entry) => entry?.sourceId || entry?.nodeId || entry?.id
+            );
+            const logicalSourceId =
+                firstBoundarySource?.sourceId ||
+                firstBoundarySource?.nodeId ||
+                firstBoundarySource?.id ||
+                clickedEdge.data?.boundaryOriginalSource ||
+                clickedEdge.data?.compoundOriginalSource ||
+                clickedEdge.data?.parallelOriginalSource ||
+                clickedEdge.source;
+            const logicalSourceHandle = String(
+                firstBoundarySource?.sourceHandle ||
+                    firstBoundarySource?.handle ||
+                    clickedEdge.data?.boundaryOriginalSourceHandle ||
+                    clickedEdge.data?.compoundOriginalSourceHandle ||
+                    clickedEdge.data?.parallelOriginalSourceHandle ||
+                    clickedEdge.sourceHandle ||
+                    clickedEdge.label ||
+                    "success"
+            );
+            const logicalTargetId =
+                clickedEdge.data?.boundaryOriginalTarget ||
+                clickedEdge.data?.compoundOriginalTarget ||
+                clickedEdge.data?.parallelOriginalTarget ||
+                clickedEdge.target;
+
+            const allEditorNodes = [...nodes, ...slotNodes];
+            const sourceNode = allEditorNodes.find(
+                (node) => node.id === logicalSourceId
+            );
+            const targetNode = allEditorNodes.find(
+                (node) => node.id === logicalTargetId
+            );
+            const slotSkillNodeId =
+                clickedEdge.data?.skillNodeId || clickedEdge.source;
+            const slotNodeId =
+                clickedEdge.data?.slotNodeId || clickedEdge.target;
+
+            setContextMenu({
+                kind: "edge",
+                x: event.clientX,
+                y: event.clientY,
+                flowPosition: flowPos,
+                edgeId: clickedEdge.id,
+                isSlotConnection: slotConnection,
+                sourceNodeId: logicalSourceId || null,
+                sourceHandle: logicalSourceHandle,
+                targetNodeId: logicalTargetId || null,
+                slotSkillNodeId: slotSkillNodeId || null,
+                slotNodeId: slotNodeId || null,
+                slotAccess: clickedEdge.data?.access || null,
+                slotIndex: Number.isInteger(Number(clickedEdge.data?.slotIndex))
+                    ? Number(clickedEdge.data.slotIndex)
+                    : null,
+                title: slotConnection
+                    ? `${getContextNodeLabel(
+                          allEditorNodes.find((node) => node.id === slotSkillNodeId)
+                      )} ↔ ${getContextNodeLabel(
+                          allEditorNodes.find((node) => node.id === slotNodeId)
+                      )}`
+                    : `${getContextNodeLabel(sourceNode)}.${logicalSourceHandle} → ${getContextNodeLabel(targetNode)}`,
+            });
+            return;
         }
 
-        const flowPos = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+        if (clickedNode) {
+            if (!clickedNode.selected) {
+                if (clickedNode.type === "slot") {
+                    setNodes((nds) =>
+                        nds.map((node) => ({ ...node, selected: false }))
+                    );
+                    setSlotNodes((currentSlotNodes) =>
+                        currentSlotNodes.map((node) => ({
+                            ...node,
+                            selected: node.id === clickedNode.id,
+                        }))
+                    );
+                } else {
+                    setNodes((nds) =>
+                        nds.map((node) => ({
+                            ...node,
+                            selected: node.id === clickedNode.id,
+                        }))
+                    );
+                    setSlotNodes((currentSlotNodes) =>
+                        currentSlotNodes.map((node) => ({
+                            ...node,
+                            selected: false,
+                        }))
+                    );
+                }
+                setSelectedNodeId(clickedNode.id);
+            }
+
+            const parentNode = clickedNode.parentId
+                ? nodes.find((node) => node.id === clickedNode.parentId)
+                : null;
+            const isStructuralLane = clickedNode.type === "parallelLane";
+            const isStructuralHelper = Boolean(
+                clickedNode.data?.autoParallelLaneCompound
+            );
+            const isReference = isEditorCloneNode(clickedNode);
+            const canSetInitial = Boolean(
+                clickedNode.parentId &&
+                    !isReference &&
+                    !isStructuralLane &&
+                    clickedNode.type !== "slot" &&
+                    !clickedNode.data?.isInitial &&
+                    ["compound", "parallelLane"].includes(parentNode?.type)
+            );
+
+            const addStateTargets =
+                clickedNode.type === "parallel"
+                    ? nodes
+                          .filter(
+                              (node) =>
+                                  node.parentId === clickedNode.id &&
+                                  node.type === "parallelLane"
+                          )
+                          .sort(
+                              (a, b) =>
+                                  Number(a.position?.y || 0) -
+                                  Number(b.position?.y || 0)
+                          )
+                          .map((lane) => ({
+                              id: lane.id,
+                              label: getContextNodeLabel(lane),
+                          }))
+                    : ["compound", "parallelLane"].includes(clickedNode.type)
+                        ? [
+                              {
+                                  id: clickedNode.id,
+                                  label: getContextNodeLabel(clickedNode),
+                              },
+                          ]
+                        : [];
+
+            setContextMenu({
+                kind: "node",
+                x: event.clientX,
+                y: event.clientY,
+                flowPosition: flowPos,
+                nodeId: clickedNode.id,
+                nodeType: clickedNode.type,
+                title: getContextNodeLabel(clickedNode),
+                isStructuralNode: isStructuralLane || isStructuralHelper,
+                addStateTargets,
+                canSetInitial: Boolean(
+                    canSetInitial &&
+                    parentNode?.data?.initialChildId !== clickedNode.id
+                ),
+                canOpenTransitions:
+                    !isReference &&
+                    !isStructuralLane &&
+                    clickedNode.type !== "slot",
+                canCreateReference: isCloneableEditorNode(clickedNode),
+                referenceLabel:
+                    clickedNode.type === "slot"
+                        ? "Create slot reference"
+                        : clickedNode.type === "compound"
+                            ? "Create compound reference"
+                            : clickedNode.type === "parallel"
+                                ? "Create parallel reference"
+                                : clickedNode.type === "submachine"
+                                    ? "Create sub-state-machine reference"
+                                    : "Create state reference",
+                canWrap:
+                    !isReference &&
+                    !isStructuralLane &&
+                    !isStructuralHelper &&
+                    clickedNode.type !== "slot",
+                canAddState: addStateTargets.length > 0,
+                canAddLane: clickedNode.type === "parallel",
+                canDelete: !isStructuralHelper && !isStructuralLane,
+            });
+            return;
+        }
+
         setContextMenu({
+            kind: "pane",
             x: event.clientX,
             y: event.clientY,
             flowPosition: flowPos,
-            nodeId: clickedNode?.id || null,
+            title: "Create new element",
         });
-    }, [screenToFlowPosition, setNodes, setSlotNodes, setSelectedNodeId]);
+    }, [
+        getContextNodeLabel,
+        isSlotEdge,
+        nodes,
+        screenToFlowPosition,
+        selectSlotEdge,
+        selectTransitionEdge,
+        setNodes,
+        setSelectedNodeId,
+        setSlotNodes,
+        slotNodes,
+    ]);
 
     const selectedSlotNodes = slotNodes.filter((node) => node.selected);
     const editorCloneSelection = [
@@ -1076,21 +1273,6 @@ function AppContent() {
         editorCloneSelection.length === 1
             ? editorCloneSelection[0]
             : null;
-    const canCreateEditorClone = isCloneableEditorNode(editorCloneSourceNode);
-    const editorCloneActionLabel = (() => {
-        switch (editorCloneSourceNode?.type) {
-            case "slot":
-                return "Reference Selected Slot";
-            case "compound":
-                return "Reference Selected Compound";
-            case "parallel":
-                return "Reference Selected Parallel";
-            case "submachine":
-                return "Reference Selected Sub-State-Machine";
-            default:
-                return "Reference Selected State";
-        }
-    })();
 
     const handleCreateEditorClone = useCallback(() => {
         if (!contextMenu?.flowPosition) return;
@@ -1098,42 +1280,11 @@ function AppContent() {
         const sourceNode = editorCloneSourceNode;
         if (!isCloneableEditorNode(sourceNode)) return;
 
-        const desiredAbsolutePosition = {
+        const cloneNode = buildEditorCloneNode(sourceNode, {
             x: Number(contextMenu.flowPosition.x || 0) + 220,
             y: Number(contextMenu.flowPosition.y || 0),
-        };
-
-        let clonePosition = desiredAbsolutePosition;
-        let cloneParent = null;
-
-        // References are visual aliases of the same semantic state. Keep them
-        // in the same semantic scope as their source so a reference to a state
-        // in a Parallel lane stays in that lane.
-        if (sourceNode.type !== "slot" && sourceNode.parentId) {
-            cloneParent = nodes.find(
-                (candidate) => candidate.id === sourceNode.parentId
-            ) || null;
-
-            if (cloneParent) {
-                const parentAbsolute = getAbsoluteNodePosition(
-                    cloneParent,
-                    nodes
-                );
-                clonePosition = {
-                    x: desiredAbsolutePosition.x - parentAbsolute.x,
-                    y: desiredAbsolutePosition.y - parentAbsolute.y,
-                };
-            }
-        }
-
-        const cloneNode = buildEditorCloneNode(sourceNode, clonePosition);
+        });
         if (!cloneNode) return;
-
-        if (cloneParent) {
-            cloneNode.parentId = cloneParent.id;
-            cloneNode.extent = "parent";
-            cloneNode.expandParent = true;
-        }
 
         if (sourceNode.type === "slot") {
             setNodes((currentNodes) =>
@@ -1150,31 +1301,13 @@ function AppContent() {
             setSlotNodes((currentSlotNodes) =>
                 currentSlotNodes.map((node) => ({ ...node, selected: false }))
             );
-            setNodes((currentNodes) => {
-                let nextNodes = orderNodesParentsFirst([
-                    ...currentNodes.map((node) => ({
-                        ...node,
-                        selected: false,
-                    })),
-                    cloneNode,
-                ]);
-
-                if (cloneParent?.type === "compound") {
-                    nextNodes = fitCompoundAndAncestorCompounds(
-                        nextNodes,
-                        cloneParent.id
-                    );
-                } else if (cloneParent?.type === "parallelLane") {
-                    if (cloneParent.parentId) {
-                        nextNodes = growParallelToLaneContents(
-                            nextNodes,
-                            cloneParent.parentId
-                        );
-                    }
-                }
-
-                return orderNodesParentsFirst(nextNodes);
-            });
+            setNodes((currentNodes) => [
+                ...currentNodes.map((node) => ({
+                    ...node,
+                    selected: false,
+                })),
+                cloneNode,
+            ]);
         }
 
         setSelectedNodeId(cloneNode.id);
@@ -1183,7 +1316,6 @@ function AppContent() {
     }, [
         contextMenu,
         editorCloneSourceNode,
-        nodes,
         setNodes,
         setSlotNodes,
         setSelectedNodeId,
@@ -1200,24 +1332,184 @@ function AppContent() {
         setContextMenu(null);
     }, [contextMenu]);
 
-    const handleSelectAction = (type) => {
+    const setNodeAsInitial = useCallback((nodeId) => {
+        if (!nodeId) return;
+
+        setNodes((nds) => {
+            const selected = nds.find((node) => node.id === nodeId);
+            if (!selected || !selected.parentId || isEditorCloneNode(selected)) {
+                return nds;
+            }
+
+            const parentId = selected.parentId;
+            const parentNode = nds.find((node) => node.id === parentId);
+            if (!parentNode || !["compound", "parallelLane"].includes(parentNode.type)) {
+                return nds;
+            }
+
+            return nds.map((node) => {
+                if (node.id === parentId && parentNode.type === "compound") {
+                    return {
+                        ...node,
+                        data: {
+                            ...(node.data || {}),
+                            initialChildId: selected.id,
+                        },
+                    };
+                }
+
+                if ((node.parentId || null) !== parentId) return node;
+                if (node.type === "slot" || node.type === "parallelLane") {
+                    return node;
+                }
+
+                return {
+                    ...node,
+                    data: {
+                        ...(node.data || {}),
+                        isInitial: node.id === selected.id,
+                    },
+                };
+            });
+        });
+    }, [setNodes]);
+
+    const addEmptyStateToContainer = useCallback((parentId) => {
+        if (!parentId) return;
+
+        const newNodeId = getNodeId();
+        setNodes((currentNodes) => {
+            const parent = currentNodes.find((node) => node.id === parentId);
+            if (!parent || !["compound", "parallelLane"].includes(parent.type)) {
+                return currentNodes;
+            }
+
+            const children = currentNodes.filter(
+                (node) => node.parentId === parentId && node.type !== "parallelLane"
+            );
+            const stateCount = currentNodes.filter(
+                (node) =>
+                    String(node.data?.label || "").startsWith("state_")
+            ).length;
+            const stateName = `state_${stateCount + 1}`;
+            const isFirstChild = children.length === 0;
+            const childX = parent.type === "compound" ? COMPOUND_PADDING_X : 24;
+            const childStartY =
+                parent.type === "compound"
+                    ? COMPOUND_HEADER_HEIGHT + 18
+                    : PARALLEL_LANE_CHILD_TOP_INSET;
+            const nextY = children.reduce((maxY, child) => {
+                const size = getOverviewLayoutNodeSize(child);
+                return Math.max(
+                    maxY,
+                    Number(child.position?.y || 0) + size.height + 18
+                );
+            }, childStartY);
+
+            const newState = {
+                id: newNodeId,
+                type: "compound",
+                parentId,
+                extent: "parent",
+                expandParent: true,
+                position: { x: childX, y: nextY },
+                style: { width: 300, height: 180 },
+                selected: true,
+                data: {
+                    label: stateName,
+                    fullSkillName: stateName,
+                    isInitial: isFirstChild,
+                    events: [],
+                },
+            };
+
+            const withSelection = currentNodes.map((node) => ({
+                ...node,
+                selected: false,
+                ...(node.id === parentId && parent.type === "compound" && isFirstChild
+                    ? {
+                          data: {
+                              ...(node.data || {}),
+                              initialChildId: newNodeId,
+                          },
+                      }
+                    : {}),
+            }));
+
+            let nextNodes = resolveNodeCollisionsAndRefit(
+                [...withSelection, newState],
+                newNodeId
+            );
+            nextNodes = normalizeParallelLaneCompounds(nextNodes);
+            nextNodes = normalizeCompoundInitialStates(nextNodes);
+            return orderNodesParentsFirst(nextNodes);
+        });
+
+        setSelectedNodeId(newNodeId);
+        setRightPanelTab("details");
+        setActiveTab("allgemein");
+    }, [setNodes, setSelectedNodeId, setRightPanelTab, setActiveTab]);
+
+    const handleSelectAction = (type, payload = null) => {
         const hasSelection = selectedNodes.length > 0;
+        const contextNodeId = contextMenu?.nodeId || null;
+        const contextEdgeId = contextMenu?.edgeId || null;
 
         if (type === "copy" || type === "paste") {
             handleGraphClipboardContextAction(type);
             return;
         }
 
-        if (type === "clone") {
+        if (type === "open-details" && contextNodeId) {
+            const node = [...nodes, ...slotNodes].find(
+                (candidate) => candidate.id === contextNodeId
+            );
+            if (node?.type === "slot") {
+                setNodes((current) =>
+                    current.map((candidate) => ({ ...candidate, selected: false }))
+                );
+                setSlotNodes((current) =>
+                    current.map((candidate) => ({
+                        ...candidate,
+                        selected: candidate.id === contextNodeId,
+                    }))
+                );
+            } else {
+                setNodes((current) =>
+                    current.map((candidate) => ({
+                        ...candidate,
+                        selected: candidate.id === contextNodeId,
+                    }))
+                );
+                setSlotNodes((current) =>
+                    current.map((candidate) => ({ ...candidate, selected: false }))
+                );
+            }
+            setSelectedNodeId(contextNodeId);
+            setRightPanelTab("details");
+            setActiveTab(node?.type === "slot" ? "slots" : "allgemein");
+        } else if (type === "open-transitions" && contextNodeId) {
+            const node = nodes.find((candidate) => candidate.id === contextNodeId);
+            const firstEventId = String(node?.data?.events?.[0]?.id || "");
+            if (firstEventId) {
+                handleOpenTransition(contextNodeId, firstEventId);
+            } else {
+                setSelectedNodeId(contextNodeId);
+                setRightPanelTab("details");
+                setActiveTab("allgemein");
+            }
+        } else if (type === "set-initial" && contextNodeId) {
+            setNodeAsInitial(contextNodeId);
+        } else if (type === "clone") {
             handleCreateEditorClone();
         } else if (type === "compound") {
-            if (hasSelection) {
+            if (hasSelection && contextMenu?.kind === "node") {
                 handleCreateCompoundFromSelected();
             } else {
                 handleCreateEmptyCompound(contextMenu.flowPosition);
             }
         } else if (type === "parallel") {
-            if (hasSelection) {
+            if (hasSelection && contextMenu?.kind === "node") {
                 handleCreateParallelFromSelected();
             } else {
                 handleCreateEmptyParallel(contextMenu.flowPosition);
@@ -1225,7 +1517,7 @@ function AppContent() {
         } else if (type === "submachine") {
             const nextIndex = nodes.filter((node) => node.type === "submachine").length + 1;
             setPendingSubMachineCreation({
-                fromSelection: hasSelection,
+                fromSelection: hasSelection && contextMenu?.kind === "node",
                 flowPosition: contextMenu.flowPosition,
                 defaultDirectory: behaviorDirectories[0]?.path || "",
                 defaultFileName: `SubMachine_${nextIndex}.xml`,
@@ -1234,6 +1526,156 @@ function AppContent() {
             if (activeMode === "slots" || activeMode === "overview") {
                 setIsCreateSlotModalOpen(true);
             }
+        } else if (type === "add-state") {
+            const targetParentId = payload || contextNodeId;
+            if (targetParentId) addEmptyStateToContainer(targetParentId);
+        } else if (type === "add-lane" && contextNodeId) {
+            handleAddLaneToParallel(contextNodeId);
+        } else if (type === "delete-node" && contextNodeId) {
+            const removalIds = new Set([contextNodeId]);
+            let foundDescendant = true;
+            while (foundDescendant) {
+                foundDescendant = false;
+                nodes.forEach((node) => {
+                    if (
+                        node.parentId &&
+                        removalIds.has(node.parentId) &&
+                        !removalIds.has(node.id)
+                    ) {
+                        removalIds.add(node.id);
+                        foundDescendant = true;
+                    }
+                });
+            }
+
+            handleNodesChange(
+                [...removalIds].map((id) => ({ id, type: "remove" }))
+            );
+            setSelectedNodeId((current) =>
+                current && removalIds.has(current) ? null : current
+            );
+        } else if (type === "open-transition" && contextEdgeId) {
+            const edge = edges.find((candidate) => candidate.id === contextEdgeId);
+            if (edge) onEdgeDoubleClick(null, edge);
+        } else if (type === "change-transition-target" && contextEdgeId) {
+            const edge = edges.find((candidate) => candidate.id === contextEdgeId);
+            if (edge && contextMenu?.sourceNodeId) {
+                selectTransitionEdge(edge.id);
+                openConditionDrawer(
+                    contextMenu.sourceNodeId,
+                    contextMenu.sourceHandle || "success",
+                    contextMenu.targetNodeId || edge.target,
+                    null,
+                    {
+                        targetOnly: true,
+                        edgeId: edge.id,
+                    }
+                );
+            }
+        } else if (type === "go-source" && contextMenu?.sourceNodeId) {
+            handleNavigateCloneSource(contextMenu.sourceNodeId);
+        } else if (type === "go-target" && contextMenu?.targetNodeId) {
+            handleNavigateCloneSource(contextMenu.targetNodeId);
+        } else if (type === "create-control-point" && contextEdgeId) {
+            const flowPosition = contextMenu?.flowPosition;
+            const edgeKind = contextMenu?.isSlotConnection ? "slot" : "transition";
+            const sourceEdges = edgeKind === "slot" ? slotEdges : edges;
+            const edge = sourceEdges.find((candidate) => candidate.id === contextEdgeId);
+
+            if (flowPosition && edge) {
+                setControlPointInsertRequest({
+                    requestId: crypto.randomUUID(),
+                    edgeId: contextEdgeId,
+                    edgeKind,
+                    expectedControlPointCount: Array.isArray(edge.data?.controlPoints)
+                        ? edge.data.controlPoints.length
+                        : 0,
+                    flowPosition: {
+                        x: Number(flowPosition.x || 0),
+                        y: Number(flowPosition.y || 0),
+                    },
+                });
+            }
+        } else if (type === "remove-control-point" && contextEdgeId) {
+            const edgeKind = contextMenu?.edgeKind === "slot" ? "slot" : "transition";
+            const sourceEdges = edgeKind === "slot" ? slotEdges : edges;
+            const edge = sourceEdges.find((candidate) => candidate.id === contextEdgeId);
+            const pointId = contextMenu?.pointId;
+
+            if (edge && pointId) {
+                const nextControlPoints = Array.isArray(edge.data?.controlPoints)
+                    ? edge.data.controlPoints.filter((point) => point.id !== pointId)
+                    : [];
+
+                updatePersistentEdgeControlPoints(
+                    contextEdgeId,
+                    nextControlPoints,
+                    edgeKind
+                );
+            }
+        } else if (type === "delete-transition" && contextEdgeId) {
+            handleVisibleEdgesChange([{ id: contextEdgeId, type: "remove" }]);
+        } else if (type === "open-slot-connection") {
+            const skillNode = nodes.find(
+                (node) => node.id === contextMenu?.slotSkillNodeId
+            );
+            const access = contextMenu?.slotAccess;
+            const slotIndex = contextMenu?.slotIndex;
+            const slotKey =
+                access === "read"
+                    ? skillNode?.data?.inSlots?.[slotIndex]?.key
+                    : access === "write"
+                        ? skillNode?.data?.outSlots?.[slotIndex]?.key
+                        : null;
+
+            if (skillNode && access && slotKey) {
+                handleOpenSlot(skillNode.id, access, slotKey);
+            } else if (skillNode) {
+                setSelectedNodeId(skillNode.id);
+                setRightPanelTab("details");
+                setActiveTab("slots");
+            }
+        } else if (type === "go-slot-skill" && contextMenu?.slotSkillNodeId) {
+            handleNavigateCloneSource(contextMenu.slotSkillNodeId);
+            setActiveTab("slots");
+        } else if (type === "go-slot-node" && contextMenu?.slotNodeId) {
+            const slotNodeId = contextMenu.slotNodeId;
+            clearAllEdgeSelection();
+            setNodes((current) =>
+                current.map((node) => ({ ...node, selected: false }))
+            );
+            setSlotNodes((current) =>
+                current.map((node) => ({
+                    ...node,
+                    selected: node.id === slotNodeId,
+                }))
+            );
+            setSelectedNodeId(slotNodeId);
+            setRightPanelTab("details");
+            setActiveTab("slots");
+
+            window.setTimeout(() => {
+                const flowNode = getNodes().find((node) => node.id === slotNodeId);
+                if (!flowNode) return;
+                const position = getAbsoluteNodePosition(flowNode, getNodes());
+                const width =
+                    Number(flowNode.measured?.width) ||
+                    Number(flowNode.width) ||
+                    Number(flowNode.style?.width) ||
+                    180;
+                const height =
+                    Number(flowNode.measured?.height) ||
+                    Number(flowNode.height) ||
+                    Number(flowNode.style?.height) ||
+                    70;
+                setCenter(
+                    position.x + width / 2,
+                    position.y + height / 2,
+                    { zoom: 1, duration: 300 }
+                );
+            }, 30);
+        } else if (type === "disconnect-slot" && contextEdgeId) {
+            handleVisibleEdgesChange([{ id: contextEdgeId, type: "remove" }]);
         }
 
         setContextMenu(null);
@@ -1246,8 +1688,6 @@ function AppContent() {
         document.addEventListener("click", handleClickOutside);
         return () => document.removeEventListener("click", handleClickOutside);
     }, [contextMenu]);
-
-
 
 
 
@@ -2930,8 +3370,30 @@ function AppContent() {
                         : edge
                 )
             );
+
+            setControlPointInsertRequest((current) =>
+                current?.edgeId === edgeId ? null : current
+            );
         },
         [setEdges, setSlotEdges]
+    );
+
+    const handleControlPointContextMenu = useCallback(
+        (event, edgeId, pointId, edgeKind = "transition") => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            setContextMenu({
+                kind: "control-point",
+                x: event.clientX,
+                y: event.clientY,
+                edgeId,
+                pointId,
+                edgeKind,
+                title: "Control point",
+            });
+        },
+        []
     );
 
     const {
@@ -2950,6 +3412,8 @@ function AppContent() {
         slotNodeIdSet,
         slotEdges,
         updatePersistentEdgeControlPoints,
+        controlPointInsertRequest,
+        onControlPointContextMenu: handleControlPointContextMenu,
         hoveredSlotAccessNodeId,
         semanticNodes,
         semanticChildrenByParent,
@@ -6024,8 +6488,6 @@ function AppContent() {
                             contextMenu={contextMenu}
                             handleSelectAction={handleSelectAction}
                             hasGraphClipboard={hasGraphClipboard}
-                            canCreateEditorClone={canCreateEditorClone}
-                            editorCloneActionLabel={editorCloneActionLabel}
                             setIsCreateSlotModalOpen={setIsCreateSlotModalOpen}
                             isDraggingNode={isDraggingNode}
                             isOverTrash={isOverTrash}

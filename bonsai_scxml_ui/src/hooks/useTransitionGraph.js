@@ -144,19 +144,41 @@ const getExitedBoundarySteps = (sourceNode, targetNode, allNodes = []) => {
     return steps;
 };
 
-const getLogicalEdgeSourceId = (edge) =>
-    edge?.data?.boundaryOriginalSource ||
-    edge?.data?.compoundOriginalSource ||
-    edge?.data?.parallelOriginalSource ||
-    edge?.source;
+const getFirstStoredBoundarySource = (edge) => {
+    const entries = Array.isArray(edge?.data?.boundaryOriginalSources)
+        ? edge.data.boundaryOriginalSources
+        : [];
+    return entries.find(
+        (entry) => entry?.sourceId || entry?.nodeId || entry?.id
+    ) || null;
+};
 
-const getLogicalEdgeSourceHandle = (edge) =>
-    edge?.data?.boundaryOriginalSourceHandle ||
-    edge?.data?.compoundOriginalSourceHandle ||
-    edge?.data?.parallelOriginalSourceHandle ||
-    edge?.sourceHandle ||
-    edge?.label ||
-    "success";
+const getLogicalEdgeSourceId = (edge) => {
+    const storedSource = getFirstStoredBoundarySource(edge);
+    return (
+        storedSource?.sourceId ||
+        storedSource?.nodeId ||
+        storedSource?.id ||
+        edge?.data?.boundaryOriginalSource ||
+        edge?.data?.compoundOriginalSource ||
+        edge?.data?.parallelOriginalSource ||
+        edge?.source
+    );
+};
+
+const getLogicalEdgeSourceHandle = (edge) => {
+    const storedSource = getFirstStoredBoundarySource(edge);
+    return (
+        storedSource?.sourceHandle ||
+        storedSource?.handle ||
+        edge?.data?.boundaryOriginalSourceHandle ||
+        edge?.data?.compoundOriginalSourceHandle ||
+        edge?.data?.parallelOriginalSourceHandle ||
+        edge?.sourceHandle ||
+        edge?.label ||
+        "success"
+    );
+};
 
 const makeSelfLoopControlPoints = () => [
     {
@@ -519,25 +541,55 @@ export function useTransitionGraph({
                 };
             });
 
-        const initialTransition = transitions.find(
+        const targetOnlyMode = Boolean(options?.targetOnly);
+        const targetOnlyEdgeId = options?.edgeId
+            ? String(options.edgeId)
+            : null;
+        const availableTargetIds = availableTargets.map((target) => target.id);
+        const drawerTransitions = targetOnlyMode
+            ? transitions
+                  .filter(
+                      (transition) =>
+                          !targetOnlyEdgeId ||
+                          String(transition.edgeId || transition.transitionId) ===
+                              targetOnlyEdgeId
+                  )
+                  .map((transition) => ({
+                      ...transition,
+                      sourceNodeId: sourceId,
+                      sourceNodeName:
+                          sourceNode.data?.label ||
+                          sourceNode.data?.fullSkillName ||
+                          sourceId,
+                      eventDisplayName:
+                          transition.event || sourceHandle || "success",
+                      originalTarget: transition.target || "",
+                      availableTargetIds,
+                  }))
+            : transitions;
+
+        const initialTransition = drawerTransitions.find(
             (transition) =>
                 (!sourceHandle || transition.event === sourceHandle) &&
                 (!initialTargetId || transition.target === initialTargetId)
-        ) || transitions.find(
+        ) || drawerTransitions.find(
             (transition) => transition.event === sourceHandle
-        ) || transitions[0];
+        ) || drawerTransitions[0];
 
         setDrawerData({
             isOpen: true,
             sourceNodeId: sourceId,
-            sourceNodeName: sourceNode.data.label,
+            sourceNodeName:
+                sourceNode.data?.label ||
+                sourceNode.data?.fullSkillName ||
+                sourceId,
             sourceEventName: sourceHandle,
             initialTargetId: initialTargetId || initialTransition?.target || "",
             initialTransitionId: initialTransition?.transitionId || null,
-            candidateTransitions: transitions,
+            candidateTransitions: drawerTransitions,
             availableEvents: [...eventMap.values()],
             availableTargets,
-            targetOnlyMode: false,
+            targetOnlyMode,
             containerNodeId: null,
         });
     };

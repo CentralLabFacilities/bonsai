@@ -3833,6 +3833,7 @@
     flex-direction: column;
     gap: 4px;
     min-width: 190px;
+    max-width: 340px;
     animation: fadeInMenu 0.15s ease-out;
 }
 
@@ -3856,6 +3857,9 @@
     border-bottom: 1px solid #1e293b;
     margin-bottom: 2px;
     letter-spacing: 0.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .context-menu-item {
@@ -3886,6 +3890,16 @@
     background: transparent;
     color: #64748b;
     font-weight: 400;
+}
+
+.context-menu-item-danger {
+    color: #fca5a5;
+}
+
+.context-menu-item-danger:hover {
+    background-color: rgba(239, 68, 68, 0.2);
+    color: #fecaca;
+    font-weight: 600;
 }
 
 /* ==========================================================================
@@ -7397,7 +7411,7 @@
  * their intentional dashed presentation.
  */
 .react-flow__edge.editor-user-transition-edge:not(.editor-edge-focus-active):not(.selected)
-.react-flow__edge-path {
+    .react-flow__edge-path {
     stroke-dasharray: none !important;
     animation: none !important;
 }
@@ -7447,7 +7461,7 @@
     letter-spacing: 0.04em;
 }
 
-/* ==========================================================================
+/* ========================================================================== 
    NODE EDITOR INTERACTION HIGHLIGHTS
    Keep clickable content inside workflow nodes visually responsive without
    competing with the stronger selected-node outline.

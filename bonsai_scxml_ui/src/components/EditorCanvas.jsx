@@ -35,54 +35,51 @@ const edgeTypes = {
 };
 
 export default function EditorCanvas({
-                                         activeMode,
-                                         setActiveMode,
-                                         showTransitionEdges,
-                                         setShowTransitionEdges,
-                                         showSlotEdges,
-                                         setShowSlotEdges,
-                                         nodes,
-                                         edges,
-                                         globalDataModel,
-                                         visibleNodes,
-                                         visibleEdges,
-                                         smartRoutingNodes,
-                                         edgeFocusMode,
-                                         nodeFocusMode,
-                                         selectedNodes,
-                                         contextMenu,
-                                         handleSelectAction,
-                                         hasGraphClipboard,
-                                         canCreateEditorClone,
-                                         editorCloneActionLabel,
-                                         setIsCreateSlotModalOpen,
-                                         isDraggingNode,
-                                         isOverTrash,
-                                         handleNodesChange,
-                                         handleVisibleEdgesChange,
-                                         onSelectionChange,
-                                         onConnect,
-                                         handleConnectStart,
-                                         handleConnectEnd,
-                                         onReconnect,
-                                         handleReconnectStart,
-                                         handleReconnectEnd,
-                                         isValidConnection,
-                                         selectSlotEdge,
-                                         selectTransitionEdge,
-                                         onEdgeDoubleClick,
-                                         clearAllEdgeSelection,
-                                         setSelectedNodeId,
-                                         setActiveTab,
-                                         setRightPanelTab,
-                                         setHoveredEditorNodeId,
-                                         setHoveredEditorEdgeId,
-                                         handleContextMenuOpen,
-                                         handleOpenSubMachine,
-                                         handleNodeDragStart,
-                                         handleNodeDrag,
-                                         handleNodeDragStop,
-                                     }) {
+    activeMode,
+    setActiveMode,
+    showTransitionEdges,
+    setShowTransitionEdges,
+    showSlotEdges,
+    setShowSlotEdges,
+    nodes,
+    edges,
+    globalDataModel,
+    visibleNodes,
+    visibleEdges,
+    smartRoutingNodes,
+    edgeFocusMode,
+    nodeFocusMode,
+    contextMenu,
+    handleSelectAction,
+    hasGraphClipboard,
+    setIsCreateSlotModalOpen,
+    isDraggingNode,
+    isOverTrash,
+    handleNodesChange,
+    handleVisibleEdgesChange,
+    onSelectionChange,
+    onConnect,
+    handleConnectStart,
+    handleConnectEnd,
+    onReconnect,
+    handleReconnectStart,
+    handleReconnectEnd,
+    isValidConnection,
+    selectSlotEdge,
+    selectTransitionEdge,
+    onEdgeDoubleClick,
+    clearAllEdgeSelection,
+    setSelectedNodeId,
+    setActiveTab,
+    setRightPanelTab,
+    setHoveredEditorNodeId,
+    setHoveredEditorEdgeId,
+    handleContextMenuOpen,
+    handleOpenSubMachine,
+    handleNodeDragStart,
+    handleNodeDrag,
+    handleNodeDragStop,
+}) {
     const codeString = useMemo(() => {
         if (activeMode !== "code") return "";
         const exportGraph = prepareGraphForScxml(nodes, edges);
@@ -181,76 +178,255 @@ export default function EditorCanvas({
                     onClick={(event) => event.stopPropagation()}
                 >
                     <div className="context-menu-header">
-                        {selectedNodes.length > 0
-                            ? `change ${selectedNodes.length} node(s) in:`
-                            : "Create new element"}
+                        {contextMenu.title || "Editor"}
                     </div>
-                    {contextMenu.nodeId ? (
-                        <button
-                            className="context-menu-item"
-                            onClick={() => handleSelectAction("copy")}
-                        >
-                            Copy
-                        </button>
-                    ) : (
-                        <button
-                            className="context-menu-item"
-                            onClick={() => handleSelectAction("paste")}
-                            disabled={!hasGraphClipboard}
-                            aria-disabled={!hasGraphClipboard}
-                            title={
-                                hasGraphClipboard
-                                    ? "Paste copied nodes"
-                                    : "Nothing copied"
-                            }
-                        >
-                            Paste
-                        </button>
+
+                    {contextMenu.kind === "pane" && (
+                        <>
+                            <button
+                                className="context-menu-item"
+                                onClick={() => handleSelectAction("paste")}
+                                disabled={!hasGraphClipboard}
+                                aria-disabled={!hasGraphClipboard}
+                                title={
+                                    hasGraphClipboard
+                                        ? "Paste copied nodes"
+                                        : "Nothing copied"
+                                }
+                            >
+                                Paste
+                            </button>
+                            <div className="context-menu-divider" aria-hidden="true" />
+                            <button
+                                className="context-menu-item"
+                                onClick={() => handleSelectAction("compound")}
+                            >
+                                New Compound State
+                            </button>
+                            <button
+                                className="context-menu-item"
+                                onClick={() => handleSelectAction("parallel")}
+                            >
+                                New Parallel State
+                            </button>
+                            <button
+                                className="context-menu-item"
+                                onClick={() => handleSelectAction("submachine")}
+                            >
+                                New Sub-State-Machine
+                            </button>
+                            {(activeMode === "slots" || activeMode === "overview") && (
+                                <button
+                                    className="context-menu-item"
+                                    onClick={() => handleSelectAction("slot")}
+                                >
+                                    New Slot
+                                </button>
+                            )}
+                        </>
                     )}
-                    <div className="context-menu-divider" aria-hidden="true" />
-                    {canCreateEditorClone && (
-                        <button
-                            className="context-menu-item"
-                            onClick={() => handleSelectAction("clone")}
-                        >
-                            {editorCloneActionLabel || "Reference Selected State"}
-                        </button>
+
+                    {contextMenu.kind === "node" && (
+                        <>
+                            {!contextMenu.isStructuralNode && (
+                                <>
+                                    <button
+                                        className="context-menu-item"
+                                        onClick={() => handleSelectAction("open-details")}
+                                    >
+                                        Open details
+                                    </button>
+                                    {contextMenu.canOpenTransitions && (
+                                        <button
+                                            className="context-menu-item"
+                                            onClick={() => handleSelectAction("open-transitions")}
+                                        >
+                                            Transitions…
+                                        </button>
+                                    )}
+                                    {contextMenu.canSetInitial && (
+                                        <button
+                                            className="context-menu-item"
+                                            onClick={() => handleSelectAction("set-initial")}
+                                        >
+                                            Set as initial
+                                        </button>
+                                    )}
+                                </>
+                            )}
+
+                            {(contextMenu.canCreateReference || contextMenu.canAddState || contextMenu.canAddLane) && (
+                                <div className="context-menu-divider" aria-hidden="true" />
+                            )}
+
+                            {contextMenu.canAddState &&
+                                (contextMenu.addStateTargets || []).map((target) => (
+                                    <button
+                                        key={`add-state-${target.id}`}
+                                        className="context-menu-item"
+                                        onClick={() =>
+                                            handleSelectAction("add-state", target.id)
+                                        }
+                                    >
+                                        {(contextMenu.addStateTargets || []).length > 1
+                                            ? `Add state to ${target.label}`
+                                            : "Add state"}
+                                    </button>
+                                ))}
+                            {contextMenu.canAddLane && (
+                                <button
+                                    className="context-menu-item"
+                                    onClick={() => handleSelectAction("add-lane")}
+                                >
+                                    Add lane
+                                </button>
+                            )}
+                            {!contextMenu.isStructuralNode && contextMenu.canCreateReference && (
+                                <button
+                                    className="context-menu-item"
+                                    onClick={() => handleSelectAction("clone")}
+                                >
+                                    {contextMenu.referenceLabel || "Create reference"}
+                                </button>
+                            )}
+                            {!contextMenu.isStructuralNode && (
+                                <button
+                                    className="context-menu-item"
+                                    onClick={() => handleSelectAction("copy")}
+                                >
+                                    Copy
+                                </button>
+                            )}
+
+                            {!contextMenu.isStructuralNode && contextMenu.canWrap && (
+                                <>
+                                    <div className="context-menu-divider" aria-hidden="true" />
+                                    <button
+                                        className="context-menu-item"
+                                        onClick={() => handleSelectAction("compound")}
+                                    >
+                                        Wrap in Compound
+                                    </button>
+                                    <button
+                                        className="context-menu-item"
+                                        onClick={() => handleSelectAction("parallel")}
+                                    >
+                                        Wrap in Parallel
+                                    </button>
+                                </>
+                            )}
+
+                            {!contextMenu.isStructuralNode && contextMenu.canDelete && (
+                                <>
+                                    <div className="context-menu-divider" aria-hidden="true" />
+                                    <button
+                                        className="context-menu-item context-menu-item-danger"
+                                        onClick={() => handleSelectAction("delete-node")}
+                                    >
+                                        Delete
+                                    </button>
+                                </>
+                            )}
+                        </>
                     )}
-                    <button
-                        className="context-menu-item"
-                        onClick={() => handleSelectAction("compound")}
-                    >
-                        Compound State
-                    </button>
-                    <button
-                        className="context-menu-item"
-                        onClick={() => handleSelectAction("parallel")}
-                    >
-                        Parallel State
-                    </button>
-                    <button
-                        className="context-menu-item"
-                        onClick={() => handleSelectAction("submachine")}
-                    >
-                        Sub-State-Machine
-                    </button>
-                    {(activeMode === "slots" || activeMode === "overview") && (
+
+
+                    {contextMenu.kind === "edge" && !contextMenu.isSlotConnection && (
+                        <>
+                            <button
+                                className="context-menu-item"
+                                onClick={() => handleSelectAction("open-transition")}
+                            >
+                                Open transition
+                            </button>
+                            <button
+                                className="context-menu-item"
+                                onClick={() => handleSelectAction("go-source")}
+                            >
+                                Go to source
+                            </button>
+                            <button
+                                className="context-menu-item"
+                                onClick={() => handleSelectAction("go-target")}
+                            >
+                                Go to target
+                            </button>
+                            <button
+                                className="context-menu-item"
+                                onClick={() => handleSelectAction("change-transition-target")}
+                            >
+                                Change target…
+                            </button>
+                            <button
+                                className="context-menu-item"
+                                onClick={() => handleSelectAction("create-control-point")}
+                            >
+                                Create control point here
+                            </button>
+                            <div className="context-menu-divider" aria-hidden="true" />
+                            <button
+                                className="context-menu-item context-menu-item-danger"
+                                onClick={() => handleSelectAction("delete-transition")}
+                            >
+                                Delete transition
+                            </button>
+                        </>
+                    )}
+
+                    {contextMenu.kind === "edge" && contextMenu.isSlotConnection && (
+                        <>
+                            <button
+                                className="context-menu-item"
+                                onClick={() => handleSelectAction("open-slot-connection")}
+                            >
+                                Open slot connection
+                            </button>
+                            <button
+                                className="context-menu-item"
+                                onClick={() => handleSelectAction("go-slot-skill")}
+                            >
+                                Go to skill
+                            </button>
+                            <button
+                                className="context-menu-item"
+                                onClick={() => handleSelectAction("go-slot-node")}
+                            >
+                                Go to slot
+                            </button>
+                            <button
+                                className="context-menu-item"
+                                onClick={() => handleSelectAction("create-control-point")}
+                            >
+                                Create control point here
+                            </button>
+                            <div className="context-menu-divider" aria-hidden="true" />
+                            <button
+                                className="context-menu-item context-menu-item-danger"
+                                onClick={() => handleSelectAction("disconnect-slot")}
+                            >
+                                Disconnect
+                            </button>
+                        </>
+                    )}
+
+                    {contextMenu.kind === "control-point" && (
                         <button
-                            className="context-menu-item"
-                            onClick={() => handleSelectAction("slot")}
+                            className="context-menu-item context-menu-item-danger"
+                            onClick={() => handleSelectAction("remove-control-point")}
                         >
-                            Slot
+                            Remove control point
                         </button>
                     )}
                 </div>
             )}
+
 
             <SmartEdgeProvider nodes={smartRoutingNodes}>
                 <ReactFlow
                     className={
                         [
                             (!showTransitionEdges || activeMode === "slots") &&
-                            "editor-transitions-context-only",
+                                "editor-transitions-context-only",
                             !showSlotEdges && "editor-slots-context-only",
                             edgeFocusMode && "editor-edge-focus-mode",
                             nodeFocusMode && "editor-node-focus-mode",
@@ -306,6 +482,9 @@ export default function EditorCanvas({
                         }
                         onEdgeDoubleClick(event, edge);
                     }}
+                    onEdgeContextMenu={(event, edge) =>
+                        handleContextMenuOpen(event, null, edge)
+                    }
                     nodeTypes={nodeTypes}
                     edgeTypes={edgeTypes}
                     onNodeClick={(_, node) => {
@@ -375,6 +554,11 @@ export default function EditorCanvas({
                     selectionOnDrag
                     selectionKeyCode={null}
                     panOnDrag={[1, 2]}
+                    // Trackpad behavior: two-finger scrolling pans the viewport.
+                    // Trackpad/wheel zoom is disabled; use the React Flow zoom
+                    // controls instead.
+                    zoomOnScroll={true}
+                    zoomOnPinch={true}
                     deleteKeyCode={["Delete"]}
                     minZoom={0.08}
                     onlyRenderVisibleElements

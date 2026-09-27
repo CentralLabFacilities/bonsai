@@ -47,6 +47,31 @@ const distanceSquared = (a, b) => {
     return dx * dx + dy * dy;
 };
 
+const pointToSegmentDistanceSquared = (point, start, end) => {
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const lengthSquared = dx * dx + dy * dy;
+
+    if (lengthSquared === 0) {
+        return distanceSquared(point, start);
+    }
+
+    const t = Math.max(
+        0,
+        Math.min(
+            1,
+            ((point.x - start.x) * dx +
+                (point.y - start.y) * dy) /
+                lengthSquared
+        )
+    );
+
+    return distanceSquared(point, {
+        x: start.x + t * dx,
+        y: start.y + t * dy,
+    });
+};
+
 const getFacingPosition = (from, to) => {
     const dx = to.x - from.x;
     const dy = to.y - from.y;
@@ -382,6 +407,10 @@ function ManualEditableTransitionEdge(
     const beginControlPointDrag =
         useCallback(
             (event, pointId) => {
+                if (event.button !== 0) {
+                    return;
+                }
+
                 event.preventDefault();
                 event.stopPropagation();
 
@@ -472,6 +501,61 @@ function ManualEditableTransitionEdge(
         () => [sourcePoint, ...controlPoints, targetPoint],
         [sourcePoint, controlPoints, targetPoint]
     );
+
+    const handledInsertRequestRef = useRef(null);
+
+    useEffect(() => {
+        const request = data?.controlPointInsertRequest;
+        if (
+            !request?.requestId ||
+            request.edgeId !== id ||
+            handledInsertRequestRef.current === request.requestId
+        ) {
+            return;
+        }
+
+        const expectedControlPointCount = Number(
+            request.expectedControlPointCount ?? controlPointsRef.current.length
+        );
+        if (controlPointsRef.current.length !== expectedControlPointCount) {
+            handledInsertRequestRef.current = request.requestId;
+            return;
+        }
+
+        const absolutePoint = request.flowPosition;
+        if (
+            !absolutePoint ||
+            !Number.isFinite(Number(absolutePoint.x)) ||
+            !Number.isFinite(Number(absolutePoint.y))
+        ) {
+            return;
+        }
+
+        handledInsertRequestRef.current = request.requestId;
+
+        let nearestSegmentIndex = 0;
+        let nearestDistance = Number.POSITIVE_INFINITY;
+
+        for (let index = 0; index < routePoints.length - 1; index += 1) {
+            const segmentDistance = pointToSegmentDistanceSquared(
+                absolutePoint,
+                routePoints[index],
+                routePoints[index + 1]
+            );
+
+            if (segmentDistance < nearestDistance) {
+                nearestDistance = segmentDistance;
+                nearestSegmentIndex = index;
+            }
+        }
+
+        addControlPoint(nearestSegmentIndex, absolutePoint);
+    }, [
+        addControlPoint,
+        data?.controlPointInsertRequest,
+        id,
+        routePoints,
+    ]);
 
     // Manual smart routing is expensive. Cache the complete geometry result so
     // display-only updates (selection, hover, edge visibility, animation/style)
@@ -654,6 +738,14 @@ function ManualEditableTransitionEdge(
                                         ? "Source"
                                         : "Target"
                                 }-relative control point. Drag to move, double-click to remove.`}
+                                onContextMenu={(event) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    data?.onControlPointContextMenu?.(
+                                        event,
+                                        point.id
+                                    );
+                                }}
                                 onPointerDown={(
                                     event
                                 ) =>
@@ -768,20 +860,13 @@ function AutoEditableTransitionEdge(props) {
     } = props;
     const { setEdges } = useReactFlow();
 
-    const addInitialControlPoint = useCallback(
-        (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-
+    const addInitialControlPointAt = useCallback(
+        (absolutePoint) => {
             const sourcePoint = { x: sourceX, y: sourceY };
             const targetPoint = { x: targetX, y: targetY };
-            const midpoint = {
-                x: (sourceX + targetX) / 2,
-                y: (sourceY + targetY) / 2,
-            };
             const nextPoints = [
                 makeRelativeControlPoint(
-                    midpoint,
+                    absolutePoint,
                     sourcePoint,
                     targetPoint,
                     `cp-${crypto.randomUUID()}`
@@ -805,6 +890,48 @@ function AutoEditableTransitionEdge(props) {
         },
         [data, id, setEdges, sourceX, sourceY, targetX, targetY]
     );
+
+    const addInitialControlPoint = useCallback(
+        (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            addInitialControlPointAt({
+                x: (sourceX + targetX) / 2,
+                y: (sourceY + targetY) / 2,
+            });
+        },
+        [addInitialControlPointAt, sourceX, sourceY, targetX, targetY]
+    );
+
+    const handledInsertRequestRef = useRef(null);
+
+    useEffect(() => {
+        const request = data?.controlPointInsertRequest;
+        if (
+            !request?.requestId ||
+            request.edgeId !== id ||
+            handledInsertRequestRef.current === request.requestId
+        ) {
+            return;
+        }
+
+        const absolutePoint = request.flowPosition;
+        if (
+            !absolutePoint ||
+            !Number.isFinite(Number(absolutePoint.x)) ||
+            !Number.isFinite(Number(absolutePoint.y))
+        ) {
+            return;
+        }
+
+        handledInsertRequestRef.current = request.requestId;
+        addInitialControlPointAt(absolutePoint);
+    }, [
+        addInitialControlPointAt,
+        data?.controlPointInsertRequest,
+        id,
+    ]);
 
     const SmartTransitionEdge = data?.forceObstacleRouting
         ? ForcedSmartTransitionEdge
