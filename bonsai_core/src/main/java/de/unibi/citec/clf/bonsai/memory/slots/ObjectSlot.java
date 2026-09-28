@@ -27,7 +27,7 @@ public class ObjectSlot<T extends Object> implements MemorySlot<T> {
 
     @Override
     public <S extends T> void  memorize(S object) throws CommunicationException {
-        logger.debug("memorized " + object.toString());
+        logger.debug("memorized object of type " + dataType +": "  + object.toString());
         savedObject = object;
     }
 
@@ -43,7 +43,7 @@ public class ObjectSlot<T extends Object> implements MemorySlot<T> {
             logger.debug("object to recall is null");
             return null;
         }
-        logger.debug("recall " + savedObject.toString());
+        logger.debug("recall object of type " + dataType + ": " + savedObject.toString());
 
         //try different copy methods
         Class<T> clazz = (Class<T>) savedObject.getClass();
