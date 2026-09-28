@@ -27,6 +27,18 @@ the 'src' attribute of states. - Appends a suffix to all sourced 'id' and
         <xsl:param name="ancestorGlobalIds"
                    tunnel="yes"
                    select="()"/>
+        <!--
+            Slot scopes of the already surrounding SCXMLs, ordered from the
+            immediate parent outwards. The suffix sequence uses the same order.
+            This lets an inheritSlot follow another inheritSlot until the scope
+            in which the slot was actually defined is reached.
+        -->
+        <xsl:param name="slotScopes"
+                   tunnel="yes"
+                   select="()"/>
+        <xsl:param name="slotSuffixes"
+                   tunnel="yes"
+                   select="()"/>
         <!-- Globals defined by THIS state machine -->
         <xsl:variable name="currentGlobalIds"
                       select="root(.)/scxml/datamodel/data[
@@ -35,7 +47,7 @@ the 'src' attribute of states. - Appends a suffix to all sourced 'id' and
                       ]/@id"/>
         <xsl:variable name="full" select="."/>
         <xsl:variable name="stateid" select="../@id"/>
-        <xsl:variable name="inheritSlots"
+        <xsl:variable name="currentSlots"
                       select="root(.)/scxml/datamodel/data/slots"/>
         <xsl:analyze-string select="$full" regex="\{{(.*)\}}">
             <xsl:matching-substring>
@@ -55,13 +67,16 @@ the 'src' attribute of states. - Appends a suffix to all sourced 'id' and
                                     select="concat('#', $stateid, $suffix)"
                                     tunnel="yes"/>
 
-                    <!-- Suffix der SCXML, die uns eingebunden hat -->
-                    <xsl:with-param name="parentSuffix"
-                                    select="$suffix"
+                    <!--
+                        Add the current SCXML to the ancestor slot stack before
+                        entering the sourced child. $suffix is the suffix of the
+                        current SCXML itself.
+                    -->
+                    <xsl:with-param name="slotScopes"
+                                    select="($currentSlots, $slotScopes)"
                                     tunnel="yes"/>
-
-                    <xsl:with-param name="inheritSlots"
-                                    select="$inheritSlots"
+                    <xsl:with-param name="slotSuffixes"
+                                    select="(string($suffix), $slotSuffixes)"
                                     tunnel="yes"/>
 
                     <xsl:with-param name="prefix"
@@ -103,7 +118,7 @@ the 'src' attribute of states. - Appends a suffix to all sourced 'id' and
         </xsl:attribute>
     </xsl:template>
 
-    <!-- Change the 'initial' attribute of all <state>, <final> and <parallel> 
+    <!-- Change the 'initial' attribute of all <state>, <final> and <parallel>
     nodes. -->
     <xsl:template match="state/@initial | final/@initial | parallel/@initial">
         <xsl:param name="suffix" tunnel="yes"/>
@@ -133,41 +148,82 @@ the 'src' attribute of states. - Appends a suffix to all sourced 'id' and
         </xsl:attribute>
     </xsl:template>
 
-    <xsl:template match="data/slots/inheritSlot/@xpath">
+    <!--
+        Resolve an inherited slot against the parent SCXML. If the parent slot
+        is itself inherited, continue with the next ancestor scope. This is the
+        important case for e.g.:
 
-        <xsl:param name="inheritSlots"
+            s1: slot /C
+            s2: inheritSlot /C
+            s3: inheritSlot /C
+
+        where s3 must still resolve to /C#s1 rather than falling back to /C.
+    -->
+    <xsl:template name="resolveInheritedSlotXpath">
+        <xsl:param name="xpath"/>
+        <xsl:param name="slotScopes"/>
+        <xsl:param name="slotSuffixes"/>
+        <xsl:param name="level" select="1"/>
+
+        <xsl:choose>
+            <!-- No more ancestor scopes: keep the xpath unchanged. -->
+            <xsl:when test="$level &gt; count($slotScopes)">
+                <xsl:value-of select="$xpath"/>
+            </xsl:when>
+
+            <xsl:otherwise>
+                <xsl:variable name="parentSlot"
+                              select="$slotScopes[$level]/*
+                                  [@xpath = $xpath][1]"/>
+
+                <xsl:choose>
+                    <!-- Normal slot: use the suffix of the scope that defines it. -->
+                    <xsl:when test="$parentSlot[self::slot]">
+                        <xsl:value-of
+                                select="concat($parentSlot/@xpath, $slotSuffixes[$level])"/>
+                    </xsl:when>
+
+                    <!-- Existing slotIn / slotOut semantics: xpath stays unchanged. -->
+                    <xsl:when test="$parentSlot[self::slotIn or self::slotOut]">
+                        <xsl:value-of select="$parentSlot/@xpath"/>
+                    </xsl:when>
+
+                    <!--
+                        The parent inherited this slot as well. Follow the same
+                        xpath one scope further out instead of dropping its suffix.
+                    -->
+                    <xsl:when test="$parentSlot[self::inheritSlot]">
+                        <xsl:call-template name="resolveInheritedSlotXpath">
+                            <xsl:with-param name="xpath" select="$xpath"/>
+                            <xsl:with-param name="slotScopes" select="$slotScopes"/>
+                            <xsl:with-param name="slotSuffixes" select="$slotSuffixes"/>
+                            <xsl:with-param name="level" select="$level + 1"/>
+                        </xsl:call-template>
+                    </xsl:when>
+
+                    <!-- No matching parent binding: preserve previous fallback. -->
+                    <xsl:otherwise>
+                        <xsl:value-of select="$xpath"/>
+                    </xsl:otherwise>
+                </xsl:choose>
+            </xsl:otherwise>
+        </xsl:choose>
+    </xsl:template>
+
+    <xsl:template match="data/slots/inheritSlot/@xpath">
+        <xsl:param name="slotScopes"
                    tunnel="yes"
                    select="()"/>
-        <xsl:param name="parentSuffix" tunnel="yes"/>
-
-        <xsl:variable name="xpath" select="."/>
-
-        <!-- Find the parent's slot referring to the same path -->
-        <xsl:variable name="inheritSlot"
-                      select="$inheritSlots/*
-                          [@xpath = $xpath][1]"/>
+        <xsl:param name="slotSuffixes"
+                   tunnel="yes"
+                   select="()"/>
 
         <xsl:attribute name="xpath">
-            <xsl:choose>
-
-                <!-- Parent is a normal slot:
-                     its xpath belongs to the parent scope -->
-                <xsl:when test="$inheritSlot[self::slot]">
-                    <xsl:value-of
-                            select="concat($inheritSlot/@xpath, $parentSuffix)"/>
-                </xsl:when>
-
-                <!-- Parent is itself slotIn / slotOut -->
-                <xsl:when test="$inheritSlot[self::slotIn or self::slotOut]">
-                    <xsl:value-of select="$inheritSlot/@xpath"/>
-                </xsl:when>
-
-                <!-- No parent binding -->
-                <xsl:otherwise>
-                    <xsl:value-of select="."/>
-                </xsl:otherwise>
-
-            </xsl:choose>
+            <xsl:call-template name="resolveInheritedSlotXpath">
+                <xsl:with-param name="xpath" select="string(.)"/>
+                <xsl:with-param name="slotScopes" select="$slotScopes"/>
+                <xsl:with-param name="slotSuffixes" select="$slotSuffixes"/>
+            </xsl:call-template>
         </xsl:attribute>
     </xsl:template>
 
@@ -307,7 +363,7 @@ the 'src' attribute of states. - Appends a suffix to all sourced 'id' and
                 </xsl:when>
                 <xsl:otherwise>
                     <xsl:value-of
-                        select="current()"/>
+                            select="current()"/>
                 </xsl:otherwise>
             </xsl:choose>
         </xsl:attribute>
