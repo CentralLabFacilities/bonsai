@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="skills.slots.SlotIO">
+    <datamodel>
+        <data id="#_SLOTS">
+            <slots>
+                <inheritSlot key="StringSlot" state="skills.slots.SlotIO" xpath="/C"/>
+            </slots>
+        </data>
+        <data id="test_val" expr="3"/>
+        <data id="no_change_test_val" expr="3"/>
+    </datamodel>
+
+    <state id="skills.slots.SlotIO">
+        <datamodel>
+            <data id="#_WRITE" expr="@test_val"/>
+        </datamodel>
+        <transition event="SlotIO.*" target="skills.Nop"/>
+    </state>
+
+
+    <state id="skills.Nop">
+        <transition event="Nop.*">
+            <send event="success"/>
+        </transition>
+    </state>
+</scxml>
