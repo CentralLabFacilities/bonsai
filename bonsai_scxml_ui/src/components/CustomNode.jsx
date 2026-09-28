@@ -144,18 +144,37 @@ function CustomNode({ id, data, selected }) {
             (data.params || [])
                 .filter((parameter) => String(parameter?.key || "").trim())
                 .map((parameter) => {
+                    const key = String(parameter.key);
                     const value = getParameterValue(parameter);
                     const defaultValue = getParameterDefaultValue(parameter);
+                    const runtimeValues = data.runtimeParameterValues || {};
+                    const runtimeEntry = Object.entries(runtimeValues).find(
+                        ([runtimeKey]) =>
+                            String(runtimeKey || "").trim() === key.trim()
+                    );
+                    const runtimeValueMeta = runtimeEntry?.[1] || null;
+                    const hasRuntimeValue = Boolean(runtimeValueMeta);
+                    const runtimeDisplayValue = hasRuntimeValue
+                        ? runtimeValueMeta.value === ""
+                            ? '""'
+                            : String(runtimeValueMeta.value)
+                        : "";
 
                     return {
-                        key: String(parameter.key),
+                        key,
                         value,
                         defaultValue,
-                        displayValue: value || defaultValue,
-                        usesDefault: value === "" && defaultValue !== "",
+                        configuredDisplayValue: value || defaultValue,
+                        displayValue: hasRuntimeValue
+                            ? runtimeDisplayValue
+                            : value || defaultValue,
+                        usesDefault:
+                            !hasRuntimeValue && value === "" && defaultValue !== "",
+                        runtimeValueMeta,
+                        hasRuntimeValue,
                     };
                 }),
-        [data.params]
+        [data.params, data.runtimeParameterValues]
     );
 
     const overviewWidth = useMemo(() => {
@@ -554,17 +573,31 @@ function CustomNode({ id, data, selected }) {
                         {parameterEntries.map((parameter) => (
                             <div
                                 key={parameter.key}
-                                className="node-parameter-row nodrag nopan"
+                                className={`node-parameter-row nodrag nopan ${
+                                    parameter.hasRuntimeValue
+                                        ? "node-parameter-row-runtime"
+                                        : ""
+                                }`}
                                 role="button"
                                 tabIndex={0}
                                 title={
-                                    parameter.displayValue
-                                        ? `${parameter.key} = ${parameter.displayValue}${
-                                            parameter.usesDefault
-                                                ? " (default)"
+                                    parameter.hasRuntimeValue
+                                        ? `${parameter.key} = ${parameter.displayValue} (runtime${
+                                            parameter.runtimeValueMeta?.timestamp
+                                                ? ` at ${parameter.runtimeValueMeta.timestamp}`
                                                 : ""
-                                        } — click to edit`
-                                        : `${parameter.key} — click to edit`
+                                        })${
+                                            parameter.configuredDisplayValue
+                                                ? ` · configured: ${parameter.configuredDisplayValue}`
+                                                : ""
+                                        }`
+                                        : parameter.displayValue
+                                            ? `${parameter.key} = ${parameter.displayValue}${
+                                                parameter.usesDefault
+                                                    ? " (default)"
+                                                    : ""
+                                            } — click to edit`
+                                            : `${parameter.key} — click to edit`
                                 }
                                 onMouseDown={(event) => event.stopPropagation()}
                                 onClick={(event) => {
@@ -613,11 +646,17 @@ function CustomNode({ id, data, selected }) {
                                                 parameter.usesDefault
                                                     ? "node-parameter-default-value"
                                                     : ""
+                                            } ${
+                                                parameter.hasRuntimeValue
+                                                    ? "node-parameter-runtime-value"
+                                                    : ""
                                             }`}
                                             style={{
-                                                color: parameter.usesDefault
-                                                    ? "#94a3b8"
-                                                    : "#0f172a",
+                                                color: parameter.hasRuntimeValue
+                                                    ? "#1d4ed8"
+                                                    : parameter.usesDefault
+                                                        ? "#94a3b8"
+                                                        : "#0f172a",
                                                 fontFamily:
                                                     "Consolas, Monaco, 'Courier New', monospace",
                                                 fontStyle: parameter.usesDefault
@@ -629,6 +668,11 @@ function CustomNode({ id, data, selected }) {
                                         >
                                             {parameter.displayValue}
                                         </span>
+                                        {parameter.hasRuntimeValue && (
+                                            <span className="node-parameter-runtime-badge">
+                                                runtime
+                                            </span>
+                                        )}
                                     </>
                                 )}
                             </div>

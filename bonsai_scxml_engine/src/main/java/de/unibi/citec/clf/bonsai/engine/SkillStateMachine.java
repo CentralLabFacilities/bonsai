@@ -730,11 +730,10 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
             } else if (a instanceof Assign) {
                 Assign action = (Assign) a;
                 if(action.getExpr().startsWith("'")) {
-                    logger.debug("\t\tASSIGN ## Name:" + action + " Expr:" + action.getExpr());
+                    logger.debug("\t\tASSIGN ## Name:" + action.getLocation() + " Expr:" + action.getExpr());
                 } else {
-                    logger.warn("\t\tASSIGN ## Name:" + action + " VALUE OF:'" + action.getExpr()+ "'");
+                    logger.warn("\t\tASSIGN ## Name:" + action.getLocation() + " VALUE OF:'" + action.getExpr()+ "'");
                 }
-
             }
         }); //logger.trace("possible actions: " + actionsStr);
     }

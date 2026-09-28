@@ -76,6 +76,12 @@ function SlotNode({ id, data, selected = false }) {
 
     const writeHandleId = "slot-node-write";
     const readHandleId = "slot-node-read";
+    const runtimeSlotValue = data.runtimeSlotValueMeta || null;
+    const runtimeValueText = runtimeSlotValue
+        ? runtimeSlotValue.value === ""
+            ? '""'
+            : String(runtimeSlotValue.value)
+        : "";
 
     return (
         <div
@@ -86,6 +92,20 @@ function SlotNode({ id, data, selected = false }) {
             } ${isSlotClone ? "slot-node-reference" : ""} ${selected ? "selected-slot-node" : ""}`}
             style={getSlotTypeStyle(slotType)}
         >
+            {runtimeSlotValue && (
+                <div
+                    className="slot-node-runtime-value"
+                    title={`Runtime value at ${runtimeSlotValue.timestamp || "this step"}${
+                        runtimeSlotValue.state
+                            ? ` · ${runtimeSlotValue.state}`
+                            : ""
+                    }`}
+                >
+                    <span className="slot-node-runtime-value-label">value</span>
+                    <code>{runtimeValueText}</code>
+                </div>
+            )}
+
             <Handle
                 id={writeHandleId}
                 type="target"

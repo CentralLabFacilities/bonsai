@@ -1976,6 +1976,7 @@
    ========================================================================== */
 
 .right-panel-shell {
+    position: relative;
     display: flex;
     flex-direction: column;
     min-width: 0;
@@ -7564,4 +7565,711 @@
 .costum-node:not(.terminal-final-node):not(.behavior-exit-node):active:not(.selected-node),
 .slot-node:active:not(.selected-slot-node) {
     filter: brightness(1.035);
+}
+
+/* ========================================================================== 
+   RUNTIME LOG PLAYBACK
+   ========================================================================== */
+.runtime-log-load-button {
+    position: absolute;
+    left: 50%;
+    bottom: 18px;
+    transform: translateX(-50%);
+    z-index: 30;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 2.2rem;
+    padding: 0 14px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.96);
+    color: #334155;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.18);
+}
+
+.runtime-log-load-button:hover {
+    border-color: #94a3b8;
+    background: #ffffff;
+}
+
+.runtime-log-player {
+    position: absolute;
+    left: 50%;
+    bottom: 18px;
+    transform: translateX(-50%);
+    z-index: 30;
+    width: min(620px, calc(100% - 48px));
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.98);
+    color: #0f172a;
+    box-shadow: 0 8px 28px rgba(15, 23, 42, 0.22);
+    overflow: hidden;
+}
+
+.runtime-log-player-header,
+.runtime-log-controls,
+.runtime-log-event-row,
+.runtime-log-route {
+    display: flex;
+    align-items: center;
+}
+
+.runtime-log-player-header {
+    min-height: 42px;
+    padding: 6px 8px;
+    gap: 8px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.runtime-log-file-button,
+.runtime-log-close-button,
+.runtime-log-controls button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    background: #ffffff;
+    color: #334155;
+    cursor: pointer;
+}
+
+.runtime-log-file-button:hover,
+.runtime-log-close-button:hover,
+.runtime-log-controls button:hover:not(:disabled) {
+    background: #f8fafc;
+    border-color: #94a3b8;
+}
+
+.runtime-log-file-info {
+    min-width: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+}
+
+.runtime-log-file-info strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+}
+
+.runtime-log-file-info span {
+    margin-top: 2px;
+    color: #64748b;
+    font-size: 10px;
+}
+
+.runtime-log-current-step {
+    padding: 8px 10px 7px;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.runtime-log-route {
+    min-width: 0;
+    gap: 7px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.runtime-log-route > span:not(.runtime-log-route-arrow) {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.runtime-log-route-arrow {
+    flex: 0 0 auto;
+    color: #64748b;
+}
+
+.runtime-log-event-row {
+    margin-top: 5px;
+    gap: 8px;
+    color: #64748b;
+    font-size: 10px;
+}
+
+.runtime-log-event-row code {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #475569;
+}
+
+.runtime-log-unmatched {
+    margin-left: auto;
+    padding: 2px 5px;
+    border-radius: 999px;
+    background: #fee2e2;
+    color: #b91c1c;
+    font-weight: 700;
+}
+
+.runtime-log-controls {
+    justify-content: center;
+    gap: 7px;
+    min-height: 44px;
+    padding: 6px 10px;
+}
+
+.runtime-log-controls button:disabled {
+    opacity: 0.38;
+    cursor: not-allowed;
+}
+
+.runtime-log-controls .runtime-log-play-button {
+    width: 38px;
+    height: 34px;
+    background: #0f172a;
+    border-color: #0f172a;
+    color: #ffffff;
+}
+
+.runtime-log-controls .runtime-log-play-button:hover:not(:disabled) {
+    background: #1e293b;
+    border-color: #1e293b;
+}
+
+.runtime-log-controls select {
+    height: 32px;
+    margin-left: 5px;
+    padding: 0 7px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    background: #ffffff;
+    color: #334155;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+
+.runtime-log-trace-overview {
+    padding: 8px 10px;
+    border-bottom: 1px solid #e2e8f0;
+    background: #f8fafc;
+    color: #475569;
+    font-size: 11px;
+    font-weight: 600;
+    text-align: center;
+}
+
+/* A loaded log has two visual states:
+   1) before playback: keep the complete executed route visible and dim the
+      rest of the graph;
+   2) during/after playback starts: keep only the current source, target and
+      transition fully emphasized. */
+.react-flow__node.runtime-log-dimmed-node {
+    opacity: 0.16 !important;
+    filter: grayscale(0.35) saturate(0.45) !important;
+}
+
+.react-flow__edge.runtime-log-dimmed-edge {
+    visibility: visible !important;
+    opacity: 0.1 !important;
+    filter: grayscale(0.4) saturate(0.35) !important;
+}
+
+.react-flow__node.runtime-log-trace-node {
+    opacity: 1 !important;
+    filter: none !important;
+    outline: 2px solid rgba(59, 130, 246, 0.42);
+    outline-offset: 3px;
+    border-radius: 8px;
+}
+
+.react-flow__edge.runtime-log-trace-edge {
+    visibility: visible !important;
+    opacity: 1 !important;
+    filter: drop-shadow(0 0 2px rgba(59, 130, 246, 0.24));
+}
+
+.react-flow__edge.runtime-log-trace-edge .react-flow__edge-path {
+    stroke-width: 3px !important;
+}
+
+/* Runtime trace visibility wins over the normal transition/slot visibility
+   toggles so the loaded execution path is never hidden accidentally. */
+.react-flow.runtime-log-focus-mode
+.react-flow__edge.runtime-log-trace-edge,
+.react-flow.runtime-log-focus-mode
+.react-flow__edge.runtime-log-active-edge,
+.react-flow.runtime-log-focus-mode
+.react-flow__edge.runtime-log-active-slot-edge,
+.react-flow.runtime-log-focus-mode
+.react-flow__edge.runtime-log-dimmed-edge {
+    visibility: visible !important;
+}
+
+/* Runtime highlighting must remain visible even when normal transition
+   visibility/focus modes would dim or hide the edge. */
+.react-flow__edge.runtime-log-active-edge {
+    visibility: visible !important;
+    opacity: 1 !important;
+    filter: drop-shadow(0 0 5px rgba(250, 204, 21, 0.9));
+}
+
+.react-flow__edge.runtime-log-active-edge .react-flow__edge-path {
+    stroke-width: 4px !important;
+}
+
+/* Slot reads/writes at the current replay step use the slot edge's existing
+   semantic color, but are brought to the foreground with a stronger stroke. */
+.react-flow__edge.runtime-log-active-slot-edge {
+    visibility: visible !important;
+    opacity: 1 !important;
+    filter: drop-shadow(0 0 5px rgba(56, 189, 248, 0.9)) !important;
+}
+
+.react-flow__edge.runtime-log-active-slot-edge .react-flow__edge-path {
+    stroke-width: 4px !important;
+}
+
+.react-flow__node.runtime-log-source-node,
+.react-flow__node.runtime-log-target-node {
+    opacity: 1 !important;
+    filter: none !important;
+}
+
+.react-flow__node.runtime-log-source-node {
+    outline: 3px solid #38bdf8;
+    outline-offset: 4px;
+    border-radius: 8px;
+}
+
+.react-flow__node.runtime-log-target-node {
+    outline: 3px solid #22c55e;
+    outline-offset: 4px;
+    border-radius: 8px;
+}
+
+.react-flow__node.runtime-log-source-node.runtime-log-target-node {
+    outline-color: #facc15;
+}
+
+.react-flow__edge.runtime-log-active-edge .react-flow__edge-path {
+    stroke-dasharray: 6 5 !important;
+    animation: dashdraw 0.55s linear infinite !important;
+}
+
+/* ========================================================================== 
+   RUNTIME LOG TIMELINE + SLOT VALUES
+   ========================================================================== */
+.runtime-log-timeline {
+    padding: 8px 12px 7px;
+    border-bottom: 1px solid #e2e8f0;
+    background: #ffffff;
+}
+
+.runtime-log-timeline-labels {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 5px;
+    color: #64748b;
+    font-size: 9.5px;
+    font-weight: 650;
+}
+
+.runtime-log-timeline-labels span:nth-child(2) {
+    color: #475569;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", monospace;
+}
+
+.runtime-log-timeline-labels span:last-child {
+    text-align: right;
+}
+
+.runtime-log-timeline-range {
+    display: block;
+    width: 100%;
+    height: 18px;
+    margin: 0;
+    cursor: pointer;
+    accent-color: #2563eb;
+}
+
+/* Runtime slot snapshots deliberately sit outside the slot card so the value
+   remains readable while inspecting the graph at a playback step. */
+.slot-node-runtime-value {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 8px);
+    z-index: 8;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 260px;
+    transform: translateX(-50%);
+    padding: 4px 7px;
+    border: 1px solid rgba(96, 165, 250, 0.62);
+    border-radius: 7px;
+    background: rgba(15, 23, 42, 0.96);
+    box-shadow: 0 4px 12px rgba(2, 6, 23, 0.32);
+    color: #e2e8f0;
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+.slot-node-runtime-value-label {
+    color: #93c5fd;
+    font-size: 8px;
+    font-weight: 850;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.slot-node-runtime-value code {
+    min-width: 0;
+    max-width: 205px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #f8fafc;
+    font-size: 11px;
+    font-weight: 750;
+}
+
+.react-flow__node.runtime-log-slot-value-node {
+    opacity: 1 !important;
+    filter: none !important;
+}
+
+/* Runtime-log parameter snapshots replace the configured expression in the
+   skill's parameter row for the selected playback step. The small badge makes
+   it explicit that this is an observed execution value, not an SCXML edit. */
+.costum-node:not(.terminal-final-node):not(.behavior-exit-node)
+    .node-parameter-row-runtime {
+    border-radius: 5px;
+    background: rgba(219, 234, 254, 0.72);
+    box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.28);
+}
+
+.costum-node:not(.terminal-final-node):not(.behavior-exit-node)
+    .node-parameter-runtime-value {
+    font-weight: 800;
+}
+
+.node-parameter-runtime-badge {
+    flex: 0 0 auto;
+    padding: 1px 4px;
+    border: 1px solid rgba(96, 165, 250, 0.48);
+    border-radius: 999px;
+    background: rgba(239, 246, 255, 0.92);
+    color: #1d4ed8;
+    font-size: 7px;
+    font-weight: 850;
+    line-height: 1.25;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    pointer-events: none;
+}
+
+/* --------------------------------------------------------------------------
+   Runtime playback + normal editor interaction
+
+   Runtime playback dims everything outside the current trace/step, but users
+   must still be able to inspect another skill. Normal editor hover/selection
+   context therefore temporarily wins over runtime dimming. This is visual
+   only: it does not change the current runtime step or playback state.
+   -------------------------------------------------------------------------- */
+.react-flow.runtime-log-focus-mode
+.react-flow__node.runtime-log-dimmed-node.editor-node-context-visible,
+.react-flow.runtime-log-focus-mode
+.react-flow__node.runtime-log-dimmed-node.editor-hover-highlight,
+.react-flow.runtime-log-focus-mode
+.react-flow__node.runtime-log-dimmed-node.selected {
+    opacity: 1 !important;
+    filter: none !important;
+}
+
+.react-flow.runtime-log-focus-mode
+.react-flow__edge.runtime-log-dimmed-edge.editor-edge-focus-active,
+.react-flow.runtime-log-focus-mode
+.react-flow__edge.runtime-log-dimmed-edge.editor-edge-context-visible,
+.react-flow.runtime-log-focus-mode
+.react-flow__edge.runtime-log-dimmed-edge.selected {
+    visibility: visible !important;
+    opacity: 1 !important;
+    filter: none !important;
+}
+
+/* Keep the actually executed transition visually stronger than an inspected
+   hover/selection context when the two overlap. */
+.react-flow.runtime-log-focus-mode
+.react-flow__edge.runtime-log-active-edge {
+    opacity: 1 !important;
+    filter: drop-shadow(0 0 5px rgba(250, 204, 21, 0.9)) !important;
+}
+
+/* --------------------------------------------------------------------------
+   Runtime change drawer
+   -------------------------------------------------------------------------- */
+.runtime-changes-drawer {
+    position: absolute;
+    top: 40px;
+    right: 0;
+    bottom: 0;
+    z-index: 24;
+    display: flex;
+    align-items: stretch;
+    pointer-events: none;
+    transition: width 0.18s ease;
+}
+
+.runtime-changes-drawer.open {
+    width: 100%;
+}
+
+.runtime-changes-drawer.closed {
+    width: 28px;
+}
+
+.runtime-changes-drawer-ledge {
+    width: 28px;
+    min-width: 28px;
+    border: 0;
+    border-left: 1px solid rgba(148, 163, 184, 0.35);
+    border-right: 1px solid rgba(148, 163, 184, 0.35);
+    background: rgba(15, 23, 42, 0.94);
+    color: #cbd5e1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.runtime-changes-drawer-ledge:hover {
+    background: #1e293b;
+    color: #ffffff;
+}
+
+.runtime-changes-drawer-content {
+    flex: 1;
+    min-width: 0;
+    overflow-y: auto;
+    background: rgba(15, 23, 42, 0.97);
+    border-left: 1px solid rgba(148, 163, 184, 0.28);
+    box-shadow: -8px 0 24px rgba(15, 23, 42, 0.24);
+    color: #e2e8f0;
+    pointer-events: auto;
+    animation: runtime-changes-slide-in 0.16s ease-out;
+}
+
+@keyframes runtime-changes-slide-in {
+    from {
+        opacity: 0;
+        transform: translateX(18px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.runtime-changes-drawer-header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 14px 14px 11px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.22);
+    background: rgba(11, 17, 32, 0.98);
+}
+
+.runtime-changes-drawer-header > div {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+.runtime-changes-drawer-header strong {
+    font-size: 13px;
+}
+
+.runtime-changes-drawer-header span {
+    font-size: 11px;
+    color: #94a3b8;
+}
+
+.runtime-changes-context {
+    flex-shrink: 0;
+    max-width: 115px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 3px 6px;
+    border-radius: 999px;
+    background: rgba(56, 189, 248, 0.12);
+    color: #7dd3fc !important;
+}
+
+.runtime-changes-groups {
+    padding: 10px;
+}
+
+.runtime-changes-group {
+    margin-bottom: 12px;
+}
+
+.runtime-changes-group h4 {
+    margin: 0 0 6px;
+    color: #94a3b8;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.runtime-change-row {
+    padding: 8px 9px;
+    margin-bottom: 5px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 6px;
+    background: rgba(30, 41, 59, 0.72);
+}
+
+.runtime-change-main {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+    font-size: 12px;
+}
+
+.runtime-change-main code {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #bae6fd;
+}
+
+.runtime-change-main strong {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    color: #fde68a;
+    font-weight: 700;
+}
+
+.runtime-change-arrow {
+    color: #64748b;
+}
+
+.runtime-change-meta {
+    display: block;
+    margin-top: 4px;
+    color: #64748b;
+    font-size: 10px;
+    overflow-wrap: anywhere;
+}
+
+.runtime-changes-empty {
+    padding: 16px 14px;
+    color: #94a3b8;
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+/* ================= RUNTIME REPLAY PREPARATION ================= */
+.runtime-replay-loading-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 4100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(2, 6, 23, 0.8);
+    backdrop-filter: blur(3px);
+}
+
+.runtime-replay-loading-card {
+    display: flex;
+    width: min(390px, calc(100vw - 40px));
+    flex-direction: column;
+    align-items: center;
+    gap: 9px;
+    padding: 26px 30px 24px;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    background: #0f172a;
+    box-shadow: 0 22px 54px rgba(0, 0, 0, 0.55);
+}
+
+.runtime-replay-loading-spinner {
+    width: 36px;
+    height: 36px;
+    margin-bottom: 2px;
+    border: 3px solid #334155;
+    border-top-color: #cbd5e1;
+    border-radius: 50%;
+    animation: state-machine-loading-spin 0.8s linear infinite;
+}
+
+.runtime-replay-loading-title {
+    color: #f8fafc;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.runtime-replay-loading-file,
+.runtime-replay-loading-phase {
+    width: 100%;
+    overflow: hidden;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.runtime-replay-loading-file {
+    color: #cbd5e1;
+    font-size: 12px;
+}
+
+.runtime-replay-loading-phase {
+    min-height: 18px;
+    color: #94a3b8;
+    font-size: 12px;
+}
+
+.runtime-replay-loading-progress {
+    width: 100%;
+    height: 6px;
+    margin-top: 4px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #1e293b;
+}
+
+.runtime-replay-loading-progress > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: #94a3b8;
+    transition: width 120ms ease-out;
+}
+
+.runtime-replay-loading-percent {
+    color: #64748b;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
 }
