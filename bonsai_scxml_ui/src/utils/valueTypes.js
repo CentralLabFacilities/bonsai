@@ -358,7 +358,20 @@ export function deserializeScxmlConditionForEditor(condition) {
     if (!trimmed) return "";
 
     const match = trimmed.match(/^([^\s]+)\s*(==|!=|>=|<=|>|<)\s*(.+)$/);
-    if (!match) return trimmed;
+    if (!match) {
+        // SCXML commonly uses a boolean datamodel variable directly as a
+        // condition, e.g. cond="gripper_open". The transition editor is
+        // comparison-based, so represent that equivalent expression
+        // explicitly instead of falling back to an uneditable free-form value.
+        if (
+            /^@?[A-Za-z_#][A-Za-z0-9_:#.\-]*$/.test(trimmed) &&
+            !/^(true|false|null)$/i.test(trimmed)
+        ) {
+            return `${trimmed.replace(/^@/, "")} == true`;
+        }
+
+        return trimmed;
+    }
 
     const [, left, operator, rawRight] = match;
     const right = deserializeScxmlValueForEditor(rawRight);

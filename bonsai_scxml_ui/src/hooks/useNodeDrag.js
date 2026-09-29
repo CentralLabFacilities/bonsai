@@ -1,22 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { resolveCollisionScope } from "../utils/nodeCollisions";
 import { rebuildBoundaryTransitions } from "../utils/boundaryTransitions";
+import { getOverviewLayoutNodeSize } from "../utils/layoutUtils";
 import {
     COMPOUND_HEADER_HEIGHT,
     COMPOUND_PADDING_X,
     COMPOUND_BOTTOM_PADDING,
     NODE_COLLISION_OPTIONS,
     PARALLEL_NODE_GAP,
+    PARALLEL_LANE_CHILD_TOP_INSET,
     fitCompoundAndAncestorCompounds,
     getAbsoluteNodePosition,
     getDirectCompoundForNode,
     getCompoundExitGutterWidth,
     getLaneForNode,
-    getNodeNestingDepth,
     getNodeSize,
     growParallelToLaneContents,
-    isNodeInsideContainer,
     isParallelLaneSkillCandidate,
+    isAutoParallelLaneCompound,
+    findDropContainerAtPoint,
     resolveNodeCollisionsAndRefit,
 } from "../utils/editorGeometry";
 
@@ -45,6 +47,7 @@ export function useNodeDrag({
     const [parallelDropTargetId, setParallelDropTargetId] = useState(null);
     const [compoundDropTargetId, setCompoundDropTargetId] = useState(null);
     const [isDraggingNode, setIsDraggingNode] = useState(false);
+    const [draggingNodeId, setDraggingNodeId] = useState(null);
     const [isOverTrash, setIsOverTrash] = useState(false);
 
     const dragFrameRef = useRef(null);
@@ -108,7 +111,10 @@ export function useNodeDrag({
         currentNodes.forEach((node) => {
             if (node.type === "parallelLane") {
                 lanes.push(toBounds(node));
-            } else if (node.type === "compound") {
+            } else if (
+                node.type === "compound" &&
+                !isAutoParallelLaneCompound(node)
+            ) {
                 compounds.push(toBounds(node));
             }
         });
@@ -169,6 +175,7 @@ export function useNodeDrag({
             dragOriginContainerRef.current = null;
         }
 
+        setDraggingNodeId(node.id);
         setIsDraggingNode(true);
         setHoveredEditorEdgeId(null);
 
@@ -199,7 +206,7 @@ export function useNodeDrag({
         const pending = pendingNodeDragRef.current;
         if (!pending) return;
 
-        const { clientX, clientY, nodeId, nodeType, isSkillClone } = pending;
+        const { clientX, clientY, nodeId, nodeType, isEditorClone } = pending;
         const isOverTrash = Boolean(
             document
                 .elementFromPoint(clientX, clientY)
@@ -208,9 +215,10 @@ export function useNodeDrag({
 
         setIsOverTrash(isOverTrash);
 
-        // Parallel-lane helper nodes are layout-only and editor-only skill
-        // clones stay top-level, so neither participates in container drops.
-        if (isOverTrash || nodeType === "parallelLane" || isSkillClone) {
+        // Parallel-lane helper nodes are layout-only. Editor references keep
+        // the semantic scope of their original state, so generic container
+        // drop highlighting does not apply to them.
+        if (isOverTrash || nodeType === "parallelLane" || isEditorClone) {
             setParallelDropTargetId(null);
             setCompoundDropTargetId(null);
             return;
@@ -229,17 +237,21 @@ export function useNodeDrag({
             entry.id !== nodeId && !entry.ancestorIds.has(nodeId);
 
         const dragContainerIndex = dragContainerIndexRef.current;
-        const hoveredCompound = dragContainerIndex.compounds.find(
-            (entry) => canUseTarget(entry) && containsPointer(entry)
-        );
+        const hoveredContainer = [
+            ...dragContainerIndex.compounds,
+            ...(nodeType !== "parallel" ? dragContainerIndex.lanes : []),
+        ]
+            .filter((entry) => canUseTarget(entry) && containsPointer(entry))
+            .sort((a, b) => b.depth - a.depth)[0] || null;
 
         let hoveredLane =
-            !hoveredCompound && nodeType !== "parallel"
-                ? dragContainerIndex.lanes.find(
-                      (entry) => canUseTarget(entry) && containsPointer(entry)
-                  )
+            hoveredContainer?.type === "parallelLane"
+                ? hoveredContainer
                 : null;
-        let effectiveCompound = hoveredCompound;
+        let effectiveCompound =
+            hoveredContainer?.type === "compound"
+                ? hoveredContainer
+                : null;
 
         // A node already inside a container is "sticky" at the border. The
         // source container remains highlighted for a small margin outside its
@@ -272,7 +284,9 @@ export function useNodeDrag({
             clientY: event.clientY,
             nodeId: draggedNode.id,
             nodeType: draggedNode.type,
-            isSkillClone: Boolean(draggedNode.data?.isSkillClone),
+            isEditorClone: Boolean(
+                draggedNode.data?.isSkillClone || draggedNode.data?.isStateClone
+            ),
         };
 
         // Give skills a tangible "sticky" container border while dragging.
@@ -285,7 +299,7 @@ export function useNodeDrag({
         if (
             origin &&
             draggedNode.type === "custom" &&
-            !draggedNode.data?.isSkillClone
+            !(draggedNode.data?.isSkillClone || draggedNode.data?.isStateClone)
         ) {
             const pointerPosition = screenToFlowPosition({
                 x: event.clientX,
@@ -372,12 +386,12 @@ export function useNodeDrag({
                         const isDescendant =
                             candidate.parentId &&
                             idsToDelete.has(candidate.parentId);
-                        const isCloneOfDeletedSkill =
-                            candidate.data?.isSkillClone &&
+                        const isCloneOfDeletedState =
+                            (candidate.data?.isSkillClone || candidate.data?.isStateClone) &&
                             idsToDelete.has(candidate.data?.cloneOfNodeId);
 
                         if (
-                            (isDescendant || isCloneOfDeletedSkill) &&
+                            (isDescendant || isCloneOfDeletedState) &&
                             !idsToDelete.has(candidate.id)
                         ) {
                             idsToDelete.add(candidate.id);
@@ -459,6 +473,7 @@ export function useNodeDrag({
                     });
             });
 
+            setDraggingNodeId(null);
             setIsDraggingNode(false);
             setIsOverTrash(false);
             setParallelDropTargetId(null);
@@ -469,6 +484,7 @@ export function useNodeDrag({
         // Parallel-lane helper nodes themselves are not draggable between
         // containers. Compound and parallel states are intentionally allowed.
         if (node.type === "parallelLane") {
+            setDraggingNodeId(null);
             setIsDraggingNode(false);
             setIsOverTrash(false);
             setParallelDropTargetId(null);
@@ -476,34 +492,81 @@ export function useNodeDrag({
             return;
         }
 
-        // Skill clones are visual aliases only. Keep them top-level so their
-        // saved absolute editor position has the same meaning after reload.
-        if (node.data?.isSkillClone) {
+        // Editor references are visual aliases only. Their semantic scope is
+        // the scope of the original state. Keep/snap the reference into that
+        // same parent instead of forcing it to the top level. This is important
+        // for references to states in later Parallel lanes and also matches the
+        // way reference metadata is reconstructed on SCXML import.
+        if (node.data?.isSkillClone || node.data?.isStateClone) {
             setNodes((currentNodes) => {
                 const liveNode = currentNodes.find(
                     (candidate) => candidate.id === node.id
                 );
+                const sourceNode = currentNodes.find(
+                    (candidate) =>
+                        candidate.id === liveNode?.data?.cloneOfNodeId
+                );
 
-                if (!liveNode?.parentId) return currentNodes;
+                if (!liveNode) return currentNodes;
 
                 const absolute = getAbsoluteNodePosition(
                     liveNode,
                     currentNodes
                 );
+                const sourceParent = sourceNode?.parentId
+                    ? currentNodes.find(
+                        (candidate) => candidate.id === sourceNode.parentId
+                    )
+                    : null;
 
-                return currentNodes.map((candidate) =>
-                    candidate.id === liveNode.id
-                        ? {
+                let nextNodes = currentNodes.map((candidate) => {
+                    if (candidate.id !== liveNode.id) return candidate;
+
+                    if (!sourceParent) {
+                        return {
                             ...candidate,
                             parentId: undefined,
                             extent: undefined,
                             expandParent: undefined,
                             position: absolute,
-                        }
-                        : candidate
-                );
+                        };
+                    }
+
+                    const parentAbsolute = getAbsoluteNodePosition(
+                        sourceParent,
+                        currentNodes
+                    );
+                    return {
+                        ...candidate,
+                        parentId: sourceParent.id,
+                        extent: "parent",
+                        expandParent: true,
+                        position: {
+                            x: absolute.x - parentAbsolute.x,
+                            y: absolute.y - parentAbsolute.y,
+                        },
+                    };
+                });
+
+                if (sourceParent?.type === "compound") {
+                    nextNodes = fitCompoundAndAncestorCompounds(
+                        nextNodes,
+                        sourceParent.id
+                    );
+                } else if (
+                    sourceParent?.type === "parallelLane" &&
+                    sourceParent.parentId
+                ) {
+                    nextNodes = growParallelToLaneContents(
+                        nextNodes,
+                        sourceParent.parentId
+                    );
+                }
+
+                return nextNodes;
             });
 
+            setDraggingNodeId(null);
             setIsDraggingNode(false);
             setIsOverTrash(false);
             setParallelDropTargetId(null);
@@ -530,43 +593,46 @@ export function useNodeDrag({
                 currentNodes
             );
 
-            let targetCompound = currentNodes
-                .filter(
-                    (c) =>
-                        c.type === "compound" &&
-                        c.id !== draggedNode.id &&
-                        // Never allow a compound to become a child of one of
-                        // its own descendants. Compound -> Compound itself is
-                        // otherwise fully supported.
-                        !isNodeInsideContainer(
-                            c,
-                            draggedNode.id,
-                            currentNodes
-                        )
-                )
-                .filter((compound) => {
-                    const p = getAbsoluteNodePosition(
-                        compound,
-                        currentNodes
-                    );
+            const targetContainer = findDropContainerAtPoint(
+                dropPoint,
+                currentNodes,
+                {
+                    excludeNodeId: draggedNode.id,
+                    allowParallelLanes: draggedNode.type !== "parallel",
+                }
+            );
 
-                    const z = getNodeSize(compound);
+            let targetCompound =
+                targetContainer?.type === "compound"
+                    ? targetContainer
+                    : null;
+            let targetLaneAtDrop =
+                targetContainer?.type === "parallelLane"
+                    ? targetContainer
+                    : null;
 
-                    return (
-                        dropPoint.x >= p.x &&
-                        dropPoint.x <= p.x + z.width &&
-                        dropPoint.y >= p.y &&
-                        dropPoint.y <= p.y + z.height
-                    );
-                })
-                .sort(
-                    (a, b) =>
-                        getNodeNestingDepth(b, currentNodes) -
-                        getNodeNestingDepth(a, currentNodes)
-                )[0] || null;
+            // A lane with several semantic states may own an editor-managed
+            // Compound wrapper. The lane is the conceptual hit target, but its
+            // wrapper is the actual semantic parent for inserted/moved states.
+            if (targetLaneAtDrop) {
+                const laneWrapper = currentNodes.find(
+                    (candidate) =>
+                        candidate.parentId === targetLaneAtDrop.id &&
+                        isAutoParallelLaneCompound(candidate)
+                );
+
+                if (laneWrapper) {
+                    targetCompound = laneWrapper;
+                    targetLaneAtDrop = null;
+                }
+            }
+
+            // The shared drop resolver already chooses the deepest real
+            // user-facing container; automatic lane wrappers are mapped above.
 
             const resistedCompoundDrop = Boolean(
                 !targetCompound &&
+                !targetLaneAtDrop &&
                 sourceCompound &&
                 dragOriginContainer?.kind === "compound" &&
                 dragOriginContainer.id === sourceCompound.id &&
@@ -649,8 +715,8 @@ export function useNodeDrag({
             }
 
             if (
-                !getLaneForNode(draggedNode, currentNodes) &&
-                (sourceCompound || targetCompound)
+                (sourceCompound || targetCompound) &&
+                (targetCompound || !targetLaneAtDrop)
             ) {
                 const absolute = getAbsoluteNodePosition(
                     draggedNode,
@@ -665,6 +731,20 @@ export function useNodeDrag({
                             parentId: undefined,
                             extent: undefined,
                             position: absolute,
+                            // Initial-state membership is scoped to the
+                            // Compound the node came from. Carrying that flag
+                            // across a reparent can create a second top-level
+                            // initial state or overwrite the target Compound's
+                            // existing initial state. Clear it here; the normal
+                            // Compound initial-state normalization will choose
+                            // the appropriate initial child for the old/new
+                            // container after the drop.
+                            data: sourceCompound
+                                ? {
+                                    ...(c.data || {}),
+                                    isInitial: false,
+                                }
+                                : c.data,
                         }
                         : c
                 );
@@ -1019,36 +1099,7 @@ export function useNodeDrag({
                 currentNodes
             );
 
-            let targetLane = draggedNode.type !== "parallel"
-                ? currentNodes
-                    .filter(
-                        (candidate) =>
-                            candidate.type === "parallelLane" &&
-                            !isNodeInsideContainer(
-                                candidate,
-                                draggedNode.id,
-                                currentNodes
-                            )
-                    )
-                    .find((lane) => {
-                        const position = getAbsoluteNodePosition(
-                            lane,
-                            currentNodes
-                        );
-
-                        const width =
-                            Number(lane.style?.width) || 420;
-                        const height =
-                            Number(lane.style?.height) || 110;
-
-                        return (
-                            dropPoint.x >= position.x &&
-                            dropPoint.x <= position.x + width &&
-                            dropPoint.y >= position.y &&
-                            dropPoint.y <= position.y + height
-                        );
-                    })
-                : null;
+            let targetLane = targetLaneAtDrop;
 
             const resistedLaneDrop = Boolean(
                 !targetLane &&
@@ -1174,7 +1225,7 @@ export function useNodeDrag({
                         );
                         const newX =
                             25 + existingMembers.reduce((x, member) => {
-                                const size = getNodeSize(member);
+                                const size = getOverviewLayoutNodeSize(member);
                                 return x + size.width + PARALLEL_NODE_GAP;
                             }, 0);
 
@@ -1185,7 +1236,10 @@ export function useNodeDrag({
                                     parentId: currentLane.id,
                                     extent: "parent",
                                     expandParent: true,
-                                    position: { x: newX, y: 20 },
+                                    position: {
+                                        x: newX,
+                                        y: PARALLEL_LANE_CHILD_TOP_INSET,
+                                    },
                                 }
                                 : candidate
                         );
@@ -1298,6 +1352,17 @@ export function useNodeDrag({
                             y: dropPoint.y,
                         },
                     selected: false,
+                    // Initial-state membership only has meaning inside the
+                    // container that owns that state. A node leaving a
+                    // Parallel lane may also have come from a Compound nested
+                    // inside that lane, so clear the flag here in the final
+                    // top-level drop path as well. Otherwise that nested case
+                    // bypasses the Compound reparenting branch above and the
+                    // node incorrectly remains initial at the root level.
+                    data: {
+                        ...(draggedNode.data || {}),
+                        isInitial: false,
+                    },
                 });
             } else {
                 nextNodes.push({
@@ -1593,6 +1658,7 @@ export function useNodeDrag({
             });
         }
 
+        setDraggingNodeId(null);
         setIsDraggingNode(false);
         setIsOverTrash(false);
         setParallelDropTargetId(null);
@@ -1614,6 +1680,7 @@ export function useNodeDrag({
         compoundDropTargetId,
         setCompoundDropTargetId,
         isDraggingNode,
+        draggingNodeId,
         isOverTrash,
         handleNodeDragStart,
         handleNodeDrag,

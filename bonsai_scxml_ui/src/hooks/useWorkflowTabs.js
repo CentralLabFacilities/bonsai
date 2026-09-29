@@ -12,6 +12,8 @@ const createInitialTab = () => ({
     slotEdges: [],
     manualSlots: [],
     parentTabId: null,
+    selectedNodeId: null,
+    viewport: { x: 0, y: 0, zoom: 1 },
     globalDataModel: [
         { id: "#_STATE_PREFIX", expr: "'de.unibi.citec.clf.bonsai.skills.'" },
     ],
@@ -32,8 +34,11 @@ export function useWorkflowTabs({
     setManualSlots,
     setGlobalDataModel,
     setInheritedGlobalDataModel,
+    selectedNodeId,
     setSelectedNodeId,
     fitView,
+    getViewport,
+    setViewport,
 }) {
     const [tabs, setTabs] = useState([createInitialTab()]);
     const [activeTabId, setActiveTabId] = useState("tab-1");
@@ -53,11 +58,20 @@ export function useWorkflowTabs({
         manualSlots,
         globalDataModel,
         inheritedGlobalDataModel,
+        selectedNodeId,
     };
 
     const persistActiveTab = useCallback((currentTabs) => {
         const current = activeEditorStateRef.current;
         if (!current) return currentTabs;
+
+        let viewport = null;
+        try {
+            viewport = getViewport?.() || null;
+        } catch {
+            // React Flow can be temporarily unmounted (for example in Code
+            // view). Keep the last tab viewport in that case.
+        }
 
         return currentTabs.map((tab) =>
             tab.id === current.activeTabId
@@ -70,10 +84,12 @@ export function useWorkflowTabs({
                     manualSlots: current.manualSlots,
                     globalDataModel: current.globalDataModel,
                     inheritedGlobalDataModel: current.inheritedGlobalDataModel,
+                    selectedNodeId: current.selectedNodeId || null,
+                    viewport: viewport || tab.viewport || null,
                 }
                 : tab
         );
-    }, []);
+    }, [getViewport]);
 
     const loadTabState = useCallback(
         (tab, { fit = false } = {}) => {
@@ -85,14 +101,35 @@ export function useWorkflowTabs({
             setManualSlots(tab.manualSlots || []);
             setGlobalDataModel(tab.globalDataModel || []);
             setInheritedGlobalDataModel(tab.inheritedGlobalDataModel || []);
-            setSelectedNodeId(null);
 
-            if (fit) {
-                window.setTimeout(
-                    () => fitView({ padding: 0.2, duration: 250 }),
-                    50
-                );
-            }
+            const selectableIds = new Set([
+                ...(tab.nodes || []).map((node) => node.id),
+                ...(tab.slotNodes || []).map((node) => node.id),
+            ]);
+            const restoredSelectedNodeId =
+                tab.selectedNodeId && selectableIds.has(tab.selectedNodeId)
+                    ? tab.selectedNodeId
+                    : [
+                        ...(tab.nodes || []),
+                        ...(tab.slotNodes || []),
+                    ].find((node) => node.selected)?.id || null;
+            setSelectedNodeId(restoredSelectedNodeId);
+
+            // React Flow applies node changes asynchronously. Restore the
+            // viewport after the new tab has mounted/measured so switching
+            // state-machine tabs returns to exactly the previous view.
+            window.requestAnimationFrame(() => {
+                window.requestAnimationFrame(() => {
+                    if (tab.viewport && setViewport) {
+                        setViewport(tab.viewport, { duration: 0 });
+                        return;
+                    }
+
+                    if (fit) {
+                        fitView({ padding: 0.2, duration: 250 });
+                    }
+                });
+            });
         },
         [
             setNodes,
@@ -104,6 +141,7 @@ export function useWorkflowTabs({
             setInheritedGlobalDataModel,
             setSelectedNodeId,
             fitView,
+            setViewport,
         ]
     );
 
@@ -117,7 +155,7 @@ export function useWorkflowTabs({
 
             setTabs(updatedTabs);
             setActiveTabId(targetTabId);
-            loadTabState(targetTab, { fit: true });
+            loadTabState(targetTab, { fit: !targetTab.viewport });
         }, [activeTabId, tabs, persistActiveTab, loadTabState]
     );
 
@@ -140,6 +178,8 @@ export function useWorkflowTabs({
             globalDataModel: [
                 { id: "#_STATE_PREFIX", expr: "'de.unibi.citec.clf.bonsai.skills.'" },
             ],
+            selectedNodeId: null,
+            viewport: { x: 0, y: 0, zoom: 1 },
         };
 
         setTabs([...updatedCurrent, newTabObj]);

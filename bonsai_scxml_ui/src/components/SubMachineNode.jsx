@@ -4,8 +4,10 @@ import {
     Position,
     useUpdateNodeInternals,
 } from "@xyflow/react";
-import { FiExternalLink } from "react-icons/fi";
+import { FiAlertCircle, FiExternalLink } from "react-icons/fi";
 import StateActionBadges from "./StateActionBadges";
+
+import { startTargetEdgeReconnectFromEntry } from "../utils/edgeReconnect";
 
 const normalizeSlotType = (type) =>
     String(type || "").trim().toLowerCase();
@@ -216,6 +218,15 @@ export default function SubMachineNode({ id, data, selected }) {
 
     const hasEvents = showEvents && eventIds.length > 0;
     const hasSlots = showSlots && slotEntries.length > 0;
+    const unexposedTransitionHandles = useMemo(
+        () =>
+            [...new Set(
+                (data.unexposedTransitionHandles || [])
+                    .map((handle) => String(handle || "").trim())
+                    .filter(Boolean)
+            )],
+        [data.unexposedTransitionHandles]
+    );
 
     return (
         <div
@@ -240,6 +251,17 @@ export default function SubMachineNode({ id, data, selected }) {
                 onExitClick={() => data.onOpenStateActions?.(id)}
             />
 
+            {unexposedTransitionHandles.length > 0 && (
+                <div
+                    className="node-warning-badge"
+                    title={`Transition uses unexposed exit token${
+                        unexposedTransitionHandles.length === 1 ? "" : "s"
+                    }: ${unexposedTransitionHandles.join(", ")}`}
+                >
+                    <FiAlertCircle />
+                </div>
+            )}
+
             {showEvents && (
                 <Handle
                     id="transition-target"
@@ -248,10 +270,24 @@ export default function SubMachineNode({ id, data, selected }) {
                     className="target-handle"
                     isConnectableStart={false}
                     isConnectableEnd={true}
+                    onMouseDown={(event) =>
+                        startTargetEdgeReconnectFromEntry(
+                            event,
+                            data.reconnectIncomingEdgeId
+                        )
+                    }
+                    title={
+                        data.reconnectIncomingEdgeId
+                            ? "Drag to reconnect the incoming transition"
+                            : undefined
+                    }
                 />
             )}
 
             <div className="submachine-header">
+                {data.isInitial && (
+                    <span className="initial-state-badge initial-state-badge-inline">INITIAL</span>
+                )}
                 <span className="submachine-badge">
                     Sub-State-Machine
                 </span>

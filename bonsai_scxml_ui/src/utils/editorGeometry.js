@@ -1,13 +1,22 @@
+import { measureContainerTask } from "./containerPerf.js";
 import { resolveCollisionScope } from "./nodeCollisions";
 
 export const getNodeId = () => `skill-node-${crypto.randomUUID()}`;
 
-export const PARALLEL_EXIT_GUTTER = 150;
-export const PARALLEL_NODE_GAP = 30;
-export const COMPOUND_NODE_GAP = 30;
-export const COMPOUND_PADDING_X = 30;
+export const COLLAPSED_CONTAINER_WIDTH = 210;
+export const COLLAPSED_CONTAINER_HEIGHT = 80;
+export const PARALLEL_EXIT_GUTTER = 170;
+export const PARALLEL_NODE_GAP = 45;
+export const PARALLEL_HEADER_HEIGHT = 64;
+export const PARALLEL_LANE_CHILD_LEFT_INSET = 40;
+export const PARALLEL_LANE_CHILD_TOP_INSET = 40;
+export const PARALLEL_LANE_CHILD_RIGHT_INSET = 45;
+export const PARALLEL_LANE_CHILD_BOTTOM_INSET = 40;
+export const PARALLEL_BOTTOM_PADDING = 45;
+export const COMPOUND_NODE_GAP = 40;
+export const COMPOUND_PADDING_X = 45;
 export const COMPOUND_HEADER_HEIGHT = 45;
-export const COMPOUND_BOTTOM_PADDING = 30;
+export const COMPOUND_BOTTOM_PADDING = 45;
 export const COMPOUND_EXIT_GUTTER_MIN = 220;
 export const COMPOUND_EXIT_GUTTER_MAX = 420;
 
@@ -67,6 +76,88 @@ export const withNodeDimensions = (node, width, height) => ({
     },
 });
 
+// Container fitting used to repeatedly scan the complete node array with
+// find()/filter()/map() for every nested Compound/Parallel. Build one small
+// geometry context per fit pass instead. The semantic graph remains unchanged;
+// this only gives layout code O(1) node lookup and direct child lists.
+const createContainerGeometryContext = (allNodes = []) => {
+    const byId = new Map();
+    const indexById = new Map();
+    const childrenByParent = new Map();
+
+    (allNodes || []).forEach((node, index) => {
+        byId.set(node.id, node);
+        indexById.set(node.id, index);
+        if (!node.parentId) return;
+        if (!childrenByParent.has(node.parentId)) {
+            childrenByParent.set(node.parentId, []);
+        }
+        childrenByParent.get(node.parentId).push(node.id);
+    });
+
+    const context = {
+        nodes: allNodes || [],
+        byId,
+        indexById,
+        childrenByParent,
+        changed: false,
+    };
+
+    context.replaceNode = (nodeId, nextNode) => {
+        const index = context.indexById.get(nodeId);
+        if (index == null || !nextNode) return;
+
+        const previous = context.byId.get(nodeId);
+        if (previous === nextNode) return;
+
+        if (!context.changed) {
+            context.nodes = [...context.nodes];
+            context.changed = true;
+        }
+
+        context.nodes[index] = nextNode;
+        context.byId.set(nodeId, nextNode);
+    };
+
+    context.getChildren = (parentId) =>
+        (context.childrenByParent.get(parentId) || [])
+            .map((id) => context.byId.get(id))
+            .filter(Boolean);
+
+    return context;
+};
+
+const getLaneForNodeFromContext = (node, context) => {
+    let current = node;
+    const visited = new Set();
+
+    while (current?.parentId && !visited.has(current.parentId)) {
+        visited.add(current.parentId);
+        const parent = context.byId.get(current.parentId);
+        if (!parent) return null;
+        if (parent.type === "parallelLane") return parent;
+        current = parent;
+    }
+
+    return null;
+};
+
+const getNodeNestingDepthFromContext = (node, context) => {
+    let depth = 0;
+    let parentId = node?.parentId;
+    const visited = new Set();
+
+    while (parentId && !visited.has(parentId)) {
+        visited.add(parentId);
+        const parent = context.byId.get(parentId);
+        if (!parent) break;
+        depth += 1;
+        parentId = parent.parentId;
+    }
+
+    return depth;
+};
+
 export const getDirectCompoundForNode = (node, allNodes) => {
     if (!node?.parentId) return null;
     const parent = allNodes.find((candidate) => candidate.id === node.parentId);
@@ -74,10 +165,16 @@ export const getDirectCompoundForNode = (node, allNodes) => {
 };
 
 export const fitCompoundToChildren = (allNodes, compoundId) => {
-    const compound = (allNodes || []).find((node) => node.id === compoundId);
-    if (!compound || compound.type !== "compound") return allNodes;
+    const context = createContainerGeometryContext(allNodes);
+    fitCompoundToChildrenInContext(context, compoundId);
+    return context.nodes;
+};
 
-    const members = allNodes.filter((node) => node.parentId === compoundId);
+const fitCompoundToChildrenInContext = (context, compoundId) => {
+    const compound = context.byId.get(compoundId);
+    if (!compound || compound.type !== "compound") return;
+
+    const members = context.getChildren(compoundId);
 
     let right = COMPOUND_PADDING_X;
     let bottom = COMPOUND_HEADER_HEIGHT;
@@ -105,74 +202,78 @@ export const fitCompoundToChildren = (allNodes, compoundId) => {
         bottom + COMPOUND_BOTTOM_PADDING
     );
 
-    return allNodes.map((node) => {
-        if (node.id !== compoundId) return node;
+    const currentSize = getNodeSize(compound);
 
-        const currentSize = getNodeSize(node);
+    if (compound.data?.isCollapsed) {
+        const savedExpanded = compound.data?.expandedContainerSize || {};
+        const expandedWidth = Math.max(
+            Number(savedExpanded.width) || 0,
+            currentSize.width,
+            requiredWidth
+        );
+        const expandedHeight = Math.max(
+            Number(savedExpanded.height) || 0,
+            requiredHeight
+        );
 
-        if (node.data?.isCollapsed) {
-            const savedExpanded = node.data?.expandedContainerSize || {};
-            const expandedWidth = Math.max(
-                Number(savedExpanded.width) || 0,
-                currentSize.width,
-                requiredWidth
-            );
-            const expandedHeight = Math.max(
-                Number(savedExpanded.height) || 0,
-                requiredHeight
-            );
-
-            // Keep the compact collapsed height on screen, but remember a
-            // large enough expanded size for all children. Manual resizing
-            // therefore becomes a minimum size rather than disabling auto-grow.
-            return {
-                ...withNodeDimensions(node, expandedWidth, currentSize.height),
-                data: {
-                    ...(node.data || {}),
-                    expandedContainerSize: {
-                        ...savedExpanded,
-                        width: expandedWidth,
-                        height: expandedHeight,
-                    },
+        // Keep the compact collapsed footprint on screen in both dimensions,
+        // but remember a large enough expanded size for all children.
+        context.replaceNode(compound.id, {
+            ...withNodeDimensions(
+                compound,
+                COLLAPSED_CONTAINER_WIDTH,
+                COLLAPSED_CONTAINER_HEIGHT
+            ),
+            data: {
+                ...(compound.data || {}),
+                expandedContainerSize: {
+                    ...savedExpanded,
+                    width: expandedWidth,
+                    height: expandedHeight,
                 },
-            };
-        }
+            },
+        });
+        return;
+    }
 
-        const width = Math.max(currentSize.width, requiredWidth);
-        const height = Math.max(currentSize.height, requiredHeight);
-
-        return withNodeDimensions(node, width, height);
-    });
+    context.replaceNode(
+        compound.id,
+        withNodeDimensions(
+            compound,
+            Math.max(currentSize.width, requiredWidth),
+            Math.max(currentSize.height, requiredHeight)
+        )
+    );
 };
 
-export const fitCompoundAndAncestorCompounds = (allNodes, compoundId) => {
-    let nextNodes = allNodes;
+const fitCompoundAndAncestorCompoundsImpl = (allNodes, compoundId) => {
+    const context = createContainerGeometryContext(allNodes);
     let currentId = compoundId;
     const visited = new Set();
 
     while (currentId && !visited.has(currentId)) {
         visited.add(currentId);
-        nextNodes = fitCompoundToChildren(nextNodes, currentId);
+        fitCompoundToChildrenInContext(context, currentId);
 
-        const current = nextNodes.find((node) => node.id === currentId);
+        const current = context.byId.get(currentId);
         if (!current?.parentId) break;
 
-        const parent = nextNodes.find((node) => node.id === current.parentId);
+        const parent = context.byId.get(current.parentId);
         currentId = parent?.type === "compound" ? parent.id : null;
     }
 
     // A compound can itself live in a parallel lane. If it grows, the lane
     // and enclosing parallel must grow too instead of clipping the compound.
-    const fittedCompound = nextNodes.find((node) => node.id === compoundId);
+    const fittedCompound = context.byId.get(compoundId);
     const lane = fittedCompound
-        ? getLaneForNode(fittedCompound, nextNodes)
+        ? getLaneForNodeFromContext(fittedCompound, context)
         : null;
 
     if (lane?.parentId) {
-        nextNodes = growParallelToLaneContents(nextNodes, lane.parentId);
+        growParallelToLaneContentsInContext(context, lane.parentId);
     }
 
-    return nextNodes;
+    return context.nodes;
 };
 
 export const getAbsoluteNodePosition = (node, allNodes) => {
@@ -281,6 +382,79 @@ export const getNodeNestingDepth = (node, allNodes = []) => {
     return depth;
 };
 
+// Resolve the actual editor container under a flow-space pointer. This is used
+// for both library drops and existing-node drags so all parallel lanes (not
+// just the first two) follow the same hit-testing rules. Automatic lane
+// compounds are implementation details and are deliberately skipped: dropping
+// onto their area conceptually means dropping into the surrounding lane; the
+// normal lane normalization can then place real states into the wrapper.
+export const findDropContainerAtPoint = (
+    point,
+    allNodes = [],
+    {
+        excludeNodeId = null,
+        allowCompounds = true,
+        allowParallelLanes = true,
+    } = {}
+) => {
+    if (!point) return null;
+
+    const candidates = [];
+
+    (allNodes || []).forEach((node, index) => {
+        const isLane = node.type === "parallelLane";
+        const isCompound = node.type === "compound";
+
+        if (isLane && !allowParallelLanes) return;
+        if (isCompound && !allowCompounds) return;
+        if (!isLane && !isCompound) return;
+
+        // Never expose the editor-created lane wrapper as an independent drop
+        // target. It occupies the full lane and otherwise masks that lane.
+        if (isCompound && isAutoParallelLaneCompound(node)) return;
+
+        if (excludeNodeId) {
+            if (node.id === excludeNodeId) return;
+            if (isNodeInsideContainer(node, excludeNodeId, allNodes)) return;
+        }
+
+        const position = getAbsoluteNodePosition(node, allNodes);
+        const size = isLane
+            ? {
+                  width: Number(node.style?.width) || Number(node.width) || 420,
+                  height: Number(node.style?.height) || Number(node.height) || 110,
+              }
+            : getNodeSize(node);
+
+        if (
+            point.x < position.x ||
+            point.x > position.x + size.width ||
+            point.y < position.y ||
+            point.y > position.y + size.height
+        ) {
+            return;
+        }
+
+        candidates.push({
+            node,
+            depth: getNodeNestingDepth(node, allNodes),
+            index,
+        });
+    });
+
+    candidates.sort((a, b) => {
+        if (a.depth !== b.depth) return b.depth - a.depth;
+        // At an equal depth a real Compound is the more specific semantic
+        // target. Fall back to later-rendered nodes for deterministic overlap.
+        if (a.node.type !== b.node.type) {
+            return a.node.type === "compound" ? -1 : 1;
+        }
+        return b.index - a.index;
+    });
+
+    return candidates[0]?.node || null;
+};
+
 // A normal transition may only target an interior state when its source is
 // already inside every compound/parallel boundary surrounding that target.
 // This prevents transitions from jumping across a state boundary directly to
@@ -350,22 +524,34 @@ export const orderNodesParentsFirst = (allNodes) => {
         .map(({ node }) => node);
 };
 
+export const isEditorReferenceNode = (node) =>
+    Boolean(
+        node?.data?.cloneOfNodeId &&
+        (
+            node.data?.isSkillClone ||
+            node.data?.isStateClone ||
+            node.data?.isSlotClone
+        )
+    );
+
 export const isCompoundInitialChildCandidate = (node) =>
     Boolean(
         node &&
         node.type !== "slot" &&
-        node.type !== "parallelLane"
+        node.type !== "parallelLane" &&
+        !isEditorReferenceNode(node)
     );
 
 // Any real SCXML state can be a branch state in a parallel lane. Structural
-// states (compound/parallel) therefore participate exactly like skills. The
-// automatically managed lane wrapper itself is excluded so it never tries to
-// wrap itself.
+// states (compound/parallel) therefore participate exactly like skills. Editor
+// references are visual aliases only and must never become lane members for
+// initial-state or SCXML-wrapper purposes.
 export const isParallelLaneSkillCandidate = (node) =>
     Boolean(
         node &&
         node.type !== "slot" &&
         node.type !== "parallelLane" &&
+        !isEditorReferenceNode(node) &&
         !(
             node.type === "compound" &&
             (
@@ -422,58 +608,58 @@ export const normalizeContainerAutoExpansion = (allNodes) => {
 // to contain the current lane contents. Existing dimensions are floors, so a
 // user resize is preserved while automatic layout may still make the state
 // larger later.
-export const growParallelToLaneContents = (allNodes, parallelId) => {
-    let nextNodes = allNodes;
-    const parallel = nextNodes.find((node) => node.id === parallelId);
-    if (!parallel || parallel.type !== "parallel") return nextNodes;
+const growParallelToLaneContentsImpl = (allNodes, parallelId) => {
+    const context = createContainerGeometryContext(allNodes);
+    growParallelToLaneContentsInContext(context, parallelId);
+    return context.nodes;
+};
 
-    const parallelLanes = nextNodes
-        .filter(
-            (node) =>
-                node.type === "parallelLane" &&
-                node.parentId === parallel.id
-        )
+const growParallelToLaneContentsInContext = (context, parallelId) => {
+    const parallel = context.byId.get(parallelId);
+    if (!parallel || parallel.type !== "parallel") return;
+
+    const parallelLanes = context
+        .getChildren(parallel.id)
+        .filter((node) => node.type === "parallelLane")
         .sort(
             (a, b) =>
                 Number(a.position?.y || 0) -
                 Number(b.position?.y || 0)
         );
 
-    if (parallelLanes.length === 0) return nextNodes;
+    if (parallelLanes.length === 0) return;
 
     // Fit automatic lane compounds first, because their required dimensions
     // determine how large the surrounding lane and parallel must become.
     parallelLanes.forEach((lane) => {
-        const wrapper = nextNodes.find(
-            (node) =>
-                node.parentId === lane.id &&
-                isAutoParallelLaneCompound(node)
-        );
+        const wrapper = context
+            .getChildren(lane.id)
+            .find(isAutoParallelLaneCompound);
 
         if (wrapper) {
-            nextNodes = fitCompoundToChildren(nextNodes, wrapper.id);
+            fitCompoundToChildrenInContext(context, wrapper.id);
         }
     });
 
-    const currentParallelSize = getNodeSize(
-        nextNodes.find((node) => node.id === parallel.id) || parallel
-    );
+    const liveParallel = context.byId.get(parallel.id) || parallel;
+    const currentParallelSize = getNodeSize(liveParallel);
 
     let requiredParallelWidth = Math.max(420, currentParallelSize.width);
     const laneHeights = new Map();
 
     parallelLanes.forEach((originalLane) => {
-        const lane =
-            nextNodes.find((node) => node.id === originalLane.id) ||
-            originalLane;
+        const lane = context.byId.get(originalLane.id) || originalLane;
         const currentLaneSize = getNodeSize(lane);
-        const laneChildren = nextNodes.filter(
-            (node) => node.parentId === lane.id
-        );
+        const laneChildren = context.getChildren(lane.id);
         const wrapper = laneChildren.find(isAutoParallelLaneCompound);
+        const directReferences = laneChildren.filter(isEditorReferenceNode);
         const laneMembers = wrapper
-            ? [wrapper]
-            : laneChildren.filter(isParallelLaneSkillCandidate);
+            ? [context.byId.get(wrapper.id) || wrapper, ...directReferences]
+            : laneChildren.filter(
+                  (child) =>
+                      isParallelLaneSkillCandidate(child) ||
+                      isEditorReferenceNode(child)
+              );
 
         let maxRight = 0;
         let maxBottom = 0;
@@ -491,11 +677,14 @@ export const growParallelToLaneContents = (allNodes, parallelId) => {
         });
 
         const requiredLaneWidth = wrapper
-            ? Math.max(420, maxRight)
-            : Math.max(420, 15 + maxRight + PARALLEL_EXIT_GUTTER);
+            ? Math.max(420, maxRight + PARALLEL_LANE_CHILD_RIGHT_INSET)
+            : Math.max(
+                  420,
+                  maxRight + PARALLEL_LANE_CHILD_RIGHT_INSET + PARALLEL_EXIT_GUTTER
+              );
         const requiredLaneHeight = wrapper
-            ? Math.max(140, maxBottom)
-            : Math.max(110, maxBottom + 20);
+            ? Math.max(150, maxBottom + PARALLEL_LANE_CHILD_BOTTOM_INSET)
+            : Math.max(130, maxBottom + PARALLEL_LANE_CHILD_BOTTOM_INSET);
 
         requiredParallelWidth = Math.max(
             requiredParallelWidth,
@@ -528,59 +717,87 @@ export const growParallelToLaneContents = (allNodes, parallelId) => {
     const requiredParallelHeight = Math.max(
         180,
         currentParallelSize.height,
-        nextLaneY + 35
+        nextLaneY + PARALLEL_BOTTOM_PADDING
     );
 
-    return nextNodes.map((node) => {
-        if (node.id === parallel.id) {
-            return withNodeDimensions(
-                node,
+    if (liveParallel.data?.isCollapsed) {
+        const savedExpanded = liveParallel.data?.expandedContainerSize || {};
+        context.replaceNode(liveParallel.id, {
+            ...withNodeDimensions(
+                liveParallel,
+                COLLAPSED_CONTAINER_WIDTH,
+                COLLAPSED_CONTAINER_HEIGHT
+            ),
+            data: {
+                ...(liveParallel.data || {}),
+                expandedContainerSize: {
+                    ...savedExpanded,
+                    width: Math.max(
+                        Number(savedExpanded.width) || 0,
+                        requiredParallelWidth
+                    ),
+                    height: Math.max(
+                        Number(savedExpanded.height) || 0,
+                        requiredParallelHeight
+                    ),
+                },
+            },
+        });
+    } else {
+        context.replaceNode(
+            liveParallel.id,
+            withNodeDimensions(
+                liveParallel,
                 requiredParallelWidth,
                 requiredParallelHeight
-            );
-        }
+            )
+        );
+    }
 
-        const geometry = laneGeometry.get(node.id);
-        if (geometry) {
-            return {
-                ...withNodeDimensions(
-                    node,
-                    geometry.width,
-                    geometry.height
-                ),
-                position: {
-                    ...node.position,
-                    x: 0,
-                    y: geometry.y,
-                },
-                expandParent: true,
-            };
-        }
+    laneGeometry.forEach((geometry, laneId) => {
+        const lane = context.byId.get(laneId);
+        if (!lane) return;
+        context.replaceNode(lane.id, {
+            ...withNodeDimensions(
+                lane,
+                geometry.width,
+                geometry.height
+            ),
+            position: {
+                ...lane.position,
+                x: 0,
+                y: geometry.y,
+            },
+            expandParent: true,
+        });
+    });
 
-        if (
-            isAutoParallelLaneCompound(node) &&
-            laneGeometry.has(node.parentId)
-        ) {
-            const laneSize = laneGeometry.get(node.parentId);
-            return {
-                ...withNodeDimensions(
-                    node,
-                    laneSize.width,
-                    laneSize.height
-                ),
-                expandParent: true,
-            };
-        }
-
-        return node;
+    parallelLanes.forEach((lane) => {
+        const geometry = laneGeometry.get(lane.id);
+        if (!geometry) return;
+        context
+            .getChildren(lane.id)
+            .filter(isAutoParallelLaneCompound)
+            .forEach((wrapper) => {
+                const liveWrapper = context.byId.get(wrapper.id) || wrapper;
+                context.replaceNode(liveWrapper.id, {
+                    ...withNodeDimensions(
+                        liveWrapper,
+                        geometry.width,
+                        geometry.height
+                    ),
+                    expandParent: true,
+                });
+            });
     });
 };
 
-// Re-evaluate all nested state containers from the inside out. Because the
-// individual fit functions are grow-only, this is stable and lets a resize of
-// any child propagate through Compound -> Parallel -> Compound chains.
-export const growAllStateContainersToContents = (allNodes) => {
-    let nextNodes = allNodes;
+// Re-evaluate nested state containers from the inside out using one shared
+// geometry context. Previously every container pass rescanned and remapped the
+// complete node array, which made Compound/Parallel-heavy graphs approach
+// O(containers * nodes).
+const growAllStateContainersToContentsImpl = (allNodes) => {
+    const context = createContainerGeometryContext(allNodes);
 
     const containers = (allNodes || [])
         .filter(
@@ -590,22 +807,19 @@ export const growAllStateContainersToContents = (allNodes) => {
         )
         .sort(
             (a, b) =>
-                getNodeNestingDepth(b, allNodes) -
-                getNodeNestingDepth(a, allNodes)
+                getNodeNestingDepthFromContext(b, context) -
+                getNodeNestingDepthFromContext(a, context)
         );
 
     containers.forEach((container) => {
         if (container.type === "compound") {
-            nextNodes = fitCompoundToChildren(nextNodes, container.id);
+            fitCompoundToChildrenInContext(context, container.id);
         } else {
-            nextNodes = growParallelToLaneContents(
-                nextNodes,
-                container.id
-            );
+            growParallelToLaneContentsInContext(context, container.id);
         }
     });
 
-    return nextNodes;
+    return context.nodes;
 };
 
 export const NODE_COLLISION_OPTIONS = {
@@ -640,9 +854,17 @@ export const resolveNodeCollisionsAndRefit = (
     // Shift the whole resolved sibling group together so its relative spacing
     // stays intact while respecting the container's content inset.
     const minContentX =
-        parent?.type === "compound" ? COMPOUND_PADDING_X : 20;
+        parent?.type === "compound"
+            ? COMPOUND_PADDING_X
+            : parent?.type === "parallelLane"
+              ? PARALLEL_LANE_CHILD_LEFT_INSET
+              : 20;
     const minContentY =
-        parent?.type === "compound" ? COMPOUND_HEADER_HEIGHT : 20;
+        parent?.type === "compound"
+            ? COMPOUND_HEADER_HEIGHT + COMPOUND_PADDING_X
+            : parent?.type === "parallelLane"
+              ? PARALLEL_LANE_CHILD_TOP_INSET
+              : 20;
     const siblings = nextNodes.filter(
         (node) =>
             (node.parentId || null) === (focusNode.parentId || null) &&
@@ -723,56 +945,132 @@ export const getNextParallelLaneCompoundName = (allNodes) => {
     return `lane_${index}`;
 };
 
-export const normalizeParallelLaneCompounds = (allNodes) => {
+const normalizeParallelLaneCompoundsImpl = (allNodes) => {
     if (!Array.isArray(allNodes) || allNodes.length === 0) {
         return allNodes;
     }
 
-    let nextNodes = allNodes;
+    /*
+     * This normalization runs after every semantic node change. Parallel-heavy
+     * graphs used to rebuild a full node-id map and repeatedly filter the whole
+     * node array once per lane. Keep one mutable hierarchy index for the entire
+     * pass instead. Reparenting a state updates only the affected parent buckets,
+     * while all lane/compound membership lookups stay O(1) + direct children.
+     */
+    const originalOrder = allNodes.map((node) => node.id);
+    const byId = new Map(allNodes.map((node) => [node.id, node]));
+    const childrenByParent = new Map();
+    const addedIds = [];
+    const removedIds = new Set();
     let changed = false;
 
-    const lanes = allNodes.filter((node) => node.type === "parallelLane");
+    const addChildId = (parentId, nodeId) => {
+        if (!parentId) return;
+        if (!childrenByParent.has(parentId)) {
+            childrenByParent.set(parentId, []);
+        }
+        const children = childrenByParent.get(parentId);
+        if (!children.includes(nodeId)) children.push(nodeId);
+    };
 
-    lanes.forEach((lane) => {
-        const currentById = new Map(nextNodes.map((node) => [node.id, node]));
-        const currentLane = currentById.get(lane.id);
+    const removeChildId = (parentId, nodeId) => {
+        if (!parentId) return;
+        const children = childrenByParent.get(parentId);
+        if (!children) return;
+        const index = children.indexOf(nodeId);
+        if (index >= 0) children.splice(index, 1);
+    };
+
+    allNodes.forEach((node) => addChildId(node.parentId, node.id));
+
+    const getChildren = (parentId) =>
+        (childrenByParent.get(parentId) || [])
+            .map((id) => byId.get(id))
+            .filter(Boolean);
+
+    const replaceNode = (nodeId, nextNode) => {
+        const previous = byId.get(nodeId);
+        if (!previous || !nextNode || previous === nextNode) return;
+
+        if (previous.parentId !== nextNode.parentId) {
+            removeChildId(previous.parentId, nodeId);
+            addChildId(nextNode.parentId, nodeId);
+        }
+
+        byId.set(nodeId, nextNode);
+        changed = true;
+    };
+
+    const addNode = (node) => {
+        if (!node?.id || byId.has(node.id)) return;
+        byId.set(node.id, node);
+        addChildId(node.parentId, node.id);
+        addedIds.push(node.id);
+        changed = true;
+    };
+
+    const removeNode = (nodeId) => {
+        const node = byId.get(nodeId);
+        if (!node) return;
+        removeChildId(node.parentId, nodeId);
+        byId.delete(nodeId);
+        removedIds.add(nodeId);
+        changed = true;
+    };
+
+    // Allocate automatic lane-compound names without rescanning every node for
+    // every lane that needs a wrapper.
+    const usedNames = new Set(
+        allNodes
+            .flatMap((node) => [node.data?.label, node.data?.fullSkillName])
+            .filter(Boolean)
+            .map(String)
+    );
+    let nextLaneNameIndex = 1;
+    const allocateLaneCompoundName = () => {
+        while (usedNames.has(`lane_${nextLaneNameIndex}`)) {
+            nextLaneNameIndex += 1;
+        }
+        const name = `lane_${nextLaneNameIndex}`;
+        usedNames.add(name);
+        nextLaneNameIndex += 1;
+        return name;
+    };
+
+    const laneIds = allNodes
+        .filter((node) => node.type === "parallelLane")
+        .map((node) => node.id);
+
+    laneIds.forEach((laneId) => {
+        const currentLane = byId.get(laneId);
         if (!currentLane) return;
 
-        const directChildren = nextNodes.filter(
-            (node) => node.parentId === currentLane.id
-        );
-
-        const wrappers = directChildren.filter(
-            (node) => isAutoParallelLaneCompound(node)
-        );
+        const directChildren = getChildren(currentLane.id);
+        const wrappers = directChildren.filter(isAutoParallelLaneCompound);
 
         // There should only ever be one automatic lane compound. If an old
         // file contains more than one, the first is kept and the others are
         // merged into it below.
         let wrapper = wrappers[0] || null;
-        const extraWrapperIds = new Set(wrappers.slice(1).map((node) => node.id));
+        const extraWrappers = wrappers.slice(1);
+        const extraWrapperIds = new Set(extraWrappers.map((node) => node.id));
 
         const directSkills = directChildren.filter(isParallelLaneSkillCandidate);
         const wrappedSkills = wrapper
-            ? nextNodes.filter(
-                (node) =>
-                    node.parentId === wrapper.id &&
-                    isParallelLaneSkillCandidate(node)
-            )
+            ? getChildren(wrapper.id).filter(isParallelLaneSkillCandidate)
             : [];
-        const extraWrappedSkills = nextNodes.filter(
-            (node) =>
-                extraWrapperIds.has(node.parentId) &&
-                isParallelLaneSkillCandidate(node)
+        const extraWrappedSkills = extraWrappers.flatMap((extraWrapper) =>
+            getChildren(extraWrapper.id).filter(isParallelLaneSkillCandidate)
         );
 
-        const allSkills = [
-            ...wrappedSkills,
-            ...extraWrappedSkills,
-            ...directSkills,
-        ].filter(
-            (node, index, values) =>
-                values.findIndex((candidate) => candidate.id === node.id) === index
+        const allSkills = [];
+        const seenSkillIds = new Set();
+        [...wrappedSkills, ...extraWrappedSkills, ...directSkills].forEach(
+            (node) => {
+                if (!node || seenSkillIds.has(node.id)) return;
+                seenSkillIds.add(node.id);
+                allSkills.push(node);
+            }
         );
 
         // A lane with zero/one direct state does not need an automatically
@@ -781,146 +1079,20 @@ export const normalizeParallelLaneCompounds = (allNodes) => {
             return;
         }
 
-        // The automatically managed Compound represents the lane itself in
-        // SCXML. Its editor geometry must therefore be an exact overlay of
-        // the visible Parallel lane, not merely "at least" as large. Using
-        // getNodeSize also covers measured/imported dimensions that may live
-        // on width/height instead of style.
         const laneSize = getNodeSize(currentLane);
         const laneWidth = Math.max(1, Number(laneSize.width) || 420);
         const laneHeight = Math.max(1, Number(laneSize.height) || 140);
 
-        /*
-         * If the lane already contains a normal compound and another sibling
-         * state is added, that existing compound becomes the lane compound.
-         * Do NOT create another compound around it. This keeps the region
-         * structure flat:
-         *
-         *   lane -> compound -> states
-         *
-         * instead of:
-         *
-         *   lane -> auto compound -> existing compound -> states
-         */
-        if (!wrapper && allSkills.length > 1) {
-            const existingDirectCompound = directSkills.find(
-                (node) => node.type === "compound"
-            );
-
-            if (existingDirectCompound) {
-                const oldWrapperPosition = existingDirectCompound.position || {
-                    x: 0,
-                    y: 0,
-                };
-                const existingChildren = nextNodes.filter(
-                    (node) =>
-                        node.parentId === existingDirectCompound.id &&
-                        isCompoundInitialChildCandidate(node)
-                );
-                const siblingsToAbsorb = directSkills.filter(
-                    (node) => node.id !== existingDirectCompound.id
-                );
-                const compoundChildren = [
-                    ...existingChildren,
-                    ...siblingsToAbsorb,
-                ].filter(
-                    (node, index, values) =>
-                        values.findIndex(
-                            (candidate) => candidate.id === node.id
-                        ) === index
-                );
-
-                const storedInitialId =
-                    existingDirectCompound.data?.initialChildId;
-                const initialChild =
-                    compoundChildren.find(
-                        (node) => node.id === storedInitialId
-                    ) ||
-                    compoundChildren.find((node) => node.data?.isInitial) ||
-                    compoundChildren[0] ||
-                    null;
-                const desiredInitialId = initialChild?.id || null;
-                const siblingIds = new Set(
-                    siblingsToAbsorb.map((node) => node.id)
-                );
-
-                const promotedWidth = laneWidth;
-                const promotedHeight = laneHeight;
-
-                nextNodes = nextNodes.map((node) => {
-                    if (node.id === existingDirectCompound.id) {
-                        return {
-                            ...node,
-                            position: { x: 0, y: 0 },
-                            parentId: currentLane.id,
-                            extent: "parent",
-                            expandParent: true,
-                            draggable: false,
-                            selectable: false,
-                            width: promotedWidth,
-                            height: promotedHeight,
-                            style: {
-                                ...node.style,
-                                width: promotedWidth,
-                                height: promotedHeight,
-                            },
-                            data: {
-                                ...node.data,
-                                initialChildId: desiredInitialId,
-                                autoParallelLaneCompound: true,
-                            },
-                        };
-                    }
-
-                    // Moving the compound itself to the lane origin must not
-                    // visually move children it already contained.
-                    if (node.parentId === existingDirectCompound.id) {
-                        return {
-                            ...node,
-                            position: {
-                                x:
-                                    Number(oldWrapperPosition.x || 0) +
-                                    Number(node.position?.x || 0),
-                                y:
-                                    Number(oldWrapperPosition.y || 0) +
-                                    Number(node.position?.y || 0),
-                            },
-                            data: {
-                                ...node.data,
-                                isInitial: node.id === desiredInitialId,
-                            },
-                        };
-                    }
-
-                    if (siblingIds.has(node.id)) {
-                        return {
-                            ...node,
-                            parentId: existingDirectCompound.id,
-                            extent: "parent",
-                            expandParent: true,
-                            data: {
-                                ...node.data,
-                                isInitial: node.id === desiredInitialId,
-                            },
-                        };
-                    }
-
-                    return node;
-                });
-
-                changed = true;
-                return;
-            }
-        }
+        // Never repurpose a user-created Compound as the editor-only lane
+        // wrapper. Semantic compounds must stay selectable and may themselves
+        // contain compounds/parallels recursively. If a lane needs a structural
+        // wrapper, create a separate automatic wrapper below.
 
         if (!wrapper) {
             const wrapperId = getNodeId();
             const initialSkill =
                 allSkills.find((node) => node.data?.isInitial) || allSkills[0];
-
-            // This is the compound that represents the parallel region/lane,
-            // so its default name should make that role explicit.
-            const compoundName = getNextParallelLaneCompoundName(nextNodes);
+            const compoundName = allocateLaneCompoundName();
 
             const autoWrapper = {
                 id: wrapperId,
@@ -949,38 +1121,33 @@ export const normalizeParallelLaneCompounds = (allNodes) => {
                 },
             };
 
-            nextNodes = [
-                ...nextNodes,
-                autoWrapper,
-            ].map((node) => {
-                if (!allSkills.some((skill) => skill.id === node.id)) {
-                    return node;
-                }
+            addNode(autoWrapper);
+            wrapper = autoWrapper;
 
-                return {
-                    ...node,
+            allSkills.forEach((skill) => {
+                const liveSkill = byId.get(skill.id) || skill;
+                replaceNode(skill.id, {
+                    ...liveSkill,
                     parentId: wrapperId,
                     extent: "parent",
                     expandParent: true,
-                    // Wrapper starts at the lane origin, so the visual position
-                    // stays exactly where the skill was before wrapping.
                     position: {
-                        x: Number(node.position?.x || 0),
-                        y: Number(node.position?.y || 0),
+                        x: Number(liveSkill.position?.x || 0),
+                        y: Number(liveSkill.position?.y || 0),
                     },
                     data: {
-                        ...node.data,
-                        isInitial: node.id === initialSkill.id,
+                        ...liveSkill.data,
+                        isInitial: liveSkill.id === initialSkill.id,
                     },
-                };
+                });
             });
 
-            changed = true;
             return;
         }
 
         // Existing lane compound: keep it as the single region compound and
         // absorb direct lane states or children of duplicate wrappers into it.
+        wrapper = byId.get(wrapper.id) || wrapper;
         const wrapperPosition = wrapper.position || { x: 0, y: 0 };
         const currentInitialId = wrapper.data?.initialChildId;
         const initialSkill =
@@ -1021,107 +1188,124 @@ export const normalizeParallelLaneCompounds = (allNodes) => {
             return;
         }
 
-        nextNodes = nextNodes
-            .filter((node) => !extraWrapperIds.has(node.id))
-            .map((node) => {
-                if (node.id === wrapper.id) {
-                    const { className: _legacyClassName, ...normalCompound } = node;
+        const { className: _legacyClassName, ...normalCompound } = wrapper;
+        replaceNode(wrapper.id, {
+            ...normalCompound,
+            position: { x: 0, y: 0 },
+            draggable: false,
+            selectable: false,
+            width: desiredWrapperWidth,
+            height: desiredWrapperHeight,
+            style: {
+                ...wrapper.style,
+                width: desiredWrapperWidth,
+                height: desiredWrapperHeight,
+            },
+            data: {
+                ...wrapper.data,
+                initialChildId: desiredInitialId,
+                autoParallelLaneCompound: true,
+            },
+        });
 
-                    return {
-                        ...normalCompound,
-                        position: { x: 0, y: 0 },
-                        draggable: false,
-                        selectable: false,
-                        width: desiredWrapperWidth,
-                        height: desiredWrapperHeight,
-                        style: {
-                            ...node.style,
-                            width: desiredWrapperWidth,
-                            height: desiredWrapperHeight,
-                        },
-                        data: {
-                            ...node.data,
-                            initialChildId: desiredInitialId,
-                            autoParallelLaneCompound: true,
-                        },
-                    };
-                }
+        const allSkillIds = new Set(allSkills.map((skill) => skill.id));
+        allSkillIds.forEach((skillId) => {
+            const node = byId.get(skillId);
+            if (!node) return;
 
-                if (!allSkills.some((skill) => skill.id === node.id)) {
-                    return node;
-                }
-
-                if (node.parentId === wrapper.id) {
-                    return {
-                        ...node,
-                        position: needsPositionReset
-                            ? {
-                                  x:
-                                      Number(wrapperPosition.x || 0) +
-                                      Number(node.position?.x || 0),
-                                  y:
-                                      Number(wrapperPosition.y || 0) +
-                                      Number(node.position?.y || 0),
-                              }
-                            : node.position,
-                        data: {
-                            ...node.data,
-                            isInitial: node.id === desiredInitialId,
-                        },
-                    };
-                }
-
-                const oldParent = currentById.get(node.parentId);
-                const oldParentPosition =
-                    isAutoParallelLaneCompound(oldParent)
-                        ? oldParent.position || { x: 0, y: 0 }
-                        : { x: 0, y: 0 };
-
-                const laneX =
-                    Number(oldParentPosition.x || 0) +
-                    Number(node.position?.x || 0);
-                const laneY =
-                    Number(oldParentPosition.y || 0) +
-                    Number(node.position?.y || 0);
-
-                return {
+            if (node.parentId === wrapper.id) {
+                replaceNode(node.id, {
                     ...node,
-                    parentId: wrapper.id,
-                    extent: "parent",
-                    expandParent: true,
-                    position: {
-                        x: laneX - Number(wrapperPosition.x || 0),
-                        y: laneY - Number(wrapperPosition.y || 0),
-                    },
+                    position: needsPositionReset
+                        ? {
+                              x:
+                                  Number(wrapperPosition.x || 0) +
+                                  Number(node.position?.x || 0),
+                              y:
+                                  Number(wrapperPosition.y || 0) +
+                                  Number(node.position?.y || 0),
+                          }
+                        : node.position,
                     data: {
                         ...node.data,
                         isInitial: node.id === desiredInitialId,
                     },
-                };
-            });
+                });
+                return;
+            }
 
-        changed = true;
+            const oldParent = byId.get(node.parentId);
+            const oldParentPosition = isAutoParallelLaneCompound(oldParent)
+                ? oldParent.position || { x: 0, y: 0 }
+                : { x: 0, y: 0 };
+            const laneX =
+                Number(oldParentPosition.x || 0) +
+                Number(node.position?.x || 0);
+            const laneY =
+                Number(oldParentPosition.y || 0) +
+                Number(node.position?.y || 0);
+
+            replaceNode(node.id, {
+                ...node,
+                parentId: wrapper.id,
+                extent: "parent",
+                expandParent: true,
+                position: {
+                    x: laneX - Number(wrapperPosition.x || 0),
+                    y: laneY - Number(wrapperPosition.y || 0),
+                },
+                data: {
+                    ...node.data,
+                    isInitial: node.id === desiredInitialId,
+                },
+            });
+        });
+
+        extraWrapperIds.forEach((extraWrapperId) => removeNode(extraWrapperId));
     });
 
-    return changed ? orderNodesParentsFirst(nextNodes) : allNodes;
+    if (!changed) return allNodes;
+
+    const normalized = [
+        ...originalOrder
+            .filter((id) => !removedIds.has(id))
+            .map((id) => byId.get(id))
+            .filter(Boolean),
+        ...addedIds.map((id) => byId.get(id)).filter(Boolean),
+    ];
+
+    return orderNodesParentsFirst(normalized);
 };
 
-export const normalizeCompoundInitialStates = (allNodes) => {
-    const compounds = (allNodes || []).filter(
-        (node) => node.type === "compound"
-    );
+const normalizeCompoundInitialStatesImpl = (allNodes) => {
+    if (!Array.isArray(allNodes) || allNodes.length === 0) {
+        return allNodes;
+    }
+
+    const compounds = [];
+    const childrenByParent = new Map();
+
+    allNodes.forEach((node) => {
+        if (node.type === "compound") compounds.push(node);
+        if (!node.parentId) return;
+        if (!childrenByParent.has(node.parentId)) {
+            childrenByParent.set(node.parentId, []);
+        }
+        childrenByParent.get(node.parentId).push(node);
+    });
 
     if (compounds.length === 0) {
         return allNodes;
     }
 
+    // This pass also runs after every semantic node change. Resolve each
+    // Compound's direct children from the hierarchy index instead of filtering
+    // the complete node array once per Compound.
     const desiredInitialByCompound = new Map();
 
     compounds.forEach((compound) => {
-        const children = (allNodes || []).filter(
-            (node) =>
-                node.parentId === compound.id &&
-                isCompoundInitialChildCandidate(node)
+        const children = (childrenByParent.get(compound.id) || []).filter(
+            isCompoundInitialChildCandidate
         );
 
         if (children.length === 0) {
@@ -1129,25 +1313,35 @@ export const normalizeCompoundInitialStates = (allNodes) => {
             return;
         }
 
-        const storedInitialId = compound.data?.initialChildId;
+        const compoundData = compound.data || {};
+        const hasStoredInitial = Object.prototype.hasOwnProperty.call(
+            compoundData,
+            "initialChildId"
+        );
+        const storedInitialId = compoundData.initialChildId;
         const storedInitialStillExists = children.some(
             (child) => child.id === storedInitialId
         );
         const existingInitial = children.find(
             (child) => child.data?.isInitial
         );
+        const explicitlyUnsetInitial =
+            hasStoredInitial &&
+            (storedInitialId === null || storedInitialId === "");
 
         desiredInitialByCompound.set(
             compound.id,
             storedInitialStillExists
                 ? storedInitialId
-                : existingInitial?.id || children[0].id
+                : explicitlyUnsetInitial
+                    ? null
+                    : existingInitial?.id || children[0].id
         );
     });
 
     let changed = false;
 
-    const normalized = (allNodes || []).map((node) => {
+    const normalized = allNodes.map((node) => {
         if (node.type === "compound") {
             const desiredInitialId =
                 desiredInitialByCompound.get(node.id) || null;
@@ -1200,3 +1394,42 @@ export const normalizeCompoundInitialStates = (allNodes) => {
     return changed ? normalized : allNodes;
 };
 
+
+// Container-heavy operations are measured at their public boundaries. The
+// semantic graph stays unchanged; only calls exceeding the threshold are
+// logged so large Compound/Parallel workflows can be profiled without
+// flooding the console.
+export const fitCompoundAndAncestorCompounds = (allNodes, compoundId) =>
+    measureContainerTask(
+        "fit compound and ancestors",
+        () => fitCompoundAndAncestorCompoundsImpl(allNodes, compoundId),
+        { nodes: allNodes?.length || 0, compoundId }
+    );
+
+export const growParallelToLaneContents = (allNodes, parallelId) =>
+    measureContainerTask(
+        "grow parallel to lane contents",
+        () => growParallelToLaneContentsImpl(allNodes, parallelId),
+        { nodes: allNodes?.length || 0, parallelId }
+    );
+
+export const growAllStateContainersToContents = (allNodes) =>
+    measureContainerTask(
+        "grow all compound/parallel containers",
+        () => growAllStateContainersToContentsImpl(allNodes),
+        { nodes: allNodes?.length || 0 }
+    );
+
+export const normalizeParallelLaneCompounds = (allNodes) =>
+    measureContainerTask(
+        "normalize parallel lane compounds",
+        () => normalizeParallelLaneCompoundsImpl(allNodes),
+        { nodes: allNodes?.length || 0 }
+    );
+
+export const normalizeCompoundInitialStates = (allNodes) =>
+    measureContainerTask(
+        "normalize compound initial states",
+        () => normalizeCompoundInitialStatesImpl(allNodes),
+        { nodes: allNodes?.length || 0 }
+    );

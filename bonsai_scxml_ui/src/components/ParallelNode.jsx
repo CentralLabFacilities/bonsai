@@ -2,15 +2,34 @@ import { Handle, NodeResizer, Position, useReactFlow } from '@xyflow/react';
 import StateActionBadges from './StateActionBadges';
 import { useCallback } from 'react';
 import { FiChevronDown, FiChevronRight, FiPlus } from 'react-icons/fi';
+import { PARALLEL_BOTTOM_PADDING, PARALLEL_HEADER_HEIGHT } from '../utils/editorGeometry';
 
 export default function ParallelNode({ id, data, selected = false }) {
     const isCollapsed = Boolean(data.isCollapsed);
+    const collapsedTransitionHandles = Array.isArray(data.collapsedTransitionHandles)
+        ? data.collapsedTransitionHandles
+        : [];
+    const collapsedExitEvents = [];
+    const seenExitIds = new Set();
+    (data.events || []).forEach((event) => {
+        const eventId = String(event?.id || "").trim();
+        if (!eventId || !event?.target || seenExitIds.has(eventId)) return;
+        seenExitIds.add(eventId);
+        collapsedExitEvents.push({ ...event, id: eventId });
+    });
+    const collapsedVisibleHandles = [...collapsedExitEvents];
+    collapsedTransitionHandles.forEach((event) => {
+        const eventId = String(event?.id || "").trim();
+        if (!eventId || seenExitIds.has(eventId)) return;
+        seenExitIds.add(eventId);
+        collapsedVisibleHandles.push({ ...event, id: eventId });
+    });
     const { setNodes } = useReactFlow();
     const laneCount = Math.max(1, Array.isArray(data.lanes) ? data.lanes.length : 1);
     const minWidth = 280;
-    const minLaneHeight = 60;
-    const defaultHeaderHeight = 40;
-    const defaultBottomReserve = 35;
+    const minLaneHeight = 90;
+    const defaultHeaderHeight = PARALLEL_HEADER_HEIGHT;
+    const defaultBottomReserve = PARALLEL_BOTTOM_PADDING;
     const minHeight = defaultHeaderHeight + defaultBottomReserve + laneCount * minLaneHeight;
 
     const handleResize = useCallback(
@@ -113,7 +132,7 @@ export default function ParallelNode({ id, data, selected = false }) {
         className={
             `${data.isDropTarget
                 ? "parallel-group-container parallel-drop-target"
-                : "parallel-group-container"} ${isCollapsed ? "collapsed-container" : ""}`
+                : "parallel-group-container"} ${data.isInitial ? "initial-parallel" : ""} ${isCollapsed ? "collapsed-container" : ""}`
         }
     >
             <NodeResizer
@@ -157,9 +176,29 @@ export default function ParallelNode({ id, data, selected = false }) {
                 >
                     {isCollapsed ? <FiChevronRight size={14} /> : <FiChevronDown size={14} />}
                 </button>
+                {data.isInitial && (
+                    <span className="initial-state-badge initial-state-badge-inline">INITIAL</span>
+                )}
                 <span className="parallel-badge">PARALLEL</span>
                 <strong className="parallel-title">{data.label || id}</strong>
             </div>
+
+            {isCollapsed && collapsedVisibleHandles.map((event, index) => (
+                <Handle
+                    key={`collapsed-parallel-source-${event.id}`}
+                    id={event.id}
+                    type="source"
+                    position={Position.Right}
+                    className="parallel-collapsed-source-handle"
+                    style={{
+                        top: `${Math.min(78, 42 + index * 14)}%`,
+                        left: "auto",
+                        right: "-6px",
+                    }}
+                    isConnectableStart={true}
+                    isConnectableEnd={false}
+                />
+            ))}
 
             {!isCollapsed && <button
                 className="parallel-add-lane-btn"

@@ -7,6 +7,7 @@ import {
     useEdgesState,
     useReactFlow,
     useUpdateNodeInternals,
+    applyEdgeChanges,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
@@ -40,11 +41,16 @@ import {
     getSlotPathFromNode,
     EDITOR_SHORTCUTS,
     FIND_SHORTCUTS,
+    getCollapsedTransitionSource,
 } from "./utils/editorGraph";
 import {
     getNodeId,
+    COLLAPSED_CONTAINER_WIDTH,
+    COLLAPSED_CONTAINER_HEIGHT,
     PARALLEL_EXIT_GUTTER,
     PARALLEL_NODE_GAP,
+    PARALLEL_HEADER_HEIGHT,
+    PARALLEL_LANE_CHILD_TOP_INSET,
     COMPOUND_NODE_GAP,
     COMPOUND_PADDING_X,
     COMPOUND_HEADER_HEIGHT,
@@ -57,6 +63,10 @@ import {
     resolveNodeCollisionsAndRefit,
     normalizeParallelLaneCompounds,
     normalizeCompoundInitialStates,
+    findDropContainerAtPoint,
+    fitCompoundAndAncestorCompounds,
+    growParallelToLaneContents,
+    isAutoParallelLaneCompound,
 } from "./utils/editorGeometry";
 import {
     getForwardingNopScxmlStateId,
@@ -81,6 +91,12 @@ import { useNodeDrag } from "./hooks/useNodeDrag";
 import { useSubStateMachines } from "./hooks/useSubStateMachines";
 import { useTransitionGraph } from "./hooks/useTransitionGraph";
 import { useContainerCreation } from "./hooks/useContainerCreation";
+import { rebuildBoundaryTransitionsIncremental } from "./utils/boundaryTransitions";
+import {
+    getTransitionExitToken,
+    isWildcardTransitionEvent,
+} from "./utils/transitionEvents";
+import { getOverviewLayoutNodeSize } from "./utils/layoutUtils";
 import "./App.css";
 
 // Initialize API proxy for Tauri desktop mode (intercepts /api/* fetch calls)
@@ -91,8 +107,17 @@ initApiProxy();
 const IS_DESKTOP = isTauri();
 
 
+const isEditorCloneNode = (node) => Boolean(
+    node?.data?.cloneOfNodeId &&
+    (
+        node.data?.isSkillClone ||
+        node.data?.isStateClone ||
+        node.data?.isSlotClone
+    )
+);
+
 const isCloneableSkillNode = (node) => {
-    if (!node || node.type !== "custom" || node.data?.isSkillClone) {
+    if (!node || node.type !== "custom" || isEditorCloneNode(node)) {
         return false;
     }
 
@@ -108,6 +133,79 @@ const isCloneableSkillNode = (node) => {
         skillName === "end" ||
         skillName === "fatal"
     );
+};
+
+const isCloneableEditorNode = (node) => Boolean(
+    isCloneableSkillNode(node) ||
+    (node &&
+        ["submachine", "compound", "parallel", "slot"].includes(node.type) &&
+        !isEditorCloneNode(node) &&
+        !node.data?.autoParallelLaneCompound)
+);
+
+const createReferenceId = () =>
+    `ref-${crypto.randomUUID().replace(/-/g, "").slice(0, 8)}`;
+
+const buildEditorCloneNode = (sourceNode, position) => {
+    if (!isCloneableEditorNode(sourceNode)) return null;
+
+    if (sourceNode.type === "slot") {
+        return {
+            id: `slot-clone-${crypto.randomUUID()}`,
+            position,
+            type: "slot",
+            selected: true,
+            data: {
+                ...(sourceNode.data || {}),
+                cloneOfNodeId: sourceNode.id,
+                editorInstanceId: createReferenceId(),
+                isSlotClone: true,
+            },
+        };
+    }
+
+    const commonData = {
+        label: sourceNode.data?.label || sourceNode.data?.fullSkillName || "State",
+        fullSkillName:
+            sourceNode.data?.fullSkillName ||
+            sourceNode.data?.label ||
+            "State",
+        cloneOfNodeId: sourceNode.id,
+        editorInstanceId: createReferenceId(),
+        isInitial: false,
+        isFinal: false,
+        events: [],
+        inSlots: [],
+        outSlots: [],
+        params: [],
+        onEntry: [],
+        onExit: [],
+    };
+
+    if (sourceNode.type === "custom") {
+        return {
+            id: getNodeId(),
+            position,
+            type: "custom",
+            selected: true,
+            data: {
+                ...commonData,
+                isSkillClone: true,
+            },
+        };
+    }
+
+    return {
+        id: getNodeId(),
+        position,
+        type: "stateClone",
+        selected: true,
+        data: {
+            ...commonData,
+            isStateClone: true,
+            sourceNodeType: sourceNode.type,
+        },
+    };
 };
 
 const DEFAULT_BEHAVIOR_DIRECTORIES = [
@@ -179,10 +277,57 @@ const cloneGraphValue = (value) => {
         return clone;
     }
 
-    // Keep functions and primitives as-is. Node data contains callbacks that
-    // must remain callable after an internal copy/paste.
+    // Keep functions and primitives as-is for normal in-memory graph copies.
     return value;
 };
+
+// The graph clipboard outlives the currently displayed graph. It must never
+// retain render callbacks or routing caches from copied nodes/edges: those
+// objects can close over an entire previous workflow and keep it alive even
+// after every visible node has been removed.
+const CLIPBOARD_TRANSIENT_KEYS = new Set([
+    "routingNodes",
+    "slotConnectionDrag",
+    "outgoingTransitionHandles",
+    "isDropTarget",
+    "mode",
+]);
+
+const cloneClipboardValue = (value, ancestors = new WeakSet()) => {
+    if (typeof value === "function") return undefined;
+
+    if (Array.isArray(value)) {
+        if (ancestors.has(value)) return undefined;
+        ancestors.add(value);
+        const clone = [];
+        value.forEach((entry) => {
+            const copiedEntry = cloneClipboardValue(entry, ancestors);
+            if (copiedEntry !== undefined) clone.push(copiedEntry);
+        });
+        ancestors.delete(value);
+        return clone;
+    }
+
+    if (value && typeof value === "object") {
+        if (ancestors.has(value)) return undefined;
+        ancestors.add(value);
+        const clone = {};
+        Object.entries(value).forEach(([key, entry]) => {
+            if (CLIPBOARD_TRANSIENT_KEYS.has(key)) return;
+            const copiedEntry = cloneClipboardValue(entry, ancestors);
+            if (copiedEntry !== undefined) clone[key] = copiedEntry;
+        });
+        ancestors.delete(value);
+        return clone;
+    }
+
+    return value;
+};
+
+// Keep the editor clipboard outside AppContent. Selection changes, workflow
+// focus changes, or an AppContent remount must not invalidate something the
+// user already copied. This is intentionally session-only editor state.
+let persistentGraphClipboard = null;
 
 function AppContent() {
     const {
@@ -197,6 +342,7 @@ function AppContent() {
     const [activeFilter, setActiveFilter] = useState("Everything");
     const [searchText, setSearchText] = useState("");
     const [contextMenu, setContextMenu] = useState(null);
+    const [controlPointInsertRequest, setControlPointInsertRequest] = useState(null);
     const updateNodeInternals = useUpdateNodeInternals();
     const [leftLibraryTab, setLeftLibraryTab] = useState("skills");
     const [behaviorDirectories, setBehaviorDirectories] = useState(
@@ -215,20 +361,49 @@ function AppContent() {
     const [edges, setEdges, onEdgesChange] = useEdgesState([]);
     const [slotNodes, setSlotNodes, onSlotNodesChange] = useNodesState([]);
     const [slotEdges, setSlotEdges, onSlotEdgesChange] = useEdgesState([]);
+
     // Internal graph clipboard. This intentionally does not use the system
     // clipboard: Ctrl+C copies the current React Flow selection and
     // Ctrl+V recreates it with fresh graph IDs.
     const graphClipboardRef = useRef(null);
+    const [hasGraphClipboard, setHasGraphClipboard] = useState(() =>
+        Boolean(
+            persistentGraphClipboard &&
+                ((persistentGraphClipboard.nodes?.length || 0) > 0 ||
+                    (persistentGraphClipboard.slotNodes?.length || 0) > 0)
+        )
+    );
+    useEffect(() => {
+        // Also sanitize a clipboard created by an older/hot-reloaded version
+        // so stale callback closures are released immediately.
+        const sanitizedClipboard = persistentGraphClipboard
+            ? cloneClipboardValue(persistentGraphClipboard)
+            : null;
+        graphClipboardRef.current = sanitizedClipboard;
+        persistentGraphClipboard = sanitizedClipboard;
+    }, []);
+    const captureGraphSelectionRef = useRef(null);
+    const requestGraphPasteRef = useRef(null);
+    const flowContainerRef = useRef(null);
+    const editorPointerPositionRef = useRef({
+        inside: false,
+        clientX: null,
+        clientY: null,
+    });
     // Keep an authoritative snapshot of React Flow's current selection.
     // Reading `node.selected` from the controlled nodes array can lag behind
     // the interaction by a render, especially when Ctrl/Meta multi-selecting.
     const graphSelectionRef = useRef(new Set());
+    // When a visual slot clone is deleted, its connected semantic slot edges
+    // are retargeted to the canonical slot instead of disconnecting the skill.
+    // React Flow may still emit remove changes for the old visual edges; keep
+    // those edge IDs here so that follow-up removal events can be ignored.
+    const remappedSlotCloneEdgeIdsRef = useRef(new Set());
     const handleGraphSelectionChange = useCallback(({ nodes: selectedFlowNodes = [] }) => {
         graphSelectionRef.current = new Set(
             selectedFlowNodes.map((node) => node.id)
         );
     }, []);
-    const pasteSequenceRef = useRef(0);
 
     // Editor-wide Find (Ctrl+F): searches skill/behavior nodes and slot paths
     // in the currently active workflow.
@@ -240,7 +415,44 @@ function AppContent() {
     const [isShortcutHelpOpen, setIsShortcutHelpOpen] = useState(false);
     const [isHintPageOpen, setIsHintPageOpen] = useState(false);
 
-    const [activeMode, setActiveMode] = useState("event");
+    const [activeMode, setActiveMode] = useState("overview");
+    const [showTransitionEdges, setShowTransitionEdges] = useState(() => {
+        try {
+            return window.localStorage.getItem("bonsai.showTransitionEdges") !== "false";
+        } catch {
+            return true;
+        }
+    });
+    const [showSlotEdges, setShowSlotEdges] = useState(() => {
+        try {
+            return window.localStorage.getItem("bonsai.showSlotEdges") !== "false";
+        } catch {
+            return true;
+        }
+    });
+
+    useEffect(() => {
+        try {
+            window.localStorage.setItem(
+                "bonsai.showTransitionEdges",
+                String(showTransitionEdges)
+            );
+        } catch {
+            // Local storage is optional; the in-memory toggle still works.
+        }
+    }, [showTransitionEdges]);
+
+    useEffect(() => {
+        try {
+            window.localStorage.setItem(
+                "bonsai.showSlotEdges",
+                String(showSlotEdges)
+            );
+        } catch {
+            // Local storage is optional; the in-memory toggle still works.
+        }
+    }, [showSlotEdges]);
+
     const [manualSlots, setManualSlots] = useState([]);
     const [isCreateSlotModalOpen, setIsCreateSlotModalOpen] = useState(false);
     const [pendingSkillPaste, setPendingSkillPaste] = useState(null);
@@ -296,7 +508,14 @@ function AppContent() {
         setSlotEdges,
     });
 
-    const { screenToFlowPosition, fitView, getNodes, setCenter } = useReactFlow();
+    const {
+        screenToFlowPosition,
+        fitView,
+        getNodes,
+        setCenter,
+        getViewport,
+        setViewport,
+    } = useReactFlow();
     const previousActiveModeRef = useRef(activeMode);
 
     useEffect(() => {
@@ -349,6 +568,7 @@ function AppContent() {
         compoundDropTargetId,
         setCompoundDropTargetId,
         isDraggingNode,
+        draggingNodeId,
         isOverTrash,
         handleNodeDragStart,
         handleNodeDrag,
@@ -422,7 +642,7 @@ function AppContent() {
             semanticNodes
                 .filter(
                     (node) =>
-                        node.data?.isSkillClone &&
+                        isEditorCloneNode(node) &&
                         (!node.data?.cloneOfNodeId ||
                             !semanticNodeIds.has(node.data.cloneOfNodeId))
                 )
@@ -451,13 +671,13 @@ function AppContent() {
             const nextNodes = [];
 
             currentNodes.forEach((node) => {
-                if (!node.data?.isSkillClone) {
+                if (!isEditorCloneNode(node)) {
                     nextNodes.push(node);
                     return;
                 }
 
                 const sourceNode = byId.get(node.data?.cloneOfNodeId);
-                if (!sourceNode || sourceNode.data?.isSkillClone) {
+                if (!sourceNode || isEditorCloneNode(sourceNode)) {
                     changed = true;
                     return;
                 }
@@ -466,9 +686,14 @@ function AppContent() {
                 const nextFullSkillName =
                     sourceNode.data?.fullSkillName || node.data?.fullSkillName;
 
+                const nextSourceNodeType = node.data?.isStateClone
+                    ? sourceNode.type
+                    : node.data?.sourceNodeType;
+
                 if (
                     node.data?.label === nextLabel &&
-                    node.data?.fullSkillName === nextFullSkillName
+                    node.data?.fullSkillName === nextFullSkillName &&
+                    node.data?.sourceNodeType === nextSourceNodeType
                 ) {
                     nextNodes.push(node);
                     return;
@@ -481,6 +706,9 @@ function AppContent() {
                         ...(node.data || {}),
                         label: nextLabel,
                         fullSkillName: nextFullSkillName,
+                        ...(node.data?.isStateClone
+                            ? { sourceNodeType: nextSourceNodeType }
+                            : {}),
                     },
                 });
             });
@@ -507,9 +735,13 @@ function AppContent() {
         drawerData,
         setDrawerData,
         slotConnectionDrag,
+        openConditionDrawer,
         isValidConnection,
         handleConnectStart,
         handleConnectEnd,
+        handleReconnectStart,
+        handleReconnectEnd,
+        onReconnect,
         onConnect,
         clearTransitionSelection,
         clearAllEdgeSelection,
@@ -583,8 +815,11 @@ function AppContent() {
         setManualSlots,
         setGlobalDataModel,
         setInheritedGlobalDataModel,
+        selectedNodeId,
         setSelectedNodeId,
         fitView,
+        getViewport,
+        setViewport,
     });
 
     const {
@@ -632,7 +867,9 @@ function AppContent() {
         setSlotNodes,
         setSlotEdges,
         setManualSlots,
+        selectedNodeId,
         setSelectedNodeId,
+        getViewport,
         setActiveTab,
         setContextMenu,
         fitView,
@@ -790,100 +1027,489 @@ function AppContent() {
             );
     }, [isFindOpen]);
 
-    const handleContextMenuOpen = useCallback((event, clickedNode = null) => {
+    const getContextNodeLabel = useCallback((node) => {
+        if (!node) return "Node";
+        return (
+            node.data?.label ||
+            node.data?.fullSkillName ||
+            node.data?.path ||
+            node.id ||
+            "Node"
+        );
+    }, []);
+
+    const handleContextMenuOpen = useCallback((event, clickedNode = null, clickedEdge = null) => {
         event.preventDefault();
         event.stopPropagation();
 
-        if (clickedNode && !clickedNode.selected) {
-            setNodes((nds) =>
-                nds.map((n) => ({
-                    ...n,
-                    selected: n.id === clickedNode.id,
-                }))
+        const flowPos = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+
+        if (clickedEdge) {
+            if (
+                clickedEdge.data?.compoundInitialEdge ||
+                clickedEdge.data?.parallelEntryEdge
+            ) {
+                setContextMenu(null);
+                return;
+            }
+
+            const slotConnection = isSlotEdge(clickedEdge);
+            if (slotConnection) {
+                selectSlotEdge(clickedEdge.id);
+            } else {
+                selectTransitionEdge(clickedEdge.id);
+            }
+
+            const storedBoundarySources = Array.isArray(
+                clickedEdge.data?.boundaryOriginalSources
+            )
+                ? clickedEdge.data.boundaryOriginalSources
+                : [];
+            const firstBoundarySource = storedBoundarySources.find(
+                (entry) => entry?.sourceId || entry?.nodeId || entry?.id
             );
-            setSelectedNodeId(clickedNode.id);
+            const logicalSourceId =
+                firstBoundarySource?.sourceId ||
+                firstBoundarySource?.nodeId ||
+                firstBoundarySource?.id ||
+                clickedEdge.data?.boundaryOriginalSource ||
+                clickedEdge.data?.compoundOriginalSource ||
+                clickedEdge.data?.parallelOriginalSource ||
+                clickedEdge.source;
+            const logicalSourceHandle = String(
+                firstBoundarySource?.sourceHandle ||
+                    firstBoundarySource?.handle ||
+                    clickedEdge.data?.boundaryOriginalSourceHandle ||
+                    clickedEdge.data?.compoundOriginalSourceHandle ||
+                    clickedEdge.data?.parallelOriginalSourceHandle ||
+                    clickedEdge.sourceHandle ||
+                    clickedEdge.label ||
+                    "success"
+            );
+            const logicalTargetId =
+                clickedEdge.data?.boundaryOriginalTarget ||
+                clickedEdge.data?.compoundOriginalTarget ||
+                clickedEdge.data?.parallelOriginalTarget ||
+                clickedEdge.target;
+
+            const allEditorNodes = [...nodes, ...slotNodes];
+            const sourceNode = allEditorNodes.find(
+                (node) => node.id === logicalSourceId
+            );
+            const targetNode = allEditorNodes.find(
+                (node) => node.id === logicalTargetId
+            );
+            const slotSkillNodeId =
+                clickedEdge.data?.skillNodeId || clickedEdge.source;
+            const slotNodeId =
+                clickedEdge.data?.slotNodeId || clickedEdge.target;
+
+            setContextMenu({
+                kind: "edge",
+                x: event.clientX,
+                y: event.clientY,
+                flowPosition: flowPos,
+                edgeId: clickedEdge.id,
+                isSlotConnection: slotConnection,
+                sourceNodeId: logicalSourceId || null,
+                sourceHandle: logicalSourceHandle,
+                targetNodeId: logicalTargetId || null,
+                slotSkillNodeId: slotSkillNodeId || null,
+                slotNodeId: slotNodeId || null,
+                slotAccess: clickedEdge.data?.access || null,
+                slotIndex: Number.isInteger(Number(clickedEdge.data?.slotIndex))
+                    ? Number(clickedEdge.data.slotIndex)
+                    : null,
+                title: slotConnection
+                    ? `${getContextNodeLabel(
+                          allEditorNodes.find((node) => node.id === slotSkillNodeId)
+                      )} ↔ ${getContextNodeLabel(
+                          allEditorNodes.find((node) => node.id === slotNodeId)
+                      )}`
+                    : `${getContextNodeLabel(sourceNode)}.${logicalSourceHandle} → ${getContextNodeLabel(targetNode)}`,
+            });
+            return;
         }
 
-        const flowPos = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+        if (clickedNode) {
+            if (!clickedNode.selected) {
+                if (clickedNode.type === "slot") {
+                    setNodes((nds) =>
+                        nds.map((node) => ({ ...node, selected: false }))
+                    );
+                    setSlotNodes((currentSlotNodes) =>
+                        currentSlotNodes.map((node) => ({
+                            ...node,
+                            selected: node.id === clickedNode.id,
+                        }))
+                    );
+                } else {
+                    setNodes((nds) =>
+                        nds.map((node) => ({
+                            ...node,
+                            selected: node.id === clickedNode.id,
+                        }))
+                    );
+                    setSlotNodes((currentSlotNodes) =>
+                        currentSlotNodes.map((node) => ({
+                            ...node,
+                            selected: false,
+                        }))
+                    );
+                }
+                setSelectedNodeId(clickedNode.id);
+            }
+
+            const parentNode = clickedNode.parentId
+                ? nodes.find((node) => node.id === clickedNode.parentId)
+                : null;
+            const isStructuralLane = clickedNode.type === "parallelLane";
+            const isStructuralHelper = Boolean(
+                clickedNode.data?.autoParallelLaneCompound
+            );
+            const isReference = isEditorCloneNode(clickedNode);
+            const canSetInitial = Boolean(
+                clickedNode.parentId &&
+                    !isReference &&
+                    !isStructuralLane &&
+                    clickedNode.type !== "slot" &&
+                    !clickedNode.data?.isInitial &&
+                    ["compound", "parallelLane"].includes(parentNode?.type)
+            );
+
+            const addStateTargets =
+                clickedNode.type === "parallel"
+                    ? nodes
+                          .filter(
+                              (node) =>
+                                  node.parentId === clickedNode.id &&
+                                  node.type === "parallelLane"
+                          )
+                          .sort(
+                              (a, b) =>
+                                  Number(a.position?.y || 0) -
+                                  Number(b.position?.y || 0)
+                          )
+                          .map((lane) => ({
+                              id: lane.id,
+                              label: getContextNodeLabel(lane),
+                          }))
+                    : ["compound", "parallelLane"].includes(clickedNode.type)
+                        ? [
+                              {
+                                  id: clickedNode.id,
+                                  label: getContextNodeLabel(clickedNode),
+                              },
+                          ]
+                        : [];
+
+            setContextMenu({
+                kind: "node",
+                x: event.clientX,
+                y: event.clientY,
+                flowPosition: flowPos,
+                nodeId: clickedNode.id,
+                nodeType: clickedNode.type,
+                title: getContextNodeLabel(clickedNode),
+                isStructuralNode: isStructuralLane || isStructuralHelper,
+                addStateTargets,
+                canSetInitial: Boolean(
+                    canSetInitial &&
+                    parentNode?.data?.initialChildId !== clickedNode.id
+                ),
+                canOpenTransitions:
+                    !isReference &&
+                    !isStructuralLane &&
+                    clickedNode.type !== "slot",
+                canCreateReference: isCloneableEditorNode(clickedNode),
+                referenceLabel:
+                    clickedNode.type === "slot"
+                        ? "Create slot reference"
+                        : clickedNode.type === "compound"
+                            ? "Create compound reference"
+                            : clickedNode.type === "parallel"
+                                ? "Create parallel reference"
+                                : clickedNode.type === "submachine"
+                                    ? "Create sub-state-machine reference"
+                                    : "Create state reference",
+                canWrap:
+                    !isReference &&
+                    !isStructuralLane &&
+                    !isStructuralHelper &&
+                    clickedNode.type !== "slot",
+                canAddState: addStateTargets.length > 0,
+                canAddLane: clickedNode.type === "parallel",
+                canDelete: !isStructuralHelper && !isStructuralLane,
+            });
+            return;
+        }
+
         setContextMenu({
+            kind: "pane",
             x: event.clientX,
             y: event.clientY,
             flowPosition: flowPos,
+            title: "Create new element",
         });
-    }, [screenToFlowPosition, setNodes]);
+    }, [
+        getContextNodeLabel,
+        isSlotEdge,
+        nodes,
+        screenToFlowPosition,
+        selectSlotEdge,
+        selectTransitionEdge,
+        setNodes,
+        setSelectedNodeId,
+        setSlotNodes,
+        slotNodes,
+    ]);
 
-    const canCreateSkillClone =
-        selectedNodes.length === 1 &&
-        isCloneableSkillNode(selectedNodes[0]);
-
-    const handleCreateSkillClone = useCallback(() => {
-        if (!contextMenu?.flowPosition) return;
-
-        const sourceNode = selectedNodes.length === 1
-            ? selectedNodes[0]
+    const selectedSlotNodes = slotNodes.filter((node) => node.selected);
+    const editorCloneSelection = [
+        ...selectedNodes,
+        ...selectedSlotNodes,
+    ];
+    const editorCloneSourceNode =
+        editorCloneSelection.length === 1
+            ? editorCloneSelection[0]
             : null;
 
-        if (!isCloneableSkillNode(sourceNode)) return;
+    const handleCreateEditorClone = useCallback(() => {
+        if (!contextMenu?.flowPosition) return;
 
-        const cloneNode = {
-            id: getNodeId(),
-            position: {
-                x: Number(contextMenu.flowPosition.x || 0) + 220,
-                y: Number(contextMenu.flowPosition.y || 0),
-            },
-            type: "custom",
-            selected: true,
-            data: {
-                label: sourceNode.data?.label || "Skill",
-                fullSkillName:
-                    sourceNode.data?.fullSkillName ||
-                    sourceNode.data?.label ||
-                    "Skill",
-                isSkillClone: true,
-                cloneOfNodeId: sourceNode.id,
-                isInitial: false,
-                isFinal: false,
-                events: [],
-                inSlots: [],
-                outSlots: [],
-                params: [],
-                onEntry: [],
-                onExit: [],
-            },
-        };
+        const sourceNode = editorCloneSourceNode;
+        if (!isCloneableEditorNode(sourceNode)) return;
 
-        setNodes((currentNodes) => [
-            ...currentNodes.map((node) => ({
-                ...node,
-                selected: false,
-            })),
-            cloneNode,
-        ]);
+        const cloneNode = buildEditorCloneNode(sourceNode, {
+            x: Number(contextMenu.flowPosition.x || 0) + 220,
+            y: Number(contextMenu.flowPosition.y || 0),
+        });
+        if (!cloneNode) return;
+
+        if (sourceNode.type === "slot") {
+            setNodes((currentNodes) =>
+                currentNodes.map((node) => ({ ...node, selected: false }))
+            );
+            setSlotNodes((currentSlotNodes) => [
+                ...currentSlotNodes.map((node) => ({
+                    ...node,
+                    selected: false,
+                })),
+                cloneNode,
+            ]);
+        } else {
+            setSlotNodes((currentSlotNodes) =>
+                currentSlotNodes.map((node) => ({ ...node, selected: false }))
+            );
+            setNodes((currentNodes) => [
+                ...currentNodes.map((node) => ({
+                    ...node,
+                    selected: false,
+                })),
+                cloneNode,
+            ]);
+        }
+
         setSelectedNodeId(cloneNode.id);
         setRightPanelTab("details");
-        setActiveTab("allgemein");
+        setActiveTab(sourceNode.type === "slot" ? "slots" : "allgemein");
     }, [
         contextMenu,
-        selectedNodes,
+        editorCloneSourceNode,
         setNodes,
+        setSlotNodes,
         setSelectedNodeId,
         setRightPanelTab,
         setActiveTab,
     ]);
 
-    const handleSelectAction = (type) => {
-        const hasSelection = selectedNodes.length > 0;
+    const handleGraphClipboardContextAction = useCallback((type) => {
+        if (type === "copy") {
+            captureGraphSelectionRef.current?.();
+        } else if (type === "paste") {
+            requestGraphPasteRef.current?.(contextMenu?.flowPosition || null);
+        }
+        setContextMenu(null);
+    }, [contextMenu]);
 
-        if (type === "clone") {
-            handleCreateSkillClone();
+    const setNodeAsInitial = useCallback((nodeId) => {
+        if (!nodeId) return;
+
+        setNodes((nds) => {
+            const selected = nds.find((node) => node.id === nodeId);
+            if (!selected || !selected.parentId || isEditorCloneNode(selected)) {
+                return nds;
+            }
+
+            const parentId = selected.parentId;
+            const parentNode = nds.find((node) => node.id === parentId);
+            if (!parentNode || !["compound", "parallelLane"].includes(parentNode.type)) {
+                return nds;
+            }
+
+            return nds.map((node) => {
+                if (node.id === parentId && parentNode.type === "compound") {
+                    return {
+                        ...node,
+                        data: {
+                            ...(node.data || {}),
+                            initialChildId: selected.id,
+                        },
+                    };
+                }
+
+                if ((node.parentId || null) !== parentId) return node;
+                if (node.type === "slot" || node.type === "parallelLane") {
+                    return node;
+                }
+
+                return {
+                    ...node,
+                    data: {
+                        ...(node.data || {}),
+                        isInitial: node.id === selected.id,
+                    },
+                };
+            });
+        });
+    }, [setNodes]);
+
+    const addEmptyStateToContainer = useCallback((parentId) => {
+        if (!parentId) return;
+
+        const newNodeId = getNodeId();
+        setNodes((currentNodes) => {
+            const parent = currentNodes.find((node) => node.id === parentId);
+            if (!parent || !["compound", "parallelLane"].includes(parent.type)) {
+                return currentNodes;
+            }
+
+            const children = currentNodes.filter(
+                (node) => node.parentId === parentId && node.type !== "parallelLane"
+            );
+            const stateCount = currentNodes.filter(
+                (node) =>
+                    String(node.data?.label || "").startsWith("state_")
+            ).length;
+            const stateName = `state_${stateCount + 1}`;
+            const isFirstChild = children.length === 0;
+            const childX = parent.type === "compound" ? COMPOUND_PADDING_X : 24;
+            const childStartY =
+                parent.type === "compound"
+                    ? COMPOUND_HEADER_HEIGHT + 18
+                    : PARALLEL_LANE_CHILD_TOP_INSET;
+            const nextY = children.reduce((maxY, child) => {
+                const size = getOverviewLayoutNodeSize(child);
+                return Math.max(
+                    maxY,
+                    Number(child.position?.y || 0) + size.height + 18
+                );
+            }, childStartY);
+
+            const newState = {
+                id: newNodeId,
+                type: "compound",
+                parentId,
+                extent: "parent",
+                expandParent: true,
+                position: { x: childX, y: nextY },
+                style: { width: 300, height: 180 },
+                selected: true,
+                data: {
+                    label: stateName,
+                    fullSkillName: stateName,
+                    isInitial: isFirstChild,
+                    events: [],
+                },
+            };
+
+            const withSelection = currentNodes.map((node) => ({
+                ...node,
+                selected: false,
+                ...(node.id === parentId && parent.type === "compound" && isFirstChild
+                    ? {
+                          data: {
+                              ...(node.data || {}),
+                              initialChildId: newNodeId,
+                          },
+                      }
+                    : {}),
+            }));
+
+            let nextNodes = resolveNodeCollisionsAndRefit(
+                [...withSelection, newState],
+                newNodeId
+            );
+            nextNodes = normalizeParallelLaneCompounds(nextNodes);
+            nextNodes = normalizeCompoundInitialStates(nextNodes);
+            return orderNodesParentsFirst(nextNodes);
+        });
+
+        setSelectedNodeId(newNodeId);
+        setRightPanelTab("details");
+        setActiveTab("allgemein");
+    }, [setNodes, setSelectedNodeId, setRightPanelTab, setActiveTab]);
+
+    const handleSelectAction = (type, payload = null) => {
+        const hasSelection = selectedNodes.length > 0;
+        const contextNodeId = contextMenu?.nodeId || null;
+        const contextEdgeId = contextMenu?.edgeId || null;
+
+        if (type === "copy" || type === "paste") {
+            handleGraphClipboardContextAction(type);
+            return;
+        }
+
+        if (type === "open-details" && contextNodeId) {
+            const node = [...nodes, ...slotNodes].find(
+                (candidate) => candidate.id === contextNodeId
+            );
+            if (node?.type === "slot") {
+                setNodes((current) =>
+                    current.map((candidate) => ({ ...candidate, selected: false }))
+                );
+                setSlotNodes((current) =>
+                    current.map((candidate) => ({
+                        ...candidate,
+                        selected: candidate.id === contextNodeId,
+                    }))
+                );
+            } else {
+                setNodes((current) =>
+                    current.map((candidate) => ({
+                        ...candidate,
+                        selected: candidate.id === contextNodeId,
+                    }))
+                );
+                setSlotNodes((current) =>
+                    current.map((candidate) => ({ ...candidate, selected: false }))
+                );
+            }
+            setSelectedNodeId(contextNodeId);
+            setRightPanelTab("details");
+            setActiveTab(node?.type === "slot" ? "slots" : "allgemein");
+        } else if (type === "open-transitions" && contextNodeId) {
+            const node = nodes.find((candidate) => candidate.id === contextNodeId);
+            const firstEventId = String(node?.data?.events?.[0]?.id || "");
+            if (firstEventId) {
+                handleOpenTransition(contextNodeId, firstEventId);
+            } else {
+                setSelectedNodeId(contextNodeId);
+                setRightPanelTab("details");
+                setActiveTab("allgemein");
+            }
+        } else if (type === "set-initial" && contextNodeId) {
+            setNodeAsInitial(contextNodeId);
+        } else if (type === "clone") {
+            handleCreateEditorClone();
         } else if (type === "compound") {
-            if (hasSelection) {
+            if (hasSelection && contextMenu?.kind === "node") {
                 handleCreateCompoundFromSelected();
             } else {
                 handleCreateEmptyCompound(contextMenu.flowPosition);
             }
         } else if (type === "parallel") {
-            if (hasSelection) {
+            if (hasSelection && contextMenu?.kind === "node") {
                 handleCreateParallelFromSelected();
             } else {
                 handleCreateEmptyParallel(contextMenu.flowPosition);
@@ -891,7 +1517,7 @@ function AppContent() {
         } else if (type === "submachine") {
             const nextIndex = nodes.filter((node) => node.type === "submachine").length + 1;
             setPendingSubMachineCreation({
-                fromSelection: hasSelection,
+                fromSelection: hasSelection && contextMenu?.kind === "node",
                 flowPosition: contextMenu.flowPosition,
                 defaultDirectory: behaviorDirectories[0]?.path || "",
                 defaultFileName: `SubMachine_${nextIndex}.xml`,
@@ -900,6 +1526,156 @@ function AppContent() {
             if (activeMode === "slots" || activeMode === "overview") {
                 setIsCreateSlotModalOpen(true);
             }
+        } else if (type === "add-state") {
+            const targetParentId = payload || contextNodeId;
+            if (targetParentId) addEmptyStateToContainer(targetParentId);
+        } else if (type === "add-lane" && contextNodeId) {
+            handleAddLaneToParallel(contextNodeId);
+        } else if (type === "delete-node" && contextNodeId) {
+            const removalIds = new Set([contextNodeId]);
+            let foundDescendant = true;
+            while (foundDescendant) {
+                foundDescendant = false;
+                nodes.forEach((node) => {
+                    if (
+                        node.parentId &&
+                        removalIds.has(node.parentId) &&
+                        !removalIds.has(node.id)
+                    ) {
+                        removalIds.add(node.id);
+                        foundDescendant = true;
+                    }
+                });
+            }
+
+            handleNodesChange(
+                [...removalIds].map((id) => ({ id, type: "remove" }))
+            );
+            setSelectedNodeId((current) =>
+                current && removalIds.has(current) ? null : current
+            );
+        } else if (type === "open-transition" && contextEdgeId) {
+            const edge = edges.find((candidate) => candidate.id === contextEdgeId);
+            if (edge) onEdgeDoubleClick(null, edge);
+        } else if (type === "change-transition-target" && contextEdgeId) {
+            const edge = edges.find((candidate) => candidate.id === contextEdgeId);
+            if (edge && contextMenu?.sourceNodeId) {
+                selectTransitionEdge(edge.id);
+                openConditionDrawer(
+                    contextMenu.sourceNodeId,
+                    contextMenu.sourceHandle || "success",
+                    contextMenu.targetNodeId || edge.target,
+                    null,
+                    {
+                        targetOnly: true,
+                        edgeId: edge.id,
+                    }
+                );
+            }
+        } else if (type === "go-source" && contextMenu?.sourceNodeId) {
+            handleNavigateCloneSource(contextMenu.sourceNodeId);
+        } else if (type === "go-target" && contextMenu?.targetNodeId) {
+            handleNavigateCloneSource(contextMenu.targetNodeId);
+        } else if (type === "create-control-point" && contextEdgeId) {
+            const flowPosition = contextMenu?.flowPosition;
+            const edgeKind = contextMenu?.isSlotConnection ? "slot" : "transition";
+            const sourceEdges = edgeKind === "slot" ? slotEdges : edges;
+            const edge = sourceEdges.find((candidate) => candidate.id === contextEdgeId);
+
+            if (flowPosition && edge) {
+                setControlPointInsertRequest({
+                    requestId: crypto.randomUUID(),
+                    edgeId: contextEdgeId,
+                    edgeKind,
+                    expectedControlPointCount: Array.isArray(edge.data?.controlPoints)
+                        ? edge.data.controlPoints.length
+                        : 0,
+                    flowPosition: {
+                        x: Number(flowPosition.x || 0),
+                        y: Number(flowPosition.y || 0),
+                    },
+                });
+            }
+        } else if (type === "remove-control-point" && contextEdgeId) {
+            const edgeKind = contextMenu?.edgeKind === "slot" ? "slot" : "transition";
+            const sourceEdges = edgeKind === "slot" ? slotEdges : edges;
+            const edge = sourceEdges.find((candidate) => candidate.id === contextEdgeId);
+            const pointId = contextMenu?.pointId;
+
+            if (edge && pointId) {
+                const nextControlPoints = Array.isArray(edge.data?.controlPoints)
+                    ? edge.data.controlPoints.filter((point) => point.id !== pointId)
+                    : [];
+
+                updatePersistentEdgeControlPoints(
+                    contextEdgeId,
+                    nextControlPoints,
+                    edgeKind
+                );
+            }
+        } else if (type === "delete-transition" && contextEdgeId) {
+            handleVisibleEdgesChange([{ id: contextEdgeId, type: "remove" }]);
+        } else if (type === "open-slot-connection") {
+            const skillNode = nodes.find(
+                (node) => node.id === contextMenu?.slotSkillNodeId
+            );
+            const access = contextMenu?.slotAccess;
+            const slotIndex = contextMenu?.slotIndex;
+            const slotKey =
+                access === "read"
+                    ? skillNode?.data?.inSlots?.[slotIndex]?.key
+                    : access === "write"
+                        ? skillNode?.data?.outSlots?.[slotIndex]?.key
+                        : null;
+
+            if (skillNode && access && slotKey) {
+                handleOpenSlot(skillNode.id, access, slotKey);
+            } else if (skillNode) {
+                setSelectedNodeId(skillNode.id);
+                setRightPanelTab("details");
+                setActiveTab("slots");
+            }
+        } else if (type === "go-slot-skill" && contextMenu?.slotSkillNodeId) {
+            handleNavigateCloneSource(contextMenu.slotSkillNodeId);
+            setActiveTab("slots");
+        } else if (type === "go-slot-node" && contextMenu?.slotNodeId) {
+            const slotNodeId = contextMenu.slotNodeId;
+            clearAllEdgeSelection();
+            setNodes((current) =>
+                current.map((node) => ({ ...node, selected: false }))
+            );
+            setSlotNodes((current) =>
+                current.map((node) => ({
+                    ...node,
+                    selected: node.id === slotNodeId,
+                }))
+            );
+            setSelectedNodeId(slotNodeId);
+            setRightPanelTab("details");
+            setActiveTab("slots");
+
+            window.setTimeout(() => {
+                const flowNode = getNodes().find((node) => node.id === slotNodeId);
+                if (!flowNode) return;
+                const position = getAbsoluteNodePosition(flowNode, getNodes());
+                const width =
+                    Number(flowNode.measured?.width) ||
+                    Number(flowNode.width) ||
+                    Number(flowNode.style?.width) ||
+                    180;
+                const height =
+                    Number(flowNode.measured?.height) ||
+                    Number(flowNode.height) ||
+                    Number(flowNode.style?.height) ||
+                    70;
+                setCenter(
+                    position.x + width / 2,
+                    position.y + height / 2,
+                    { zoom: 1, duration: 300 }
+                );
+            }, 30);
+        } else if (type === "disconnect-slot" && contextEdgeId) {
+            handleVisibleEdgesChange([{ id: contextEdgeId, type: "remove" }]);
         }
 
         setContextMenu(null);
@@ -912,8 +1688,6 @@ function AppContent() {
         document.addEventListener("click", handleClickOutside);
         return () => document.removeEventListener("click", handleClickOutside);
     }, [contextMenu]);
-
-
 
 
 
@@ -956,45 +1730,101 @@ function AppContent() {
         return next;
     }, [semanticSlotNodesDependency]);
 
-    // Shared graph indexes replace repeated nodes.find()/nodes.filter() scans
-    // in display-only edge construction and hover/normalization helpers.
-    const nodeById = useMemo(
-        () => new Map(semanticNodes.map((node) => [node.id, node])),
-        [semanticNodes]
-    );
+    // Build the semantic hierarchy once per real topology/data change. Compound
+    // and Parallel operations used to construct several independent maps and
+    // then rediscover collapsed descendants by repeatedly traversing the same
+    // subtrees. Large workflows with many nested containers paid that cost over
+    // and over even though parent/child membership had not changed.
+    //
+    // Keep all hierarchy-derived data together so every consumer shares the
+    // same cached topology snapshot. Collapsed visibility is propagated in one
+    // tree walk: each semantic node is visited at most once, even when several
+    // collapsed containers are nested inside one another.
+    const semanticHierarchy = useMemo(() => {
+        const nodeById = new Map();
+        const parentByNodeId = new Map();
+        const childIdsByParent = new Map();
+        const childrenByParent = new Map();
+
+        semanticNodes.forEach((node) => {
+            nodeById.set(node.id, node);
+
+            if (!node.parentId) return;
+            parentByNodeId.set(node.id, node.parentId);
+
+            if (!childIdsByParent.has(node.parentId)) {
+                childIdsByParent.set(node.parentId, []);
+                childrenByParent.set(node.parentId, []);
+            }
+
+            childIdsByParent.get(node.parentId).push(node.id);
+            childrenByParent.get(node.parentId).push(node);
+        });
+
+        const hiddenNodeIds = new Set();
+        const visitedNodeIds = new Set();
+        const stack = [];
+
+        // Start with semantic roots. Children of a collapsed Compound/Parallel
+        // inherit hidden=true, but the container itself remains visible.
+        semanticNodes.forEach((node) => {
+            if (!node.parentId || !nodeById.has(node.parentId)) {
+                stack.push({ node, hiddenByAncestor: false });
+            }
+        });
+
+        const walk = () => {
+            while (stack.length > 0) {
+                const { node, hiddenByAncestor } = stack.pop();
+                if (!node || visitedNodeIds.has(node.id)) continue;
+                visitedNodeIds.add(node.id);
+
+                if (hiddenByAncestor) hiddenNodeIds.add(node.id);
+
+                const hidesChildren =
+                    hiddenByAncestor ||
+                    ((node.type === "compound" || node.type === "parallel") &&
+                        Boolean(node.data?.isCollapsed));
+
+                const children = childrenByParent.get(node.id) || [];
+                for (let index = children.length - 1; index >= 0; index -= 1) {
+                    stack.push({
+                        node: children[index],
+                        hiddenByAncestor: hidesChildren,
+                    });
+                }
+            }
+        };
+
+        walk();
+
+        // Malformed/imported graphs can contain orphaned parent cycles or
+        // disconnected islands. Process them as additional roots so the index
+        // remains total without risking an infinite traversal.
+        semanticNodes.forEach((node) => {
+            if (visitedNodeIds.has(node.id)) return;
+            stack.push({ node, hiddenByAncestor: false });
+            walk();
+        });
+
+        return {
+            nodeById,
+            parentByNodeId,
+            childIdsByParent,
+            childrenByParent,
+            hiddenNodeIds,
+        };
+    }, [semanticNodes]);
+
+    const nodeById = semanticHierarchy.nodeById;
+    const childIdsByParent = semanticHierarchy.childIdsByParent;
+    const semanticChildrenByParent = semanticHierarchy.childrenByParent;
+    const hiddenNodeIds = semanticHierarchy.hiddenNodeIds;
 
     const slotNodeIdSet = useMemo(
         () => new Set(semanticSlotNodes.map((node) => node.id)),
         [semanticSlotNodes]
     );
-
-    // Parent/child membership is semantic and does not change while a node is
-    // merely moving. Store child IDs from the semantic snapshot so the index is
-    // not rebuilt on every drag frame. Layout code can resolve those IDs to the
-    // current node objects only when it actually needs geometry.
-    const childIdsByParent = useMemo(() => {
-        const index = new Map();
-        semanticNodes.forEach((node) => {
-            if (!node.parentId) return;
-            if (!index.has(node.parentId)) {
-                index.set(node.parentId, []);
-            }
-            index.get(node.parentId).push(node.id);
-        });
-        return index;
-    }, [semanticNodes]);
-
-    const semanticChildrenByParent = useMemo(() => {
-        const index = new Map();
-        semanticNodes.forEach((node) => {
-            if (!node.parentId) return;
-            if (!index.has(node.parentId)) {
-                index.set(node.parentId, []);
-            }
-            index.get(node.parentId).push(node);
-        });
-        return index;
-    }, [semanticNodes]);
 
     // Hilfsfunktion: Bounding Box um alle ausgewählten Nodes berechnen
 
@@ -1033,31 +1863,18 @@ function AppContent() {
                             Number(node.measured?.height) ||
                             Number(node.style?.height) ||
                             (node.type === "compound" ? 220 : 295);
-                        const collapsedHeight =
-                            node.type === "compound"
-                                ? Math.max(
-                                    48,
-                                    28 +
-                                    (Array.isArray(node.data?.events)
-                                        ? node.data.events.length
-                                        : 0) *
-                                    22
-                                )
-                                : 44;
-
                         return {
                             ...node,
-                            // NodeResizer stores the current size on the node's
-                            // top-level width/height fields. Those values take
-                            // precedence over style.width/style.height in React
-                            // Flow, so collapse has to update both places.
-                            width: expandedWidth,
-                            height: collapsedHeight,
+                            // A collapsed Compound/Parallel uses the same
+                            // footprint as a regular state node. Preserve the
+                            // expanded dimensions separately for restoration.
+                            width: COLLAPSED_CONTAINER_WIDTH,
+                            height: COLLAPSED_CONTAINER_HEIGHT,
                             style: {
                                 ...(node.style || {}),
-                                width: expandedWidth,
-                                height: collapsedHeight,
-                                minHeight: collapsedHeight,
+                                width: COLLAPSED_CONTAINER_WIDTH,
+                                height: COLLAPSED_CONTAINER_HEIGHT,
+                                minHeight: COLLAPSED_CONTAINER_HEIGHT,
                             },
                             data: {
                                 ...(node.data || {}),
@@ -1128,32 +1945,198 @@ function AppContent() {
         [setNodes, updateNodeInternals]
     );
 
-    const hiddenNodeIds = useMemo(() => {
-        const hidden = new Set();
+    // Cache the transition handles used by each skill for its local validation
+    // badge. CustomNode used to call React Flow's useEdges(), which subscribed
+    // every skill node to the entire edge array. With a large state machine,
+    // showing/highlighting one transition could therefore wake up every skill.
+    // Keep the full transition graph loaded, but expose only this tiny derived
+    // per-skill dependency to the node renderer.
+    const outgoingTransitionHandlesCacheRef = useRef({
+        byNodeId: new Map(),
+        signaturesByNodeId: new Map(),
+    });
 
-        semanticNodes
-            .filter(
-                (node) =>
-                    (node.type === "compound" || node.type === "parallel") &&
-                    Boolean(node.data?.isCollapsed)
-            )
-            .forEach((container) => {
-                const queue = [
-                    ...(semanticChildrenByParent.get(container.id) || []),
-                ];
+    const outgoingTransitionHandlesByNodeId = useMemo(() => {
+        const handlesByNodeId = new Map();
 
-                while (queue.length > 0) {
-                    const child = queue.shift();
-                    if (!child || hidden.has(child.id)) continue;
-                    hidden.add(child.id);
-                    queue.push(
-                        ...(semanticChildrenByParent.get(child.id) || [])
-                    );
-                }
+        edges.forEach((edge) => {
+            if (!edge?.source) return;
+            const handle = edge.sourceHandle;
+            if (handle === undefined || handle === null) return;
+
+            if (!handlesByNodeId.has(edge.source)) {
+                handlesByNodeId.set(edge.source, new Set());
+            }
+            handlesByNodeId.get(edge.source).add(String(handle));
+        });
+
+        const previous = outgoingTransitionHandlesCacheRef.current;
+        const nextSignatures = new Map();
+        handlesByNodeId.forEach((handles, nodeId) => {
+            nextSignatures.set(nodeId, [...handles].sort().join("\u001f"));
+        });
+
+        // React Flow changes edge object identity for selection and other
+        // presentation-only updates. Those changes must not invalidate every
+        // skill node. Keep this derived map referentially stable unless the
+        // semantic set of source handles actually changed.
+        const topologyUnchanged =
+            previous.signaturesByNodeId.size === nextSignatures.size &&
+            [...nextSignatures].every(
+                ([nodeId, signature]) =>
+                    previous.signaturesByNodeId.get(nodeId) === signature
+            );
+
+        if (topologyUnchanged) return previous.byNodeId;
+
+        const result = new Map();
+        nextSignatures.forEach((signature, nodeId) => {
+            const previousEntry = previous.byNodeId.get(nodeId);
+            if (previousEntry?.signature === signature) {
+                result.set(nodeId, previousEntry);
+                return;
+            }
+
+            result.set(nodeId, {
+                handles: signature ? signature.split("\u001f") : [],
+                signature,
             });
+        });
 
-        return hidden;
-    }, [semanticNodes, semanticChildrenByParent]);
+        outgoingTransitionHandlesCacheRef.current = {
+            byNodeId: result,
+            signaturesByNodeId: nextSignatures,
+        };
+        return result;
+    }, [edges]);
+
+    // Expose the single semantic incoming transition to the target node so the
+    // visible entry handle can hand the drag off to React Flow's native edge
+    // reconnect anchor. With zero or multiple incoming transitions the entry
+    // handle remains a normal target only.
+    const reconnectableIncomingEdgeByNodeId = useMemo(() => {
+        const incoming = new Map();
+
+        edges.forEach((edge) => {
+            if (
+                edge.data?.boundaryInternalEdge ||
+                edge.data?.compoundInternalEdge ||
+                edge.data?.parallelInternalEdge ||
+                edge.data?.compoundInitialEdge ||
+                edge.data?.parallelEntryEdge
+            ) {
+                return;
+            }
+            if (!edge.target) return;
+
+            if (!incoming.has(edge.target)) incoming.set(edge.target, []);
+            incoming.get(edge.target).push(edge);
+        });
+
+        return new Map(
+            [...incoming.entries()]
+                .filter(([, incomingEdges]) => incomingEdges.length === 1)
+                .map(([nodeId, incomingEdges]) => [nodeId, incomingEdges[0].id])
+        );
+    }, [edges]);
+
+    // Track outgoing transitions whose event handle is not actually exposed by
+    // the source state. Imported SCXML can legitimately contain such edges: we
+    // keep them visible and report them in Problems, but the source skill/Sub-SM
+    // should also carry the small warning badge. Derive this from the same
+    // semantic event metadata used by the Problems validator.
+    const unexposedTransitionHandlesByNodeId = useMemo(() => {
+        const result = new Map();
+
+        nodes.forEach((node) => {
+            const outgoingHandles =
+                outgoingTransitionHandlesByNodeId.get(node.id)?.handles || [];
+            if (outgoingHandles.length === 0) return;
+
+            const exposedHandles = new Set(
+                (node.data?.events || [])
+                    .filter(
+                        (event) =>
+                            !event?.editorImportedSynthetic &&
+                            !event?.editorBoundarySynthetic
+                    )
+                    .map((event) => String(event?.id || "").trim())
+                    .filter(Boolean)
+            );
+            const baseStateName = String(
+                node.data?.fullSkillName || node.data?.label || ""
+            )
+                .split("#")[0]
+                .split(".")
+                .pop()
+                .toLowerCase();
+            const exposesImplicitFatal =
+                node.type === "custom" &&
+                !node.data?.isFinal &&
+                !node.data?.isBehaviorExit &&
+                baseStateName !== "end" &&
+                baseStateName !== "fatal";
+
+            if (exposesImplicitFatal) exposedHandles.add("fatal");
+
+            const unexposedHandles = outgoingHandles
+                .map((handle) => String(handle || "").trim())
+                .filter(
+                    (handle) =>
+                        handle &&
+                        handle !== "*" &&
+                        !exposedHandles.has(handle)
+                )
+                .sort();
+
+            if (unexposedHandles.length > 0) {
+                result.set(node.id, unexposedHandles);
+            }
+        });
+
+        return result;
+    }, [nodes, outgoingTransitionHandlesByNodeId]);
+
+    const collapsedParallelTransitionHandlesByNodeId = useMemo(() => {
+        const result = new Map();
+
+        edges.forEach((edge) => {
+            if (
+                edge.data?.boundaryInternalEdge ||
+                edge.data?.compoundInternalEdge ||
+                edge.data?.parallelInternalEdge ||
+                edge.data?.compoundInitialEdge ||
+                edge.data?.parallelEntryEdge
+            ) {
+                return;
+            }
+
+            const collapsedSource = getCollapsedTransitionSource(edge, nodeById);
+            if (!collapsedSource) return;
+            if (nodeById.get(collapsedSource.nodeId)?.type !== "parallel") return;
+
+            if (!result.has(collapsedSource.nodeId)) {
+                result.set(collapsedSource.nodeId, new Map());
+            }
+
+            const byHandle = result.get(collapsedSource.nodeId);
+            if (!byHandle.has(collapsedSource.sourceHandle)) {
+                byHandle.set(collapsedSource.sourceHandle, {
+                    id: collapsedSource.sourceHandle,
+                    name: collapsedSource.label,
+                    sourceNodeId: collapsedSource.logicalSourceId,
+                    transitionHandleId: collapsedSource.logicalHandle,
+                });
+            }
+        });
+
+        return new Map(
+            [...result.entries()].map(([nodeId, byHandle]) => [
+                nodeId,
+                [...byHandle.values()],
+            ])
+        );
+    }, [edges, nodeById]);
 
 
     // Keep the injected React Flow node objects stable whenever the source
@@ -1169,6 +2152,23 @@ function AppContent() {
 
         const result = nodes.map((n) => {
             const hidden = hiddenNodeIds.has(n.id);
+            const outgoingTransitionInfo =
+                outgoingTransitionHandlesByNodeId.get(n.id) || null;
+            const outgoingTransitionSignature =
+                outgoingTransitionInfo?.signature || "";
+            const unexposedTransitionHandles =
+                unexposedTransitionHandlesByNodeId.get(n.id) || [];
+            const unexposedTransitionSignature =
+                unexposedTransitionHandles.join("\u001f");
+            const collapsedTransitionHandles =
+                collapsedParallelTransitionHandlesByNodeId.get(n.id) || [];
+            const reconnectIncomingEdgeId =
+                (n.type === "custom" || n.type === "submachine")
+                    ? reconnectableIncomingEdgeByNodeId.get(n.id) || null
+                    : null;
+            const collapsedTransitionSignature = collapsedTransitionHandles
+                .map((event) => `${event.id}:${event.sourceNodeId}:${event.transitionHandleId}`)
+                .join("\u001f");
             let childTab = null;
 
             if (n.type === "submachine") {
@@ -1200,6 +2200,13 @@ function AppContent() {
                 cached &&
                 cached.sourceNode === n &&
                 cached.hidden === hidden &&
+                cached.outgoingTransitionSignature ===
+                    outgoingTransitionSignature &&
+                cached.unexposedTransitionSignature ===
+                    unexposedTransitionSignature &&
+                cached.collapsedTransitionSignature ===
+                    collapsedTransitionSignature &&
+                cached.reconnectIncomingEdgeId === reconnectIncomingEdgeId &&
                 cached.activeMode === activeMode &&
                 cached.slotConnectionDrag === slotConnectionDrag &&
                 cached.childGlobalDataModel === childGlobalDataModel &&
@@ -1222,6 +2229,11 @@ function AppContent() {
             const injectedData = {
                 ...n.data,
                 mode: activeMode,
+                outgoingTransitionHandles:
+                    outgoingTransitionInfo?.handles || [],
+                unexposedTransitionHandles,
+                collapsedTransitionHandles,
+                reconnectIncomingEdgeId,
                 onOpenStateActions: handleOpenStateActions,
                 onOpenParameter: handleOpenParameter,
                 onOpenSlot: handleOpenSlot,
@@ -1253,6 +2265,10 @@ function AppContent() {
             nextCache.set(n.id, {
                 sourceNode: n,
                 hidden,
+                outgoingTransitionSignature,
+                unexposedTransitionSignature,
+                collapsedTransitionSignature,
+                reconnectIncomingEdgeId,
                 activeMode,
                 slotConnectionDrag,
                 childGlobalDataModel,
@@ -1273,6 +2289,10 @@ function AppContent() {
         return result;
     }, [
         nodes,
+        outgoingTransitionHandlesByNodeId,
+        unexposedTransitionHandlesByNodeId,
+        collapsedParallelTransitionHandlesByNodeId,
+        reconnectableIncomingEdgeByNodeId,
         tabs,
         activeTabId,
         activeMode,
@@ -1383,9 +2403,18 @@ function AppContent() {
                     slotEdges: [],
                     manualSlots: [],
                     parentTabId: null,
+                    selectedNodeId: null,
+                    viewport: null,
                     inheritedGlobalDataModel: [],
                     globalDataModel: parsed.globalDataModel,
                 };
+
+                let currentViewport = null;
+                try {
+                    currentViewport = getViewport?.() || null;
+                } catch {
+                    // Keep the previous saved viewport if React Flow is not mounted.
+                }
 
                 setTabs((previousTabs) => [
                     ...previousTabs.map((tab) =>
@@ -1399,6 +2428,8 @@ function AppContent() {
                                 manualSlots,
                                 globalDataModel,
                                 inheritedGlobalDataModel,
+                                selectedNodeId: selectedNodeId || null,
+                                viewport: currentViewport || tab.viewport || null,
                             }
                             : tab
                     ),
@@ -1414,7 +2445,11 @@ function AppContent() {
                 setGlobalDataModel(parsed.globalDataModel);
                 setInheritedGlobalDataModel([]);
                 setSelectedNodeId(null);
-                checkSlotConnection(parsedNodes);
+                checkSlotConnection(
+                    parsedNodes,
+                    [],
+                    parsed.editorSlotNodes || []
+                );
 
                 setTimeout(
                     () =>
@@ -1447,6 +2482,8 @@ function AppContent() {
             manualSlots,
             globalDataModel,
             inheritedGlobalDataModel,
+            selectedNodeId,
+            getViewport,
             fitView,
             beginStateMachineLoad,
             endStateMachineLoad,
@@ -1512,14 +2549,10 @@ function AppContent() {
                 );
             }
 
-            // Prefer the real outward events emitted by Nop nodes. Keep the
-            // legacy fallback only when the source cannot be inspected or
-            // does not expose an outward Nop event.
-            const events = (
-                behaviorEvents.length > 0
-                    ? behaviorEvents
-                    : ["success", "failure"]
-            ).map((eventId) => ({ id: eventId }));
+            // A Sub-SM exposes exactly the events forwarded by Nop states
+            // inside the child machine. Do not invent generic success/failure
+            // tokens: an empty child interface should remain visibly empty.
+            const events = behaviorEvents.map((eventId) => ({ id: eventId }));
 
             return {
                 id: getNodeId(),
@@ -1556,10 +2589,20 @@ function AppContent() {
     const selectedNode = selectedRawNode;
 
     const selectedCloneSourceNode = useMemo(() => {
-        if (!selectedNode?.data?.isSkillClone) return null;
+        if (!isEditorCloneNode(selectedNode)) return null;
         return semanticNodes.find(
             (node) => node.id === selectedNode.data?.cloneOfNodeId
         ) || null;
+    }, [selectedNode, semanticNodes]);
+
+    const selectedNodeClones = useMemo(() => {
+        if (!selectedNode || isEditorCloneNode(selectedNode)) return [];
+
+        return semanticNodes.filter(
+            (node) =>
+                node.id !== selectedNode.id &&
+                node.data?.cloneOfNodeId === selectedNode.id
+        );
     }, [selectedNode, semanticNodes]);
 
     const selectedContainerOutgoingTransitions = useMemo(() => {
@@ -1609,6 +2652,70 @@ function AppContent() {
         const seen = new Set();
         const result = [];
 
+        const appendOutgoingTransition = ({
+            edgeId,
+            sourceId,
+            sourceHandle,
+            targetId,
+            rawEvent = "",
+            isFallback = false,
+        }) => {
+            if (
+                !sourceId ||
+                !targetId ||
+                !isInsideSelectedContainer(sourceId) ||
+                isInsideSelectedContainer(targetId)
+            ) {
+                return;
+            }
+
+            const normalizedHandle = String(sourceHandle || "success");
+            const semanticKey = `${sourceId}::${normalizedHandle}::${targetId}`;
+
+            // Every real edge is a real SCXML transition and must stay visible
+            // even when two transitions share the same event/target but differ
+            // by condition. The managed boundary-event pass below is only a
+            // fallback and must never add a second copy of an already-live edge.
+            if (isFallback && seen.has(semanticKey)) return;
+            seen.add(semanticKey);
+
+            const sourceNode = nodeById.get(sourceId);
+            const targetNode = nodeById.get(targetId);
+            // Container exits are semantic transitions from the actual skill
+            // inside the container. Mirror SCXML export naming here instead of
+            // prefixing the event with the Compound/Parallel container name.
+            const sourceSkillBase = String(
+                sourceNode?.data?.label ||
+                    sourceNode?.data?.fullSkillName ||
+                    sourceNode?.id ||
+                    ""
+            )
+                .split("#")[0]
+                .split(".")
+                .filter(Boolean)
+                .pop();
+            const rawEventName = String(rawEvent || normalizedHandle).trim();
+            const eventSuffix = getTransitionExitToken(
+                rawEventName || normalizedHandle,
+                sourceSkillBase
+            );
+            const semanticEventName = `${
+                sourceSkillBase || displayNameFor(sourceNode)
+            }.${eventSuffix || normalizedHandle}`;
+
+            result.push({
+                edgeId,
+                sourceNodeId: sourceId,
+                sourceDisplayName: displayNameFor(sourceNode),
+                eventId: normalizedHandle,
+                eventDisplayName: semanticEventName,
+                targetNodeId: targetId,
+                targetDisplayName: displayNameFor(targetNode),
+            });
+        };
+
+        // Prefer the actual transition edges. These preserve duplicate /
+        // conditional transitions and are the canonical live graph state.
         edges.forEach((edge) => {
             if (
                 edge.data?.boundaryInternalEdge ||
@@ -1621,50 +2728,159 @@ function AppContent() {
                 return;
             }
 
-            const sourceId =
-                edge.data?.boundaryOriginalSource ||
-                edge.data?.compoundOriginalSource ||
-                edge.data?.parallelOriginalSource ||
-                edge.source;
-            const sourceHandle = String(
-                edge.data?.boundaryOriginalSourceHandle ||
-                edge.data?.compoundOriginalSourceHandle ||
-                edge.data?.parallelOriginalSourceHandle ||
-                edge.sourceHandle ||
-                edge.label ||
-                "success"
-            );
-            const targetId =
-                edge.data?.compoundOriginalTarget ||
-                edge.data?.parallelOriginalTarget ||
-                edge.target;
-
-            if (
-                !isInsideSelectedContainer(sourceId) ||
-                isInsideSelectedContainer(targetId)
-            ) {
-                return;
-            }
-
-            const key = `${sourceId}::${sourceHandle}::${targetId}`;
-            if (seen.has(key)) return;
-            seen.add(key);
-
-            const sourceNode = nodeById.get(sourceId);
-            const targetNode = nodeById.get(targetId);
-            result.push({
+            appendOutgoingTransition({
                 edgeId: edge.id,
-                sourceNodeId: sourceId,
-                sourceDisplayName: displayNameFor(sourceNode),
-                eventId: sourceHandle,
-                eventDisplayName: `${displayNameFor(sourceNode)}.${sourceHandle}`,
-                targetNodeId: targetId,
-                targetDisplayName: displayNameFor(targetNode),
+                sourceId:
+                    edge.data?.boundaryOriginalSource ||
+                    edge.data?.compoundOriginalSource ||
+                    edge.data?.parallelOriginalSource ||
+                    edge.source,
+                sourceHandle:
+                    edge.data?.boundaryOriginalSourceHandle ||
+                    edge.data?.compoundOriginalSourceHandle ||
+                    edge.data?.parallelOriginalSourceHandle ||
+                    edge.sourceHandle ||
+                    edge.label ||
+                    "success",
+                targetId:
+                    edge.data?.boundaryOriginalTarget ||
+                    edge.data?.compoundOriginalTarget ||
+                    edge.data?.parallelOriginalTarget ||
+                    edge.target,
+                rawEvent: edge.data?.boundaryImportedRawEvent || "",
             });
         });
 
+        // Managed boundary events are regenerated from the same transitions by
+        // rebuildBoundaryTransitions(). Use them as a fallback as well. This
+        // makes the Compound/Parallel Exit Tokens overview robust for imported
+        // graphs and legacy edge shapes where the visual edge itself may not
+        // carry all boundary metadata yet.
+        const boundaryAnchors =
+            selectedNode.type === "compound"
+                ? [selectedNode]
+                : semanticNodes.filter(
+                    (node) =>
+                        node.type === "parallelLane" &&
+                        isInsideSelectedContainer(node.id)
+                );
+
+        boundaryAnchors.forEach((anchor) => {
+            (anchor.data?.events || []).forEach((event, index) => {
+                if (!(event?.sourceNodeId && event?.transitionHandleId && event?.target)) {
+                    return;
+                }
+
+                // Only trust managed metadata while its boundary segment still
+                // exists in the live graph. This avoids resurrecting a stale
+                // border event in the details panel after its transition was
+                // deleted.
+                const boundaryEdge = edges.find(
+                    (edge) =>
+                        edge.source === anchor.id &&
+                        String(edge.sourceHandle || "") ===
+                            String(event.id || "")
+                );
+                if (!boundaryEdge) return;
+
+                appendOutgoingTransition({
+                    edgeId:
+                        boundaryEdge.id ||
+                        `boundary-${anchor.id}-${event.id || index}`,
+                    sourceId: event.sourceNodeId,
+                    sourceHandle: event.transitionHandleId,
+                    targetId: event.target,
+                    rawEvent: event.rawEvent || event.name || "",
+                    isFallback: true,
+                });
+            });
+        });
+
+        const storedOrder = Array.isArray(selectedNode.data?.containerTransitionOrder)
+            ? selectedNode.data.containerTransitionOrder
+            : [];
+        if (storedOrder.length > 0) {
+            const orderRank = new Map(
+                storedOrder.map((edgeId, index) => [String(edgeId), index])
+            );
+            result.sort((a, b) => {
+                const aRank = orderRank.has(String(a.edgeId))
+                    ? orderRank.get(String(a.edgeId))
+                    : Number.MAX_SAFE_INTEGER;
+                const bRank = orderRank.has(String(b.edgeId))
+                    ? orderRank.get(String(b.edgeId))
+                    : Number.MAX_SAFE_INTEGER;
+                return aRank - bRank;
+            });
+        }
+
         return result;
     }, [selectedNode, semanticNodes, edges]);
+
+    const handleMoveContainerTransition = useCallback((edgeId, direction) => {
+        if (
+            !selectedNode ||
+            (selectedNode.type !== "compound" && selectedNode.type !== "parallel") ||
+            !edgeId
+        ) {
+            return;
+        }
+
+        const orderedIds = selectedContainerOutgoingTransitions
+            .map((transition) => transition.edgeId)
+            .filter(Boolean);
+        const currentIndex = orderedIds.indexOf(edgeId);
+        if (currentIndex < 0) return;
+
+        const delta = direction === "up" ? -1 : direction === "down" ? 1 : 0;
+        const nextIndex = currentIndex + delta;
+        if (delta === 0 || nextIndex < 0 || nextIndex >= orderedIds.length) return;
+
+        const nextOrder = [...orderedIds];
+        [nextOrder[currentIndex], nextOrder[nextIndex]] = [
+            nextOrder[nextIndex],
+            nextOrder[currentIndex],
+        ];
+
+        // Keep the explicit UI order on the container. The SCXML exporter uses
+        // this exact order for the container-level <transition> elements, so a
+        // specific event such as Talk.error can be placed before Talk.*.
+        setNodes((currentNodes) =>
+            currentNodes.map((node) =>
+                node.id === selectedNode.id
+                    ? {
+                        ...node,
+                        data: {
+                            ...(node.data || {}),
+                            containerTransitionOrder: nextOrder,
+                        },
+                    }
+                    : node
+            )
+        );
+
+        // Reorder the matching semantic edges as well. This keeps the live
+        // graph/boundary rebuild order aligned with the order shown in the
+        // Exit Tokens panel instead of only changing export-time presentation.
+        setEdges((currentEdges) => {
+            const byId = new Map(currentEdges.map((edge) => [edge.id, edge]));
+            const orderedEdges = nextOrder.map((id) => byId.get(id)).filter(Boolean);
+            let orderedIndex = 0;
+            const orderedSet = new Set(nextOrder);
+
+            return currentEdges.map((edge) => {
+                if (!orderedSet.has(edge.id)) return edge;
+                const replacement = orderedEdges[orderedIndex];
+                orderedIndex += 1;
+                return replacement || edge;
+            });
+        });
+    }, [
+        selectedNode,
+        selectedContainerOutgoingTransitions,
+        setNodes,
+        setEdges,
+    ]);
 
     const handleNavigateCloneSource = useCallback((nodeId) => {
         if (!nodeId) return;
@@ -1848,6 +3064,189 @@ function AppContent() {
                 setActiveMode(problem.mode);
             }
 
+            const liveNodes = getNodes();
+            const liveNodeById = new Map(
+                liveNodes.map((node) => [node.id, node])
+            );
+
+            const problemEdge = problem.edgeId
+                ? edges.find((edge) => edge.id === problem.edgeId)
+                : null;
+            const transitionSourceId =
+                problem.category === "Transitions" && problemEdge
+                    ? problemEdge.data?.boundaryOriginalSource ||
+                      problemEdge.data?.compoundOriginalSource ||
+                      problemEdge.data?.parallelOriginalSource ||
+                      problemEdge.source
+                    : null;
+            const selectedProblemNodeId =
+                transitionSourceId && liveNodeById.has(transitionSourceId)
+                    ? transitionSourceId
+                    : problem.nodeId && liveNodeById.has(problem.nodeId)
+                        ? problem.nodeId
+                        : null;
+
+            const requestedFocusIds = problem.focusNodeIds?.length
+                ? [...problem.focusNodeIds]
+                : selectedProblemNodeId
+                    ? [selectedProblemNodeId]
+                    : [];
+
+            if (
+                transitionSourceId &&
+                liveNodeById.has(transitionSourceId) &&
+                !requestedFocusIds.includes(transitionSourceId)
+            ) {
+                requestedFocusIds.unshift(transitionSourceId);
+            }
+
+            const focusIds = requestedFocusIds.filter((id) =>
+                liveNodeById.has(id)
+            );
+
+            // Problems can point at nodes hidden inside one or more collapsed
+            // Compound/Parallel states. Reveal the complete ancestor chain
+            // before focusing; otherwise React Flow may fit the viewport to a
+            // hidden child's stale/internal bounds and jump somewhere else.
+            const containerAncestors = new Set();
+            focusIds.forEach((focusId) => {
+                let parentId = liveNodeById.get(focusId)?.parentId;
+                const visited = new Set();
+
+                while (parentId && !visited.has(parentId)) {
+                    visited.add(parentId);
+                    const parent = liveNodeById.get(parentId);
+                    if (!parent) break;
+
+                    if (
+                        parent.type === "compound" ||
+                        parent.type === "parallel"
+                    ) {
+                        containerAncestors.add(parent.id);
+                    }
+
+                    parentId = parent.parentId;
+                }
+            });
+
+            // Expand outside-in so nested children become measurable in the
+            // same order they become visible. Parallel lane wrapper nodes are
+            // deliberately skipped; their Parallel parent is what collapses.
+            const getAncestorDepth = (nodeId) => {
+                let depth = 0;
+                let parentId = liveNodeById.get(nodeId)?.parentId;
+                const visited = new Set();
+
+                while (parentId && !visited.has(parentId)) {
+                    visited.add(parentId);
+                    depth += 1;
+                    parentId = liveNodeById.get(parentId)?.parentId;
+                }
+
+                return depth;
+            };
+
+            const containersToExpand = [...containerAncestors].sort(
+                (leftId, rightId) =>
+                    getAncestorDepth(leftId) - getAncestorDepth(rightId)
+            );
+
+            if (containersToExpand.length > 0) {
+                const containerIds = new Set(containersToExpand);
+
+                // Expand all collapsed ancestors explicitly in one state update.
+                // Using the generic toggle handler here only revealed descendants
+                // reliably; nested containers could keep their compact React Flow
+                // dimensions and therefore never render as genuinely opened frames.
+                // Restoring the saved expanded dimensions here makes the actual
+                // Compound/Parallel node open before we navigate to its child.
+                setNodes((currentNodes) =>
+                    currentNodes.map((node) => {
+                        if (!containerIds.has(node.id)) return node;
+                        if (
+                            node.type !== "compound" &&
+                            node.type !== "parallel"
+                        ) {
+                            return node;
+                        }
+
+                        const savedSize =
+                            node.data?.expandedContainerSize || {};
+                        const fallbackWidth =
+                            node.type === "compound" ? 320 : 420;
+                        const fallbackHeight =
+                            node.type === "compound" ? 220 : 295;
+                        const currentWidth =
+                            Number(node.width) ||
+                            Number(node.measured?.width) ||
+                            Number(node.style?.width) ||
+                            0;
+                        const currentHeight =
+                            Number(node.height) ||
+                            Number(node.measured?.height) ||
+                            Number(node.style?.height) ||
+                            0;
+                        const hasCompactFootprint =
+                            currentWidth <= COLLAPSED_CONTAINER_WIDTH + 1 &&
+                            currentHeight <= COLLAPSED_CONTAINER_HEIGHT + 1;
+                        const needsPhysicalExpansion =
+                            Boolean(node.data?.isCollapsed) ||
+                            hasCompactFootprint;
+
+                        if (!needsPhysicalExpansion) {
+                            return node;
+                        }
+
+                        const restoredWidth = Math.max(
+                            Number(savedSize.width) || 0,
+                            fallbackWidth
+                        );
+                        const restoredHeight = Math.max(
+                            Number(savedSize.height) || 0,
+                            fallbackHeight
+                        );
+                        const restoredStyle = {
+                            ...(node.style || {}),
+                            width: restoredWidth,
+                            height: restoredHeight,
+                        };
+
+                        if (savedSize.minHeight == null) {
+                            delete restoredStyle.minHeight;
+                        } else {
+                            restoredStyle.minHeight = savedSize.minHeight;
+                        }
+
+                        return {
+                            ...node,
+                            width: restoredWidth,
+                            height: restoredHeight,
+                            style: restoredStyle,
+                            data: {
+                                ...(node.data || {}),
+                                isCollapsed: false,
+                            },
+                        };
+                    })
+                );
+
+                // React Flow caches node measurements independently of our node
+                // objects. Re-measure every opened ancestor after the state update
+                // so the expanded Compound/Parallel frame is actually painted and
+                // its nested children receive their correct absolute positions.
+                requestAnimationFrame(() => {
+                    containersToExpand.forEach((containerId) =>
+                        updateNodeInternals(containerId)
+                    );
+                });
+            }
+
+            if (problem.category === "Transitions" && problem.edgeId) {
+                // A transition problem should always reveal the transition it
+                // refers to, even when the user previously hid transition edges.
+                setShowTransitionEdges(true);
+            }
+
             setEdges((currentEdges) =>
                 currentEdges.map((edge) => ({
                     ...edge,
@@ -1858,14 +3257,17 @@ function AppContent() {
                 }))
             );
 
-            if (problem.nodeId) {
+            if (selectedProblemNodeId) {
+                // For transition problems select the semantic source skill as
+                // well as the edge. Boundary-routed edges can visually start at
+                // a container, but the actual problem belongs to the nested state.
                 setNodes((currentNodes) =>
                     currentNodes.map((node) => ({
                         ...node,
-                        selected: node.id === problem.nodeId,
+                        selected: node.id === selectedProblemNodeId,
                     }))
                 );
-                setSelectedNodeId(problem.nodeId);
+                setSelectedNodeId(selectedProblemNodeId);
                 setActiveTab(problem.detailTab || "allgemein");
                 setRightPanelTab("details");
             } else if (problem.category === "Datamodel") {
@@ -1873,28 +3275,66 @@ function AppContent() {
                 setRightPanelTab("datamodel");
             }
 
-            const focusIds = (
-                problem.focusNodeIds?.length
-                    ? problem.focusNodeIds
-                    : problem.nodeId
-                        ? [problem.nodeId]
-                        : []
-            ).filter((id) =>
-                nodes.some((node) => node.id === id)
-            );
-
             if (focusIds.length > 0) {
-                window.setTimeout(() => {
-                    fitView({
-                        nodes: focusIds.map((id) => ({ id })),
-                        padding: 0.55,
-                        maxZoom: 1.25,
-                        duration: 300,
+                const primaryFocusId =
+                    selectedProblemNodeId ||
+                    (focusIds.length === 1 ? focusIds[0] : null);
+
+                // Give React Flow two frames to apply the expanded container
+                // dimensions and remeasure nested nodes before navigating.
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        const currentNodes = getNodes();
+
+                        if (primaryFocusId) {
+                            const focusNode = currentNodes.find(
+                                (node) => node.id === primaryFocusId
+                            );
+
+                            if (focusNode) {
+                                const position = getAbsoluteNodePosition(
+                                    focusNode,
+                                    currentNodes
+                                );
+                                const width =
+                                    Number(focusNode.measured?.width) ||
+                                    Number(focusNode.width) ||
+                                    Number(focusNode.style?.width) ||
+                                    220;
+                                const height =
+                                    Number(focusNode.measured?.height) ||
+                                    Number(focusNode.height) ||
+                                    Number(focusNode.style?.height) ||
+                                    90;
+
+                                setCenter(
+                                    position.x + width / 2,
+                                    position.y + height / 2,
+                                    { zoom: 1, duration: 300 }
+                                );
+                                return;
+                            }
+                        }
+
+                        fitView({
+                            nodes: focusIds.map((id) => ({ id })),
+                            padding: 0.55,
+                            maxZoom: 1.25,
+                            duration: 300,
+                        });
                     });
-                }, 0);
+                });
             }
         },
-        [nodes, setNodes, setEdges, fitView]
+        [
+            edges,
+            fitView,
+            getNodes,
+            setCenter,
+            setEdges,
+            setNodes,
+            updateNodeInternals,
+        ]
     );
 
     const {
@@ -1930,11 +3370,39 @@ function AppContent() {
                         : edge
                 )
             );
+
+            setControlPointInsertRequest((current) =>
+                current?.edgeId === edgeId ? null : current
+            );
         },
         [setEdges, setSlotEdges]
     );
 
-    const { visibleNodes, visibleEdges, smartRoutingNodes } = useEditorDisplay({
+    const handleControlPointContextMenu = useCallback(
+        (event, edgeId, pointId, edgeKind = "transition") => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            setContextMenu({
+                kind: "control-point",
+                x: event.clientX,
+                y: event.clientY,
+                edgeId,
+                pointId,
+                edgeKind,
+                title: "Control point",
+            });
+        },
+        []
+    );
+
+    const {
+        visibleNodes,
+        visibleEdges,
+        smartRoutingNodes,
+        edgeFocusMode,
+        nodeFocusMode,
+    } = useEditorDisplay({
         hoveredEditorNodeId,
         hoveredEditorEdgeId,
         selectedNodes,
@@ -1944,15 +3412,20 @@ function AppContent() {
         slotNodeIdSet,
         slotEdges,
         updatePersistentEdgeControlPoints,
+        controlPointInsertRequest,
+        onControlPointContextMenu: handleControlPointContextMenu,
         hoveredSlotAccessNodeId,
         semanticNodes,
         semanticChildrenByParent,
         nodes,
         childIdsByParent,
         activeMode,
+        showTransitionEdges,
+        showSlotEdges,
         injectedNodes,
         injectedSlotNodes,
         isDraggingNode,
+        draggingNodeId,
         hiddenNodeIds,
         parallelDropTargetId,
         compoundDropTargetId,
@@ -1961,7 +3434,7 @@ function AppContent() {
     const createNameforSkill = (fullSkillName) => {
         const label = fullSkillName.split(".").pop();
         const count = nodes.filter(
-            (n) => !n.data?.isSkillClone && n.data?.label === label
+            (n) => !isEditorCloneNode(n) && n.data?.label === label
         ).length;
         return `${fullSkillName}#${count + 1}`;
     };
@@ -2178,6 +3651,48 @@ function AppContent() {
                 }
             }
             if (slotChanges.length > 0) {
+                const removedSlotCloneIds = new Map();
+                slotChanges
+                    .filter((change) => change.type === "remove")
+                    .forEach((change) => {
+                        const removedNode = slotNodes.find(
+                            (node) => node.id === change.id
+                        );
+                        if (
+                            removedNode?.data?.isSlotClone &&
+                            removedNode.data?.cloneOfNodeId
+                        ) {
+                            removedSlotCloneIds.set(
+                                removedNode.id,
+                                removedNode.data.cloneOfNodeId
+                            );
+                        }
+                    });
+
+                if (removedSlotCloneIds.size > 0) {
+                    setSlotEdges((currentEdges) =>
+                        currentEdges.map((edge) => {
+                            const canonicalSlotNodeId =
+                                removedSlotCloneIds.get(edge.target);
+                            if (!canonicalSlotNodeId) return edge;
+
+                            remappedSlotCloneEdgeIdsRef.current.add(edge.id);
+
+                            return {
+                                ...edge,
+                                id: `${edge.id}-clone-remap-${crypto.randomUUID()}`,
+                                target: canonicalSlotNodeId,
+                                data: {
+                                    ...(edge.data || {}),
+                                    slotNodeId: canonicalSlotNodeId,
+                                    canonicalSlotNodeId,
+                                    controlPoints: [],
+                                },
+                            };
+                        })
+                    );
+                }
+
                 onSlotNodesChange(slotChanges);
             }
         },
@@ -2188,24 +3703,207 @@ function AppContent() {
             onSlotNodesChange,
             setEdges,
             setNodes,
+            slotNodes,
+            setSlotEdges,
         ]
     );
 
     const handleVisibleEdgesChange = useCallback(
         (changes) => {
+            const ignoredRemapIds = remappedSlotCloneEdgeIdsRef.current;
+            const effectiveChanges = changes.filter((change) => {
+                const shouldIgnore =
+                    change.type === "remove" && ignoredRemapIds.has(change.id);
+                if (shouldIgnore) {
+                    ignoredRemapIds.delete(change.id);
+                }
+                return !shouldIgnore;
+            });
+
             const slotEdgeIds = new Set(
                 (slotEdges || []).map((edge) => edge.id)
             );
 
-            const slotChanges = changes.filter((change) =>
+            const slotChanges = effectiveChanges.filter((change) =>
                 slotEdgeIds.has(change.id)
             );
-            const transitionChanges = changes.filter(
+            const transitionChanges = effectiveChanges.filter(
                 (change) => !slotEdgeIds.has(change.id)
             );
 
             if (transitionChanges.length > 0) {
-                onEdgesChange(transitionChanges);
+                const removesTransition = transitionChanges.some(
+                    (change) => change.type === "remove"
+                );
+
+                if (removesTransition) {
+                    // Removing the visible external part of a boundary
+                    // transition must also remove its editor-only helper edge
+                    // and Compound/Parallel border event. Otherwise stale
+                    // exits such as Skill.* remain visible even though no
+                    // semantic transition exists anymore.
+                    const changedEdges = applyEdgeChanges(
+                        transitionChanges,
+                        edges
+                    );
+
+                    const getLogicalSourceEntries = (edge) => {
+                        const storedEntries = Array.isArray(
+                            edge?.data?.boundaryOriginalSources
+                        )
+                            ? edge.data.boundaryOriginalSources
+                                  .map((entry) => ({
+                                      sourceId: String(entry?.sourceId || ""),
+                                      sourceHandle: String(
+                                          entry?.sourceHandle || ""
+                                      ),
+                                  }))
+                                  .filter(
+                                      (entry) =>
+                                          entry.sourceId && entry.sourceHandle
+                                  )
+                            : [];
+                        if (storedEntries.length > 0) return storedEntries;
+
+                        return [
+                            {
+                                sourceId:
+                                    edge?.data?.boundaryOriginalSource ||
+                                    edge?.data?.compoundOriginalSource ||
+                                    edge?.data?.parallelOriginalSource ||
+                                    edge?.source ||
+                                    "",
+                                sourceHandle: String(
+                                    edge?.data?.boundaryOriginalSourceHandle ||
+                                    edge?.data?.compoundOriginalSourceHandle ||
+                                    edge?.data?.parallelOriginalSourceHandle ||
+                                    edge?.sourceHandle ||
+                                    edge?.label ||
+                                    "success"
+                                ),
+                            },
+                        ];
+                    };
+
+                    const isSemanticTransitionEdge = (edge) =>
+                        !edge?.data?.boundaryInternalEdge &&
+                        !edge?.data?.compoundInternalEdge &&
+                        !edge?.data?.parallelInternalEdge &&
+                        !String(edge?.id || "").startsWith(
+                            "edge-internal-boundary-"
+                        );
+
+                    const removedTransientEventsByNode = new Map();
+                    transitionChanges
+                        .filter((change) => change.type === "remove")
+                        .forEach((change) => {
+                            const removedEdge = edges.find(
+                                (edge) => edge.id === change.id
+                            );
+                            if (!removedEdge) return;
+
+                            getLogicalSourceEntries(removedEdge).forEach(
+                                ({ sourceId, sourceHandle }) => {
+                                    if (!sourceId || !sourceHandle) return;
+
+                                    const sourceNode = nodes.find(
+                                        (node) => node.id === sourceId
+                                    );
+                                    const matchingEvents = (
+                                        sourceNode?.data?.events || []
+                                    ).filter(
+                                        (event) =>
+                                            String(event?.id || "") ===
+                                            sourceHandle
+                                    );
+                                    const isImportedOnlyHandle =
+                                        matchingEvents.length > 0 &&
+                                        matchingEvents.every(
+                                            (event) =>
+                                                event?.editorImportedSynthetic ||
+                                                event?.editorBoundarySynthetic
+                                        );
+
+                                    if (sourceHandle === "*") return;
+
+                                    if (
+                                        !isWildcardTransitionEvent(sourceHandle) &&
+                                        !isImportedOnlyHandle
+                                    ) {
+                                        return;
+                                    }
+
+                                    const stillUsed = changedEdges.some(
+                                        (edge) =>
+                                            isSemanticTransitionEdge(edge) &&
+                                            getLogicalSourceEntries(edge).some(
+                                                (entry) =>
+                                                    entry.sourceId === sourceId &&
+                                                    entry.sourceHandle ===
+                                                        sourceHandle
+                                            )
+                                    );
+                                    if (stillUsed) return;
+
+                                    if (
+                                        !removedTransientEventsByNode.has(
+                                            sourceId
+                                        )
+                                    ) {
+                                        removedTransientEventsByNode.set(
+                                            sourceId,
+                                            new Set()
+                                        );
+                                    }
+                                    removedTransientEventsByNode
+                                        .get(sourceId)
+                                        .add(sourceHandle);
+                                }
+                            );
+                        });
+
+                    const cleanedNodes =
+                        removedTransientEventsByNode.size === 0
+                            ? nodes
+                            : nodes.map((node) => {
+                                const removedHandles =
+                                    removedTransientEventsByNode.get(node.id);
+                                if (!removedHandles) return node;
+                                return {
+                                    ...node,
+                                    data: {
+                                        ...node.data,
+                                        events: (node.data?.events || []).filter(
+                                            (event) =>
+                                                !removedHandles.has(
+                                                    String(event?.id || "")
+                                                )
+                                        ),
+                                    },
+                                };
+                            });
+
+                    const normalized = rebuildBoundaryTransitionsIncremental(
+                        cleanedNodes,
+                        changedEdges,
+                        {
+                            previousEdges: edges,
+                            changedEdgeIds: transitionChanges
+                                .filter((change) => change.type === "remove")
+                                .map((change) => change.id),
+                        }
+                    );
+
+                    setNodes(normalized.nodes);
+                    setEdges(normalized.edges);
+                    (normalized.affectedNodeIds || []).forEach((nodeId) => {
+                        requestAnimationFrame(() =>
+                            updateNodeInternals(nodeId)
+                        );
+                    });
+                } else {
+                    onEdgesChange(transitionChanges);
+                }
             }
 
             if (slotChanges.length === 0) {
@@ -2281,9 +3979,13 @@ function AppContent() {
         },
         [
             slotEdges,
+            edges,
+            nodes,
             onEdgesChange,
             onSlotEdgesChange,
             setNodes,
+            setEdges,
+            updateNodeInternals,
         ]
     );
 
@@ -2365,10 +4067,42 @@ function AppContent() {
             };
         });
 
+        const oldCanonicalSlotNodeId = `slot-${oldPath}`;
+        const newCanonicalSlotNodeId = `slot-${newPath}`;
+        const updatedSlotNodes = slotNodes.map((slotNode) => {
+            const isCanonical = slotNode.id === oldCanonicalSlotNodeId;
+            const isClone =
+                slotNode.data?.isSlotClone &&
+                slotNode.data?.cloneOfNodeId === oldCanonicalSlotNodeId;
+
+            if (!isCanonical && !isClone) return slotNode;
+
+            return {
+                ...slotNode,
+                ...(isCanonical ? { id: newCanonicalSlotNodeId } : {}),
+                data: {
+                    ...(slotNode.data || {}),
+                    path: formattedPath,
+                    label: formattedPath,
+                    ...(isClone
+                        ? { cloneOfNodeId: newCanonicalSlotNodeId }
+                        : {}),
+                },
+            };
+        });
+
         setNodes(updatedNodes);
         setManualSlots(updatedManualSlots);
-        setSelectedNodeId(`slot-${newPath}`);
-        checkSlotConnection(updatedNodes, updatedManualSlots);
+        setSelectedNodeId(
+            selectedRawNode.data?.isSlotClone
+                ? selectedRawNode.id
+                : newCanonicalSlotNodeId
+        );
+        checkSlotConnection(
+            updatedNodes,
+            updatedManualSlots,
+            updatedSlotNodes
+        );
     };
 
     const handleUpdateSelectedSlotInherited = (shouldInherit) => {
@@ -2452,37 +4186,109 @@ function AppContent() {
         };
 
         const captureSelection = () => {
-            const selectedIds = graphSelectionRef.current;
+            // Merge React Flow's selection callback with the controlled node
+            // flags. This makes a just-clicked slot copyable even if the
+            // selection callback has not propagated yet.
+            const selectedIds = new Set(graphSelectionRef.current);
+            nodes.forEach((node) => {
+                if (node.selected) selectedIds.add(node.id);
+            });
+            slotNodes.forEach((node) => {
+                if (node.selected) selectedIds.add(node.id);
+            });
+
             let nodesToCopy = nodes.filter(
                 (node) =>
                     selectedIds.has(node.id) &&
                     node.type !== "parallelLane"
             );
+            let slotNodesToCopy = slotNodes.filter((node) =>
+                selectedIds.has(node.id)
+            );
 
-            // React Flow's onSelectionChange is the authoritative source for
-            // multi-selection. Only fall back to the explicitly focused node
-            // when there is no usable Flow selection (or a single stale node
-            // from the previous click). This keeps the original stale-click
-            // fix without collapsing a genuine Ctrl/Meta selection to one node.
-            if (selectedNodeId && nodesToCopy.length <= 1) {
-                const focusedNode = nodes.find(
-                    (node) =>
-                        node.id === selectedNodeId &&
-                        node.type !== "parallelLane"
-                );
-                const focusedNodeIsSelected = nodesToCopy.some(
-                    (node) => node.id === selectedNodeId
-                );
+            // A normal click also records the focused node in selectedNodeId.
+            // Use it as the final fallback so slot copying does not depend on
+            // React Flow's selection-event ordering.
+            if (
+                selectedNodeId &&
+                nodesToCopy.length + slotNodesToCopy.length <= 1
+            ) {
+                const focusedNode =
+                    nodes.find(
+                        (node) =>
+                            node.id === selectedNodeId &&
+                            node.type !== "parallelLane"
+                    ) ||
+                    slotNodes.find((node) => node.id === selectedNodeId);
+                const focusedNodeIsSelected =
+                    nodesToCopy.some((node) => node.id === selectedNodeId) ||
+                    slotNodesToCopy.some(
+                        (node) => node.id === selectedNodeId
+                    );
 
                 if (focusedNode && !focusedNodeIsSelected) {
-                    nodesToCopy = [focusedNode];
+                    if (focusedNode.type === "slot") {
+                        nodesToCopy = [];
+                        slotNodesToCopy = [focusedNode];
+                    } else {
+                        nodesToCopy = [focusedNode];
+                        slotNodesToCopy = [];
+                    }
                 }
             }
 
-            if (nodesToCopy.length === 0) return false;
+            if (nodesToCopy.length === 0 && slotNodesToCopy.length === 0) {
+                return false;
+            }
 
+            // Remember which single node the user explicitly copied before
+            // recursively adding container descendants. This lets a copied
+            // compound/parallel still be pasted as one editor reference even
+            // though its clipboard payload contains the complete subtree.
+            const explicitReferenceSourceNodeId =
+                nodesToCopy.length === 1 && slotNodesToCopy.length === 0
+                    ? nodesToCopy[0].id
+                    : null;
+
+            // Copying a container must copy its complete subtree, including
+            // structural parallel lanes. Those lanes are not directly
+            // selectable, but they are required to preserve the hierarchy
+            // and relative positions of the states inside a parallel node.
             const copiedNodeIds = new Set(
                 nodesToCopy.map((node) => node.id)
+            );
+            const childrenByParent = new Map();
+            nodes.forEach((node) => {
+                if (!node.parentId) return;
+                if (!childrenByParent.has(node.parentId)) {
+                    childrenByParent.set(node.parentId, []);
+                }
+                childrenByParent.get(node.parentId).push(node);
+            });
+
+            const descendantQueue = nodesToCopy
+                .filter(
+                    (node) =>
+                        node.type === "compound" ||
+                        node.type === "parallel" ||
+                        node.type === "parallelLane"
+                )
+                .map((node) => node.id);
+
+            while (descendantQueue.length > 0) {
+                const parentId = descendantQueue.shift();
+                (childrenByParent.get(parentId) || []).forEach((child) => {
+                    if (copiedNodeIds.has(child.id)) return;
+                    copiedNodeIds.add(child.id);
+                    descendantQueue.push(child.id);
+                });
+            }
+
+            // Re-read from the canonical node array to keep React Flow's
+            // parent-before-child ordering and to include non-selectable
+            // parallel lane nodes in the clipboard.
+            nodesToCopy = nodes.filter((node) =>
+                copiedNodeIds.has(node.id)
             );
 
             const copiedEdges = edges.filter(
@@ -2491,71 +4297,286 @@ function AppContent() {
                     copiedNodeIds.has(edge.target)
             );
 
-            graphClipboardRef.current = {
+            const clipboard = {
+                explicitReferenceSourceNodeId,
                 nodes: nodesToCopy.map((node) =>
-                    cloneGraphValue({
+                    cloneClipboardValue({
                         ...node,
                         selected: false,
                     })
                 ),
+                slotNodes: slotNodesToCopy.map((node) => {
+                    const canonicalSlotNodeId =
+                        node.data?.cloneOfNodeId || node.id;
+                    const canonicalSlotNode =
+                        slotNodes.find(
+                            (candidate) =>
+                                candidate.id === canonicalSlotNodeId &&
+                                !candidate.data?.isSlotClone
+                        ) || node;
+
+                    return cloneClipboardValue({
+                        ...node,
+                        selected: false,
+                        data: {
+                            ...(node.data || {}),
+                            clipboardCanonicalSlotNodeId:
+                                canonicalSlotNode.id ||
+                                canonicalSlotNodeId,
+                            clipboardCanonicalSlotPath:
+                                canonicalSlotNode.data?.path ||
+                                node.data?.path ||
+                                "",
+                        },
+                    });
+                }),
                 edges: copiedEdges.map((edge) =>
-                    cloneGraphValue({
+                    cloneClipboardValue({
                         ...edge,
                         selected: false,
                     })
                 ),
             };
 
-            pasteSequenceRef.current = 0;
+            graphClipboardRef.current = clipboard;
+            persistentGraphClipboard = clipboard;
+            setHasGraphClipboard(true);
             return true;
         };
 
-        const pasteClipboard = (pasteMode = "copy") => {
-            const clipboard = graphClipboardRef.current;
-            if (!clipboard?.nodes?.length) return false;
+        const resolvePasteTargetPosition = (explicitFlowPosition = null) => {
+            if (
+                Number.isFinite(explicitFlowPosition?.x) &&
+                Number.isFinite(explicitFlowPosition?.y)
+            ) {
+                return explicitFlowPosition;
+            }
+
+            const pointer = editorPointerPositionRef.current;
+            if (
+                pointer?.inside &&
+                Number.isFinite(pointer.clientX) &&
+                Number.isFinite(pointer.clientY)
+            ) {
+                return screenToFlowPosition({
+                    x: pointer.clientX,
+                    y: pointer.clientY,
+                });
+            }
+
+            const editorRect = flowContainerRef.current?.getBoundingClientRect();
+            if (editorRect?.width > 0 && editorRect?.height > 0) {
+                return screenToFlowPosition({
+                    x: editorRect.left + editorRect.width / 2,
+                    y: editorRect.top + editorRect.height / 2,
+                });
+            }
+
+            return screenToFlowPosition({
+                x: window.innerWidth / 2,
+                y: window.innerHeight / 2,
+            });
+        };
+
+        const getClipboardPasteTranslation = (clipboard, targetPosition) => {
+            const copiedNodes = clipboard?.nodes || [];
+            const copiedNodeIds = new Set(copiedNodes.map((node) => node.id));
+            const rootNodes = copiedNodes.filter(
+                (node) => !node.parentId || !copiedNodeIds.has(node.parentId)
+            );
+            const layoutNodes = [
+                ...rootNodes,
+                ...(clipboard?.slotNodes || []),
+            ];
+
+            if (layoutNodes.length === 0) {
+                return { x: 0, y: 0 };
+            }
+
+            let minX = Infinity;
+            let minY = Infinity;
+            let maxX = -Infinity;
+            let maxY = -Infinity;
+
+            layoutNodes.forEach((node) => {
+                const x = Number(node.position?.x || 0);
+                const y = Number(node.position?.y || 0);
+                const { width, height } = getNodeSize(node);
+                minX = Math.min(minX, x);
+                minY = Math.min(minY, y);
+                maxX = Math.max(maxX, x + width);
+                maxY = Math.max(maxY, y + height);
+            });
+
+            const centerX = minX + (maxX - minX) / 2;
+            const centerY = minY + (maxY - minY) / 2;
+
+            return {
+                x: Number(targetPosition?.x || 0) - centerX,
+                y: Number(targetPosition?.y || 0) - centerY,
+            };
+        };
+
+        const buildPastedSlotAliases = (copiedSlotNodes, translation) =>
+            (copiedSlotNodes || [])
+                .map((copiedSlotNode) => {
+                    const copiedCanonicalId =
+                        copiedSlotNode.data?.clipboardCanonicalSlotNodeId ||
+                        copiedSlotNode.data?.cloneOfNodeId ||
+                        copiedSlotNode.id;
+                    const copiedPath = normalizeSlotPath(
+                        copiedSlotNode.data?.clipboardCanonicalSlotPath ||
+                            copiedSlotNode.data?.path ||
+                            ""
+                    );
+
+                    // Resolve by canonical id first, then by semantic path.
+                    // Pasting therefore no longer depends on whichever visual
+                    // slot happens to be selected after Ctrl+C.
+                    const canonicalSlotNode =
+                        slotNodes.find(
+                            (node) =>
+                                !node.data?.isSlotClone &&
+                                node.id === copiedCanonicalId
+                        ) ||
+                        slotNodes.find(
+                            (node) =>
+                                !node.data?.isSlotClone &&
+                                copiedPath &&
+                                normalizeSlotPath(
+                                    node.data?.path || ""
+                                ) === copiedPath
+                        );
+
+                    if (!canonicalSlotNode) return null;
+
+                    return {
+                        id: `slot-clone-${crypto.randomUUID()}`,
+                        position: {
+                            x:
+                                Number(
+                                    copiedSlotNode.position?.x || 0
+                                ) + Number(translation?.x || 0),
+                            y:
+                                Number(
+                                    copiedSlotNode.position?.y || 0
+                                ) + Number(translation?.y || 0),
+                        },
+                        type: "slot",
+                        selected: true,
+                        data: {
+                            ...(canonicalSlotNode.data || {}),
+                            cloneOfNodeId: canonicalSlotNode.id,
+                            editorInstanceId: createReferenceId(),
+                            isSlotClone: true,
+                        },
+                    };
+                })
+                .filter(Boolean);
+
+        const pasteClipboard = (pasteMode = "copy", targetPosition = null) => {
+            const clipboard =
+                graphClipboardRef.current || persistentGraphClipboard;
+            if (clipboard && graphClipboardRef.current !== clipboard) {
+                graphClipboardRef.current = clipboard;
+            }
+            const copiedStateNodes = clipboard?.nodes || [];
+            const copiedSlotNodes = clipboard?.slotNodes || [];
+            const copiedNodeCount =
+                copiedStateNodes.length + copiedSlotNodes.length;
+
+            if (copiedNodeCount === 0) return false;
+
+            const resolvedPasteTarget = resolvePasteTargetPosition(targetPosition);
+            const pasteTranslation = getClipboardPasteTranslation(
+                clipboard,
+                resolvedPasteTarget
+            );
 
             if (pasteMode === "clone") {
-                const copiedNode =
-                    clipboard.nodes.length === 1 ? clipboard.nodes[0] : null;
+                const explicitSourceId =
+                    clipboard?.explicitReferenceSourceNodeId || null;
+                const copiedNode = explicitSourceId
+                    ? copiedStateNodes.find((node) => node.id === explicitSourceId) || null
+                    : copiedNodeCount === 1
+                        ? copiedStateNodes[0] || copiedSlotNodes[0] || null
+                        : null;
+
+                if (!copiedNode) return false;
+
+                if (copiedNode?.type === "slot") {
+                    const pastedSlotAliases = buildPastedSlotAliases(
+                        [copiedNode],
+                        pasteTranslation
+                    );
+                    const cloneNode = pastedSlotAliases[0];
+                    if (!cloneNode) return false;
+
+                    const nextSlotNodes = [
+                        ...slotNodes.map((node) => ({
+                            ...node,
+                            selected: false,
+                        })),
+                        cloneNode,
+                    ];
+
+                    setNodes((currentNodes) =>
+                        currentNodes.map((node) => ({
+                            ...node,
+                            selected: false,
+                        }))
+                    );
+                    setSlotNodes(nextSlotNodes);
+                    setEdges((currentEdges) =>
+                        currentEdges.map((edge) => ({
+                            ...edge,
+                            selected: false,
+                        }))
+                    );
+                    setSlotEdges((currentEdges) =>
+                        currentEdges.map((edge) => ({
+                            ...edge,
+                            selected: false,
+                        }))
+                    );
+                    setSelectedNodeId(cloneNode.id);
+                    setRightPanelTab("details");
+                    setActiveTab("slots");
+
+                    requestAnimationFrame(() => {
+                        updateNodeInternals(cloneNode.id);
+                    });
+
+                    return true;
+                }
+
                 const sourceNode = copiedNode
                     ? nodes.find((node) => node.id === copiedNode.id)
                     : null;
 
-                if (!isCloneableSkillNode(sourceNode)) return false;
+                if (!isCloneableEditorNode(sourceNode)) return false;
 
-                pasteSequenceRef.current += 1;
-                const offset = 40 * pasteSequenceRef.current;
-                const absoluteSourcePosition = getAbsoluteNodePosition(
-                    sourceNode,
-                    nodes
+                // References have their own compact visual size. Do not use
+                // the source container dimensions here: a large compound or
+                // parallel would otherwise place its small reference far away
+                // from the requested paste position.
+                const referenceSize = { width: 180, height: 58 };
+                const cloneNode = buildEditorCloneNode(sourceNode, {
+                    x:
+                        Number(resolvedPasteTarget.x || 0) -
+                        referenceSize.width / 2,
+                    y:
+                        Number(resolvedPasteTarget.y || 0) -
+                        referenceSize.height / 2,
+                });
+                if (!cloneNode) return false;
+
+                setSlotNodes((currentNodes) =>
+                    currentNodes.map((node) => ({
+                        ...node,
+                        selected: false,
+                    }))
                 );
-                const cloneNode = {
-                    id: getNodeId(),
-                    position: {
-                        x: Number(absoluteSourcePosition.x || 0) + offset,
-                        y: Number(absoluteSourcePosition.y || 0) + offset,
-                    },
-                    type: "custom",
-                    selected: true,
-                    data: {
-                        label: sourceNode.data?.label || "Skill",
-                        fullSkillName:
-                            sourceNode.data?.fullSkillName ||
-                            sourceNode.data?.label ||
-                            "Skill",
-                        isSkillClone: true,
-                        cloneOfNodeId: sourceNode.id,
-                        isInitial: false,
-                        isFinal: false,
-                        events: [],
-                        inSlots: [],
-                        outSlots: [],
-                        params: [],
-                        onEntry: [],
-                        onExit: [],
-                    },
-                };
-
                 setNodes((currentNodes) => [
                     ...currentNodes.map((node) => ({
                         ...node,
@@ -2580,8 +4601,57 @@ function AppContent() {
                 return true;
             }
 
-            pasteSequenceRef.current += 1;
-            const offset = 40 * pasteSequenceRef.current;
+            // Slot declarations are unique semantic SCXML objects. Copy/paste
+            // therefore creates visual aliases for selected slots instead of a
+            // second declaration with the same path.
+            if (copiedStateNodes.length === 0 && copiedSlotNodes.length > 0) {
+                const pastedSlotAliases = buildPastedSlotAliases(
+                    copiedSlotNodes,
+                    pasteTranslation
+                );
+                if (pastedSlotAliases.length === 0) return false;
+
+                const nextSlotNodes = [
+                    ...slotNodes.map((node) => ({
+                        ...node,
+                        selected: false,
+                    })),
+                    ...pastedSlotAliases,
+                ];
+
+                setNodes((currentNodes) =>
+                    currentNodes.map((node) => ({
+                        ...node,
+                        selected: false,
+                    }))
+                );
+                setSlotNodes(nextSlotNodes);
+                setEdges((currentEdges) =>
+                    currentEdges.map((edge) => ({
+                        ...edge,
+                        selected: false,
+                    }))
+                );
+                setSlotEdges((currentEdges) =>
+                    currentEdges.map((edge) => ({
+                        ...edge,
+                        selected: false,
+                    }))
+                );
+
+                const firstPastedSlot = pastedSlotAliases[0];
+                setSelectedNodeId(firstPastedSlot.id);
+                setRightPanelTab("details");
+                setActiveTab("slots");
+
+                requestAnimationFrame(() => {
+                    pastedSlotAliases.forEach((node) =>
+                        updateNodeInternals(node.id)
+                    );
+                });
+
+                return true;
+            }
 
             const idMap = new Map();
             clipboard.nodes.forEach((node) => {
@@ -2718,6 +4788,15 @@ function AppContent() {
                     eventCopy.sourceNodeId = idMap.get(eventCopy.sourceNodeId);
                 }
 
+                if (Array.isArray(eventCopy.sourceNodeIds)) {
+                    eventCopy.sourceNodeIds = eventCopy.sourceNodeIds.map(
+                        (sourceNodeId) =>
+                            idMap.has(sourceNodeId)
+                                ? idMap.get(sourceNodeId)
+                                : sourceNodeId
+                    );
+                }
+
                 if (!eventCopy.target) return eventCopy;
 
                 if (idMap.has(eventCopy.target)) {
@@ -2749,11 +4828,18 @@ function AppContent() {
                 }
 
                 if (
-                    data?.isSkillClone &&
+                    (data?.isSkillClone || data?.isStateClone) &&
                     data?.cloneOfNodeId &&
                     idMap.has(data.cloneOfNodeId)
                 ) {
                     data.cloneOfNodeId = idMap.get(data.cloneOfNodeId);
+                }
+
+                if (data?.isSkillClone || data?.isStateClone) {
+                    // Each visual Reference needs its own stable route identity
+                    // so transition targeting can distinguish multiple aliases
+                    // of the same underlying SCXML state.
+                    data.editorInstanceId = createReferenceId();
                 }
 
                 data = allocateFullSkillName(node, data);
@@ -2775,10 +4861,24 @@ function AppContent() {
                             ? node.extent
                             : undefined,
                     position: {
-                        x: Number(node.position?.x || 0) + offset,
-                        y: Number(node.position?.y || 0) + offset,
+                        x:
+                            Number(node.position?.x || 0) +
+                            (node.parentId && idMap.has(node.parentId)
+                                ? 0
+                                : pasteTranslation.x),
+                        y:
+                            Number(node.position?.y || 0) +
+                            (node.parentId && idMap.has(node.parentId)
+                                ? 0
+                                : pasteTranslation.y),
                     },
-                    selected: true,
+                    // Descendants come along because their container was
+                    // copied; keep only clipboard roots selected. Selecting
+                    // both a parent and all of its children can make a drag
+                    // apply the movement twice to nested React Flow nodes.
+                    selected: !(
+                        node.parentId && idMap.has(node.parentId)
+                    ),
                     data,
                 };
             });
@@ -2787,6 +4887,8 @@ function AppContent() {
                 const nextData = cloneGraphValue(edgeData || {});
 
                 [
+                    "boundaryOriginalSource",
+                    "boundaryOriginalTarget",
                     "parallelOriginalSource",
                     "parallelOriginalTarget",
                     "compoundOriginalSource",
@@ -2796,6 +4898,17 @@ function AppContent() {
                         nextData[keyName] = idMap.get(nextData[keyName]);
                     }
                 });
+
+                if (Array.isArray(nextData.boundaryOriginalSources)) {
+                    nextData.boundaryOriginalSources =
+                        nextData.boundaryOriginalSources.map((source) => ({
+                            ...source,
+                            sourceId:
+                                source?.sourceId && idMap.has(source.sourceId)
+                                    ? idMap.get(source.sourceId)
+                                    : source?.sourceId,
+                        }));
+                }
 
                 return nextData;
             };
@@ -2824,8 +4937,20 @@ function AppContent() {
                 })),
                 ...pastedNodes,
             ]);
+            const pastedSlotAliases = buildPastedSlotAliases(
+                copiedSlotNodes,
+                pasteTranslation
+            );
+            const nextSlotNodes = [
+                ...slotNodes.map((node) => ({
+                    ...node,
+                    selected: false,
+                })),
+                ...pastedSlotAliases,
+            ];
 
             setNodes(nextNodes);
+            setSlotNodes(nextSlotNodes);
             setEdges([
                 ...edges.map((edge) => ({
                     ...edge,
@@ -2836,55 +4961,91 @@ function AppContent() {
 
             const firstPastedNode = pastedNodes.find(
                 (node) => !node.parentId
-            ) || pastedNodes[0];
+            ) || pastedNodes[0] || pastedSlotAliases[0];
 
             setSelectedNodeId(firstPastedNode?.id || null);
 
             // Slot paths live on the skill nodes. Rebuild the slot-view edges
-            // so copied skills immediately retain their slot connections too.
+            // so copied skills immediately retain their slot connections too,
+            // while preserving any visual slot aliases pasted with the group.
             requestAnimationFrame(() => {
-                checkSlotConnection(nextNodes);
+                checkSlotConnection(nextNodes, null, nextSlotNodes);
 
                 pastedIds.forEach((nodeId) => {
                     updateNodeInternals(nodeId);
+                });
+                pastedSlotAliases.forEach((node) => {
+                    updateNodeInternals(node.id);
                 });
             });
 
             return true;
         };
 
-        const requestPasteClipboard = () => {
+        const requestPasteClipboard = (targetPosition = null) => {
             if (pendingSkillPasteActionRef.current) return true;
 
-            const clipboard = graphClipboardRef.current;
-            if (!clipboard?.nodes?.length) return false;
+            const clipboard =
+                graphClipboardRef.current || persistentGraphClipboard;
+            if (clipboard && graphClipboardRef.current !== clipboard) {
+                graphClipboardRef.current = clipboard;
+            }
+            const copiedStateNodes = clipboard?.nodes || [];
+            const copiedSlotNodes = clipboard?.slotNodes || [];
+            const copiedNodeCount =
+                copiedStateNodes.length + copiedSlotNodes.length;
+            if (copiedNodeCount === 0) return false;
 
-            const copiedNode =
-                clipboard.nodes.length === 1 ? clipboard.nodes[0] : null;
+            // Slots have one semantic declaration per path, so normal
+            // copy/paste directly creates another visual alias.
+            if (copiedNodeCount === 1 && copiedSlotNodes.length === 1) {
+                return pasteClipboard("copy", targetPosition);
+            }
+
+            const explicitSourceId =
+                clipboard?.explicitReferenceSourceNodeId || null;
+            const copiedNode = explicitSourceId
+                ? copiedStateNodes.find((node) => node.id === explicitSourceId) || null
+                : copiedNodeCount === 1
+                    ? copiedStateNodes[0] || null
+                    : null;
             const sourceNode = copiedNode
                 ? nodes.find((node) => node.id === copiedNode.id)
                 : null;
 
-            if (isCloneableSkillNode(sourceNode)) {
+            if (isCloneableEditorNode(sourceNode)) {
                 // Keep the pending action itself outside React state. This
                 // avoids copying callback-heavy node data into a dialog state
                 // while still letting the user decide how this paste behaves.
                 pendingSkillPasteActionRef.current = {
-                    clone: () => pasteClipboard("clone"),
-                    copy: () => pasteClipboard("copy"),
+                    clone: () => pasteClipboard("clone", targetPosition),
+                    copy: () => pasteClipboard("copy", targetPosition),
                 };
+                const sourceTypeLabel =
+                    sourceNode.type === "compound"
+                        ? "Compound"
+                        : sourceNode.type === "parallel"
+                            ? "Parallel"
+                            : sourceNode.type === "submachine"
+                                ? "Sub-State-Machine"
+                                : "State";
+
                 setPendingSkillPaste({
-                    label: sourceNode.data?.label || "Skill",
+                    label: sourceNode.data?.label || sourceTypeLabel,
                     fullSkillName:
                         sourceNode.data?.fullSkillName ||
                         sourceNode.data?.label ||
-                        "Skill",
+                        sourceTypeLabel,
+                    sourceTypeLabel,
                 });
                 return true;
             }
 
-            return pasteClipboard("copy");
+            return pasteClipboard("copy", targetPosition);
         };
+
+        captureGraphSelectionRef.current = captureSelection;
+        requestGraphPasteRef.current = requestPasteClipboard;
 
         const handleGraphClipboardShortcut = (event) => {
             if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
@@ -2923,7 +5084,7 @@ function AppContent() {
             }
 
             if (key === "v") {
-                if (graphClipboardRef.current) {
+                if (graphClipboardRef.current || persistentGraphClipboard) {
                     event.preventDefault();
                     requestPasteClipboard();
                 }
@@ -2944,22 +5105,36 @@ function AppContent() {
             handleGraphClipboardShortcut,
             true
         );
-        return () =>
+        return () => {
+            if (captureGraphSelectionRef.current === captureSelection) {
+                captureGraphSelectionRef.current = null;
+            }
+            if (requestGraphPasteRef.current === requestPasteClipboard) {
+                requestGraphPasteRef.current = null;
+            }
             window.removeEventListener(
                 "keydown",
                 handleGraphClipboardShortcut,
                 true
             );
+        };
     }, [
         activeMode,
         selectedNodeId,
         nodes,
         edges,
+        slotNodes,
         setNodes,
         setEdges,
         setSlotNodes,
+        setSlotEdges,
+        setSelectedNodeId,
+        setRightPanelTab,
+        setActiveTab,
         clearAllEdgeSelection,
+        checkSlotConnection,
         updateNodeInternals,
+        screenToFlowPosition,
     ]);
 
     const resolvePendingSkillPaste = useCallback((choice) => {
@@ -3195,8 +5370,8 @@ function AppContent() {
     );
 
     // Reconfigure a skill after one of its parameters changes. The Bonsai skill
-    // endpoint can expose a different set of events, sensors/actuators and slot
-    // requests depending on the current parameter values.
+    // endpoint can expose a different set of events, sensors/actuators, parameters
+    // and slot requests depending on the current parameter values.
     const skillConfigurationRequestVersionsRef = useRef(new Map());
 
     const reconcileDynamicSlots = (currentSlots = [], requestedSlots = []) =>
@@ -3221,6 +5396,32 @@ function AppContent() {
                 inherited: existingSlot?.inherited || null,
             };
         });
+
+    const reconcileDynamicParameters = (currentParams = [], requestedParams = []) =>
+        (Array.isArray(requestedParams) ? requestedParams : []).map(
+            (requestedParam) => {
+                const existingParam = (currentParams || []).find(
+                    (param) => param?.key === requestedParam?.key
+                );
+
+                return {
+                    ...requestedParam,
+                    key: requestedParam?.key || "",
+                    type: requestedParam?.type || existingParam?.type || "Unknown",
+                    required: Boolean(requestedParam?.required),
+                    default: requestedParam?.default,
+                    description:
+                        requestedParam?.description ??
+                        existingParam?.description ??
+                        "",
+                    // Parameter requests can depend on other parameter values.
+                    // Keep the value the user already entered when a parameter
+                    // is still requested, while newly requested parameters start
+                    // empty and parameters no longer requested disappear.
+                    expr: existingParam?.expr ?? "",
+                };
+            }
+        );
 
     const updateEventsFromParameters = async (nodeId, parameterOverride = null) => {
         const node = nodes.find((candidate) => candidate.id === nodeId);
@@ -3330,6 +5531,14 @@ function AppContent() {
                         )
                         : currentNode.data?.outSlots || [];
 
+                const nextParams =
+                    data.params !== undefined
+                        ? reconcileDynamicParameters(
+                            currentNode.data?.params || [],
+                            data.params
+                        )
+                        : currentNode.data?.params || [];
+
                 const updatedNodes = currentNodes.map((candidate) => {
                     if (candidate.id !== nodeId) return candidate;
 
@@ -3350,6 +5559,7 @@ function AppContent() {
                                         : candidate.data?.actuators || [],
                             inSlots: nextInSlots,
                             outSlots: nextOutSlots,
+                            params: nextParams,
                         },
                     };
                 });
@@ -3376,6 +5586,7 @@ function AppContent() {
         isDesktop: IS_DESKTOP,
         nodes,
         edges,
+        slotNodes,
         globalDataModel,
         tabs,
         setTabs,
@@ -3732,7 +5943,9 @@ function AppContent() {
                         aria-modal="true"
                         aria-labelledby="skill-paste-choice-title"
                     >
-                        <h3 id="skill-paste-choice-title">Paste skill</h3>
+                        <h3 id="skill-paste-choice-title">
+                            Paste {pendingSkillPaste.sourceTypeLabel || "State"}
+                        </h3>
                         <p>
                             How should <strong>{pendingSkillPaste.label}</strong> be pasted?
                         </p>
@@ -3742,9 +5955,9 @@ function AppContent() {
                                 className="skill-paste-choice-option"
                                 onClick={() => resolvePendingSkillPaste("clone")}
                             >
-                                <span className="skill-paste-choice-option-title">Clone</span>
+                                <span className="skill-paste-choice-option-title">Reference</span>
                                 <span className="skill-paste-choice-option-description">
-                                    Inbound-only visual alias of the original skill.
+                                    Inbound-only reference to the original state.
                                 </span>
                             </button>
                             <button
@@ -3754,7 +5967,7 @@ function AppContent() {
                             >
                                 <span className="skill-paste-choice-option-title">Copy</span>
                                 <span className="skill-paste-choice-option-description">
-                                    Same skill with a new instance ID.
+                                    Create an independent copy of the selected state.
                                 </span>
                             </button>
                         </div>
@@ -3839,70 +6052,49 @@ function AppContent() {
                     />
 
                     <div
+                        ref={flowContainerRef}
                         className="flow-container"
+                        onPointerMove={(event) => {
+                            editorPointerPositionRef.current = {
+                                inside: true,
+                                clientX: event.clientX,
+                                clientY: event.clientY,
+                            };
+                        }}
+                        onPointerLeave={() => {
+                            editorPointerPositionRef.current = {
+                                inside: false,
+                                clientX: null,
+                                clientY: null,
+                            };
+                        }}
                         onDragOver={(e) => {
                             e.preventDefault();
 
                             const skill = e.dataTransfer.getData("skill");
-                            if (!skill) return;
+                            const behavior = e.dataTransfer.getData("behavior");
+                            if (!skill && !behavior) return;
 
                             const pointerPosition = screenToFlowPosition({
                                 x: e.clientX,
                                 y: e.clientY,
                             });
 
-                            const hoveredCompound = nodes
-                                .filter(
-                                    (node) =>
-                                        node.type === "compound"
-                                )
-                                .find((compound) => {
-                                    const position = getAbsoluteNodePosition(
-                                        compound,
-                                        nodes
-                                    );
-                                    const { width, height } = getNodeSize(compound);
-
-                                    return (
-                                        pointerPosition.x >= position.x &&
-                                        pointerPosition.x <= position.x + width &&
-                                        pointerPosition.y >= position.y &&
-                                        pointerPosition.y <= position.y + height
-                                    );
-                                });
-
-                            const hoveredLane = hoveredCompound
-                                ? null
-                                : nodes
-                                    .filter(
-                                        (node) => node.type === "parallelLane"
-                                    )
-                                    .find((lane) => {
-                                        const lanePosition =
-                                            getAbsoluteNodePosition(lane, nodes);
-                                        const width =
-                                            Number(lane.style?.width) || 420;
-                                        const height =
-                                            Number(lane.style?.height) || 110;
-
-                                        return (
-                                            pointerPosition.x >= lanePosition.x &&
-                                            pointerPosition.x <=
-                                            lanePosition.x + width &&
-                                            pointerPosition.y >= lanePosition.y &&
-                                            pointerPosition.y <=
-                                            lanePosition.y + height
-                                        );
-                                    });
-
-                            setCompoundDropTargetId(
-                                hoveredCompound?.id || null
+                            const hoveredContainer = findDropContainerAtPoint(
+                                pointerPosition,
+                                nodes
                             );
-                            setParallelDropTargetId(
-                                hoveredCompound
-                                    ? null
-                                    : hoveredLane?.id || null
-                            );
+                            const hoveredCompound =
+                                hoveredContainer?.type === "compound"
+                                    ? hoveredContainer
+                                    : null;
+                            const hoveredLane =
+                                hoveredContainer?.type === "parallelLane"
+                                    ? hoveredContainer
+                                    : null;
+
+                            setCompoundDropTargetId(hoveredCompound?.id || null);
+                            setParallelDropTargetId(hoveredLane?.id || null);
                         }}
                         onDragLeave={(e) => {
                             const rect =
@@ -3932,109 +6124,81 @@ function AppContent() {
                                 y: e.clientY,
                             });
 
+                            const targetContainer = findDropContainerAtPoint(
+                                mousePosition,
+                                nodes
+                            );
+                            const targetCompound =
+                                targetContainer?.type === "compound"
+                                    ? targetContainer
+                                    : null;
+                            const targetLane =
+                                targetContainer?.type === "parallelLane"
+                                    ? targetContainer
+                                    : null;
+                            const targetLaneCompound = targetLane
+                                ? nodes.find(
+                                    (candidate) =>
+                                        candidate.parentId === targetLane.id &&
+                                        isAutoParallelLaneCompound(candidate)
+                                ) || null
+                                : null;
+                            const insertionCompound =
+                                targetCompound || targetLaneCompound;
+
                             const behaviorPayload =
                                 e.dataTransfer.getData("behavior");
+                            const skill = e.dataTransfer.getData("skill");
+                            const isBehaviorDrop = Boolean(behaviorPayload);
+
+                            let newNode;
 
                             if (behaviorPayload) {
                                 try {
                                     const behavior = JSON.parse(behaviorPayload);
-                                    const newNode = await createBehaviorNode(
+                                    newNode = await createBehaviorNode(
                                         behavior,
-                                        mousePosition
+                                        { x: 0, y: 0 }
                                     );
-                                    const updatedNodes =
-                                        resolveNodeCollisionsAndRefit(
-                                            [...nodes, newNode],
-                                            newNode.id
-                                        );
-                                    setNodes(updatedNodes);
-                                    checkSlotConnection(updatedNodes);
                                 } catch (error) {
                                     console.error(
                                         "Invalid behavior drag payload:",
                                         error
                                     );
+                                    return;
                                 }
-                                return;
+                            } else {
+                                if (!skill) return;
+                                newNode = await createNode(
+                                    skill.split("skills.")[1],
+                                    getNodeId(),
+                                    { x: 0, y: 0 }
+                                );
                             }
 
-                            const skill = e.dataTransfer.getData("skill");
-                            if (!skill) return;
-
-                            const targetCompound = nodes
-                                .filter(
-                                    (node) =>
-                                        node.type === "compound"
-                                )
-                                .find((compound) => {
-                                    const position = getAbsoluteNodePosition(
-                                        compound,
-                                        nodes
-                                    );
-                                    const { width, height } = getNodeSize(compound);
-                                    return (
-                                        mousePosition.x >= position.x &&
-                                        mousePosition.x <= position.x + width &&
-                                        mousePosition.y >= position.y &&
-                                        mousePosition.y <= position.y + height
-                                    );
+                            const refreshBehaviorSlots = () => {
+                                if (!isBehaviorDrop) return;
+                                requestAnimationFrame(() => {
+                                    checkSlotConnection(getNodes());
                                 });
+                            };
 
-                            const targetLane = targetCompound
-                                ? null
-                                : nodes
-                                    .filter(
-                                        (node) => node.type === "parallelLane"
-                                    )
-                                    .find((lane) => {
-                                        const lanePosition =
-                                            getAbsoluteNodePosition(lane, nodes);
-                                        const width =
-                                            Number(lane.style?.width) || 420;
-                                        const height =
-                                            Number(lane.style?.height) || 110;
+                            const {
+                                width: estimatedNodeWidth,
+                                height: estimatedNodeHeight,
+                            } = getOverviewLayoutNodeSize(newNode);
 
-                                        return (
-                                            mousePosition.x >= lanePosition.x &&
-                                            mousePosition.x <=
-                                            lanePosition.x + width &&
-                                            mousePosition.y >= lanePosition.y &&
-                                            mousePosition.y <=
-                                            lanePosition.y + height
-                                        );
-                                    });
-
-                            const newNode = await createNode(
-                                skill.split("skills.")[1],
-                                getNodeId(),
-                                { x: 0, y: 0 }
-                            );
-
-                            const labelLen =
-                                (newNode.data?.label || "").length +
-                                (newNode.data?.fullSkillName || "").length;
-                            const estimatedNodeWidth = Math.max(
-                                210,
-                                Math.min(300, 160 + labelLen * 3)
-                            );
-                            const eventCount =
-                                newNode.data?.events?.length || 0;
-                            const estimatedNodeHeight = Math.max(
-                                70,
-                                50 + eventCount * 18
-                            );
-
-                            if (targetCompound) {
+                            if (insertionCompound) {
                                 let newX = COMPOUND_PADDING_X;
 
                                 nodes
                                     .filter(
                                         (member) =>
                                             member.parentId ===
-                                            targetCompound.id
+                                            insertionCompound.id
                                     )
                                     .forEach((member) => {
-                                        const size = getNodeSize(member);
+                                        const size = getOverviewLayoutNodeSize(member);
                                         newX = Math.max(
                                             newX,
                                             Number(member.position?.x || 0) +
@@ -4043,7 +6207,7 @@ function AppContent() {
                                         );
                                     });
 
-                                newNode.parentId = targetCompound.id;
+                                newNode.parentId = insertionCompound.id;
                                 newNode.extent = "parent";
                                 newNode.position = {
                                     x: newX,
@@ -4059,7 +6223,7 @@ function AppContent() {
 
                                     return orderNodesParentsFirst([
                                         ...currentNodes.map((candidate) =>
-                                            candidate.id === targetCompound.id
+                                            candidate.id === insertionCompound.id
                                                 ? {
                                                     ...candidate,
                                                     style: {
@@ -4072,7 +6236,7 @@ function AppContent() {
                                                             right +
                                                             COMPOUND_PADDING_X +
                                                             getCompoundExitGutterWidth(
-                                                                targetCompound.data?.events || []
+                                                                insertionCompound.data?.events || []
                                                             )
                                                         ),
                                                         height: Math.max(
@@ -4092,6 +6256,7 @@ function AppContent() {
                                 });
 
                                 setSelectedNodeId(newNode.id);
+                                refreshBehaviorSlots();
                                 return;
                             }
 
@@ -4103,10 +6268,7 @@ function AppContent() {
                                 let newX = 25;
                                 existingMembers.forEach((member) => {
                                     const memberWidth =
-                                        Number(member.measured?.width) ||
-                                        Number(member.width) ||
-                                        Number(member.style?.width) ||
-                                        210;
+                                        getOverviewLayoutNodeSize(member).width;
                                     newX = Math.max(
                                         newX,
                                         Number(member.position?.x || 0) +
@@ -4118,7 +6280,10 @@ function AppContent() {
                                 const isFirstLaneState = existingMembers.length === 0;
                                 newNode.parentId = targetLane.id;
                                 newNode.extent = "parent";
-                                newNode.position = { x: newX, y: 20 };
+                                newNode.position = {
+                                    x: newX,
+                                    y: PARALLEL_LANE_CHILD_TOP_INSET,
+                                };
                                 newNode.data = {
                                     ...(newNode.data || {}),
                                     isInitial: isFirstLaneState,
@@ -4176,14 +6341,7 @@ function AppContent() {
                                             const memberWidth =
                                                 member.id === newNode.id
                                                     ? estimatedNodeWidth
-                                                    : Number(
-                                                        member.measured?.width
-                                                    ) ||
-                                                    Number(member.width) ||
-                                                    Number(
-                                                        member.style?.width
-                                                    ) ||
-                                                    210;
+                                                    : getOverviewLayoutNodeSize(member).width;
                                             maxRight = Math.max(
                                                 maxRight,
                                                 Number(
@@ -4201,10 +6359,14 @@ function AppContent() {
                                     const laneLayouts = new Map();
                                     const headerHeight =
                                         lanes.length > 0
-                                            ? Number(
-                                                lanes[0].position?.y || 40
+                                            ? Math.max(
+                                                PARALLEL_HEADER_HEIGHT,
+                                                Number(
+                                                    lanes[0].position?.y ||
+                                                    PARALLEL_HEADER_HEIGHT
+                                                )
                                             )
-                                            : 40;
+                                            : PARALLEL_HEADER_HEIGHT;
                                     let currentY = headerHeight;
 
                                     lanes.forEach((lane) => {
@@ -4218,14 +6380,7 @@ function AppContent() {
                                             const memberHeight =
                                                 member.id === newNode.id
                                                     ? estimatedNodeHeight
-                                                    : Number(
-                                                        member.measured?.height
-                                                    ) ||
-                                                    Number(member.height) ||
-                                                    Number(
-                                                        member.style?.height
-                                                    ) ||
-                                                    70;
+                                                    : getOverviewLayoutNodeSize(member).height;
                                             maxBottom = Math.max(
                                                 maxBottom,
                                                 Number(
@@ -4235,8 +6390,8 @@ function AppContent() {
                                         });
 
                                         const requiredHeight = Math.max(
-                                            110,
-                                            maxBottom + 20
+                                            130,
+                                            maxBottom + 30
                                         );
                                         laneLayouts.set(lane.id, {
                                             y: currentY,
@@ -4289,6 +6444,7 @@ function AppContent() {
                                 });
 
                                 setSelectedNodeId(newNode.id);
+                                refreshBehaviorSlots();
                                 return;
                             }
 
@@ -4308,21 +6464,30 @@ function AppContent() {
                                 )
                             );
                             setSelectedNodeId(newNode.id);
+                            refreshBehaviorSlots();
                         }}
                     >
                         <EditorCanvas
                             activeMode={activeMode}
                             setActiveMode={setActiveMode}
+                            showTransitionEdges={showTransitionEdges}
+                            setShowTransitionEdges={setShowTransitionEdges}
+                            showSlotEdges={showSlotEdges}
+                            setShowSlotEdges={setShowSlotEdges}
                             nodes={nodes}
                             edges={edges}
+                            slotNodes={slotNodes}
                             globalDataModel={globalDataModel}
                             visibleNodes={visibleNodes}
                             visibleEdges={visibleEdges}
                             smartRoutingNodes={smartRoutingNodes}
+                            edgeFocusMode={edgeFocusMode}
+                            nodeFocusMode={nodeFocusMode}
                             selectedNodes={selectedNodes}
+                            contextSelectionCount={editorCloneSelection.length}
                             contextMenu={contextMenu}
                             handleSelectAction={handleSelectAction}
-                            canCreateSkillClone={canCreateSkillClone}
+                            hasGraphClipboard={hasGraphClipboard}
                             setIsCreateSlotModalOpen={setIsCreateSlotModalOpen}
                             isDraggingNode={isDraggingNode}
                             isOverTrash={isOverTrash}
@@ -4332,6 +6497,9 @@ function AppContent() {
                             onConnect={onConnect}
                             handleConnectStart={handleConnectStart}
                             handleConnectEnd={handleConnectEnd}
+                            onReconnect={onReconnect}
+                            handleReconnectStart={handleReconnectStart}
+                            handleReconnectEnd={handleReconnectEnd}
                             isValidConnection={isValidConnection}
                             selectSlotEdge={selectSlotEdge}
                             selectTransitionEdge={selectTransitionEdge}
@@ -4456,11 +6624,31 @@ function AppContent() {
                                 selectedNode={selectedNode}
                                 cloneSourceNode={selectedCloneSourceNode}
                                 onNavigateCloneSource={handleNavigateCloneSource}
+                                cloneNodes={selectedNodeClones}
+                                onNavigateClone={handleNavigateCloneSource}
                                 containerOutgoingTransitions={selectedContainerOutgoingTransitions}
+                                onMoveContainerTransition={handleMoveContainerTransition}
                                 onNavigateTransitionNode={handleNavigateCloneSource}
                                 onHoverTransitionNode={(nodeId) =>
                                     setHoveredEditorNodeId(nodeId || null)
                                 }
+                                onOpenTransitionPanel={(
+                                    sourceNodeId,
+                                    eventId,
+                                    targetNodeId = null,
+                                    options = null
+                                ) => {
+                                    if (!sourceNodeId) return;
+                                    if (!options?.containerMode && !eventId) return;
+
+                                    openConditionDrawer(
+                                        sourceNodeId,
+                                        eventId,
+                                        targetNodeId || null,
+                                        null,
+                                        options
+                                    );
+                                }}
                                 hasInitialNode={hasInitialNode}
                                 activeTab={activeTab}
                                 setActiveTab={setActiveTab}
@@ -5160,6 +7348,7 @@ function AppContent() {
                 availableTargets={drawerData.availableTargets}
                 initialTransitionId={drawerData.initialTransitionId}
                 initialTargetId={drawerData.initialTargetId}
+                targetOnlyMode={drawerData.targetOnlyMode}
             />
 
             <CreateSlotModal

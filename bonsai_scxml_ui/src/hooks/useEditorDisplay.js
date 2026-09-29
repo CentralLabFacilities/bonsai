@@ -2,17 +2,18 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { MarkerType } from "@xyflow/react";
 import {
     SLOT_CONNECTION_COLORS,
-    highlightSelectedTransitions,
+    clearTransientTransitionHighlight,
+    getCollapsedTransitionSource,
+    getTransitionHighlightColor,
     withSmartTransitionRouting,
 } from "../utils/editorGraph";
 import {
-    getAbsoluteNodePosition,
     getNodeSize,
     isAutoParallelLaneCompound,
 } from "../utils/editorGeometry";
 
 const SLOT_EDGE_INACTIVE_COLOR = "#64748b";
-const HOVER_INACTIVE_EDGE_COLOR = "#94a3b8";
+const COMPOUND_ROUTING_GRID_CELL_SIZE = 640;
 
 const pointInsideRect = (point, rect) =>
     point.x >= rect.left &&
@@ -52,6 +53,62 @@ const segmentIntersectsRect = (start, end, rect) => {
     );
 };
 
+const getTransitionEdgeNodeIds = (edge) => {
+    const ids = [
+        edge.source,
+        edge.target,
+        edge.data?.boundaryOriginalSource,
+        edge.data?.boundaryOriginalTarget,
+        edge.data?.compoundOriginalSource,
+        edge.data?.compoundOriginalTarget,
+        edge.data?.parallelOriginalSource,
+        edge.data?.parallelOriginalTarget,
+    ];
+
+    if (Array.isArray(edge.data?.boundaryOriginalSources)) {
+        edge.data.boundaryOriginalSources.forEach((source) => {
+            ids.push(source?.sourceId || source?.nodeId || source?.id);
+        });
+    }
+
+    return ids.filter(Boolean);
+};
+
+const getSlotEdgeNodeIds = (edge) =>
+    [
+        edge.source,
+        edge.target,
+        edge.data?.skillNodeId,
+        edge.data?.slotNodeId,
+        edge.data?.canonicalSlotNodeId,
+    ].filter(Boolean);
+
+const buildEdgeIndexByNodeId = (edgeList, getNodeIds) => {
+    const index = new Map();
+
+    edgeList.forEach((edge, edgeIndex) => {
+        new Set(getNodeIds(edge)).forEach((nodeId) => {
+            if (!index.has(nodeId)) index.set(nodeId, []);
+            index.get(nodeId).push(edgeIndex);
+        });
+    });
+
+    return index;
+};
+
+const withEdgeClassName = (edge, className) => {
+    const classNames = String(edge?.className || "")
+        .split(/\s+/)
+        .filter(Boolean);
+
+    if (!classNames.includes(className)) classNames.push(className);
+
+    const nextClassName = classNames.join(" ");
+    if (nextClassName === String(edge?.className || "")) return edge;
+
+    return { ...edge, className: nextClassName };
+};
+
 export function useEditorDisplay({
     hoveredEditorNodeId,
     hoveredEditorEdgeId,
@@ -62,15 +119,20 @@ export function useEditorDisplay({
     slotNodeIdSet,
     slotEdges,
     updatePersistentEdgeControlPoints,
+    controlPointInsertRequest,
+    onControlPointContextMenu,
     hoveredSlotAccessNodeId,
     semanticNodes,
     semanticChildrenByParent,
     nodes,
     childIdsByParent,
     activeMode,
+    showTransitionEdges,
+    showSlotEdges,
     injectedNodes,
     injectedSlotNodes,
     isDraggingNode,
+    draggingNodeId,
     hiddenNodeIds,
     parallelDropTargetId,
     compoundDropTargetId,
@@ -82,20 +144,6 @@ export function useEditorDisplay({
     const activeHoveredEditorEdgeId = isDraggingNode
         ? null
         : hoveredEditorEdgeId;
-
-    const selectedTransitionNodeIdKey = useMemo(
-        () =>
-            [
-                ...new Set([
-                    ...selectedNodes.map((node) => node.id),
-                    ...(selectedNodeId ? [selectedNodeId] : []),
-                    ...(activeCanvasFocusNodeId ? [activeCanvasFocusNodeId] : []),
-                ]),
-            ]
-                .sort()
-                .join("\u0001"),
-        [selectedNodes, selectedNodeId, activeCanvasFocusNodeId]
-    );
 
     // Keep true editor selection visually independent from hover focus. A
     // hovered node may dim unrelated context, but it must never fade nodes the
@@ -109,10 +157,167 @@ export function useEditorDisplay({
         [selectedNodes, selectedNodeId]
     );
 
+    const cloneGroupByNodeId = useMemo(() => {
+        const visualNodes = [...(nodes || []), ...(injectedSlotNodes || [])];
+        const visualNodeById = new Map(
+            visualNodes.map((node) => [node.id, node])
+        );
+        const groupsByOriginalId = new Map();
+
+        const resolveOriginalId = (node) => {
+            let originalId = node?.data?.cloneOfNodeId;
+            const visited = new Set([node?.id]);
+
+            while (originalId && !visited.has(originalId)) {
+                visited.add(originalId);
+                const originalNode = visualNodeById.get(originalId);
+                const nextOriginalId = originalNode?.data?.cloneOfNodeId;
+                if (!nextOriginalId) break;
+                originalId = nextOriginalId;
+            }
+
+            return originalId || null;
+        };
+
+        visualNodes.forEach((node) => {
+            // cloneOfNodeId is the authoritative editor-alias relationship.
+            // Do not depend on a particular clone flag here: imported or older
+            // Sub-SM/Compound/Parallel aliases may still be valid visual clones
+            // even if their presentation flag differs.
+            const originalId = resolveOriginalId(node);
+            if (!originalId || !visualNodeById.has(originalId)) return;
+
+            if (!groupsByOriginalId.has(originalId)) {
+                groupsByOriginalId.set(originalId, new Set([originalId]));
+            }
+            groupsByOriginalId.get(originalId).add(node.id);
+        });
+
+        const groups = new Map();
+        groupsByOriginalId.forEach((group) => {
+            group.forEach((nodeId) => groups.set(nodeId, group));
+        });
+
+        return groups;
+    }, [nodes, injectedSlotNodes]);
+
+    const selectedVisualNodeIdSet = useMemo(() => {
+        const ids = new Set(selectedNodeIdSet);
+        selectedNodeIdSet.forEach((nodeId) => {
+            cloneGroupByNodeId.get(nodeId)?.forEach((linkedId) => ids.add(linkedId));
+        });
+        return ids;
+    }, [cloneGroupByNodeId, selectedNodeIdSet]);
+
+
+
+    // Keep an index of the visual/semantic nodes connected to each edge.
+    // Transition visibility itself is paint-only: all transitions stay mounted
+    // and routed after load, while this focus set marks the cached subset that
+    // should remain visible when global transition visibility is disabled.
+    const edgeFocusNodeIds = useMemo(() => {
+        // While a node is being dragged, its connections are the only node-based
+        // transition context that should be highlighted. The persistent editor
+        // selection must not keep unrelated transitions highlighted during the
+        // drag. This is display-only and does not change actual node selection.
+        const ids = isDraggingNode && draggingNodeId
+            ? new Set([draggingNodeId])
+            : new Set([
+                  ...selectedNodes.map((node) => node.id),
+                  ...(selectedNodeId ? [selectedNodeId] : []),
+                  ...(activeCanvasFocusNodeId ? [activeCanvasFocusNodeId] : []),
+                  ...(hoveredSlotAccessNodeId ? [hoveredSlotAccessNodeId] : []),
+              ]);
+
+        [...ids].forEach((nodeId) => {
+            cloneGroupByNodeId
+                .get(nodeId)
+                ?.forEach((linkedId) => ids.add(linkedId));
+        });
+
+        return ids;
+    }, [
+        isDraggingNode,
+        draggingNodeId,
+        selectedNodes,
+        selectedNodeId,
+        activeCanvasFocusNodeId,
+        hoveredSlotAccessNodeId,
+        cloneGroupByNodeId,
+    ]);
+
+    const transitionEdgeMatchesFocus = (edge) => {
+        if (edgeFocusNodeIds.size === 0) return false;
+        return getTransitionEdgeNodeIds(edge).some((id) =>
+            edgeFocusNodeIds.has(id)
+        );
+    };
+
+    // React Flow stores selection on the edge object itself. Ignore that
+    // display-only flag for routing-cache invalidation: clicking an edge must
+    // not make the whole workflow normalize/re-route again.
+    const transitionStructureEdgesRef = useRef([]);
+    const transitionStructureEdges = useMemo(() => {
+        const previous = transitionStructureEdgesRef.current;
+        const structurallyUnchanged =
+            previous.length === edges.length &&
+            edges.every((edge, index) => {
+                const oldEdge = previous[index];
+                return (
+                    oldEdge?.id === edge.id &&
+                    oldEdge?.source === edge.source &&
+                    oldEdge?.target === edge.target &&
+                    oldEdge?.sourceHandle === edge.sourceHandle &&
+                    oldEdge?.targetHandle === edge.targetHandle &&
+                    oldEdge?.label === edge.label &&
+                    oldEdge?.type === edge.type &&
+                    oldEdge?.data === edge.data &&
+                    oldEdge?.style === edge.style &&
+                    oldEdge?.markerEnd === edge.markerEnd
+                );
+            });
+
+        if (structurallyUnchanged) return previous;
+
+        const next = edges.map((edge) =>
+            edge.selected ? { ...edge, selected: false } : edge
+        );
+        transitionStructureEdgesRef.current = next;
+        return next;
+    }, [edges]);
+
+    const selectedTransitionEdgeIds = useMemo(
+        () =>
+            new Set(
+                edges
+                    .filter((edge) => edge.selected)
+                    .map((edge) => edge.id)
+            ),
+        [edges]
+    );
+
+    // Build the complete transition render model once for the loaded graph.
+    // Visibility/hover changes must never force normalization or routing to run
+    // again; those interactions only select entries from this cache below.
     const normalizedTransitionEdges = useMemo(
         () =>
-            edges.map((edge) => {
+            transitionStructureEdges.map((edge) => {
                 let normalizedEdge = edge;
+
+                const collapsedSource = getCollapsedTransitionSource(
+                    normalizedEdge,
+                    nodeById
+                );
+                if (
+                    collapsedSource &&
+                    nodeById.get(collapsedSource.nodeId)?.type === "parallel"
+                ) {
+                    normalizedEdge = {
+                        ...normalizedEdge,
+                        source: collapsedSource.nodeId,
+                        sourceHandle: collapsedSource.sourceHandle,
+                    };
+                }
 
                 if (!normalizedEdge.targetHandle) {
                     const targetNode = nodeById.get(normalizedEdge.target);
@@ -131,8 +336,8 @@ export function useEditorDisplay({
                 }
 
                 // Loaded/older self loops may not have editor control points.
-                // Give them a deterministic two-point route so they visibly
-                // leave the node and return around its top edge.
+                // Cache their deterministic loop route once instead of rebuilding
+                // it whenever the edge visibility/focus state changes.
                 if (
                     normalizedEdge.source === normalizedEdge.target &&
                     !(
@@ -164,23 +369,122 @@ export function useEditorDisplay({
 
                 return normalizedEdge;
             }),
-        [edges, nodeById]
+        [transitionStructureEdges, nodeById]
     );
 
-    const compoundAvoidanceCacheRef = useRef(new Map());
-    const compoundAvoidanceNodesDependency = isDraggingNode ? null : nodes;
-    const compoundAvoidanceByEdgeId = useMemo(() => {
-        if (!compoundAvoidanceNodesDependency) {
-            return compoundAvoidanceCacheRef.current;
+    const routingGeometryNodesRef = useRef([]);
+    const routingGeometryNodes = useMemo(() => {
+        if (isDraggingNode && routingGeometryNodesRef.current.length > 0) {
+            return routingGeometryNodesRef.current;
         }
 
-        const liveNodes = compoundAvoidanceNodesDependency;
+        const previous = routingGeometryNodesRef.current;
+        const geometryUnchanged =
+            previous.length === nodes.length &&
+            nodes.every((node, index) => {
+                const oldNode = previous[index];
+                return (
+                    oldNode?.id === node.id &&
+                    oldNode?.type === node.type &&
+                    oldNode?.parentId === node.parentId &&
+                    oldNode?.hidden === node.hidden &&
+                    oldNode?.position?.x === node.position?.x &&
+                    oldNode?.position?.y === node.position?.y &&
+                    oldNode?.style?.width === node.style?.width &&
+                    oldNode?.style?.height === node.style?.height &&
+                    Boolean(oldNode?.data?.isCollapsed) ===
+                        Boolean(node.data?.isCollapsed)
+                );
+            });
+
+        if (geometryUnchanged) return previous;
+
+        routingGeometryNodesRef.current = nodes;
+        return nodes;
+    }, [nodes, isDraggingNode]);
+
+    // Smart/manual edge routing only depends on node geometry, not display-only
+    // node data such as selection/hover highlighting. Keep one stable obstacle
+    // array so those UI interactions do not invalidate every routed edge.
+    // Slot nodes are included only in modes where they are actually rendered.
+    const manualRoutingNodesRef = useRef([]);
+    const manualRoutingNodes = useMemo(() => {
+        const requestedNodes =
+            activeMode === "slots" || activeMode === "overview"
+                ? [...injectedNodes, ...injectedSlotNodes]
+                : injectedNodes;
+        const previous = manualRoutingNodesRef.current;
+        const geometryUnchanged =
+            previous.length === requestedNodes.length &&
+            requestedNodes.every((node, index) => {
+                const oldNode = previous[index];
+                return (
+                    oldNode?.id === node.id &&
+                    oldNode?.type === node.type &&
+                    oldNode?.parentId === node.parentId &&
+                    oldNode?.hidden === node.hidden &&
+                    oldNode?.position?.x === node.position?.x &&
+                    oldNode?.position?.y === node.position?.y &&
+                    oldNode?.style?.width === node.style?.width &&
+                    oldNode?.style?.height === node.style?.height &&
+                    Boolean(oldNode?.data?.isCollapsed) ===
+                        Boolean(node.data?.isCollapsed)
+                );
+            });
+
+        if (geometryUnchanged) return previous;
+
+        manualRoutingNodesRef.current = requestedNodes;
+        return requestedNodes;
+    }, [activeMode, injectedNodes, injectedSlotNodes]);
+
+    // Build the expensive routing geometry once per real geometry change.
+    // Previously the compound-avoidance pass repeatedly walked parent chains
+    // with Array.find() and then tested every transition against every
+    // Compound. On large graphs that can become O(edges * compounds * nodes).
+    // The cached index below resolves absolute positions/ancestors once and
+    // places Compound rectangles into a simple spatial grid. Each transition
+    // therefore checks only nearby Compound obstacles.
+    const routingGeometryIndex = useMemo(() => {
         const liveNodeById = new Map(
-            liveNodes.map((node) => [node.id, node])
+            routingGeometryNodes.map((node) => [node.id, node])
         );
-        const compounds = liveNodes.filter(
-            (node) => node.type === "compound" && !node.hidden
-        );
+        const absolutePositionByNodeId = new Map();
+        const resolvingPositionIds = new Set();
+
+        const getAbsolutePosition = (node) => {
+            if (!node) return { x: 0, y: 0 };
+            const cached = absolutePositionByNodeId.get(node.id);
+            if (cached) return cached;
+
+            const local = {
+                x: node.position?.x || 0,
+                y: node.position?.y || 0,
+            };
+
+            // Guard malformed/cyclic parent relationships without making the
+            // normal tree path more expensive.
+            if (resolvingPositionIds.has(node.id)) return local;
+            resolvingPositionIds.add(node.id);
+
+            const parent = node.parentId
+                ? liveNodeById.get(node.parentId)
+                : null;
+            const parentPosition = parent
+                ? getAbsolutePosition(parent)
+                : { x: 0, y: 0 };
+            const absolute = {
+                x: local.x + parentPosition.x,
+                y: local.y + parentPosition.y,
+            };
+
+            resolvingPositionIds.delete(node.id);
+            absolutePositionByNodeId.set(node.id, absolute);
+            return absolute;
+        };
+
+        routingGeometryNodes.forEach((node) => getAbsolutePosition(node));
+
         const ancestorIdsByNodeId = new Map();
         const getAncestorIds = (node) => {
             if (!node) return new Set();
@@ -200,6 +504,69 @@ export function useEditorDisplay({
             ancestorIdsByNodeId.set(node.id, ancestors);
             return ancestors;
         };
+
+        const compoundEntries = routingGeometryNodes
+            .filter((node) => node.type === "compound" && !node.hidden)
+            .map((compound) => {
+                const position = absolutePositionByNodeId.get(compound.id) ||
+                    getAbsolutePosition(compound);
+                const size = getNodeSize(compound);
+                const padding = 18;
+
+                return {
+                    id: compound.id,
+                    rect: {
+                        left: position.x - padding,
+                        right: position.x + size.width + padding,
+                        top: position.y - padding,
+                        bottom: position.y + size.height + padding,
+                    },
+                };
+            });
+
+        const compoundGrid = new Map();
+        compoundEntries.forEach((entry) => {
+            const { rect } = entry;
+            const minCellX = Math.floor(
+                rect.left / COMPOUND_ROUTING_GRID_CELL_SIZE
+            );
+            const maxCellX = Math.floor(
+                rect.right / COMPOUND_ROUTING_GRID_CELL_SIZE
+            );
+            const minCellY = Math.floor(
+                rect.top / COMPOUND_ROUTING_GRID_CELL_SIZE
+            );
+            const maxCellY = Math.floor(
+                rect.bottom / COMPOUND_ROUTING_GRID_CELL_SIZE
+            );
+
+            for (let cellX = minCellX; cellX <= maxCellX; cellX += 1) {
+                for (let cellY = minCellY; cellY <= maxCellY; cellY += 1) {
+                    const key = `${cellX}:${cellY}`;
+                    if (!compoundGrid.has(key)) compoundGrid.set(key, []);
+                    compoundGrid.get(key).push(entry);
+                }
+            }
+        });
+
+        return {
+            liveNodeById,
+            absolutePositionByNodeId,
+            ancestorIdsByNodeId,
+            compoundEntries,
+            compoundGrid,
+            getAncestorIds,
+        };
+    }, [routingGeometryNodes]);
+
+    const compoundAvoidanceByEdgeId = useMemo(() => {
+        const {
+            liveNodeById,
+            absolutePositionByNodeId,
+            compoundEntries,
+            compoundGrid,
+            getAncestorIds,
+        } = routingGeometryIndex;
         const next = new Map();
 
         normalizedTransitionEdges.forEach((edge) => {
@@ -216,14 +583,10 @@ export function useEditorDisplay({
             const targetNode = liveNodeById.get(edge.target);
             if (!sourceNode || !targetNode) return;
 
-            const sourcePosition = getAbsoluteNodePosition(
-                sourceNode,
-                liveNodes
-            );
-            const targetPosition = getAbsoluteNodePosition(
-                targetNode,
-                liveNodes
-            );
+            const sourcePosition = absolutePositionByNodeId.get(sourceNode.id);
+            const targetPosition = absolutePositionByNodeId.get(targetNode.id);
+            if (!sourcePosition || !targetPosition) return;
+
             const sourceSize = getNodeSize(sourceNode);
             const targetSize = getNodeSize(targetNode);
             const start = {
@@ -238,52 +601,129 @@ export function useEditorDisplay({
             const sourceAncestorIds = getAncestorIds(sourceNode);
             const targetAncestorIds = getAncestorIds(targetNode);
 
-            const crossesCompound = compounds.some((compound) => {
+            let candidates = compoundEntries;
+            if (compoundEntries.length > 8) {
+                const minX = Math.min(start.x, end.x);
+                const maxX = Math.max(start.x, end.x);
+                const minY = Math.min(start.y, end.y);
+                const maxY = Math.max(start.y, end.y);
+                const minCellX = Math.floor(
+                    minX / COMPOUND_ROUTING_GRID_CELL_SIZE
+                );
+                const maxCellX = Math.floor(
+                    maxX / COMPOUND_ROUTING_GRID_CELL_SIZE
+                );
+                const minCellY = Math.floor(
+                    minY / COMPOUND_ROUTING_GRID_CELL_SIZE
+                );
+                const maxCellY = Math.floor(
+                    maxY / COMPOUND_ROUTING_GRID_CELL_SIZE
+                );
+                const seenIds = new Set();
+                const nearby = [];
+
+                for (let cellX = minCellX; cellX <= maxCellX; cellX += 1) {
+                    for (let cellY = minCellY; cellY <= maxCellY; cellY += 1) {
+                        const entries = compoundGrid.get(`${cellX}:${cellY}`);
+                        if (!entries) continue;
+
+                        entries.forEach((entry) => {
+                            if (seenIds.has(entry.id)) return;
+                            seenIds.add(entry.id);
+                            nearby.push(entry);
+                        });
+                    }
+                }
+
+                candidates = nearby;
+            }
+
+            const crossesCompound = candidates.some((entry) => {
                 if (
-                    compound.id === sourceNode.id ||
-                    compound.id === targetNode.id ||
-                    sourceAncestorIds.has(compound.id) ||
-                    targetAncestorIds.has(compound.id)
+                    entry.id === sourceNode.id ||
+                    entry.id === targetNode.id ||
+                    sourceAncestorIds.has(entry.id) ||
+                    targetAncestorIds.has(entry.id)
                 ) {
                     return false;
                 }
 
-                const position = getAbsoluteNodePosition(compound, liveNodes);
-                const size = getNodeSize(compound);
-                const padding = 18;
-                const rect = {
-                    left: position.x - padding,
-                    right: position.x + size.width + padding,
-                    top: position.y - padding,
-                    bottom: position.y + size.height + padding,
-                };
-
-                return segmentIntersectsRect(start, end, rect);
+                return segmentIntersectsRect(start, end, entry.rect);
             });
 
-            if (crossesCompound) {
-                next.set(edge.id, true);
-            }
+            if (crossesCompound) next.set(edge.id, true);
         });
 
-        compoundAvoidanceCacheRef.current = next;
         return next;
-    }, [compoundAvoidanceNodesDependency, normalizedTransitionEdges]);
+    }, [routingGeometryIndex, normalizedTransitionEdges]);
+
+
+    const reconnectableTransitionEdgeIds = useMemo(() => {
+        const incomingByTarget = new Map();
+
+        normalizedTransitionEdges.forEach((edge) => {
+            if (
+                edge.data?.boundaryInternalEdge ||
+                edge.data?.compoundInternalEdge ||
+                edge.data?.parallelInternalEdge ||
+                edge.data?.compoundInitialEdge ||
+                edge.data?.parallelEntryEdge
+            ) {
+                return;
+            }
+
+            const targetNode = nodeById.get(edge.target);
+            if (!targetNode || !["custom", "submachine"].includes(targetNode.type)) {
+                return;
+            }
+
+            if (!incomingByTarget.has(edge.target)) {
+                incomingByTarget.set(edge.target, []);
+            }
+            incomingByTarget.get(edge.target).push(edge.id);
+        });
+
+        return new Set(
+            [...incomingByTarget.values()]
+                .filter((edgeIds) => edgeIds.length === 1)
+                .map((edgeIds) => edgeIds[0])
+        );
+    }, [normalizedTransitionEdges, nodeById]);
 
     const smartTransitionEdges = useMemo(
         () =>
             withSmartTransitionRouting(normalizedTransitionEdges).map(
                 (edge) => ({
                     ...edge,
+                    // React Flow's native target reconnect handle re-drags the
+                    // existing edge instead of creating a second connection.
+                    reconnectable: reconnectableTransitionEdgeIds.has(edge.id)
+                        ? "target"
+                        : false,
                     data: {
                         ...(edge.data || {}),
                         ...(compoundAvoidanceByEdgeId.has(edge.id)
                             ? { forceObstacleRouting: true }
                             : {}),
+                        // ManualEditableTransitionEdge consumes this stable
+                        // geometry cache instead of subscribing to useNodes().
+                        routingNodes: manualRoutingNodes,
                         onControlPointsChange: (controlPoints) =>
                             updatePersistentEdgeControlPoints(
                                 edge.id,
                                 controlPoints,
+                                "transition"
+                            ),
+                        controlPointInsertRequest:
+                            controlPointInsertRequest?.edgeKind === "transition" &&
+                            controlPointInsertRequest?.edgeId === edge.id
+                                ? controlPointInsertRequest
+                                : null,
+                        onControlPointContextMenu: (event, pointId) =>
+                            onControlPointContextMenu?.(
+                                event,
+                                edge.id,
+                                pointId,
                                 "transition"
                             ),
                     },
@@ -291,25 +731,202 @@ export function useEditorDisplay({
             ),
         [
             normalizedTransitionEdges,
+            reconnectableTransitionEdgeIds,
             compoundAvoidanceByEdgeId,
+            manualRoutingNodes,
             updatePersistentEdgeControlPoints,
+            controlPointInsertRequest,
+            onControlPointContextMenu,
         ]
     );
 
-    const highlightedTransitionEdges = useMemo(
-        () =>
-            highlightSelectedTransitions(
-                smartTransitionEdges,
-                new Set(
-                    selectedTransitionNodeIdKey
-                        ? selectedTransitionNodeIdKey.split("\u0001")
-                        : []
-                )
+    // Rendering every background transition with obstacle-aware smart routing is
+    // disproportionately expensive on large workflows. Keep the complete
+    // semantic graph loaded, but switch only the unfocused presentation to a
+    // cheap Bezier path once the graph crosses this threshold. Focused/selected
+    // transitions still use the full smart-routed, labelled representation.
+    const useLightweightBackgroundTransitions =
+        smartTransitionEdges.length >= 300;
+
+    // Cache all presentation variants independently from React Flow selection.
+    // Selecting one edge used to rebuild base/focused objects for the complete
+    // transition graph. With large workflows that meant O(E) object churn for
+    // a one-edge interaction. Selection now only swaps the indexed entries
+    // below, while this cache changes only when transition structure changes.
+    const transitionRenderCache = useMemo(() => {
+        const baseEdges = [];
+        const focusedEdges = [];
+        const selectedEdges = [];
+        const selectedFocusedEdges = [];
+
+        smartTransitionEdges.forEach((rawEdge) => {
+            const clearedEdge = clearTransientTransitionHighlight(rawEdge);
+            const isInternalHelper = Boolean(
+                clearedEdge.data?.boundaryInternalEdge ||
+                clearedEdge.data?.compoundInternalEdge ||
+                clearedEdge.data?.parallelInternalEdge ||
+                clearedEdge.data?.compoundInitialEdge ||
+                clearedEdge.data?.parallelEntryEdge
+            );
+            let semanticEdge = withEdgeClassName(
+                clearedEdge,
+                "editor-transition-edge"
+            );
+            if (!isInternalHelper) {
+                semanticEdge = withEdgeClassName(
+                    semanticEdge,
+                    "editor-user-transition-edge"
+                );
+            }
+            const edge = useLightweightBackgroundTransitions
+                ? {
+                      ...semanticEdge,
+                      data: {
+                          ...(semanticEdge.data || {}),
+                          lightweightBackgroundRouting: true,
+                      },
+                  }
+                : semanticEdge;
+            const semanticHandle =
+                edge.data?.boundaryOriginalSourceHandle ||
+                edge.data?.compoundOriginalSourceHandle ||
+                edge.data?.parallelOriginalSourceHandle ||
+                edge.sourceHandle ||
+                edge.label;
+            const color = getTransitionHighlightColor(semanticHandle);
+
+            const fullDetailEdge = useLightweightBackgroundTransitions
+                ? {
+                      ...semanticEdge,
+                      data: {
+                          ...(semanticEdge.data || {}),
+                          lightweightBackgroundRouting: false,
+                      },
+                  }
+                : semanticEdge;
+            const selectedEdge = {
+                ...fullDetailEdge,
+                selected: true,
+                style: { ...(fullDetailEdge.style || {}), stroke: color },
+                markerEnd: fullDetailEdge.markerEnd
+                    ? { ...fullDetailEdge.markerEnd, color }
+                    : fullDetailEdge.markerEnd,
+            };
+            const focusedEdge = {
+                ...withEdgeClassName(
+                    withEdgeClassName(
+                        fullDetailEdge,
+                        "editor-edge-context-visible"
+                    ),
+                    "editor-edge-focus-active"
+                ),
+                animated: true,
+                style: {
+                    ...(fullDetailEdge.style || {}),
+                    stroke: color,
+                },
+                markerEnd: fullDetailEdge.markerEnd
+                    ? { ...fullDetailEdge.markerEnd, color }
+                    : fullDetailEdge.markerEnd,
+            };
+            const selectedFocusedEdge = {
+                ...withEdgeClassName(
+                    withEdgeClassName(
+                        selectedEdge,
+                        "editor-edge-context-visible"
+                    ),
+                    "editor-edge-focus-active"
+                ),
+                animated: true,
+            };
+
+            baseEdges.push(edge);
+            focusedEdges.push(focusedEdge);
+            selectedEdges.push(selectedEdge);
+            selectedFocusedEdges.push(selectedFocusedEdge);
+        });
+
+        return {
+            baseEdges,
+            focusedEdges,
+            selectedEdges,
+            selectedFocusedEdges,
+            indexByNodeId: buildEdgeIndexByNodeId(
+                baseEdges,
+                getTransitionEdgeNodeIds
             ),
-        [smartTransitionEdges, selectedTransitionNodeIdKey]
-    );
+            indexByEdgeId: new Map(
+                baseEdges.map((edge, index) => [edge.id, index])
+            ),
+        };
+    }, [smartTransitionEdges, useLightweightBackgroundTransitions]);
+
+    const transitionEdgesForDisplay = useMemo(() => {
+        if (activeMode === "code") return [];
+
+        const {
+            baseEdges,
+            focusedEdges,
+            selectedEdges,
+            selectedFocusedEdges,
+            indexByNodeId,
+            indexByEdgeId,
+        } = transitionRenderCache;
+        const focusedIndexes = new Set();
+        edgeFocusNodeIds.forEach((nodeId) => {
+            (indexByNodeId.get(nodeId) || []).forEach((edgeIndex) =>
+                focusedIndexes.add(edgeIndex)
+            );
+        });
+
+        if (activeHoveredEditorEdgeId) {
+            const hoveredIndex = indexByEdgeId.get(activeHoveredEditorEdgeId);
+            if (hoveredIndex !== undefined) focusedIndexes.add(hoveredIndex);
+        }
+
+        // Keep every transition mounted after load. The visibility toggle is
+        // implemented by a CSS class on React Flow instead of removing edges
+        // from the array. Selection/focus only replaces the indexed cached
+        // variants instead of rebuilding the complete edge cache.
+        if (
+            focusedIndexes.size === 0 &&
+            selectedTransitionEdgeIds.size === 0
+        ) {
+            return baseEdges;
+        }
+
+        const displayed = baseEdges.slice();
+
+        selectedTransitionEdgeIds.forEach((edgeId) => {
+            const edgeIndex = indexByEdgeId.get(edgeId);
+            if (edgeIndex === undefined) return;
+            displayed[edgeIndex] = selectedEdges[edgeIndex];
+        });
+
+        focusedIndexes.forEach((edgeIndex) => {
+            const edgeId = baseEdges[edgeIndex]?.id;
+            displayed[edgeIndex] =
+                edgeId && selectedTransitionEdgeIds.has(edgeId)
+                    ? selectedFocusedEdges[edgeIndex]
+                    : focusedEdges[edgeIndex];
+        });
+
+        return displayed;
+    }, [
+        activeMode,
+        transitionRenderCache,
+        selectedTransitionEdgeIds,
+        edgeFocusNodeIds,
+        activeHoveredEditorEdgeId,
+    ]);
+
+    const highlightedTransitionEdges = transitionEdgesForDisplay;
 
     const selectedSlotContextId = activeCanvasFocusNodeId || selectedNodeId;
+    const selectedSlotContextNodeIds = selectedSlotContextId
+        ? cloneGroupByNodeId.get(selectedSlotContextId) ||
+          new Set([selectedSlotContextId])
+        : new Set();
     const hasSelectedSlotContext = Boolean(
         selectedSlotContextId &&
             (nodeById.has(selectedSlotContextId) ||
@@ -324,9 +941,53 @@ export function useEditorDisplay({
     const inactiveSlotEdgeCacheRef = useRef(new WeakMap());
     const hoveredSlotEdgeCacheRef = useRef(new WeakMap());
 
-    const routedSlotEdges = useMemo(
+    // Slot-edge selection is display-only too. Keep it out of the structural
+    // cache so selecting a slot connection does not rebuild every routed edge.
+    const slotStructureEdgesRef = useRef([]);
+    const slotStructureEdges = useMemo(() => {
+        const previous = slotStructureEdgesRef.current;
+        const structurallyUnchanged =
+            previous.length === slotEdges.length &&
+            slotEdges.every((edge, index) => {
+                const oldEdge = previous[index];
+                return (
+                    oldEdge?.id === edge.id &&
+                    oldEdge?.source === edge.source &&
+                    oldEdge?.target === edge.target &&
+                    oldEdge?.sourceHandle === edge.sourceHandle &&
+                    oldEdge?.targetHandle === edge.targetHandle &&
+                    oldEdge?.data === edge.data &&
+                    oldEdge?.style === edge.style &&
+                    oldEdge?.markerEnd === edge.markerEnd
+                );
+            });
+
+        if (structurallyUnchanged) return previous;
+
+        const next = slotEdges.map((edge) =>
+            edge.selected ? { ...edge, selected: false } : edge
+        );
+        slotStructureEdgesRef.current = next;
+        return next;
+    }, [slotEdges]);
+
+    const selectedSlotEdgeIds = useMemo(
         () =>
-            slotEdges.map((edge) => {
+            new Set(
+                slotEdges
+                    .filter((edge) => edge.selected)
+                    .map((edge) => edge.id)
+            ),
+        [slotEdges]
+    );
+
+    // Slot edges follow the same cache-first rule as transitions: make every
+    // render-ready edge once when the slot graph changes, then visibility only
+    // chooses cached entries. No edge objects/routing callbacks are rebuilt on
+    // hover or toggle changes.
+    const routedSlotEdgeCache = useMemo(
+        () =>
+            slotStructureEdges.map((edge) => {
                 const access = edge.data?.access === "write" ? "write" : "read";
 
                 return {
@@ -335,17 +996,139 @@ export function useEditorDisplay({
                     data: {
                         ...(edge.data || {}),
                         access,
+                        // Slot edges use the same geometry-only obstacle cache;
+                        // in Slot/Overview mode it already includes slot nodes.
+                        routingNodes: manualRoutingNodes,
                         onControlPointsChange: (controlPoints) =>
                             updatePersistentEdgeControlPoints(
                                 edge.id,
                                 controlPoints,
                                 "slot"
                             ),
+                        controlPointInsertRequest:
+                            controlPointInsertRequest?.edgeKind === "slot" &&
+                            controlPointInsertRequest?.edgeId === edge.id
+                                ? controlPointInsertRequest
+                                : null,
+                        onControlPointContextMenu: (event, pointId) =>
+                            onControlPointContextMenu?.(
+                                event,
+                                edge.id,
+                                pointId,
+                                "slot"
+                            ),
                     },
                 };
             }),
-        [slotEdges, updatePersistentEdgeControlPoints]
+        [
+            slotStructureEdges,
+            manualRoutingNodes,
+            updatePersistentEdgeControlPoints,
+            controlPointInsertRequest,
+            onControlPointContextMenu,
+        ]
     );
+
+    // Keep every slot edge mounted while Slot/Overview mode is active. Just as
+    // with transitions, the visibility toggle must be paint-only; otherwise
+    // enabling slot edges mounts every smart-edge component in one frame and
+    // forces the router to run for the complete slot graph at once.
+    //
+    // Both base and contextual variants are cached here. Hover/selection only
+    // swaps references at the indexed connected positions below.
+    const slotRenderCache = useMemo(() => {
+        const baseEdges = [];
+        const contextEdges = [];
+        const selectedEdges = [];
+        const selectedContextEdges = [];
+
+        routedSlotEdgeCache.forEach((rawEdge) => {
+            const edge = withEdgeClassName(rawEdge, "editor-slot-edge");
+            const contextEdge = withEdgeClassName(
+                edge,
+                "editor-edge-context-visible"
+            );
+            const selectedEdge = { ...edge, selected: true };
+            const selectedContextEdge = {
+                ...contextEdge,
+                selected: true,
+            };
+
+            baseEdges.push(edge);
+            contextEdges.push(contextEdge);
+            selectedEdges.push(selectedEdge);
+            selectedContextEdges.push(selectedContextEdge);
+        });
+
+        return {
+            baseEdges,
+            contextEdges,
+            selectedEdges,
+            selectedContextEdges,
+            indexByNodeId: buildEdgeIndexByNodeId(
+                baseEdges,
+                getSlotEdgeNodeIds
+            ),
+            indexByEdgeId: new Map(
+                baseEdges.map((edge, index) => [edge.id, index])
+            ),
+        };
+    }, [routedSlotEdgeCache]);
+
+    const slotFocusedIndexes = useMemo(() => {
+        const indexes = new Set();
+        edgeFocusNodeIds.forEach((nodeId) => {
+            (slotRenderCache.indexByNodeId.get(nodeId) || []).forEach(
+                (edgeIndex) => indexes.add(edgeIndex)
+            );
+        });
+        return indexes;
+    }, [slotRenderCache, edgeFocusNodeIds]);
+
+    const routedSlotEdges = useMemo(() => {
+        if (activeMode !== "slots" && activeMode !== "overview") {
+            return [];
+        }
+
+        const {
+            baseEdges,
+            contextEdges,
+            selectedEdges,
+            selectedContextEdges,
+            indexByEdgeId,
+        } = slotRenderCache;
+        if (
+            slotFocusedIndexes.size === 0 &&
+            selectedSlotEdgeIds.size === 0
+        ) {
+            return baseEdges;
+        }
+
+        // Keep the complete edge set mounted and swap only cached entries that
+        // are selected or contextual. Selecting one slot edge therefore no
+        // longer rebuilds render objects for every slot connection.
+        const displayed = baseEdges.slice();
+
+        selectedSlotEdgeIds.forEach((edgeId) => {
+            const edgeIndex = indexByEdgeId.get(edgeId);
+            if (edgeIndex === undefined) return;
+            displayed[edgeIndex] = selectedEdges[edgeIndex];
+        });
+
+        slotFocusedIndexes.forEach((edgeIndex) => {
+            const edgeId = baseEdges[edgeIndex]?.id;
+            displayed[edgeIndex] =
+                edgeId && selectedSlotEdgeIds.has(edgeId)
+                    ? selectedContextEdges[edgeIndex]
+                    : contextEdges[edgeIndex];
+        });
+        return displayed;
+    }, [
+        activeMode,
+        slotRenderCache,
+        slotFocusedIndexes,
+        selectedSlotEdgeIds,
+    ]);
 
     const editableSlotEdges = useMemo(() => {
         if (!hasSelectedSlotContext && !isSlotDetailsConnectionPreview) {
@@ -353,6 +1136,18 @@ export function useEditorDisplay({
         }
 
         return routedSlotEdges.map((edge) => {
+            const isContextVisibleSlotEdge = String(edge.className || "")
+                .split(/\s+/)
+                .includes("editor-edge-context-visible");
+
+            // With slot edges globally hidden, unrelated edges are already
+            // invisible through CSS. Preserve their cached object identity
+            // instead of rebuilding dimmed variants for the entire graph on
+            // every hover/selection change.
+            if (!showSlotEdges && !isContextVisibleSlotEdge && !edge.selected) {
+                return edge;
+            }
+
             const access = edge.data?.access === "write" ? "write" : "read";
             const semanticColor = SLOT_CONNECTION_COLORS[access];
 
@@ -363,16 +1158,16 @@ export function useEditorDisplay({
                 (skillNodeId === hoveredSlotAccessNodeId ||
                     edge.source === hoveredSlotAccessNodeId ||
                     edge.target === hoveredSlotAccessNodeId) &&
-                (slotNodeId === selectedNodeId ||
-                    edge.source === selectedNodeId ||
-                    edge.target === selectedNodeId);
+                (selectedSlotContextNodeIds.has(slotNodeId) ||
+                    selectedSlotContextNodeIds.has(edge.source) ||
+                    selectedSlotContextNodeIds.has(edge.target));
 
             const isConnectedToSelection = isSlotDetailsConnectionPreview
                 ? isHoveredSlotDetailsConnection
-                : skillNodeId === selectedSlotContextId ||
-                  slotNodeId === selectedSlotContextId ||
-                  edge.source === selectedSlotContextId ||
-                  edge.target === selectedSlotContextId;
+                : selectedSlotContextNodeIds.has(skillNodeId) ||
+                  selectedSlotContextNodeIds.has(slotNodeId) ||
+                  selectedSlotContextNodeIds.has(edge.source) ||
+                  selectedSlotContextNodeIds.has(edge.target);
 
             if (isConnectedToSelection && !isHoveredSlotDetailsConnection) {
                 return edge;
@@ -429,6 +1224,8 @@ export function useEditorDisplay({
         selectedNodeId,
         hasSelectedSlotContext,
         selectedSlotContextId,
+        cloneGroupByNodeId,
+        showSlotEdges,
     ]);
 
     const compoundInitialEdges = useMemo(
@@ -583,8 +1380,17 @@ export function useEditorDisplay({
         [activeMode, injectedNodes, injectedSlotNodes]
     );
 
-    const [smartRoutingNodes, setSmartRoutingNodes] = useState(baseVisibleNodes);
-    const smartRoutingNodesDependency = isDraggingNode ? null : baseVisibleNodes;
+    const hasSmartRoutedEdges =
+        highlightedTransitionEdges.length > 0 || editableSlotEdges.length > 0;
+    const requestedSmartRoutingNodes = hasSmartRoutedEdges
+        ? manualRoutingNodes
+        : [];
+    const [smartRoutingNodes, setSmartRoutingNodes] = useState(
+        requestedSmartRoutingNodes
+    );
+    const smartRoutingNodesDependency = isDraggingNode
+        ? null
+        : requestedSmartRoutingNodes;
 
     useEffect(() => {
         // Smart-edge obstacle routing is one of the most expensive parts of a
@@ -601,44 +1407,60 @@ export function useEditorDisplay({
         );
     }, [smartRoutingNodesDependency]);
 
-    const dimmedHoverEdgeCacheRef = useRef(new WeakMap());
-    const dimmedHoverNodeCacheRef = useRef(new WeakMap());
-    const highlightedHoverNodeCacheRef = useRef(new WeakMap());
-
     const isSlotDetailsFocus = Boolean(
         hoveredSlotAccessNodeId &&
             selectedNodeId &&
             slotNodeIdSet.has(selectedNodeId)
     );
 
+    const edgeFocusMode = Boolean(
+        activeCanvasFocusNodeId ||
+            activeHoveredEditorEdgeId ||
+            isSlotDetailsFocus
+    );
+
     const visibleEdges = useMemo(() => {
-        let nextVisibleEdges = [
-            ...highlightedTransitionEdges,
+        const structuralTransitionEdges = [
             ...compoundInitialEdges,
             ...parallelEntryEdges,
+        ].map((edge) => {
+            let transitionEdge = withEdgeClassName(
+                edge,
+                "editor-transition-edge"
+            );
+            const isFocused =
+                transitionEdgeMatchesFocus(edge) ||
+                edge.id === activeHoveredEditorEdgeId;
+
+            if (isFocused) {
+                transitionEdge = withEdgeClassName(
+                    transitionEdge,
+                    "editor-edge-context-visible"
+                );
+                transitionEdge = withEdgeClassName(
+                    transitionEdge,
+                    "editor-edge-focus-active"
+                );
+            }
+
+            return transitionEdge;
+        });
+
+        let nextVisibleEdges = [
+            ...highlightedTransitionEdges,
+            ...structuralTransitionEdges,
         ];
 
-        if (activeMode === "slots") {
-            const hoveredTransitionEdges = activeCanvasFocusNodeId
-                ? highlightedTransitionEdges.filter(
-                      (edge) =>
-                          edge.source === activeCanvasFocusNodeId ||
-                          edge.target === activeCanvasFocusNodeId
-                  )
-                : [];
-
-            nextVisibleEdges = [...hoveredTransitionEdges, ...editableSlotEdges];
-        } else if (activeMode === "overview") {
+        if (activeMode === "slots" || activeMode === "overview") {
             nextVisibleEdges = [
                 ...highlightedTransitionEdges,
-                ...compoundInitialEdges,
-                ...parallelEntryEdges,
+                ...structuralTransitionEdges,
                 ...editableSlotEdges,
             ];
         }
 
-        // This pass now runs once when dragging starts/stops instead of once per
-        // node position update because it no longer shares a memo with nodes.
+        // This pass runs only when dragging starts/stops. Hover focus is now
+        // handled by CSS classes, so it no longer clones every visible edge.
         if (isDraggingNode) {
             nextVisibleEdges = nextVisibleEdges.map((edge) =>
                 edge.animated ? { ...edge, animated: false } : edge
@@ -653,99 +1475,48 @@ export function useEditorDisplay({
             );
         }
 
-        const hoveredEditorEdge = activeHoveredEditorEdgeId
-            ? nextVisibleEdges.find(
-                  (edge) => edge.id === activeHoveredEditorEdgeId
-              )
-            : null;
-        const hasHoverFocus = Boolean(
-            activeCanvasFocusNodeId || hoveredEditorEdge || isSlotDetailsFocus
-        );
-
-        if (!hasHoverFocus) {
-            return nextVisibleEdges;
-        }
-
-        return nextVisibleEdges.map((edge) => {
-            const isCanvasHoverConnection = Boolean(
-                activeCanvasFocusNodeId &&
-                    (edge.source === activeCanvasFocusNodeId ||
-                        edge.target === activeCanvasFocusNodeId)
-            );
-            const isHoveredEditorEdge = Boolean(
-                activeHoveredEditorEdgeId &&
-                    edge.id === activeHoveredEditorEdgeId
-            );
-            const isSlotDetailsConnection = Boolean(
-                isSlotDetailsFocus &&
-                    ((edge.source === hoveredSlotAccessNodeId &&
-                        edge.target === selectedNodeId) ||
-                        (edge.target === hoveredSlotAccessNodeId &&
-                            edge.source === selectedNodeId))
-            );
-
-            if (
-                isCanvasHoverConnection ||
-                isHoveredEditorEdge ||
-                isSlotDetailsConnection
-            ) {
-                return edge;
-            }
-
-            const existingOpacity = Number(edge.style?.opacity);
-            const dimmedOpacity = Number.isFinite(existingOpacity)
-                ? Math.min(existingOpacity, 0.22)
-                : 0.22;
-
-            const cachedDimmedEdge = dimmedHoverEdgeCacheRef.current.get(edge);
-            if (cachedDimmedEdge) return cachedDimmedEdge;
-
-            const dimmedEdge = {
-                ...edge,
-                animated: false,
-                style: {
-                    ...(edge.style || {}),
-                    stroke: HOVER_INACTIVE_EDGE_COLOR,
-                    opacity: dimmedOpacity,
-                },
-                markerEnd: edge.markerEnd
-                    ? {
-                          ...edge.markerEnd,
-                          color: HOVER_INACTIVE_EDGE_COLOR,
-                      }
-                    : edge.markerEnd,
-                labelStyle: {
-                    ...(edge.labelStyle || {}),
-                    opacity: 0.42,
-                },
-            };
-            dimmedHoverEdgeCacheRef.current.set(edge, dimmedEdge);
-            return dimmedEdge;
-        });
+        return nextVisibleEdges;
     }, [
         highlightedTransitionEdges,
         compoundInitialEdges,
         parallelEntryEdges,
+        edgeFocusNodeIds,
         activeMode,
-        activeCanvasFocusNodeId,
         editableSlotEdges,
         isDraggingNode,
         hiddenNodeIds,
         activeHoveredEditorEdgeId,
-        isSlotDetailsFocus,
-        hoveredSlotAccessNodeId,
-        selectedNodeId,
     ]);
 
-    const hoveredEditorEdge = useMemo(
-        () =>
-            activeHoveredEditorEdgeId
-                ? visibleEdges.find(
-                      (edge) => edge.id === activeHoveredEditorEdgeId
-                  ) || null
-                : null,
-        [activeHoveredEditorEdgeId, visibleEdges]
-    );
+    const structuralEdgeById = useMemo(() => {
+        const byId = new Map();
+        compoundInitialEdges.forEach((edge) => byId.set(edge.id, edge));
+        parallelEntryEdges.forEach((edge) => byId.set(edge.id, edge));
+        return byId;
+    }, [compoundInitialEdges, parallelEntryEdges]);
+
+    const hoveredEditorEdge = useMemo(() => {
+        if (!activeHoveredEditorEdgeId) return null;
+
+        const transitionIndex =
+            transitionRenderCache.indexByEdgeId.get(activeHoveredEditorEdgeId);
+        if (transitionIndex !== undefined) {
+            return transitionRenderCache.baseEdges[transitionIndex] || null;
+        }
+
+        const slotIndex =
+            slotRenderCache.indexByEdgeId.get(activeHoveredEditorEdgeId);
+        if (slotIndex !== undefined) {
+            return slotRenderCache.baseEdges[slotIndex] || null;
+        }
+
+        return structuralEdgeById.get(activeHoveredEditorEdgeId) || null;
+    }, [
+        activeHoveredEditorEdgeId,
+        transitionRenderCache,
+        slotRenderCache,
+        structuralEdgeById,
+    ]);
 
     const hasHoverFocus = Boolean(
         activeCanvasFocusNodeId || hoveredEditorEdge || isSlotDetailsFocus
@@ -754,142 +1525,201 @@ export function useEditorDisplay({
     const hoverFocusNodeIds = useMemo(() => {
         if (!hasHoverFocus) return null;
 
-        const ids = new Set();
+        const ids = new Set(selectedVisualNodeIdSet);
+
+        const addCloneGroup = (nodeId) => {
+            if (!nodeId) return;
+            ids.add(nodeId);
+            cloneGroupByNodeId
+                .get(nodeId)
+                ?.forEach((linkedId) => ids.add(linkedId));
+        };
+
+        const addEdgeEndpoints = (edge) => {
+            if (!edge) return;
+            addCloneGroup(edge.source);
+            addCloneGroup(edge.target);
+            getTransitionEdgeNodeIds(edge).forEach(addCloneGroup);
+            getSlotEdgeNodeIds(edge).forEach(addCloneGroup);
+        };
+
         if (activeCanvasFocusNodeId) {
-            ids.add(activeCanvasFocusNodeId);
-            visibleEdges.forEach((edge) => {
+            addCloneGroup(activeCanvasFocusNodeId);
+
+            // Use the prebuilt edge indexes instead of scanning every visible
+            // edge on each mouse move. Large workflows can have thousands of
+            // mounted edges, while a single node normally touches only a few.
+            const transitionIndexes =
+                transitionRenderCache.indexByNodeId.get(activeCanvasFocusNodeId) ||
+                [];
+            transitionIndexes.forEach((edgeIndex) =>
+                addEdgeEndpoints(transitionRenderCache.baseEdges[edgeIndex])
+            );
+
+            const slotIndexes =
+                slotRenderCache.indexByNodeId.get(activeCanvasFocusNodeId) || [];
+            slotIndexes.forEach((edgeIndex) =>
+                addEdgeEndpoints(slotRenderCache.baseEdges[edgeIndex])
+            );
+
+            // Structural entry/initial edges are comparatively few and are not
+            // part of the semantic transition cache.
+            compoundInitialEdges.forEach((edge) => {
                 if (
                     edge.source === activeCanvasFocusNodeId ||
                     edge.target === activeCanvasFocusNodeId
                 ) {
-                    ids.add(edge.source);
-                    ids.add(edge.target);
+                    addEdgeEndpoints(edge);
+                }
+            });
+            parallelEntryEdges.forEach((edge) => {
+                if (
+                    edge.source === activeCanvasFocusNodeId ||
+                    edge.target === activeCanvasFocusNodeId
+                ) {
+                    addEdgeEndpoints(edge);
                 }
             });
         }
 
         if (hoveredEditorEdge) {
-            ids.add(hoveredEditorEdge.source);
-            ids.add(hoveredEditorEdge.target);
+            addEdgeEndpoints(hoveredEditorEdge);
         }
 
         if (isSlotDetailsFocus) {
-            ids.add(hoveredSlotAccessNodeId);
-            ids.add(selectedNodeId);
+            addCloneGroup(hoveredSlotAccessNodeId);
+            addCloneGroup(selectedNodeId);
         }
 
         return ids;
     }, [
         hasHoverFocus,
         activeCanvasFocusNodeId,
-        visibleEdges,
         hoveredEditorEdge,
         isSlotDetailsFocus,
         hoveredSlotAccessNodeId,
         selectedNodeId,
+        selectedVisualNodeIdSet,
+        cloneGroupByNodeId,
+        transitionRenderCache,
+        slotRenderCache,
+        compoundInitialEdges,
+        parallelEntryEdges,
     ]);
 
+    const hoverHighlightNodeIds = useMemo(() => {
+        if (!hasHoverFocus) return null;
+
+        const ids = new Set();
+        const addCloneGroup = (nodeId) => {
+            if (!nodeId) return;
+            ids.add(nodeId);
+            cloneGroupByNodeId
+                .get(nodeId)
+                ?.forEach((linkedId) => ids.add(linkedId));
+        };
+
+        if (activeCanvasFocusNodeId) addCloneGroup(activeCanvasFocusNodeId);
+        if (hoveredEditorEdge) {
+            addCloneGroup(hoveredEditorEdge.source);
+            addCloneGroup(hoveredEditorEdge.target);
+        }
+        if (isSlotDetailsFocus) {
+            addCloneGroup(hoveredSlotAccessNodeId);
+            addCloneGroup(selectedNodeId);
+        }
+
+        return ids;
+    }, [
+        hasHoverFocus,
+        activeCanvasFocusNodeId,
+        hoveredEditorEdge,
+        isSlotDetailsFocus,
+        hoveredSlotAccessNodeId,
+        selectedNodeId,
+        cloneGroupByNodeId,
+    ]);
+
+    const nodeIndexById = useMemo(
+        () =>
+            new Map(
+                baseVisibleNodes.map((node, index) => [node.id, index])
+            ),
+        [baseVisibleNodes]
+    );
+
+    const contextVisibleNodeCacheRef = useRef(new WeakMap());
+    const highlightedContextNodeCacheRef = useRef(new WeakMap());
+
+    const withNodeFocusClass = (node, highlighted) => {
+        const cache = highlighted
+            ? highlightedContextNodeCacheRef.current
+            : contextVisibleNodeCacheRef.current;
+        const cached = cache.get(node);
+        if (cached) return cached;
+
+        const classNames = String(node.className || "")
+            .split(/\s+/)
+            .filter(Boolean);
+        if (!classNames.includes("editor-node-context-visible")) {
+            classNames.push("editor-node-context-visible");
+        }
+        if (highlighted && !classNames.includes("editor-hover-highlight")) {
+            classNames.push("editor-hover-highlight");
+        }
+
+        const nextNode = {
+            ...node,
+            className: classNames.join(" "),
+        };
+        cache.set(node, nextNode);
+        return nextNode;
+    };
+
     const visibleNodes = useMemo(() => {
-        if (!hasHoverFocus && !parallelDropTargetId && !compoundDropTargetId) {
+        const needsFocusPresentation = Boolean(
+            hasHoverFocus && hoverFocusNodeIds?.size
+        );
+        const needsDropPresentation = Boolean(
+            parallelDropTargetId || compoundDropTargetId
+        );
+
+        if (!needsFocusPresentation && !needsDropPresentation) {
             return baseVisibleNodes;
         }
 
-        const activeParallelLane = parallelDropTargetId
-            ? baseVisibleNodes.find((node) => node.id === parallelDropTargetId)
-            : null;
-        const activeParallelId =
-            activeParallelLane?.type === "parallelLane"
-                ? activeParallelLane.parentId
-                : null;
+        // Copy only the array shell, then replace the handful of nodes whose
+        // presentation really changes. Previously every mouse move mapped over
+        // the complete graph and rebuilt opacity/filter decisions for every
+        // node, which was costly on large workflows.
+        const displayed = baseVisibleNodes.slice();
 
-        return baseVisibleNodes.map((visibleNode) => {
-            const isCanvasHoverHighlight =
-                visibleNode.id === activeCanvasFocusNodeId;
-            const isSlotDetailsSkillHoverHighlight =
-                visibleNode.id === hoveredSlotAccessNodeId &&
-                visibleNode.type === "custom";
-            const isSlotDetailsSelectedSlot =
-                isSlotDetailsFocus && visibleNode.id === selectedNodeId;
-            const isHoveredEdgeEndpoint = Boolean(
-                hoveredEditorEdge &&
-                    (visibleNode.id === hoveredEditorEdge.source ||
-                        visibleNode.id === hoveredEditorEdge.target)
-            );
-            const isConnectedHoverFocusNode =
-                hasHoverFocus && hoverFocusNodeIds?.has(visibleNode.id);
-            const isSelectedNode =
-                visibleNode.selected || selectedNodeIdSet.has(visibleNode.id);
-            const isDimmedByHoverFocus =
-                hasHoverFocus &&
-                !isSelectedNode &&
-                !isConnectedHoverFocusNode &&
-                !isCanvasHoverHighlight &&
-                !isSlotDetailsSkillHoverHighlight &&
-                !isSlotDetailsSelectedSlot;
-
-            if (isDimmedByHoverFocus) {
-                const cachedDimmedNode =
-                    dimmedHoverNodeCacheRef.current.get(visibleNode);
-                if (cachedDimmedNode) return cachedDimmedNode;
-
-                const dimmedNode = {
-                    ...visibleNode,
-                    style: {
-                        ...(visibleNode.style || {}),
-                        opacity: 0.42,
-                        filter: "grayscale(0.72)",
-                        transition:
-                            visibleNode.style?.transition ||
-                            "opacity 120ms ease, filter 120ms ease",
-                    },
-                };
-                dimmedHoverNodeCacheRef.current.set(visibleNode, dimmedNode);
-                return dimmedNode;
-            }
-
-            if (
-                isCanvasHoverHighlight ||
-                isHoveredEdgeEndpoint ||
-                isSlotDetailsSkillHoverHighlight
-            ) {
-                // Hover highlighting must never mutate React Flow's real
-                // selection state. Setting `selected: true` here made a mere
-                // mouse hover replace Ctrl/Meta multi-selection and then clear
-                // it again on mouse leave. Use a presentation-only class
-                // instead, while preserving an already selected node as-is.
-                if (visibleNode.selected) return visibleNode;
-
-                const cachedHighlightedNode =
-                    highlightedHoverNodeCacheRef.current.get(visibleNode);
-                if (cachedHighlightedNode) return cachedHighlightedNode;
-
-                const classNames = String(visibleNode.className || "")
-                    .split(/\s+/)
-                    .filter(Boolean);
-                if (!classNames.includes("editor-hover-highlight")) {
-                    classNames.push("editor-hover-highlight");
-                }
-
-                const highlightedNode = {
-                    ...visibleNode,
-                    className: classNames.join(" "),
-                };
-                highlightedHoverNodeCacheRef.current.set(
-                    visibleNode,
-                    highlightedNode
+        if (needsFocusPresentation) {
+            hoverFocusNodeIds.forEach((nodeId) => {
+                const index = nodeIndexById.get(nodeId);
+                if (index === undefined) return;
+                const node = displayed[index];
+                displayed[index] = withNodeFocusClass(
+                    node,
+                    Boolean(hoverHighlightNodeIds?.has(nodeId))
                 );
-                return highlightedNode;
-            }
+            });
+        }
 
-            if (visibleNode.type === "parallelLane") {
-                const isLaneDropTarget =
-                    visibleNode.id === parallelDropTargetId;
-                if (!isLaneDropTarget) return visibleNode;
+        if (parallelDropTargetId) {
+            const laneIndex = nodeIndexById.get(parallelDropTargetId);
+            const activeParallelLane =
+                laneIndex !== undefined ? displayed[laneIndex] : null;
+            const activeParallelId =
+                activeParallelLane?.type === "parallelLane"
+                    ? activeParallelLane.parentId
+                    : null;
 
-                return {
-                    ...visibleNode,
+            if (laneIndex !== undefined && activeParallelLane) {
+                displayed[laneIndex] = {
+                    ...activeParallelLane,
                     style: {
-                        ...visibleNode.style,
+                        ...activeParallelLane.style,
                         outline: "3px solid #0284c7",
                         outlineOffset: "-3px",
                         backgroundColor: "rgba(2, 132, 199, 0.12)",
@@ -898,63 +1728,63 @@ export function useEditorDisplay({
                         borderRadius: 4,
                     },
                     data: {
-                        ...visibleNode.data,
+                        ...activeParallelLane.data,
                         isDropTarget: true,
                     },
                 };
             }
 
-            if (visibleNode.type === "parallel") {
-                const isDropTarget = visibleNode.id === activeParallelId;
-                if (Boolean(visibleNode.data?.isDropTarget) === isDropTarget) {
-                    return visibleNode;
+            if (activeParallelId) {
+                const parallelIndex = nodeIndexById.get(activeParallelId);
+                if (parallelIndex !== undefined) {
+                    const parallelNode = displayed[parallelIndex];
+                    if (!parallelNode.data?.isDropTarget) {
+                        displayed[parallelIndex] = {
+                            ...parallelNode,
+                            data: {
+                                ...parallelNode.data,
+                                isDropTarget: true,
+                            },
+                        };
+                    }
                 }
-
-                return {
-                    ...visibleNode,
-                    data: {
-                        ...visibleNode.data,
-                        isDropTarget,
-                    },
-                };
             }
+        }
 
-            if (visibleNode.type === "compound") {
-                const isDropTarget = visibleNode.id === compoundDropTargetId;
-                if (
-                    Boolean(visibleNode.data?.isDropTarget) === isDropTarget
-                ) {
-                    return visibleNode;
+        if (compoundDropTargetId) {
+            const compoundIndex = nodeIndexById.get(compoundDropTargetId);
+            if (compoundIndex !== undefined) {
+                const compoundNode = displayed[compoundIndex];
+                if (!compoundNode.data?.isDropTarget) {
+                    displayed[compoundIndex] = {
+                        ...compoundNode,
+                        data: {
+                            ...compoundNode.data,
+                            isDropTarget: true,
+                        },
+                    };
                 }
-
-                return {
-                    ...visibleNode,
-                    data: {
-                        ...visibleNode.data,
-                        isDropTarget,
-                    },
-                };
             }
+        }
 
-            return visibleNode;
-        });
+        return displayed;
     }, [
         baseVisibleNodes,
         hasHoverFocus,
         hoverFocusNodeIds,
-        activeCanvasFocusNodeId,
-        hoveredSlotAccessNodeId,
-        isSlotDetailsFocus,
-        selectedNodeId,
-        selectedNodeIdSet,
-        hoveredEditorEdge,
+        hoverHighlightNodeIds,
+        nodeIndexById,
         parallelDropTargetId,
         compoundDropTargetId,
     ]);
+
+    const nodeFocusMode = Boolean(hasHoverFocus);
 
     return {
         visibleNodes,
         visibleEdges,
         smartRoutingNodes,
+        edgeFocusMode,
+        nodeFocusMode,
     };
 }

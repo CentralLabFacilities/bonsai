@@ -11,7 +11,51 @@ const escapeXmlAttribute = (value) => String(value)
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;");
 
-const buildEditorMetadataXml = (node, indent, isLane) => {
+
+const buildEditorEdgeRoutingByTarget = (nodes, edges) => {
+    const nodeById = new Map((nodes || []).map((node) => [node.id, node]));
+    const occurrenceByKey = new Map();
+    const routesByTargetId = new Map();
+
+    (edges || []).forEach((edge) => {
+        const targetInstanceId = String(
+            edge.data?.editorTargetInstanceId || ""
+        ).trim();
+        if (!targetInstanceId) return;
+
+        const sourceNode = nodeById.get(edge.source);
+        const targetNode = nodeById.get(edge.target);
+        if (!sourceNode || !targetNode) return;
+
+        const sourceSkillName = String(
+            sourceNode.data?.fullSkillName || sourceNode.data?.label || ""
+        ).trim();
+        const targetStateName = String(
+            targetNode.data?.fullSkillName || targetNode.data?.label || ""
+        ).trim();
+        if (!sourceSkillName || !targetStateName) return;
+
+        const rawHandle = edge.sourceHandle || edge.label || "success";
+        const eventName = getScxmlTransitionEvent(rawHandle, sourceSkillName);
+        const routeKey = `${eventName}\u0000${targetStateName}`;
+        const occurrence = occurrenceByKey.get(routeKey) || 0;
+        occurrenceByKey.set(routeKey, occurrence + 1);
+
+        if (!routesByTargetId.has(edge.target)) {
+            routesByTargetId.set(edge.target, []);
+        }
+        routesByTargetId.get(edge.target).push({
+            eventName,
+            targetStateName,
+            occurrence,
+            targetInstanceId,
+        });
+    });
+
+    return routesByTargetId;
+};
+
+const buildEditorMetadataXml = (node, indent, isLane, edgeRoutes = []) => {
     if (isLane) return "";
 
     const clonePositions = Array.isArray(node.data?.editorClonePositions)
@@ -19,15 +63,18 @@ const buildEditorMetadataXml = (node, indent, isLane) => {
         : [];
 
     const positionLines = clonePositions.length > 0
-        ? clonePositions.map((position, index) => {
+        ? clonePositions.map((position) => {
             const x = Math.round(Number(position?.x || 0));
             const y = Math.round(Number(position?.y || 0));
             const instanceId = String(position?.instanceId || "").trim();
             const instanceAttr = instanceId
                 ? ` instance="${escapeXmlAttribute(instanceId)}"`
                 : "";
-            const cloneAttr = position?.isSkillClone
-                ? ' clone="skill"'
+            const cloneType = String(
+                position?.cloneType || (position?.isSkillClone ? "skill" : "")
+            ).trim();
+            const cloneAttr = cloneType
+                ? ` clone="${escapeXmlAttribute(cloneType)}"`
                 : "";
 
             return `${indent}        <editor:position${instanceAttr}${cloneAttr} x="${x}" y="${y}"/>`;
@@ -36,7 +83,12 @@ const buildEditorMetadataXml = (node, indent, isLane) => {
             `${indent}        <editor:position x="${Math.round(node.position?.x || 0)}" y="${Math.round(node.position?.y || 0)}"/>`,
         ];
 
-    return `${indent}    <metadata>\n${positionLines.join("\n")}\n${indent}    </metadata>`;
+    const edgeRouteLines = (edgeRoutes || []).map((route) =>
+        `${indent}        <editor:edgeTarget event="${escapeXmlAttribute(route.eventName)}" target="${escapeXmlAttribute(route.targetStateName)}" occurrence="${route.occurrence}" instance="${escapeXmlAttribute(route.targetInstanceId)}"/>`
+    );
+    const metadataLines = [...positionLines, ...edgeRouteLines];
+
+    return `${indent}    <metadata>\n${metadataLines.join("\n")}\n${indent}    </metadata>`;
 };
 
 /**
@@ -137,6 +189,7 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
         globalDataLines.splice(1, 0, slotsXml);
     }
     const globalDataXml = globalDataLines.join("\n");
+    const editorEdgeRoutesByTarget = buildEditorEdgeRoutingByTarget(nodes, edges);
 
     const isDescendantOf = (childNodeId, ancestorNodeId) => {
         let current = nodes.find((n) => n.id === childNodeId);
@@ -146,6 +199,34 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
         }
         return false;
     };
+
+    const semanticSourceIdOf = (edge) =>
+        edge?.data?.boundaryOriginalSource ||
+        edge?.data?.compoundOriginalSource ||
+        edge?.data?.parallelOriginalSource ||
+        edge?.source;
+
+    const semanticSourceHandleOf = (edge) =>
+        edge?.data?.boundaryOriginalSourceHandle ||
+        edge?.data?.compoundOriginalSourceHandle ||
+        edge?.data?.parallelOriginalSourceHandle ||
+        edge?.sourceHandle ||
+        edge?.label ||
+        "success";
+
+    const semanticTargetIdOf = (edge) =>
+        edge?.data?.boundaryOriginalTarget ||
+        edge?.data?.compoundOriginalTarget ||
+        edge?.data?.parallelOriginalTarget ||
+        edge?.target;
+
+    const isBoundaryHelperEdge = (edge) =>
+        edge?.data?.boundaryInternalEdge ||
+        edge?.data?.compoundInternalEdge ||
+        edge?.data?.parallelInternalEdge ||
+        edge?.data?.compoundInitialEdge ||
+        edge?.data?.parallelEntryEdge ||
+        String(edge?.id || "").startsWith("edge-internal-");
 
     const buildStateActionXml = (actionName, assignments, indent) => {
         const configuredAssignments = getConfiguredAssignments(assignments);
@@ -291,7 +372,12 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
             : [];
         const onentryBlock = buildStateActionXml("onentry", onEntryAssignments, indent + "    ");
         const onexitBlock = buildStateActionXml("onexit", onExitAssignments, indent + "    ");
-        const metadataXml = buildEditorMetadataXml(node, indent, isLane);
+        const metadataXml = buildEditorMetadataXml(
+            node,
+            indent,
+            isLane,
+            editorEdgeRoutesByTarget.get(node.id) || []
+        );
 
         if (isFinal && !isSubMachine && children.length === 0) {
             const finalBlocks = [metadataXml, onentryBlock, onexitBlock].filter(Boolean);
@@ -306,7 +392,17 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
 
         let initialAttr = "";
         if (isCompound || children.length > 0) {
-            const initialChild = children.find((c) => c.data?.isInitial);
+            const storedInitialChild = node.data?.initialChildId
+                ? children.find((child) => child.id === node.data.initialChildId)
+                : null;
+            const initialChild =
+                storedInitialChild ||
+                children.find((child) => child.data?.isInitial) ||
+                // A Parallel lane is exported as a compound SCXML state. It
+                // must never be serialized without an initial state when it has
+                // children, even if stale editor data slipped through.
+                (isLane ? children[0] : null);
+
             if (initialChild) {
                 initialAttr = ` initial="${initialChild.data.fullSkillName || initialChild.data.label}"`;
             } else if (node.data?.initialSubState) {
@@ -368,156 +464,176 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
                 transitionsXml = `${indent}    <transition event="${escapeXmlAttribute(configuredSend.triggerEvent)}">\n${indent}        <send event="${escapeXmlAttribute(configuredSend.sendEvent)}"/>\n${indent}    </transition>`;
             }
         } else if (isContainer) {
+            /*
+             * Compound transition order is semantically significant in SCXML.
+             * For example, Talk.* must not be written before Talk.error when
+             * Talk.error is intended to handle the specific error first. The
+             * Exit Tokens panel stores its explicit order as edge ids on the
+             * container, and this exporter writes transitions in that order.
+             */
+            const explicitOrder = Array.isArray(node.data?.containerTransitionOrder)
+                ? node.data.containerTransitionOrder.map(String)
+                : [];
+            const orderRank = new Map(
+                explicitOrder.map((edgeId, index) => [edgeId, index])
+            );
+
+            const leavingEdges = edges
+                .map((edge, edgeIndex) => {
+                    if (isBoundaryHelperEdge(edge)) return null;
+
+                    const sourceId = semanticSourceIdOf(edge);
+                    const sourceHandle = String(semanticSourceHandleOf(edge));
+                    const targetNodeId = semanticTargetIdOf(edge);
+                    const sourceInside =
+                        sourceId === node.id || isDescendantOf(sourceId, node.id);
+                    const targetInside =
+                        targetNodeId === node.id ||
+                        isDescendantOf(targetNodeId, node.id);
+
+                    if (!sourceInside || targetInside) return null;
+
+                    return {
+                        edge,
+                        edgeIndex,
+                        sourceId,
+                        sourceHandle,
+                        targetNodeId,
+                    };
+                })
+                .filter(Boolean)
+                .sort((a, b) => {
+                    const aRank = orderRank.has(String(a.edge.id))
+                        ? orderRank.get(String(a.edge.id))
+                        : Number.MAX_SAFE_INTEGER;
+                    const bRank = orderRank.has(String(b.edge.id))
+                        ? orderRank.get(String(b.edge.id))
+                        : Number.MAX_SAFE_INTEGER;
+
+                    return aRank - bRank || a.edgeIndex - b.edgeIndex;
+                });
+
             const leavingTransitions = [];
 
-            // 1. Eigene Parent-Transitions erfassen (z. B. Fallback 'Succeeder.*')
-            const directParentTransitions = buildTransitionsXml(node, indent + "    ", null);
-            if (directParentTransitions) {
-                leavingTransitions.push(directParentTransitions);
-            }
+            const appendTransitionXml = ({
+                edgeId,
+                rawEvent,
+                targetNodeId,
+                cond = "",
+                assignments = [],
+            }) => {
+                const targetNode = nodes.find((candidate) => candidate.id === targetNodeId);
+                const targetId = targetNode
+                    ? targetNode.data?.fullSkillName || targetNode.data?.label
+                    : targetNodeId;
+                if (!targetId || !rawEvent) return;
 
-            // 2. Transitions aller Kindknoten erfassen, die nach DRAUSSEN führen
-            nodes.forEach((n) => {
-                if (isDescendantOf(n.id, node.id)) {
-                    const outgoing = edges.filter(
-                        (e) =>
-                            e.source === n.id &&
-                            !e.id.startsWith("edge-internal-") &&
-                            !isDescendantOf(e.target, node.id)
+                const scxmlCondition = serializeEditorConditionForScxml(cond);
+                const condAttr = scxmlCondition
+                    ? ` cond="${escapeXmlAttribute(scxmlCondition)}"`
+                    : "";
+                const assignmentLines = (assignments || [])
+                    .filter(
+                        (assignment) =>
+                            assignment?.location && assignment?.expr !== undefined
+                    )
+                    .map((assignment) => {
+                        const location = String(assignment.location)
+                            .trim()
+                            .replace(/^@/, "");
+                        const expr = serializeEditorValueForScxml(assignment.expr);
+                        return (
+                            `${indent}        ` +
+                            `<assign location="${escapeXmlAttribute(location)}" ` +
+                            `expr="${escapeXmlAttribute(expr)}"/>`
+                        );
+                    });
+
+                const xml = assignmentLines.length > 0
+                    ? `${indent}    <transition event="${escapeXmlAttribute(rawEvent)}" target="${escapeXmlAttribute(targetId)}"${condAttr}>\n${assignmentLines.join("\n")}\n${indent}    </transition>`
+                    : `${indent}    <transition event="${escapeXmlAttribute(rawEvent)}" target="${escapeXmlAttribute(targetId)}"${condAttr}/>`;
+
+                leavingTransitions.push({ edgeId, xml });
+            };
+
+            leavingEdges.forEach(
+                ({ edge, sourceId, sourceHandle, targetNodeId }) => {
+                    const sourceNode = nodes.find(
+                        (candidate) => candidate.id === sourceId
                     );
+                    const sourceSkillName =
+                        sourceNode?.data?.fullSkillName ||
+                        sourceNode?.data?.label ||
+                        "";
+                    const importedRawEvent = String(
+                        edge.data?.boundaryImportedRawEvent || ""
+                    ).trim();
 
-                    outgoing.forEach((e) => {
-                        const targetNode = nodes.find(
-                            (tn) => tn.id === e.target
-                        );
-
-                        const targetId = targetNode
-                            ? targetNode.data.fullSkillName ||
-                              targetNode.data.label
-                            : e.target;
-
-                        /*
-                         * Bei einer Parallel-Transition ist e.source
-                         * möglicherweise die Lane.
-                         *
-                         * Die tatsächliche Source steckt dann in
-                         * parallelOriginalSource.
-                         */
-                        const actualSourceId =
-                            e.data?.parallelOriginalSource ||
-                            e.source;
-
-                        const actualSourceNode = nodes.find(
-                            (candidate) =>
-                                candidate.id === actualSourceId
-                        );
-
-                        const rawHandle =
-                            e.sourceHandle ||
-                            e.label ||
-                            "success";
-
-                        /*
-                         * Wichtig:
-                         * Den tatsächlichen Skillnamen verwenden,
-                         * NICHT Lane_1.
-                         */
-                        const sourceSkillName =
-                            actualSourceNode?.data?.fullSkillName ||
-                            actualSourceNode?.data?.label ||
-                            "";
-
-                        const fullEvent =
-                            getScxmlTransitionEvent(
-                                rawHandle,
+                    // Imported compound events such as Talk.* are preserved
+                    // verbatim. For newly-created exits, reconstruct the full
+                    // SCXML event from the logical child skill + exit token.
+                    const fullEvent = importedRawEvent ||
+                        (sourceId === node.id && sourceHandle.includes(".")
+                            ? sourceHandle
+                            : getScxmlTransitionEvent(
+                                sourceHandle,
                                 sourceSkillName
-                            );
+                            ));
 
-                        const condAttr =
-                            e.data?.cond
-                                ? ` cond="${escapeXmlAttribute(
-                                      e.data.cond
-                                  )}"`
-                                : "";
-
-                        const assignments =
-                            Array.isArray(
-                                e.data?.assignments
-                            )
-                                ? e.data.assignments
-                                : e.data?.assign?.location
-                                  ? [e.data.assign]
-                                  : [];
-
-                        if (assignments.length > 0) {
-                            const assignmentLines =
-                                assignments
-                                    .filter(
-                                        (assignment) =>
-                                            assignment?.location &&
-                                            assignment?.expr !==
-                                                undefined
-                                    )
-                                    .map((assignment) => {
-                                        const location =
-                                            String(
-                                                assignment.location
-                                            )
-                                                .trim()
-                                                .replace(/^@/, "");
-
-                                        const expr =
-                                            serializeEditorValueForScxml(
-                                                assignment.expr
-                                            );
-
-                                        return (
-                                            `${indent}        ` +
-                                            `<assign location="${escapeXmlAttribute(
-                                                location
-                                            )}" ` +
-                                            `expr="${escapeXmlAttribute(
-                                                expr
-                                            )}"/>`
-                                        );
-                                    });
-
-                            if (assignmentLines.length > 0) {
-                                leavingTransitions.push(
-                                    `${indent}    <transition event="${escapeXmlAttribute(
-                                        fullEvent
-                                    )}" target="${escapeXmlAttribute(
-                                        targetId
-                                    )}"${condAttr}>\n` +
-                                    `${assignmentLines.join(
-                                        "\n"
-                                    )}\n` +
-                                    `${indent}    </transition>`
-                                );
-                            } else {
-                                leavingTransitions.push(
-                                    `${indent}    <transition event="${escapeXmlAttribute(
-                                        fullEvent
-                                    )}" target="${escapeXmlAttribute(
-                                        targetId
-                                    )}"${condAttr}/>`
-                                );
-                            }
-                        } else {
-                            leavingTransitions.push(
-                                `${indent}    <transition event="${escapeXmlAttribute(
-                                    fullEvent
-                                )}" target="${escapeXmlAttribute(
-                                    targetId
-                                )}"${condAttr}/>`
-                            );
-                        }
+                    appendTransitionXml({
+                        edgeId: edge.id,
+                        rawEvent: fullEvent,
+                        targetNodeId,
+                        cond: edge.data?.cond || "",
+                        assignments: Array.isArray(edge.data?.assignments)
+                            ? edge.data.assignments
+                            : edge.data?.assign?.location
+                                ? [edge.data.assign]
+                                : [],
                     });
                 }
+            );
+
+            // Keep genuine container-level transitions which do not currently
+            // have a visual edge. Managed boundary events are already covered
+            // by leavingEdges above and must not be emitted a second time.
+            (node.data?.events || []).forEach((event, eventIndex) => {
+                if (!event?.target) return;
+                if (event?.sourceNodeId && event?.transitionHandleId) return;
+
+                const rawEvent = String(
+                    event.rawEvent || event.name || event.id || ""
+                ).trim();
+                if (!rawEvent) return;
+
+                appendTransitionXml({
+                    edgeId: `event-${eventIndex}`,
+                    rawEvent,
+                    targetNodeId: event.target,
+                    cond: event.cond || "",
+                    assignments: Array.isArray(event.assignments)
+                        ? event.assignments
+                        : event.assignLocation
+                            ? [
+                                {
+                                    location: event.assignLocation,
+                                    expr: event.assignExpr || "",
+                                },
+                            ]
+                            : [],
+                });
             });
 
-            // Doppelte Einträge vermeiden
-            transitionsXml = Array.from(new Set(leavingTransitions)).join("\n");
+            // Preserve order while removing exact duplicate XML transitions.
+            const seenTransitionXml = new Set();
+            transitionsXml = leavingTransitions
+                .filter(({ xml }) => {
+                    if (seenTransitionXml.has(xml)) return false;
+                    seenTransitionXml.add(xml);
+                    return true;
+                })
+                .map(({ xml }) => xml)
+                .join("\n");
         } else if (!isLane) {
             transitionsXml = buildTransitionsXml(node, indent + "    ", activeContainerId);
         }

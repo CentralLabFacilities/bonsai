@@ -156,7 +156,9 @@ export function useSubStateMachines({
     setSlotNodes,
     setSlotEdges,
     setManualSlots,
+    selectedNodeId,
     setSelectedNodeId,
+    getViewport,
     setActiveTab,
     setContextMenu,
     fitView,
@@ -164,6 +166,14 @@ export function useSubStateMachines({
     onStateMachineLoadStart,
     onStateMachineLoadEnd,
 }) {
+    const captureCurrentViewport = () => {
+        try {
+            return getViewport?.() || null;
+        } catch {
+            return null;
+        }
+    };
+
     const hydrateSubMachineInheritedSlots = async (
         targetNodes,
         parentFilePath = null
@@ -194,6 +204,8 @@ export function useSubStateMachines({
                         xmlText = await response.text();
                     }
 
+                    const behaviorExitEvents =
+                        extractBehaviorExitEventsFromScxml(xmlText);
                     const declaredInheritedSlots =
                         extractInheritedSlotsFromScxml(xmlText);
                     const parsedChild = await parseScxmlFile(
@@ -208,11 +220,52 @@ export function useSubStateMachines({
                     const localDataModel = getLocalDataModelEntries(
                         parsedChild.globalDataModel
                     );
+                    const existingEventsById = new Map(
+                        (node.data?.events || []).map((event) => [
+                            String(event?.id || ""),
+                            event,
+                        ])
+                    );
+                    const confirmedEventIds = new Set(
+                        behaviorExitEvents.map((eventId) => String(eventId))
+                    );
+                    const confirmedEvents = behaviorExitEvents.map((eventId) => ({
+                        ...(existingEventsById.get(String(eventId)) || {}),
+                        id: eventId,
+                        // This event is confirmed by a forwarding Nop inside
+                        // the referenced state machine. It may have been added
+                        // provisionally while importing the parent SCXML, but
+                        // it is now part of the real Sub-SM interface.
+                        editorImportedSynthetic: false,
+                        editorBoundarySynthetic: false,
+                    }));
+                    const unresolvedImportedEvents = (node.data?.events || [])
+                        .filter((event) => {
+                            const eventId = String(event?.id || "");
+                            if (!eventId || confirmedEventIds.has(eventId)) {
+                                return false;
+                            }
+
+                            // Keep editor-only handles for invalid transitions
+                            // so React Flow can still render those edges. The
+                            // Problems panel deliberately ignores these handles
+                            // as exposed exits, and deletion prunes them once
+                            // their last transition disappears.
+                            return Boolean(
+                                event?.editorImportedSynthetic ||
+                                event?.editorBoundarySynthetic
+                            );
+                        });
+                    const events = [
+                        ...confirmedEvents,
+                        ...unresolvedImportedEvents,
+                    ];
 
                     return {
                         ...node,
                         data: {
                             ...node.data,
+                            events,
                             inheritedSlots,
                             localDataModel,
                         },
@@ -326,12 +379,47 @@ export function useSubStateMachines({
                         ...node.data,
                         events:
                             discoveredBehaviorExitEvents.length > 0
-                                ? discoveredBehaviorExitEvents.map(
-                                    (eventId) => ({
-                                        ...(existingEventsById.get(eventId) || {}),
-                                        id: eventId,
-                                    })
-                                )
+                                ? (() => {
+                                    const confirmedEventIds = new Set(
+                                        discoveredBehaviorExitEvents.map(
+                                            (eventId) => String(eventId)
+                                        )
+                                    );
+                                    const confirmedEvents =
+                                        discoveredBehaviorExitEvents.map(
+                                            (eventId) => ({
+                                                ...(existingEventsById.get(eventId) || {}),
+                                                id: eventId,
+                                                // Opening the child machine confirms
+                                                // that this exit is genuinely exposed
+                                                // by a forwarding Nop. Do not retain a
+                                                // provisional imported-handle marker.
+                                                editorImportedSynthetic: false,
+                                                editorBoundarySynthetic: false,
+                                            })
+                                        );
+                                    const unresolvedImportedEvents = (
+                                        node.data?.events || []
+                                    ).filter((event) => {
+                                        const eventId = String(event?.id || "");
+                                        if (
+                                            !eventId ||
+                                            confirmedEventIds.has(eventId)
+                                        ) {
+                                            return false;
+                                        }
+
+                                        return Boolean(
+                                            event?.editorImportedSynthetic ||
+                                            event?.editorBoundarySynthetic
+                                        );
+                                    });
+
+                                    return [
+                                        ...confirmedEvents,
+                                        ...unresolvedImportedEvents,
+                                    ];
+                                })()
                                 : node.data?.events || [],
                         inheritedSlots: discoveredInheritedSlots,
                         localDataModel: getLocalDataModelEntries(
@@ -370,10 +458,13 @@ export function useSubStateMachines({
                 slotEdges: [],
                 manualSlots: [],
                 parentTabId: activeTabId,
+                selectedNodeId: null,
+                viewport: null,
                 inheritedGlobalDataModel: inheritedForChild,
                 globalDataModel: parsed.globalDataModel,
             };
 
+            const parentViewport = captureCurrentViewport();
             setTabs((prev) => [
                 ...prev.map((tab) =>
                     tab.id === activeTabId
@@ -386,6 +477,8 @@ export function useSubStateMachines({
                             manualSlots,
                             globalDataModel,
                             inheritedGlobalDataModel,
+                            selectedNodeId: selectedNodeId || null,
+                            viewport: parentViewport || tab.viewport || null,
                         }
                         : tab
                 ),
@@ -401,7 +494,11 @@ export function useSubStateMachines({
             setGlobalDataModel(parsed.globalDataModel);
             setInheritedGlobalDataModel(inheritedForChild);
             setSelectedNodeId(null);
-            checkSlotConnection(parsedNodes);
+            checkSlotConnection(
+                parsedNodes,
+                [],
+                parsed.editorSlotNodes || []
+            );
 
             setTimeout(
                 () => fitView({ padding: 0.2, duration: 300 }),
@@ -475,6 +572,8 @@ export function useSubStateMachines({
                 slotEdges: [],
                 manualSlots: [],
                 parentTabId: activeTabId,
+                selectedNodeId: null,
+                viewport: null,
                 inheritedGlobalDataModel: inheritedForChild,
                 globalDataModel: DEFAULT_CHILD_DATA_MODEL,
             };
@@ -482,6 +581,7 @@ export function useSubStateMachines({
             // Save the new Sub-SM node in the parent tab before switching to
             // the child. Otherwise returning to the parent can restore the old
             // snapshot without the freshly created node.
+            const parentViewport = captureCurrentViewport();
             setTabs((prevTabs) => [
                 ...prevTabs.map((tab) =>
                     tab.id === activeTabId
@@ -494,6 +594,8 @@ export function useSubStateMachines({
                             manualSlots,
                             globalDataModel,
                             inheritedGlobalDataModel,
+                            selectedNodeId: selectedNodeId || null,
+                            viewport: parentViewport || tab.viewport || null,
                         }
                         : tab
                 ),
@@ -641,10 +743,13 @@ export function useSubStateMachines({
                 slotEdges: [],
                 manualSlots: [],
                 parentTabId: activeTabId,
+                selectedNodeId: null,
+                viewport: null,
                 inheritedGlobalDataModel: inheritedForChild,
                 globalDataModel: DEFAULT_CHILD_DATA_MODEL,
             };
 
+            const parentViewport = captureCurrentViewport();
             setTabs((prevTabs) => [
                 ...prevTabs.map((tab) =>
                     tab.id === activeTabId
@@ -657,6 +762,8 @@ export function useSubStateMachines({
                             manualSlots,
                             globalDataModel,
                             inheritedGlobalDataModel,
+                            selectedNodeId: selectedNodeId || null,
+                            viewport: parentViewport || tab.viewport || null,
                         }
                         : tab
                 ),

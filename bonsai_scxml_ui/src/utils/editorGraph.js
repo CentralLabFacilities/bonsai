@@ -1,4 +1,5 @@
 import { isCompoundInitialChildCandidate } from "./editorGeometry";
+import { normalizeTypedValue, normalizeValueType } from "./valueTypes";
 
 export const withSmartTransitionRouting = (transitionEdges) =>
     transitionEdges.map((edge) => ({
@@ -49,6 +50,63 @@ export const FIND_SHORTCUTS = [
     { keys: "Enter", action: "Focus selected result" },
     { keys: "Esc", action: "Close search" },
 ];
+
+export const getCollapsedTransitionSource = (edge, nodeById) => {
+    if (!edge || !nodeById) return null;
+
+    let current = nodeById.get(edge.source);
+    let collapsedAncestor = null;
+    const visited = new Set();
+
+    while (current?.parentId && !visited.has(current.id)) {
+        visited.add(current.id);
+        const parent = nodeById.get(current.parentId);
+        if (!parent) break;
+
+        if (
+            (parent.type === "compound" || parent.type === "parallel") &&
+            parent.data?.isCollapsed
+        ) {
+            // When collapsed containers are nested, only the outermost one is
+            // visible and can own the temporary transition handle.
+            collapsedAncestor = parent;
+        }
+
+        current = parent;
+    }
+
+    if (!collapsedAncestor) return null;
+
+    const logicalSourceId =
+        edge.data?.boundaryOriginalSource ||
+        edge.data?.compoundOriginalSource ||
+        edge.data?.parallelOriginalSource ||
+        edge.source;
+    const logicalHandle = String(
+        edge.data?.boundaryOriginalSourceHandle ||
+        edge.data?.compoundOriginalSourceHandle ||
+        edge.data?.parallelOriginalSourceHandle ||
+        edge.sourceHandle ||
+        edge.label ||
+        "success"
+    );
+    const visualSourceNode = nodeById.get(edge.source);
+    const existingBoundaryHandle =
+        visualSourceNode?.type === "parallelLane" ||
+        visualSourceNode?.type === "compound"
+            ? String(edge.sourceHandle || "").trim()
+            : "";
+    const sourceHandle =
+        existingBoundaryHandle || `${logicalSourceId}-${logicalHandle}`;
+
+    return {
+        nodeId: collapsedAncestor.id,
+        sourceHandle,
+        logicalSourceId,
+        logicalHandle,
+        label: String(edge.label || logicalHandle || sourceHandle),
+    };
+};
 
 export const getTransitionHighlightColor = (sourceHandle) => {
     const parts = String(sourceHandle || "")
@@ -218,6 +276,8 @@ export const getAncestorSlotSourcesByPath = (
         });
 
         (tab?.slotNodes || []).forEach((slotNode) => {
+            if (slotNode?.data?.isSlotClone) return;
+
             const slotPath = normalizeSlotPath(
                 slotNode?.data?.path || slotNode?.data?.label
             );
@@ -270,6 +330,8 @@ export const getAncestorSlotSourcesByPath = (
         });
 
         (tab?.slotNodes || []).forEach((slotNode) => {
+            if (slotNode?.data?.isSlotClone) return;
+
             if (slotNode?.data?.currentMachineInherited) {
                 addPath(slotNode?.data?.path || slotNode?.data?.label);
             }
@@ -626,6 +688,9 @@ export const buildEditorProblems = (
         );
     };
 
+    const exposesImplicitFatal = (node) =>
+        node?.type === "custom" && !isValidBehaviorTerminal(node);
+
     const addProblem = (problem) => {
         problems.push({
             severity: "error",
@@ -769,8 +834,16 @@ export const buildEditorProblems = (
 
         if (
             edge.sourceHandle &&
+            edge.sourceHandle !== "*" &&
+            !(
+                edge.sourceHandle === "fatal" &&
+                exposesImplicitFatal(source)
+            ) &&
             !(source.data?.events || []).some(
-                (event) => event?.id === edge.sourceHandle
+                (event) =>
+                    event?.id === edge.sourceHandle &&
+                    !event?.editorImportedSynthetic &&
+                    !event?.editorBoundarySynthetic
             )
         ) {
             addProblem({
@@ -797,11 +870,17 @@ export const buildEditorProblems = (
         if (isValidBehaviorTerminal(node)) return;
 
         const exposedEventIds = [
-            ...new Set(
-                (node.data?.events || [])
+            ...new Set([
+                ...(node.data?.events || [])
+                    .filter(
+                        (event) =>
+                            !event?.editorImportedSynthetic &&
+                            !event?.editorBoundarySynthetic
+                    )
                     .map((event) => String(event?.id || "").trim())
-                    .filter(Boolean)
-            ),
+                    .filter(Boolean),
+                ...(exposesImplicitFatal(node) ? ["fatal"] : []),
+            ]),
         ];
 
         if (exposedEventIds.length === 0) return;
@@ -835,20 +914,61 @@ export const buildEditorProblems = (
             });
     });
 
-    // Required parameters
+    // Parameters: required values and type compatibility. This is also run
+    // immediately after SCXML import, so a stale/wrongly typed value from a
+    // file is surfaced in Problems without requiring the user to edit it first.
     (nodes || []).forEach((node) => {
-        (node.data?.params || []).forEach((parameter, index) => {
-            if (!parameter?.required) return;
+        const nodeParameters = node.data?.params || [];
+        const parameterVariables = [
+            ...(globalDataModel || []),
+            ...nodeParameters
+                .filter((parameter) => parameter?.key)
+                .map((parameter) => ({
+                    id: parameter.key,
+                    type: parameter.type,
+                    valueType: parameter.type,
+                    expr: parameter.expr ?? parameter.default ?? "",
+                })),
+        ];
 
+        nodeParameters.forEach((parameter, index) => {
             const value = String(parameter.expr ?? "").trim();
             const defaultValue = String(parameter.default ?? "").trim();
+            const parameterName =
+                parameter.key || `parameter ${index + 1}`;
 
-            if (!value && !defaultValue) {
+            if (parameter?.required && !value && !defaultValue) {
                 addProblem({
                     id: `parameter-required-${node.id}-${index}`,
                     category: "Parameters",
                     title: "Required parameter is missing",
-                    message: `${nodeLabel(node)}.${parameter.key || `parameter ${index + 1}`} needs a value.`,
+                    message: `${nodeLabel(node)}.${parameterName} needs a value.`,
+                    nodeId: node.id,
+                    detailTab: "parameter",
+                    mode: "event",
+                });
+                return;
+            }
+
+            const effectiveValue = value || defaultValue;
+            if (!effectiveValue) return;
+
+            const normalizedParameterType = normalizeValueType(parameter.type);
+            if (!normalizedParameterType) return;
+
+            const validation = normalizeTypedValue(
+                effectiveValue,
+                normalizedParameterType,
+                parameterVariables,
+                { allowEmpty: true }
+            );
+
+            if (!validation.valid) {
+                addProblem({
+                    id: `parameter-type-${node.id}-${index}`,
+                    category: "Parameters",
+                    title: "Invalid parameter type",
+                    message: `${nodeLabel(node)}.${parameterName}: ${validation.error || `expected ${parameter.type || "the configured type"}.`}`,
                     nodeId: node.id,
                     detailTab: "parameter",
                     mode: "event",

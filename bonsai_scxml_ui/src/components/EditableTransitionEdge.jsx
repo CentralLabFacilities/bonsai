@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import {
     BaseEdge,
     EdgeLabelRenderer,
     Position,
     getBezierPath,
-    useNodes,
     useReactFlow,
 } from "@xyflow/react";
 import {
@@ -46,6 +45,31 @@ const distanceSquared = (a, b) => {
     const dx = a.x - b.x;
     const dy = a.y - b.y;
     return dx * dx + dy * dy;
+};
+
+const pointToSegmentDistanceSquared = (point, start, end) => {
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const lengthSquared = dx * dx + dy * dy;
+
+    if (lengthSquared === 0) {
+        return distanceSquared(point, start);
+    }
+
+    const t = Math.max(
+        0,
+        Math.min(
+            1,
+            ((point.x - start.x) * dx +
+                (point.y - start.y) * dy) /
+                lengthSquared
+        )
+    );
+
+    return distanceSquared(point, {
+        x: start.x + t * dx,
+        y: start.y + t * dy,
+    });
 };
 
 const getFacingPosition = (from, to) => {
@@ -211,7 +235,12 @@ function ManualEditableTransitionEdge(
         interactionWidth = 20,
     } = props;
 
-    const nodes = useNodes();
+    // Obstacle geometry is injected from useEditorDisplay as a stable cache.
+    // Do not subscribe every manual edge to React Flow's complete node store:
+    // selection/hover-only node updates would otherwise wake every manual edge.
+    const routingNodes = Array.isArray(data?.routingNodes)
+        ? data.routingNodes
+        : [];
 
     const {
         setEdges,
@@ -378,6 +407,10 @@ function ManualEditableTransitionEdge(
     const beginControlPointDrag =
         useCallback(
             (event, pointId) => {
+                if (event.button !== 0) {
+                    return;
+                }
+
                 event.preventDefault();
                 event.stopPropagation();
 
@@ -464,107 +497,134 @@ function ManualEditableTransitionEdge(
             ]
         );
 
-    const routePoints = [
-        sourcePoint,
-        ...controlPoints,
-        targetPoint,
-    ];
+    const routePoints = useMemo(
+        () => [sourcePoint, ...controlPoints, targetPoint],
+        [sourcePoint, controlPoints, targetPoint]
+    );
 
-    const routedSegments = [];
+    const handledInsertRequestRef = useRef(null);
 
-    for (
-        let index = 0;
-        index < routePoints.length - 1;
-        index += 1
-    ) {
-        const isFirstSegment =
-            index === 0;
+    useEffect(() => {
+        const request = data?.controlPointInsertRequest;
+        if (
+            !request?.requestId ||
+            request.edgeId !== id ||
+            handledInsertRequestRef.current === request.requestId
+        ) {
+            return;
+        }
 
-        const isLastSegment =
-            index ===
-            routePoints.length - 2;
-
-        routedSegments.push(
-            getRoutedSegmentPath(
-                routePoints[index],
-                routePoints[index + 1],
-                nodes,
-                isFirstSegment
-                    ? sourcePosition
-                    : null,
-                isLastSegment
-                    ? targetPosition
-                    : null
-            )
+        const expectedControlPointCount = Number(
+            request.expectedControlPointCount ?? controlPointsRef.current.length
         );
-    }
+        if (controlPointsRef.current.length !== expectedControlPointCount) {
+            handledInsertRequestRef.current = request.requestId;
+            return;
+        }
 
-    const combinedPath =
-        routedSegments
-            .map(
-                (
-                    segmentPath,
-                    index
-                ) => {
-                    if (index === 0) {
-                        return segmentPath;
-                    }
+        const absolutePoint = request.flowPosition;
+        if (
+            !absolutePoint ||
+            !Number.isFinite(Number(absolutePoint.x)) ||
+            !Number.isFinite(Number(absolutePoint.y))
+        ) {
+            return;
+        }
 
-                    const remainder =
-                        stripMoveCommand(
-                            segmentPath
-                        );
+        handledInsertRequestRef.current = request.requestId;
 
-                    return remainder
-                        ? remainder
-                        : segmentPath;
-                }
-            )
-            .join(" ");
+        let nearestSegmentIndex = 0;
+        let nearestDistance = Number.POSITIVE_INFINITY;
 
-    const segmentMidpoints =
-        routePoints
-            .slice(0, -1)
-            .map(
-                (point, index) => {
-                    const nextPoint =
-                        routePoints[
-                        index + 1
-                            ];
-
-                    return {
-                        x:
-                            (
-                                point.x +
-                                nextPoint.x
-                            ) / 2,
-                        y:
-                            (
-                                point.y +
-                                nextPoint.y
-                            ) / 2,
-                        insertIndex:
-                        index,
-                    };
-                }
+        for (let index = 0; index < routePoints.length - 1; index += 1) {
+            const segmentDistance = pointToSegmentDistanceSquared(
+                absolutePoint,
+                routePoints[index],
+                routePoints[index + 1]
             );
 
-    const labelPoint =
-        segmentMidpoints[
-            Math.floor(
-                segmentMidpoints.length /
-                2
-            )
+            if (segmentDistance < nearestDistance) {
+                nearestDistance = segmentDistance;
+                nearestSegmentIndex = index;
+            }
+        }
+
+        addControlPoint(nearestSegmentIndex, absolutePoint);
+    }, [
+        addControlPoint,
+        data?.controlPointInsertRequest,
+        id,
+        routePoints,
+    ]);
+
+    // Manual smart routing is expensive. Cache the complete geometry result so
+    // display-only updates (selection, hover, edge visibility, animation/style)
+    // do not rerun A* routing for every segment. The common routingNodes array
+    // changes only when actual node/slot geometry changes.
+    const { combinedPath, segmentMidpoints, labelPoint } = useMemo(() => {
+        const routedSegments = [];
+
+        for (
+            let index = 0;
+            index < routePoints.length - 1;
+            index += 1
+        ) {
+            const isFirstSegment = index === 0;
+            const isLastSegment = index === routePoints.length - 2;
+
+            routedSegments.push(
+                getRoutedSegmentPath(
+                    routePoints[index],
+                    routePoints[index + 1],
+                    routingNodes,
+                    isFirstSegment ? sourcePosition : null,
+                    isLastSegment ? targetPosition : null
+                )
+            );
+        }
+
+        const nextCombinedPath = routedSegments
+            .map((segmentPath, index) => {
+                if (index === 0) return segmentPath;
+                const remainder = stripMoveCommand(segmentPath);
+                return remainder || segmentPath;
+            })
+            .join(" ");
+
+        const nextSegmentMidpoints = routePoints
+            .slice(0, -1)
+            .map((point, index) => {
+                const nextPoint = routePoints[index + 1];
+                return {
+                    x: (point.x + nextPoint.x) / 2,
+                    y: (point.y + nextPoint.y) / 2,
+                    insertIndex: index,
+                };
+            });
+
+        const nextLabelPoint =
+            nextSegmentMidpoints[
+                Math.floor(nextSegmentMidpoints.length / 2)
             ] || {
-            x:
-                (sourceX +
-                    targetX) /
-                2,
-            y:
-                (sourceY +
-                    targetY) /
-                2,
+                x: (sourceX + targetX) / 2,
+                y: (sourceY + targetY) / 2,
+            };
+
+        return {
+            combinedPath: nextCombinedPath,
+            segmentMidpoints: nextSegmentMidpoints,
+            labelPoint: nextLabelPoint,
         };
+    }, [
+        routePoints,
+        routingNodes,
+        sourcePosition,
+        targetPosition,
+        sourceX,
+        sourceY,
+        targetX,
+        targetY,
+    ]);
 
     return (
         <>
@@ -678,6 +738,14 @@ function ManualEditableTransitionEdge(
                                         ? "Source"
                                         : "Target"
                                 }-relative control point. Drag to move, double-click to remove.`}
+                                onContextMenu={(event) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    data?.onControlPointContextMenu?.(
+                                        event,
+                                        point.id
+                                    );
+                                }}
                                 onPointerDown={(
                                     event
                                 ) =>
@@ -740,6 +808,46 @@ function ManualEditableTransitionEdge(
     );
 }
 
+function LightweightBackgroundTransitionEdge(props) {
+    const {
+        id,
+        sourceX,
+        sourceY,
+        targetX,
+        targetY,
+        sourcePosition,
+        targetPosition,
+        markerEnd,
+        markerStart,
+        style,
+        interactionWidth = 12,
+    } = props;
+
+    // Large workflows keep the full semantic transition graph in memory, but
+    // background edges do not need obstacle-aware A* routing or a label DOM
+    // node. A focused/selected edge swaps to the normal smart-routed variant.
+    const [path] = getBezierPath({
+        sourceX,
+        sourceY,
+        targetX,
+        targetY,
+        sourcePosition,
+        targetPosition,
+        curvature: 0.38,
+    });
+
+    return (
+        <BaseEdge
+            id={id}
+            path={path}
+            markerStart={markerStart}
+            markerEnd={markerEnd}
+            style={style}
+            interactionWidth={interactionWidth}
+        />
+    );
+}
+
 function AutoEditableTransitionEdge(props) {
     const {
         id,
@@ -752,20 +860,13 @@ function AutoEditableTransitionEdge(props) {
     } = props;
     const { setEdges } = useReactFlow();
 
-    const addInitialControlPoint = useCallback(
-        (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-
+    const addInitialControlPointAt = useCallback(
+        (absolutePoint) => {
             const sourcePoint = { x: sourceX, y: sourceY };
             const targetPoint = { x: targetX, y: targetY };
-            const midpoint = {
-                x: (sourceX + targetX) / 2,
-                y: (sourceY + targetY) / 2,
-            };
             const nextPoints = [
                 makeRelativeControlPoint(
-                    midpoint,
+                    absolutePoint,
                     sourcePoint,
                     targetPoint,
                     `cp-${crypto.randomUUID()}`
@@ -790,13 +891,62 @@ function AutoEditableTransitionEdge(props) {
         [data, id, setEdges, sourceX, sourceY, targetX, targetY]
     );
 
+    const addInitialControlPoint = useCallback(
+        (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            addInitialControlPointAt({
+                x: (sourceX + targetX) / 2,
+                y: (sourceY + targetY) / 2,
+            });
+        },
+        [addInitialControlPointAt, sourceX, sourceY, targetX, targetY]
+    );
+
+    const handledInsertRequestRef = useRef(null);
+
+    useEffect(() => {
+        const request = data?.controlPointInsertRequest;
+        if (
+            !request?.requestId ||
+            request.edgeId !== id ||
+            handledInsertRequestRef.current === request.requestId
+        ) {
+            return;
+        }
+
+        const absolutePoint = request.flowPosition;
+        if (
+            !absolutePoint ||
+            !Number.isFinite(Number(absolutePoint.x)) ||
+            !Number.isFinite(Number(absolutePoint.y))
+        ) {
+            return;
+        }
+
+        handledInsertRequestRef.current = request.requestId;
+        addInitialControlPointAt(absolutePoint);
+    }, [
+        addInitialControlPointAt,
+        data?.controlPointInsertRequest,
+        id,
+    ]);
+
     const SmartTransitionEdge = data?.forceObstacleRouting
         ? ForcedSmartTransitionEdge
         : AutoSmartTransitionEdge;
+    const useLightweightBackgroundRouting = Boolean(
+        data?.lightweightBackgroundRouting && !selected
+    );
 
     return (
         <>
-            <SmartTransitionEdge {...props} />
+            {useLightweightBackgroundRouting ? (
+                <LightweightBackgroundTransitionEdge {...props} />
+            ) : (
+                <SmartTransitionEdge {...props} />
+            )}
 
             {selected && (
                 <EdgeLabelRenderer>
@@ -835,7 +985,7 @@ function AutoEditableTransitionEdge(props) {
     );
 }
 
-export default function EditableTransitionEdge(props) {
+function EditableTransitionEdge(props) {
     const hasManualControlPoints =
         Array.isArray(props.data?.controlPoints) &&
         props.data.controlPoints.length > 0;
@@ -846,4 +996,9 @@ export default function EditableTransitionEdge(props) {
         <AutoEditableTransitionEdge {...props} />
     );
 }
+
+// React Flow can re-render its edge layer for unrelated UI state changes.
+// Keep routed transition components stable when their actual edge props did not
+// change so toggling visibility remains a paint-only operation.
+export default memo(EditableTransitionEdge);
 

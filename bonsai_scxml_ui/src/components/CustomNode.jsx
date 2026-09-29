@@ -2,11 +2,12 @@ import { useEffect, useMemo } from "react";
 import {
     Handle,
     Position,
-    useEdges,
     useUpdateNodeInternals,
 } from "@xyflow/react";
-import { FiAlertCircle } from "react-icons/fi";
+import { FiAlertCircle, FiLink2 } from "react-icons/fi";
 import StateActionBadges from "./StateActionBadges";
+
+import { startTargetEdgeReconnectFromEntry } from "../utils/edgeReconnect";
 
 const normalizeSlotType = (type) =>
     String(type || "").trim().toLowerCase();
@@ -56,7 +57,6 @@ const getParameterDefaultValue = (parameter) => {
 };
 
 function CustomNode({ id, data, selected }) {
-    const edges = useEdges();
     const updateNodeInternals = useUpdateNodeInternals();
 
     const instanceId = String(data.editorInstanceId || "").trim()
@@ -80,6 +80,9 @@ function CustomNode({ id, data, selected }) {
 
     const isBehaviorExit = Boolean(data.isBehaviorExit);
     const isSkillClone = Boolean(data.isSkillClone);
+    const referenceId = isSkillClone
+        ? String(data.editorInstanceId || id || "").trim()
+        : "";
 
     // "event"    -> transitions only
     // "slots"    -> slots only
@@ -120,17 +123,20 @@ function CustomNode({ id, data, selected }) {
     );
 
     const eventIds = useMemo(
-        () =>
-            isSkillClone
-                ? []
-                : [
-                    ...new Set(
-                        (data.events || [])
-                            .map((event) => event.id)
-                            .filter(Boolean)
-                    ),
-                ],
-        [data.events, isSkillClone]
+        () => {
+            if (isSkillClone) return [];
+
+            const ids = (data.events || [])
+                .map((event) => event.id)
+                .filter(Boolean);
+
+            // `fatal` is implicit for normal executable skills only. Terminal
+            // states and behavior exits do not expose outgoing skill events.
+            if (!isFinalState && !isBehaviorExit) ids.push("fatal");
+
+            return [...new Set(ids)];
+        },
+        [data.events, isBehaviorExit, isFinalState, isSkillClone]
     );
 
     const parameterEntries = useMemo(
@@ -257,11 +263,12 @@ function CustomNode({ id, data, selected }) {
             return value === "" && defaultValue === "";
         });
 
-        const outgoingHandles = new Set(
-            edges
-                .filter((edge) => edge.source === id)
-                .map((edge) => edge.sourceHandle)
-        );
+        // Do not subscribe every skill node to React Flow's complete edge
+        // array. App.jsx precomputes this small per-node handle list whenever
+        // the semantic transition graph actually changes. On large workflows
+        // this prevents every skill from re-rendering when unrelated edges are
+        // shown/hidden, selected, highlighted, or otherwise repainted.
+        const outgoingHandles = new Set(data.outgoingTransitionHandles || []);
 
         const hasWildcard = outgoingHandles.has("*");
         let missingTransitions = false;
@@ -282,14 +289,29 @@ function CustomNode({ id, data, selected }) {
         }
 
         const hasMissingSlots = showSlots ? missingSlots : false;
+        const unexposedTransitionHandles = (
+            data.unexposedTransitionHandles || []
+        ).filter(Boolean);
+        const hasUnexposedTransition =
+            unexposedTransitionHandles.length > 0;
         const hasError =
             !isSkillClone &&
-            (hasMissingSlots || missingParams || missingTransitions);
+            (hasMissingSlots ||
+                missingParams ||
+                missingTransitions ||
+                hasUnexposedTransition);
 
         const reasons = [];
         if (hasMissingSlots) reasons.push("Not every slot has a path");
         if (missingParams) reasons.push("Required parameters are missing");
         if (missingTransitions) reasons.push("Not every transition is set");
+        if (hasUnexposedTransition) {
+            reasons.push(
+                `Transition uses unexposed exit token${
+                    unexposedTransitionHandles.length === 1 ? "" : "s"
+                }: ${unexposedTransitionHandles.join(", ")}`
+            );
+        }
 
         return {
             hasError,
@@ -297,7 +319,6 @@ function CustomNode({ id, data, selected }) {
         };
     }, [
         data,
-        edges,
         id,
         showEvents,
         showSlots,
@@ -305,6 +326,54 @@ function CustomNode({ id, data, selected }) {
         isBehaviorExit,
         isSkillClone,
     ]);
+
+    if (isSkillClone) {
+        return (
+            <div
+                className={`state-clone-node ${
+                    selected ? "selected-node" : ""
+                }`}
+                style={{ borderLeftColor: "#0f766e" }}
+            >
+                <Handle
+                    id="transition-target"
+                    type="target"
+                    position={Position.Left}
+                    className="target-handle"
+                    isConnectableStart={false}
+                    isConnectableEnd={true}
+                    onMouseDown={(event) =>
+                        startTargetEdgeReconnectFromEntry(
+                            event,
+                            data.reconnectIncomingEdgeId
+                        )
+                    }
+                    title={
+                        data.reconnectIncomingEdgeId
+                            ? "Drag to reconnect the incoming transition"
+                            : undefined
+                    }
+                />
+
+                <div className="state-clone-header">
+                    <span className="state-clone-reference-mark" aria-hidden="true">
+                        <FiLink2 />
+                    </span>
+                    <span className="state-clone-type">SKILL</span>
+                    <span
+                        className="state-clone-badge"
+                        title={referenceId ? `Reference ID: ${referenceId}` : "Reference"}
+                    >
+                        {referenceId ? `REF · ${referenceId}` : "REF"}
+                    </span>
+                </div>
+
+                <div className="state-clone-label">
+                    {data.label || data.fullSkillName || "Skill"}
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div
@@ -350,14 +419,35 @@ function CustomNode({ id, data, selected }) {
                     className="target-handle"
                     isConnectableStart={false}
                     isConnectableEnd={true}
+                    onMouseDown={(event) =>
+                        startTargetEdgeReconnectFromEntry(
+                            event,
+                            data.reconnectIncomingEdgeId
+                        )
+                    }
+                    title={
+                        data.reconnectIncomingEdgeId
+                            ? "Drag to reconnect the incoming transition"
+                            : undefined
+                    }
                 />
             )}
 
             <div className="custom-node-label">
+                {data.isInitial && !isSkillClone && (
+                    <span className="initial-state-badge initial-state-badge-inline">
+                        INITIAL
+                    </span>
+                )}
+
+                {!isFinalState && !isBehaviorExit && (
+                    <span className="skill-type-badge">SKILL</span>
+                )}
+
                 {data.label}
 
                 {isSkillClone && (
-                    <span className="skill-clone-badge">CLONE</span>
+                    <span className="skill-clone-badge">REFERENCE</span>
                 )}
 
                 {instanceId && (
@@ -423,7 +513,7 @@ function CustomNode({ id, data, selected }) {
                                     }
                                     style={
                                         mode === "overview"
-                                            ? { cursor: "text" }
+                                            ? { cursor: "pointer" }
                                             : undefined
                                     }
                                 >
@@ -496,7 +586,7 @@ function CustomNode({ id, data, selected }) {
                                     minWidth: 0,
                                     fontSize: "10px",
                                     lineHeight: 1.35,
-                                    cursor: "text",
+                                    cursor: "pointer",
                                 }}
                             >
                                 <span
@@ -659,7 +749,7 @@ function CustomNode({ id, data, selected }) {
                                             }
                                             style={
                                                 mode === "overview"
-                                                    ? { cursor: "text" }
+                                                    ? { cursor: "pointer" }
                                                     : undefined
                                             }
                                         >

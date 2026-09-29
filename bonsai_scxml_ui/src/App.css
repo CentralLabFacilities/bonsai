@@ -471,6 +471,50 @@
     color: #ffffff;
 }
 
+.edge-visibility-toggle-group {
+    position: absolute;
+    top: 58px;
+    left: 15px;
+    z-index: 10;
+    display: flex;
+    gap: 6px;
+}
+
+.edge-visibility-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 2rem;
+    padding: 0 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.94);
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.16);
+    transition:
+            background-color 120ms ease,
+            border-color 120ms ease,
+            color 120ms ease;
+}
+
+.edge-visibility-toggle:hover {
+    border-color: #94a3b8;
+    color: #334155;
+}
+
+.edge-visibility-toggle.active {
+    border-color: var(--secondary-color);
+    background: rgba(37, 150, 240, 0.12);
+    color: var(--secondary-color);
+}
+
+.edge-visibility-toggle svg {
+    flex: 0 0 auto;
+}
+
 /* Inline Code View */
 .inline-code-view {
     position: relative;
@@ -993,11 +1037,21 @@
 /* Events & Slots Containers */
 .events-container,
 .slots-container {
-    overflow-y: auto;
     padding: 10px;
     margin-top: 10px;
     border: 1px solid var(--secondary-color);
     border-radius: 8px;
+}
+
+/* Exit Tokens are part of the Details tab's normal document flow. The tab
+   itself owns vertical scrolling; a nested scrollbar here made the token list
+   awkward to use and clipped dropdowns/references. */
+.events-container {
+    overflow: visible;
+}
+
+.slots-container {
+    overflow-y: auto;
     scrollbar-width: thin;
     scrollbar-color: var(--secondary-color) transparent;
 }
@@ -1390,6 +1444,15 @@
     border-color: #9333ea !important;
     box-shadow: 0 6px 16px rgba(147, 51, 234, 0.22) !important;
     transform: translateY(-1px);
+}
+
+.submachine-node.selected-node {
+    border-color: #38bdf8 !important;
+    border-top-color: #38bdf8 !important;
+    box-shadow:
+            0 0 0 3px rgba(56, 189, 248, 0.30),
+            0 8px 20px rgba(76, 29, 149, 0.18) !important;
+    transform: translateY(-2px);
 }
 
 .submachine-header {
@@ -2487,8 +2550,13 @@
 }
 
 .exit-target-suggestion:hover,
+.exit-target-suggestion.active,
 .exit-target-suggestion.selected {
     background: #1e293b;
+}
+
+.exit-target-suggestion.active {
+    outline: 1px solid #64748b;
 }
 
 .exit-target-suggestion.selected {
@@ -3765,6 +3833,7 @@
     flex-direction: column;
     gap: 4px;
     min-width: 190px;
+    max-width: 340px;
     animation: fadeInMenu 0.15s ease-out;
 }
 
@@ -3788,6 +3857,9 @@
     border-bottom: 1px solid #1e293b;
     margin-bottom: 2px;
     letter-spacing: 0.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .context-menu-item {
@@ -3805,6 +3877,28 @@
 .context-menu-item:hover {
     background-color: #38bdf8;
     color: #0f172a;
+    font-weight: 600;
+}
+
+.context-menu-item:disabled {
+    color: #64748b;
+    cursor: default;
+    opacity: 0.6;
+}
+
+.context-menu-item:disabled:hover {
+    background: transparent;
+    color: #64748b;
+    font-weight: 400;
+}
+
+.context-menu-item-danger {
+    color: #fca5a5;
+}
+
+.context-menu-item-danger:hover {
+    background-color: rgba(239, 68, 68, 0.2);
+    color: #fecaca;
     font-weight: 600;
 }
 
@@ -4978,8 +5072,7 @@
     font-weight: 700;
 }
 
-.costum-node:not(.terminal-final-node):not(.behavior-exit-node) .custom-node-label::before {
-    content: "SKILL";
+.costum-node:not(.terminal-final-node):not(.behavior-exit-node) .skill-type-badge {
     flex: 0 0 auto;
     padding: 2px 6px;
     border: 1px solid #60768a;
@@ -5240,6 +5333,50 @@
     box-shadow:
             0 0 0 3px rgba(129, 140, 248, 0.24),
             0 8px 20px rgba(9, 15, 28, 0.36);
+}
+
+/* Slot references use the same ghosted visual language as state references. */
+.slot-node.slot-node-reference {
+    background:
+            linear-gradient(145deg, rgba(32, 42, 67, 0.72), rgba(20, 30, 48, 0.66)),
+            repeating-linear-gradient(
+                    135deg,
+                    rgba(255, 255, 255, 0.025) 0,
+                    rgba(255, 255, 255, 0.025) 5px,
+                    transparent 5px,
+                    transparent 11px
+            );
+    border-style: dashed;
+    border-color: rgba(148, 163, 184, 0.62);
+    box-shadow: 0 4px 14px rgba(9, 15, 28, 0.24);
+}
+
+.slot-node.slot-node-reference::before {
+    background: linear-gradient(90deg, rgba(125, 211, 252, 0.78), rgba(129, 140, 248, 0.58));
+    opacity: 0.72;
+}
+
+.slot-node.slot-node-reference:hover {
+    border-color: rgba(186, 199, 216, 0.78);
+}
+
+.slot-node.slot-node-reference.selected-slot-node {
+    border-color: #7dd3fc;
+    box-shadow:
+            0 0 0 3px rgba(125, 211, 252, 0.18),
+            0 6px 16px rgba(9, 15, 28, 0.30);
+}
+
+.slot-node-clone-badge {
+    margin-left: 2px;
+    padding: 2px 5px;
+    border: 1px solid rgba(125, 211, 252, 0.34);
+    border-radius: 999px;
+    background: rgba(14, 116, 144, 0.12);
+    color: #bae6fd;
+    font-size: 7.5px;
+    font-weight: 850;
+    letter-spacing: 0.45px;
 }
 
 .slot-node-header {
@@ -6019,8 +6156,8 @@
     width: 36px;
     height: 36px;
     border-radius: 10px;
-    background: var(--surface-secondary, rgba(127, 127, 127, 0.10));
-    border: 1px solid var(--border-color, rgba(127, 127, 127, 0.18));
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border);
     font-size: 17px;
 }
 
@@ -6048,8 +6185,8 @@
 .nop-send-card {
     padding: 14px;
     border-radius: 12px;
-    border: 1px solid var(--border-color, rgba(127, 127, 127, 0.18));
-    background: var(--surface-secondary, rgba(127, 127, 127, 0.055));
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.045);
 }
 
 .nop-send-card-header {
@@ -6111,8 +6248,8 @@
     min-height: 38px;
     padding: 9px 36px 9px 10px;
     border-radius: 8px;
-    border: 1px solid var(--border-color, rgba(127, 127, 127, 0.22));
-    background: var(--input-background, rgba(127, 127, 127, 0.045));
+    border: 1px solid var(--border);
+    background: var(--background);
     color: inherit;
     outline: none;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
@@ -6123,7 +6260,7 @@
 .nop-send-input:focus {
     border-color: currentColor;
     box-shadow: 0 0 0 2px rgba(127, 127, 127, 0.10);
-    background: var(--input-background-focus, rgba(127, 127, 127, 0.075));
+    background: #1e293b;
 }
 
 .nop-send-clear {
@@ -6159,8 +6296,8 @@
     overflow: hidden;
     padding: 4px;
     border-radius: 9px;
-    border: 1px solid var(--border-color, rgba(127, 127, 127, 0.2));
-    background: var(--panel-background, var(--background-color, #fff));
+    border: 1px solid var(--border);
+    background: var(--background);
     box-shadow: 0 10px 28px rgba(0, 0, 0, 0.14);
 }
 
@@ -6212,7 +6349,7 @@
 .nop-send-preset {
     padding: 5px 8px;
     border-radius: 999px;
-    border: 1px solid var(--border-color, rgba(127, 127, 127, 0.18));
+    border: 1px solid var(--border);
     background: transparent;
     color: inherit;
     cursor: pointer;
@@ -6327,9 +6464,9 @@
     flex-direction: column;
     gap: 8px;
     padding: 12px;
-    border: 1px solid #506c71;
+    border: 1px dashed #5e7780;
     border-radius: 8px;
-    background: #1f3034;
+    background: linear-gradient(145deg, rgba(31, 48, 52, 0.88), rgba(24, 38, 43, 0.82));
 }
 
 .skill-clone-source-button {
@@ -6792,7 +6929,7 @@
 }
 
 .container-transition-card {
-    border: 1px solid var(--border-color, #d5dbe3);
+    border: 1px solid var(--border);
     border-radius: 8px;
     padding: 9px 10px;
     background: rgba(2, 132, 199, 0.04);
@@ -6914,4 +7051,517 @@
     outline: 3px solid rgba(37, 99, 235, 0.72);
     outline-offset: 3px;
     border-radius: 8px;
+}
+
+/* Initial-state marker ---------------------------------------------------- */
+:is(.costum-node.initial-node,
+    .submachine-node.initial-node,
+    .compound-frame-node.initial-compound,
+    .parallel-group-container.initial-parallel) {
+    outline: 3px solid #0f172a;
+    outline-offset: 3px;
+}
+
+.costum-node,
+.submachine-node,
+.compound-frame-node,
+.parallel-group-container {
+    position: relative;
+}
+
+.initial-state-badge {
+    position: absolute;
+    top: -13px;
+    left: 10px;
+    z-index: 35;
+    display: inline-flex;
+    align-items: center;
+    min-height: 20px;
+    padding: 2px 7px;
+    border: 2px solid #ffffff;
+    border-radius: 999px;
+    background: #0f172a;
+    color: #ffffff;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.28);
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: 0.65px;
+    line-height: 1;
+    pointer-events: none;
+}
+
+.initial-state-badge-container {
+    left: 14px;
+}
+
+
+.initial-state-badge-inline {
+    position: static;
+    top: auto;
+    left: auto;
+    right: auto;
+    z-index: auto;
+    flex: 0 0 auto;
+    min-height: 16px;
+    padding: 1px 6px;
+    border-width: 1px;
+    box-shadow: none;
+    font-size: 8px;
+}
+
+/* Editor-only references to existing states.
+   References keep the source node family accent, but use a lighter, muted
+   neutral surface so they remain visually secondary to real workflow nodes.
+   Avoid whole-node opacity so labels, handles and selection states stay readable. */
+.state-clone-node {
+    position: relative;
+    min-width: 150px;
+    max-width: 240px;
+    --reference-accent: #64748b;
+    --reference-accent-soft: #7f8b96;
+    --reference-accent-text: #52606d;
+
+    /* Regular skill references: use the dark blue of the normal skill surface. */
+    --reference-fade-start: rgba(35, 52, 67, 0.58);
+    --reference-fade-middle: rgba(35, 52, 67, 0.30);
+    --reference-fade-end: rgba(35, 52, 67, 0.08);
+    border: 1.5px dashed #8d99a6;
+    border-left: 3px solid var(--reference-accent);
+    border-radius: 7px;
+    background:
+            linear-gradient(
+                    90deg,
+                    var(--reference-fade-start) 0%,
+                    var(--reference-fade-middle) 34%,
+                    var(--reference-fade-end) 68%,
+                    transparent 100%
+            ),
+            #e4e9ed;
+    color: #4b5563;
+    box-shadow: none;
+    overflow: visible;
+}
+
+.state-clone-node:hover {
+    border-color: #6f7d89;
+    border-left-color: var(--reference-accent);
+    background:
+            linear-gradient(
+                    90deg,
+                    var(--reference-fade-start) 0%,
+                    var(--reference-fade-middle) 36%,
+                    var(--reference-fade-end) 72%,
+                    transparent 100%
+            ),
+            #edf1f4;
+}
+
+.state-clone-node.selected-node {
+    outline: 2px solid #7dd3fc;
+    outline-offset: 3px;
+}
+
+/* Keep the source node family's accent color, while the reference surface stays neutral. */
+.state-clone-submachine {
+    --reference-accent: #9333ea;
+    --reference-accent-soft: #a970d4;
+    --reference-accent-text: #7e22ce;
+    --reference-fade-start: rgba(147, 51, 234, 0.42);
+    --reference-fade-middle: rgba(147, 51, 234, 0.20);
+    --reference-fade-end: rgba(147, 51, 234, 0.05);
+}
+
+.state-clone-compound {
+    --reference-accent: #000000;
+    --reference-accent-soft: #7b8490;
+    --reference-accent-text: #475569;
+    /* Compound references stay neutral: gray fade instead of blue. */
+    --reference-fade-start: rgba(100, 116, 139, 0.50);
+    --reference-fade-middle: rgba(100, 116, 139, 0.24);
+    --reference-fade-end: rgba(100, 116, 139, 0.06);
+}
+
+.state-clone-parallel {
+    --reference-accent: #0284c7;
+    --reference-accent-soft: #5f98b5;
+    --reference-accent-text: #036b9a;
+    --reference-fade-start: rgba(2, 132, 199, 0.42);
+    --reference-fade-middle: rgba(2, 132, 199, 0.20);
+    --reference-fade-end: rgba(2, 132, 199, 0.05);
+}
+
+.state-clone-header {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 6px;
+    min-height: 27px;
+    padding: 4px 7px;
+    border-bottom: 1.5px dashed #9aa5af;
+    background:
+            linear-gradient(
+                    90deg,
+                    var(--reference-fade-start) 0%,
+                    var(--reference-fade-middle) 34%,
+                    var(--reference-fade-end) 68%,
+                    transparent 100%
+            ),
+            #d8dfe4;
+}
+
+.state-clone-reference-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border: 1px solid var(--reference-accent-soft);
+    border-radius: 5px;
+    background: #eef2f4;
+    color: var(--reference-accent-text);
+    font-size: 11px;
+}
+
+.state-clone-type,
+.state-clone-badge {
+    font-size: 8px;
+    font-weight: 800;
+    letter-spacing: 0.62px;
+}
+
+.state-clone-type {
+    color: #69747f;
+    text-transform: uppercase;
+}
+
+.state-clone-badge {
+    padding: 2px 6px;
+    border: 1px solid var(--reference-accent-soft);
+    border-radius: 999px;
+    background: #eef2f4;
+    color: var(--reference-accent-text);
+}
+
+.state-clone-label {
+    padding: 8px 10px 9px;
+    color: #46515c;
+    font-size: 12px;
+    font-weight: 600;
+    text-align: center;
+    overflow-wrap: anywhere;
+}
+
+/* Exit-token shortcut into the full transition editor. */
+.exit-token-header-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+}
+
+.exit-token-transition-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 24px;
+    padding: 3px 7px;
+    border: 1px solid rgba(96, 165, 250, 0.34);
+    border-radius: 5px;
+    background: rgba(59, 130, 246, 0.09);
+    color: #93c5fd;
+    font-size: 10px;
+    font-weight: 750;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.exit-token-transition-button:hover {
+    border-color: rgba(96, 165, 250, 0.62);
+    background: rgba(59, 130, 246, 0.18);
+    color: #dbeafe;
+}
+
+.exit-token-order-controls {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.exit-token-order-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    border-radius: 4px;
+    background: rgba(15, 23, 42, 0.32);
+    color: #cbd5e1;
+    cursor: pointer;
+}
+
+.exit-token-order-button:hover:not(:disabled) {
+    border-color: rgba(96, 165, 250, 0.58);
+    background: rgba(59, 130, 246, 0.14);
+    color: #dbeafe;
+}
+
+.exit-token-order-button:disabled {
+    opacity: 0.28;
+    cursor: default;
+}
+
+
+
+/* Compact collapsed state containers ------------------------------------ */
+.compound-frame-node.collapsed-container .compound-collapsed-source-handle {
+    top: 50% !important;
+    right: -6px !important;
+    pointer-events: auto;
+}
+
+.parallel-group-container.collapsed-container .parallel-title,
+.compound-frame-node.collapsed-container .compound-frame-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/*
+ * Transition visibility is intentionally paint-only.
+ *
+ * All transition edge components stay mounted after a state machine is loaded,
+ * so turning transitions back on does not mount and smart-route every edge in a
+ * single frame. When transitions are hidden (or Slot Mode is active), only the
+ * already-cached edges connected to the hovered/selected context are painted.
+ */
+.react-flow.editor-transitions-context-only
+.react-flow__edge.editor-transition-edge:not(.editor-edge-context-visible):not(.selected) {
+    visibility: hidden;
+    pointer-events: none;
+}
+
+/*
+ * Slot-edge visibility is paint-only for the same reason as transitions.
+ * Slot edges stay mounted/routed in Slot and Overview modes, so enabling them
+ * does not create and smart-route the complete slot graph in one frame.
+ */
+.react-flow.editor-slots-context-only
+.react-flow__edge.editor-slot-edge:not(.editor-edge-context-visible):not(.selected) {
+    visibility: hidden;
+    pointer-events: none;
+}
+
+/*
+ * Large-graph hover focus must stay paint-only. Previously useEditorDisplay
+ * cloned/restyled every visible transition whenever the pointer moved onto a
+ * node/edge. With thousands of transitions that O(E) React update dominated
+ * interaction time. Connected transitions now receive
+ * .editor-edge-focus-active, while the canvas class dims all other mounted
+ * transition SVG groups directly in CSS.
+ */
+.react-flow.editor-edge-focus-mode
+.react-flow__edge.editor-transition-edge:not(.editor-edge-focus-active):not(.selected) {
+    opacity: 0.22;
+}
+
+.react-flow.editor-edge-focus-mode
+.react-flow__edge.editor-transition-edge.editor-edge-focus-active,
+.react-flow.editor-edge-focus-mode
+.react-flow__edge.editor-transition-edge.selected {
+    opacity: 1;
+}
+
+
+/*
+ * Node focus is paint-only for large graphs. The display hook marks only the
+ * handful of context nodes; CSS dims the rest. This avoids mapping and cloning
+ * every node whenever the pointer moves across a large state machine.
+ */
+.react-flow.editor-node-focus-mode
+.react-flow__node:not(.editor-node-context-visible):not(.selected) {
+    opacity: 0.42;
+    filter: grayscale(0.72);
+    transition: opacity 120ms ease, filter 120ms ease;
+}
+
+.react-flow.editor-node-focus-mode
+.react-flow__node.editor-node-context-visible,
+.react-flow.editor-node-focus-mode
+.react-flow__node.selected {
+    opacity: 1;
+    filter: none;
+}
+
+.context-menu-divider {
+    height: 1px;
+    margin: 2px 6px;
+    background-color: #1e293b;
+}
+
+
+
+/*
+ * Keep inactive user transitions visually stable without mutating edge data.
+ * React Flow's animated edge class uses a dashed SVG stroke; imported edges
+ * may also carry a dash pattern. While an edge is not focused or selected,
+ * render it as one solid, non-animated line. Structural helper edges keep
+ * their intentional dashed presentation.
+ */
+.react-flow__edge.editor-user-transition-edge:not(.editor-edge-focus-active):not(.selected)
+    .react-flow__edge-path {
+    stroke-dasharray: none !important;
+    animation: none !important;
+}
+
+
+/* Container transition editor: Compound/Parallel transitions are target-only. */
+.transition-container-target-only .transition-add-row .skill-select:disabled,
+.transition-container-target-only .transition-add-button:disabled {
+    background: #1e293b !important;
+    border-color: #475569 !important;
+    color: #64748b !important;
+    cursor: not-allowed !important;
+    box-shadow: none !important;
+}
+
+.transition-container-target-only .transition-add-button:disabled:hover {
+    background: #1e293b !important;
+    border-color: #475569 !important;
+    color: #64748b !important;
+}
+
+.transition-container-target-only .transition-delete-button:disabled {
+    border-color: #334155;
+    background: rgba(51, 65, 85, 0.24);
+    color: #64748b;
+    cursor: not-allowed;
+}
+
+.transition-step-locked {
+    opacity: 0.58;
+}
+
+.transition-step-locked :is(button, input, select, textarea) {
+    cursor: not-allowed !important;
+}
+
+.transition-locked-label {
+    margin-left: auto;
+    padding: 2px 6px;
+    border: 1px solid #475569;
+    border-radius: 999px;
+    background: #1e293b;
+    color: #94a3b8;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* ========================================================================== 
+   NODE EDITOR INTERACTION HIGHLIGHTS
+   Keep clickable content inside workflow nodes visually responsive without
+   competing with the stronger selected-node outline.
+   ========================================================================== */
+
+/* Exit tokens inside regular skill nodes. */
+.costum-node:not(.terminal-final-node):not(.behavior-exit-node) .event-name[role="button"] {
+    display: inline-flex;
+    align-items: center;
+    min-height: 18px;
+    padding: 1px 5px;
+    border-radius: 4px;
+    outline: none;
+    cursor: pointer;
+    transition:
+            background-color 0.12s ease,
+            box-shadow 0.12s ease,
+            color 0.12s ease;
+}
+
+.costum-node:not(.terminal-final-node):not(.behavior-exit-node) .event-name[role="button"]:hover,
+.costum-node:not(.terminal-final-node):not(.behavior-exit-node) .event-name[role="button"]:focus {
+    background: rgba(148, 163, 184, 0.13);
+    box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.12);
+    color: #f1f5f9;
+}
+
+.costum-node:not(.terminal-final-node):not(.behavior-exit-node) .event-name[role="button"]:active {
+    background: rgba(56, 189, 248, 0.16);
+    box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.22);
+}
+
+/* Parameters shown directly in overview-mode skill nodes. */
+.costum-node:not(.terminal-final-node):not(.behavior-exit-node) .node-parameter-row[role="button"] {
+    margin: -1px -4px;
+    padding: 2px 4px;
+    border-radius: 4px;
+    outline: none;
+    cursor: pointer;
+    transition:
+            background-color 0.12s ease,
+            box-shadow 0.12s ease;
+}
+
+.costum-node:not(.terminal-final-node):not(.behavior-exit-node) .node-parameter-row[role="button"]:hover,
+.costum-node:not(.terminal-final-node):not(.behavior-exit-node) .node-parameter-row[role="button"]:focus {
+    background: rgba(148, 163, 184, 0.11);
+    box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.10);
+}
+
+.costum-node:not(.terminal-final-node):not(.behavior-exit-node) .node-parameter-row[role="button"]:active {
+    background: rgba(56, 189, 248, 0.14);
+    box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.20);
+}
+
+/* Slot labels are clickable in overview mode. Earlier layout rules disable
+   pointer events on these labels so the connection handles remain easy to
+   drag; enable them only in overview mode, where clicking a slot opens it. */
+.costum-node.mode-overview.has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-entry[role="button"] {
+    pointer-events: auto;
+    outline: none;
+    cursor: pointer;
+}
+
+.costum-node.mode-overview.has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-entry[role="button"] .node-slot-key {
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition:
+            background-color 0.12s ease,
+            box-shadow 0.12s ease,
+            color 0.12s ease;
+}
+
+.costum-node.mode-overview.has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-entry[role="button"]:hover .node-slot-key,
+.costum-node.mode-overview.has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-entry[role="button"]:focus .node-slot-key {
+    background: rgba(148, 163, 184, 0.13);
+    box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.12);
+    color: #f1f5f9;
+}
+
+.costum-node.mode-overview.has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-entry[role="button"]:active .node-slot-key {
+    background: rgba(56, 189, 248, 0.16);
+    box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.22);
+}
+
+/* Draggable node surfaces use a grab cursor; interactive content above
+   overrides this with pointer so click targets remain obvious. */
+.costum-node:not(.terminal-final-node):not(.behavior-exit-node),
+.slot-node {
+    cursor: grab;
+}
+
+.costum-node:not(.terminal-final-node):not(.behavior-exit-node):active,
+.slot-node:active {
+    cursor: grabbing;
+}
+
+/* Give the skill card itself a small pressed response before React Flow applies
+   the persistent selected-node state. */
+.costum-node:not(.terminal-final-node):not(.behavior-exit-node):active:not(.selected-node),
+.slot-node:active:not(.selected-slot-node) {
+    filter: brightness(1.035);
 }

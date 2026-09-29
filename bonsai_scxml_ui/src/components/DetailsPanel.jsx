@@ -746,12 +746,21 @@ function sortExitTokens(events) {
         .map(({ event }) => event);
 }
 
-function getEditableExitTokens(events) {
-    return sortExitTokens(
-        (events || []).filter(
-            (event) => !(event?.sourceNodeId && event?.transitionHandleId)
-        )
+function getEditableExitTokens(events, includeImplicitFatal = false) {
+    const editable = (events || []).filter(
+        (event) => !(event?.sourceNodeId && event?.transitionHandleId)
     );
+
+    // `fatal` is implicit only for normal executable skills. Sub-state
+    // machines expose exactly the exits declared by their referenced behavior.
+    if (
+        includeImplicitFatal &&
+        !editable.some((event) => String(event?.id || "").trim() === "fatal")
+    ) {
+        editable.push({ id: "fatal", description: "" });
+    }
+
+    return sortExitTokens(editable);
 }
 
 function DetailsPanel({
@@ -788,14 +797,25 @@ function DetailsPanel({
                           transitionFocusRequest,
                           cloneSourceNode,
                           onNavigateCloneSource,
+                          cloneNodes = [],
+                          onNavigateClone,
                           containerOutgoingTransitions = [],
+                          skillOutgoingTransitions = [],
+                          onMoveContainerTransition,
                           onNavigateTransitionNode,
                           onHoverTransitionNode,
+                          onOpenTransitionPanel,
                       }) {
     const isSubMachine =
         selectedNode.type === "submachine" ||
         Boolean(selectedNode.data.src);
     const isSkillClone = Boolean(selectedNode.data?.isSkillClone);
+    const isStateClone = Boolean(selectedNode.data?.isStateClone);
+    const isEditorClone = isSkillClone || isStateClone;
+    const selectedReferenceId = isEditorClone
+        ? String(selectedNode.data?.editorInstanceId || selectedNode.id || "").trim()
+        : "";
+    const hasClones = Array.isArray(cloneNodes) && cloneNodes.length > 0;
     const isContainerState =
         selectedNode.type === "compound" ||
         selectedNode.type === "parallel";
@@ -804,11 +824,28 @@ function DetailsPanel({
         .split(".")
         .pop()
         .toLowerCase();
+    const exposesImplicitFatal =
+        selectedNode.type === "custom" &&
+        !["fatal", "end"].includes(selectedSkillType) &&
+        !selectedNode.data?.isFinal &&
+        !selectedNode.data?.isBehaviorExit;
     const isNopSkill = !isSubMachine && selectedSkillType === "nop";
     const hasNopSend =
         isNopSkill &&
         Array.isArray(selectedNode.data?.behaviorExitEvents) &&
         String(selectedNode.data.behaviorExitEvents[0] || "").trim().length > 0;
+    const editableExitTokens = getEditableExitTokens(
+        selectedNode.data?.events || [],
+        exposesImplicitFatal
+    );
+    const firstEditableExitToken = editableExitTokens[0] || null;
+    const transitionButtonSourceId = selectedNode.id;
+    const transitionButtonEventId = isContainerState
+        ? ""
+        : firstEditableExitToken?.id || null;
+    const canOpenTransitionPanel =
+        isContainerState ||
+        Boolean(transitionButtonSourceId && transitionButtonEventId);
     const usesEditorInstanceId =
         !isSubMachine &&
         ["nop", "fatal", "end"].includes(selectedSkillType);
@@ -959,7 +996,10 @@ function DetailsPanel({
             return;
         }
 
-        const sortedEvents = getEditableExitTokens(selectedNode.data?.events || []);
+        const sortedEvents = getEditableExitTokens(
+            selectedNode.data?.events || [],
+            exposesImplicitFatal
+        );
         const eventIndex = sortedEvents.findIndex(
             (event) =>
                 String(event?.id || "") ===
@@ -1004,22 +1044,29 @@ function DetailsPanel({
 
     useEffect(() => {
         const hiddenStandardTab =
-            (hidesParameterAndSlots || isSkillClone) &&
+            (hidesParameterAndSlots || isEditorClone) &&
             (activeTab === "parameter" || activeTab === "slots");
         const invalidSendTab =
-            activeTab === "send" && (!isNopSkill || isSkillClone);
+            activeTab === "send" && (!isNopSkill || isEditorClone);
         const hiddenActionsTab =
-            activeTab === "actions" && (hidesEntryExit || isSkillClone);
+            activeTab === "actions" && (hidesEntryExit || isEditorClone);
+        const invalidClonesTab = activeTab === "clones" && !hasClones;
 
-        if (hiddenStandardTab || invalidSendTab || hiddenActionsTab) {
+        if (
+            hiddenStandardTab ||
+            invalidSendTab ||
+            hiddenActionsTab ||
+            invalidClonesTab
+        ) {
             setActiveTab("allgemein");
         }
     }, [
         activeTab,
+        hasClones,
         hidesParameterAndSlots,
         hidesEntryExit,
         isNopSkill,
-        isSkillClone,
+        isEditorClone,
         selectedNode.id,
         setActiveTab,
     ]);
@@ -1040,7 +1087,7 @@ function DetailsPanel({
         );
     }
 
-    if (isSkillClone) {
+    if (isEditorClone) {
         const sourceIdentity = cloneSourceNode
             ? String(
                 cloneSourceNode.data?.fullSkillName ||
@@ -1049,11 +1096,11 @@ function DetailsPanel({
             )
                 .split(".")
                 .pop()
-            : "Original skill not found";
+            : "Original state not found";
 
         return (
             <aside className="details-panel">
-                <h3>Details: {selectedNode.data?.label || "Skill Clone"}</h3>
+                <h3>Details: {selectedNode.data?.label || "State Reference"}</h3>
 
                 <div className="tabs">
                     <div className="tab active-tab">Overall</div>
@@ -1062,11 +1109,15 @@ function DetailsPanel({
                 <div className="tab-content">
                     <div className="allgemein-container">
                         <div className="description-header">
-                            <h3>Skill Clone</h3>
+                            <h3>{isSkillClone ? "Skill Reference" : "State Reference"}</h3>
                         </div>
 
                         <div className="skill-clone-detail-card">
-                            <div className="detail-card-title">Cloned from</div>
+                            <div className="detail-card-title">Reference target</div>
+                            <MetadataRow
+                                label="Reference ID"
+                                value={selectedReferenceId || "—"}
+                            />
                             <button
                                 type="button"
                                 className="skill-clone-source-button"
@@ -1077,15 +1128,15 @@ function DetailsPanel({
                                 }
                                 title={
                                     cloneSourceNode
-                                        ? "Go to the original skill node"
-                                        : "The original skill node no longer exists"
+                                        ? "Go to the original state"
+                                        : "The original state no longer exists"
                                 }
                             >
                                 {sourceIdentity}
                             </button>
                             <div className="detail-description">
-                                This is an editor-only inbound alias. Incoming
-                                transitions target the original skill in SCXML;
+                                This is an editor-only inbound reference. Incoming
+                                transitions target the original state in SCXML;
                                 outgoing transitions remain on the original node.
                             </div>
                         </div>
@@ -1100,7 +1151,13 @@ function DetailsPanel({
         const editorInstanceId = String(
             node.data?.editorInstanceId || ""
         ).trim();
-        const stateName = editorInstanceId
+        const isReference = Boolean(
+            node.data?.isSkillClone || node.data?.isStateClone
+        );
+        const referenceId = isReference
+            ? editorInstanceId || String(node.id || "")
+            : "";
+        const stateName = editorInstanceId && !isReference
             ? `#${editorInstanceId}`
             : fullSkillName.includes("#")
                 ? fullSkillName.split("#").pop()
@@ -1111,11 +1168,13 @@ function DetailsPanel({
             fullSkillName.split(".").pop().split("#")[0] ||
             node.id;
 
-        const displayName = editorInstanceId
-            ? `${skillName}#${editorInstanceId}`
-            : stateName && stateName !== skillName
-                ? `${skillName}${stateName.startsWith("#") ? "" : "#"}${stateName}`
-                : skillName;
+        const displayName = isReference
+            ? `${skillName} [${referenceId}]`
+            : editorInstanceId
+                ? `${skillName}#${editorInstanceId}`
+                : stateName && stateName !== skillName
+                    ? `${skillName}${stateName.startsWith("#") ? "" : "#"}${stateName}`
+                    : skillName;
 
         return {
             id: node.id,
@@ -1124,32 +1183,61 @@ function DetailsPanel({
             stateName,
             fullSkillName,
             editorInstanceId,
+            isReference,
+            referenceId,
             packageName: getSkillPackageName(fullSkillName),
         };
     });
 
-    const resolveEventTargetNodeId = (event) => {
-        if (!event?.target) return null;
-        const option = targetNodeOptions.find(
-            (candidate) =>
-                candidate.id === event.target ||
-                candidate.fullSkillName === event.target ||
-                candidate.displayName === event.target
-        );
-        return option?.id || null;
+    const getSemanticTargetNodeIds = (event) => {
+        const targetIds = [];
+        const addTarget = (targetId) => {
+            if (!targetId || targetIds.includes(targetId)) return;
+            targetIds.push(targetId);
+        };
+
+        if (event?.target) {
+            const option = targetNodeOptions.find(
+                (candidate) =>
+                    candidate.id === event.target ||
+                    candidate.fullSkillName === event.target ||
+                    candidate.displayName === event.target
+            );
+            addTarget(option?.id || event.target);
+        }
+
+        (skillOutgoingTransitions || [])
+            .filter(
+                (transition) =>
+                    transition?.sourceNodeId === selectedNode.id &&
+                    String(transition?.eventId || "") ===
+                    String(event?.id || "")
+            )
+            .forEach((transition) => addTarget(transition.targetNodeId));
+
+        return targetIds;
     };
+
+    const resolveEventTargetNodeId = (event) =>
+        getSemanticTargetNodeIds(event)[0] || null;
+
+    const transitionButtonTargetId =
+        !isContainerState && firstEditableExitToken
+            ? resolveEventTargetNodeId(firstEditableExitToken)
+            : null;
 
     const getTargetSelectorKey = (event, index) =>
         `${selectedNode.id}:${event.id}:${index}`;
 
     const getCurrentTargetDisplayName = (event) => {
-        if (!event.target) return "";
+        const targetNodeId = resolveEventTargetNodeId(event);
+        if (!targetNodeId) return "";
 
         const option = targetNodeOptions.find(
-            (candidate) => candidate.id === event.target
+            (candidate) => candidate.id === targetNodeId
         );
 
-        return option?.displayName || event.target;
+        return option?.displayName || targetNodeId;
     };
 
     const getTargetQuery = (event, index) => {
@@ -1182,6 +1270,7 @@ function DetailsPanel({
                 option.fullSkillName,
                 option.packageName,
                 option.id,
+                option.referenceId,
             ].some((value) =>
                 String(value || "")
                     .toLowerCase()
@@ -1199,7 +1288,13 @@ function DetailsPanel({
         }));
 
         setOpenTargetSelector(null);
-        onSetEventTarget?.(event, option.id);
+        onSetEventTarget?.(
+            {
+                ...event,
+                target: resolveEventTargetNodeId(event) || event.target,
+            },
+            option.id
+        );
     };
 
     const handleTargetKeyDown = (
@@ -1225,6 +1320,7 @@ function DetailsPanel({
                 option.fullSkillName,
                 option.packageName,
                 option.id,
+                option.referenceId,
             ].some(
                 (value) =>
                     String(value || "").toLowerCase() ===
@@ -1285,6 +1381,17 @@ function DetailsPanel({
                 >
                     Overall
                 </div>
+
+                {hasClones && (
+                    <div
+                        className={`tab ${
+                            activeTab === "clones" ? "active-tab" : ""
+                        }`}
+                        onClick={() => setActiveTab("clones")}
+                    >
+                        References
+                    </div>
+                )}
 
                 {!isSubMachine && !hidesParameterAndSlots && (
                     <>
@@ -1349,13 +1456,20 @@ function DetailsPanel({
 
                             <button
                                 className="initial-button"
-                                disabled={
-                                    hasInitialNode &&
-                                    !selectedNode.data.isInitial
-                                }
                                 onClick={onSetInitial}
+                                title={
+                                    selectedNode.data.isInitial
+                                        ? "This state is initial"
+                                        : hasInitialNode
+                                            ? "Replace the current initial state"
+                                            : "Set as initial state"
+                                }
                             >
-                                Initial set
+                                {selectedNode.data.isInitial
+                                    ? "Initial set"
+                                    : hasInitialNode
+                                        ? "Set initial instead"
+                                        : "Set initial"}
                             </button>
                         </div>
 
@@ -1482,7 +1596,7 @@ function DetailsPanel({
                                             usesEditorInstanceId
                                                 ? selectedNode.data.editorInstanceId || ""
                                                 : selectedNode.data.fullSkillName
-                                                    ?.split("#")[1] || ""
+                                                ?.split("#")[1] || ""
                                         }
                                         onChange={(e) =>
                                             onUpdateName(e.target.value)
@@ -1512,9 +1626,43 @@ function DetailsPanel({
                             </>
                         )}
 
-                        {!isSubMachine && !hasNopSend && (
+                        {!hasNopSend && (
                             <div className="events-container">
-                                <h3>Exit Tokens</h3>
+                                <div className="compact-slot-header">
+                                    <h3>Exit Tokens</h3>
+
+                                    {canOpenTransitionPanel && (
+                                        <button
+                                            type="button"
+                                            className="exit-token-transition-button"
+                                            title="Open transition editor"
+                                            onClick={() => {
+                                                if (isContainerState) {
+                                                    onOpenTransitionPanel?.(
+                                                        selectedNode.id,
+                                                        "",
+                                                        null,
+                                                        {
+                                                            containerMode: true,
+                                                            containerTransitions:
+                                                            containerOutgoingTransitions,
+                                                        }
+                                                    );
+                                                    return;
+                                                }
+
+                                                onOpenTransitionPanel?.(
+                                                    transitionButtonSourceId,
+                                                    transitionButtonEventId,
+                                                    transitionButtonTargetId
+                                                );
+                                            }}
+                                        >
+                                            <FiActivity size={12} />
+                                            Transitions
+                                        </button>
+                                    )}
+                                </div>
 
                                 <div className="event-list">
                                     {isContainerState &&
@@ -1538,13 +1686,15 @@ function DetailsPanel({
                                                         {transition.eventDisplayName}
                                                     </span>
 
-                                                    <span
-                                                        className={`detail-badge exit-token-badge exit-token-badge-${getExitTokenType(
-                                                            transition.eventId
-                                                        )}`}
-                                                    >
-                                                        Exit Token
-                                                    </span>
+                                                    <div className="exit-token-header-actions">
+                                                        <span
+                                                            className={`detail-badge exit-token-badge exit-token-badge-${getExitTokenType(
+                                                                transition.eventId
+                                                            )}`}
+                                                        >
+                                                            Exit Token
+                                                        </span>
+                                                    </div>
                                                 </div>
 
                                                 <div className="exit-token-node-references">
@@ -1568,9 +1718,7 @@ function DetailsPanel({
                                             </div>
                                         ))}
 
-                                    {getEditableExitTokens(
-                                        selectedNode.data.events
-                                    ).map((event, index) => (
+                                    {!isContainerState && editableExitTokens.map((event, index) => (
                                             <div
                                                 className={`slot-text-field compact-slot-card exit-token-card exit-token-${getExitTokenType(
                                                     event.id
@@ -1590,13 +1738,15 @@ function DetailsPanel({
                                                         {event.id}
                                                     </span>
 
-                                                    <span
-                                                        className={`detail-badge exit-token-badge exit-token-badge-${getExitTokenType(
-                                                            event.id
-                                                        )}`}
-                                                    >
-                                                        Exit Token
-                                                    </span>
+                                                    <div className="exit-token-header-actions">
+                                                        <span
+                                                            className={`detail-badge exit-token-badge exit-token-badge-${getExitTokenType(
+                                                                event.id
+                                                            )}`}
+                                                        >
+                                                            Exit Token
+                                                        </span>
+                                                    </div>
                                                 </div>
 
                                                 {event.description && (
@@ -1606,33 +1756,40 @@ function DetailsPanel({
                                                 )}
 
                                                 {(() => {
-                                                    const targetNodeId =
-                                                        resolveEventTargetNodeId(event);
-                                                    if (!targetNodeId) return null;
-
-                                                    const targetOption =
-                                                        targetNodeOptions.find(
-                                                            (option) =>
-                                                                option.id === targetNodeId
-                                                        );
+                                                    const targetNodeIds =
+                                                        getSemanticTargetNodeIds(event);
+                                                    if (targetNodeIds.length === 0) {
+                                                        return null;
+                                                    }
 
                                                     return (
                                                         <div className="exit-token-node-references">
-                                                            <NodeReferenceCard
-                                                                nodeId={targetNodeId}
-                                                                name={
-                                                                    targetOption?.displayName ||
-                                                                    event.target
-                                                                }
-                                                                badge="Target"
-                                                                onNavigate={
-                                                                    onNavigateTransitionNode
-                                                                }
-                                                                onHover={
-                                                                    onHoverTransitionNode
-                                                                }
-                                                                hoverFallbackId={targetNodeId}
-                                                            />
+                                                            {targetNodeIds.map((targetNodeId) => {
+                                                                const targetOption =
+                                                                    targetNodeOptions.find(
+                                                                        (option) =>
+                                                                            option.id === targetNodeId
+                                                                    );
+
+                                                                return (
+                                                                    <NodeReferenceCard
+                                                                        key={`${event.id}-${targetNodeId}`}
+                                                                        nodeId={targetNodeId}
+                                                                        name={
+                                                                            targetOption?.displayName ||
+                                                                            targetNodeId
+                                                                        }
+                                                                        badge="Target"
+                                                                        onNavigate={
+                                                                            onNavigateTransitionNode
+                                                                        }
+                                                                        onHover={
+                                                                            onHoverTransitionNode
+                                                                        }
+                                                                        hoverFallbackId={targetNodeId}
+                                                                    />
+                                                                );
+                                                            })}
                                                         </div>
                                                     );
                                                 })()}
@@ -1784,9 +1941,11 @@ function DetailsPanel({
                                                                                         </span>
 
                                                                                         <span className="exit-target-suggestion-path">
-                                                                                            {option.packageName
-                                                                                                ? `${option.packageName}.${option.skillName}`
-                                                                                                : option.fullSkillName}
+                                                                                            {option.isReference
+                                                                                                ? `Reference ID: ${option.referenceId}`
+                                                                                                : option.packageName
+                                                                                                    ? `${option.packageName}.${option.skillName}`
+                                                                                                    : option.fullSkillName}
                                                                                         </span>
                                                                                     </button>
                                                                                 )
@@ -1808,6 +1967,38 @@ function DetailsPanel({
                                 </div>
                             </div>
                         )}
+                    </div>
+                )}
+
+                {activeTab === "clones" && hasClones && (
+                    <div className="allgemein-container">
+                        <div className="description-header">
+                            <h3>References</h3>
+                        </div>
+
+                        <div className="skill-clone-detail-card">
+                            <div className="detail-description">
+                                Select a reference to move the editor view to it.
+                            </div>
+
+                            {cloneNodes.map((cloneNode, index) => (
+                                <button
+                                    key={cloneNode.id}
+                                    type="button"
+                                    className="skill-clone-source-button"
+                                    onClick={() => onNavigateClone?.(cloneNode.id)}
+                                    title="Go to this reference"
+                                >
+                                    <FiLink2 /> Reference {index + 1}
+                                    {cloneNode.data?.editorInstanceId
+                                        ? ` · ${cloneNode.data.editorInstanceId}`
+                                        : ""}
+                                    {cloneNode.data?.label
+                                        ? ` · ${cloneNode.data.label}`
+                                        : ""}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 )}
 

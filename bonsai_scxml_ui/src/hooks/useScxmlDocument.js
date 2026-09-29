@@ -14,10 +14,56 @@ import {
     prepareGraphForScxml,
 } from "../utils/editorScxml";
 
+const showSavedToast = () => {
+    if (typeof document === "undefined") return;
+
+    document.querySelectorAll(".bonsai-save-toast").forEach((element) =>
+        element.remove()
+    );
+
+    const toast = document.createElement("div");
+    toast.className = "bonsai-save-toast";
+    toast.setAttribute("role", "status");
+    toast.setAttribute("aria-live", "polite");
+    toast.textContent = "Saved!";
+
+    Object.assign(toast.style, {
+        position: "fixed",
+        left: "50%",
+        bottom: "28px",
+        zIndex: "10000",
+        transform: "translate(-50%, 8px)",
+        padding: "7px 14px",
+        border: "1px solid rgba(34, 197, 94, 0.45)",
+        borderRadius: "7px",
+        background: "#0f172a",
+        color: "#86efac",
+        boxShadow: "0 6px 18px rgba(0, 0, 0, 0.28)",
+        fontSize: "12px",
+        fontWeight: "700",
+        opacity: "0",
+        pointerEvents: "none",
+        transition: "opacity 140ms ease, transform 140ms ease",
+    });
+
+    document.body.appendChild(toast);
+    window.requestAnimationFrame(() => {
+        toast.style.opacity = "1";
+        toast.style.transform = "translate(-50%, 0)";
+    });
+
+    window.setTimeout(() => {
+        toast.style.opacity = "0";
+        toast.style.transform = "translate(-50%, 8px)";
+        window.setTimeout(() => toast.remove(), 160);
+    }, 1200);
+};
+
 export function useScxmlDocument({
     isDesktop,
     nodes,
     edges,
+    slotNodes,
     globalDataModel,
     tabs,
     setTabs,
@@ -74,7 +120,29 @@ export function useScxmlDocument({
                     )
                 );
 
-                checkSlotConnection(parsedNodes);
+                checkSlotConnection(
+                    parsedNodes,
+                    [],
+                    parsed.editorSlotNodes || []
+                );
+
+                if ((parsed.parameterErrors || []).length > 0) {
+                    const visibleErrors = parsed.parameterErrors.slice(0, 10);
+                    const lines = visibleErrors.map((error) =>
+                        `• ${error.state}.${error.parameter}: ${error.message}`
+                    );
+                    const remaining =
+                        parsed.parameterErrors.length - visibleErrors.length;
+
+                    if (remaining > 0) {
+                        lines.push(`• …and ${remaining} more parameter type error${remaining === 1 ? "" : "s"}.`);
+                    }
+
+                    alert(
+                        `Imported with ${parsed.parameterErrors.length} parameter type error${parsed.parameterErrors.length === 1 ? "" : "s"}:\n\n${lines.join("\n")}\n\nThe workflow was loaded. These errors are also listed under Problems → Parameters.`
+                    );
+                }
+
                 window.setTimeout(
                     () => fitView({ padding: 0.2, duration: 400 }),
                     150
@@ -155,7 +223,9 @@ export function useScxmlDocument({
             const xml = generateXmlString(
                 exportGraph.nodes,
                 exportGraph.edges,
-                globalDataModel
+                globalDataModel,
+                [],
+                slotNodes
             );
             const defaultName =
                 currentActiveTab?.fileName ||
@@ -206,11 +276,16 @@ export function useScxmlDocument({
                 }
             }
 
+            if (result?.success) {
+                showSavedToast();
+            }
+
             return result;
         },
         [
             nodes,
             edges,
+            slotNodes,
             globalDataModel,
             tabs,
             activeTabId,
@@ -219,6 +294,8 @@ export function useScxmlDocument({
         ]
     );
 
+    // Save / Ctrl+S overwrite the current destination without interrupting
+    // the editor. A picker is only needed when the tab has never been saved.
     const handleSaveCurrentTab = useCallback(
         () => saveDocument({ forceSaveAs: false }),
         [saveDocument]

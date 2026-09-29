@@ -1,6 +1,14 @@
 import { useCallback, useMemo, useRef } from "react";
 import {
     COMPOUND_PADDING_X,
+    COMPOUND_HEADER_HEIGHT,
+    PARALLEL_HEADER_HEIGHT,
+    PARALLEL_EXIT_GUTTER,
+    PARALLEL_LANE_CHILD_LEFT_INSET,
+    PARALLEL_LANE_CHILD_TOP_INSET,
+    PARALLEL_LANE_CHILD_RIGHT_INSET,
+    PARALLEL_LANE_CHILD_BOTTOM_INSET,
+    PARALLEL_BOTTOM_PADDING,
     PARALLEL_NODE_GAP,
     getCompoundExitGutterWidth,
     getNodeId,
@@ -8,6 +16,7 @@ import {
     resolveNodeCollisionsAndRefit,
 } from "../utils/editorGeometry";
 import { rebuildBoundaryTransitions } from "../utils/boundaryTransitions";
+import { getOverviewLayoutNodeSize } from "../utils/layoutUtils";
 
 
 export function useContainerCreation({
@@ -28,9 +37,23 @@ export function useContainerCreation({
             return selectedNodesCacheRef.current;
         }
 
-        const next = selectionNodesDependency.filter(
-            (node) => node.selected && !node.parentId
+        const candidates = selectionNodesDependency.filter(
+            (node) =>
+                node.selected &&
+                node.type !== "parallelLane" &&
+                !node.data?.autoParallelLaneCompound
         );
+
+        // Container creation is scoped to siblings. This allows recursive
+        // compounds/parallels while preventing one new container from trying
+        // to adopt nodes that currently belong to unrelated parents.
+        const groups = new Map();
+        candidates.forEach((node) => {
+            const key = node.parentId || "__root__";
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key).push(node);
+        });
+        const next = [...groups.values()].sort((a, b) => b.length - a.length)[0] || [];
         selectedNodesCacheRef.current = next;
         return next;
     }, [selectionNodesDependency]);
@@ -49,9 +72,9 @@ export function useContainerCreation({
                 .sort((a, b) => a.position.y - b.position.y);
 
             const laneIndex = existingLanes.length;
-            const laneHeight = 140;
-            const headerHeight = 45;
-            const buttonReserve = 35;
+            const laneHeight = 170;
+            const headerHeight = PARALLEL_HEADER_HEIGHT;
+            const buttonReserve = PARALLEL_BOTTOM_PADDING;
 
             const newLaneId = getNodeId();
             const newLaneName = `Lane_${laneIndex + 1}`;
@@ -160,8 +183,8 @@ export function useContainerCreation({
     const handleCreateEmptyParallel = (pos) => {
         const parallelId = getNodeId();
         const parallelName = `parallel_${nodes.filter((n) => n.type === "parallel").length + 1}`;
-        const laneHeight = 110;
-        const headerHeight = 40;
+        const laneHeight = 130;
+        const headerHeight = PARALLEL_HEADER_HEIGHT;
         const containerWidth = 420;
         const containerHeight = headerHeight + 2 * laneHeight + 35;
 
@@ -224,8 +247,7 @@ export function useContainerCreation({
         selectedList.forEach((n) => {
             const x = n.position.x;
             const y = n.position.y;
-            const w = n.style?.width || 180;
-            const h = n.style?.height || 80;
+            const { width: w, height: h } = getOverviewLayoutNodeSize(n);
 
             if (x < minX) minX = x;
             if (y < minY) minY = y;
@@ -239,6 +261,8 @@ export function useContainerCreation({
     const handleCreateCompoundFromSelected = () => {
         if (selectedNodes.length < 1) return;
 
+        const selectionParentId = selectedNodes[0]?.parentId || null;
+
         const {
             minX,
             minY,
@@ -246,8 +270,8 @@ export function useContainerCreation({
             maxY,
         } = getSelectionBoundingBox(selectedNodes);
 
-        const padding = 40;
-        const headerOffset = 50;
+        const padding = COMPOUND_PADDING_X;
+        const headerOffset = COMPOUND_HEADER_HEIGHT;
 
         const contentWidth =
             maxX - minX + padding * 2;
@@ -485,6 +509,10 @@ export function useContainerCreation({
                     headerOffset,
             },
 
+            ...(selectionParentId
+                ? { parentId: selectionParentId, extent: "parent", expandParent: true }
+                : {}),
+
             style: {
                 width: containerWidth,
                 height: containerHeight,
@@ -560,10 +588,23 @@ export function useContainerCreation({
             }
         );
 
+        const parentAwareNodes = updatedNodes.map((candidate) => {
+            if (candidate.id !== selectionParentId || !compoundNode.data.isInitial) {
+                return candidate;
+            }
+            return {
+                ...candidate,
+                data: {
+                    ...(candidate.data || {}),
+                    initialChildId: compoundId,
+                },
+            };
+        });
+
         const nextNodes =
             orderNodesParentsFirst([
                 compoundNode,
-                ...updatedNodes,
+                ...parentAwareNodes,
             ]);
 
         const normalizedGraph = rebuildBoundaryTransitions(
@@ -594,6 +635,8 @@ export function useContainerCreation({
 
     const handleCreateParallelFromSelected = () => {
         if (selectedNodes.length < 1) return;
+
+        const selectionParentId = selectedNodes[0]?.parentId || null;
 
         const selectedIds = new Set(selectedNodes.map((n) => n.id));
 
@@ -635,20 +678,13 @@ export function useContainerCreation({
             groups.push(currentGroup);
         });
 
-        // 2. Präzise Breiten & Höhen pro Gruppe berechnen
-        // Eine CustomNode mit langem Label oder Instance-ID benötigt ca. 220-250px
-        const getNodeWidth = (node) => {
-            const labelLen = (node.data?.label || "").length + (node.data?.fullSkillName || "").length;
-            return Math.max(210, Math.min(300, 160 + labelLen * 3));
-        };
+        // 2. Use the same dimensions automatic Overview placement reserves.
+        // This includes parameters and slot docks, not only transition rows.
+        const getNodeWidth = (node) => getOverviewLayoutNodeSize(node).width;
+        const getNodeHeight = (node) => getOverviewLayoutNodeSize(node).height;
 
-        const getNodeHeight = (node) => {
-            const eventCount = node.data?.events?.length || 0;
-            return Math.max(node.style?.height || 70, 50 + eventCount * 18);
-        };
-
-        const headerHeight = 45;
-        const buttonReserve = 40;
+        const headerHeight = PARALLEL_HEADER_HEIGHT;
+        const buttonReserve = PARALLEL_BOTTOM_PADDING;
         const laneHeights = [];
         const groupWidths = [];
 
@@ -661,20 +697,37 @@ export function useContainerCreation({
             group.forEach((n) => {
                 const h = getNodeHeight(n);
                 if (h > maxH) maxH = h;
-                totalW += getNodeWidth(n) + 40; // 40px Abstand zwischen Nodes
+                totalW += getNodeWidth(n);
             });
 
             if (isCompound) {
                 // Compound-Rahmen: Header (35px) + Node-Höhe + Rand-Padding (40px)
-                laneHeights.push(Math.max(170, maxH + 75));
-                // Breite: Padding links/rechts (60px) + Exit-Handle-Puffer (120px)
-                groupWidths.push(totalW + 160);
-            } else {
-                laneHeights.push(Math.max(130, maxH + 40));
+                laneHeights.push(
+                    Math.max(
+                        190,
+                        maxH + PARALLEL_LANE_CHILD_TOP_INSET + PARALLEL_LANE_CHILD_BOTTOM_INSET
+                    )
+                );
                 groupWidths.push(
-                    group.length > 1
-                        ? totalW + 80
-                        : getNodeWidth(group[0]) + 160
+                    PARALLEL_LANE_CHILD_LEFT_INSET +
+                    totalW +
+                    Math.max(0, group.length - 1) * PARALLEL_NODE_GAP +
+                    PARALLEL_LANE_CHILD_RIGHT_INSET +
+                    PARALLEL_EXIT_GUTTER
+                );
+            } else {
+                laneHeights.push(
+                    Math.max(
+                        150,
+                        maxH + PARALLEL_LANE_CHILD_TOP_INSET + PARALLEL_LANE_CHILD_BOTTOM_INSET
+                    )
+                );
+                groupWidths.push(
+                    PARALLEL_LANE_CHILD_LEFT_INSET +
+                    totalW +
+                    Math.max(0, group.length - 1) * PARALLEL_NODE_GAP +
+                    PARALLEL_LANE_CHILD_RIGHT_INSET +
+                    PARALLEL_EXIT_GUTTER
                 );
             }
         });
@@ -716,6 +769,10 @@ export function useContainerCreation({
                 x: minX - 30,
                 y: minY - 30 - headerHeight,
             },
+
+            ...(selectionParentId
+                ? { parentId: selectionParentId, extent: "parent", expandParent: true }
+                : {}),
 
             style: {
                 width: containerWidth,
@@ -806,7 +863,7 @@ export function useContainerCreation({
             // States DIREKT in die Lane. The lane itself is the single SCXML
             // compound branch; do not create another wrapper compound.
             // Kein Group_X_Part Compound mehr.
-            let currentX = 25;
+            let currentX = PARALLEL_LANE_CHILD_LEFT_INSET;
 
             group.forEach((node) => {
                 const nodeWidth = getNodeWidth(node);
@@ -819,7 +876,7 @@ export function useContainerCreation({
 
                     position: {
                         x: currentX,
-                        y: 20,
+                        y: PARALLEL_LANE_CHILD_TOP_INSET,
                     },
 
                     selected: false,
@@ -906,16 +963,6 @@ export function useContainerCreation({
                     return false;
                 }
 
-                if (n.type === "compound") {
-                    const hasRemainingChildren = nodes.some(
-                        (child) =>
-                            child.parentId === n.id &&
-                            !selectedIds.has(child.id)
-                    );
-
-                    return hasRemainingChildren;
-                }
-
                 return true;
             })
             .map((node) => {
@@ -925,7 +972,7 @@ export function useContainerCreation({
                  * Kinder eines Compound-/Parallel-/Submachine-Nodes
                  * werden automatisch mit ihrem Parent verschoben.
                  */
-                if (node.parentId) {
+                if ((node.parentId || null) !== selectionParentId) {
                     return node;
                 }
 
@@ -956,9 +1003,24 @@ export function useContainerCreation({
 
         const newRootNodes = [...remainingNodes];
         newRootNodes.splice(insertIndex, 0, parallelNode);
+        const parentAwareRootNodes = newRootNodes.map((candidate) => {
+            if (
+                candidate.id !== selectionParentId ||
+                !parallelNode.data.isInitial
+            ) {
+                return candidate;
+            }
+            return {
+                ...candidate,
+                data: {
+                    ...(candidate.data || {}),
+                    initialChildId: parallelId,
+                },
+            };
+        });
 
         const normalizedGraph = rebuildBoundaryTransitions(
-            [...newRootNodes, ...newLanes, ...movedNodes],
+            [...parentAwareRootNodes, ...newLanes, ...movedNodes],
             [...updatedEdges, ...newEdgesToAdd]
         );
         setNodes(normalizedGraph.nodes);

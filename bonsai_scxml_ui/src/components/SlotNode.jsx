@@ -39,6 +39,10 @@ function SlotNode({ id, data, selected = false }) {
         ? displayPath
         : `/${displayPath}`;
     const slotType = data.slotType || "Unknown";
+    const isSlotClone = Boolean(data.isSlotClone);
+    const referenceId = isSlotClone
+        ? String(data.editorInstanceId || id || "").trim()
+        : "";
 
     // Two different inheritance directions must stay visible independently:
     // 1) current workflow declares <inheritSlot> -> inherited from its parent
@@ -79,7 +83,7 @@ function SlotNode({ id, data, selected = false }) {
                 isInheritedFromParent ? "slot-node-inherited" : ""
             } ${
                 isRequiredByChild ? "slot-node-child-required" : ""
-            } ${selected ? "selected-slot-node" : ""}`}
+            } ${isSlotClone ? "slot-node-reference" : ""} ${selected ? "selected-slot-node" : ""}`}
             style={getSlotTypeStyle(slotType)}
         >
             <Handle
@@ -123,6 +127,14 @@ function SlotNode({ id, data, selected = false }) {
                         style={isInheritedFromParent ? { color: "#f59e0b" } : undefined}
                     />
                     <span>{isInheritedFromParent ? "INHERIT SLOT" : "SLOT"}</span>
+                    {isSlotClone && (
+                        <span
+                            className="slot-node-clone-badge"
+                            title={referenceId ? `Reference ID: ${referenceId}` : "Reference"}
+                        >
+                            {referenceId ? `REF · ${referenceId}` : "REFERENCE"}
+                        </span>
+                    )}
                 </div>
                 <div className="slot-node-type" title={slotType}>
                     {slotType}
