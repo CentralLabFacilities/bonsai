@@ -30,13 +30,13 @@ A native desktop application with file system access and direct save support.
 
 ```bash
 bun install
-bun run tauri:dev         # starts dev server with hot reload
+bun --bun run tauri:dev         # starts dev server with hot reload
 ```
 
 ### Production Build
 
 ```bash
-bun run tauri:build       # produces src-tauri/target/release/bonsai-ui
+bun --bun tauri:build       # produces src-tauri/target/release/bonsai-ui
 ```
 
 The resulting binary (~5–10 MB) opens as a native window. It supports:
@@ -58,8 +58,8 @@ A self-contained HTTP server with embedded frontend assets. No js runtime needed
 ### Build
 
 ```bash
-bun installq
-bun run build:binary               # produces target/bonsai-ui (~98 MB)
+bun install
+bun --bun run build:binary               # produces target/bonsai-ui (~98 MB)
 ```
 
 ### Run
