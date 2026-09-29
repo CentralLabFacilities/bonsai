@@ -9,6 +9,7 @@ const CATEGORY_ORDER = [
     "Transitions",
     "Slots",
     "Parameters",
+    "Variables",
     "Datamodel",
     "Workflow",
 ];
@@ -58,7 +59,7 @@ export default function ProblemsPanel({
                         No problems found
                     </div>
                     <div className="problems-empty-copy">
-                        Transitions, slots, parameters and workflow
+                        Transitions, slots, parameters, variables and workflow
                         configuration look consistent.
                     </div>
                 </div>

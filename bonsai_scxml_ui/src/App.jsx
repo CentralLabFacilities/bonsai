@@ -66,6 +66,7 @@ import {
     findDropContainerAtPoint,
     fitCompoundAndAncestorCompounds,
     growParallelToLaneContents,
+    layoutStateContainerForExpansion,
     isAutoParallelLaneCompound,
 } from "./utils/editorGeometry";
 import {
@@ -2064,34 +2065,38 @@ function AppContent() {
 
     const handleToggleContainerCollapse = useCallback(
         (containerId) => {
-            setNodes((currentNodes) =>
-                currentNodes.map((node) => {
-                    if (node.id !== containerId) return node;
-                    if (node.type !== "compound" && node.type !== "parallel") {
-                        return node;
-                    }
+            setNodes((currentNodes) => {
+                const container = currentNodes.find(
+                    (node) => node.id === containerId
+                );
 
-                    const isCollapsed = Boolean(node.data?.isCollapsed);
+                if (
+                    !container ||
+                    (container.type !== "compound" &&
+                        container.type !== "parallel")
+                ) {
+                    return currentNodes;
+                }
 
-                    if (!isCollapsed) {
-                        // NodeResizer writes the resized dimensions onto the real
-                        // React Flow node. Remember those dimensions before
-                        // replacing the height with the compact collapsed height.
-                        const expandedWidth =
-                            Number(node.width) ||
-                            Number(node.measured?.width) ||
-                            Number(node.style?.width) ||
-                            (node.type === "compound" ? 320 : 420);
-                        const expandedHeight =
-                            Number(node.height) ||
-                            Number(node.measured?.height) ||
-                            Number(node.style?.height) ||
-                            (node.type === "compound" ? 220 : 295);
+                const isCollapsed = Boolean(container.data?.isCollapsed);
+
+                if (!isCollapsed) {
+                    const expandedWidth =
+                        Number(container.width) ||
+                        Number(container.measured?.width) ||
+                        Number(container.style?.width) ||
+                        (container.type === "compound" ? 320 : 420);
+                    const expandedHeight =
+                        Number(container.height) ||
+                        Number(container.measured?.height) ||
+                        Number(container.style?.height) ||
+                        (container.type === "compound" ? 220 : 295);
+
+                    return currentNodes.map((node) => {
+                        if (node.id !== containerId) return node;
+
                         return {
                             ...node,
-                            // A collapsed Compound/Parallel uses the same
-                            // footprint as a regular state node. Preserve the
-                            // expanded dimensions separately for restoration.
                             width: COLLAPSED_CONTAINER_WIDTH,
                             height: COLLAPSED_CONTAINER_HEIGHT,
                             style: {
@@ -2110,43 +2115,44 @@ function AppContent() {
                                 },
                             },
                         };
-                    }
+                    });
+                }
 
-                    const savedSize = node.data?.expandedContainerSize || {};
-                    const restoredStyle = {
-                        ...(node.style || {}),
-                        width:
-                            Number(savedSize.width) ||
-                            Number(node.style?.width) ||
-                            (node.type === "compound" ? 320 : 420),
-                        height:
-                            Number(savedSize.height) ||
-                            (node.type === "compound" ? 220 : 295),
-                    };
-
-                    if (savedSize.minHeight == null) {
-                        delete restoredStyle.minHeight;
-                    } else {
-                        restoredStyle.minHeight = savedSize.minHeight;
-                    }
-
-                    const restoredWidth =
+                const savedSize = container.data?.expandedContainerSize || {};
+                const restoredStyle = {
+                    ...(container.style || {}),
+                    width:
                         Number(savedSize.width) ||
-                        Number(node.width) ||
-                        Number(restoredStyle.width) ||
-                        (node.type === "compound" ? 320 : 420);
-                    const restoredHeight =
+                        Number(container.style?.width) ||
+                        (container.type === "compound" ? 320 : 420),
+                    height:
                         Number(savedSize.height) ||
-                        (node.type === "compound" ? 220 : 295);
+                        (container.type === "compound" ? 220 : 295),
+                };
 
-                    restoredStyle.width = restoredWidth;
-                    restoredStyle.height = restoredHeight;
+                if (savedSize.minHeight == null) {
+                    delete restoredStyle.minHeight;
+                } else {
+                    restoredStyle.minHeight = savedSize.minHeight;
+                }
+
+                const restoredWidth =
+                    Number(savedSize.width) ||
+                    Number(container.width) ||
+                    Number(restoredStyle.width) ||
+                    (container.type === "compound" ? 320 : 420);
+                const restoredHeight =
+                    Number(savedSize.height) ||
+                    (container.type === "compound" ? 220 : 295);
+
+                restoredStyle.width = restoredWidth;
+                restoredStyle.height = restoredHeight;
+
+                const expandedNodes = currentNodes.map((node) => {
+                    if (node.id !== containerId) return node;
 
                     return {
                         ...node,
-                        // Restore the actual React Flow dimensions as well as
-                        // the CSS dimensions so an expanded, previously resized
-                        // container returns to exactly its saved size.
                         width: restoredWidth,
                         height: restoredHeight,
                         style: restoredStyle,
@@ -2155,18 +2161,37 @@ function AppContent() {
                             isCollapsed: false,
                         },
                     };
-                })
-            );
+                });
 
-            // Force React Flow to re-measure the node after changing its actual
-            // dimensions. This is important after the node has been resized.
-            requestAnimationFrame(() => updateNodeInternals(containerId));
+                // First settle the descendants (nested states and sibling
+                // collisions), then compute the exact frame around the final
+                // child positions. Unlike the normal grow-only helpers this is
+                // allowed to shrink an outdated expanded size as well.
+                return layoutStateContainerForExpansion(
+                    expandedNodes,
+                    containerId
+                );
+            });
 
-            // Keep the visible container selected rather than leaving a hidden
-            // child selected in the details panel after collapsing it.
+            requestAnimationFrame(() => {
+                const containerIds = getNodes()
+                    .filter((node) =>
+                        ["compound", "parallel", "parallelLane"].includes(
+                            node.type
+                        )
+                    )
+                    .map((node) => node.id);
+
+                if (containerIds.length === 0) {
+                    updateNodeInternals(containerId);
+                } else {
+                    containerIds.forEach((id) => updateNodeInternals(id));
+                }
+            });
+
             setSelectedNodeId(containerId);
         },
-        [setNodes, updateNodeInternals]
+        [getNodes, setNodes, updateNodeInternals]
     );
 
     // Cache the transition handles used by each skill for its local validation
@@ -3207,6 +3232,7 @@ function AppContent() {
         selectedRawNode,
         edges,
         globalDataModel,
+        availableDataModel: availableDataModelParameters,
         behaviorDirectories,
     });
 
@@ -3620,6 +3646,23 @@ function AppContent() {
         []
     );
 
+    const variableProblemNodeIds = useMemo(
+        () =>
+            new Set(
+                editorProblems
+                    .filter((problem) => problem.category === "Variables")
+                    .flatMap((problem) =>
+                        problem.focusNodeIds?.length
+                            ? problem.focusNodeIds
+                            : problem.nodeId
+                                ? [problem.nodeId]
+                                : []
+                    )
+                    .filter(Boolean)
+            ),
+        [editorProblems]
+    );
+
     const {
         visibleNodes,
         visibleEdges,
@@ -3653,6 +3696,7 @@ function AppContent() {
         hiddenNodeIds,
         parallelDropTargetId,
         compoundDropTargetId,
+        problemNodeIds: variableProblemNodeIds,
     });
 
 

@@ -7054,6 +7054,22 @@
     border-radius: 8px;
 }
 
+/* Undefined-variable validation is persistent rather than hover-only. The
+   Problems panel can focus the node, but the red outline also makes the
+   offending skill immediately visible after loading an SCXML file. */
+.react-flow__node.editor-node-problem {
+    outline: 3px solid rgba(220, 38, 38, 0.88);
+    outline-offset: 4px;
+    border-radius: 8px;
+    box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.18);
+}
+
+.react-flow__node.editor-node-problem.selected,
+.react-flow__node.editor-node-problem.editor-hover-highlight {
+    outline-color: #dc2626;
+    box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.26);
+}
+
 /* Initial-state marker ---------------------------------------------------- */
 :is(.costum-node.initial-node,
     .submachine-node.initial-node,

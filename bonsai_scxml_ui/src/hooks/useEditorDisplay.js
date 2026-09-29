@@ -136,6 +136,7 @@ export function useEditorDisplay({
     hiddenNodeIds,
     parallelDropTargetId,
     compoundDropTargetId,
+    problemNodeIds,
 }) {
     // Dragging should stay on the cheapest possible render path. Hover/focus
     // dimming is useful while inspecting the graph, but forcing every node and
@@ -1640,12 +1641,32 @@ export function useEditorDisplay({
         cloneGroupByNodeId,
     ]);
 
+    const problemVisibleNodes = useMemo(() => {
+        if (!problemNodeIds?.size) return baseVisibleNodes;
+
+        return baseVisibleNodes.map((node) => {
+            if (!problemNodeIds.has(node.id)) return node;
+
+            const classNames = String(node.className || "")
+                .split(/\s+/)
+                .filter(Boolean);
+            if (!classNames.includes("editor-node-problem")) {
+                classNames.push("editor-node-problem");
+            }
+
+            return {
+                ...node,
+                className: classNames.join(" "),
+            };
+        });
+    }, [baseVisibleNodes, problemNodeIds]);
+
     const nodeIndexById = useMemo(
         () =>
             new Map(
-                baseVisibleNodes.map((node, index) => [node.id, index])
+                problemVisibleNodes.map((node, index) => [node.id, index])
             ),
-        [baseVisibleNodes]
+        [problemVisibleNodes]
     );
 
     const contextVisibleNodeCacheRef = useRef(new WeakMap());
@@ -1685,14 +1706,14 @@ export function useEditorDisplay({
         );
 
         if (!needsFocusPresentation && !needsDropPresentation) {
-            return baseVisibleNodes;
+            return problemVisibleNodes;
         }
 
         // Copy only the array shell, then replace the handful of nodes whose
         // presentation really changes. Previously every mouse move mapped over
         // the complete graph and rebuilt opacity/filter decisions for every
         // node, which was costly on large workflows.
-        const displayed = baseVisibleNodes.slice();
+        const displayed = problemVisibleNodes.slice();
 
         if (needsFocusPresentation) {
             hoverFocusNodeIds.forEach((nodeId) => {
@@ -1769,7 +1790,7 @@ export function useEditorDisplay({
 
         return displayed;
     }, [
-        baseVisibleNodes,
+        problemVisibleNodes,
         hasHoverFocus,
         hoverFocusNodeIds,
         hoverHighlightNodeIds,
