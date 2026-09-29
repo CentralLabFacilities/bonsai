@@ -109,6 +109,8 @@ function SlotNode({ id, data, selected = false }) {
             <Handle
                 id={writeHandleId}
                 type="target"
+                isConnectableStart={false}
+                isConnectableEnd={true}
                 position={Position.Top}
                 style={{ left: "35%" }}
                 className={`source-handle slot-node-handle slot-node-write-handle ${getSlotHandleDragClass({
@@ -124,6 +126,8 @@ function SlotNode({ id, data, selected = false }) {
             <Handle
                 id={readHandleId}
                 type="target"
+                isConnectableStart={false}
+                isConnectableEnd={true}
                 position={Position.Top}
                 style={{ left: "65%" }}
                 className={`source-handle slot-node-handle slot-node-read-handle ${getSlotHandleDragClass({
