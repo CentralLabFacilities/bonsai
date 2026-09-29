@@ -488,6 +488,8 @@ export default function SubMachineNode({ id, data, selected }) {
                                         <Handle
                                             id={entry.handleId}
                                             type="source"
+                                            isConnectableStart={true}
+                                            isConnectableEnd={false}
                                             position={Position.Bottom}
                                             className={`source-handle skill-slot-handle slot-skill-${entry.access}-handle ${dragClass}`}
                                             title={`${
