@@ -17,6 +17,7 @@ export function useEditorAnalysis({
     selectedRawNode,
     edges,
     globalDataModel,
+    availableDataModel = globalDataModel,
     behaviorDirectories,
 }) {
     const ancestorSlotSourcesCacheRef = useRef(new Map());
@@ -206,7 +207,8 @@ export function useEditorAnalysis({
             isBehaviorWorkflow,
             manualSlots,
             ancestorSlotSourcesByPath,
-            semanticSlotNodes
+            semanticSlotNodes,
+            availableDataModel
         );
         editorProblemsCacheRef.current = next;
         return next;
@@ -215,6 +217,7 @@ export function useEditorAnalysis({
         semanticNodes,
         edges,
         globalDataModel,
+        availableDataModel,
         behaviorDirectories,
         isBehaviorWorkflow,
         manualSlots,

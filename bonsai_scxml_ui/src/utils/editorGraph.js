@@ -647,6 +647,77 @@ export const getBehaviorSourceKey = (src) => {
         : null;
 };
 
+
+const VARIABLE_IDENTIFIER_PATTERN = /@?[A-Za-z_#][A-Za-z0-9_:#.]*/g;
+const VARIABLE_EXPRESSION_KEYWORDS = new Set([
+    "true",
+    "false",
+    "null",
+    "undefined",
+    "NaN",
+    "Infinity",
+]);
+
+const stripQuotedExpressionParts = (value) => {
+    const text = String(value || "");
+    let result = "";
+    let quote = null;
+    let escaped = false;
+
+    for (let index = 0; index < text.length; index += 1) {
+        const char = text[index];
+
+        if (quote) {
+            if (!escaped && char === quote) {
+                quote = null;
+            }
+            escaped = !escaped && char === "\\";
+            if (char !== "\\") escaped = false;
+            result += " ";
+            continue;
+        }
+
+        if (char === "'" || char === '"') {
+            quote = char;
+            escaped = false;
+            result += " ";
+            continue;
+        }
+
+        result += char;
+    }
+
+    return result;
+};
+
+const getVariableReferences = (value, { includeBare = true } = {}) => {
+    const text = stripQuotedExpressionParts(value);
+    const references = new Set();
+
+    for (const match of text.matchAll(VARIABLE_IDENTIFIER_PATTERN)) {
+        const raw = String(match[0] || "");
+        if (!includeBare && !raw.startsWith("@")) continue;
+        const name = raw.replace(/^@/, "");
+        if (!name || VARIABLE_EXPRESSION_KEYWORDS.has(name)) continue;
+
+        const start = match.index || 0;
+        const end = start + raw.length;
+        const before = text[start - 1] || "";
+        const after = text.slice(end).trimStart();
+
+        // Property names and function identifiers are not datamodel variables.
+        if (!raw.startsWith("@") && before === ".") continue;
+        if (!raw.startsWith("@") && after.startsWith("(")) continue;
+
+        references.add(name);
+    }
+
+    return [...references];
+};
+
+const normalizeAssignmentLocation = (value) =>
+    String(value || "").trim().replace(/^@/, "");
+
 export const buildEditorProblems = (
     nodes,
     edges,
@@ -655,7 +726,8 @@ export const buildEditorProblems = (
     isBehaviorWorkflow = false,
     manualSlots = [],
     ancestorSlotSourcesByPath = new Map(),
-    currentSlotNodes = []
+    currentSlotNodes = [],
+    availableDataModel = globalDataModel
 ) => {
     const problems = [];
     const nodeMap = new Map((nodes || []).map((node) => [node.id, node]));
@@ -800,6 +872,146 @@ export const buildEditorProblems = (
         }
     });
 
+    const availableVariableEntries = Array.isArray(availableDataModel)
+        ? availableDataModel
+        : globalDataModel || [];
+    const globalVariableIds = new Set(
+        availableVariableEntries
+            .map((entry) => String(entry?.id || "").trim())
+            .filter(Boolean)
+    );
+
+    const getLocalVariableIds = (entries = []) =>
+        new Set(
+            (Array.isArray(entries) ? entries : [])
+                .map((entry) => String(entry?.id || "").trim())
+                .filter(Boolean)
+        );
+
+    const addMissingVariableProblem = ({
+        node,
+        variableName,
+        usage,
+        detailTab = "allgemein",
+        edgeId = null,
+        suffix = "",
+    }) => {
+        addProblem({
+            id: `variable-missing-${node?.id || "workflow"}-${variableName}-${usage}-${suffix}`
+                .replace(/[^A-Za-z0-9_.:#-]+/g, "-"),
+            category: "Variables",
+            title: "Undefined variable",
+            message: `${nodeLabel(node)} uses “${variableName}” ${usage}, but it is not defined in this state machine.`,
+            nodeId: node?.id || null,
+            edgeId,
+            detailTab,
+            mode: "event",
+        });
+    };
+
+    const validateExpressionReferences = ({
+        node,
+        expression,
+        availableIds,
+        usage,
+        detailTab,
+        edgeId = null,
+        suffix = "",
+    }) => {
+        getVariableReferences(expression).forEach((variableName) => {
+            if (availableIds.has(variableName)) return;
+            addMissingVariableProblem({
+                node,
+                variableName,
+                usage,
+                detailTab,
+                edgeId,
+                suffix,
+            });
+        });
+    };
+
+    // State actions. Assignment targets must exist in the datamodel they write
+    // to; expressions are evaluated in the current/parent workflow scope.
+    (nodes || []).forEach((node) => {
+        const actionTargetVariableIds =
+            node.type === "submachine" &&
+            Array.isArray(node.data?.localDataModel)
+                ? getLocalVariableIds(node.data.localDataModel)
+                : globalVariableIds;
+
+        [
+            ["onEntry", node.data?.onEntry || []],
+            ["onExit", node.data?.onExit || []],
+        ].forEach(([actionName, assignments]) => {
+            (assignments || []).forEach((assignment, index) => {
+                const location = normalizeAssignmentLocation(
+                    assignment?.location
+                );
+                if (location && !actionTargetVariableIds.has(location)) {
+                    addMissingVariableProblem({
+                        node,
+                        variableName: location,
+                        usage: `as the ${actionName} assignment target`,
+                        detailTab: "actions",
+                        suffix: `${actionName}-location-${index}`,
+                    });
+                }
+
+                validateExpressionReferences({
+                    node,
+                    expression: assignment?.expr,
+                    availableIds: globalVariableIds,
+                    usage: `in the ${actionName} assignment expression`,
+                    detailTab: "actions",
+                    suffix: `${actionName}-expr-${index}`,
+                });
+            });
+        });
+    });
+
+    // Transition assignments belong to the current workflow datamodel and are
+    // reported on the semantic source skill so Problems navigation can focus it.
+    (edges || []).forEach((edge) => {
+        const source = nodeMap.get(
+            edge.data?.boundaryOriginalSource ||
+            edge.data?.compoundOriginalSource ||
+            edge.data?.parallelOriginalSource ||
+            edge.source
+        );
+        if (!source) return;
+
+        const assignments = Array.isArray(edge.data?.assignments)
+            ? edge.data.assignments
+            : edge.data?.assign?.location
+                ? [edge.data.assign]
+                : [];
+
+        assignments.forEach((assignment, index) => {
+            const location = normalizeAssignmentLocation(assignment?.location);
+            if (location && !globalVariableIds.has(location)) {
+                addMissingVariableProblem({
+                    node: source,
+                    variableName: location,
+                    usage: "as a transition assignment target",
+                    detailTab: "allgemein",
+                    edgeId: edge.id,
+                    suffix: `transition-location-${edge.id}-${index}`,
+                });
+            }
+
+            validateExpressionReferences({
+                node: source,
+                expression: assignment?.expr,
+                availableIds: globalVariableIds,
+                usage: "in a transition assignment expression",
+                detailTab: "allgemein",
+                edgeId: edge.id,
+                suffix: `transition-expr-${edge.id}-${index}`,
+            });
+        });
+    });
+
     // Transitions
     (edges || []).forEach((edge) => {
         const source = nodeMap.get(edge.source);
@@ -920,7 +1132,7 @@ export const buildEditorProblems = (
     (nodes || []).forEach((node) => {
         const nodeParameters = node.data?.params || [];
         const parameterVariables = [
-            ...(globalDataModel || []),
+            ...availableVariableEntries,
             ...nodeParameters
                 .filter((parameter) => parameter?.key)
                 .map((parameter) => ({
@@ -952,6 +1164,29 @@ export const buildEditorProblems = (
 
             const effectiveValue = value || defaultValue;
             if (!effectiveValue) return;
+
+            const parameterVariableIds = new Set(
+                parameterVariables
+                    .map((variable) => String(variable?.id || "").trim())
+                    .filter(Boolean)
+            );
+            const missingParameterReferences = getVariableReferences(
+                effectiveValue,
+                { includeBare: false }
+            ).filter((variableName) => !parameterVariableIds.has(variableName));
+
+            if (missingParameterReferences.length > 0) {
+                missingParameterReferences.forEach((variableName) =>
+                    addMissingVariableProblem({
+                        node,
+                        variableName,
+                        usage: `for parameter ${parameterName}`,
+                        detailTab: "parameter",
+                        suffix: `parameter-${index}`,
+                    })
+                );
+                return;
+            }
 
             const normalizedParameterType = normalizeValueType(parameter.type);
             if (!normalizedParameterType) return;
