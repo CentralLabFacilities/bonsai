@@ -361,6 +361,32 @@ export const generateXmlString = (nodes, edgesOrDataModel = [], maybeDataModel =
 
         const children = nodes.filter((n) => n.parentId === node.id);
 
+        /*
+         * An atomic <state> directly below <parallel> is represented in the
+         * editor as a structural parallelLane plus one executable child. On
+         * import, both necessarily carry the same SCXML id so the child can be
+         * edited like every other skill/state. Serializing both would produce
+         * invalid SCXML such as:
+         *
+         *   <state id="lookAtFace" initial="lookAtFace">
+         *       <state id="lookAtFace" .../>
+         *   </state>
+         *
+         * In that one-child/same-id case the lane is only an editor wrapper,
+         * not a second semantic SCXML state. Flatten it and emit the child at
+         * the lane's depth. Multi-state lanes (or lanes whose id differs from
+         * their child) still need the normal compound-state wrapper.
+         */
+        if (isLane && children.length === 1) {
+            const onlyChild = children[0];
+            const childSkillId =
+                onlyChild.data?.fullSkillName || onlyChild.data?.label || "";
+
+            if (skillId && childSkillId === skillId) {
+                return renderNode(onlyChild, depth, currentContainerId);
+            }
+        }
+
         const legacyOnEntryAssignments = (node.data.params || []).filter(
             (parameter) => parameter.location && parameter.expr
         );
