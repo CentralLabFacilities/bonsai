@@ -38,13 +38,7 @@ export function useWorkflowTabs({
     manualSlots,
     globalDataModel,
     inheritedGlobalDataModel,
-    setNodes,
-    setEdges,
-    setSlotNodes,
-    setSlotEdges,
-    setManualSlots,
-    setGlobalDataModel,
-    setInheritedGlobalDataModel,
+    replaceDocument,
     selectedNodeId,
     setSelectedNodeId,
     fitView,
@@ -69,6 +63,27 @@ export function useWorkflowTabs({
     const [activeTabId, setActiveTabId] = useState("tab-1");
     const [tabPathTooltip, setTabPathTooltip] = useState(null);
     const [draggedTabId, setDraggedTabId] = useState(null);
+
+    const activeTab = tabs.find((tab) => tab.id === activeTabId) || null;
+
+    // File/document controllers should update tab metadata through one stable
+    // operation rather than reaching into setTabs themselves. The updater can
+    // be either a partial object or a function of the current active tab.
+    const updateActiveTab = useCallback((patchOrUpdater) => {
+        const currentActiveTabId = activeEditorStateRef.current?.activeTabId;
+        if (!currentActiveTabId) return;
+
+        setTabs((currentTabs) =>
+            currentTabs.map((tab) => {
+                if (tab.id !== currentActiveTabId) return tab;
+                const patch =
+                    typeof patchOrUpdater === "function"
+                        ? patchOrUpdater(tab)
+                        : patchOrUpdater;
+                return patch ? { ...tab, ...patch } : tab;
+            })
+        );
+    }, [setTabs]);
 
     // Keep tab actions stable while nodes move. The active editor state is read
     // from a ref so tab operations do not get recreated on every drag frame.
@@ -119,13 +134,15 @@ export function useWorkflowTabs({
     const loadTabState = useCallback(
         (tab, { fit = false, fitOptions = null } = {}) => {
             if (!tab) return;
-            setNodes(tab.nodes || []);
-            setEdges(tab.edges || []);
-            setSlotNodes(tab.slotNodes || []);
-            setSlotEdges(tab.slotEdges || []);
-            setManualSlots(tab.manualSlots || []);
-            setGlobalDataModel(tab.globalDataModel || []);
-            setInheritedGlobalDataModel(tab.inheritedGlobalDataModel || []);
+            replaceDocument({
+                nodes: tab.nodes || [],
+                edges: tab.edges || [],
+                slotNodes: tab.slotNodes || [],
+                slotEdges: tab.slotEdges || [],
+                manualSlots: tab.manualSlots || [],
+                globalDataModel: tab.globalDataModel || [],
+                inheritedGlobalDataModel: tab.inheritedGlobalDataModel || [],
+            });
 
             const selectableIds = new Set([
                 ...(tab.nodes || []).map((node) => node.id),
@@ -161,13 +178,7 @@ export function useWorkflowTabs({
             });
         },
         [
-            setNodes,
-            setEdges,
-            setSlotNodes,
-            setSlotEdges,
-            setManualSlots,
-            setGlobalDataModel,
-            setInheritedGlobalDataModel,
+            replaceDocument,
             setSelectedNodeId,
             fitView,
             setViewport,
@@ -389,6 +400,8 @@ export function useWorkflowTabs({
         tabs,
         setTabs,
         activeTabId,
+        activeTab,
+        updateActiveTab,
         tabPathTooltip,
         draggedTabId,
         switchTab,

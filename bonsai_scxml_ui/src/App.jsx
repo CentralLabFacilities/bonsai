@@ -73,7 +73,7 @@ import { useSlotGraph } from "./hooks/useSlotGraph";
 import { useSkillDefinitions } from "./hooks/useSkillDefinitions";
 import { useWorkflowTabs } from "./hooks/useWorkflowTabs";
 import { useFocusHistory } from "./hooks/useFocusHistory";
-import { useScxmlDocument } from "./hooks/useScxmlDocument";
+import { useWorkflowDocument } from "./hooks/useWorkflowDocument";
 import { useEditorAnalysis } from "./hooks/useEditorAnalysis";
 import { useEditorDisplay } from "./hooks/useEditorDisplay";
 import { useSkillLibraryView } from "./hooks/useSkillLibraryView";
@@ -291,6 +291,7 @@ function AppContent() {
         setGlobalDataModel,
         inheritedGlobalDataModel,
         setInheritedGlobalDataModel,
+        replaceDocument,
     } = useEditorGraphState();
 
     // When a visual slot clone is deleted, its connected semantic slot edges
@@ -768,6 +769,8 @@ function AppContent() {
         tabs,
         setTabs,
         activeTabId,
+        activeTab: activeWorkflowTab,
+        updateActiveTab,
         tabPathTooltip,
         draggedTabId,
         switchTab,
@@ -788,13 +791,7 @@ function AppContent() {
         manualSlots,
         globalDataModel,
         inheritedGlobalDataModel,
-        setNodes,
-        setEdges,
-        setSlotNodes,
-        setSlotEdges,
-        setManualSlots,
-        setGlobalDataModel,
-        setInheritedGlobalDataModel,
+        replaceDocument,
         selectedNodeId,
         setSelectedNodeId,
         fitView,
@@ -3667,22 +3664,20 @@ function AppContent() {
     };
 
     const {
-        handleImportFile,
+        handleOpenDocument,
         handleSaveCurrentTab,
         handleSaveAsCurrentTab,
-    } = useScxmlDocument({
+        hasFilePath: activeWorkflowHasFilePath,
+        isSaving: isWorkflowSaving,
+    } = useWorkflowDocument({
         isDesktop: IS_DESKTOP,
         nodes,
         edges,
         manualSlots,
         globalDataModel,
-        tabs,
-        setTabs,
-        activeTabId,
-        setGlobalDataModel,
-        setNodes,
-        setEdges,
-        setManualSlots,
+        activeTab: activeWorkflowTab,
+        updateActiveTab,
+        replaceDocument,
         setSelectedNodeId,
         fetchSkillData,
         hydrateSubMachineInheritedSlots,
@@ -3710,8 +3705,6 @@ function AppContent() {
         clearAllEdgeSelection,
         handleAddNewTab,
         handleCloseTab,
-        handleSaveCurrentTab,
-        handleSaveAsCurrentTab,
         canGoFocusBack,
         canGoFocusForward,
         goFocusBack,
@@ -3747,8 +3740,6 @@ function AppContent() {
                 clearAllEdgeSelection: liveClearAllEdgeSelection,
                 handleAddNewTab: liveHandleAddNewTab,
                 handleCloseTab: liveHandleCloseTab,
-                handleSaveCurrentTab: liveHandleSaveCurrentTab,
-                handleSaveAsCurrentTab: liveHandleSaveAsCurrentTab,
                 canGoFocusBack: liveCanGoFocusBack,
                 canGoFocusForward: liveCanGoFocusForward,
                 goFocusBack: liveGoFocusBack,
@@ -3840,16 +3831,6 @@ function AppContent() {
             }
 
             if (hasModifier && !event.altKey) {
-                if (key === "s") {
-                    event.preventDefault();
-                    if (event.shiftKey) {
-                        void liveHandleSaveAsCurrentTab();
-                    } else {
-                        void liveHandleSaveCurrentTab();
-                    }
-                    return;
-                }
-
                 if (key === "n") {
                     event.preventDefault();
                     liveHandleAddNewTab();
@@ -3936,7 +3917,13 @@ function AppContent() {
 
     return (
         <div className="container">
-            <Header onImportFile={handleImportFile} onSaveFile={handleSaveCurrentTab} onSaveAsFile={handleSaveAsCurrentTab} hasFilePath={IS_DESKTOP && Boolean(tabs.find(t => t.id === activeTabId)?.filePath)} />
+            <Header
+                onOpenFile={handleOpenDocument}
+                onSaveFile={handleSaveCurrentTab}
+                onSaveAsFile={handleSaveAsCurrentTab}
+                hasFilePath={activeWorkflowHasFilePath}
+                isSaving={isWorkflowSaving}
+            />
 
             {stateMachineLoading && (
                 <div
