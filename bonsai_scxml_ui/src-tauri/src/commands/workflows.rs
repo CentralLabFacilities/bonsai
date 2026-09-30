@@ -1,4 +1,7 @@
+use tauri::State;
+
 use crate::core::editor_export::{build_workflow_from_editor, EditorExportRequestDto};
+use crate::core::document::WorkflowDocumentStore;
 use crate::core::model::{Workflow, WorkflowDto};
 use crate::core::scxml::{parse_scxml, serialize_scxml};
 use crate::workspace::inspection::{
@@ -40,20 +43,34 @@ pub(crate) async fn inspect_workflow_source(
 }
 
 #[tauri::command]
-pub(crate) async fn parse_scxml_workflow(xml: String) -> Result<WorkflowDto, String> {
-    parse_scxml(&xml).map(|workflow| workflow.to_dto())
+pub(crate) async fn parse_scxml_workflow(
+    xml: String,
+    store: State<'_, WorkflowDocumentStore>,
+) -> Result<WorkflowDto, String> {
+    let workflow = parse_scxml(&xml)?;
+    let dto = workflow.to_dto();
+    store.replace(workflow)?;
+    Ok(dto)
 }
 
 #[tauri::command]
-pub(crate) async fn serialize_scxml_workflow(workflow: WorkflowDto) -> Result<String, String> {
+pub(crate) async fn serialize_scxml_workflow(
+    workflow: WorkflowDto,
+    store: State<'_, WorkflowDocumentStore>,
+) -> Result<String, String> {
     let workflow = Workflow::from_dto(workflow)?;
-    serialize_scxml(&workflow)
+    let xml = serialize_scxml(&workflow)?;
+    store.replace(workflow)?;
+    Ok(xml)
 }
 
 #[tauri::command]
 pub(crate) async fn serialize_editor_workflow(
     request: EditorExportRequestDto,
+    store: State<'_, WorkflowDocumentStore>,
 ) -> Result<String, String> {
     let workflow = build_workflow_from_editor(&request)?;
-    serialize_scxml(&workflow)
+    let xml = serialize_scxml(&workflow)?;
+    store.replace(workflow)?;
+    Ok(xml)
 }

@@ -235,7 +235,8 @@ export function isTauri() {
 }
 
 /**
- * Parse SCXML into the serializable Rust workflow domain model.
+ * Parse SCXML into the serializable Rust workflow DTO and install the parsed
+ * semantic workflow as the active revisioned Rust document.
  *
  * In the desktop app this is now the authoritative SCXML parser. React Flow
  * still receives its historical view-model shape through a compatibility
@@ -285,6 +286,53 @@ export async function serializeEditorWorkflow(request) {
  * The request is deliberately a small semantic snapshot rather than React
  * Flow nodes. This keeps callbacks, geometry and transient UI state out of IPC.
  */
+/**
+ * Return the revisioned semantic workflow currently owned by Rust.
+ * This is primarily the bridge for incremental editor commands; React Flow
+ * remains the visual projection.
+ */
+export async function getActiveWorkflowDocument() {
+  if (!isTauri()) {
+    throw new Error('Rust workflow document state is only available in the Tauri app.');
+  }
+
+  return await invoke('get_active_workflow_document');
+}
+
+/** Replace the Rust-owned semantic document, optionally using optimistic locking. */
+export async function replaceActiveWorkflowDocument(workflow, expectedRevision = null) {
+  if (!isTauri()) {
+    throw new Error('Rust workflow document state is only available in the Tauri app.');
+  }
+
+  return await invoke('replace_active_workflow_document', {
+    workflow,
+    expectedRevision,
+  });
+}
+
+/** Clear the Rust-owned active workflow document. */
+export async function clearActiveWorkflowDocument() {
+  if (!isTauri()) return;
+  await invoke('clear_active_workflow_document');
+}
+
+/**
+ * Apply one semantic mutation to the Rust-owned workflow.
+ * `expectedRevision` enables optimistic concurrency when several UI actions
+ * are in flight. The response contains the new revision and current DTO.
+ */
+export async function applyWorkflowCommand(command, expectedRevision = null) {
+  if (!isTauri()) {
+    throw new Error('Rust workflow commands are only available in the Tauri app.');
+  }
+
+  return await invoke('apply_workflow_command', {
+    command,
+    expectedRevision,
+  });
+}
+
 export async function validateEditorWorkflow(request) {
   if (!isTauri()) {
     throw new Error('Rust editor validation is only available in the Tauri app.');

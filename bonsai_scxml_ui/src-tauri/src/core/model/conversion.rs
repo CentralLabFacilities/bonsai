@@ -290,7 +290,7 @@ impl Assignment {
 }
 
 impl DataModelEntry {
-    fn from_dto(dto: DataModelEntryDto) -> Self {
+    pub(crate) fn from_dto(dto: DataModelEntryDto) -> Self {
         Self {
             id: dto.id,
             type_name: dto.type_name,

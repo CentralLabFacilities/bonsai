@@ -58,10 +58,17 @@ impl WorkflowIndex {
         index
     }
 
+    pub(crate) fn state_position(&self, id: &StateId) -> Option<usize> {
+        self.state_position_by_id.get(id).copied()
+    }
+
+    pub(crate) fn transition_position(&self, id: &TransitionId) -> Option<usize> {
+        self.transition_position_by_id.get(id).copied()
+    }
+
     pub(crate) fn state<'a>(&self, workflow: &'a Workflow, id: &StateId) -> Option<&'a State> {
-        self.state_position_by_id
-            .get(id)
-            .and_then(|position| workflow.states.get(*position))
+        self.state_position(id)
+            .and_then(|position| workflow.states.get(position))
     }
 
     pub(crate) fn transition<'a>(
@@ -69,9 +76,8 @@ impl WorkflowIndex {
         workflow: &'a Workflow,
         id: &TransitionId,
     ) -> Option<&'a Transition> {
-        self.transition_position_by_id
-            .get(id)
-            .and_then(|position| workflow.transitions.get(*position))
+        self.transition_position(id)
+            .and_then(|position| workflow.transitions.get(position))
     }
 
     pub(crate) fn states_for_scxml_id(&self, scxml_id: &str) -> &[StateId] {

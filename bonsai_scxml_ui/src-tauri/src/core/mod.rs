@@ -7,3 +7,4 @@ pub(crate) mod transitions;
 pub(crate) mod runtime;
 
 pub(crate) mod editor_export;
+pub(crate) mod document;
