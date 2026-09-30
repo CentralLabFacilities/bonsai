@@ -36,7 +36,7 @@ export const isCloneableEditorNode = (node) => Boolean(
         !node.data?.autoParallelLaneCompound)
 );
 
-const createReferenceId = () =>
+export const createEditorReferenceId = () =>
     `ref-${crypto.randomUUID().replace(/-/g, "").slice(0, 8)}`;
 
 export const buildEditorCloneNode = (sourceNode, position) => {
@@ -51,7 +51,7 @@ export const buildEditorCloneNode = (sourceNode, position) => {
             data: {
                 ...(sourceNode.data || {}),
                 cloneOfNodeId: sourceNode.id,
-                editorInstanceId: createReferenceId(),
+                editorInstanceId: createEditorReferenceId(),
                 isSlotClone: true,
             },
         };
@@ -64,7 +64,7 @@ export const buildEditorCloneNode = (sourceNode, position) => {
             sourceNode.data?.label ||
             "State",
         cloneOfNodeId: sourceNode.id,
-        editorInstanceId: createReferenceId(),
+        editorInstanceId: createEditorReferenceId(),
         isInitial: false,
         isFinal: false,
         events: [],
