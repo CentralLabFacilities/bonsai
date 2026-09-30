@@ -1,6 +1,10 @@
-use crate::core::model::{DataModelEntry, StateId, TransitionId, Workflow, WorkflowIndex};
+use std::collections::HashSet;
 
-use super::types::WorkflowCommandDto;
+use crate::core::model::{
+    Assignment, DataModelEntry, StateId, Transition, TransitionId, Workflow, WorkflowIndex,
+};
+
+use super::types::{TargetedTransitionCommandDto, WorkflowCommandDto};
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct WorkflowCommandChanges {
@@ -55,6 +59,15 @@ pub(crate) fn apply_command(
             transition_id,
             target_state_id,
             target_instance_id,
+        ),
+        WorkflowCommandDto::ReplaceTargetedTransitions {
+            source_state_id,
+            transitions,
+        } => replace_targeted_transitions(
+            workflow,
+            index,
+            source_state_id,
+            transitions,
         ),
     }
 }
@@ -282,3 +295,124 @@ fn update_transition_target(
         ..WorkflowCommandChanges::default()
     })
 }
+fn replace_targeted_transitions(
+    workflow: &mut Workflow,
+    index: &WorkflowIndex,
+    source_state_id: String,
+    transitions: Vec<TargetedTransitionCommandDto>,
+) -> Result<WorkflowCommandChanges, String> {
+    let source_id = StateId::from(source_state_id);
+    index
+        .state(workflow, &source_id)
+        .ok_or_else(|| format!("Unknown transition source state '{source_id}'"))?;
+
+    let preserved_ids = workflow
+        .transitions
+        .iter()
+        .filter(|transition| {
+            transition.source_state_id != source_id || transition.target_state_id.is_none()
+        })
+        .map(|transition| transition.id.clone())
+        .collect::<HashSet<_>>();
+
+    let mut seen_ids = HashSet::new();
+    let mut replacements = Vec::with_capacity(transitions.len());
+    for transition in transitions {
+        let transition_id = TransitionId::from(transition.id.trim());
+        if transition_id.as_str().is_empty() {
+            return Err("Transition id must not be empty".to_string());
+        }
+        if !seen_ids.insert(transition_id.clone()) {
+            return Err(format!("Duplicate replacement transition id '{transition_id}'"));
+        }
+        if preserved_ids.contains(&transition_id) {
+            return Err(format!(
+                "Transition id '{transition_id}' is already used by another semantic transition"
+            ));
+        }
+
+        let target_id = StateId::from(transition.target_state_id);
+        let target = index
+            .state(workflow, &target_id)
+            .ok_or_else(|| format!("Unknown transition target state '{target_id}'"))?;
+
+        replacements.push(Transition {
+            id: transition_id,
+            source_state_id: source_id.clone(),
+            target_state_id: Some(target_id),
+            target_scxml_id: target.scxml_id.clone(),
+            event: transition.event.trim().to_string(),
+            condition: transition.condition,
+            assignments: transition
+                .assignments
+                .into_iter()
+                .map(|assignment| Assignment {
+                    location: assignment.location,
+                    expression: assignment.expression,
+                })
+                .collect(),
+            sent_events: Vec::new(),
+            target_instance_id: transition.target_instance_id,
+        });
+    }
+
+    let old_targeted_ids = workflow
+        .transitions
+        .iter()
+        .filter(|transition| {
+            transition.source_state_id == source_id && transition.target_state_id.is_some()
+        })
+        .map(|transition| transition.id.as_str().to_string())
+        .collect::<Vec<_>>();
+
+    let insertion_index = workflow
+        .transitions
+        .iter()
+        .position(|transition| {
+            transition.source_state_id == source_id && transition.target_state_id.is_some()
+        })
+        .unwrap_or(workflow.transitions.len());
+
+    let mut next = Vec::with_capacity(
+        workflow.transitions.len() - old_targeted_ids.len() + replacements.len(),
+    );
+    let mut inserted = false;
+    let mut replacement_iter = Some(replacements);
+
+    for (position, existing) in workflow.transitions.drain(..).enumerate() {
+        if !inserted && position == insertion_index {
+            next.extend(replacement_iter.take().unwrap_or_default());
+            inserted = true;
+        }
+
+        if existing.source_state_id == source_id && existing.target_state_id.is_some() {
+            continue;
+        }
+        next.push(existing);
+    }
+
+    if !inserted {
+        next.extend(replacement_iter.take().unwrap_or_default());
+    }
+    workflow.transitions = next;
+
+    let mut changed_transition_ids = old_targeted_ids;
+    changed_transition_ids.extend(
+        workflow
+            .transitions
+            .iter()
+            .filter(|transition| {
+                transition.source_state_id == source_id && transition.target_state_id.is_some()
+            })
+            .map(|transition| transition.id.as_str().to_string()),
+    );
+    changed_transition_ids.sort();
+    changed_transition_ids.dedup();
+
+    Ok(WorkflowCommandChanges {
+        changed_transition_ids,
+        index_changed: true,
+        ..WorkflowCommandChanges::default()
+    })
+}
+

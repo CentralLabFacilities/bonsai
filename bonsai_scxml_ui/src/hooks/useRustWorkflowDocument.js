@@ -5,11 +5,21 @@ import {
     replaceActiveEditorWorkflowDocument,
 } from "../tauri-client";
 import { buildRustEditorExportRequest } from "../utils/scxmlRustExport";
+import { buildRustTransitionSyncPlan } from "../utils/rustTransitionSync";
 
 const isRevisionConflict = (error) =>
     String(error?.message || error || "")
         .toLowerCase()
         .includes("revision conflict");
+
+const waitForEditorCommit = () =>
+    new Promise((resolve) => {
+        if (typeof window === "undefined") {
+            resolve();
+            return;
+        }
+        window.requestAnimationFrame(() => resolve());
+    });
 
 /**
  * Keeps the Rust-owned semantic Workflow aligned with the active React Flow
@@ -62,6 +72,49 @@ export function useRustWorkflowDocument({
         return snapshot;
     }, []);
 
+    const resyncFromEditor = useCallback(
+        async (error = null) => {
+            if (error) {
+                if (isRevisionConflict(error)) {
+                    console.debug(
+                        "Rust workflow revision changed; resynchronizing active editor document."
+                    );
+                } else {
+                    console.warn(
+                        "Rust workflow command failed; resynchronizing from editor state.",
+                        error
+                    );
+                }
+            }
+
+            await waitForEditorCommit();
+            return replaceNow(editorStateRef.current, null);
+        },
+        [replaceNow]
+    );
+
+    const applyCommandNow = useCallback(
+        async (command) => {
+            if (!isTauri() || !command) return null;
+
+            if (!readyRef.current) {
+                await replaceNow(editorStateRef.current, null);
+            }
+
+            try {
+                const result = await applyWorkflowCommandTauri(
+                    command,
+                    revisionRef.current
+                );
+                revisionRef.current = result?.revision ?? revisionRef.current;
+                return result;
+            } catch (error) {
+                return resyncFromEditor(error);
+            }
+        },
+        [replaceNow, resyncFromEditor]
+    );
+
     const syncEditorState = useCallback(
         (editorState = null) =>
             enqueue(async () => {
@@ -72,54 +125,58 @@ export function useRustWorkflowDocument({
     );
 
     const applyWorkflowCommand = useCallback(
-        (command) =>
+        (command) => enqueue(() => applyCommandNow(command)),
+        [applyCommandNow, enqueue]
+    );
+
+    const syncTransitionSources = useCallback(
+        (sourceStateIds) =>
             enqueue(async () => {
-                if (!isTauri() || !command) return null;
+                if (!isTauri()) return null;
 
-                // The first semantic edit of a new/blank tab establishes a
-                // graph-ID-based Rust document before applying the command.
-                // This also normalizes imported workflows whose parser IDs are
-                // intentionally independent from React Flow node IDs.
-                if (!readyRef.current) {
-                    await replaceNow(editorStateRef.current, null);
+                const sourceIds = Array.from(
+                    new Set(
+                        (Array.isArray(sourceStateIds)
+                            ? sourceStateIds
+                            : [sourceStateIds]
+                        )
+                            .map((id) => String(id || "").trim())
+                            .filter(Boolean)
+                    )
+                );
+                if (sourceIds.length === 0) return null;
+
+                // Transition mutations are optimistic local React updates. Wait
+                // one frame so editorStateRef observes the committed graph.
+                await waitForEditorCommit();
+                const editorState = editorStateRef.current || {};
+                const plans = sourceIds.map((sourceStateId) =>
+                    buildRustTransitionSyncPlan({
+                        ...editorState,
+                        sourceStateId,
+                    })
+                );
+
+                // Nested/container transitions are hoisted by the SCXML export
+                // rules. Until that ownership becomes a Rust editor command of
+                // its own, resync those complex cases atomically.
+                if (plans.some((plan) => plan?.mode === "full")) {
+                    return replaceNow(editorState, null);
                 }
 
-                try {
-                    const result = await applyWorkflowCommandTauri(
-                        command,
-                        revisionRef.current
-                    );
-                    revisionRef.current = result?.revision ?? revisionRef.current;
-                    return result;
-                } catch (error) {
-                    // Save/import may legitimately advance the backend revision
-                    // outside this bridge. The editor already contains the
-                    // user's local mutation, so a full semantic resync is the
-                    // safest recovery and avoids replaying the command twice.
-                    if (isRevisionConflict(error)) {
-                        console.debug(
-                            "Rust workflow revision changed; resynchronizing active editor document."
-                        );
-                    } else {
-                        console.warn(
-                            "Rust workflow command failed; resynchronizing from editor state.",
-                            error
-                        );
-                    }
-
-                    // Let React commit the optimistic local mutation before
-                    // rebuilding the backend document from the live editor.
-                    await new Promise((resolve) => {
-                        if (typeof window === "undefined") {
-                            resolve();
-                            return;
-                        }
-                        window.requestAnimationFrame(() => resolve());
-                    });
-                    return replaceNow(editorStateRef.current, null);
+                let result = null;
+                for (const plan of plans) {
+                    if (plan?.mode !== "command" || !plan.command) continue;
+                    result = await applyCommandNow(plan.command);
                 }
+                return result;
             }),
-        [enqueue, replaceNow]
+        [applyCommandNow, enqueue, replaceNow]
+    );
+
+    const syncTransitionsForSource = useCallback(
+        (sourceStateId) => syncTransitionSources([sourceStateId]),
+        [syncTransitionSources]
     );
 
     const invalidate = useCallback(() => {
@@ -130,6 +187,8 @@ export function useRustWorkflowDocument({
     return {
         applyWorkflowCommand,
         syncEditorState,
+        syncTransitionsForSource,
+        syncTransitionSources,
         invalidate,
         getRevision: () => revisionRef.current,
     };

@@ -132,7 +132,8 @@ fn command_result(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::model::{State, StateId, StateKind};
+    use super::super::types::TargetedTransitionCommandDto;
+    use crate::core::model::{AssignmentDto, State, StateId, StateKind, Transition, TransitionId};
 
     fn sample_workflow() -> Workflow {
         Workflow {
@@ -208,4 +209,73 @@ mod tests {
             .unwrap_err();
         assert!(error.contains("revision conflict"));
     }
+    #[test]
+    fn replacing_targeted_transitions_preserves_targetless_behavior_exits() {
+        let store = WorkflowDocumentStore::default();
+        let mut workflow = sample_workflow();
+        workflow.transitions = vec![
+            Transition {
+                id: TransitionId::from("old"),
+                source_state_id: StateId::from("a"),
+                target_state_id: Some(StateId::from("b")),
+                target_scxml_id: "B".into(),
+                event: "A.success".into(),
+                condition: String::new(),
+                assignments: vec![],
+                sent_events: vec![],
+                target_instance_id: None,
+            },
+            Transition {
+                id: TransitionId::from("exit"),
+                source_state_id: StateId::from("a"),
+                target_state_id: None,
+                target_scxml_id: String::new(),
+                event: "Nop.fatal".into(),
+                condition: String::new(),
+                assignments: vec![],
+                sent_events: vec!["behavior.success".into()],
+                target_instance_id: None,
+            },
+        ];
+        assert_eq!(store.replace(workflow).unwrap(), 1);
+
+        let result = store
+            .apply(
+                Some(1),
+                WorkflowCommandDto::ReplaceTargetedTransitions {
+                    source_state_id: "a".into(),
+                    transitions: vec![TargetedTransitionCommandDto {
+                        id: "new".into(),
+                        target_state_id: "b".into(),
+                        event: "A.error".into(),
+                        condition: "@retry".into(),
+                        assignments: vec![AssignmentDto {
+                            location: "counter".into(),
+                            expression: "1".into(),
+                        }],
+                        target_instance_id: Some("ref-1".into()),
+                    }],
+                },
+            )
+            .unwrap();
+        assert_eq!(result.revision, 2);
+
+        let snapshot = store.snapshot().unwrap().unwrap();
+        assert_eq!(snapshot.workflow.transitions.len(), 2);
+        assert!(snapshot
+            .workflow
+            .transitions
+            .iter()
+            .any(|transition| transition.id == "exit" && transition.target_state_id.is_none()));
+        let replacement = snapshot
+            .workflow
+            .transitions
+            .iter()
+            .find(|transition| transition.id == "new")
+            .unwrap();
+        assert_eq!(replacement.event, "A.error");
+        assert_eq!(replacement.target_state_id.as_deref(), Some("b"));
+        assert_eq!(replacement.target_instance_id.as_deref(), Some("ref-1"));
+    }
+
 }

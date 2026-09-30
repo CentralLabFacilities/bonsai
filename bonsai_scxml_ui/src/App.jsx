@@ -593,6 +593,8 @@ function AppContent() {
         checkSlotConnection,
         updateNodeInternals,
         applyWorkflowCommand: rustWorkflowDocument.applyWorkflowCommand,
+        syncTransitionsForSource:
+            rustWorkflowDocument.syncTransitionsForSource,
     });
 
     const {
@@ -742,6 +744,8 @@ function AppContent() {
         setSelectedNodeId,
         updateNodeInternals,
         selectTransitionEdge,
+        syncTransitionsForSource:
+            rustWorkflowDocument.syncTransitionsForSource,
     });
 
     const {
@@ -2960,6 +2964,7 @@ function AppContent() {
                         transitionChanges,
                         edges
                     );
+                    const affectedTransitionSourceIds = new Set();
 
                     const getLogicalSourceEntries = (edge) => {
                         const storedEntries = Array.isArray(
@@ -3019,6 +3024,7 @@ function AppContent() {
                             getLogicalSourceEntries(removedEdge).forEach(
                                 ({ sourceId, sourceHandle }) => {
                                     if (!sourceId || !sourceHandle) return;
+                                    affectedTransitionSourceIds.add(sourceId);
 
                                     const sourceNode = nodes.find(
                                         (node) => node.id === sourceId
@@ -3115,6 +3121,9 @@ function AppContent() {
                             updateNodeInternals(nodeId)
                         );
                     });
+                    void rustWorkflowDocument.syncTransitionSources(
+                        [...affectedTransitionSourceIds]
+                    );
                 } else {
                     onEdgesChange(transitionChanges);
                 }
@@ -3200,6 +3209,7 @@ function AppContent() {
             setNodes,
             setEdges,
             updateNodeInternals,
+            rustWorkflowDocument.syncTransitionSources,
         ]
     );
 

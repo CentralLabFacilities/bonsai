@@ -27,6 +27,7 @@ export function useEditorTransitionActions({
     setSlotEdges,
     setSelectedNodeId,
     updateNodeInternals,
+    syncTransitionsForSource,
 }) {
     const clearTransitionSelection = useCallback(() => {
         setEdges((currentEdges) =>
@@ -233,6 +234,7 @@ export function useEditorTransitionActions({
             (normalized.affectedNodeIds || []).forEach((nodeId) => {
                 requestAnimationFrame(() => updateNodeInternals(nodeId));
             });
+            void syncTransitionsForSource?.(selectedNode.id);
             return true;
         },
         [
@@ -242,6 +244,7 @@ export function useEditorTransitionActions({
             setNodes,
             setEdges,
             updateNodeInternals,
+            syncTransitionsForSource,
         ]
     );
 
@@ -307,9 +310,13 @@ export function useEditorTransitionActions({
                 });
             });
 
+            // Container transitions have SCXML ownership/hoisting semantics,
+            // so the Rust bridge deliberately promotes this to a full semantic
+            // resync rather than issuing an unsafe state-local command.
+            void syncTransitionsForSource?.(containerNodeId);
             return true;
         },
-        [setNodes, setEdges]
+        [setNodes, setEdges, syncTransitionsForSource]
     );
 
     return {

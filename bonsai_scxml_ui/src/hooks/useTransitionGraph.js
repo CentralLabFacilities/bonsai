@@ -145,6 +145,7 @@ export function useTransitionGraph({
     setSelectedNodeId,
     updateNodeInternals,
     selectTransitionEdge,
+    syncTransitionsForSource,
 }) {
     const [slotConnectionDrag, setSlotConnectionDrag] = useState(null);
     const reconnectingEdgeRef = useRef(null);
@@ -853,8 +854,16 @@ export function useTransitionGraph({
                 requestAnimationFrame(() => updateNodeInternals(nodeId))
             );
             requestAnimationFrame(() => updateNodeInternals(destinationNode.id));
+            void syncTransitionsForSource?.(logicalSourceId);
         },
-        [edges, nodes, setEdges, setNodes, updateNodeInternals]
+        [
+            edges,
+            nodes,
+            setEdges,
+            setNodes,
+            updateNodeInternals,
+            syncTransitionsForSource,
+        ]
     );
 
     const onConnect = useCallback(
@@ -1418,6 +1427,7 @@ export function useTransitionGraph({
                         nextEdges
                     );
                 }
+                void syncTransitionsForSource?.(logicalSourceId);
                 return;
             }
 
@@ -1621,6 +1631,7 @@ export function useTransitionGraph({
                     updateNodeInternals(sourceCompound.id);
                 });
 
+                void syncTransitionsForSource?.(params.source);
                 return;
             }
 
@@ -1856,6 +1867,7 @@ export function useTransitionGraph({
                     );
                 }
 
+                void syncTransitionsForSource?.(params.source);
                 return;
             }
 
@@ -1987,6 +1999,7 @@ export function useTransitionGraph({
                     updatedEdges
                 );
             }
+            void syncTransitionsForSource?.(params.source);
         },
         [
             edges,
@@ -1996,6 +2009,7 @@ export function useTransitionGraph({
             setNodes,
             setSlotEdges,
             updateNodeInternals,
+            syncTransitionsForSource,
         ]
     );
 
@@ -2252,6 +2266,9 @@ export function useTransitionGraph({
                     );
                 }
             );
+            void syncTransitionsForSource?.(
+                drawerData.containerNodeId || drawerData.sourceNodeId
+            );
 
             setDrawerData((previous) => ({
                 ...previous,
@@ -2470,6 +2487,7 @@ export function useTransitionGraph({
         (normalized.affectedNodeIds || []).forEach((nodeId) => {
             requestAnimationFrame(() => updateNodeInternals(nodeId));
         });
+        void syncTransitionsForSource?.(sourceId);
 
         setDrawerData((previous) => ({ ...previous, isOpen: false }));
     };

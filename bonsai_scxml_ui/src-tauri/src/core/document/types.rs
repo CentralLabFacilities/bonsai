@@ -1,4 +1,4 @@
-use crate::core::model::{DataModelEntryDto, WorkflowDto};
+use crate::core::model::{AssignmentDto, DataModelEntryDto, WorkflowDto};
 
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,6 +17,24 @@ pub(crate) struct WorkflowCommandResultDto {
     pub changed_transition_ids: Vec<String>,
     #[serde(default)]
     pub data_model_changed: bool,
+}
+
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct TargetedTransitionCommandDto {
+    pub id: String,
+    #[serde(rename = "targetStateId")]
+    pub target_state_id: String,
+    #[serde(default)]
+    pub event: String,
+    #[serde(default)]
+    pub condition: String,
+    #[serde(default)]
+    pub assignments: Vec<AssignmentDto>,
+    #[serde(default)]
+    #[serde(rename = "targetInstanceId")]
+    pub target_instance_id: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -71,5 +89,11 @@ pub(crate) enum WorkflowCommandDto {
         #[serde(default)]
         #[serde(rename = "targetInstanceId")]
         target_instance_id: Option<String>,
+    },
+    ReplaceTargetedTransitions {
+        #[serde(rename = "sourceStateId")]
+        source_state_id: String,
+        #[serde(default)]
+        transitions: Vec<TargetedTransitionCommandDto>,
     },
 }

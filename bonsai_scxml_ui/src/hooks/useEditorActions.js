@@ -56,6 +56,7 @@ export function useEditorActions(options) {
         setSlotEdges: options.setSlotEdges,
         setSelectedNodeId: options.setSelectedNodeId,
         updateNodeInternals: options.updateNodeInternals,
+        syncTransitionsForSource: options.syncTransitionsForSource,
     });
 
     return {
