@@ -255,3 +255,18 @@ export async function validateEditorWorkflow(request) {
     request,
   });
 }
+
+/**
+ * Resolve the inherited-slot source chain across open parent state machines.
+ * The request contains only semantic slot/tab data; React Flow geometry and
+ * callbacks never cross the Tauri boundary.
+ */
+export async function resolveEditorSlotAncestry(request) {
+  if (!isTauri()) {
+    throw new Error('Rust slot ancestry is only available in the Tauri app.');
+  }
+
+  return await invoke('resolve_editor_slot_ancestry', {
+    request,
+  });
+}

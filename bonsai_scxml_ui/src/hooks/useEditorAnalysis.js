@@ -7,7 +7,15 @@ import {
     normalizeSlotType,
 } from "../utils/editorGraph";
 import { buildEditorValidationRequest } from "../utils/editorValidation";
-import { isTauri, validateEditorWorkflow } from "../tauri-client";
+import {
+    buildSlotAncestryRequest,
+    slotAncestryResponseToMap,
+} from "../utils/slotAnalysis";
+import {
+    isTauri,
+    resolveEditorSlotAncestry,
+    validateEditorWorkflow,
+} from "../tauri-client";
 
 export function useEditorAnalysis({
     tabs,
@@ -22,21 +30,82 @@ export function useEditorAnalysis({
     availableDataModel = globalDataModel,
     behaviorDirectories,
 }) {
-    const ancestorSlotSourcesCacheRef = useRef(new Map());
-    const ancestorSlotSourcesByPath = useMemo(() => {
-        if (isDraggingNode) {
-            return ancestorSlotSourcesCacheRef.current;
+    const [ancestorSlotSourcesByPath, setAncestorSlotSourcesByPath] = useState(
+        () => new Map()
+    );
+    const slotAncestryRevisionRef = useRef(0);
+
+    const slotAncestryRequest = useMemo(
+        () =>
+            buildSlotAncestryRequest({
+                tabs,
+                activeTabId,
+                nodes: semanticNodes,
+                manualSlots,
+                slotNodes: semanticSlotNodes,
+            }),
+        [tabs, activeTabId, semanticNodes, manualSlots, semanticSlotNodes]
+    );
+
+    useEffect(() => {
+        // Keep Slot Details stable while React Flow emits intermediate drag
+        // states. The ancestry relationship cannot change until the drag has
+        // completed, so there is no reason to cross the IPC boundary here.
+        if (isDraggingNode) return undefined;
+
+        const revision = ++slotAncestryRevisionRef.current;
+        let cancelled = false;
+
+        const commit = (next) => {
+            if (cancelled || revision !== slotAncestryRevisionRef.current) {
+                return;
+            }
+            setAncestorSlotSourcesByPath(next);
+        };
+
+        if (!isTauri()) {
+            commit(
+                getAncestorSlotSourcesByPath(tabs, activeTabId, {
+                    nodes: semanticNodes,
+                    slotNodes: semanticSlotNodes,
+                    manualSlots,
+                })
+            );
+            return () => {
+                cancelled = true;
+            };
         }
 
-        const next = getAncestorSlotSourcesByPath(tabs, activeTabId, {
-            nodes: semanticNodes,
-            slotNodes: semanticSlotNodes,
-            manualSlots,
-        });
-        ancestorSlotSourcesCacheRef.current = next;
-        return next;
+        // Several node/slot state updates commonly happen in the same React
+        // turn. Coalesce them so Rust receives only the final semantic snapshot.
+        const timer = window.setTimeout(async () => {
+            try {
+                const response = await resolveEditorSlotAncestry(
+                    slotAncestryRequest
+                );
+                commit(slotAncestryResponseToMap(response));
+            } catch (error) {
+                console.warn(
+                    "Rust slot ancestry failed; using frontend fallback:",
+                    error
+                );
+                commit(
+                    getAncestorSlotSourcesByPath(tabs, activeTabId, {
+                        nodes: semanticNodes,
+                        slotNodes: semanticSlotNodes,
+                        manualSlots,
+                    })
+                );
+            }
+        }, 30);
+
+        return () => {
+            cancelled = true;
+            window.clearTimeout(timer);
+        };
     }, [
         isDraggingNode,
+        slotAncestryRequest,
         tabs,
         activeTabId,
         semanticNodes,
