@@ -99,6 +99,10 @@ pub(crate) struct TransitionDto {
     pub condition: String,
     #[serde(default)]
     pub assignments: Vec<AssignmentDto>,
+    /// Events emitted by targetless forwarding transitions (for example the
+    /// Nop states used to expose behavior exits).
+    #[serde(default)]
+    pub sent_events: Vec<String>,
     /// Editor routing hint used when several visual instances represent the
     /// same SCXML target state.
     #[serde(default)]

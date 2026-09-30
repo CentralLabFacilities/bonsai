@@ -168,18 +168,16 @@ fn parse_state(
     });
 
     for transition in element.direct_children("transition") {
-        let Some(target_scxml_id) = non_empty(transition.attr("target")) else {
-            continue;
-        };
         let transition_id = context.create_transition_id();
         context.transitions.push(TransitionDto {
             id: transition_id,
             source_state_id: internal_id.clone(),
             target_state_id: None,
-            target_scxml_id,
+            target_scxml_id: non_empty(transition.attr("target")).unwrap_or_default(),
             event: transition.attr("event").unwrap_or_default().trim().to_string(),
             condition: transition.attr("cond").unwrap_or_default().trim().to_string(),
             assignments: parse_direct_assignments(transition),
+            sent_events: parse_direct_sends(transition),
             target_instance_id: None,
         });
     }
@@ -306,6 +304,12 @@ fn parse_direct_assignments(node: &XmlNode) -> Vec<AssignmentDto> {
         .collect()
 }
 
+fn parse_direct_sends(node: &XmlNode) -> Vec<String> {
+    node.direct_children("send")
+        .filter_map(|send| non_empty(send.attr("event")))
+        .collect()
+}
+
 fn parse_editor_metadata(state: &XmlNode) -> EditorMetadataDto {
     let Some(metadata) = state.first_direct_child("metadata") else {
         return EditorMetadataDto::default();
@@ -385,7 +389,11 @@ fn resolve_state_references(
     let mut transition_occurrences: HashMap<(String, String), u32> = HashMap::new();
 
     for transition in transitions {
-        transition.target_state_id = resolve_from_index(&by_scxml_id, &transition.target_scxml_id);
+        transition.target_state_id = if transition.target_scxml_id.is_empty() {
+            None
+        } else {
+            resolve_from_index(&by_scxml_id, &transition.target_scxml_id)
+        };
 
         if !transition.event.is_empty() && !transition.target_scxml_id.is_empty() {
             let occurrence_key = (transition.event.clone(), transition.target_scxml_id.clone());

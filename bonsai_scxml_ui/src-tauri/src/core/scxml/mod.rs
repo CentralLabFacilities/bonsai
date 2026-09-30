@@ -82,4 +82,21 @@ mod tests {
         assert!(serialized.contains("<slot key=\"Model\""));
         assert!(serialized.contains("<inheritSlot key=\"Speech\""));
     }
+
+    #[test]
+    fn preserves_targetless_behavior_exit_sends() {
+        let workflow = parse_scxml(
+            r#"<scxml initial="Nop#exit"><state id="Nop#exit"><transition event="Nop.success"><send event="behavior.success"/></transition></state></scxml>"#,
+        )
+        .expect("SCXML should parse");
+
+        assert_eq!(workflow.transitions.len(), 1);
+        let transition = &workflow.transitions[0];
+        assert!(transition.target_scxml_id.is_empty());
+        assert_eq!(transition.sent_events, vec!["behavior.success"]);
+
+        let serialized = serialize_scxml(&workflow).expect("workflow should serialize");
+        assert!(serialized.contains("<send event=\"behavior.success\"/>"));
+        assert!(!serialized.contains("target=\"\""));
+    }
 }

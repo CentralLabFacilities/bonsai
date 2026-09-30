@@ -342,7 +342,7 @@ fn render_transition(
         output.push_str(&format!(" cond=\"{}\"", escape_attr(&transition.condition)));
     }
 
-    if transition.assignments.is_empty() {
+    if transition.assignments.is_empty() && transition.sent_events.is_empty() {
         output.push_str("/>\n");
         return;
     }
@@ -354,6 +354,13 @@ fn render_transition(
             indent,
             escape_attr(assignment.location.trim_start_matches('@')),
             escape_attr(&assignment.expression)
+        ));
+    }
+    for event in &transition.sent_events {
+        output.push_str(&format!(
+            "{}    <send event=\"{}\"/>\n",
+            indent,
+            escape_attr(event)
         ));
     }
     output.push_str(&format!("{}</transition>\n", indent));

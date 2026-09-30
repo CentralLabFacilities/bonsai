@@ -1,4 +1,6 @@
 import { MarkerType } from "@xyflow/react";
+import { isTauri, parseScxmlWorkflow } from "../tauri-client.js";
+import { workflowDtoToScxmlDocument } from "./scxmlRustDocument.js";
 import { getLayoutedElements } from "./layoutUtils";
 import { parseStateAssignments } from "./stateActions.js";
 import { getTransitionExitToken } from "./transitionEvents.js";
@@ -676,13 +678,35 @@ export const extractBehaviorExitEventsFromScxml = (xmlText) => {
 };
 
 export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
-    const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(normalizeLegacyScxmlComments(xmlText), "application/xml");
+    const normalizedXml = normalizeLegacyScxmlComments(xmlText);
+    let xmlDoc;
 
-    // 1. Prüfen auf XML-Syntaxfehler
-    const parserError = xmlDoc.getElementsByTagName("parsererror")[0];
-    if (parserError) {
-        throw new Error("Fehler in der XML-Struktur:\n" + parserError.textContent.slice(0, 200));
+    if (isTauri()) {
+        // Desktop: Rust is the authoritative SCXML parser. The returned
+        // semantic WorkflowDto is projected onto the tiny Element facade used
+        // by the existing React Flow import code below.
+        try {
+            const workflow = await parseScxmlWorkflow(normalizedXml);
+            xmlDoc = workflowDtoToScxmlDocument(workflow);
+        } catch (error) {
+            throw new Error(
+                "Fehler in der XML-Struktur:\n" +
+                    String(error?.message || error || "Unknown SCXML parse error")
+            );
+        }
+    } else {
+        // Browser/dev fallback until the semantic adapter becomes the only
+        // supported import boundary.
+        const parser = new DOMParser();
+        xmlDoc = parser.parseFromString(normalizedXml, "application/xml");
+
+        const parserError = xmlDoc.getElementsByTagName("parsererror")[0];
+        if (parserError) {
+            throw new Error(
+                "Fehler in der XML-Struktur:\n" +
+                    parserError.textContent.slice(0, 200)
+            );
+        }
     }
 
     const scxmlElem = xmlDoc.getElementsByTagName("scxml")[0];

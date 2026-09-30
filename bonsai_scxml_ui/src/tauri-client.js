@@ -204,15 +204,18 @@ export async function readWorkflowSource(
  * Check if running inside Tauri (desktop app).
  */
 export function isTauri() {
-  return typeof window !== 'undefined' && window.__TAURI__ !== undefined;
+  return (
+    typeof window !== 'undefined' &&
+    (window.__TAURI_INTERNALS__ !== undefined || window.__TAURI__ !== undefined)
+  );
 }
 
 /**
  * Parse SCXML into the serializable Rust workflow domain model.
  *
- * This is intentionally not wired into React Flow yet. It is the semantic
- * boundary used by the staged SCXML migration, so the existing editor import
- * path can remain unchanged until the adapter is ready.
+ * In the desktop app this is now the authoritative SCXML parser. React Flow
+ * still receives its historical view-model shape through a compatibility
+ * adapter, keeping the migration isolated from canvas behavior.
  */
 export async function parseScxmlWorkflow(xml) {
   if (!isTauri()) {
