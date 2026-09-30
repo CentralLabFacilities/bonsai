@@ -151,42 +151,20 @@ export function useSubStateMachines({
     nodes,
     edges,
     selectedNodes,
-    slotNodes,
-    slotEdges,
-    manualSlots,
     tabs,
-    setTabs,
     activeTabId,
-    setActiveTabId,
     switchTab,
+    openTab,
     globalDataModel,
-    setGlobalDataModel,
     inheritedGlobalDataModel,
-    setInheritedGlobalDataModel,
     behaviorDirectories,
     fetchSkillData,
-    setNodes,
-    setEdges,
-    setSlotNodes,
-    setSlotEdges,
-    setManualSlots,
-    selectedNodeId,
-    setSelectedNodeId,
-    getViewport,
     setActiveTab,
     setContextMenu,
-    fitView,
     checkSlotConnection,
     onStateMachineLoadStart,
     onStateMachineLoadEnd,
 }) {
-    const captureCurrentViewport = () => {
-        try {
-            return getViewport?.() || null;
-        } catch {
-            return null;
-        }
-    };
 
     const hydrateSubMachineInheritedSlots = async (
         targetNodes,
@@ -440,46 +418,17 @@ export function useSubStateMachines({
                 globalDataModel: parsed.globalDataModel,
             };
 
-            const parentViewport = captureCurrentViewport();
-            setTabs((prev) => [
-                ...prev.map((tab) =>
-                    tab.id === activeTabId
-                        ? {
-                            ...tab,
-                            nodes: syncedParentNodes,
-                            edges,
-                            slotNodes,
-                            slotEdges,
-                            manualSlots,
-                            globalDataModel,
-                            inheritedGlobalDataModel,
-                            selectedNodeId: selectedNodeId || null,
-                            viewport: parentViewport || tab.viewport || null,
-                        }
-                        : tab
-                ),
-                newTabObj,
-            ]);
-
-            setActiveTabId(tabId);
-            setNodes(parsedNodes);
-            setEdges(parsed.edges);
-            setSlotNodes([]);
-            setSlotEdges([]);
-            setManualSlots([]);
-            setGlobalDataModel(parsed.globalDataModel);
-            setInheritedGlobalDataModel(inheritedForChild);
-            setSelectedNodeId(null);
+            openTab(newTabObj, {
+                currentTabPatch: { nodes: syncedParentNodes },
+                fit: true,
+                fitOptions: { duration: 300 },
+            });
             checkSlotConnection(
                 parsedNodes,
                 [],
                 parsed.editorSlotNodes || []
             );
 
-            setTimeout(
-                () => fitView({ padding: 0.2, duration: 300 }),
-                100
-            );
         } catch (err) {
             console.error("Sub-Machine loading error:", err);
             alert(
@@ -557,38 +506,12 @@ export function useSubStateMachines({
             // Save the new Sub-SM node in the parent tab before switching to
             // the child. Otherwise returning to the parent can restore the old
             // snapshot without the freshly created node.
-            const parentViewport = captureCurrentViewport();
-            setTabs((prevTabs) => [
-                ...prevTabs.map((tab) =>
-                    tab.id === activeTabId
-                        ? {
-                            ...tab,
-                            nodes: parentNodes,
-                            edges,
-                            slotNodes,
-                            slotEdges,
-                            manualSlots,
-                            globalDataModel,
-                            inheritedGlobalDataModel,
-                            selectedNodeId: selectedNodeId || null,
-                            viewport: parentViewport || tab.viewport || null,
-                        }
-                        : tab
-                ),
-                newTabObj,
-            ]);
-
+            openTab(newTabObj, {
+                currentTabPatch: { nodes: parentNodes },
+                fit: true,
+                fitOptions: { duration: 300 },
+            });
             setContextMenu(null);
-            setActiveTabId(newTabId);
-            setNodes([]);
-            setEdges([]);
-            setSlotNodes([]);
-            setSlotEdges([]);
-            setManualSlots([]);
-            setGlobalDataModel(DEFAULT_CHILD_DATA_MODEL);
-            setInheritedGlobalDataModel(inheritedForChild);
-            setSelectedNodeId(null);
-            setTimeout(() => fitView({ padding: 0.2, duration: 300 }), 80);
             return true;
         } catch (error) {
             console.error("Could not create sub-state-machine:", error);
@@ -725,38 +648,15 @@ export function useSubStateMachines({
                 globalDataModel: DEFAULT_CHILD_DATA_MODEL,
             };
 
-            const parentViewport = captureCurrentViewport();
-            setTabs((prevTabs) => [
-                ...prevTabs.map((tab) =>
-                    tab.id === activeTabId
-                        ? {
-                            ...tab,
-                            nodes: remainingParentNodes,
-                            edges: updatedParentEdges,
-                            slotNodes,
-                            slotEdges,
-                            manualSlots,
-                            globalDataModel,
-                            inheritedGlobalDataModel,
-                            selectedNodeId: selectedNodeId || null,
-                            viewport: parentViewport || tab.viewport || null,
-                        }
-                        : tab
-                ),
-                newTabObj,
-            ]);
-
-            setActiveTabId(newTabId);
-            setNodes(subTabNodes);
-            setEdges(subTabEdges);
-            setSlotNodes([]);
-            setSlotEdges([]);
-            setManualSlots([]);
-            setGlobalDataModel(DEFAULT_CHILD_DATA_MODEL);
-            setInheritedGlobalDataModel(inheritedForChild);
-            setSelectedNodeId(null);
+            openTab(newTabObj, {
+                currentTabPatch: {
+                    nodes: remainingParentNodes,
+                    edges: updatedParentEdges,
+                },
+                fit: true,
+                fitOptions: { duration: 300 },
+            });
             checkSlotConnection(subTabNodes);
-            setTimeout(() => fitView({ padding: 0.2, duration: 300 }), 80);
             return true;
         } catch (error) {
             console.error("Could not create sub-state-machine:", error);

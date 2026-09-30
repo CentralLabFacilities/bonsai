@@ -291,7 +291,6 @@ function AppContent() {
         setGlobalDataModel,
         inheritedGlobalDataModel,
         setInheritedGlobalDataModel,
-        replaceDocument,
     } = useEditorGraphState();
 
     // When a visual slot clone is deleted, its connected semantic slot edges
@@ -769,17 +768,18 @@ function AppContent() {
         tabs,
         setTabs,
         activeTabId,
-        setActiveTabId,
         tabPathTooltip,
-        setTabPathTooltip,
         draggedTabId,
         switchTab,
+        openTab,
         handleAddNewTab,
         handleCloseTab,
         handleTabDragStart,
         handleTabDragOver,
         handleTabDragEnd,
         handleTabMiddleMouseDown,
+        handleTabMouseEnter,
+        handleTabMouseLeave,
     } = useWorkflowTabs({
         nodes,
         edges,
@@ -828,31 +828,16 @@ function AppContent() {
         nodes,
         edges,
         selectedNodes,
-        slotNodes,
-        slotEdges,
-        manualSlots,
         tabs,
-        setTabs,
         activeTabId,
-        setActiveTabId,
         switchTab,
+        openTab,
         globalDataModel,
-        setGlobalDataModel,
         inheritedGlobalDataModel,
-        setInheritedGlobalDataModel,
         behaviorDirectories,
         fetchSkillData,
-        setNodes,
-        setEdges,
-        setSlotNodes,
-        setSlotEdges,
-        setManualSlots,
-        selectedNodeId,
-        setSelectedNodeId,
-        getViewport,
         setActiveTab,
         setContextMenu,
-        fitView,
         checkSlotConnection,
         onStateMachineLoadStart: beginStateMachineLoad,
         onStateMachineLoadEnd: endStateMachineLoad,
@@ -920,61 +905,31 @@ function AppContent() {
 
 
 
-    // IDE-style workflow navigation/search shortcuts. Ctrl+Tab cycles
-    // workflow tabs; Shift reverses direction. Ctrl+F opens the editor
-    // search instead of the browser's page search.
+    // Ctrl+F opens the graph search instead of the browser's page search.
+    // Workflow-tab cycling (Ctrl+Tab / Ctrl+Shift+Tab) is owned by
+    // useWorkflowTabs so tab lifecycle and navigation stay together.
     useEffect(() => {
-        const handleEditorShortcut = (event) => {
+        const handleEditorFindShortcut = (event) => {
             if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+            if (String(event.key || "").toLowerCase() !== "f") return;
 
-            const key = String(event.key || "").toLowerCase();
+            const target = event.target;
+            const insideCodeEditor =
+                target instanceof Element &&
+                Boolean(target.closest(".monaco-editor, .cm-editor"));
 
-            const isTabShortcut =
-                key === "tab" ||
-                event.code === "Tab" ||
-                event.keyCode === 9;
+            // Preserve the native editor search when the user is actively
+            // editing code. Everywhere else Ctrl+F searches the graph.
+            if (insideCodeEditor) return;
 
-            if (isTabShortcut) {
-                if (tabs.length <= 1) return;
-
-                // Handle this in the capture phase so React Flow / focused UI
-                // controls cannot consume Shift+Tab before workflow navigation.
-                event.preventDefault();
-                event.stopPropagation();
-
-                const currentIndex = Math.max(
-                    0,
-                    tabs.findIndex((tab) => tab.id === activeTabId)
-                );
-                const direction = event.shiftKey ? -1 : 1;
-                const nextIndex =
-                    (currentIndex + direction + tabs.length) % tabs.length;
-
-                switchTab(tabs[nextIndex].id);
-                return;
-            }
-
-            if (key === "f") {
-                const target = event.target;
-                const insideCodeEditor =
-                    target instanceof Element &&
-                    Boolean(target.closest(".monaco-editor, .cm-editor"));
-
-                // Preserve the native editor search when the user is actively
-                // editing code. Everywhere else Ctrl+F searches the graph.
-                if (insideCodeEditor) return;
-
-                event.preventDefault();
-                setIsFindOpen(true);
-            }
+            event.preventDefault();
+            setIsFindOpen(true);
         };
 
-        // Capture-phase listener is important for Ctrl+Shift+Tab: focused
-        // components often use Shift+Tab for their own backwards focus order.
-        window.addEventListener("keydown", handleEditorShortcut, true);
+        window.addEventListener("keydown", handleEditorFindShortcut, true);
         return () =>
-            window.removeEventListener("keydown", handleEditorShortcut, true);
-    }, [tabs, activeTabId, switchTab]);
+            window.removeEventListener("keydown", handleEditorFindShortcut, true);
+    }, []);
 
     useEffect(() => {
         if (!isFindOpen) return;
@@ -1738,58 +1693,16 @@ function AppContent() {
                     globalDataModel: parsed.globalDataModel,
                 };
 
-                let currentViewport = null;
-                try {
-                    currentViewport = getViewport?.() || null;
-                } catch {
-                    // Keep the previous saved viewport if React Flow is not mounted.
-                }
-
-                setTabs((previousTabs) => [
-                    ...previousTabs.map((tab) =>
-                        tab.id === activeTabId
-                            ? {
-                                ...tab,
-                                nodes,
-                                edges,
-                                slotNodes,
-                                slotEdges,
-                                manualSlots,
-                                globalDataModel,
-                                inheritedGlobalDataModel,
-                                selectedNodeId: selectedNodeId || null,
-                                viewport: currentViewport || tab.viewport || null,
-                            }
-                            : tab
-                    ),
-                    newTabObj,
-                ]);
-
-                setActiveTabId(tabId);
-                replaceDocument({
-                    nodes: parsedNodes,
-                    edges: parsed.edges,
-                    slotNodes: [],
-                    slotEdges: [],
-                    manualSlots: [],
-                    globalDataModel: parsed.globalDataModel,
-                    inheritedGlobalDataModel: [],
+                openTab(newTabObj, {
+                    fit: true,
+                    fitOptions: { duration: 300 },
                 });
-                setSelectedNodeId(null);
                 checkSlotConnection(
                     parsedNodes,
                     [],
                     parsed.editorSlotNodes || []
                 );
 
-                setTimeout(
-                    () =>
-                        fitView({
-                            padding: 0.2,
-                            duration: 300,
-                        }),
-                    100
-                );
             } catch (error) {
                 console.error(
                     "Could not open behavior:",
@@ -1805,23 +1718,13 @@ function AppContent() {
         [
             behaviorDirectories,
             tabs,
-            activeTabId,
-            nodes,
-            edges,
-            slotNodes,
-            slotEdges,
-            manualSlots,
-            globalDataModel,
-            inheritedGlobalDataModel,
-            selectedNodeId,
-            getViewport,
-            fitView,
             beginStateMachineLoad,
             endStateMachineLoad,
             fetchSkillData,
             hydrateSubMachineInheritedSlots,
             switchTab,
-            replaceDocument,
+            openTab,
+            checkSlotConnection,
         ]
     );
 
@@ -4030,44 +3933,6 @@ function AppContent() {
         setIsShortcutHelpOpen,
         setActiveMode,
     ]);
-
-    const getTabDisplayPath = (tab) => {
-        if (!tab) return "";
-
-        return (
-            tab.filePath ||
-            tab.sourcePath ||
-            tab.fileName ||
-            "Unsaved workflow"
-        );
-    };
-
-    const handleTabMouseEnter = (event, tab) => {
-        const rect = event.currentTarget.getBoundingClientRect();
-
-        const tooltipWidth = 320;
-        const gap = 8;
-        const viewportPadding = 8;
-
-        let left = rect.left;
-
-        if (left + tooltipWidth > window.innerWidth - viewportPadding) {
-            left = Math.max(
-                viewportPadding,
-                window.innerWidth - tooltipWidth - viewportPadding
-            );
-        }
-
-        setTabPathTooltip({
-            path: getTabDisplayPath(tab),
-            left,
-            top: rect.bottom + gap,
-        });
-    };
-
-    const handleTabMouseLeave = () => {
-        setTabPathTooltip(null);
-    };
 
     return (
         <div className="container">
