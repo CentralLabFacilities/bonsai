@@ -1521,7 +1521,15 @@ function DetailsPanel({
                                         onChange={(e) =>
                                             onUpdateSrc?.(
                                                 selectedNode.id,
-                                                e.target.value
+                                                e.target.value,
+                                                false
+                                            )
+                                        }
+                                        onBlur={(e) =>
+                                            onUpdateSrc?.(
+                                                selectedNode.id,
+                                                e.target.value,
+                                                true
                                             )
                                         }
                                     />

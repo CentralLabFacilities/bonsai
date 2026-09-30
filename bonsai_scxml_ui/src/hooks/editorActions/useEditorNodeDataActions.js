@@ -14,6 +14,7 @@ export function useEditorNodeDataActions({
     setNodes,
     setEdges,
     checkSlotConnection,
+    applyWorkflowCommand,
 }) {
     const updateNodeName = useCallback(
         (nodeId, name) => {
@@ -83,7 +84,7 @@ export function useEditorNodeDataActions({
     );
 
     const updateNodeSource = useCallback(
-        (nodeId, source) => {
+        (nodeId, source, commit = false) => {
             if (!nodeId) return;
             setNodes((currentNodes) =>
                 currentNodes.map((node) =>
@@ -98,8 +99,16 @@ export function useEditorNodeDataActions({
                         : node
                 )
             );
+
+            if (commit) {
+                void applyWorkflowCommand?.({
+                    type: "setStateSource",
+                    stateId: nodeId,
+                    source: String(source || "").trim() || null,
+                });
+            }
         },
-        [setNodes]
+        [setNodes, applyWorkflowCommand]
     );
 
     const updateNodeParameter = useCallback(

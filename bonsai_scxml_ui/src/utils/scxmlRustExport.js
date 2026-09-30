@@ -148,6 +148,13 @@ const normalizeEdge = (edge) => ({
     editorTargetInstanceId: String(edge?.data?.editorTargetInstanceId || ""),
 });
 
+
+export const buildRustDataModelEntries = (globalDataModel = []) =>
+    (globalDataModel || []).map((entry) => ({
+        id: String(entry?.id || ""),
+        expression: serializeEditorValueForScxml(entry?.expr ?? ""),
+    }));
+
 export const buildRustEditorExportRequest = ({
     nodes,
     edges,
@@ -159,10 +166,7 @@ export const buildRustEditorExportRequest = ({
     return {
         nodes: exportGraph.nodes.map(normalizeNode),
         edges: exportGraph.edges.map(normalizeEdge),
-        dataModel: (globalDataModel || []).map((entry) => ({
-            id: String(entry?.id || ""),
-            expression: serializeEditorValueForScxml(entry?.expr ?? ""),
-        })),
+        dataModel: buildRustDataModelEntries(globalDataModel),
         extraSlotDeclarations: (manualSlots || []).map((slot) => {
             const inherited =
                 slot?.slotKind === "inheritSlot" || Boolean(slot?.inherited);

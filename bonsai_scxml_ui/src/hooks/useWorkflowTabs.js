@@ -44,6 +44,7 @@ export function useWorkflowTabs({
     fitView,
     getViewport,
     setViewport,
+    syncRustDocument,
 }) {
     const [tabs, setTabsState] = useState([createInitialTab()]);
     const tabsRef = useRef(tabs);
@@ -134,7 +135,7 @@ export function useWorkflowTabs({
     const loadTabState = useCallback(
         (tab, { fit = false, fitOptions = null } = {}) => {
             if (!tab) return;
-            replaceDocument({
+            const nextDocument = {
                 nodes: tab.nodes || [],
                 edges: tab.edges || [],
                 slotNodes: tab.slotNodes || [],
@@ -142,6 +143,13 @@ export function useWorkflowTabs({
                 manualSlots: tab.manualSlots || [],
                 globalDataModel: tab.globalDataModel || [],
                 inheritedGlobalDataModel: tab.inheritedGlobalDataModel || [],
+            };
+            replaceDocument(nextDocument);
+            void syncRustDocument?.(nextDocument).catch((error) => {
+                console.warn(
+                    "Could not synchronize Rust workflow document after tab switch.",
+                    error
+                );
             });
 
             const selectableIds = new Set([
@@ -182,6 +190,7 @@ export function useWorkflowTabs({
             setSelectedNodeId,
             fitView,
             setViewport,
+            syncRustDocument,
         ]
     );
 

@@ -141,6 +141,7 @@ export function useWorkflowDocument({
     fitView,
     onStateMachineLoadStart,
     onStateMachineLoadEnd,
+    syncRustDocument,
 }) {
     const [saveStatus, setSaveStatus] = useState("idle");
     const [lastSavedAt, setLastSavedAt] = useState(null);
@@ -179,6 +180,12 @@ export function useWorkflowDocument({
                 };
 
                 replaceDocument(nextDocument);
+                void syncRustDocument?.(nextDocument).catch((error) => {
+                    console.warn(
+                        "Could not synchronize Rust workflow document after import.",
+                        error
+                    );
+                });
                 setSelectedNodeId(null);
 
                 const cleanTitle = normalizedFileName.replace(/\.(xml|scxml)$/i, "");
@@ -236,6 +243,7 @@ export function useWorkflowDocument({
             fitView,
             onStateMachineLoadStart,
             onStateMachineLoadEnd,
+            syncRustDocument,
         ]
     );
 

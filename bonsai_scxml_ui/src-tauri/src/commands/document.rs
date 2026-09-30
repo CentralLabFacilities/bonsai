@@ -1,5 +1,6 @@
 use tauri::State;
 
+use crate::core::editor_export::{build_workflow_from_editor, EditorExportRequestDto};
 use crate::core::document::{
     WorkflowCommandDto, WorkflowCommandResultDto, WorkflowDocumentSnapshotDto,
     WorkflowDocumentStore,
@@ -20,6 +21,17 @@ pub(crate) async fn replace_active_workflow_document(
     store: State<'_, WorkflowDocumentStore>,
 ) -> Result<WorkflowDocumentSnapshotDto, String> {
     let workflow = Workflow::from_dto(workflow)?;
+    store.replace_if_revision(workflow, expected_revision)
+}
+
+
+#[tauri::command]
+pub(crate) async fn replace_active_editor_workflow_document(
+    request: EditorExportRequestDto,
+    expected_revision: Option<u64>,
+    store: State<'_, WorkflowDocumentStore>,
+) -> Result<WorkflowDocumentSnapshotDto, String> {
+    let workflow = build_workflow_from_editor(&request)?;
     store.replace_if_revision(workflow, expected_revision)
 }
 

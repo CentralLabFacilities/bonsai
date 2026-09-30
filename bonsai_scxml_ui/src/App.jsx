@@ -82,6 +82,7 @@ import { useContainerCreation } from "./hooks/useContainerCreation";
 import { useEditorGraphState } from "./hooks/useEditorGraphState";
 import { useEditorGraphMaintenance } from "./hooks/useEditorGraphMaintenance";
 import { useEditorActions } from "./hooks/useEditorActions";
+import { useRustWorkflowDocument } from "./hooks/useRustWorkflowDocument";
 import { useEditorClipboard } from "./hooks/useEditorClipboard";
 import { useProblemNavigation } from "./hooks/useProblemNavigation";
 import { useEditorSelectionController } from "./hooks/useEditorSelectionController";
@@ -540,6 +541,13 @@ function AppContent() {
         setSlotEdges,
     });
 
+    const rustWorkflowDocument = useRustWorkflowDocument({
+        nodes,
+        edges,
+        globalDataModel,
+        manualSlots,
+    });
+
     const {
         selectEditorNode,
         clearEditorNodeSelection,
@@ -584,6 +592,7 @@ function AppContent() {
         setActiveTab,
         checkSlotConnection,
         updateNodeInternals,
+        applyWorkflowCommand: rustWorkflowDocument.applyWorkflowCommand,
     });
 
     const {
@@ -808,6 +817,7 @@ function AppContent() {
         fitView,
         getViewport,
         setViewport,
+        syncRustDocument: rustWorkflowDocument.syncEditorState,
     });
 
     const {
@@ -3621,6 +3631,7 @@ function AppContent() {
         fitView,
         onStateMachineLoadStart: beginStateMachineLoad,
         onStateMachineLoadEnd: endStateMachineLoad,
+        syncRustDocument: rustWorkflowDocument.syncEditorState,
     });
 
     // Global editor shortcuts that depend on actions declared above. Keep the

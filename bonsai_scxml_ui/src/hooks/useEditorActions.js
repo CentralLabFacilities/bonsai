@@ -17,6 +17,7 @@ export function useEditorActions(options) {
         setSelectedNodeId: options.setSelectedNodeId,
         setRightPanelTab: options.setRightPanelTab,
         setActiveTab: options.setActiveTab,
+        applyWorkflowCommand: options.applyWorkflowCommand,
     });
 
     const slotActions = useEditorSlotActions({
@@ -35,11 +36,13 @@ export function useEditorActions(options) {
         setNodes: options.setNodes,
         setEdges: options.setEdges,
         checkSlotConnection: options.checkSlotConnection,
+        applyWorkflowCommand: options.applyWorkflowCommand,
     });
 
     const dataModelActions = useEditorDataModelActions({
         globalDataModel: options.globalDataModel,
         setGlobalDataModel: options.setGlobalDataModel,
+        applyWorkflowCommand: options.applyWorkflowCommand,
     });
 
     const transitionActions = useEditorTransitionActions({

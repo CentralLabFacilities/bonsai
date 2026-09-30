@@ -311,6 +311,26 @@ export async function replaceActiveWorkflowDocument(workflow, expectedRevision =
   });
 }
 
+/**
+ * Replace the Rust-owned document from the current editor graph snapshot.
+ * Unlike serialization this does not generate XML; it only normalizes the
+ * editor projection into the semantic Rust Workflow model and returns the new
+ * revision.
+ */
+export async function replaceActiveEditorWorkflowDocument(
+  request,
+  expectedRevision = null
+) {
+  if (!isTauri()) {
+    throw new Error('Rust workflow document state is only available in the Tauri app.');
+  }
+
+  return await invoke('replace_active_editor_workflow_document', {
+    request,
+    expectedRevision,
+  });
+}
+
 /** Clear the Rust-owned active workflow document. */
 export async function clearActiveWorkflowDocument() {
   if (!isTauri()) return;
@@ -320,7 +340,7 @@ export async function clearActiveWorkflowDocument() {
 /**
  * Apply one semantic mutation to the Rust-owned workflow.
  * `expectedRevision` enables optimistic concurrency when several UI actions
- * are in flight. The response contains the new revision and current DTO.
+ * are in flight. The response is a small patch summary, not the whole workflow.
  */
 export async function applyWorkflowCommand(command, expectedRevision = null) {
   if (!isTauri()) {

@@ -1,21 +1,35 @@
 import { useCallback } from "react";
+import { buildRustDataModelEntries } from "../../utils/scxmlRustExport";
 
 /** Workflow-level datamodel mutations used by WorkflowPanel. */
 export function useEditorDataModelActions({
     globalDataModel,
     setGlobalDataModel,
+    applyWorkflowCommand,
 }) {
-    const updateGlobalParameter = useCallback(
-        (index, expression) => {
-            setGlobalDataModel((current) =>
-                current.map((parameter, parameterIndex) =>
-                    parameterIndex === index
-                        ? { ...parameter, expr: expression }
-                        : parameter
-                )
-            );
+    const syncDataModel = useCallback(
+        (entries) => {
+            void applyWorkflowCommand?.({
+                type: "replaceDataModel",
+                entries: buildRustDataModelEntries(entries),
+            });
         },
-        [setGlobalDataModel]
+        [applyWorkflowCommand]
+    );
+
+    const updateGlobalParameter = useCallback(
+        (index, expression, commit = false) => {
+            const next = globalDataModel.map((parameter, parameterIndex) =>
+                parameterIndex === index
+                    ? { ...parameter, expr: expression }
+                    : parameter
+            );
+            setGlobalDataModel(next);
+            if (commit) {
+                syncDataModel(next);
+            }
+        },
+        [globalDataModel, setGlobalDataModel, syncDataModel]
     );
 
     const addGlobalParameter = useCallback(
@@ -30,22 +44,26 @@ export function useEditorDataModelActions({
                 return false;
             }
 
-            setGlobalDataModel((current) => [
-                ...current,
+            const next = [
+                ...globalDataModel,
                 { id: normalizedId, expr: expression },
-            ]);
+            ];
+            setGlobalDataModel(next);
+            syncDataModel(next);
             return true;
         },
-        [globalDataModel, setGlobalDataModel]
+        [globalDataModel, setGlobalDataModel, syncDataModel]
     );
 
     const deleteGlobalParameter = useCallback(
         (index) => {
-            setGlobalDataModel((current) =>
-                current.filter((_, parameterIndex) => parameterIndex !== index)
+            const next = globalDataModel.filter(
+                (_, parameterIndex) => parameterIndex !== index
             );
+            setGlobalDataModel(next);
+            syncDataModel(next);
         },
-        [setGlobalDataModel]
+        [globalDataModel, setGlobalDataModel, syncDataModel]
     );
 
     return {

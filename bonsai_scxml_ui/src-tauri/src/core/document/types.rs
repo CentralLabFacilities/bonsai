@@ -11,7 +11,6 @@ pub(crate) struct WorkflowDocumentSnapshotDto {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct WorkflowCommandResultDto {
     pub revision: u64,
-    pub workflow: WorkflowDto,
     #[serde(default)]
     pub changed_state_ids: Vec<String>,
     #[serde(default)]

@@ -7,6 +7,7 @@ pub(crate) struct WorkflowCommandChanges {
     pub changed_state_ids: Vec<String>,
     pub changed_transition_ids: Vec<String>,
     pub data_model_changed: bool,
+    pub index_changed: bool,
 }
 
 pub(crate) fn apply_command(
@@ -191,6 +192,7 @@ fn rename_state(
     Ok(WorkflowCommandChanges {
         changed_state_ids: vec![id.as_str().to_string()],
         changed_transition_ids: changed_transitions,
+        index_changed: true,
         ..WorkflowCommandChanges::default()
     })
 }
@@ -276,6 +278,7 @@ fn update_transition_target(
 
     Ok(WorkflowCommandChanges {
         changed_transition_ids: vec![transition_id.as_str().to_string()],
+        index_changed: true,
         ..WorkflowCommandChanges::default()
     })
 }

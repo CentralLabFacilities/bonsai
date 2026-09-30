@@ -31,6 +31,7 @@ export function useEditorNodeActions({
     setSelectedNodeId,
     setRightPanelTab,
     setActiveTab,
+    applyWorkflowCommand,
 }) {
     const selectEditorNode = useCallback(
         (nodeId, options = {}) => {
@@ -155,28 +156,24 @@ export function useEditorNodeActions({
         (nodeId) => {
             if (!nodeId) return;
 
-            setNodes((currentNodes) => {
-                const selected = currentNodes.find(
-                    (node) => node.id === nodeId
-                );
-                if (!selected || isEditorCloneNode(selected)) {
-                    return currentNodes;
-                }
+            const selected = nodes.find((node) => node.id === nodeId);
+            if (!selected || isEditorCloneNode(selected)) return;
 
-                const parentId = selected.parentId || null;
-                const parentNode = parentId
-                    ? currentNodes.find((node) => node.id === parentId)
-                    : null;
+            const parentId = selected.parentId || null;
+            const parentNode = parentId
+                ? nodes.find((node) => node.id === parentId)
+                : null;
 
-                if (
-                    parentId &&
-                    (!parentNode ||
-                        !["compound", "parallelLane"].includes(parentNode.type))
-                ) {
-                    return currentNodes;
-                }
+            if (
+                parentId &&
+                (!parentNode ||
+                    !["compound", "parallelLane"].includes(parentNode.type))
+            ) {
+                return;
+            }
 
-                return currentNodes.map((node) => {
+            setNodes((currentNodes) =>
+                currentNodes.map((node) => {
                     if (
                         parentNode?.type === "compound" &&
                         node.id === parentId
@@ -205,10 +202,29 @@ export function useEditorNodeActions({
                             isInitial: node.id === selected.id,
                         },
                     };
+                })
+            );
+
+            if (!parentId) {
+                void applyWorkflowCommand?.({
+                    type: "setRootInitial",
+                    stateId: selected.id,
                 });
-            });
+            } else if (
+                parentNode?.type === "compound" &&
+                !parentNode.data?.autoParallelLaneCompound
+            ) {
+                void applyWorkflowCommand?.({
+                    type: "setStateInitialChild",
+                    parentStateId: parentId,
+                    stateId: selected.id,
+                });
+            }
+            // Parallel lanes are flattened by the semantic exporter in some
+            // layouts, so their initial child stays local until lane commands
+            // are represented directly in the Rust model.
         },
-        [setNodes]
+        [nodes, setNodes, applyWorkflowCommand]
     );
 
     const addEmptyStateToContainer = useCallback(

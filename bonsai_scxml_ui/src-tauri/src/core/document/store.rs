@@ -73,7 +73,9 @@ impl WorkflowDocumentStore {
             .as_mut()
             .ok_or_else(|| "No active workflow document is loaded".to_string())?;
         let changes = apply_command(&mut stored.workflow, &stored.index, command)?;
-        stored.index = WorkflowIndex::new(&stored.workflow);
+        if changes.index_changed {
+            stored.index = WorkflowIndex::new(&stored.workflow);
+        }
         state.revision = state.revision.saturating_add(1).max(1);
 
         command_result(&state, changes)
@@ -115,13 +117,12 @@ fn command_result(
     state: &StoreState,
     changes: WorkflowCommandChanges,
 ) -> Result<WorkflowCommandResultDto, String> {
-    let stored = state
-        .active
-        .as_ref()
-        .ok_or_else(|| "No active workflow document is loaded".to_string())?;
+    if state.active.is_none() {
+        return Err("No active workflow document is loaded".to_string());
+    }
+
     Ok(WorkflowCommandResultDto {
         revision: state.revision,
-        workflow: stored.workflow.to_dto(),
         changed_state_ids: changes.changed_state_ids,
         changed_transition_ids: changes.changed_transition_ids,
         data_model_changed: changes.data_model_changed,
@@ -194,7 +195,8 @@ mod tests {
             )
             .unwrap();
         assert_eq!(result.revision, 2);
-        assert_eq!(result.workflow.initial_state_id.as_deref(), Some("b"));
+        let snapshot = store.snapshot().unwrap().unwrap();
+        assert_eq!(snapshot.workflow.initial_state_id.as_deref(), Some("b"));
 
         let error = store
             .apply(

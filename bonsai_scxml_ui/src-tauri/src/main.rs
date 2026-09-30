@@ -26,6 +26,7 @@ fn main() {
             commands::runtime::prepare_runtime_replay_cache,
             commands::document::get_active_workflow_document,
             commands::document::replace_active_workflow_document,
+            commands::document::replace_active_editor_workflow_document,
             commands::document::clear_active_workflow_document,
             commands::document::apply_workflow_command
         ])
