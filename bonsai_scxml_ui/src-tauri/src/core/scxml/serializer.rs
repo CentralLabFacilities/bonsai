@@ -1,8 +1,13 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::core::model::{AssignmentDto, StateDto, StateKindDto, WorkflowDto};
+use crate::core::model::{AssignmentDto, StateDto, StateKindDto, Workflow, WorkflowDto};
 
-pub(crate) fn serialize_scxml(workflow: &WorkflowDto) -> Result<String, String> {
+pub(crate) fn serialize_scxml(workflow: &Workflow) -> Result<String, String> {
+    let dto = workflow.to_dto();
+    serialize_scxml_dto(&dto)
+}
+
+fn serialize_scxml_dto(workflow: &WorkflowDto) -> Result<String, String> {
     let states_by_id: HashMap<&str, &StateDto> = workflow
         .states
         .iter()

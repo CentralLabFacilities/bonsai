@@ -1,5 +1,5 @@
 use crate::core::editor_export::{build_workflow_from_editor, EditorExportRequestDto};
-use crate::core::model::WorkflowDto;
+use crate::core::model::{Workflow, WorkflowDto};
 use crate::core::scxml::{parse_scxml, serialize_scxml};
 use crate::workspace::inspection::{
     inspect_workflow_source as inspect_workflow_source_impl, WorkflowInspectionResult,
@@ -41,11 +41,12 @@ pub(crate) async fn inspect_workflow_source(
 
 #[tauri::command]
 pub(crate) async fn parse_scxml_workflow(xml: String) -> Result<WorkflowDto, String> {
-    parse_scxml(&xml)
+    parse_scxml(&xml).map(|workflow| workflow.to_dto())
 }
 
 #[tauri::command]
 pub(crate) async fn serialize_scxml_workflow(workflow: WorkflowDto) -> Result<String, String> {
+    let workflow = Workflow::from_dto(workflow)?;
     serialize_scxml(&workflow)
 }
 

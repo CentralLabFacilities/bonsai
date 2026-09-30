@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 use std::time::SystemTime;
 
-use crate::core::model::{DataModelEntryDto, WorkflowDto};
+use crate::core::model::{DataModelEntryDto, Workflow, WorkflowDto, WorkflowIndex};
 use crate::core::scxml::parse_scxml;
 
 use super::library::BehaviorDirectoryMapping;
@@ -95,7 +95,7 @@ pub(crate) fn inspect_workflow_source(
         behavior_exit_events: collect_behavior_exit_events(&workflow),
         inherited_slots: collect_inherited_slot_declarations(&workflow),
         local_data_model: collect_local_data_model(&workflow),
-        workflow,
+        workflow: workflow.to_dto(),
         content,
     };
 
@@ -115,19 +115,16 @@ pub(crate) fn inspect_workflow_source(
     Ok(result)
 }
 
-fn collect_behavior_exit_events(workflow: &WorkflowDto) -> Vec<String> {
-    let nop_state_ids: HashSet<String> = workflow
-        .states
-        .iter()
-        .filter(|state| base_state_name(&state.scxml_id).eq_ignore_ascii_case("nop"))
-        .map(|state| state.id.clone())
-        .collect();
-
+fn collect_behavior_exit_events(workflow: &Workflow) -> Vec<String> {
+    let index = WorkflowIndex::new(workflow);
     let mut seen = HashSet::new();
     let mut result = Vec::new();
 
     for transition in &workflow.transitions {
-        if !nop_state_ids.contains(&transition.source_state_id) {
+        let Some(source_state) = index.state(workflow, &transition.source_state_id) else {
+            continue;
+        };
+        if !base_state_name(&source_state.scxml_id).eq_ignore_ascii_case("nop") {
             continue;
         }
         if !transition.target_scxml_id.trim().is_empty() || transition.target_state_id.is_some() {
@@ -153,7 +150,7 @@ fn collect_behavior_exit_events(workflow: &WorkflowDto) -> Vec<String> {
 }
 
 fn collect_inherited_slot_declarations(
-    workflow: &WorkflowDto,
+    workflow: &Workflow,
 ) -> Vec<InheritedSlotDeclarationDto> {
     let mut seen_paths = HashSet::new();
     let mut result = Vec::new();
@@ -178,7 +175,7 @@ fn collect_inherited_slot_declarations(
     result
 }
 
-fn collect_local_data_model(workflow: &WorkflowDto) -> Vec<DataModelEntryDto> {
+fn collect_local_data_model(workflow: &Workflow) -> Vec<DataModelEntryDto> {
     workflow
         .data_model
         .iter()
@@ -186,7 +183,7 @@ fn collect_local_data_model(workflow: &WorkflowDto) -> Vec<DataModelEntryDto> {
             let id = entry.id.trim();
             !id.is_empty() && id != "#_STATE_PREFIX" && id != "#_SLOTS" && !id.starts_with('_')
         })
-        .cloned()
+        .map(|entry| entry.to_dto())
         .collect()
 }
 
@@ -256,6 +253,7 @@ mod tests {
             target_instance_id: None,
         });
 
+        let workflow = Workflow::from_dto(workflow).unwrap();
         assert_eq!(collect_behavior_exit_events(&workflow), vec!["behavior.success"]);
     }
 
@@ -277,6 +275,7 @@ mod tests {
             },
         ];
 
+        let workflow = Workflow::from_dto(workflow).unwrap();
         let slots = collect_inherited_slot_declarations(&workflow);
         assert_eq!(slots.len(), 1);
         assert_eq!(slots[0].path, "pick/model");

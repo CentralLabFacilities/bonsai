@@ -8,7 +8,7 @@ pub(crate) use serializer::serialize_scxml;
 #[cfg(test)]
 mod tests {
     use super::{parse_scxml, serialize_scxml};
-    use crate::core::model::StateKindDto;
+    use crate::core::model::StateKind;
 
     const SAMPLE: &str = r##"<?xml version="1.0" encoding="UTF-8"?>
 <scxml xmlns="http://www.w3.org/2005/07/scxml"
@@ -52,7 +52,7 @@ mod tests {
             .iter()
             .find(|state| state.scxml_id == "ExecSetup")
             .expect("compound state");
-        assert_eq!(compound.kind, StateKindDto::Compound);
+        assert_eq!(compound.kind, StateKind::Compound);
         assert_eq!(compound.editor.x, 100.0);
         assert_eq!(compound.initial_child_scxml_id.as_deref(), Some("Talk"));
     }

@@ -1,4 +1,4 @@
-use crate::core::model::{DataModelEntryDto, WorkflowDto};
+use crate::core::model::{DataModelEntryDto, Workflow, WorkflowDto};
 
 use super::{
     index::ExportIndex,
@@ -10,7 +10,7 @@ use super::{
 
 pub(crate) fn build_workflow_from_editor(
     request: &EditorExportRequestDto,
-) -> Result<WorkflowDto, String> {
+) -> Result<Workflow, String> {
     let index = ExportIndex::new(request);
     let edge_routes = build_edge_target_routes(request, &index);
     let states = build_states(request, &index, &edge_routes);
@@ -25,7 +25,7 @@ pub(crate) fn build_workflow_from_editor(
         .find(|state| state.is_initial)
         .or_else(|| root_nodes.first().copied());
 
-    Ok(WorkflowDto {
+    Workflow::from_dto(WorkflowDto {
         name: None,
         initial_state_id: root_initial.map(|state| state.id.clone()),
         initial_scxml_state_id: root_initial.map(|state| state.scxml_id.clone()),

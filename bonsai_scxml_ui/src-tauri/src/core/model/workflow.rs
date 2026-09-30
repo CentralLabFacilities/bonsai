@@ -1,9 +1,9 @@
-//! Serializable semantic workflow model shared by the Rust editor core and the
-//! frontend boundary.
+//! Serializable workflow DTOs used only at transport/conversion boundaries.
 //!
-//! The model intentionally does not contain React Flow details (callbacks,
-//! handles, marker types, selection state, etc.). React Flow remains a view of
-//! this semantic representation.
+//! These types intentionally mirror the camelCase payload consumed by the
+//! frontend. Rust domain logic should prefer [`super::Workflow`] and the typed
+//! ids from `domain.rs`, converting to/from these DTOs at Tauri or compatibility
+//! boundaries.
 
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]

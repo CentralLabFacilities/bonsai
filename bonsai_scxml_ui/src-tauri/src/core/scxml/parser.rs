@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::core::model::{
     AssignmentDto, DataModelEntryDto, EditorEdgeTargetDto, EditorMetadataDto,
     EditorPositionDto, ExitEventDto, ParameterDto, SlotDeclarationDto, StateDto,
-    StateKindDto, TransitionDto, WorkflowDto,
+    StateKindDto, TransitionDto, Workflow, WorkflowDto,
 };
 
 use super::xml::{parse_document, XmlNode};
@@ -38,7 +38,11 @@ impl ParseContext {
     }
 }
 
-pub(crate) fn parse_scxml(xml: &str) -> Result<WorkflowDto, String> {
+pub(crate) fn parse_scxml(xml: &str) -> Result<Workflow, String> {
+    Workflow::from_dto(parse_scxml_dto(xml)?)
+}
+
+fn parse_scxml_dto(xml: &str) -> Result<WorkflowDto, String> {
     let root = parse_document(xml)?;
     if root.local_name() != "scxml" {
         return Err("Kein <scxml>-Wurzelelement gefunden.".to_string());
