@@ -1,3 +1,5 @@
+use crate::core::model::WorkflowDto;
+use crate::core::scxml::{parse_scxml, serialize_scxml};
 use crate::workspace::library::{
     list_behavior_directory as list_behavior_directory_impl, BehaviorDirectoryMapping,
     BehaviorTreeEntry,
@@ -21,4 +23,14 @@ pub(crate) async fn read_workflow_source(
     current_file_path: Option<String>,
 ) -> Result<WorkflowSourceResult, String> {
     read_workflow_source_impl(&src, &directories, current_file_path.as_deref())
+}
+
+#[tauri::command]
+pub(crate) async fn parse_scxml_workflow(xml: String) -> Result<WorkflowDto, String> {
+    parse_scxml(&xml)
+}
+
+#[tauri::command]
+pub(crate) async fn serialize_scxml_workflow(workflow: WorkflowDto) -> Result<String, String> {
+    serialize_scxml(&workflow)
 }

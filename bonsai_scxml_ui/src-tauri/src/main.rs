@@ -13,7 +13,9 @@ fn main() {
             commands::workflows::list_behavior_directory,
             commands::files::save_file,
             commands::files::read_file,
-            commands::workflows::read_workflow_source
+            commands::workflows::read_workflow_source,
+            commands::workflows::parse_scxml_workflow,
+            commands::workflows::serialize_scxml_workflow
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
