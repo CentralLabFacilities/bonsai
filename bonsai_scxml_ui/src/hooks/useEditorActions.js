@@ -1,6 +1,8 @@
 import { useEditorNodeActions } from "./editorActions/useEditorNodeActions";
 import { useEditorSlotActions } from "./editorActions/useEditorSlotActions";
 import { useEditorTransitionActions } from "./editorActions/useEditorTransitionActions";
+import { useEditorNodeDataActions } from "./editorActions/useEditorNodeDataActions";
+import { useEditorDataModelActions } from "./editorActions/useEditorDataModelActions";
 
 /**
  * Public action facade used by App.jsx. Domain-specific action groups stay in
@@ -27,6 +29,19 @@ export function useEditorActions(options) {
         checkSlotConnection: options.checkSlotConnection,
     });
 
+
+    const nodeDataActions = useEditorNodeDataActions({
+        nodes: options.nodes,
+        setNodes: options.setNodes,
+        setEdges: options.setEdges,
+        checkSlotConnection: options.checkSlotConnection,
+    });
+
+    const dataModelActions = useEditorDataModelActions({
+        globalDataModel: options.globalDataModel,
+        setGlobalDataModel: options.setGlobalDataModel,
+    });
+
     const transitionActions = useEditorTransitionActions({
         nodes: options.nodes,
         edges: options.edges,
@@ -43,6 +58,8 @@ export function useEditorActions(options) {
     return {
         ...nodeActions,
         ...slotActions,
+        ...nodeDataActions,
+        ...dataModelActions,
         ...transitionActions,
     };
 }

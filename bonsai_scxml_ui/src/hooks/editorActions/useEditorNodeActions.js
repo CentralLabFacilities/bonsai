@@ -38,10 +38,14 @@ export function useEditorNodeActions({
 
             const explicitKind = options.kind;
             const slotNode = slotNodes.find((node) => node.id === nodeId);
-            const isSlot = explicitKind === "slot" || Boolean(slotNode);
-            const exists = isSlot
-                ? Boolean(slotNode) || explicitKind === "slot"
-                : nodes.some((node) => node.id === nodeId);
+            const isSlot =
+                explicitKind === "slot" ||
+                (explicitKind !== "node" && Boolean(slotNode));
+            const exists = options.allowMissing
+                ? true
+                : isSlot
+                  ? Boolean(slotNode) || explicitKind === "slot"
+                  : nodes.some((node) => node.id === nodeId);
 
             if (!exists) return false;
 
@@ -78,6 +82,20 @@ export function useEditorNodeActions({
             setActiveTab,
         ]
     );
+
+    const clearEditorNodeSelection = useCallback(() => {
+        setNodes((currentNodes) =>
+            currentNodes.map((node) =>
+                node.selected ? { ...node, selected: false } : node
+            )
+        );
+        setSlotNodes((currentNodes) =>
+            currentNodes.map((node) =>
+                node.selected ? { ...node, selected: false } : node
+            )
+        );
+        setSelectedNodeId(null);
+    }, [setNodes, setSlotNodes, setSelectedNodeId]);
 
     const createEditorReference = useCallback(
         (sourceNode, position) => {
@@ -141,29 +159,27 @@ export function useEditorNodeActions({
                 const selected = currentNodes.find(
                     (node) => node.id === nodeId
                 );
-                if (
-                    !selected ||
-                    !selected.parentId ||
-                    isEditorCloneNode(selected)
-                ) {
+                if (!selected || isEditorCloneNode(selected)) {
                     return currentNodes;
                 }
 
-                const parentId = selected.parentId;
-                const parentNode = currentNodes.find(
-                    (node) => node.id === parentId
-                );
+                const parentId = selected.parentId || null;
+                const parentNode = parentId
+                    ? currentNodes.find((node) => node.id === parentId)
+                    : null;
+
                 if (
-                    !parentNode ||
-                    !["compound", "parallelLane"].includes(parentNode.type)
+                    parentId &&
+                    (!parentNode ||
+                        !["compound", "parallelLane"].includes(parentNode.type))
                 ) {
                     return currentNodes;
                 }
 
                 return currentNodes.map((node) => {
                     if (
-                        node.id === parentId &&
-                        parentNode.type === "compound"
+                        parentNode?.type === "compound" &&
+                        node.id === parentId
                     ) {
                         return {
                             ...node,
@@ -288,6 +304,7 @@ export function useEditorNodeActions({
 
     return {
         selectEditorNode,
+        clearEditorNodeSelection,
         createEditorReference,
         setNodeAsInitial,
         addEmptyStateToContainer,

@@ -31,7 +31,6 @@ import {
     normalizeSlotPath,
     normalizeSlotType,
     collectInheritedSlotUsages,
-    isSlotEdge,
     getSlotPathFromNode,
     EDITOR_SHORTCUTS,
     FIND_SHORTCUTS,
@@ -60,7 +59,6 @@ import {
     isAutoParallelLaneCompound,
 } from "./utils/editorGeometry";
 import {
-    getForwardingNopScxmlStateId,
     getSharedScxmlStateId,
     normalizeSharedScxmlStateIdentity,
     ensureSharedEditorInstanceIds,
@@ -544,6 +542,7 @@ function AppContent() {
 
     const {
         selectEditorNode,
+        clearEditorNodeSelection,
         createEditorReference,
         setNodeAsInitial,
         addEmptyStateToContainer,
@@ -556,18 +555,30 @@ function AppContent() {
         selectSlotEdge,
         updateNodeEvent,
         setExistingTargetForEvent,
+        moveContainerTransition,
+        updateNodeName,
+        updateNodeSource,
+        updateNodeParameter,
+        updateStateActions,
+        updateSendEvents,
+        updateSkillSlotPath,
+        updateGlobalParameter,
+        addGlobalParameter,
+        deleteGlobalParameter,
     } = useEditorActions({
         nodes,
         edges,
         slotNodes,
         slotEdges,
         manualSlots,
+        globalDataModel,
         selectedNodeId,
         setNodes,
         setEdges,
         setSlotNodes,
         setSlotEdges,
         setManualSlots,
+        setGlobalDataModel,
         setSelectedNodeId,
         setRightPanelTab,
         setActiveTab,
@@ -1839,70 +1850,29 @@ function AppContent() {
         behaviorDirectories,
     });
 
-    const handleMoveContainerTransition = useCallback((edgeId, direction) => {
-        if (
-            !selectedNode ||
-            (selectedNode.type !== "compound" && selectedNode.type !== "parallel") ||
-            !edgeId
-        ) {
-            return;
-        }
+    const handleMoveContainerTransition = useCallback(
+        (edgeId, direction) => {
+            if (
+                !selectedNode ||
+                (selectedNode.type !== "compound" &&
+                    selectedNode.type !== "parallel")
+            ) {
+                return;
+            }
 
-        const orderedIds = selectedContainerOutgoingTransitions
-            .map((transition) => transition.edgeId)
-            .filter(Boolean);
-        const currentIndex = orderedIds.indexOf(edgeId);
-        if (currentIndex < 0) return;
-
-        const delta = direction === "up" ? -1 : direction === "down" ? 1 : 0;
-        const nextIndex = currentIndex + delta;
-        if (delta === 0 || nextIndex < 0 || nextIndex >= orderedIds.length) return;
-
-        const nextOrder = [...orderedIds];
-        [nextOrder[currentIndex], nextOrder[nextIndex]] = [
-            nextOrder[nextIndex],
-            nextOrder[currentIndex],
-        ];
-
-        // Keep the explicit UI order on the container. The SCXML exporter uses
-        // this exact order for the container-level <transition> elements, so a
-        // specific event such as Talk.error can be placed before Talk.*.
-        setNodes((currentNodes) =>
-            currentNodes.map((node) =>
-                node.id === selectedNode.id
-                    ? {
-                        ...node,
-                        data: {
-                            ...(node.data || {}),
-                            containerTransitionOrder: nextOrder,
-                        },
-                    }
-                    : node
-            )
-        );
-
-        // Reorder the matching semantic edges as well. This keeps the live
-        // graph/boundary rebuild order aligned with the order shown in the
-        // Exit Tokens panel instead of only changing export-time presentation.
-        setEdges((currentEdges) => {
-            const byId = new Map(currentEdges.map((edge) => [edge.id, edge]));
-            const orderedEdges = nextOrder.map((id) => byId.get(id)).filter(Boolean);
-            let orderedIndex = 0;
-            const orderedSet = new Set(nextOrder);
-
-            return currentEdges.map((edge) => {
-                if (!orderedSet.has(edge.id)) return edge;
-                const replacement = orderedEdges[orderedIndex];
-                orderedIndex += 1;
-                return replacement || edge;
-            });
-        });
-    }, [
-        selectedNode,
-        selectedContainerOutgoingTransitions,
-        setNodes,
-        setEdges,
-    ]);
+            moveContainerTransition(
+                selectedNode.id,
+                selectedContainerOutgoingTransitions,
+                edgeId,
+                direction
+            );
+        },
+        [
+            selectedNode,
+            selectedContainerOutgoingTransitions,
+            moveContainerTransition,
+        ]
+    );
 
     const handleNavigateCloneSource = useCallback((nodeId) => {
         if (!nodeId) return;
@@ -1931,20 +1901,7 @@ function AppContent() {
         );
 
         clearAllEdgeSelection();
-        setNodes((currentNodes) =>
-            currentNodes.map((node) => ({
-                ...node,
-                selected: node.id === nodeId,
-            }))
-        );
-        setSlotNodes((currentNodes) =>
-            currentNodes.map((node) => ({
-                ...node,
-                selected: false,
-            }))
-        );
-        setSelectedNodeId(nodeId);
-        setRightPanelTab("details");
+        selectEditorNode(nodeId, { kind: "node", tab: null });
 
         window.setTimeout(() => {
             const flowNode = getNodes().find((node) => node.id === nodeId);
@@ -1982,11 +1939,8 @@ function AppContent() {
         fitView,
         getNodes,
         handleToggleContainerCollapse,
+        selectEditorNode,
         setCenter,
-        setNodes,
-        setSelectedNodeId,
-        setRightPanelTab,
-        setSlotNodes,
     ]);
 
 
@@ -3392,21 +3346,14 @@ function AppContent() {
                 // Ensure a slot node exists even when the slot view has not
                 // been opened since loading/importing this workflow.
                 checkSlotConnection(nodes, manualSlots);
-                setSelectedNodeId(result.id);
 
                 window.setTimeout(() => {
-                    setSlotNodes((currentNodes) =>
-                        currentNodes.map((node) => ({
-                            ...node,
-                            selected: node.id === result.id,
-                        }))
-                    );
-                    setNodes((currentNodes) =>
-                        currentNodes.map((node) => ({
-                            ...node,
-                            selected: false,
-                        }))
-                    );
+                    selectEditorNode(result.id, {
+                        kind: "slot",
+                        allowMissing: true,
+                        openDetails: false,
+                        tab: null,
+                    });
 
                     fitView({
                         nodes: [{ id: result.id }],
@@ -3416,20 +3363,10 @@ function AppContent() {
                     });
                 }, 40);
             } else {
-                setNodes((currentNodes) =>
-                    currentNodes.map((node) => ({
-                        ...node,
-                        selected: node.id === result.id,
-                    }))
-                );
-                setSlotNodes((currentNodes) =>
-                    currentNodes.map((node) => ({
-                        ...node,
-                        selected: false,
-                    }))
-                );
-                setSelectedNodeId(result.id);
-                setRightPanelTab("details");
+                selectEditorNode(result.id, {
+                    kind: "node",
+                    tab: null,
+                });
 
                 window.setTimeout(() => {
                     fitView({
@@ -3447,8 +3384,7 @@ function AppContent() {
             activeMode,
             nodes,
             manualSlots,
-            setNodes,
-            setSlotNodes,
+            selectEditorNode,
             fitView,
             clearAllEdgeSelection,
         ]
@@ -3747,20 +3683,8 @@ function AppContent() {
             } = live;
 
             const clearGraphSelection = () => {
-                setNodes((currentNodes) =>
-                    currentNodes.map((node) => ({
-                        ...node,
-                        selected: false,
-                    }))
-                );
-                setSlotNodes((currentNodes) =>
-                    currentNodes.map((node) => ({
-                        ...node,
-                        selected: false,
-                    }))
-                );
+                clearEditorNodeSelection();
                 liveClearAllEdgeSelection();
-                setSelectedNodeId(null);
             };
 
             const key = String(event.key || "").toLowerCase();
@@ -3904,9 +3828,7 @@ function AppContent() {
         return () =>
             window.removeEventListener("keydown", handleGlobalShortcut);
     }, [
-        setNodes,
-        setSlotNodes,
-        setSelectedNodeId,
+        clearEditorNodeSelection,
         setIsFindOpen,
         setContextMenu,
         setDrawerData,
@@ -4801,46 +4723,14 @@ function AppContent() {
                                 setNewParamId={setNewParamId}
                                 newParamExpr={newParamExpr}
                                 setNewParamExpr={setNewParamExpr}
-                                onUpdateGlobalParam={(index, value) => {
-                                    setGlobalDataModel((prev) =>
-                                        prev.map((param, i) =>
-                                            i === index
-                                                ? { ...param, expr: value }
-                                                : param
-                                        )
-                                    );
-                                }}
+                                onUpdateGlobalParam={updateGlobalParameter}
                                 onAddParameter={(parameterId, parameterExpr) => {
-                                    const normalizedId = parameterId.trim();
-                                    if (!normalizedId) return;
-
-                                    setGlobalDataModel((prev) => {
-                                        if (
-                                            prev.some(
-                                                (parameter) =>
-                                                    parameter.id === normalizedId
-                                            )
-                                        ) {
-                                            return prev;
-                                        }
-
-                                        return [
-                                            ...prev,
-                                            {
-                                                id: normalizedId,
-                                                expr: parameterExpr,
-                                            },
-                                        ];
-                                    });
-
+                                    if (!String(parameterId || "").trim()) return;
+                                    addGlobalParameter(parameterId, parameterExpr);
                                     setNewParamId("");
                                     setNewParamExpr("");
                                 }}
-                                onDeleteParameter={(index) => {
-                                    setGlobalDataModel((prev) =>
-                                        prev.filter((_, i) => i !== index)
-                                    );
-                                }}
+                                onDeleteParameter={deleteGlobalParameter}
                             />
                         )}
 
@@ -4887,165 +4777,30 @@ function AppContent() {
                                 packages={packages}
                                 getPackageSkillEvent={getPackageSkillEvent}
                                 onSetInitial={() =>
-                                    setNodes((nds) => {
-                                        const parentId =
-                                            selectedNode.parentId || null;
-
-                                        const parentCompound =
-                                            parentId
-                                                ? nds.find(
-                                                    (node) =>
-                                                        node.id ===
-                                                        parentId &&
-                                                        node.type ===
-                                                        "compound"
-                                                )
-                                                : null;
-
-                                        return nds.map((node) => {
-                                            if (
-                                                parentCompound &&
-                                                node.id ===
-                                                parentCompound.id
-                                            ) {
-                                                return {
-                                                    ...node,
-                                                    data: {
-                                                        ...node.data,
-                                                        initialChildId:
-                                                        selectedNode.id,
-                                                    },
-                                                };
-                                            }
-
-                                            if (
-                                                (node.parentId || null) !==
-                                                parentId
-                                            ) {
-                                                return node;
-                                            }
-
-                                            if (
-                                                node.type === "slot" ||
-                                                node.type ===
-                                                "parallelLane"
-                                            ) {
-                                                return node;
-                                            }
-
-                                            return {
-                                                ...node,
-                                                data: {
-                                                    ...node.data,
-                                                    isInitial:
-                                                        node.id ===
-                                                        selectedNode.id,
-                                                },
-                                            };
-                                        });
-                                    })
+                                    setNodeAsInitial(selectedNode.id)
                                 }
                                 onUpdateName={(name) =>
-                                    setNodes((nds) =>
-                                        nds.map((n) => {
-                                            if (n.id !== selectedNode.id) return n;
-
-                                            const isContainerOrSub =
-                                                n.type === "compound" ||
-                                                n.type === "parallel" ||
-                                                n.type === "submachine";
-
-                                            if (isContainerOrSub) {
-                                                return {
-                                                    ...n,
-                                                    data: {
-                                                        ...n.data,
-                                                        label: name,
-                                                        fullSkillName: name,
-                                                    },
-                                                };
-                                            }
-
-                                            const skillType = String(
-                                                n.data?.fullSkillName || ""
-                                            )
-                                                .split("#")[0]
-                                                .split(".")
-                                                .pop()
-                                                .toLowerCase();
-
-                                            // End, Fatal and forwarding Nop clones use an
-                                            // editor-only instance ID. Renaming that ID must
-                                            // never modify the underlying skill/SCXML identity.
-                                            if (["nop", "fatal", "end"].includes(skillType)) {
-                                                return {
-                                                    ...n,
-                                                    data: {
-                                                        ...n.data,
-                                                        editorInstanceId: name,
-                                                        fullSkillName:
-                                                            n.data?.fullSkillName?.split("#")[0] ||
-                                                            n.data?.fullSkillName,
-                                                    },
-                                                };
-                                            }
-
-                                            const baseSkillName =
-                                                n.data?.fullSkillName?.split("#")[0] ||
-                                                n.data?.label ||
-                                                "";
-                                            const nextInstanceId = String(name || "").trim();
-
-                                            return {
-                                                ...n,
-                                                data: {
-                                                    ...n.data,
-                                                    // The visible skill name identifies the skill
-                                                    // definition. Editing the instance ID must only
-                                                    // change the SCXML state suffix.
-                                                    fullSkillName: nextInstanceId
-                                                        ? `${baseSkillName}#${nextInstanceId}`
-                                                        : baseSkillName,
-                                                },
-                                            };
-                                        })
-                                    )
+                                    updateNodeName(selectedNode.id, name)
                                 }
-                                onUpdateSrc={(nodeId, newSrc) =>
-                                    setNodes((nds) =>
-                                        nds.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, src: newSrc } } : n))
-                                    )
-                                }
+                                onUpdateSrc={updateNodeSource}
                                 onUpdateEvent={updateNodeEvent}
                                 availableTargetNodes={nodes}
                                 onSetEventTarget={setExistingTargetForEvent}
                                 onUpdateParameter={(idx, val) => {
-                                    const nextParams = (selectedNode.data?.params || []).map(
-                                        (parameter, i) =>
-                                            i === idx
-                                                ? { ...parameter, expr: val }
-                                                : parameter
-                                    );
-
-                                    setNodes((nds) =>
-                                        nds.map((n) =>
-                                            n.id === selectedNode.id
-                                                ? {
-                                                    ...n,
-                                                    data: {
-                                                        ...n.data,
-                                                        params: nextParams,
-                                                    },
-                                                }
-                                                : n
-                                        )
+                                    const nextParams = updateNodeParameter(
+                                        selectedNode.id,
+                                        idx,
+                                        val
                                     );
 
                                     // Clearing a parameter changes the configured
                                     // skill just as adding one does. Refresh right
                                     // away and pass the new parameter list explicitly
                                     // so the request cannot see stale React state.
-                                    if (String(val ?? "").trim() === "") {
+                                    if (
+                                        nextParams &&
+                                        String(val ?? "").trim() === ""
+                                    ) {
                                         updateEventsFromParameters(
                                             selectedNode.id,
                                             nextParams
@@ -5056,200 +4811,25 @@ function AppContent() {
                                 onUpdateParameterBlur={updateEventsFromParameters}
                                 globalDataModel={selectedActionDataModel}
                                 actionValueVariables={selectedActionExpressionVariables}
-                                onUpdateStateActions={(nodeId, actionType, assignments) =>
-                                    setNodes((nds) =>
-                                        nds.map((node) =>
-                                            node.id === nodeId
-                                                ? {
-                                                    ...node,
-                                                    data: {
-                                                        ...node.data,
-                                                        [actionType]: assignments,
-                                                    },
-                                                }
-                                                : node
-                                        )
-                                    )
-                                }
-                                onUpdateSendEvents={(nodeId, events) => {
-                                    const sourceNode = nodes.find((node) => node.id === nodeId);
-                                    if (!sourceNode) return;
-
-                                    const nextEvent = Array.isArray(events)
-                                        ? String(events[0] ?? "")
-                                        : "";
-                                    const nextEvents = nextEvent ? [nextEvent] : [];
-                                    const nonEmptyEvents = nextEvent.trim()
-                                        ? [nextEvent.trim()]
-                                        : [];
-                                    const currentTransitions = Array.isArray(
-                                        sourceNode.data?.behaviorExitTransitions
-                                    )
-                                        ? sourceNode.data.behaviorExitTransitions
-                                        : [];
-                                    const triggerEvent =
-                                        currentTransitions[0]?.triggerEvent || "Nop.fatal";
-                                    const sharedScxmlStateId = String(
-                                        sourceNode.data?.scxmlStateId ||
-                                        sourceNode.data?.behaviorExitScxmlStateId ||
-                                        ""
-                                    ).trim();
-
-                                    const isSameSharedNop = (node) => {
-                                        if (node.type !== "custom") return false;
-                                        const baseName = String(
-                                            node.data?.fullSkillName || ""
-                                        )
-                                            .split("#")[0]
-                                            .split(".")
-                                            .pop()
-                                            .toLowerCase();
-                                        if (baseName !== "nop") return false;
-                                        if (!sharedScxmlStateId) {
-                                            return node.id === nodeId;
-                                        }
-                                        const candidateSharedId = String(
-                                            node.data?.scxmlStateId ||
-                                            node.data?.behaviorExitScxmlStateId ||
-                                            ""
-                                        ).trim();
-                                        return candidateSharedId === sharedScxmlStateId;
-                                    };
-
-                                    const sharedNopIds = new Set(
-                                        nodes.filter(isSameSharedNop).map((node) => node.id)
-                                    );
-
-                                    // Once a Nop sends an event it becomes an outward forwarding
-                                    // state. Ordinary SCXML transitions are mutually exclusive
-                                    // with that behavior, so remove them from every visual clone.
-                                    if (nonEmptyEvents.length > 0) {
-                                        setEdges((currentEdges) =>
-                                            currentEdges.filter(
-                                                (edge) =>
-                                                    !sharedNopIds.has(edge.source) ||
-                                                    isSlotEdge(edge)
-                                            )
-                                        );
-                                    }
-
-                                    setNodes((nds) =>
-                                        nds.map((node) => {
-                                            if (!isSameSharedNop(node)) return node;
-
-                                            const clearedEvents =
-                                                nonEmptyEvents.length > 0
-                                                    ? (node.data?.events || []).map((event) => ({
-                                                        ...event,
-                                                        target: null,
-                                                        cond: "",
-                                                        assignments: [],
-                                                        assign: null,
-                                                        assignLocation: "",
-                                                        assignExpr: "",
-                                                        selectedPackage: "",
-                                                        selectedSkill: "",
-                                                    }))
-                                                    : node.data?.events;
-
-                                            return {
-                                                ...node,
-                                                data: {
-                                                    ...node.data,
-                                                    ...(nonEmptyEvents.length > 0
-                                                        ? { events: clearedEvents }
-                                                        : {}),
-                                                    ...(nonEmptyEvents.length > 0
-                                                        ? { onEntry: [], onExit: [] }
-                                                        : {}),
-                                                    isBehaviorExit: nextEvents.length > 0,
-                                                    behaviorExitEvents: nextEvents,
-                                                    behaviorExitTransitions:
-                                                        nextEvents.length > 0
-                                                            ? [
-                                                                {
-                                                                    triggerEvent,
-                                                                    sendEvents: nextEvents,
-                                                                },
-                                                            ]
-                                                            : [],
-                                                    label:
-                                                        nonEmptyEvents.length > 0
-                                                            ? nonEmptyEvents.join(", ")
-                                                            : "Nop",
-                                                    ...(nextEvents.length > 0
-                                                        ? (() => {
-                                                            const nextScxmlStateId =
-                                                                getForwardingNopScxmlStateId(
-                                                                    node,
-                                                                    nextEvents[0]
-                                                                );
-                                                            return {
-                                                                behaviorExitScxmlStateId:
-                                                                nextScxmlStateId,
-                                                                scxmlStateId:
-                                                                nextScxmlStateId,
-                                                            };
-                                                        })()
-                                                        : {}),
-                                                },
-                                            };
-                                        })
-                                    );
-                                }}
+                                onUpdateStateActions={updateStateActions}
+                                onUpdateSendEvents={updateSendEvents}
                                 onUpdateInSlotPath={(idx, val, commit = false) =>
-                                    setNodes((nds) => {
-                                        const updatedNodes = nds.map((n) =>
-                                            n.id === selectedNode.id
-                                                ? {
-                                                    ...n,
-                                                    data: {
-                                                        ...n.data,
-                                                        inSlots: n.data.inSlots.map((s, i) =>
-                                                            i === idx
-                                                                ? { ...s, path: val }
-                                                                : s
-                                                        ),
-                                                    },
-                                                }
-                                                : n
-                                        );
-
-                                        if (commit) {
-                                            requestAnimationFrame(() =>
-                                                checkSlotConnection(updatedNodes)
-                                            );
-                                        }
-
-                                        return updatedNodes;
-                                    })
+                                    updateSkillSlotPath(
+                                        selectedNode.id,
+                                        "read",
+                                        idx,
+                                        val,
+                                        commit
+                                    )
                                 }
                                 onUpdateOutSlotPath={(idx, val, commit = false) =>
-                                    setNodes((nds) => {
-                                        const updatedNodes = nds.map((n) =>
-                                            n.id === selectedNode.id
-                                                ? {
-                                                    ...n,
-                                                    data: {
-                                                        ...n.data,
-                                                        outSlots: n.data.outSlots.map((s, i) =>
-                                                            i === idx
-                                                                ? { ...s, path: val }
-                                                                : s
-                                                        ),
-                                                    },
-                                                }
-                                                : n
-                                        );
-
-                                        if (commit) {
-                                            requestAnimationFrame(() =>
-                                                checkSlotConnection(updatedNodes)
-                                            );
-                                        }
-
-                                        return updatedNodes;
-                                    })
+                                    updateSkillSlotPath(
+                                        selectedNode.id,
+                                        "write",
+                                        idx,
+                                        val,
+                                        commit
+                                    )
                                 }
                                 onCheckSlots={checkSlotConnection}
                                 availableSlotPaths={canvasSlotPathOptions}
@@ -5264,20 +4844,10 @@ function AppContent() {
 
                                     setHoveredSlotAccessNodeId(null);
                                     clearAllEdgeSelection();
-                                    setNodes((currentNodes) =>
-                                        currentNodes.map((node) => ({
-                                            ...node,
-                                            selected: node.id === nodeId,
-                                        }))
-                                    );
-                                    setSlotNodes((currentNodes) =>
-                                        currentNodes.map((node) => ({
-                                            ...node,
-                                            selected: false,
-                                        }))
-                                    );
-                                    setSelectedNodeId(nodeId);
-                                    setRightPanelTab("details");
+                                    selectEditorNode(nodeId, {
+                                        kind: "node",
+                                        tab: null,
+                                    });
 
                                     // Selection alone is easy to miss in a large graph. Move
                                     // the viewport to the clicked Accessed-by skill as well.
@@ -5328,19 +4898,11 @@ function AppContent() {
                                     // Wait until the parent tab's graph has been installed,
                                     // then select and center the hierarchy writer there.
                                     window.setTimeout(() => {
-                                        setNodes((currentNodes) =>
-                                            currentNodes.map((node) => ({
-                                                ...node,
-                                                selected: node.id === nodeId,
-                                            }))
-                                        );
-                                        setSlotNodes((currentNodes) =>
-                                            currentNodes.map((node) => ({
-                                                ...node,
-                                                selected: false,
-                                            }))
-                                        );
-                                        setSelectedNodeId(nodeId);
+                                        selectEditorNode(nodeId, {
+                                            kind: "node",
+                                            allowMissing: true,
+                                            tab: null,
+                                        });
 
                                         window.setTimeout(() => {
                                             const flowNode = getNodes().find(

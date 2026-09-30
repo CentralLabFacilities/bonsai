@@ -245,6 +245,73 @@ export function useEditorTransitionActions({
         ]
     );
 
+
+    const moveContainerTransition = useCallback(
+        (containerNodeId, outgoingTransitions, edgeId, direction) => {
+            if (!containerNodeId || !edgeId) return false;
+
+            const orderedIds = (outgoingTransitions || [])
+                .map((transition) => transition.edgeId)
+                .filter(Boolean);
+            const currentIndex = orderedIds.indexOf(edgeId);
+            if (currentIndex < 0) return false;
+
+            const delta =
+                direction === "up" ? -1 : direction === "down" ? 1 : 0;
+            const nextIndex = currentIndex + delta;
+            if (
+                delta === 0 ||
+                nextIndex < 0 ||
+                nextIndex >= orderedIds.length
+            ) {
+                return false;
+            }
+
+            const nextOrder = [...orderedIds];
+            [nextOrder[currentIndex], nextOrder[nextIndex]] = [
+                nextOrder[nextIndex],
+                nextOrder[currentIndex],
+            ];
+
+            setNodes((currentNodes) =>
+                currentNodes.map((node) =>
+                    node.id === containerNodeId
+                        ? {
+                              ...node,
+                              data: {
+                                  ...(node.data || {}),
+                                  containerTransitionOrder: nextOrder,
+                              },
+                          }
+                        : node
+                )
+            );
+
+            // Keep live edge order aligned with the explicit container order.
+            // The SCXML exporter uses the same order for container transitions.
+            setEdges((currentEdges) => {
+                const byId = new Map(
+                    currentEdges.map((edge) => [edge.id, edge])
+                );
+                const orderedEdges = nextOrder
+                    .map((id) => byId.get(id))
+                    .filter(Boolean);
+                const orderedSet = new Set(nextOrder);
+                let orderedIndex = 0;
+
+                return currentEdges.map((edge) => {
+                    if (!orderedSet.has(edge.id)) return edge;
+                    const replacement = orderedEdges[orderedIndex];
+                    orderedIndex += 1;
+                    return replacement || edge;
+                });
+            });
+
+            return true;
+        },
+        [setNodes, setEdges]
+    );
+
     return {
         clearTransitionSelection,
         clearSlotEdgeSelection,
@@ -253,5 +320,6 @@ export function useEditorTransitionActions({
         selectSlotEdge,
         updateNodeEvent,
         setExistingTargetForEvent,
+        moveContainerTransition,
     };
 }
