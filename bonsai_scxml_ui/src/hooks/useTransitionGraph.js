@@ -9,7 +9,6 @@ import {
 } from "../utils/editorGraph";
 import {
     COMPOUND_PADDING_X,
-    canTargetAcrossStateBoundaries,
     getCompoundChildrenRight,
     getCompoundExitGutterWidth,
     getDirectCompoundForNode,
@@ -22,27 +21,15 @@ import {
     getSkillPackageName,
     getStoredTransitionAssignments,
 } from "../utils/editorScxml";
+import {
+    canTargetVisualNode,
+    getLogicalEdgeSourceHandle,
+    getLogicalEdgeSourceId,
+    getSemanticTransitionTarget,
+    makeSelfLoopControlPoints,
+} from "../utils/transitionSemantics";
 import { rebuildBoundaryTransitionsIncremental } from "../utils/boundaryTransitions";
 import { isWildcardTransitionEvent } from "../utils/transitionEvents";
-
-const getSemanticTransitionTarget = (targetNode, allNodes = []) => {
-    if (!(targetNode?.data?.isSkillClone || targetNode?.data?.isStateClone)) {
-        return targetNode;
-    }
-
-    return (
-        allNodes.find(
-            (node) => node.id === targetNode.data?.cloneOfNodeId
-        ) || targetNode
-    );
-};
-
-const canTargetVisualNode = (sourceNode, targetNode, allNodes = []) =>
-    canTargetAcrossStateBoundaries(
-        sourceNode,
-        getSemanticTransitionTarget(targetNode, allNodes),
-        allNodes
-    );
 
 const getBoundarySourceEvent = (sourceNode, sourceHandle, allNodes = []) => {
     if (!sourceNode || !["compound", "parallelLane"].includes(sourceNode.type)) {
@@ -144,57 +131,6 @@ const getExitedBoundarySteps = (sourceNode, targetNode, allNodes = []) => {
     return steps;
 };
 
-const getFirstStoredBoundarySource = (edge) => {
-    const entries = Array.isArray(edge?.data?.boundaryOriginalSources)
-        ? edge.data.boundaryOriginalSources
-        : [];
-    return entries.find(
-        (entry) => entry?.sourceId || entry?.nodeId || entry?.id
-    ) || null;
-};
-
-const getLogicalEdgeSourceId = (edge) => {
-    const storedSource = getFirstStoredBoundarySource(edge);
-    return (
-        storedSource?.sourceId ||
-        storedSource?.nodeId ||
-        storedSource?.id ||
-        edge?.data?.boundaryOriginalSource ||
-        edge?.data?.compoundOriginalSource ||
-        edge?.data?.parallelOriginalSource ||
-        edge?.source
-    );
-};
-
-const getLogicalEdgeSourceHandle = (edge) => {
-    const storedSource = getFirstStoredBoundarySource(edge);
-    return (
-        storedSource?.sourceHandle ||
-        storedSource?.handle ||
-        edge?.data?.boundaryOriginalSourceHandle ||
-        edge?.data?.compoundOriginalSourceHandle ||
-        edge?.data?.parallelOriginalSourceHandle ||
-        edge?.sourceHandle ||
-        edge?.label ||
-        "success"
-    );
-};
-
-const makeSelfLoopControlPoints = () => [
-    {
-        id: `cp-${crypto.randomUUID()}`,
-        anchor: "source",
-        dx: 76,
-        dy: -92,
-    },
-    {
-        id: `cp-${crypto.randomUUID()}`,
-        anchor: "target",
-        dx: -76,
-        dy: -92,
-    },
-];
-
 export function useTransitionGraph({
     nodes,
     edges,
@@ -208,6 +144,7 @@ export function useTransitionGraph({
     setGlobalDataModel,
     setSelectedNodeId,
     updateNodeInternals,
+    selectTransitionEdge,
 }) {
     const [slotConnectionDrag, setSlotConnectionDrag] = useState(null);
     const reconnectingEdgeRef = useRef(null);
@@ -2062,95 +1999,6 @@ export function useTransitionGraph({
         ]
     );
 
-    const clearTransitionSelection = useCallback(() => {
-        setEdges((currentEdges) =>
-            currentEdges.map((edge) => ({
-                ...clearTransientTransitionHighlight(edge),
-                selected: false,
-            }))
-        );
-    }, [setEdges]);
-
-    const clearSlotEdgeSelection = useCallback(() => {
-        setSlotEdges((currentEdges) =>
-            currentEdges.map((edge) => ({
-                ...edge,
-                selected: false,
-            }))
-        );
-    }, [setSlotEdges]);
-
-    const clearAllEdgeSelection = useCallback(() => {
-        clearTransitionSelection();
-        clearSlotEdgeSelection();
-    }, [clearTransitionSelection, clearSlotEdgeSelection]);
-
-    const selectTransitionEdge = useCallback(
-        (edgeId, additive = false) => {
-            // Edge and node selection are mutually exclusive. A previously
-            // selected skill would otherwise keep all of its connected
-            // transitions highlighted in addition to the explicitly selected
-            // transition.
-            setSelectedNodeId(null);
-            setNodes((currentNodes) =>
-                currentNodes.map((node) =>
-                    node.selected
-                        ? { ...node, selected: false }
-                        : node
-                )
-            );
-            setSlotNodes((currentNodes) =>
-                currentNodes.map((node) =>
-                    node.selected
-                        ? { ...node, selected: false }
-                        : node
-                )
-            );
-
-            clearSlotEdgeSelection();
-            setEdges((currentEdges) =>
-                currentEdges.map((edge) => {
-                    const normalized = clearTransientTransitionHighlight(edge);
-
-                    if (!additive) {
-                        return {
-                            ...normalized,
-                            selected: edge.id === edgeId,
-                        };
-                    }
-
-                    if (edge.id !== edgeId) {
-                        return normalized;
-                    }
-
-                    return {
-                        ...normalized,
-                        selected: !edge.selected,
-                    };
-                })
-            );
-        },
-        [
-            setEdges,
-            setNodes,
-            setSlotNodes,
-            clearSlotEdgeSelection,
-        ]
-    );
-
-    const selectSlotEdge = useCallback(
-        (edgeId) => {
-            clearTransitionSelection();
-            setSlotEdges((currentEdges) =>
-                currentEdges.map((edge) => ({
-                    ...edge,
-                    selected: edge.id === edgeId,
-                }))
-            );
-        },
-        [setSlotEdges, clearTransitionSelection]
-    );
-
     const onEdgeDoubleClick = useCallback(
         (event, edge) => {
             selectTransitionEdge(edge.id);
@@ -2626,113 +2474,6 @@ export function useTransitionGraph({
         setDrawerData((previous) => ({ ...previous, isOpen: false }));
     };
 
-    const updateNodeEvent = (nodeId, eventId, changes) => {
-        setNodes((nds) =>
-            nds.map((n) =>
-                n.id === nodeId
-                    ? { ...n, data: { ...n.data, events: n.data.events.map((e) => (e.id === eventId ? { ...e, ...changes } : e)) } }
-                    : n
-            )
-        );
-    };
-
-    const setExistingTargetForEvent = (event, targetNodeId) => {
-        const selectedNode = nodes.find((node) => node.id === selectedNodeId);
-        if (!selectedNode || selectedNode.type === "slot" || !targetNodeId) return;
-
-        const targetNode = nodes.find((node) => node.id === targetNodeId);
-        if (
-            !targetNode ||
-            !canTargetVisualNode(selectedNode, targetNode, nodes)
-        ) {
-            return;
-        }
-
-        const withoutPreviousTarget = edges.filter((edge) => {
-            if (edge.data?.boundaryInternalEdge) return true;
-            const sameSource = getLogicalEdgeSourceId(edge) === selectedNode.id;
-            const sameEvent = String(getLogicalEdgeSourceHandle(edge)) === String(event.id);
-            if (!sameSource || !sameEvent) return true;
-            if (!event.target) return true;
-            return edge.target !== event.target;
-        });
-
-        const alreadyExists = withoutPreviousTarget.some(
-            (edge) =>
-                !edge.data?.boundaryInternalEdge &&
-                getLogicalEdgeSourceId(edge) === selectedNode.id &&
-                String(getLogicalEdgeSourceHandle(edge)) === String(event.id) &&
-                edge.target === targetNodeId
-        );
-
-        const nextEdges = alreadyExists
-            ? withoutPreviousTarget
-            : [
-                ...withoutPreviousTarget,
-                {
-                    id: `edge-${selectedNode.id}-${event.id}-${targetNodeId}-${crypto.randomUUID()}`,
-                    source: selectedNode.id,
-                    target: targetNodeId,
-                    sourceHandle: event.id,
-                    targetHandle: getTransitionTargetHandleForNode(targetNode),
-                    label: event.id,
-                    type: "smartTransition",
-                    markerEnd: { type: MarkerType.ArrowClosed },
-                    data: {
-                        cond: "",
-                        assignments: [],
-                        assign: null,
-                        ...(selectedNode.id === targetNodeId
-                            ? { controlPoints: makeSelfLoopControlPoints() }
-                            : {}),
-                    },
-                },
-            ];
-
-        const nextNodes = nodes.map((node) => {
-            if (node.id !== selectedNode.id) return node;
-            return {
-                ...node,
-                data: {
-                    ...node.data,
-                    events: (node.data.events || []).map((candidate) =>
-                        candidate.id === event.id
-                            ? {
-                                ...candidate,
-                                selectedPackage: getSkillPackageName(
-                                    targetNode.data?.fullSkillName
-                                ),
-                                selectedSkill:
-                                    targetNode.data?.fullSkillName?.split("#")[0] ||
-                                    targetNode.data?.label ||
-                                    "",
-                                target: targetNodeId,
-                            }
-                            : candidate
-                    ),
-                },
-            };
-        });
-
-        const normalized = rebuildBoundaryTransitionsIncremental(
-            nextNodes,
-            nextEdges,
-            {
-                previousEdges: edges,
-                sourceKeys: [
-                    {
-                        sourceId: selectedNode.id,
-                        sourceHandle: event.id,
-                    },
-                ],
-            }
-        );
-        setNodes(normalized.nodes);
-        setEdges(normalized.edges);
-        (normalized.affectedNodeIds || []).forEach((nodeId) => {
-            requestAnimationFrame(() => updateNodeInternals(nodeId));
-        });
-    };
 
 
     return {
@@ -2747,14 +2488,7 @@ export function useTransitionGraph({
         handleReconnectEnd,
         onReconnect,
         onConnect,
-        clearTransitionSelection,
-        clearSlotEdgeSelection,
-        clearAllEdgeSelection,
-        selectTransitionEdge,
-        selectSlotEdge,
         onEdgeDoubleClick,
         handleConfirmDrawer,
-        updateNodeEvent,
-        setExistingTargetForEvent,
     };
 }

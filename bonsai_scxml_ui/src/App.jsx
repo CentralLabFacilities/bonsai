@@ -657,17 +657,29 @@ function AppContent() {
         updateSlotPath,
         updateSlotInherited,
         createManualSlot,
+        clearTransitionSelection,
+        clearAllEdgeSelection,
+        selectTransitionEdge,
+        selectSlotEdge,
+        updateNodeEvent,
+        setExistingTargetForEvent,
     } = useEditorActions({
         nodes,
+        edges,
         slotNodes,
+        slotEdges,
         manualSlots,
+        selectedNodeId,
         setNodes,
+        setEdges,
         setSlotNodes,
+        setSlotEdges,
         setManualSlots,
         setSelectedNodeId,
         setRightPanelTab,
         setActiveTab,
         checkSlotConnection,
+        updateNodeInternals,
     });
 
     const {
@@ -772,14 +784,8 @@ function AppContent() {
         handleReconnectEnd,
         onReconnect,
         onConnect,
-        clearTransitionSelection,
-        clearAllEdgeSelection,
-        selectTransitionEdge,
-        selectSlotEdge,
         onEdgeDoubleClick,
         handleConfirmDrawer,
-        updateNodeEvent,
-        setExistingTargetForEvent,
     } = useTransitionGraph({
         nodes,
         edges,
@@ -793,6 +799,7 @@ function AppContent() {
         setGlobalDataModel,
         setSelectedNodeId,
         updateNodeInternals,
+        selectTransitionEdge,
     });
 
     const {

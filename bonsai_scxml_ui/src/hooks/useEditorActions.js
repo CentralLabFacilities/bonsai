@@ -1,5 +1,6 @@
 import { useEditorNodeActions } from "./editorActions/useEditorNodeActions";
 import { useEditorSlotActions } from "./editorActions/useEditorSlotActions";
+import { useEditorTransitionActions } from "./editorActions/useEditorTransitionActions";
 
 /**
  * Public action facade used by App.jsx. Domain-specific action groups stay in
@@ -26,8 +27,22 @@ export function useEditorActions(options) {
         checkSlotConnection: options.checkSlotConnection,
     });
 
+    const transitionActions = useEditorTransitionActions({
+        nodes: options.nodes,
+        edges: options.edges,
+        slotNodes: options.slotNodes,
+        selectedNodeId: options.selectedNodeId,
+        setNodes: options.setNodes,
+        setEdges: options.setEdges,
+        setSlotNodes: options.setSlotNodes,
+        setSlotEdges: options.setSlotEdges,
+        setSelectedNodeId: options.setSelectedNodeId,
+        updateNodeInternals: options.updateNodeInternals,
+    });
+
     return {
         ...nodeActions,
         ...slotActions,
+        ...transitionActions,
     };
 }

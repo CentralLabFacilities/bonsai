@@ -1,0 +1,257 @@
+import { useCallback } from "react";
+import { clearTransientTransitionHighlight } from "../../utils/editorGraph";
+import { getSkillPackageName } from "../../utils/editorScxml";
+import { rebuildBoundaryTransitionsIncremental } from "../../utils/boundaryTransitions";
+import {
+    buildSemanticTransitionEdge,
+    canTargetVisualNode,
+    getLogicalEdgeSourceHandle,
+    getLogicalEdgeSourceId,
+} from "../../utils/transitionSemantics";
+
+/**
+ * Document-level transition mutations and edge selection.
+ *
+ * React Flow connection/reconnection gestures remain in useTransitionGraph;
+ * this hook owns the resulting persistent editor mutations that are also used
+ * by panels, keyboard actions, and problem navigation.
+ */
+export function useEditorTransitionActions({
+    nodes,
+    edges,
+    slotNodes,
+    selectedNodeId,
+    setNodes,
+    setEdges,
+    setSlotNodes,
+    setSlotEdges,
+    setSelectedNodeId,
+    updateNodeInternals,
+}) {
+    const clearTransitionSelection = useCallback(() => {
+        setEdges((currentEdges) =>
+            currentEdges.map((edge) => ({
+                ...clearTransientTransitionHighlight(edge),
+                selected: false,
+            }))
+        );
+    }, [setEdges]);
+
+    const clearSlotEdgeSelection = useCallback(() => {
+        setSlotEdges((currentEdges) =>
+            currentEdges.map((edge) => ({
+                ...edge,
+                selected: false,
+            }))
+        );
+    }, [setSlotEdges]);
+
+    const clearAllEdgeSelection = useCallback(() => {
+        clearTransitionSelection();
+        clearSlotEdgeSelection();
+    }, [clearTransitionSelection, clearSlotEdgeSelection]);
+
+    const selectTransitionEdge = useCallback(
+        (edgeId, additive = false) => {
+            // Node and transition selection are mutually exclusive. Otherwise
+            // the selected skill's transient edge highlighting would remain in
+            // addition to the explicitly selected transition.
+            setSelectedNodeId(null);
+            setNodes((currentNodes) =>
+                currentNodes.map((node) =>
+                    node.selected ? { ...node, selected: false } : node
+                )
+            );
+            setSlotNodes((currentNodes) =>
+                currentNodes.map((node) =>
+                    node.selected ? { ...node, selected: false } : node
+                )
+            );
+
+            clearSlotEdgeSelection();
+            setEdges((currentEdges) =>
+                currentEdges.map((edge) => {
+                    const normalized = clearTransientTransitionHighlight(edge);
+
+                    if (!additive) {
+                        return {
+                            ...normalized,
+                            selected: edge.id === edgeId,
+                        };
+                    }
+
+                    if (edge.id !== edgeId) return normalized;
+
+                    return {
+                        ...normalized,
+                        selected: !edge.selected,
+                    };
+                })
+            );
+        },
+        [
+            setSelectedNodeId,
+            setNodes,
+            setSlotNodes,
+            clearSlotEdgeSelection,
+            setEdges,
+        ]
+    );
+
+    const selectSlotEdge = useCallback(
+        (edgeId) => {
+            clearTransitionSelection();
+            setSlotEdges((currentEdges) =>
+                currentEdges.map((edge) => ({
+                    ...edge,
+                    selected: edge.id === edgeId,
+                }))
+            );
+        },
+        [setSlotEdges, clearTransitionSelection]
+    );
+
+    const updateNodeEvent = useCallback(
+        (nodeId, eventId, changes) => {
+            setNodes((currentNodes) =>
+                currentNodes.map((node) =>
+                    node.id === nodeId
+                        ? {
+                              ...node,
+                              data: {
+                                  ...node.data,
+                                  events: (node.data?.events || []).map(
+                                      (event) =>
+                                          event.id === eventId
+                                              ? { ...event, ...changes }
+                                              : event
+                                  ),
+                              },
+                          }
+                        : node
+                )
+            );
+        },
+        [setNodes]
+    );
+
+    const setExistingTargetForEvent = useCallback(
+        (event, targetNodeId) => {
+            const selectedNode = nodes.find(
+                (node) => node.id === selectedNodeId
+            );
+            if (
+                !selectedNode ||
+                selectedNode.type === "slot" ||
+                !targetNodeId
+            ) {
+                return false;
+            }
+
+            const targetNode = nodes.find((node) => node.id === targetNodeId);
+            if (
+                !targetNode ||
+                !canTargetVisualNode(selectedNode, targetNode, nodes)
+            ) {
+                return false;
+            }
+
+            const withoutPreviousTarget = edges.filter((edge) => {
+                if (edge.data?.boundaryInternalEdge) return true;
+                const sameSource =
+                    getLogicalEdgeSourceId(edge) === selectedNode.id;
+                const sameEvent =
+                    String(getLogicalEdgeSourceHandle(edge)) ===
+                    String(event.id);
+                if (!sameSource || !sameEvent) return true;
+                if (!event.target) return true;
+                return edge.target !== event.target;
+            });
+
+            const alreadyExists = withoutPreviousTarget.some(
+                (edge) =>
+                    !edge.data?.boundaryInternalEdge &&
+                    getLogicalEdgeSourceId(edge) === selectedNode.id &&
+                    String(getLogicalEdgeSourceHandle(edge)) ===
+                        String(event.id) &&
+                    edge.target === targetNodeId
+            );
+
+            const nextEdges = alreadyExists
+                ? withoutPreviousTarget
+                : [
+                      ...withoutPreviousTarget,
+                      buildSemanticTransitionEdge({
+                          sourceNode: selectedNode,
+                          eventId: event.id,
+                          targetNode,
+                      }),
+                  ];
+
+            const nextNodes = nodes.map((node) => {
+                if (node.id !== selectedNode.id) return node;
+                return {
+                    ...node,
+                    data: {
+                        ...node.data,
+                        events: (node.data?.events || []).map((candidate) =>
+                            candidate.id === event.id
+                                ? {
+                                      ...candidate,
+                                      selectedPackage: getSkillPackageName(
+                                          targetNode.data?.fullSkillName
+                                      ),
+                                      selectedSkill:
+                                          targetNode.data?.fullSkillName?.split(
+                                              "#"
+                                          )[0] ||
+                                          targetNode.data?.label ||
+                                          "",
+                                      target: targetNodeId,
+                                  }
+                                : candidate
+                        ),
+                    },
+                };
+            });
+
+            const normalized = rebuildBoundaryTransitionsIncremental(
+                nextNodes,
+                nextEdges,
+                {
+                    previousEdges: edges,
+                    sourceKeys: [
+                        {
+                            sourceId: selectedNode.id,
+                            sourceHandle: event.id,
+                        },
+                    ],
+                }
+            );
+            setNodes(normalized.nodes);
+            setEdges(normalized.edges);
+            (normalized.affectedNodeIds || []).forEach((nodeId) => {
+                requestAnimationFrame(() => updateNodeInternals(nodeId));
+            });
+            return true;
+        },
+        [
+            nodes,
+            edges,
+            selectedNodeId,
+            setNodes,
+            setEdges,
+            updateNodeInternals,
+        ]
+    );
+
+    return {
+        clearTransitionSelection,
+        clearSlotEdgeSelection,
+        clearAllEdgeSelection,
+        selectTransitionEdge,
+        selectSlotEdge,
+        updateNodeEvent,
+        setExistingTargetForEvent,
+    };
+}
