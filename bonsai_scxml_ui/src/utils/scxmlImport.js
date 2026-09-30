@@ -677,7 +677,12 @@ export const extractBehaviorExitEventsFromScxml = (xmlText) => {
     return sentEvents;
 };
 
-export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
+export const parseScxmlFile = async (
+    xmlText,
+    fetchSkillData,
+    getNodeId,
+    parsedWorkflow = null
+) => {
     const normalizedXml = normalizeLegacyScxmlComments(xmlText);
     let xmlDoc;
 
@@ -686,7 +691,8 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
         // semantic WorkflowDto is projected onto the tiny Element facade used
         // by the existing React Flow import code below.
         try {
-            const workflow = await parseScxmlWorkflow(normalizedXml);
+            const workflow =
+                parsedWorkflow || (await parseScxmlWorkflow(normalizedXml));
             xmlDoc = workflowDtoToScxmlDocument(workflow);
         } catch (error) {
             throw new Error(

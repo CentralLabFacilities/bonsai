@@ -201,6 +201,30 @@ export async function readWorkflowSource(
 }
 
 /**
+ * Resolve, read and inspect one workflow in Rust.
+ *
+ * Unlike readWorkflowSource(), this keeps the symbolic ${KEY}/... source all
+ * the way to Rust. The backend resolves it, caches the parsed WorkflowDto by
+ * canonical path + modification time and returns the semantic interface
+ * metadata together with the file contents.
+ */
+export async function inspectWorkflowSource(
+    src,
+    directories = [],
+    currentFilePath = null,
+) {
+  if (!isTauri()) {
+    throw new Error('Rust workflow inspection is only available in the Tauri app.');
+  }
+
+  return await invoke('inspect_workflow_source', {
+    src: String(src || ''),
+    directories: directories || [],
+    currentFilePath,
+  });
+}
+
+/**
  * Check if running inside Tauri (desktop app).
  */
 export function isTauri() {
@@ -299,5 +323,20 @@ export async function parseRuntimeLogText(text) {
 
   return await invoke('parse_runtime_log_text', {
     text: String(text || ''),
+  });
+}
+
+/**
+ * Resolve all expensive runtime replay structures in Rust.
+ * The request is a compact semantic snapshot of the open workflow contexts;
+ * React Flow callbacks and rendering-only state never cross the Tauri boundary.
+ */
+export async function prepareRuntimeReplayCacheRust(request) {
+  if (!isTauri()) {
+    throw new Error('Rust runtime replay preparation is only available in the Tauri app.');
+  }
+
+  return await invoke('prepare_runtime_replay_cache', {
+    request,
   });
 }

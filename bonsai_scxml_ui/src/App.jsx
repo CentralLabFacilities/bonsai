@@ -25,17 +25,13 @@ import WorkflowTabBar from "./components/WorkflowTabBar";
 import EditorFindOverlay from "./components/EditorFindOverlay";
 import HintPage from "./components/HintPage";
 
-import { parseScxmlFile, extractBehaviorExitEventsFromScxml } from "./utils/scxmlImport";
-import { DEFAULT_PREFIX_CONFIG, resolveSrcPath } from "./config/prefixMapping";
 import {
     isTauri,
     initApiProxy,
-    readWorkflowSource,
 } from "./tauri-client.js";
 import {
     normalizeSlotPath,
     normalizeSlotType,
-    extractInheritedSlotsFromScxml,
     collectInheritedSlotUsages,
     isSlotEdge,
     getSlotPathFromNode,
@@ -95,11 +91,16 @@ import { useContainerCreation } from "./hooks/useContainerCreation";
 import { rebuildBoundaryTransitionsIncremental } from "./utils/boundaryTransitions";
 import { isWildcardTransitionEvent } from "./utils/transitionEvents";
 import { getOverviewLayoutNodeSize } from "./utils/layoutUtils";
+import { buildRuntimeReplayContexts } from "./utils/runtimeLog";
 import {
-    buildRuntimeReplayContexts,
-    prepareRuntimeReplayCache,
-} from "./utils/runtimeLog";
-import { parseRuntimeLogForReplay } from "./utils/runtimeRust";
+    parseRuntimeLogForReplay,
+    prepareRuntimeReplayCacheForReplay,
+} from "./utils/runtimeRust";
+import {
+    inspectWorkflowForEditorSource,
+    loadWorkflowForEditor,
+    projectWorkflowInspectionForEditor,
+} from "./utils/workflowLoader";
 import "./App.css";
 
 // Initialize API proxy for Tauri desktop mode (intercepts /api/* fetch calls)
@@ -580,7 +581,7 @@ function AppContent() {
                     fileName,
                 };
 
-                prepared = await prepareRuntimeReplayCache(parsed, contexts, {
+                prepared = await prepareRuntimeReplayCacheForReplay(parsed, contexts, {
                     onProgress: ({ phase, progress }) => {
                         if (runtimeLoadRequestRef.current !== requestId) return;
                         setRuntimePreparation({ fileName, phase, progress });
@@ -2603,14 +2604,14 @@ function AppContent() {
 
             try {
                 // behavior.source remains ${KEY}/... for SCXML portability.
-                // readWorkflowSource expands it only for local file access.
-                const loaded = await readWorkflowSource(
-                    behavior.source,
-                    behaviorDirectories,
-                    null
-                );
+                // Rust resolves and caches the referenced workflow for local access.
+                const loaded = await inspectWorkflowForEditorSource({
+                    src: behavior.source,
+                    directories: behaviorDirectories,
+                    currentFilePath: null,
+                });
 
-                const tabId = `tab-behavior-${loaded.path}`;
+                const tabId = `tab-behavior-${loaded.path || behavior.source}`;
                 const existingTab = tabs.find(
                     (tab) => tab.id === tabId
                 );
@@ -2620,11 +2621,10 @@ function AppContent() {
                     return;
                 }
 
-                const parsed = await parseScxmlFile(
-                    loaded.content,
+                const parsed = await projectWorkflowInspectionForEditor(loaded, {
                     fetchSkillData,
-                    getNodeId
-                );
+                    getNodeId,
+                });
                 const parsedNodes = ensureSharedEditorInstanceIds(
                     (await hydrateSubMachineInheritedSlots(
                         parsed.nodes,
@@ -2638,8 +2638,8 @@ function AppContent() {
                         behavior.name?.replace(
                             /\.(xml|scxml)$/i,
                             ""
-                        ) || loaded.file_name,
-                    fileName: loaded.file_name,
+                        ) || loaded.fileName,
+                    fileName: loaded.fileName,
                     fileHandle: null,
                     filePath: loaded.path,
                     sourcePath: behavior.source,
@@ -2733,6 +2733,9 @@ function AppContent() {
             fitView,
             beginStateMachineLoad,
             endStateMachineLoad,
+            fetchSkillData,
+            hydrateSubMachineInheritedSlots,
+            switchTab,
         ]
     );
 
@@ -2748,45 +2751,23 @@ function AppContent() {
 
             try {
                 if (behavior?.source) {
-                    let behaviorContent = "";
+                    const loaded = await loadWorkflowForEditor({
+                        src: behavior.source,
+                        directories: behaviorDirectories,
+                        currentFilePath: null,
+                        fetchSkillData,
+                        getNodeId,
+                    });
+                    const parsedBehavior = loaded.parsed;
 
-                    if (IS_DESKTOP) {
-                        const loaded = await readWorkflowSource(
-                            behavior.source,
-                            behaviorDirectories,
-                            null
-                        );
-                        behaviorContent = loaded.content || "";
-                    } else {
-                        const resolvedUrl = resolveSrcPath(
-                            behavior.source,
-                            DEFAULT_PREFIX_CONFIG
-                        );
-                        const response = await fetch(resolvedUrl);
-                        if (response.ok) {
-                            behaviorContent = await response.text();
-                        }
-                    }
-
-                    if (behaviorContent) {
-                        behaviorEvents = extractBehaviorExitEventsFromScxml(
-                            behaviorContent
-                        );
-                        const declaredInheritedSlots =
-                            extractInheritedSlotsFromScxml(behaviorContent);
-                        const parsedBehavior = await parseScxmlFile(
-                            behaviorContent,
-                            fetchSkillData,
-                            getNodeId
-                        );
-                        inheritedSlots = collectInheritedSlotUsages(
-                            parsedBehavior.nodes,
-                            declaredInheritedSlots
-                        );
-                        localDataModel = getLocalDataModelEntries(
-                            parsedBehavior.globalDataModel
-                        );
-                    }
+                    behaviorEvents = loaded.behaviorExitEvents || [];
+                    inheritedSlots = collectInheritedSlotUsages(
+                        parsedBehavior.nodes,
+                        loaded.inheritedSlotDeclarations || []
+                    );
+                    localDataModel = getLocalDataModelEntries(
+                        parsedBehavior.globalDataModel
+                    );
                 }
             } catch (error) {
                 console.warn(
@@ -2818,7 +2799,7 @@ function AppContent() {
                 },
             };
         },
-        [behaviorDirectories, handleOpenSubMachine]
+        [behaviorDirectories, fetchSkillData, handleOpenSubMachine]
     );
 
     const selectedRawNode = useMemo(

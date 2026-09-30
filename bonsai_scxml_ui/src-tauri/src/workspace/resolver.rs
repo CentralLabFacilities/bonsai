@@ -4,10 +4,16 @@ use super::library::{expand_home, normalize_key, BehaviorDirectoryMapping};
 
 #[derive(serde::Serialize, Clone)]
 pub(crate) struct WorkflowSourceResult {
-    content: String,
-    path: String,
-    file_name: String,
-    root_key: Option<String>,
+    pub(crate) content: String,
+    pub(crate) path: String,
+    pub(crate) file_name: String,
+    pub(crate) root_key: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ResolvedWorkflowPath {
+    pub(crate) path: PathBuf,
+    pub(crate) root_key: Option<String>,
 }
 
 pub(crate) fn read_workflow_source(
@@ -15,6 +21,34 @@ pub(crate) fn read_workflow_source(
     directories: &[BehaviorDirectoryMapping],
     current_file_path: Option<&str>,
 ) -> Result<WorkflowSourceResult, String> {
+    let resolved = resolve_workflow_source_path(src, directories, current_file_path)?;
+
+    let content = std::fs::read_to_string(&resolved.path).map_err(|error| {
+        format!(
+            "Could not read workflow file '{}': {error}",
+            resolved.path.display()
+        )
+    })?;
+
+    let file_name = resolved
+        .path
+        .file_name()
+        .map(|name| name.to_string_lossy().to_string())
+        .unwrap_or_default();
+
+    Ok(WorkflowSourceResult {
+        content,
+        path: resolved.path.to_string_lossy().to_string(),
+        file_name,
+        root_key: resolved.root_key,
+    })
+}
+
+pub(crate) fn resolve_workflow_source_path(
+    src: &str,
+    directories: &[BehaviorDirectoryMapping],
+    current_file_path: Option<&str>,
+) -> Result<ResolvedWorkflowPath, String> {
     let (candidate, root_key, root_path) =
         resolve_workflow_path(src, directories, current_file_path)?;
 
@@ -41,22 +75,8 @@ pub(crate) fn read_workflow_source(
         }
     }
 
-    let content = std::fs::read_to_string(&resolved_path).map_err(|error| {
-        format!(
-            "Could not read workflow file '{}': {error}",
-            resolved_path.display()
-        )
-    })?;
-
-    let file_name = resolved_path
-        .file_name()
-        .map(|name| name.to_string_lossy().to_string())
-        .unwrap_or_default();
-
-    Ok(WorkflowSourceResult {
-        content,
-        path: resolved_path.to_string_lossy().to_string(),
-        file_name,
+    Ok(ResolvedWorkflowPath {
+        path: resolved_path,
         root_key,
     })
 }

@@ -1,11 +1,6 @@
 import { useCallback, useRef } from "react";
-import { parseScxmlFile, extractBehaviorExitEventsFromScxml } from "../utils/scxmlImport";
-import { DEFAULT_PREFIX_CONFIG, resolveSrcPath } from "../config/prefixMapping";
-import { isTauri, readWorkflowSource, saveFile } from "../tauri-client.js";
-import {
-    extractInheritedSlotsFromScxml,
-    collectInheritedSlotUsages,
-} from "../utils/editorGraph";
+import { isTauri, saveFile } from "../tauri-client.js";
+import { collectInheritedSlotUsages } from "../utils/editorGraph";
 import { getNodeId } from "../utils/editorGeometry";
 import {
     getLocalDataModelEntries,
@@ -14,6 +9,11 @@ import {
     prepareGraphForScxml,
 } from "../utils/editorScxml";
 import { generateXmlString } from "../utils/scxmlExport";
+import {
+    inspectWorkflowForEditorSource,
+    loadWorkflowForEditor,
+    projectWorkflowInspectionForEditor,
+} from "../utils/workflowLoader";
 
 const IS_DESKTOP = isTauri();
 
@@ -185,34 +185,17 @@ export function useSubStateMachines({
                 }
 
                 try {
-                    let xmlText = "";
-
-                    if (IS_DESKTOP) {
-                        const loaded = await readWorkflowSource(
-                            node.data.src,
-                            behaviorDirectories,
-                            parentFilePath
-                        );
-                        xmlText = loaded.content || "";
-                    } else {
-                        const resolvedUrl = resolveSrcPath(
-                            node.data.src,
-                            DEFAULT_PREFIX_CONFIG
-                        );
-                        const response = await fetch(resolvedUrl);
-                        if (!response.ok) return node;
-                        xmlText = await response.text();
-                    }
-
-                    const behaviorExitEvents =
-                        extractBehaviorExitEventsFromScxml(xmlText);
-                    const declaredInheritedSlots =
-                        extractInheritedSlotsFromScxml(xmlText);
-                    const parsedChild = await parseScxmlFile(
-                        xmlText,
+                    const loaded = await loadWorkflowForEditor({
+                        src: node.data.src,
+                        directories: behaviorDirectories,
+                        currentFilePath: parentFilePath,
                         fetchSkillData,
-                        getNodeId
-                    );
+                        getNodeId,
+                    });
+                    const behaviorExitEvents = loaded.behaviorExitEvents || [];
+                    const declaredInheritedSlots =
+                        loaded.inheritedSlotDeclarations || [];
+                    const parsedChild = loaded.parsed;
                     const inheritedSlots = collectInheritedSlotUsages(
                         parsedChild.nodes,
                         declaredInheritedSlots
@@ -297,37 +280,18 @@ export function useSubStateMachines({
 
         let tabId = `tab-sub-${baseName}`;
         let resolvedFilePath = null;
-        let xmlText = "";
 
         try {
-            if (IS_DESKTOP) {
-                // Keep srcPath symbolic in SCXML, but resolve ${KEY} to the
-                // configured local directory before reading from disk.
-                const loaded = await readWorkflowSource(
-                    srcPath,
-                    behaviorDirectories,
-                    currentTab?.filePath || null
-                );
-
-                xmlText = loaded.content;
-                resolvedFilePath = loaded.path;
+            // Inspect first so an already-open tab can be selected without
+            // rebuilding its React Flow projection or refetching skill data.
+            const inspection = await inspectWorkflowForEditorSource({
+                src: srcPath,
+                directories: behaviorDirectories,
+                currentFilePath: currentTab?.filePath || null,
+            });
+            resolvedFilePath = inspection.path;
+            if (resolvedFilePath) {
                 tabId = `tab-sub-${resolvedFilePath}`;
-            } else {
-                // Browser compatibility only. The desktop app resolves
-                // ${KEY}/... directly from the Behavior Library.
-                const resolvedUrl = resolveSrcPath(
-                    srcPath,
-                    DEFAULT_PREFIX_CONFIG
-                );
-                const response = await fetch(resolvedUrl);
-
-                if (!response.ok) {
-                    throw new Error(
-                        `Server returned status ${response.status} (${response.statusText})`
-                    );
-                }
-
-                xmlText = await response.text();
             }
 
             const existingTab = tabs.find((tab) => tab.id === tabId);
@@ -336,22 +300,20 @@ export function useSubStateMachines({
                 return;
             }
 
-            if (!xmlText || !xmlText.includes("<scxml")) {
+            if (!inspection.content || !inspection.content.includes("<scxml")) {
                 throw new Error(
                     "The selected file does not contain a valid <scxml> document."
                 );
             }
 
             const discoveredBehaviorExitEvents =
-                extractBehaviorExitEventsFromScxml(xmlText);
+                inspection.behaviorExitEvents || [];
             const declaredInheritedSlots =
-                extractInheritedSlotsFromScxml(xmlText);
-
-            const parsed = await parseScxmlFile(
-                xmlText,
+                inspection.inheritedSlotDeclarations || [];
+            const parsed = await projectWorkflowInspectionForEditor(inspection, {
                 fetchSkillData,
-                getNodeId
-            );
+                getNodeId,
+            });
             const discoveredInheritedSlots =
                 collectInheritedSlotUsages(
                     parsed.nodes,
