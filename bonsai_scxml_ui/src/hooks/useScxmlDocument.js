@@ -7,6 +7,7 @@ import {
     generateXmlString,
 } from "../utils/scxmlExport";
 import { parseScxmlFile } from "../utils/scxmlImport";
+import { serializeEditorGraphWithRust } from "../utils/scxmlRustExport";
 import { getNodeId } from "../utils/editorGeometry";
 import {
     ensureSharedEditorInstanceIds,
@@ -63,7 +64,7 @@ export function useScxmlDocument({
     isDesktop,
     nodes,
     edges,
-    slotNodes,
+    manualSlots,
     globalDataModel,
     tabs,
     setTabs,
@@ -219,14 +220,42 @@ export function useScxmlDocument({
             }
 
             const currentActiveTab = tabs.find((tab) => tab.id === activeTabId);
-            const exportGraph = prepareGraphForScxml(nodes, edges);
-            const xml = generateXmlString(
-                exportGraph.nodes,
-                exportGraph.edges,
-                globalDataModel,
-                [],
-                slotNodes
-            );
+            let xml;
+            if (isDesktop) {
+                try {
+                    xml = await serializeEditorGraphWithRust({
+                        nodes,
+                        edges,
+                        globalDataModel,
+                        manualSlots,
+                    });
+                } catch (error) {
+                    // Keep a compatibility escape hatch while the Rust exporter
+                    // is rolled out. A malformed/unsupported editor snapshot
+                    // must never prevent the user from saving their workflow.
+                    console.warn(
+                        "Rust SCXML serialization failed; using JavaScript fallback.",
+                        error
+                    );
+                    const exportGraph = prepareGraphForScxml(nodes, edges);
+                    xml = generateXmlString(
+                        exportGraph.nodes,
+                        exportGraph.edges,
+                        globalDataModel,
+                        [],
+                        manualSlots
+                    );
+                }
+            } else {
+                const exportGraph = prepareGraphForScxml(nodes, edges);
+                xml = generateXmlString(
+                    exportGraph.nodes,
+                    exportGraph.edges,
+                    globalDataModel,
+                    [],
+                    manualSlots
+                );
+            }
             const defaultName =
                 currentActiveTab?.fileName ||
                 `${currentActiveTab?.title || "workflow"}.xml`;
@@ -285,7 +314,7 @@ export function useScxmlDocument({
         [
             nodes,
             edges,
-            slotNodes,
+            manualSlots,
             globalDataModel,
             tabs,
             activeTabId,

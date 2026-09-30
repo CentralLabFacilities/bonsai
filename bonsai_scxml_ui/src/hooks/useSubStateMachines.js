@@ -9,6 +9,7 @@ import {
     prepareGraphForScxml,
 } from "../utils/editorScxml";
 import { generateXmlString } from "../utils/scxmlExport";
+import { serializeEditorGraphWithRust } from "../utils/scxmlRustExport";
 import {
     inspectWorkflowForEditorSource,
     loadWorkflowForEditor,
@@ -65,12 +66,25 @@ const writeNewSubMachineFile = async ({ filePath, nodes = [], edges = [] }) => {
 
     let xml = buildEmptySubMachineXml();
     if (nodes.length > 0) {
-        const exportGraph = prepareGraphForScxml(nodes, edges);
-        xml = generateXmlString(
-            exportGraph.nodes,
-            exportGraph.edges,
-            DEFAULT_CHILD_DATA_MODEL
-        ) || xml;
+        try {
+            xml = await serializeEditorGraphWithRust({
+                nodes,
+                edges,
+                globalDataModel: DEFAULT_CHILD_DATA_MODEL,
+                manualSlots: [],
+            });
+        } catch (error) {
+            console.warn(
+                "Rust Sub-SM serialization failed; using JavaScript fallback.",
+                error
+            );
+            const exportGraph = prepareGraphForScxml(nodes, edges);
+            xml = generateXmlString(
+                exportGraph.nodes,
+                exportGraph.edges,
+                DEFAULT_CHILD_DATA_MODEL
+            ) || xml;
+        }
     }
 
     const result = await saveFile(xml, filePath, "Create Sub-State-Machine");

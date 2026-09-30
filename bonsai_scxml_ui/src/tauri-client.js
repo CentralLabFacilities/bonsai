@@ -265,6 +265,21 @@ export async function serializeScxmlWorkflow(workflow) {
 }
 
 /**
+ * Serialize the current editor graph through the Rust semantic export layer.
+ * The payload is a compact serializable snapshot without React callbacks or
+ * rendering-only objects.
+ */
+export async function serializeEditorWorkflow(request) {
+  if (!isTauri()) {
+    throw new Error('Rust editor SCXML serialization is only available in the Tauri app.');
+  }
+
+  return await invoke('serialize_editor_workflow', {
+    request,
+  });
+}
+
+/**
  * Validate the current editor state in Rust.
  *
  * The request is deliberately a small semantic snapshot rather than React

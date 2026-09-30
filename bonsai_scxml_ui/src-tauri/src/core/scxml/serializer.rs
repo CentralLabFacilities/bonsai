@@ -81,26 +81,15 @@ fn validate_parent_links(
 }
 
 fn render_root_datamodel(workflow: &WorkflowDto, output: &mut String) {
-    if workflow.data_model.is_empty() && workflow.slot_declarations.is_empty() {
-        return;
-    }
-
+    // The editor has historically emitted a root <datamodel> even when it is
+    // empty. Keep that stable for desktop Rust serialization so a save does not
+    // introduce an avoidable structural diff in otherwise unchanged files.
     output.push_str("    <datamodel>\n");
-    for entry in &workflow.data_model {
-        output.push_str(&format!(
-            "        <data id=\"{}\" expr=\"{}\"{} />\n",
-            escape_attr(&entry.id),
-            escape_attr(&entry.expression),
-            entry
-                .type_name
-                .as_deref()
-                .filter(|value| !value.is_empty())
-                .map(|value| format!(" type=\"{}\"", escape_attr(value)))
-                .unwrap_or_default()
-        ));
-    }
 
-    if !workflow.slot_declarations.is_empty() {
+    let render_slots = |output: &mut String| {
+        if workflow.slot_declarations.is_empty() {
+            return;
+        }
         output.push_str("        <data id=\"#_SLOTS\">\n");
         output.push_str("            <slots>\n");
         for slot in &workflow.slot_declarations {
@@ -115,7 +104,32 @@ fn render_root_datamodel(workflow: &WorkflowDto, output: &mut String) {
         }
         output.push_str("            </slots>\n");
         output.push_str("        </data>\n");
+    };
+
+    for (index, entry) in workflow.data_model.iter().enumerate() {
+        output.push_str(&format!(
+            "        <data id=\"{}\" expr=\"{}\"{} />\n",
+            escape_attr(&entry.id),
+            escape_attr(&entry.expression),
+            entry
+                .type_name
+                .as_deref()
+                .filter(|value| !value.is_empty())
+                .map(|value| format!(" type=\"{}\"", escape_attr(value)))
+                .unwrap_or_default()
+        ));
+
+        // Match the historical JS exporter: #_SLOTS is placed directly after
+        // the first root datamodel entry (normally #_STATE_PREFIX).
+        if index == 0 {
+            render_slots(output);
+        }
     }
+
+    if workflow.data_model.is_empty() {
+        render_slots(output);
+    }
+
     output.push_str("    </datamodel>\n");
 }
 

@@ -6116,7 +6116,7 @@ function AppContent() {
         isDesktop: IS_DESKTOP,
         nodes,
         edges,
-        slotNodes,
+        manualSlots,
         globalDataModel,
         tabs,
         setTabs,
