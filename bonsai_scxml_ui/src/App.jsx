@@ -54,8 +54,6 @@ import {
     getAbsoluteNodePosition,
     orderNodesParentsFirst,
     resolveNodeCollisionsAndRefit,
-    normalizeParallelLaneCompounds,
-    normalizeCompoundInitialStates,
     findDropContainerAtPoint,
     fitCompoundAndAncestorCompounds,
     growParallelToLaneContents,
@@ -87,6 +85,7 @@ import { useTransitionGraph } from "./hooks/useTransitionGraph";
 import { useContainerCreation } from "./hooks/useContainerCreation";
 import { useEditorGraphState } from "./hooks/useEditorGraphState";
 import { useEditorGraphMaintenance } from "./hooks/useEditorGraphMaintenance";
+import { useEditorActions } from "./hooks/useEditorActions";
 import { rebuildBoundaryTransitionsIncremental } from "./utils/boundaryTransitions";
 import {
     isEditorCloneNode,
@@ -648,6 +647,27 @@ function AppContent() {
         slotEdges,
         setSlotNodes,
         setSlotEdges,
+    });
+
+    const {
+        selectEditorNode,
+        createEditorReference,
+        setNodeAsInitial,
+        addEmptyStateToContainer,
+        updateSlotPath,
+        updateSlotInherited,
+        createManualSlot,
+    } = useEditorActions({
+        nodes,
+        slotNodes,
+        manualSlots,
+        setNodes,
+        setSlotNodes,
+        setManualSlots,
+        setSelectedNodeId,
+        setRightPanelTab,
+        setActiveTab,
+        checkSlotConnection,
     });
 
     const {
@@ -1284,53 +1304,13 @@ function AppContent() {
             : null;
 
     const handleCreateEditorClone = useCallback(() => {
-        if (!contextMenu?.flowPosition) return;
+        if (!contextMenu?.flowPosition || !editorCloneSourceNode) return;
 
-        const sourceNode = editorCloneSourceNode;
-        if (!isCloneableEditorNode(sourceNode)) return;
-
-        const cloneNode = buildEditorCloneNode(sourceNode, {
+        createEditorReference(editorCloneSourceNode, {
             x: Number(contextMenu.flowPosition.x || 0) + 220,
             y: Number(contextMenu.flowPosition.y || 0),
         });
-        if (!cloneNode) return;
-
-        if (sourceNode.type === "slot") {
-            setNodes((currentNodes) =>
-                currentNodes.map((node) => ({ ...node, selected: false }))
-            );
-            setSlotNodes((currentSlotNodes) => [
-                ...currentSlotNodes.map((node) => ({
-                    ...node,
-                    selected: false,
-                })),
-                cloneNode,
-            ]);
-        } else {
-            setSlotNodes((currentSlotNodes) =>
-                currentSlotNodes.map((node) => ({ ...node, selected: false }))
-            );
-            setNodes((currentNodes) => [
-                ...currentNodes.map((node) => ({
-                    ...node,
-                    selected: false,
-                })),
-                cloneNode,
-            ]);
-        }
-
-        setSelectedNodeId(cloneNode.id);
-        setRightPanelTab("details");
-        setActiveTab(sourceNode.type === "slot" ? "slots" : "allgemein");
-    }, [
-        contextMenu,
-        editorCloneSourceNode,
-        setNodes,
-        setSlotNodes,
-        setSelectedNodeId,
-        setRightPanelTab,
-        setActiveTab,
-    ]);
+    }, [contextMenu, editorCloneSourceNode, createEditorReference]);
 
     const handleGraphClipboardContextAction = useCallback((type) => {
         if (type === "copy") {
@@ -1340,124 +1320,6 @@ function AppContent() {
         }
         setContextMenu(null);
     }, [contextMenu]);
-
-    const setNodeAsInitial = useCallback((nodeId) => {
-        if (!nodeId) return;
-
-        setNodes((nds) => {
-            const selected = nds.find((node) => node.id === nodeId);
-            if (!selected || !selected.parentId || isEditorCloneNode(selected)) {
-                return nds;
-            }
-
-            const parentId = selected.parentId;
-            const parentNode = nds.find((node) => node.id === parentId);
-            if (!parentNode || !["compound", "parallelLane"].includes(parentNode.type)) {
-                return nds;
-            }
-
-            return nds.map((node) => {
-                if (node.id === parentId && parentNode.type === "compound") {
-                    return {
-                        ...node,
-                        data: {
-                            ...(node.data || {}),
-                            initialChildId: selected.id,
-                        },
-                    };
-                }
-
-                if ((node.parentId || null) !== parentId) return node;
-                if (node.type === "slot" || node.type === "parallelLane") {
-                    return node;
-                }
-
-                return {
-                    ...node,
-                    data: {
-                        ...(node.data || {}),
-                        isInitial: node.id === selected.id,
-                    },
-                };
-            });
-        });
-    }, [setNodes]);
-
-    const addEmptyStateToContainer = useCallback((parentId) => {
-        if (!parentId) return;
-
-        const newNodeId = getNodeId();
-        setNodes((currentNodes) => {
-            const parent = currentNodes.find((node) => node.id === parentId);
-            if (!parent || !["compound", "parallelLane"].includes(parent.type)) {
-                return currentNodes;
-            }
-
-            const children = currentNodes.filter(
-                (node) => node.parentId === parentId && node.type !== "parallelLane"
-            );
-            const stateCount = currentNodes.filter(
-                (node) =>
-                    String(node.data?.label || "").startsWith("state_")
-            ).length;
-            const stateName = `state_${stateCount + 1}`;
-            const isFirstChild = children.length === 0;
-            const childX = parent.type === "compound" ? COMPOUND_PADDING_X : 24;
-            const childStartY =
-                parent.type === "compound"
-                    ? COMPOUND_HEADER_HEIGHT + 18
-                    : PARALLEL_LANE_CHILD_TOP_INSET;
-            const nextY = children.reduce((maxY, child) => {
-                const size = getOverviewLayoutNodeSize(child);
-                return Math.max(
-                    maxY,
-                    Number(child.position?.y || 0) + size.height + 18
-                );
-            }, childStartY);
-
-            const newState = {
-                id: newNodeId,
-                type: "compound",
-                parentId,
-                extent: "parent",
-                expandParent: true,
-                position: { x: childX, y: nextY },
-                style: { width: 300, height: 180 },
-                selected: true,
-                data: {
-                    label: stateName,
-                    fullSkillName: stateName,
-                    isInitial: isFirstChild,
-                    events: [],
-                },
-            };
-
-            const withSelection = currentNodes.map((node) => ({
-                ...node,
-                selected: false,
-                ...(node.id === parentId && parent.type === "compound" && isFirstChild
-                    ? {
-                          data: {
-                              ...(node.data || {}),
-                              initialChildId: newNodeId,
-                          },
-                      }
-                    : {}),
-            }));
-
-            let nextNodes = resolveNodeCollisionsAndRefit(
-                [...withSelection, newState],
-                newNodeId
-            );
-            nextNodes = normalizeParallelLaneCompounds(nextNodes);
-            nextNodes = normalizeCompoundInitialStates(nextNodes);
-            return orderNodesParentsFirst(nextNodes);
-        });
-
-        setSelectedNodeId(newNodeId);
-        setRightPanelTab("details");
-        setActiveTab("allgemein");
-    }, [setNodes, setSelectedNodeId, setRightPanelTab, setActiveTab]);
 
     const handleSelectAction = (type, payload = null) => {
         const hasSelection = selectedNodes.length > 0;
@@ -1470,33 +1332,7 @@ function AppContent() {
         }
 
         if (type === "open-details" && contextNodeId) {
-            const node = [...nodes, ...slotNodes].find(
-                (candidate) => candidate.id === contextNodeId
-            );
-            if (node?.type === "slot") {
-                setNodes((current) =>
-                    current.map((candidate) => ({ ...candidate, selected: false }))
-                );
-                setSlotNodes((current) =>
-                    current.map((candidate) => ({
-                        ...candidate,
-                        selected: candidate.id === contextNodeId,
-                    }))
-                );
-            } else {
-                setNodes((current) =>
-                    current.map((candidate) => ({
-                        ...candidate,
-                        selected: candidate.id === contextNodeId,
-                    }))
-                );
-                setSlotNodes((current) =>
-                    current.map((candidate) => ({ ...candidate, selected: false }))
-                );
-            }
-            setSelectedNodeId(contextNodeId);
-            setRightPanelTab("details");
-            setActiveTab(node?.type === "slot" ? "slots" : "allgemein");
+            selectEditorNode(contextNodeId);
         } else if (type === "open-transitions" && contextNodeId) {
             const node = nodes.find((candidate) => candidate.id === contextNodeId);
             const firstEventId = String(node?.data?.events?.[0]?.id || "");
@@ -1650,18 +1486,7 @@ function AppContent() {
         } else if (type === "go-slot-node" && contextMenu?.slotNodeId) {
             const slotNodeId = contextMenu.slotNodeId;
             clearAllEdgeSelection();
-            setNodes((current) =>
-                current.map((node) => ({ ...node, selected: false }))
-            );
-            setSlotNodes((current) =>
-                current.map((node) => ({
-                    ...node,
-                    selected: node.id === slotNodeId,
-                }))
-            );
-            setSelectedNodeId(slotNodeId);
-            setRightPanelTab("details");
-            setActiveTab("slots");
+            selectEditorNode(slotNodeId, { kind: "slot", tab: "slots" });
 
             window.setTimeout(() => {
                 const flowNode = getNodes().find((node) => node.id === slotNodeId);
@@ -4336,158 +4161,16 @@ function AppContent() {
 
 
 
-    const handleUpdateSelectedSlotPath = (nextPath) => {
-        if (!selectedRawNode || selectedRawNode.type !== "slot") return;
+    const handleUpdateSelectedSlotPath = useCallback(
+        (nextPath) => updateSlotPath(selectedRawNode, nextPath),
+        [selectedRawNode, updateSlotPath]
+    );
 
-        const oldPath = getSlotPathFromNode(selectedRawNode);
-        const newPath = normalizeSlotPath(nextPath);
-        if (!oldPath || !newPath || oldPath === newPath) return;
-
-        const formattedPath = `/${newPath}`;
-        const updateSlotReference = (slot) => {
-            if (normalizeSlotPath(slot?.path) !== oldPath) return slot;
-
-            return {
-                ...slot,
-                path: formattedPath,
-                inherited: slot?.inherited
-                    ? {
-                        ...slot.inherited,
-                        xpath: formattedPath,
-                    }
-                    : slot?.inherited,
-            };
-        };
-
-        const updatedNodes = nodes.map((node) => ({
-            ...node,
-            data: {
-                ...node.data,
-                inSlots: (node.data?.inSlots || []).map(updateSlotReference),
-                outSlots: (node.data?.outSlots || []).map(updateSlotReference),
-            },
-        }));
-
-        const updatedManualSlots = (manualSlots || []).map((slot) => {
-            const declarationPath = normalizeSlotPath(
-                slot?.inherited?.xpath || slot?.path
-            );
-            if (declarationPath !== oldPath) return slot;
-
-            return {
-                ...slot,
-                path: formattedPath,
-                inherited: slot?.inherited
-                    ? {
-                        ...slot.inherited,
-                        xpath: formattedPath,
-                    }
-                    : slot?.inherited,
-            };
-        });
-
-        const oldCanonicalSlotNodeId = `slot-${oldPath}`;
-        const newCanonicalSlotNodeId = `slot-${newPath}`;
-        const updatedSlotNodes = slotNodes.map((slotNode) => {
-            const isCanonical = slotNode.id === oldCanonicalSlotNodeId;
-            const isClone =
-                slotNode.data?.isSlotClone &&
-                slotNode.data?.cloneOfNodeId === oldCanonicalSlotNodeId;
-
-            if (!isCanonical && !isClone) return slotNode;
-
-            return {
-                ...slotNode,
-                ...(isCanonical ? { id: newCanonicalSlotNodeId } : {}),
-                data: {
-                    ...(slotNode.data || {}),
-                    path: formattedPath,
-                    label: formattedPath,
-                    ...(isClone
-                        ? { cloneOfNodeId: newCanonicalSlotNodeId }
-                        : {}),
-                },
-            };
-        });
-
-        setNodes(updatedNodes);
-        setManualSlots(updatedManualSlots);
-        setSelectedNodeId(
-            selectedRawNode.data?.isSlotClone
-                ? selectedRawNode.id
-                : newCanonicalSlotNodeId
-        );
-        checkSlotConnection(
-            updatedNodes,
-            updatedManualSlots,
-            updatedSlotNodes
-        );
-    };
-
-    const handleUpdateSelectedSlotInherited = (shouldInherit) => {
-        if (!selectedRawNode || selectedRawNode.type !== "slot") return;
-
-        const path = getSlotPathFromNode(selectedRawNode);
-        if (!path) return;
-        const formattedPath = `/${path}`;
-
-        const updatedNodes = nodes.map((node) => {
-            const stateName =
-                node.data?.fullSkillName ||
-                node.data?.label ||
-                node.id;
-
-            const updateSlotReference = (slot) => {
-                if (normalizeSlotPath(slot?.path) !== path) return slot;
-
-                return {
-                    ...slot,
-                    inherited: shouldInherit
-                        ? {
-                            ...(slot?.inherited || {}),
-                            state: slot?.inherited?.state || stateName,
-                            xpath: formattedPath,
-                        }
-                        : null,
-                };
-            };
-
-            return {
-                ...node,
-                data: {
-                    ...node.data,
-                    inSlots: (node.data?.inSlots || []).map(updateSlotReference),
-                    outSlots: (node.data?.outSlots || []).map(updateSlotReference),
-                },
-            };
-        });
-
-        const updatedManualSlots = (manualSlots || []).map((slot) => {
-            const declarationPath = normalizeSlotPath(
-                slot?.inherited?.xpath || slot?.path
-            );
-            if (declarationPath !== path) return slot;
-
-            return {
-                ...slot,
-                slotKind: shouldInherit ? "inheritSlot" : "slot",
-                inherited: shouldInherit
-                    ? {
-                        ...(slot?.inherited || {}),
-                        state:
-                            slot?.inherited?.state ||
-                            slot?.state ||
-                            "",
-                        xpath: formattedPath,
-                    }
-                    : null,
-            };
-        });
-
-        setNodes(updatedNodes);
-        setManualSlots(updatedManualSlots);
-        checkSlotConnection(updatedNodes, updatedManualSlots);
-    };
+    const handleUpdateSelectedSlotInherited = useCallback(
+        (shouldInherit) =>
+            updateSlotInherited(selectedRawNode, shouldInherit),
+        [selectedRawNode, updateSlotInherited]
+    );
 
     // Graph-aware copy/paste/duplicate/select-all shortcuts. A copied
     // selection contains the selected nodes plus transitions whose source and
@@ -5483,56 +5166,7 @@ function AppContent() {
             window.removeEventListener("keydown", handlePendingPasteKey, true);
     }, [pendingSkillPaste, cancelPendingSkillPaste]);
 
-    const handleCreateManualSlot = (slotData) => {
-        const newSlot = {
-            id: `manual-${crypto.randomUUID()}`,
-            path: slotData.path,
-            type: slotData.type,
-            inherited: slotData.isInherited
-                ? { state: slotData.inheritedFrom || "" }
-                : null,
-        };
-
-        const updatedManualSlots = [...manualSlots, newSlot];
-        setManualSlots(updatedManualSlots);
-
-        let updatedNodes = nodes;
-
-        if (slotData.linkedSkillSlot) {
-            const { nodeId, access, slotIndex } = slotData.linkedSkillSlot;
-            const cleanPath = `/${normalizeSlotPath(slotData.path)}`;
-
-            updatedNodes = nodes.map((node) => {
-                if (node.id !== nodeId) return node;
-
-                const key = access === "read" ? "inSlots" : "outSlots";
-                return {
-                    ...node,
-                    data: {
-                        ...node.data,
-                        [key]: node.data[key].map((slot, index) =>
-                            index === slotIndex
-                                ? {
-                                    ...slot,
-                                    path: cleanPath,
-                                    inherited: slotData.isInherited
-                                        ? {
-                                            state: "",
-                                            xpath: cleanPath,
-                                        }
-                                        : null,
-                                }
-                                : slot
-                        ),
-                    },
-                };
-            });
-
-            setNodes(updatedNodes);
-        }
-
-        checkSlotConnection(updatedNodes, updatedManualSlots);
-    };
+    const handleCreateManualSlot = createManualSlot;
 
     const findResults = useMemo(() => {
         const query = findQuery.trim().toLowerCase();
