@@ -270,3 +270,18 @@ export async function resolveEditorSlotAncestry(request) {
     request,
   });
 }
+/**
+ * Analyze semantic transitions that leave the currently selected container.
+ * Visual boundary/helper edge routing stays in React; Rust only receives the
+ * compact semantic node/edge snapshot.
+ */
+export async function analyzeEditorTransitions(request) {
+  if (!isTauri()) {
+    throw new Error('Rust transition analysis is only available in the Tauri app.');
+  }
+
+  return await invoke('analyze_editor_transitions', {
+    request,
+  });
+}
+

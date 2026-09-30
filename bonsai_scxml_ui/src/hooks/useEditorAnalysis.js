@@ -12,6 +12,11 @@ import {
     slotAncestryResponseToMap,
 } from "../utils/slotAnalysis";
 import {
+    analyzeContainerOutgoingTransitionsInJavascript,
+    buildTransitionAnalysisRequest,
+} from "../utils/transitionAnalysis";
+import {
+    analyzeEditorTransitions,
     isTauri,
     resolveEditorSlotAncestry,
     validateEditorWorkflow,
@@ -111,6 +116,86 @@ export function useEditorAnalysis({
         semanticNodes,
         semanticSlotNodes,
         manualSlots,
+    ]);
+
+    const transitionAnalysisRequest = useMemo(
+        () =>
+            buildTransitionAnalysisRequest({
+                selectedNode: selectedRawNode,
+                nodes: semanticNodes,
+                edges,
+            }),
+        [selectedRawNode, semanticNodes, edges]
+    );
+
+    const [selectedContainerOutgoingTransitions, setSelectedContainerOutgoingTransitions] =
+        useState([]);
+    const transitionAnalysisRevisionRef = useRef(0);
+
+    useEffect(() => {
+        const revision = ++transitionAnalysisRevisionRef.current;
+        let cancelled = false;
+
+        const selectedIsContainer =
+            selectedRawNode?.type === "compound" ||
+            selectedRawNode?.type === "parallel";
+        if (!selectedIsContainer) {
+            setSelectedContainerOutgoingTransitions([]);
+            return () => {
+                cancelled = true;
+            };
+        }
+
+        // Boundary metadata is normalized after a drag completes. Avoid
+        // analyzing transient helper edges while the node is still moving.
+        if (isDraggingNode) {
+            return () => {
+                cancelled = true;
+            };
+        }
+
+        const commit = (next) => {
+            if (cancelled || revision !== transitionAnalysisRevisionRef.current) {
+                return;
+            }
+            setSelectedContainerOutgoingTransitions(
+                Array.isArray(next) ? next : []
+            );
+        };
+
+        const analyzeWithJavascript = () =>
+            analyzeContainerOutgoingTransitionsInJavascript({
+                selectedNode: selectedRawNode,
+                nodes: semanticNodes,
+                edges,
+            });
+
+        if (!isTauri()) {
+            commit(analyzeWithJavascript());
+            return () => {
+                cancelled = true;
+            };
+        }
+
+        analyzeEditorTransitions(transitionAnalysisRequest)
+            .then(commit)
+            .catch((error) => {
+                console.warn(
+                    "Rust transition analysis failed; using frontend fallback:",
+                    error
+                );
+                commit(analyzeWithJavascript());
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [
+        isDraggingNode,
+        transitionAnalysisRequest,
+        selectedRawNode,
+        semanticNodes,
+        edges,
     ]);
 
     const selectedSlotDetails = useMemo(() => {
@@ -372,6 +457,7 @@ export function useEditorAnalysis({
         selectedSlotDetails,
         canvasSlotPathOptions,
         canvasSkillSlotOptions,
+        selectedContainerOutgoingTransitions,
         editorProblems,
         errorProblemCount,
     };

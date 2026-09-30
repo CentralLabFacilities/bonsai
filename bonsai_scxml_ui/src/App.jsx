@@ -93,10 +93,7 @@ import { useSubStateMachines } from "./hooks/useSubStateMachines";
 import { useTransitionGraph } from "./hooks/useTransitionGraph";
 import { useContainerCreation } from "./hooks/useContainerCreation";
 import { rebuildBoundaryTransitionsIncremental } from "./utils/boundaryTransitions";
-import {
-    getTransitionExitToken,
-    isWildcardTransitionEvent,
-} from "./utils/transitionEvents";
+import { isWildcardTransitionEvent } from "./utils/transitionEvents";
 import { getOverviewLayoutNodeSize } from "./utils/layoutUtils";
 import {
     parseSkillStateMachineLog,
@@ -2854,217 +2851,26 @@ function AppContent() {
         );
     }, [selectedNode, semanticNodes]);
 
-    const selectedContainerOutgoingTransitions = useMemo(() => {
-        if (
-            !selectedNode ||
-            (selectedNode.type !== "compound" && selectedNode.type !== "parallel")
-        ) {
-            return [];
-        }
-
-        const nodeById = new Map(semanticNodes.map((node) => [node.id, node]));
-        const isInsideSelectedContainer = (nodeId) => {
-            if (!nodeId) return false;
-            if (nodeId === selectedNode.id) return true;
-
-            const visited = new Set();
-            let current = nodeById.get(nodeId);
-            while (current?.parentId && !visited.has(current.parentId)) {
-                visited.add(current.parentId);
-                if (current.parentId === selectedNode.id) return true;
-                current = nodeById.get(current.parentId);
-            }
-            return false;
-        };
-
-        const displayNameFor = (node) => {
-            if (!node) return "Unknown";
-            const fullSkillName = String(
-                node.data?.fullSkillName || node.data?.label || node.id
-            ).trim();
-            const editorInstanceId = String(
-                node.data?.editorInstanceId || ""
-            ).trim();
-            const baseName =
-                node.data?.label ||
-                fullSkillName.split(".").pop()?.split("#")[0] ||
-                node.id;
-
-            if (editorInstanceId) return `${baseName}#${editorInstanceId}`;
-            if (fullSkillName.includes("#")) {
-                const instanceId = fullSkillName.split("#").pop();
-                return `${baseName}#${instanceId}`;
-            }
-            return baseName;
-        };
-
-        const seen = new Set();
-        const result = [];
-
-        const appendOutgoingTransition = ({
-            edgeId,
-            sourceId,
-            sourceHandle,
-            targetId,
-            rawEvent = "",
-            isFallback = false,
-        }) => {
-            if (
-                !sourceId ||
-                !targetId ||
-                !isInsideSelectedContainer(sourceId) ||
-                isInsideSelectedContainer(targetId)
-            ) {
-                return;
-            }
-
-            const normalizedHandle = String(sourceHandle || "success");
-            const semanticKey = `${sourceId}::${normalizedHandle}::${targetId}`;
-
-            // Every real edge is a real SCXML transition and must stay visible
-            // even when two transitions share the same event/target but differ
-            // by condition. The managed boundary-event pass below is only a
-            // fallback and must never add a second copy of an already-live edge.
-            if (isFallback && seen.has(semanticKey)) return;
-            seen.add(semanticKey);
-
-            const sourceNode = nodeById.get(sourceId);
-            const targetNode = nodeById.get(targetId);
-            // Container exits are semantic transitions from the actual skill
-            // inside the container. Mirror SCXML export naming here instead of
-            // prefixing the event with the Compound/Parallel container name.
-            const sourceSkillBase = String(
-                sourceNode?.data?.label ||
-                    sourceNode?.data?.fullSkillName ||
-                    sourceNode?.id ||
-                    ""
-            )
-                .split("#")[0]
-                .split(".")
-                .filter(Boolean)
-                .pop();
-            const rawEventName = String(rawEvent || normalizedHandle).trim();
-            const eventSuffix = getTransitionExitToken(
-                rawEventName || normalizedHandle,
-                sourceSkillBase
-            );
-            const semanticEventName = `${
-                sourceSkillBase || displayNameFor(sourceNode)
-            }.${eventSuffix || normalizedHandle}`;
-
-            result.push({
-                edgeId,
-                sourceNodeId: sourceId,
-                sourceDisplayName: displayNameFor(sourceNode),
-                eventId: normalizedHandle,
-                eventDisplayName: semanticEventName,
-                targetNodeId: targetId,
-                targetDisplayName: displayNameFor(targetNode),
-            });
-        };
-
-        // Prefer the actual transition edges. These preserve duplicate /
-        // conditional transitions and are the canonical live graph state.
-        edges.forEach((edge) => {
-            if (
-                edge.data?.boundaryInternalEdge ||
-                edge.data?.compoundInternalEdge ||
-                edge.data?.parallelInternalEdge ||
-                edge.data?.compoundInitialEdge ||
-                edge.data?.parallelEntryEdge ||
-                String(edge.id || "").startsWith("edge-internal-")
-            ) {
-                return;
-            }
-
-            appendOutgoingTransition({
-                edgeId: edge.id,
-                sourceId:
-                    edge.data?.boundaryOriginalSource ||
-                    edge.data?.compoundOriginalSource ||
-                    edge.data?.parallelOriginalSource ||
-                    edge.source,
-                sourceHandle:
-                    edge.data?.boundaryOriginalSourceHandle ||
-                    edge.data?.compoundOriginalSourceHandle ||
-                    edge.data?.parallelOriginalSourceHandle ||
-                    edge.sourceHandle ||
-                    edge.label ||
-                    "success",
-                targetId:
-                    edge.data?.boundaryOriginalTarget ||
-                    edge.data?.compoundOriginalTarget ||
-                    edge.data?.parallelOriginalTarget ||
-                    edge.target,
-                rawEvent: edge.data?.boundaryImportedRawEvent || "",
-            });
-        });
-
-        // Managed boundary events are regenerated from the same transitions by
-        // rebuildBoundaryTransitions(). Use them as a fallback as well. This
-        // makes the Compound/Parallel Exit Tokens overview robust for imported
-        // graphs and legacy edge shapes where the visual edge itself may not
-        // carry all boundary metadata yet.
-        const boundaryAnchors =
-            selectedNode.type === "compound"
-                ? [selectedNode]
-                : semanticNodes.filter(
-                    (node) =>
-                        node.type === "parallelLane" &&
-                        isInsideSelectedContainer(node.id)
-                );
-
-        boundaryAnchors.forEach((anchor) => {
-            (anchor.data?.events || []).forEach((event, index) => {
-                if (!(event?.sourceNodeId && event?.transitionHandleId && event?.target)) {
-                    return;
-                }
-
-                // Only trust managed metadata while its boundary segment still
-                // exists in the live graph. This avoids resurrecting a stale
-                // border event in the details panel after its transition was
-                // deleted.
-                const boundaryEdge = edges.find(
-                    (edge) =>
-                        edge.source === anchor.id &&
-                        String(edge.sourceHandle || "") ===
-                            String(event.id || "")
-                );
-                if (!boundaryEdge) return;
-
-                appendOutgoingTransition({
-                    edgeId:
-                        boundaryEdge.id ||
-                        `boundary-${anchor.id}-${event.id || index}`,
-                    sourceId: event.sourceNodeId,
-                    sourceHandle: event.transitionHandleId,
-                    targetId: event.target,
-                    rawEvent: event.rawEvent || event.name || "",
-                    isFallback: true,
-                });
-            });
-        });
-
-        const storedOrder = Array.isArray(selectedNode.data?.containerTransitionOrder)
-            ? selectedNode.data.containerTransitionOrder
-            : [];
-        if (storedOrder.length > 0) {
-            const orderRank = new Map(
-                storedOrder.map((edgeId, index) => [String(edgeId), index])
-            );
-            result.sort((a, b) => {
-                const aRank = orderRank.has(String(a.edgeId))
-                    ? orderRank.get(String(a.edgeId))
-                    : Number.MAX_SAFE_INTEGER;
-                const bRank = orderRank.has(String(b.edgeId))
-                    ? orderRank.get(String(b.edgeId))
-                    : Number.MAX_SAFE_INTEGER;
-                return aRank - bRank;
-            });
-        }
-
-        return result;
-    }, [selectedNode, semanticNodes, edges]);
+    const {
+        selectedSlotDetails,
+        canvasSlotPathOptions,
+        canvasSkillSlotOptions,
+        selectedContainerOutgoingTransitions,
+        editorProblems,
+        errorProblemCount,
+    } = useEditorAnalysis({
+        tabs,
+        activeTabId,
+        semanticNodes,
+        semanticSlotNodes,
+        manualSlots,
+        isDraggingNode,
+        selectedRawNode,
+        edges,
+        globalDataModel,
+        availableDataModel: availableDataModelParameters,
+        behaviorDirectories,
+    });
 
     const handleMoveContainerTransition = useCallback((edgeId, direction) => {
         if (
@@ -3216,25 +3022,7 @@ function AppContent() {
         setSlotNodes,
     ]);
 
-    const {
-        selectedSlotDetails,
-        canvasSlotPathOptions,
-        canvasSkillSlotOptions,
-        editorProblems,
-        errorProblemCount,
-    } = useEditorAnalysis({
-        tabs,
-        activeTabId,
-        semanticNodes,
-        semanticSlotNodes,
-        manualSlots,
-        isDraggingNode,
-        selectedRawNode,
-        edges,
-        globalDataModel,
-        availableDataModel: availableDataModelParameters,
-        behaviorDirectories,
-    });
+
 
     // OnEntry/OnExit has asymmetric scope for sub-state-machines:
     // - assignment location belongs to the child machine's local datamodel
