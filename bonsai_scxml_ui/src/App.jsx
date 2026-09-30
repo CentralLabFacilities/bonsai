@@ -3,8 +3,6 @@ import { createPortal } from "react-dom";
 import { FiChevronLeft, FiChevronRight, FiPlus, FiX } from "react-icons/fi";
 import {
     ReactFlowProvider,
-    useNodesState,
-    useEdgesState,
     useReactFlow,
     useUpdateNodeInternals,
     applyEdgeChanges,
@@ -55,7 +53,6 @@ import {
     getNodeSize,
     getAbsoluteNodePosition,
     orderNodesParentsFirst,
-    normalizeContainerAutoExpansion,
     resolveNodeCollisionsAndRefit,
     normalizeParallelLaneCompounds,
     normalizeCompoundInitialStates,
@@ -88,7 +85,14 @@ import { useNodeDrag } from "./hooks/useNodeDrag";
 import { useSubStateMachines } from "./hooks/useSubStateMachines";
 import { useTransitionGraph } from "./hooks/useTransitionGraph";
 import { useContainerCreation } from "./hooks/useContainerCreation";
+import { useEditorGraphState } from "./hooks/useEditorGraphState";
+import { useEditorGraphMaintenance } from "./hooks/useEditorGraphMaintenance";
 import { rebuildBoundaryTransitionsIncremental } from "./utils/boundaryTransitions";
+import {
+    isEditorCloneNode,
+    isCloneableEditorNode,
+    buildEditorCloneNode,
+} from "./utils/editorClones";
 import { isWildcardTransitionEvent } from "./utils/transitionEvents";
 import { getOverviewLayoutNodeSize } from "./utils/layoutUtils";
 import { buildRuntimeReplayContexts } from "./utils/runtimeLog";
@@ -186,107 +190,6 @@ const buildRuntimeReplayCacheKey = (text, contexts = []) => {
     return `${text.length}:${hash.toString(16)}`;
 };
 
-
-const isEditorCloneNode = (node) => Boolean(
-    node?.data?.cloneOfNodeId &&
-    (
-        node.data?.isSkillClone ||
-        node.data?.isStateClone ||
-        node.data?.isSlotClone
-    )
-);
-
-const isCloneableSkillNode = (node) => {
-    if (!node || node.type !== "custom" || isEditorCloneNode(node)) {
-        return false;
-    }
-
-    const skillName = String(node.data?.fullSkillName || node.data?.label || "")
-        .split("#")[0]
-        .split(".")
-        .pop()
-        .toLowerCase();
-
-    return !(
-        node.data?.isFinal ||
-        node.data?.isBehaviorExit ||
-        skillName === "end" ||
-        skillName === "fatal"
-    );
-};
-
-const isCloneableEditorNode = (node) => Boolean(
-    isCloneableSkillNode(node) ||
-    (node &&
-        ["submachine", "compound", "parallel", "slot"].includes(node.type) &&
-        !isEditorCloneNode(node) &&
-        !node.data?.autoParallelLaneCompound)
-);
-
-const createReferenceId = () =>
-    `ref-${crypto.randomUUID().replace(/-/g, "").slice(0, 8)}`;
-
-const buildEditorCloneNode = (sourceNode, position) => {
-    if (!isCloneableEditorNode(sourceNode)) return null;
-
-    if (sourceNode.type === "slot") {
-        return {
-            id: `slot-clone-${crypto.randomUUID()}`,
-            position,
-            type: "slot",
-            selected: true,
-            data: {
-                ...(sourceNode.data || {}),
-                cloneOfNodeId: sourceNode.id,
-                editorInstanceId: createReferenceId(),
-                isSlotClone: true,
-            },
-        };
-    }
-
-    const commonData = {
-        label: sourceNode.data?.label || sourceNode.data?.fullSkillName || "State",
-        fullSkillName:
-            sourceNode.data?.fullSkillName ||
-            sourceNode.data?.label ||
-            "State",
-        cloneOfNodeId: sourceNode.id,
-        editorInstanceId: createReferenceId(),
-        isInitial: false,
-        isFinal: false,
-        events: [],
-        inSlots: [],
-        outSlots: [],
-        params: [],
-        onEntry: [],
-        onExit: [],
-    };
-
-    if (sourceNode.type === "custom") {
-        return {
-            id: getNodeId(),
-            position,
-            type: "custom",
-            selected: true,
-            data: {
-                ...commonData,
-                isSkillClone: true,
-            },
-        };
-    }
-
-    return {
-        id: getNodeId(),
-        position,
-        type: "stateClone",
-        selected: true,
-        data: {
-            ...commonData,
-            isStateClone: true,
-            sourceNodeType: sourceNode.type,
-        },
-    };
-};
 
 const DEFAULT_BEHAVIOR_DIRECTORIES = [
     {
@@ -437,10 +340,27 @@ function AppContent() {
     }, [behaviorDirectories]);
 
     //---- TAB / GRAPH MANAGEMENT ----
-    const [nodes, setNodes, onNodesChange] = useNodesState([]);
-    const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-    const [slotNodes, setSlotNodes, onSlotNodesChange] = useNodesState([]);
-    const [slotEdges, setSlotEdges, onSlotEdgesChange] = useEdgesState([]);
+    const {
+        nodes,
+        setNodes,
+        onNodesChange,
+        edges,
+        setEdges,
+        onEdgesChange,
+        slotNodes,
+        setSlotNodes,
+        onSlotNodesChange,
+        slotEdges,
+        setSlotEdges,
+        onSlotEdgesChange,
+        manualSlots,
+        setManualSlots,
+        globalDataModel,
+        setGlobalDataModel,
+        inheritedGlobalDataModel,
+        setInheritedGlobalDataModel,
+        replaceDocument,
+    } = useEditorGraphState();
 
     // Internal graph clipboard. This intentionally does not use the system
     // clipboard: Ctrl+C copies the current React Flow selection and
@@ -676,7 +596,6 @@ function AppContent() {
         runtimePlaybackDelay,
     ]);
 
-    const [manualSlots, setManualSlots] = useState([]);
     const [isCreateSlotModalOpen, setIsCreateSlotModalOpen] = useState(false);
     const [pendingSkillPaste, setPendingSkillPaste] = useState(null);
     const pendingSkillPasteActionRef = useRef(null);
@@ -809,148 +728,15 @@ function AppContent() {
         getNodes,
     });
 
-    // Semantic node snapshots intentionally ignore position/selection changes.
-    // During an active drag the only live change is geometry, so keep the
-    // semantic snapshot completely frozen instead of scanning all nodes.
-    const semanticNodesRef = useRef([]);
-    const semanticNodesDependency = isDraggingNode ? null : nodes;
-    const semanticNodes = useMemo(() => {
-        const previous = semanticNodesRef.current;
-        if (!semanticNodesDependency) return previous;
-
-        const unchanged =
-            previous.length === semanticNodesDependency.length &&
-            semanticNodesDependency.every((node, index) => {
-                const oldNode = previous[index];
-                return (
-                    oldNode?.id === node.id &&
-                    oldNode?.type === node.type &&
-                    oldNode?.parentId === node.parentId &&
-                    oldNode?.data === node.data
-                );
-            });
-
-        if (unchanged) return previous;
-
-        const next = semanticNodesDependency.map((node) => ({
-            id: node.id,
-            type: node.type,
-            parentId: node.parentId,
-            data: node.data,
-        }));
-        semanticNodesRef.current = next;
-        return next;
-    }, [semanticNodesDependency]);
-
-    useEffect(() => {
-        if (isDraggingNode) return;
-
-        setNodes((currentNodes) => {
-            const withAutoExpansion =
-                normalizeContainerAutoExpansion(currentNodes);
-            const withParallelLaneCompounds =
-                normalizeParallelLaneCompounds(withAutoExpansion);
-
-            return normalizeCompoundInitialStates(
-                withParallelLaneCompounds
-            );
-        });
-    }, [semanticNodes, isDraggingNode, setNodes]);
-
-    useEffect(() => {
-        if (isDraggingNode) return;
-
-        const semanticNodeIds = new Set(semanticNodes.map((node) => node.id));
-        const danglingCloneIds = new Set(
-            semanticNodes
-                .filter(
-                    (node) =>
-                        isEditorCloneNode(node) &&
-                        (!node.data?.cloneOfNodeId ||
-                            !semanticNodeIds.has(node.data.cloneOfNodeId))
-                )
-                .map((node) => node.id)
-        );
-
-        if (danglingCloneIds.size > 0) {
-            setEdges((currentEdges) =>
-                currentEdges.filter(
-                    (edge) =>
-                        !danglingCloneIds.has(edge.source) &&
-                        !danglingCloneIds.has(edge.target)
-                )
-            );
-
-            if (danglingCloneIds.has(selectedNodeId)) {
-                setSelectedNodeId(null);
-            }
-        }
-
-        setNodes((currentNodes) => {
-            const byId = new Map(
-                currentNodes.map((node) => [node.id, node])
-            );
-            let changed = false;
-            const nextNodes = [];
-
-            currentNodes.forEach((node) => {
-                if (!isEditorCloneNode(node)) {
-                    nextNodes.push(node);
-                    return;
-                }
-
-                const sourceNode = byId.get(node.data?.cloneOfNodeId);
-                if (!sourceNode || isEditorCloneNode(sourceNode)) {
-                    changed = true;
-                    return;
-                }
-
-                const nextLabel = sourceNode.data?.label || node.data?.label;
-                const nextFullSkillName =
-                    sourceNode.data?.fullSkillName || node.data?.fullSkillName;
-
-                const nextSourceNodeType = node.data?.isStateClone
-                    ? sourceNode.type
-                    : node.data?.sourceNodeType;
-
-                if (
-                    node.data?.label === nextLabel &&
-                    node.data?.fullSkillName === nextFullSkillName &&
-                    node.data?.sourceNodeType === nextSourceNodeType
-                ) {
-                    nextNodes.push(node);
-                    return;
-                }
-
-                changed = true;
-                nextNodes.push({
-                    ...node,
-                    data: {
-                        ...(node.data || {}),
-                        label: nextLabel,
-                        fullSkillName: nextFullSkillName,
-                        ...(node.data?.isStateClone
-                            ? { sourceNodeType: nextSourceNodeType }
-                            : {}),
-                    },
-                });
-            });
-
-            return changed ? nextNodes : currentNodes;
-        });
-    }, [
-        semanticNodes,
+    const semanticNodes = useEditorGraphMaintenance({
+        nodes,
         isDraggingNode,
         selectedNodeId,
         setNodes,
         setEdges,
         setSelectedNodeId,
-    ]);
+    });
 
-    const [globalDataModel, setGlobalDataModel] = useState([
-        { id: "#_STATE_PREFIX", expr: "'de.unibi.citec.clf.bonsai.skills.'" },
-    ]);
-    const [inheritedGlobalDataModel, setInheritedGlobalDataModel] = useState([]);
     const [newParamId, setNewParamId] = useState("");
     const [newParamExpr, setNewParamExpr] = useState("");
 
@@ -2683,13 +2469,15 @@ function AppContent() {
                 ]);
 
                 setActiveTabId(tabId);
-                setNodes(parsedNodes);
-                setEdges(parsed.edges);
-                setSlotNodes([]);
-                setSlotEdges([]);
-                setManualSlots([]);
-                setGlobalDataModel(parsed.globalDataModel);
-                setInheritedGlobalDataModel([]);
+                replaceDocument({
+                    nodes: parsedNodes,
+                    edges: parsed.edges,
+                    slotNodes: [],
+                    slotEdges: [],
+                    manualSlots: [],
+                    globalDataModel: parsed.globalDataModel,
+                    inheritedGlobalDataModel: [],
+                });
                 setSelectedNodeId(null);
                 checkSlotConnection(
                     parsedNodes,
@@ -2736,6 +2524,7 @@ function AppContent() {
             fetchSkillData,
             hydrateSubMachineInheritedSlots,
             switchTab,
+            replaceDocument,
         ]
     );
 
