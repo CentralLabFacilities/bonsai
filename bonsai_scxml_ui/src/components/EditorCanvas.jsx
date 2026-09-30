@@ -28,7 +28,6 @@ import StateCloneNode from "./StateCloneNode";
 import ParallelLaneNode from "./ParallelLaneNode";
 import EditableTransitionEdge from "./EditableTransitionEdge";
 import CodeView from "./CodeView";
-import { isSlotEdge } from "../utils/editorGraph";
 import { prepareGraphForScxml } from "../utils/editorScxml";
 import { generateXmlString } from "../utils/scxmlExport";
 
@@ -77,15 +76,14 @@ export default function EditorCanvas({
     handleReconnectStart,
     handleReconnectEnd,
     isValidConnection,
-    selectSlotEdge,
-    selectTransitionEdge,
-    onEdgeDoubleClick,
-    clearAllEdgeSelection,
-    setSelectedNodeId,
-    setActiveTab,
-    setRightPanelTab,
-    setHoveredEditorNodeId,
-    setHoveredEditorEdgeId,
+    handleEdgeClick,
+    handleEdgeDoubleClick,
+    handleNodeClick,
+    handlePaneClick,
+    handleNodeMouseEnter,
+    handleNodeMouseLeave,
+    handleEdgeMouseEnter,
+    handleEdgeMouseLeave,
     handleContextMenuOpen,
     handleOpenSubMachine,
     handleNodeDragStart,
@@ -664,97 +662,19 @@ export default function EditorCanvas({
                     edgesReconnectable
                     isValidConnection={isValidConnection}
                     connectionMode={ConnectionMode.Loose}
-                    onEdgeClick={(event, edge) => {
-                        if (
-                            edge.data?.compoundInitialEdge ||
-                            edge.data?.parallelEntryEdge
-                        ) {
-                            return;
-                        }
-                        if (isSlotEdge(edge)) {
-                            selectSlotEdge(edge.id);
-                            return;
-                        }
-                        selectTransitionEdge(
-                            edge.id,
-                            Boolean(event.ctrlKey || event.metaKey)
-                        );
-                    }}
-                    onEdgeDoubleClick={(event, edge) => {
-                        if (
-                            edge.data?.compoundInitialEdge ||
-                            edge.data?.parallelEntryEdge
-                        ) {
-                            return;
-                        }
-                        if (isSlotEdge(edge)) {
-                            selectSlotEdge(edge.id);
-                            return;
-                        }
-                        onEdgeDoubleClick(event, edge);
-                    }}
+                    onEdgeClick={handleEdgeClick}
+                    onEdgeDoubleClick={handleEdgeDoubleClick}
                     onEdgeContextMenu={(event, edge) =>
                         handleContextMenuOpen(event, null, edge)
                     }
                     nodeTypes={nodeTypes}
                     edgeTypes={edgeTypes}
-                    onNodeClick={(_, node) => {
-                        clearAllEdgeSelection();
-
-                        const isParallelLaneStructure =
-                            node.type === "parallelLane" ||
-                            Boolean(node.data?.autoParallelLaneCompound) ||
-                            node.className === "compound-in-lane";
-
-                        if (isParallelLaneStructure) {
-                            let currentNode = node;
-                            const visited = new Set();
-
-                            while (currentNode?.parentId && !visited.has(currentNode.id)) {
-                                visited.add(currentNode.id);
-                                const parentNode = nodes.find(
-                                    (candidate) => candidate.id === currentNode.parentId
-                                );
-
-                                if (!parentNode) break;
-
-                                if (parentNode.type === "parallel") {
-                                    setSelectedNodeId(parentNode.id);
-                                    setRightPanelTab("details");
-                                    setActiveTab("allgemein");
-                                    return;
-                                }
-
-                                currentNode = parentNode;
-                            }
-                        }
-
-                        setSelectedNodeId(node.id);
-                        setRightPanelTab("details");
-                    }}
-                    onNodeMouseEnter={(_, node) => {
-                        setHoveredEditorEdgeId(null);
-                        setHoveredEditorNodeId(node.id);
-                    }}
-                    onNodeMouseLeave={(_, node) => {
-                        setHoveredEditorNodeId((current) =>
-                            current === node.id ? null : current
-                        );
-                    }}
-                    onEdgeMouseEnter={(_, edge) => {
-                        setHoveredEditorNodeId(null);
-                        setHoveredEditorEdgeId(edge.id);
-                    }}
-                    onEdgeMouseLeave={(_, edge) => {
-                        setHoveredEditorEdgeId((current) =>
-                            current === edge.id ? null : current
-                        );
-                    }}
-                    onPaneClick={() => {
-                        clearAllEdgeSelection();
-                        setSelectedNodeId(null);
-                        setRightPanelTab("datamodel");
-                    }}
+                    onNodeClick={handleNodeClick}
+                    onNodeMouseEnter={handleNodeMouseEnter}
+                    onNodeMouseLeave={handleNodeMouseLeave}
+                    onEdgeMouseEnter={handleEdgeMouseEnter}
+                    onEdgeMouseLeave={handleEdgeMouseLeave}
+                    onPaneClick={handlePaneClick}
                     onPaneContextMenu={(event) => handleContextMenuOpen(event)}
                     onNodeContextMenu={(event, node) =>
                         handleContextMenuOpen(event, node)
@@ -772,7 +692,6 @@ export default function EditorCanvas({
                     zoomOnPinch={true}
                     deleteKeyCode={["Delete"]}
                     minZoom={0.08}
-                    onlyRenderVisibleElements
                     onNodeDoubleClick={(_, node) => {
                         if (node.type === "submachine" && node.data?.src) {
                             handleOpenSubMachine(node.data.src, node.data.label);
