@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
     buildEditorProblems,
     getAncestorSlotSourcesByPath,
@@ -6,6 +6,8 @@ import {
     normalizeSlotPath,
     normalizeSlotType,
 } from "../utils/editorGraph";
+import { buildEditorValidationRequest } from "../utils/editorValidation";
+import { isTauri, validateEditorWorkflow } from "../tauri-client";
 
 export function useEditorAnalysis({
     tabs,
@@ -193,27 +195,91 @@ export function useEditorAnalysis({
         activeWorkflowTab?.sourcePath || activeWorkflowTab?.parentTabId
     );
 
-    const editorProblemsCacheRef = useRef([]);
-    const editorProblems = useMemo(() => {
-        if (isDraggingNode) {
-            return editorProblemsCacheRef.current;
-        }
-
-        const next = buildEditorProblems(
+    const validationRequest = useMemo(
+        () =>
+            buildEditorValidationRequest({
+                nodes: semanticNodes,
+                edges,
+                globalDataModel,
+                availableDataModel,
+                behaviorDirectories,
+                isBehaviorWorkflow,
+                manualSlots,
+                ancestorSlotSourcesByPath,
+                currentSlotNodes: semanticSlotNodes,
+            }),
+        [
             semanticNodes,
             edges,
             globalDataModel,
+            availableDataModel,
             behaviorDirectories,
             isBehaviorWorkflow,
             manualSlots,
             ancestorSlotSourcesByPath,
             semanticSlotNodes,
-            availableDataModel
-        );
-        editorProblemsCacheRef.current = next;
-        return next;
+        ]
+    );
+
+    const [editorProblems, setEditorProblems] = useState([]);
+    const validationRevisionRef = useRef(0);
+
+    useEffect(() => {
+        // Validation is deliberately frozen while a node is being dragged.
+        // React Flow emits many intermediate graph updates during a drag and
+        // none of those need a Rust IPC round-trip.
+        if (isDraggingNode) return undefined;
+
+        const revision = ++validationRevisionRef.current;
+        let cancelled = false;
+
+        const commitProblems = (next) => {
+            if (cancelled || revision !== validationRevisionRef.current) return;
+            setEditorProblems(next);
+        };
+
+        const validateWithJavascript = () =>
+            buildEditorProblems(
+                semanticNodes,
+                edges,
+                globalDataModel,
+                behaviorDirectories,
+                isBehaviorWorkflow,
+                manualSlots,
+                ancestorSlotSourcesByPath,
+                semanticSlotNodes,
+                availableDataModel
+            );
+
+        if (!isTauri()) {
+            commitProblems(validateWithJavascript());
+            return () => {
+                cancelled = true;
+            };
+        }
+
+        // Coalesce bursts caused by one editor operation (for example moving a
+        // state into a container updates several pieces of semantic state).
+        const timer = window.setTimeout(async () => {
+            try {
+                const next = await validateEditorWorkflow(validationRequest);
+                commitProblems(Array.isArray(next) ? next : []);
+            } catch (error) {
+                console.error(
+                    "Rust editor validation failed; using JavaScript fallback:",
+                    error
+                );
+                commitProblems(validateWithJavascript());
+            }
+        }, 40);
+
+        return () => {
+            cancelled = true;
+            window.clearTimeout(timer);
+        };
     }, [
         isDraggingNode,
+        validationRequest,
         semanticNodes,
         edges,
         globalDataModel,

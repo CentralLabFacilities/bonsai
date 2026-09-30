@@ -239,3 +239,19 @@ export async function serializeScxmlWorkflow(workflow) {
     workflow,
   });
 }
+
+/**
+ * Validate the current editor state in Rust.
+ *
+ * The request is deliberately a small semantic snapshot rather than React
+ * Flow nodes. This keeps callbacks, geometry and transient UI state out of IPC.
+ */
+export async function validateEditorWorkflow(request) {
+  if (!isTauri()) {
+    throw new Error('Rust editor validation is only available in the Tauri app.');
+  }
+
+  return await invoke('validate_editor_workflow', {
+    request,
+  });
+}
