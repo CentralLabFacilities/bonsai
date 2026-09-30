@@ -96,10 +96,10 @@ import { rebuildBoundaryTransitionsIncremental } from "./utils/boundaryTransitio
 import { isWildcardTransitionEvent } from "./utils/transitionEvents";
 import { getOverviewLayoutNodeSize } from "./utils/layoutUtils";
 import {
-    parseSkillStateMachineLog,
     buildRuntimeReplayContexts,
     prepareRuntimeReplayCache,
 } from "./utils/runtimeLog";
+import { parseRuntimeLogForReplay } from "./utils/runtimeRust";
 import "./App.css";
 
 // Initialize API proxy for Tauri desktop mode (intercepts /api/* fetch calls)
@@ -576,7 +576,7 @@ function AppContent() {
                 if (runtimeLoadRequestRef.current !== requestId) return;
 
                 parsed = {
-                    ...parseSkillStateMachineLog(text),
+                    ...(await parseRuntimeLogForReplay(text)),
                     fileName,
                 };
 

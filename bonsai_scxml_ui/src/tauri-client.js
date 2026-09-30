@@ -285,3 +285,19 @@ export async function analyzeEditorTransitions(request) {
   });
 }
 
+
+/**
+ * Parse a SkillStateMachine runtime log in Rust.
+ *
+ * The returned object intentionally matches parseSkillStateMachineLog() from
+ * runtimeLog.js so the replay resolver can be migrated independently.
+ */
+export async function parseRuntimeLogText(text) {
+  if (!isTauri()) {
+    throw new Error('Rust runtime-log parsing is only available in the Tauri app.');
+  }
+
+  return await invoke('parse_runtime_log_text', {
+    text: String(text || ''),
+  });
+}

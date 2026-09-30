@@ -18,7 +18,8 @@ fn main() {
             commands::workflows::serialize_scxml_workflow,
             commands::validation::validate_editor_workflow,
             commands::slots::resolve_editor_slot_ancestry,
-            commands::transitions::analyze_editor_transitions
+            commands::transitions::analyze_editor_transitions,
+            commands::runtime::parse_runtime_log_text
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
