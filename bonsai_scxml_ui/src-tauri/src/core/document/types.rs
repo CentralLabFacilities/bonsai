@@ -66,14 +66,6 @@ pub(crate) struct WorkflowPatchDto {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct WorkflowCommandResultDto {
     pub revision: u64,
-    /// Retained for compatibility while the frontend migrates to the concrete
-    /// patch payload below.
-    #[serde(default)]
-    pub changed_state_ids: Vec<String>,
-    #[serde(default)]
-    pub changed_transition_ids: Vec<String>,
-    #[serde(default)]
-    pub data_model_changed: bool,
     pub patch: WorkflowPatchDto,
 }
 
@@ -243,11 +235,6 @@ pub(crate) enum WorkflowCommandDto {
         #[serde(default)]
         positions: Vec<EditorPositionDto>,
     },
-    SetStateLabel {
-        #[serde(rename = "stateId")]
-        state_id: String,
-        label: String,
-    },
     SetStateSource {
         #[serde(rename = "stateId")]
         state_id: String,
@@ -271,21 +258,6 @@ pub(crate) enum WorkflowCommandDto {
         #[serde(rename = "extraSlotDeclarations")]
         extra_slot_declarations: Vec<EditorExportSlotDeclarationDto>,
     },
-    UpdateTransitionEvent {
-        #[serde(rename = "transitionId")]
-        transition_id: String,
-        event: String,
-    },
-    UpdateTransitionTarget {
-        #[serde(rename = "transitionId")]
-        transition_id: String,
-        #[serde(default)]
-        #[serde(rename = "targetStateId")]
-        target_state_id: Option<String>,
-        #[serde(default)]
-        #[serde(rename = "targetInstanceId")]
-        target_instance_id: Option<String>,
-    },
     ReplaceTargetedTransitions {
         #[serde(rename = "sourceStateId")]
         source_state_id: String,
@@ -293,12 +265,6 @@ pub(crate) enum WorkflowCommandDto {
         transitions: Vec<TargetedTransitionCommandDto>,
     },
     ReplaceEditorTransitions {
-        #[serde(default)]
-        nodes: Vec<EditorExportNodeDto>,
-        #[serde(default)]
-        edges: Vec<EditorExportEdgeDto>,
-    },
-    ReplaceEditorStructure {
         #[serde(default)]
         nodes: Vec<EditorExportNodeDto>,
         #[serde(default)]

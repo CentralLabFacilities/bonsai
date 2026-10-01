@@ -41,8 +41,6 @@ const getCanonicalPatchPolicy = (command) => {
             return { stateMode: "initial", applyTransitions: false };
         case "renameState":
             return { stateMode: "identity", applyTransitions: true };
-        case "setStateLabel":
-            return { stateMode: "label", applyTransitions: false };
         case "setStateSource":
             return { stateMode: "source", applyTransitions: false };
         case "updateStateEditorPosition":
@@ -54,8 +52,6 @@ const getCanonicalPatchPolicy = (command) => {
             return { stateMode: "slots", applyTransitions: false };
         case "replaceDataModel":
             return { stateMode: "none", applyTransitions: false };
-        case "updateTransitionEvent":
-        case "updateTransitionTarget":
         case "replaceTargetedTransitions":
         case "replaceEditorTransitions":
             return { stateMode: "none", applyTransitions: true };

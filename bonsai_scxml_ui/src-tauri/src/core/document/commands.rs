@@ -105,9 +105,6 @@ pub(crate) fn apply_command(
             state_id,
             positions,
         } => replace_state_editor_positions(workflow, index, state_id, positions),
-        WorkflowCommandDto::SetStateLabel { state_id, label } => {
-            set_state_label(workflow, index, state_id, label)
-        }
         WorkflowCommandDto::SetStateSource { state_id, source } => {
             set_state_source(workflow, index, state_id, source)
         }
@@ -131,21 +128,6 @@ pub(crate) fn apply_command(
             states,
             extra_slot_declarations,
         ),
-        WorkflowCommandDto::UpdateTransitionEvent {
-            transition_id,
-            event,
-        } => update_transition_event(workflow, index, transition_id, event),
-        WorkflowCommandDto::UpdateTransitionTarget {
-            transition_id,
-            target_state_id,
-            target_instance_id,
-        } => update_transition_target(
-            workflow,
-            index,
-            transition_id,
-            target_state_id,
-            target_instance_id,
-        ),
         WorkflowCommandDto::ReplaceTargetedTransitions {
             source_state_id,
             transitions,
@@ -157,9 +139,6 @@ pub(crate) fn apply_command(
         ),
         WorkflowCommandDto::ReplaceEditorTransitions { nodes, edges } => {
             replace_editor_transitions(workflow, nodes, edges)
-        },
-        WorkflowCommandDto::ReplaceEditorStructure { nodes, edges } => {
-            replace_editor_structure(workflow, nodes, edges)
         },
     }
 }
@@ -237,72 +216,6 @@ fn editor_edge_targets_equal(
                 && left.occurrence == right.occurrence
                 && left.target_instance_id == right.target_instance_id
         })
-}
-
-fn replace_editor_structure(
-    workflow: &mut Workflow,
-    nodes: Vec<EditorExportNodeDto>,
-    edges: Vec<EditorExportEdgeDto>,
-) -> Result<WorkflowCommandChanges, String> {
-    let previous_state_ids = workflow
-        .states
-        .iter()
-        .map(|state| state.id.as_str().to_string())
-        .collect::<HashSet<_>>();
-    let previous_transition_ids = workflow
-        .transitions
-        .iter()
-        .map(|transition| transition.id.as_str().to_string())
-        .collect::<HashSet<_>>();
-
-    // Structural editor mutations intentionally do not carry workflow-global
-    // datamodel/manual-slot payloads. Rebuild SCXML ownership (parents,
-    // parallel-lane flattening and container-hoisted transitions) from the
-    // normalized editor graph, then retain those unrelated document sections
-    // from the already-loaded Rust workflow.
-    let preserved_name = workflow.name.clone();
-    let preserved_data_model = workflow.data_model.clone();
-    let preserved_slot_declarations = workflow.slot_declarations.clone();
-
-    let mut rebuilt = build_workflow_from_editor(&EditorExportRequestDto {
-        nodes,
-        edges,
-        data_model: Vec::new(),
-        extra_slot_declarations: Vec::new(),
-    })?;
-    rebuilt.name = preserved_name;
-    rebuilt.data_model = preserved_data_model;
-    rebuilt.slot_declarations = preserved_slot_declarations;
-
-    let mut changed_state_ids = previous_state_ids;
-    changed_state_ids.extend(
-        rebuilt
-            .states
-            .iter()
-            .map(|state| state.id.as_str().to_string()),
-    );
-    let mut changed_state_ids = changed_state_ids.into_iter().collect::<Vec<_>>();
-    changed_state_ids.sort();
-
-    let mut changed_transition_ids = previous_transition_ids;
-    changed_transition_ids.extend(
-        rebuilt
-            .transitions
-            .iter()
-            .map(|transition| transition.id.as_str().to_string()),
-    );
-    let mut changed_transition_ids =
-        changed_transition_ids.into_iter().collect::<Vec<_>>();
-    changed_transition_ids.sort();
-
-    *workflow = rebuilt;
-
-    Ok(WorkflowCommandChanges {
-        changed_state_ids,
-        changed_transition_ids,
-        index_changed: true,
-        ..WorkflowCommandChanges::default()
-    })
 }
 
 fn replace_state_parameters(
@@ -1158,23 +1071,6 @@ fn replace_state_editor_positions(
     })
 }
 
-fn set_state_label(
-    workflow: &mut Workflow,
-    index: &WorkflowIndex,
-    state_id: String,
-    label: String,
-) -> Result<WorkflowCommandChanges, String> {
-    let id = StateId::from(state_id);
-    let position = index
-        .state_position(&id)
-        .ok_or_else(|| format!("Unknown state '{id}'"))?;
-    workflow.states[position].label = label;
-    Ok(WorkflowCommandChanges {
-        changed_state_ids: vec![id.as_str().to_string()],
-        ..WorkflowCommandChanges::default()
-    })
-}
-
 fn set_state_source(
     workflow: &mut Workflow,
     index: &WorkflowIndex,
@@ -1192,57 +1088,6 @@ fn set_state_source(
     })
 }
 
-fn update_transition_event(
-    workflow: &mut Workflow,
-    index: &WorkflowIndex,
-    transition_id: String,
-    event: String,
-) -> Result<WorkflowCommandChanges, String> {
-    let id = TransitionId::from(transition_id);
-    let position = index
-        .transition_position(&id)
-        .ok_or_else(|| format!("Unknown transition '{id}'"))?;
-    workflow.transitions[position].event = event;
-    Ok(WorkflowCommandChanges {
-        changed_transition_ids: vec![id.as_str().to_string()],
-        ..WorkflowCommandChanges::default()
-    })
-}
-
-fn update_transition_target(
-    workflow: &mut Workflow,
-    index: &WorkflowIndex,
-    transition_id: String,
-    target_state_id: Option<String>,
-    target_instance_id: Option<String>,
-) -> Result<WorkflowCommandChanges, String> {
-    let transition_id = TransitionId::from(transition_id);
-    let position = index
-        .transition_position(&transition_id)
-        .ok_or_else(|| format!("Unknown transition '{transition_id}'"))?;
-
-    let target_id = target_state_id.map(StateId::from);
-    let target_scxml_id = if let Some(id) = target_id.as_ref() {
-        index
-            .state(workflow, id)
-            .ok_or_else(|| format!("Unknown transition target state '{id}'"))?
-            .scxml_id
-            .clone()
-    } else {
-        String::new()
-    };
-
-    let transition = &mut workflow.transitions[position];
-    transition.target_state_id = target_id;
-    transition.target_scxml_id = target_scxml_id;
-    transition.target_instance_id = target_instance_id;
-
-    Ok(WorkflowCommandChanges {
-        changed_transition_ids: vec![transition_id.as_str().to_string()],
-        index_changed: true,
-        ..WorkflowCommandChanges::default()
-    })
-}
 fn replace_targeted_transitions(
     workflow: &mut Workflow,
     index: &WorkflowIndex,

@@ -59,25 +59,3 @@ export const getTransitionExitToken = (rawEvent, sourceSkillName = "") => {
     // unchanged when no source prefix can be identified safely.
     return eventName;
 };
-
-/**
- * Convert a UI exit-token id back to the SCXML event name for a skill node.
- */
-export const getScxmlTransitionEvent = (exitToken, sourceSkillName) => {
-    const token = String(exitToken || "success").trim() || "success";
-    const sourceWithoutInstance = String(sourceSkillName || "").split("#")[0];
-    const skillBaseName = sourceWithoutInstance.split(".").filter(Boolean).pop() || sourceWithoutInstance;
-
-    if (!skillBaseName) return token;
-
-    // Keep an event that is already explicitly prefixed with this skill.
-    if (token === skillBaseName || token.startsWith(`${skillBaseName}.`)) {
-        return token;
-    }
-
-    if (token === "*") {
-        return `${skillBaseName}.*`;
-    }
-
-    return `${skillBaseName}.${token}`;
-};

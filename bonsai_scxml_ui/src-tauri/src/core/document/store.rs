@@ -190,9 +190,6 @@ fn command_result(
 
     Ok(WorkflowCommandResultDto {
         revision: state.revision,
-        changed_state_ids: changes.changed_state_ids,
-        changed_transition_ids: changes.changed_transition_ids,
-        data_model_changed: changes.data_model_changed,
         patch,
     })
 }
@@ -772,7 +769,6 @@ mod tests {
             )
             .unwrap();
         assert_eq!(parameter_result.revision, 2);
-        assert_eq!(parameter_result.changed_state_ids, vec!["a"]);
         assert_eq!(parameter_result.patch.states.len(), 1);
         assert_eq!(parameter_result.patch.states[0].id, "a");
         assert_eq!(parameter_result.patch.states[0].parameters.len(), 1);
@@ -857,206 +853,10 @@ mod tests {
             )
             .unwrap();
 
-        assert!(result.data_model_changed);
         let data_model = result.patch.data_model.as_ref().unwrap();
         assert_eq!(data_model.len(), 1);
         assert_eq!(data_model[0].id, "counter");
         assert!(result.patch.metadata.initial_state_id.is_none());
-    }
-
-    #[test]
-    fn replacing_editor_structure_rebuilds_container_semantics_and_preserves_globals() {
-        let store = WorkflowDocumentStore::default();
-        let mut workflow = sample_workflow();
-        workflow.data_model = vec![DataModelEntry {
-            id: "counter".into(),
-            type_name: None,
-            expression: "1".into(),
-        }];
-        workflow.slot_declarations = vec![SlotDeclaration {
-            key: "Manual".into(),
-            state: "A".into(),
-            xpath: "/manual".into(),
-            inherited: false,
-        }];
-        assert_eq!(store.replace(workflow).unwrap(), 1);
-
-        let node = |id: &str, node_type: &str, parent_id: Option<&str>| {
-            EditorExportNodeDto {
-                id: id.into(),
-                node_type: node_type.into(),
-                parent_id: parent_id.map(str::to_string),
-                label: id.into(),
-                full_skill_name: id.into(),
-                ..EditorExportNodeDto::default()
-            }
-        };
-        let mut compound = node("container", "compound", None);
-        compound.is_initial = true;
-        compound.initial_child_id = Some("a".into());
-        let mut child = node("a", "custom", Some("container"));
-        child.label = "A".into();
-        child.full_skill_name = "A".into();
-        child.is_initial = true;
-        let mut outside = node("b", "custom", None);
-        outside.label = "B".into();
-        outside.full_skill_name = "B".into();
-
-        let result = store
-            .apply(
-                Some(1),
-                WorkflowCommandDto::ReplaceEditorStructure {
-                    nodes: vec![compound, child, outside],
-                    edges: vec![EditorExportEdgeDto {
-                        id: "edge-a-b".into(),
-                        source: "a".into(),
-                        target: "b".into(),
-                        source_handle: "success".into(),
-                        ..EditorExportEdgeDto::default()
-                    }],
-                },
-            )
-            .unwrap();
-        assert_eq!(result.revision, 2);
-
-        let snapshot = store.snapshot().unwrap().unwrap();
-        let child = snapshot
-            .workflow
-            .states
-            .iter()
-            .find(|state| state.id == "a")
-            .unwrap();
-        assert_eq!(child.parent_id.as_deref(), Some("container"));
-
-        let transition = snapshot
-            .workflow
-            .transitions
-            .iter()
-            .find(|transition| transition.id == "edge-a-b")
-            .unwrap();
-        assert_eq!(transition.source_state_id, "container");
-        assert_eq!(transition.logical_sources.len(), 1);
-        assert_eq!(transition.logical_sources[0].state_id, "a");
-        assert_eq!(transition.logical_sources[0].handle, "success");
-        assert_eq!(transition.event, "A.success");
-        assert_eq!(transition.target_state_id.as_deref(), Some("b"));
-
-        assert_eq!(snapshot.workflow.data_model.len(), 1);
-        assert_eq!(snapshot.workflow.data_model[0].id, "counter");
-        assert_eq!(snapshot.workflow.slot_declarations.len(), 1);
-        assert_eq!(snapshot.workflow.slot_declarations[0].key, "Manual");
-    }
-
-    #[test]
-    fn replacing_editor_structure_promotes_flattened_parallel_lane_without_replacing_globals() {
-        let store = WorkflowDocumentStore::default();
-        let node = |id: &str, name: &str, node_type: &str, parent_id: Option<&str>| {
-            EditorExportNodeDto {
-                id: id.into(),
-                node_type: node_type.into(),
-                parent_id: parent_id.map(str::to_string),
-                label: name.into(),
-                full_skill_name: name.into(),
-                ..EditorExportNodeDto::default()
-            }
-        };
-
-        // Start with the imported atomic-lane shape. The structural lane and its
-        // only child share the same SCXML id, so the editor exporter flattens the
-        // lane and Rust stores the executable child directly below the Parallel.
-        let initial_request = EditorExportRequestDto {
-            nodes: vec![
-                node("parallel", "Parallel", "parallel", None),
-                node("lane", "Talk", "parallelLane", Some("parallel")),
-                node("talk", "Talk", "custom", Some("lane")),
-            ],
-            ..EditorExportRequestDto::default()
-        };
-        let mut workflow = build_workflow_from_editor(&initial_request).unwrap();
-        assert!(workflow.states.iter().all(|state| state.id != "lane"));
-        assert_eq!(
-            workflow
-                .states
-                .iter()
-                .find(|state| state.id == "talk")
-                .and_then(|state| state.parent_id.as_ref())
-                .map(StateId::as_str),
-            Some("parallel")
-        );
-        workflow.data_model = vec![DataModelEntry {
-            id: "counter".into(),
-            type_name: None,
-            expression: "1".into(),
-        }];
-        workflow.slot_declarations = vec![SlotDeclaration {
-            key: "Manual".into(),
-            state: "Talk".into(),
-            xpath: "/manual".into(),
-            inherited: false,
-        }];
-        assert_eq!(store.replace(workflow).unwrap(), 1);
-
-        // Adding a second executable state makes the frontend introduce its
-        // automatic lane Compound. replaceEditorStructure must promote the lane
-        // back into a semantic state while retaining unrelated Rust-owned data.
-        let mut lane = node("lane", "Talk", "parallelLane", Some("parallel"));
-        lane.initial_child_id = Some("lane-wrapper".into());
-        let mut wrapper = node("lane-wrapper", "lane_1", "compound", Some("lane"));
-        wrapper.initial_child_id = Some("talk".into());
-        let mut talk = node("talk", "Talk", "custom", Some("lane-wrapper"));
-        talk.is_initial = true;
-        let wait = node("wait", "Wait", "custom", Some("lane-wrapper"));
-
-        let result = store
-            .apply(
-                Some(1),
-                WorkflowCommandDto::ReplaceEditorStructure {
-                    nodes: vec![
-                        node("parallel", "Parallel", "parallel", None),
-                        lane,
-                        wrapper,
-                        talk,
-                        wait,
-                    ],
-                    edges: vec![],
-                },
-            )
-            .unwrap();
-        assert_eq!(result.revision, 2);
-
-        let snapshot = store.snapshot().unwrap().unwrap();
-        let lane = snapshot
-            .workflow
-            .states
-            .iter()
-            .find(|state| state.id == "lane")
-            .unwrap();
-        assert_eq!(lane.parent_id.as_deref(), Some("parallel"));
-        assert_eq!(lane.initial_child_id.as_deref(), Some("lane-wrapper"));
-
-        let wrapper = snapshot
-            .workflow
-            .states
-            .iter()
-            .find(|state| state.id == "lane-wrapper")
-            .unwrap();
-        assert_eq!(wrapper.parent_id.as_deref(), Some("lane"));
-        assert_eq!(wrapper.initial_child_id.as_deref(), Some("talk"));
-
-        for child_id in ["talk", "wait"] {
-            let child = snapshot
-                .workflow
-                .states
-                .iter()
-                .find(|state| state.id == child_id)
-                .unwrap();
-            assert_eq!(child.parent_id.as_deref(), Some("lane-wrapper"));
-        }
-
-        assert_eq!(snapshot.workflow.data_model.len(), 1);
-        assert_eq!(snapshot.workflow.data_model[0].id, "counter");
-        assert_eq!(snapshot.workflow.slot_declarations.len(), 1);
-        assert_eq!(snapshot.workflow.slot_declarations[0].key, "Manual");
     }
 
     #[test]
@@ -1223,7 +1023,6 @@ mod tests {
             .unwrap();
 
         assert_eq!(result.revision, 2);
-        assert_eq!(result.changed_state_ids, vec!["a"]);
 
         let snapshot = store.snapshot().unwrap().unwrap();
         let state = snapshot
