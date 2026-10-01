@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import {
     growAllStateContainersToContents,
-    normalizeCompoundInitialStates,
     normalizeContainerAutoExpansion,
-    normalizeParallelLaneCompounds,
 } from "../utils/editorGeometry";
 
 const cloneGraphValue = (value) => {
@@ -363,16 +361,12 @@ export function useEditorHistory({
         }
         applyingHistoryRef.current = true;
 
-        const restoredNodes = normalizeCompoundInitialStates(
-            growAllStateContainersToContents(
-                normalizeParallelLaneCompounds(
-                    normalizeContainerAutoExpansion(
-                        cloneGraphValue(snapshot.nodes || []).map((node) => ({
-                            ...node,
-                            selected: false,
-                        }))
-                    )
-                )
+        const restoredNodes = growAllStateContainersToContents(
+            normalizeContainerAutoExpansion(
+                cloneGraphValue(snapshot.nodes || []).map((node) => ({
+                    ...node,
+                    selected: false,
+                }))
             )
         );
 

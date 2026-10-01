@@ -34,6 +34,12 @@ pub(crate) struct ParallelLaneEditorPatchDto {
     pub initial_child_id: Option<String>,
     #[serde(default)]
     pub member_state_ids: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wrapper_state_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wrapper_label: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wrapper_initial_child_id: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -103,6 +109,17 @@ pub(crate) struct ParallelLaneMoveContextDto {
     pub member_state_ids: Vec<String>,
 }
 
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct WrapEditorGroupDto {
+    #[serde(default)]
+    pub lane: Option<ParallelLaneMoveContextDto>,
+    #[serde(default)]
+    #[serde(rename = "stateIds")]
+    pub state_ids: Vec<String>,
+}
+
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct StateSlotsCommandDto {
@@ -164,6 +181,14 @@ pub(crate) enum WorkflowCommandDto {
         target_lane: Option<ParallelLaneMoveContextDto>,
         x: f64,
         y: f64,
+    },
+    ReconcileParallelLane {
+        context: ParallelLaneMoveContextDto,
+    },
+    WrapEditorStates {
+        container: EditorExportNodeDto,
+        #[serde(default)]
+        groups: Vec<WrapEditorGroupDto>,
     },
     RemoveStates {
         #[serde(default)]

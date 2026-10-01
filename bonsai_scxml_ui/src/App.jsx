@@ -341,6 +341,8 @@ function AppContent() {
         applyWorkflowCommand: rustWorkflowDocument.applyWorkflowCommand,
         syncEditorStructureAfterCommit:
             rustWorkflowDocument.syncEditorStructureAfterCommit,
+        syncInsertedParallelLaneStateAfterCommit:
+            rustWorkflowDocument.syncInsertedParallelLaneStateAfterCommit,
         syncStateEditorPositions:
             rustWorkflowDocument.syncStateEditorPositions,
         syncTransitionsForSource:
@@ -550,10 +552,10 @@ function AppContent() {
         setActiveTab,
         setContextMenu,
         updateNodeInternals,
-        syncEditorStructureAfterCommit:
-            rustWorkflowDocument.syncEditorStructureAfterCommit,
         syncInsertedEditorStatesAfterCommit:
             rustWorkflowDocument.syncInsertedEditorStatesAfterCommit,
+        syncWrappedContainerAfterCommit:
+            rustWorkflowDocument.syncWrappedContainerAfterCommit,
     });
 
     const {
@@ -1246,10 +1248,10 @@ function AppContent() {
         getNodes,
         setNodes,
         setSelectedNodeId,
-        syncEditorStructureAfterCommit:
-            rustWorkflowDocument.syncEditorStructureAfterCommit,
         syncInsertedEditorStatesAfterCommit:
             rustWorkflowDocument.syncInsertedEditorStatesAfterCommit,
+        syncInsertedParallelLaneStateAfterCommit:
+            rustWorkflowDocument.syncInsertedParallelLaneStateAfterCommit,
     });
 
     const {

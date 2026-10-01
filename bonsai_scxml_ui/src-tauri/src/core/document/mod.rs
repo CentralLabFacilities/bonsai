@@ -2,6 +2,7 @@ mod commands;
 mod reparent;
 mod store;
 mod types;
+mod wrap;
 
 pub(crate) use store::WorkflowDocumentStore;
 pub(crate) use types::{

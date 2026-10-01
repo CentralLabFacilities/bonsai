@@ -29,8 +29,8 @@ export function useEditorLibraryDrop({
     getNodes,
     setNodes,
     setSelectedNodeId,
-    syncEditorStructureAfterCommit,
     syncInsertedEditorStatesAfterCommit,
+    syncInsertedParallelLaneStateAfterCommit,
 }) {
     const handleLibraryDragOver = useCallback(
         (event) => {
@@ -233,35 +233,16 @@ export function useEditorLibraryDrop({
                     );
                 });
 
-                const isFirstLaneState = existingMembers.length === 0;
                 newNode.parentId = targetLane.id;
                 newNode.extent = "parent";
                 newNode.position = {
                     x: newX,
                     y: PARALLEL_LANE_CHILD_TOP_INSET,
                 };
-                newNode.data = {
-                    ...(newNode.data || {}),
-                    isInitial: isFirstLaneState,
-                };
-
                 const parallelId = targetLane.parentId;
 
                 setNodes((currentNodes) => {
-                    let nextNodes = [
-                        ...currentNodes.map((candidate) =>
-                            candidate.id === targetLane.id && isFirstLaneState
-                                ? {
-                                    ...candidate,
-                                    data: {
-                                        ...(candidate.data || {}),
-                                        initialChildId: newNode.id,
-                                    },
-                                }
-                                : candidate
-                        ),
-                        newNode,
-                    ];
+                    let nextNodes = [...currentNodes, newNode];
 
                     const parallel = nextNodes.find(
                         (node) => node.id === parallelId
@@ -386,7 +367,10 @@ export function useEditorLibraryDrop({
 
                 setSelectedNodeId(newNode.id);
                 refreshBehaviorSlots();
-                void syncEditorStructureAfterCommit();
+                void syncInsertedParallelLaneStateAfterCommit?.(
+                    newNode.id,
+                    targetLane.id
+                );
                 return;
             }
 
@@ -417,8 +401,8 @@ export function useEditorLibraryDrop({
             setNodes,
             setParallelDropTargetId,
             setSelectedNodeId,
-            syncEditorStructureAfterCommit,
             syncInsertedEditorStatesAfterCommit,
+            syncInsertedParallelLaneStateAfterCommit,
         ]
     );
 

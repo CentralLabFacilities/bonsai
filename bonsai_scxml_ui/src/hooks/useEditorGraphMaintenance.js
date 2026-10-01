@@ -1,9 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
-import {
-    normalizeContainerAutoExpansion,
-    normalizeParallelLaneCompounds,
-    normalizeCompoundInitialStates,
-} from "../utils/editorGeometry";
+import { normalizeContainerAutoExpansion } from "../utils/editorGeometry";
 import { isEditorCloneNode } from "../utils/editorClones";
 
 /**
@@ -54,14 +50,7 @@ export function useEditorGraphMaintenance({
         if (isDraggingNode) return;
 
         setNodes((currentNodes) => {
-            const withAutoExpansion =
-                normalizeContainerAutoExpansion(currentNodes);
-            const withParallelLaneCompounds =
-                normalizeParallelLaneCompounds(withAutoExpansion);
-
-            return normalizeCompoundInitialStates(
-                withParallelLaneCompounds
-            );
+            return normalizeContainerAutoExpansion(currentNodes);
         });
     }, [semanticNodes, isDraggingNode, setNodes]);
 

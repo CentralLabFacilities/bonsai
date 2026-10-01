@@ -254,12 +254,77 @@ export const applyRustWorkflowStatePatch = (
 
     if (mode === "move" && parallelLaneUpdates.size > 0) {
         const laneMembers = new Map();
+
         parallelLaneUpdates.forEach((lane, laneId) => {
-            const initialChildId = lane?.initialChildId
-                ? String(lane.initialChildId)
+            const wrapperStateId = lane?.wrapperStateId
+                ? String(lane.wrapperStateId)
                 : null;
+            const semanticInitialChildId = lane?.wrapperInitialChildId
+                ? String(lane.wrapperInitialChildId)
+                : lane?.initialChildId
+                    ? String(lane.initialChildId)
+                    : null;
+
+            if (wrapperStateId) {
+                const wrapperExists = nextNodes.some(
+                    (node) => String(node?.id || "") === wrapperStateId
+                );
+                if (!wrapperExists) {
+                    const laneNode = nextNodes.find(
+                        (node) => String(node?.id || "") === laneId
+                    );
+                    const laneIndex = nextNodes.findIndex(
+                        (node) => String(node?.id || "") === laneId
+                    );
+                    const canonicalWrapper = changedById.get(wrapperStateId);
+                    const wrapperNode = {
+                        id: wrapperStateId,
+                        type: "compound",
+                        parentId: laneId,
+                        extent: "parent",
+                        expandParent: true,
+                        draggable: false,
+                        selectable: false,
+                        position: { x: 0, y: 0 },
+                        style: {
+                            width: Number(laneNode?.style?.width) || 420,
+                            height: Number(laneNode?.style?.height) || 140,
+                        },
+                        data: {
+                            label:
+                                lane?.wrapperLabel ||
+                                canonicalWrapper?.label ||
+                                "lane",
+                            fullSkillName:
+                                canonicalWrapper?.fullSkillName ||
+                                lane?.wrapperLabel ||
+                                "lane",
+                            isInitial: false,
+                            initialChildId:
+                                lane?.wrapperInitialChildId ||
+                                canonicalWrapper?.initialChildId ||
+                                null,
+                            events: [],
+                            onEntry: [],
+                            onExit: [],
+                            autoParallelLaneCompound: true,
+                        },
+                    };
+                    nextNodes.splice(
+                        laneIndex >= 0 ? laneIndex + 1 : nextNodes.length,
+                        0,
+                        wrapperNode
+                    );
+                    changed = true;
+                }
+            }
+
             for (const memberId of lane?.memberStateIds || []) {
-                laneMembers.set(String(memberId), { laneId, initialChildId });
+                laneMembers.set(String(memberId), {
+                    laneId,
+                    wrapperStateId,
+                    initialChildId: semanticInitialChildId,
+                });
             }
         });
 
@@ -279,18 +344,27 @@ export const applyRustWorkflowStatePatch = (
             }
 
             const membership = laneMembers.get(String(node?.id || ""));
-            if (membership && node?.parentId === membership.laneId) {
-                const isInitial = node.id === membership.initialChildId;
-                if (Boolean(node?.data?.isInitial) !== isInitial) {
-                    nextNodes[index] = {
-                        ...node,
-                        data: {
-                            ...(node.data || {}),
-                            isInitial,
-                        },
-                    };
-                    changed = true;
-                }
+            if (!membership) continue;
+
+            const desiredParentId =
+                membership.wrapperStateId || membership.laneId;
+            const isInitial = node.id === membership.initialChildId;
+            if (
+                node?.parentId !== desiredParentId ||
+                Boolean(node?.data?.isInitial) !== isInitial ||
+                node?.extent !== "parent"
+            ) {
+                nextNodes[index] = {
+                    ...node,
+                    parentId: desiredParentId,
+                    extent: "parent",
+                    expandParent: true,
+                    data: {
+                        ...(node.data || {}),
+                        isInitial,
+                    },
+                };
+                changed = true;
             }
         }
     }

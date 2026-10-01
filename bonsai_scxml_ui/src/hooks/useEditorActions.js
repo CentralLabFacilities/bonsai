@@ -18,7 +18,8 @@ export function useEditorActions(options) {
         setRightPanelTab: options.setRightPanelTab,
         setActiveTab: options.setActiveTab,
         applyWorkflowCommand: options.applyWorkflowCommand,
-        syncEditorStructureAfterCommit: options.syncEditorStructureAfterCommit,
+        syncInsertedParallelLaneStateAfterCommit:
+            options.syncInsertedParallelLaneStateAfterCommit,
         syncStateEditorPositions: options.syncStateEditorPositions,
     });
 
@@ -40,7 +41,7 @@ export function useEditorActions(options) {
         setEdges: options.setEdges,
         checkSlotConnection: options.checkSlotConnection,
         applyWorkflowCommand: options.applyWorkflowCommand,
-        syncEditorStateAfterCommit: options.syncEditorStateAfterCommit,
+        syncEditorStructureAfterCommit: options.syncEditorStructureAfterCommit,
         syncStateParameters: options.syncStateParameters,
         syncSlotsAfterCommit: options.syncSlotsAfterCommit,
     });

@@ -202,6 +202,7 @@ mod tests {
     use super::*;
     use super::super::types::{
         ParallelLaneMoveContextDto, StateSlotsCommandDto, TargetedTransitionCommandDto,
+        WrapEditorGroupDto,
     };
     use crate::core::editor_export::{
         build_workflow_from_editor,
@@ -1373,7 +1374,138 @@ mod tests {
 
 
     #[test]
-    fn moving_state_into_atomic_parallel_lane_promotes_and_demotes_lane_in_rust() {
+    fn wrapping_states_in_compound_is_owned_by_rust() {
+        let store = WorkflowDocumentStore::default();
+        let mut workflow = sample_workflow();
+        workflow.initial_state_id = Some(StateId::from("a"));
+        workflow.initial_scxml_state_id = Some("A".into());
+        workflow.states[0].is_initial = true;
+        assert_eq!(store.replace(workflow).unwrap(), 1);
+
+        let result = store
+            .apply(
+                Some(1),
+                WorkflowCommandDto::WrapEditorStates {
+                    container: EditorExportNodeDto {
+                        id: "compound".into(),
+                        node_type: "compound".into(),
+                        label: "compound_1".into(),
+                        full_skill_name: "compound_1".into(),
+                        x: 20.0,
+                        y: 30.0,
+                        ..EditorExportNodeDto::default()
+                    },
+                    groups: vec![WrapEditorGroupDto {
+                        lane: None,
+                        state_ids: vec!["a".into(), "b".into()],
+                    }],
+                },
+            )
+            .unwrap();
+
+        assert_eq!(result.revision, 2);
+        let snapshot = store.snapshot().unwrap().unwrap();
+        assert_eq!(snapshot.workflow.initial_state_id.as_deref(), Some("compound"));
+        let container = snapshot
+            .workflow
+            .states
+            .iter()
+            .find(|state| state.id == "compound")
+            .unwrap();
+        assert_eq!(container.kind, StateKindDto::Compound);
+        assert_eq!(container.initial_child_id.as_deref(), Some("a"));
+        for child_id in ["a", "b"] {
+            let child = snapshot
+                .workflow
+                .states
+                .iter()
+                .find(|state| state.id == child_id)
+                .unwrap();
+            assert_eq!(child.parent_id.as_deref(), Some("compound"));
+        }
+    }
+
+    #[test]
+    fn reconciling_parallel_lane_creates_backend_owned_wrapper() {
+        let store = WorkflowDocumentStore::default();
+        let workflow = Workflow {
+            states: vec![
+                State {
+                    id: StateId::from("parallel"),
+                    scxml_id: "Parallel".into(),
+                    label: "Parallel".into(),
+                    kind: StateKind::Parallel,
+                    ..sample_state_defaults()
+                },
+                State {
+                    id: StateId::from("a"),
+                    scxml_id: "A".into(),
+                    label: "A".into(),
+                    kind: StateKind::Skill,
+                    parent_id: Some(StateId::from("parallel")),
+                    ..sample_state_defaults()
+                },
+                State {
+                    id: StateId::from("b"),
+                    scxml_id: "B".into(),
+                    label: "B".into(),
+                    kind: StateKind::Skill,
+                    parent_id: Some(StateId::from("parallel")),
+                    ..sample_state_defaults()
+                },
+            ],
+            ..Workflow::default()
+        };
+        assert_eq!(store.replace(workflow).unwrap(), 1);
+
+        let lane = EditorExportNodeDto {
+            id: "lane".into(),
+            node_type: "parallelLane".into(),
+            parent_id: Some("parallel".into()),
+            label: "Lane".into(),
+            full_skill_name: "Lane".into(),
+            ..EditorExportNodeDto::default()
+        };
+
+
+        let result = store
+            .apply(
+                Some(1),
+                WorkflowCommandDto::ReconcileParallelLane {
+                    context: ParallelLaneMoveContextDto {
+                        lane,
+                        wrapper: None,
+                        member_state_ids: vec!["a".into(), "b".into()],
+                    },
+                },
+            )
+            .unwrap();
+
+        let lane_patch = &result.patch.parallel_lane_updates[0];
+        assert_eq!(lane_patch.wrapper_state_id.as_deref(), Some("auto-lane-lane"));
+        assert_eq!(lane_patch.wrapper_initial_child_id.as_deref(), Some("a"));
+        let snapshot = store.snapshot().unwrap().unwrap();
+        let wrapper = snapshot
+            .workflow
+            .states
+            .iter()
+            .find(|state| state.id == "auto-lane-lane")
+            .unwrap();
+        assert_eq!(wrapper.kind, StateKindDto::Compound);
+        assert_eq!(wrapper.parent_id.as_deref(), Some("lane"));
+        for child_id in ["a", "b"] {
+            let child = snapshot
+                .workflow
+                .states
+                .iter()
+                .find(|state| state.id == child_id)
+                .unwrap();
+            assert_eq!(child.parent_id.as_deref(), Some("auto-lane-lane"));
+        }
+    }
+
+    #[test]
+    fn moving_state_into_atomic_parallel_lane_creates_and_retains_wrapper_in_rust() {
         let store = WorkflowDocumentStore::default();
         let workflow = Workflow {
             states: vec![
@@ -1434,10 +1566,13 @@ mod tests {
             .unwrap();
         assert_eq!(promoted.revision, 2);
         assert_eq!(promoted.patch.parallel_lane_updates.len(), 1);
-        assert_eq!(
-            promoted.patch.parallel_lane_updates[0].initial_child_id.as_deref(),
-            Some("a")
-        );
+        let lane_patch = &promoted.patch.parallel_lane_updates[0];
+        let wrapper_id = lane_patch
+            .wrapper_state_id
+            .clone()
+            .expect("Rust should create a wrapper for a multi-state lane");
+        assert_eq!(lane_patch.initial_child_id.as_deref(), Some(wrapper_id.as_str()));
+        assert_eq!(lane_patch.wrapper_initial_child_id.as_deref(), Some("a"));
 
         let snapshot = store.snapshot().unwrap().unwrap();
         let lane = snapshot
@@ -1445,10 +1580,10 @@ mod tests {
             .states
             .iter()
             .find(|state| state.id == "lane-a")
-            .expect("lane wrapper should be promoted into the semantic model");
+            .expect("lane should be promoted into the semantic model");
         assert_eq!(lane.kind, StateKindDto::ParallelLane);
         assert_eq!(lane.parent_id.as_deref(), Some("parallel"));
-        assert_eq!(lane.initial_child_id.as_deref(), Some("a"));
+        assert_eq!(lane.initial_child_id.as_deref(), Some(wrapper_id.as_str()));
         for child_id in ["a", "b"] {
             let child = snapshot
                 .workflow
@@ -1456,8 +1591,18 @@ mod tests {
                 .iter()
                 .find(|state| state.id == child_id)
                 .unwrap();
-            assert_eq!(child.parent_id.as_deref(), Some("lane-a"));
+            assert_eq!(child.parent_id.as_deref(), Some(wrapper_id.as_str()));
         }
+
+        let wrapper_node = EditorExportNodeDto {
+            id: wrapper_id.clone(),
+            node_type: "compound".into(),
+            parent_id: Some("lane-a".into()),
+            label: lane_patch.wrapper_label.clone().unwrap_or_else(|| "lane_1".into()),
+            full_skill_name: lane_patch.wrapper_label.clone().unwrap_or_else(|| "lane_1".into()),
+            initial_child_id: Some("a".into()),
+            ..EditorExportNodeDto::default()
+        };
 
         let demoted = store
             .apply(
@@ -1467,7 +1612,7 @@ mod tests {
                     parent_state_id: None,
                     source_lane: Some(ParallelLaneMoveContextDto {
                         lane: lane_node,
-                        wrapper: None,
+                        wrapper: Some(wrapper_node),
                         member_state_ids: vec!["a".into()],
                     }),
                     target_lane: None,
@@ -1480,18 +1625,20 @@ mod tests {
         assert_eq!(demoted.patch.parallel_lane_updates.len(), 1);
 
         let snapshot = store.snapshot().unwrap().unwrap();
-        assert!(snapshot
+        let retained_lane = snapshot
             .workflow
             .states
             .iter()
-            .all(|state| state.id != "lane-a"));
+            .find(|state| state.id == "lane-a")
+            .expect("existing wrapped lanes remain stable when they shrink");
+        assert_eq!(retained_lane.initial_child_id.as_deref(), Some(wrapper_id.as_str()));
         let a = snapshot
             .workflow
             .states
             .iter()
             .find(|state| state.id == "a")
             .unwrap();
-        assert_eq!(a.parent_id.as_deref(), Some("parallel"));
+        assert_eq!(a.parent_id.as_deref(), Some(wrapper_id.as_str()));
         let b = snapshot
             .workflow
             .states

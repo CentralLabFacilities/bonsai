@@ -6,8 +6,6 @@ import {
     PARALLEL_LANE_CHILD_TOP_INSET,
     orderNodesParentsFirst,
     resolveNodeCollisionsAndRefit,
-    normalizeParallelLaneCompounds,
-    normalizeCompoundInitialStates,
 } from "../../utils/editorGeometry";
 import { getOverviewLayoutNodeSize } from "../../utils/layoutUtils";
 import {
@@ -32,7 +30,7 @@ export function useEditorNodeActions({
     setRightPanelTab,
     setActiveTab,
     applyWorkflowCommand,
-    syncEditorStructureAfterCommit,
+    syncInsertedParallelLaneStateAfterCommit,
     syncStateEditorPositions,
 }) {
     const selectEditorNode = useCallback(
@@ -227,10 +225,8 @@ export function useEditorNodeActions({
                     stateId: selected.id,
                 });
             }
-            // A direct Parallel lane has at most one executable child; otherwise
-            // normalizeParallelLaneCompounds wraps its members in the semantic
-            // Compound handled above. Atomic one-child lanes may be flattened by
-            // Rust, so there is no independent semantic initial choice to sync.
+            // Direct Parallel-lane initial state is normalized by Rust when the
+            // lane membership changes.
         },
         [nodes, setNodes, applyWorkflowCommand]
     );
@@ -257,7 +253,6 @@ export function useEditorNodeActions({
                 String(node.data?.label || "").startsWith("state_")
             ).length;
             const stateName = `state_${stateCount + 1}`;
-            const isFirstChild = children.length === 0;
             const childX =
                 parent.type === "compound" ? COMPOUND_PADDING_X : 24;
             const childStartY =
@@ -284,7 +279,7 @@ export function useEditorNodeActions({
                 data: {
                     label: stateName,
                     fullSkillName: stateName,
-                    isInitial: isFirstChild,
+                    isInitial: false,
                     events: [],
                 },
             };
@@ -293,24 +288,11 @@ export function useEditorNodeActions({
                 const withSelection = currentNodes.map((node) => ({
                     ...node,
                     selected: false,
-                    ...(node.id === parentId &&
-                    parent.type === "compound" &&
-                    isFirstChild
-                        ? {
-                              data: {
-                                  ...(node.data || {}),
-                                  initialChildId: newNodeId,
-                              },
-                          }
-                        : {}),
                 }));
-
-                let nextNodes = resolveNodeCollisionsAndRefit(
+                const nextNodes = resolveNodeCollisionsAndRefit(
                     [...withSelection, newState],
                     newNodeId
                 );
-                nextNodes = normalizeParallelLaneCompounds(nextNodes);
-                nextNodes = normalizeCompoundInitialStates(nextNodes);
                 return orderNodesParentsFirst(nextNodes);
             });
 
@@ -327,7 +309,7 @@ export function useEditorNodeActions({
                         parentId,
                         initialChildId: null,
                         initialChildScxmlId: null,
-                        isInitial: isFirstChild,
+                        isInitial: false,
                         isFinal: false,
                         events: [],
                         inputSlots: [],
@@ -356,11 +338,10 @@ export function useEditorNodeActions({
                     },
                 });
             } else {
-                // Adding directly to a Parallel lane can change whether that lane
-                // is flattened or represented by an automatic Compound. Rebuild
-                // only the semantic structure; workflow-global datamodel/slots
-                // stay owned by the existing Rust document.
-                void syncEditorStructureAfterCommit?.();
+                void syncInsertedParallelLaneStateAfterCommit?.(
+                    newNodeId,
+                    parentId
+                );
             }
 
             // Keep the previous App.jsx behavior: once an add-state action is
@@ -377,7 +358,7 @@ export function useEditorNodeActions({
             setRightPanelTab,
             setActiveTab,
             applyWorkflowCommand,
-            syncEditorStructureAfterCommit,
+            syncInsertedParallelLaneStateAfterCommit,
         ]
     );
 

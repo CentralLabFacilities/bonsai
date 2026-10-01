@@ -66,6 +66,8 @@ const getCanonicalPatchPolicy = (command) => {
         case "insertEditorStates":
             return { stateMode: "initial", applyTransitions: false };
         case "moveEditorState":
+        case "reconcileParallelLane":
+        case "wrapEditorStates":
             return { stateMode: "move", applyTransitions: true };
         case "addState":
         case "replaceEditorStructure":
@@ -340,6 +342,126 @@ export function useRustWorkflowDocument({
                 return applyCommandNow({
                     type: "insertEditorStates",
                     nodes: insertedNodes,
+                });
+            }),
+        [applyCommandNow, enqueue, syncEditorStructureNow]
+    );
+
+
+    const syncInsertedParallelLaneStateAfterCommit = useCallback(
+        (stateId, laneId) =>
+            enqueue(async () => {
+                if (!isTauri() || !stateId || !laneId) return null;
+                await waitForEditorCommit();
+
+                const editorState = editorStateRef.current || {};
+                const currentNodes = editorState.nodes || [];
+                const context = buildRustParallelLaneMoveContext({
+                    nodes: currentNodes,
+                    laneId,
+                });
+                if (!context) {
+                    return syncEditorStructureNow(editorState);
+                }
+
+                const [insertedNode] = buildRustEditorNodeSnapshots({
+                    ...editorState,
+                    stateIds: [stateId],
+                });
+                if (!insertedNode) {
+                    return syncEditorStructureNow(editorState);
+                }
+
+                // A visual Parallel lane may be flattened in the semantic
+                // workflow. Insert the new state under the nearest semantic
+                // owner first; Rust then promotes the lane/wrapper as needed.
+                insertedNode.parentId =
+                    context.wrapper?.id || context.lane?.parentId || null;
+
+                await applyCommandNow({
+                    type: "insertEditorStates",
+                    nodes: [insertedNode],
+                });
+
+                return applyCommandNow({
+                    type: "reconcileParallelLane",
+                    context,
+                });
+            }),
+        [applyCommandNow, enqueue, syncEditorStructureNow]
+    );
+
+
+    const syncWrappedContainerAfterCommit = useCallback(
+        (containerId) =>
+            enqueue(async () => {
+                if (!isTauri() || !containerId) return null;
+                await waitForEditorCommit();
+
+                const editorState = editorStateRef.current || {};
+                const currentNodes = editorState.nodes || [];
+                const containerNode = currentNodes.find(
+                    (candidate) => candidate.id === containerId
+                );
+                if (!containerNode || !["compound", "parallel"].includes(containerNode.type)) {
+                    return syncEditorStructureNow(editorState);
+                }
+
+                const [container] = buildRustEditorNodeSnapshots({
+                    ...editorState,
+                    stateIds: [containerId],
+                });
+                if (!container) {
+                    return syncEditorStructureNow(editorState);
+                }
+
+                let groups;
+                if (containerNode.type === "compound") {
+                    groups = [
+                        {
+                            lane: null,
+                            stateIds: currentNodes
+                                .filter(
+                                    (candidate) =>
+                                        candidate.parentId === containerId &&
+                                        candidate.type !== "slot" &&
+                                        candidate.type !== "parallelLane" &&
+                                        !candidate.data?.isSkillClone &&
+                                        !candidate.data?.isStateClone
+                                )
+                                .map((candidate) => candidate.id),
+                        },
+                    ];
+                } else {
+                    groups = currentNodes
+                        .filter(
+                            (candidate) =>
+                                candidate.parentId === containerId &&
+                                candidate.type === "parallelLane"
+                        )
+                        .map((lane) => {
+                            const laneContext = buildRustParallelLaneMoveContext({
+                                nodes: currentNodes,
+                                laneId: lane.id,
+                            });
+                            return laneContext
+                                ? {
+                                      lane: laneContext,
+                                      stateIds: laneContext.memberStateIds || [],
+                                  }
+                                : null;
+                        })
+                        .filter(Boolean);
+                }
+
+                if (groups.length === 0 || groups.some((group) => group.stateIds.length === 0)) {
+                    return syncEditorStructureNow(editorState);
+                }
+
+                return applyCommandNow({
+                    type: "wrapEditorStates",
+                    container,
+                    groups,
                 });
             }),
         [applyCommandNow, enqueue, syncEditorStructureNow]
@@ -701,6 +823,8 @@ export function useRustWorkflowDocument({
         syncEditorState,
         syncEditorStructureAfterCommit,
         syncInsertedEditorStatesAfterCommit,
+        syncInsertedParallelLaneStateAfterCommit,
+        syncWrappedContainerAfterCommit,
         syncStateEditorPositions,
         syncStatePosition,
         syncStateParameters,

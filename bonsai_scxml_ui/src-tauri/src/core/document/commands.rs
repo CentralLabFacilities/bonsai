@@ -8,10 +8,13 @@ use crate::core::editor_export::types::{
 };
 use crate::core::model::{
     Assignment, DataModelEntry, EditorPosition, Parameter, Slot, SlotDeclaration, State, StateId,
-    Transition, TransitionId, TransitionSource, Workflow, WorkflowIndex,
+    StateKind, Transition, TransitionId, TransitionSource, Workflow, WorkflowIndex,
 };
 
-use super::reparent::{move_editor_state, update_editor_position};
+use super::reparent::{
+    move_editor_state, reconcile_parallel_lane_command, update_editor_position,
+};
+use super::wrap::wrap_editor_states;
 use super::types::{
     ParallelLaneEditorPatchDto, StateSlotsCommandDto, TargetedTransitionCommandDto,
     WorkflowCommandDto,
@@ -74,6 +77,12 @@ pub(crate) fn apply_command(
             x,
             y,
         ),
+        WorkflowCommandDto::ReconcileParallelLane { context } => {
+            reconcile_parallel_lane_command(workflow, context)
+        }
+        WorkflowCommandDto::WrapEditorStates { container, groups } => {
+            wrap_editor_states(workflow, index, container, groups)
+        }
         WorkflowCommandDto::RemoveStates { state_ids } => {
             remove_states(workflow, index, state_ids)
         }
@@ -787,7 +796,18 @@ fn add_state(
     let new_id = state.id.clone();
     let new_scxml_id = state.scxml_id.clone();
     let parent_id = state.parent_id.clone();
-    let make_initial = state.is_initial;
+    let scope_needs_initial = if let Some(parent_id) = parent_id.as_ref() {
+        index
+            .state(workflow, parent_id)
+            .is_some_and(|parent| {
+                parent.kind == StateKind::Compound && parent.initial_child_id.is_none()
+            })
+    } else {
+        workflow.initial_state_id.is_none()
+    };
+    let make_initial = state.is_initial || scope_needs_initial;
+    let mut state = state;
+    state.is_initial = make_initial;
     workflow.states.push(state);
 
     let mut changed = vec![new_id.as_str().to_string()];
