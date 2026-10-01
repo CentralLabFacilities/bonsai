@@ -614,6 +614,137 @@ mod tests {
     }
 
     #[test]
+    fn replacing_editor_transitions_handles_nested_ownership_without_replacing_document_data() {
+        let store = WorkflowDocumentStore::default();
+        let mut workflow = Workflow {
+            states: vec![
+                State {
+                    id: StateId::from("container"),
+                    scxml_id: "Container".into(),
+                    label: "Container".into(),
+                    kind: StateKind::Compound,
+                    initial_child_id: Some(StateId::from("talk")),
+                    initial_child_scxml_id: Some("Talk".into()),
+                    ..sample_state_defaults()
+                },
+                State {
+                    id: StateId::from("talk"),
+                    scxml_id: "Talk".into(),
+                    label: "Talk".into(),
+                    kind: StateKind::Skill,
+                    parent_id: Some(StateId::from("container")),
+                    parameters: vec![crate::core::model::Parameter {
+                        key: "text".into(),
+                        expression: "hello".into(),
+                        ..crate::core::model::Parameter::default()
+                    }],
+                    ..sample_state_defaults()
+                },
+                State {
+                    id: StateId::from("outside"),
+                    scxml_id: "Outside".into(),
+                    label: "Outside".into(),
+                    kind: StateKind::Skill,
+                    ..sample_state_defaults()
+                },
+            ],
+            data_model: vec![DataModelEntry {
+                id: "counter".into(),
+                type_name: None,
+                expression: "1".into(),
+            }],
+            slot_declarations: vec![SlotDeclaration {
+                key: "Manual".into(),
+                state: "Talk".into(),
+                xpath: "/manual".into(),
+                inherited: false,
+            }],
+            ..Workflow::default()
+        };
+        workflow.transitions.push(Transition {
+            id: TransitionId::from("old-edge"),
+            source_state_id: StateId::from("container"),
+            target_state_id: Some(StateId::from("outside")),
+            target_scxml_id: "Outside".into(),
+            event: "Talk.success".into(),
+            condition: String::new(),
+            assignments: vec![],
+            sent_events: vec![],
+            target_instance_id: None,
+        });
+        assert_eq!(store.replace(workflow).unwrap(), 1);
+
+        let node = |id: &str, node_type: &str, parent_id: Option<&str>, name: &str| {
+            EditorExportNodeDto {
+                id: id.into(),
+                node_type: node_type.into(),
+                parent_id: parent_id.map(str::to_string),
+                label: name.into(),
+                full_skill_name: name.into(),
+                ..EditorExportNodeDto::default()
+            }
+        };
+        let mut container = node("container", "compound", None, "Container");
+        container.initial_child_id = Some("talk".into());
+        let mut talk = node("talk", "custom", Some("container"), "Talk");
+        talk.is_initial = true;
+        let outside = node("outside", "custom", None, "Outside");
+
+        let result = store
+            .apply(
+                Some(1),
+                WorkflowCommandDto::ReplaceEditorTransitions {
+                    nodes: vec![container, talk, outside],
+                    edges: vec![EditorExportEdgeDto {
+                        id: "edge-talk-out".into(),
+                        source: "talk".into(),
+                        target: "outside".into(),
+                        source_handle: "error".into(),
+                        editor_target_instance_id: "ref-1".into(),
+                        ..EditorExportEdgeDto::default()
+                    }],
+                },
+            )
+            .unwrap();
+        assert_eq!(result.revision, 2);
+
+        let snapshot = store.snapshot().unwrap().unwrap();
+        assert_eq!(snapshot.workflow.data_model.len(), 1);
+        assert_eq!(snapshot.workflow.data_model[0].id, "counter");
+        assert_eq!(snapshot.workflow.slot_declarations.len(), 1);
+        assert_eq!(snapshot.workflow.slot_declarations[0].key, "Manual");
+
+        let talk = snapshot
+            .workflow
+            .states
+            .iter()
+            .find(|state| state.id == "talk")
+            .unwrap();
+        assert_eq!(talk.parameters.len(), 1);
+        assert_eq!(talk.parameters[0].key, "text");
+
+        assert_eq!(snapshot.workflow.transitions.len(), 1);
+        let transition = &snapshot.workflow.transitions[0];
+        assert_eq!(transition.id, "edge-talk-out");
+        assert_eq!(transition.source_state_id, "container");
+        assert_eq!(transition.event, "Talk.error");
+        assert_eq!(transition.target_state_id.as_deref(), Some("outside"));
+
+        let outside = snapshot
+            .workflow
+            .states
+            .iter()
+            .find(|state| state.id == "outside")
+            .unwrap();
+        assert_eq!(outside.editor.edge_targets.len(), 1);
+        assert_eq!(
+            outside.editor.edge_targets[0].target_instance_id,
+            "ref-1"
+        );
+        assert_eq!(outside.editor.edge_targets[0].event, "Talk.error");
+    }
+
+    #[test]
     fn replacing_editor_positions_updates_only_state_metadata() {
         let store = WorkflowDocumentStore::default();
         assert_eq!(store.replace(sample_workflow()).unwrap(), 1);

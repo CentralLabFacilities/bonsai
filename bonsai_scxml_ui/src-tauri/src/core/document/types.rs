@@ -152,6 +152,12 @@ pub(crate) enum WorkflowCommandDto {
         #[serde(default)]
         transitions: Vec<TargetedTransitionCommandDto>,
     },
+    ReplaceEditorTransitions {
+        #[serde(default)]
+        nodes: Vec<EditorExportNodeDto>,
+        #[serde(default)]
+        edges: Vec<EditorExportEdgeDto>,
+    },
     ReplaceEditorStructure {
         #[serde(default)]
         nodes: Vec<EditorExportNodeDto>,

@@ -135,6 +135,20 @@ export function useRustWorkflowDocument({
         [applyCommandNow]
     );
 
+    const syncEditorTransitionsNow = useCallback(
+        async (editorState = null) => {
+            if (!isTauri()) return null;
+            const structure = buildRustEditorStructureSnapshot(
+                editorState || editorStateRef.current || {}
+            );
+            return applyCommandNow({
+                type: "replaceEditorTransitions",
+                ...structure,
+            });
+        },
+        [applyCommandNow]
+    );
+
     const syncEditorState = useCallback(
         (editorState = null) =>
             enqueue(async () => {
@@ -425,10 +439,11 @@ export function useRustWorkflowDocument({
                 );
 
                 // Nested/container transitions are hoisted by the SCXML export
-                // rules. Until that ownership becomes a Rust editor command of
-                // its own, resync those complex cases atomically.
+                // rules. Rebuild only the transition projection in Rust so their
+                // logical SCXML owner, full event and target-instance routing stay
+                // correct without replacing unrelated workflow state.
                 if (plans.some((plan) => plan?.mode === "full")) {
-                    return replaceNow(editorState, null);
+                    return syncEditorTransitionsNow(editorState);
                 }
 
                 let result = null;
@@ -438,7 +453,7 @@ export function useRustWorkflowDocument({
                 }
                 return result;
             }),
-        [applyCommandNow, enqueue, replaceNow]
+        [applyCommandNow, enqueue, syncEditorTransitionsNow]
     );
 
     const syncTransitionsForSource = useCallback(

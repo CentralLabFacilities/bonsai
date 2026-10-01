@@ -106,10 +106,88 @@ pub(crate) fn apply_command(
             source_state_id,
             transitions,
         ),
+        WorkflowCommandDto::ReplaceEditorTransitions { nodes, edges } => {
+            replace_editor_transitions(workflow, nodes, edges)
+        },
         WorkflowCommandDto::ReplaceEditorStructure { nodes, edges } => {
             replace_editor_structure(workflow, nodes, edges)
         },
     }
+}
+
+
+fn replace_editor_transitions(
+    workflow: &mut Workflow,
+    nodes: Vec<EditorExportNodeDto>,
+    edges: Vec<EditorExportEdgeDto>,
+) -> Result<WorkflowCommandChanges, String> {
+    let previous_transition_ids = workflow
+        .transitions
+        .iter()
+        .map(|transition| transition.id.as_str().to_string())
+        .collect::<HashSet<_>>();
+
+    // Reuse the canonical editor exporter for transition ownership. This is
+    // intentionally transition-only: nested skills can become container-owned
+    // SCXML transitions (for example `Talk.success` on a Compound), but changing
+    // such a transition must not replace state configuration, slots or datamodel.
+    let rebuilt = build_workflow_from_editor(&EditorExportRequestDto {
+        nodes,
+        edges,
+        data_model: Vec::new(),
+        extra_slot_declarations: Vec::new(),
+    })?;
+
+    let mut next_edge_targets = rebuilt
+        .states
+        .into_iter()
+        .map(|state| (state.id, state.editor.edge_targets))
+        .collect::<HashMap<_, _>>();
+
+    let mut changed_state_ids = Vec::new();
+    for state in &mut workflow.states {
+        let next = next_edge_targets
+            .remove(state.id.as_str())
+            .unwrap_or_default();
+        if !editor_edge_targets_equal(&state.editor.edge_targets, &next) {
+            state.editor.edge_targets = next;
+            changed_state_ids.push(state.id.as_str().to_string());
+        }
+    }
+
+    workflow.transitions = rebuilt.transitions;
+
+    let mut changed_transition_ids = previous_transition_ids;
+    changed_transition_ids.extend(
+        workflow
+            .transitions
+            .iter()
+            .map(|transition| transition.id.as_str().to_string()),
+    );
+    let mut changed_transition_ids = changed_transition_ids.into_iter().collect::<Vec<_>>();
+    changed_transition_ids.sort();
+    changed_state_ids.sort();
+
+    Ok(WorkflowCommandChanges {
+        changed_state_ids,
+        changed_transition_ids,
+        // Incoming/outgoing transition indexes changed even when state structure did not.
+        index_changed: true,
+        ..WorkflowCommandChanges::default()
+    })
+}
+
+fn editor_edge_targets_equal(
+    left: &[crate::core::model::EditorEdgeTarget],
+    right: &[crate::core::model::EditorEdgeTarget],
+) -> bool {
+    left.len() == right.len()
+        && left.iter().zip(right).all(|(left, right)| {
+            left.event == right.event
+                && left.target_scxml_id == right.target_scxml_id
+                && left.occurrence == right.occurrence
+                && left.target_instance_id == right.target_instance_id
+        })
 }
 
 fn replace_editor_structure(

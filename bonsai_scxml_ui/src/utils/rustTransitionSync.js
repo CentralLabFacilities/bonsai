@@ -73,8 +73,8 @@ const hasUnrepresentedTargetEvents = (
 /**
  * Build the smallest safe Rust document update for one logical transition
  * source. Root-level executable states can replace their targeted transitions
- * directly. Container/nested transitions still fall back to a full semantic
- * document sync because SCXML hoists those transitions to container states.
+ * directly. Container/nested transitions request a transition-projection rebuild
+ * because SCXML hoists those transitions to container states.
  */
 export const buildRustTransitionSyncPlan = ({
     nodes = [],
@@ -88,8 +88,9 @@ export const buildRustTransitionSyncPlan = ({
     const sourceNode = nodeById.get(normalizedSourceId);
     if (!sourceNode) return { mode: "full" };
 
-    // References and nested/container states require the full editor exporter:
-    // their visual edge source is not necessarily the SCXML transition owner.
+    // References and nested/container states require the structure-aware
+    // transition projection: their visual edge source is not necessarily the
+    // SCXML transition owner.
     if (
         sourceNode.parentId ||
         sourceNode.type === "compound" ||
