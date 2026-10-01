@@ -49,6 +49,10 @@ pub(crate) fn apply_command(
         WorkflowCommandDto::UpdateStateEditorPosition { state_id, x, y } => {
             update_state_editor_position(workflow, index, state_id, x, y)
         }
+        WorkflowCommandDto::ReplaceStateEditorPositions {
+            state_id,
+            positions,
+        } => replace_state_editor_positions(workflow, index, state_id, positions),
         WorkflowCommandDto::SetStateLabel { state_id, label } => {
             set_state_label(workflow, index, state_id, label)
         }
@@ -775,6 +779,46 @@ fn update_state_editor_position(
             clone_type: None,
         });
     }
+
+    Ok(WorkflowCommandChanges {
+        changed_state_ids: vec![id.as_str().to_string()],
+        ..WorkflowCommandChanges::default()
+    })
+}
+
+fn replace_state_editor_positions(
+    workflow: &mut Workflow,
+    index: &WorkflowIndex,
+    state_id: String,
+    positions: Vec<crate::core::model::EditorPositionDto>,
+) -> Result<WorkflowCommandChanges, String> {
+    let id = StateId::from(state_id);
+    let state_position = index
+        .state_position(&id)
+        .ok_or_else(|| format!("Unknown state '{id}'"))?;
+
+    let next_positions = positions
+        .into_iter()
+        .map(|position| EditorPosition {
+            x: position.x,
+            y: position.y,
+            instance_id: position.instance_id,
+            clone_type: position.clone_type,
+        })
+        .collect::<Vec<_>>();
+
+    let primary = next_positions
+        .iter()
+        .find(|position| position.clone_type.is_none())
+        .or_else(|| next_positions.first())
+        .cloned();
+
+    let editor = &mut workflow.states[state_position].editor;
+    if let Some(primary) = primary {
+        editor.x = primary.x;
+        editor.y = primary.y;
+    }
+    editor.positions = next_positions;
 
     Ok(WorkflowCommandChanges {
         changed_state_ids: vec![id.as_str().to_string()],

@@ -33,6 +33,7 @@ export function useEditorNodeActions({
     setActiveTab,
     applyWorkflowCommand,
     syncEditorStateAfterCommit,
+    syncStateEditorPositions,
 }) {
     const selectEditorNode = useCallback(
         (nodeId, options = {}) => {
@@ -143,7 +144,7 @@ export function useEditorNodeActions({
             setRightPanelTab("details");
             setActiveTab(sourceNode.type === "slot" ? "slots" : "allgemein");
             if (sourceNode.type !== "slot") {
-                void syncEditorStateAfterCommit?.();
+                void syncStateEditorPositions?.(sourceNode.id);
             }
             return cloneNode;
         },
@@ -153,7 +154,7 @@ export function useEditorNodeActions({
             setSelectedNodeId,
             setRightPanelTab,
             setActiveTab,
-            syncEditorStateAfterCommit,
+            syncStateEditorPositions,
         ]
     );
 

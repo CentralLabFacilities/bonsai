@@ -44,6 +44,7 @@ export function useNodeDrag({
     screenToFlowPosition,
     getNodes,
     syncStatePosition,
+    syncStateEditorPositions,
     syncRemovedStates,
     syncEditorStateAfterCommit,
 }) {
@@ -405,13 +406,28 @@ export function useNodeDrag({
                 });
             }
 
+            const removedReferenceNodes = currentNodes.filter(
+                (candidate) =>
+                    idsToDelete.has(candidate.id) &&
+                    (candidate.data?.isSkillClone || candidate.data?.isStateClone)
+            );
+            const referenceStateIds = removedReferenceNodes.map(
+                (candidate) => candidate.id
+            );
+            const referenceSourceIds = Array.from(
+                new Set(
+                    removedReferenceNodes
+                        .map((candidate) => candidate.data?.cloneOfNodeId)
+                        .filter((sourceId) => sourceId && !idsToDelete.has(sourceId))
+                )
+            );
             const forceFullSemanticSync = currentNodes.some(
                 (candidate) =>
                     idsToDelete.has(candidate.id) &&
+                    !candidate.data?.isSkillClone &&
+                    !candidate.data?.isStateClone &&
                     (candidate.type === "parallelLane" ||
                         candidate.data?.autoParallelLaneCompound ||
-                        candidate.data?.isSkillClone ||
-                        candidate.data?.isStateClone ||
                         (candidate.data?.inSlots || []).some((slot) => slot?.path) ||
                         (candidate.data?.outSlots || []).some((slot) => slot?.path))
             );
@@ -479,6 +495,8 @@ export function useNodeDrag({
 
             void syncRemovedStates?.([...idsToDelete], {
                 forceFull: forceFullSemanticSync,
+                referenceStateIds,
+                referenceSourceIds,
             });
 
             setDraggingNodeId(null);
@@ -506,6 +524,9 @@ export function useNodeDrag({
         // for references to states in later Parallel lanes and also matches the
         // way reference metadata is reconstructed on SCXML import.
         if (node.data?.isSkillClone || node.data?.isStateClone) {
+            const referenceSourceId = String(
+                node.data?.cloneOfNodeId || ""
+            ).trim();
             setNodes((currentNodes) => {
                 const liveNode = currentNodes.find(
                     (candidate) => candidate.id === node.id
@@ -574,7 +595,11 @@ export function useNodeDrag({
                 return nextNodes;
             });
 
-            void syncEditorStateAfterCommit?.();
+            if (referenceSourceId) {
+                void syncStateEditorPositions?.(referenceSourceId);
+            } else {
+                void syncEditorStateAfterCommit?.();
+            }
             setDraggingNodeId(null);
             setIsDraggingNode(false);
             setIsOverTrash(false);
@@ -1684,6 +1709,7 @@ export function useNodeDrag({
         setSlotEdges,
         setSlotNodes,
         syncStatePosition,
+        syncStateEditorPositions,
         syncRemovedStates,
         syncEditorStateAfterCommit,
     ]);

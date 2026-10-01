@@ -1,5 +1,7 @@
 use crate::core::editor_export::types::{EditorExportSlotDeclarationDto, EditorExportSlotDto};
-use crate::core::model::{AssignmentDto, DataModelEntryDto, ParameterDto, StateDto, WorkflowDto};
+use crate::core::model::{
+    AssignmentDto, DataModelEntryDto, EditorPositionDto, ParameterDto, StateDto, WorkflowDto,
+};
 
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -92,6 +94,12 @@ pub(crate) enum WorkflowCommandDto {
         state_id: String,
         x: f64,
         y: f64,
+    },
+    ReplaceStateEditorPositions {
+        #[serde(rename = "stateId")]
+        state_id: String,
+        #[serde(default)]
+        positions: Vec<EditorPositionDto>,
     },
     SetStateLabel {
         #[serde(rename = "stateId")]

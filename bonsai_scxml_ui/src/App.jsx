@@ -596,6 +596,8 @@ function AppContent() {
         applyWorkflowCommand: rustWorkflowDocument.applyWorkflowCommand,
         syncEditorStateAfterCommit:
             rustWorkflowDocument.syncEditorStateAfterCommit,
+        syncStateEditorPositions:
+            rustWorkflowDocument.syncStateEditorPositions,
         syncTransitionsForSource:
             rustWorkflowDocument.syncTransitionsForSource,
         syncStateParameters: rustWorkflowDocument.syncStateParameters,
@@ -710,6 +712,8 @@ function AppContent() {
         screenToFlowPosition,
         getNodes,
         syncStatePosition: rustWorkflowDocument.syncStatePosition,
+        syncStateEditorPositions:
+            rustWorkflowDocument.syncStateEditorPositions,
         syncRemovedStates: rustWorkflowDocument.syncRemovedStates,
         syncEditorStateAfterCommit:
             rustWorkflowDocument.syncEditorStateAfterCommit,
@@ -2903,18 +2907,40 @@ function AppContent() {
                     const removedNodes = nodes.filter((node) =>
                         semanticRemovalIds.has(node.id)
                     );
+                    const removedReferenceNodes = removedNodes.filter(
+                        (node) =>
+                            node.data?.isSkillClone || node.data?.isStateClone
+                    );
+                    const referenceStateIds = removedReferenceNodes.map(
+                        (node) => node.id
+                    );
+                    const referenceSourceIds = Array.from(
+                        new Set(
+                            removedReferenceNodes
+                                .map((node) => node.data?.cloneOfNodeId)
+                                .filter(
+                                    (sourceId) =>
+                                        sourceId &&
+                                        !semanticRemovalIds.has(sourceId)
+                                )
+                        )
+                    );
                     const forceFullSemanticSync = removedNodes.some(
                         (node) =>
-                            node.type === "parallelLane" ||
-                            node.data?.autoParallelLaneCompound ||
-                            node.data?.isSkillClone ||
-                            node.data?.isStateClone ||
-                            (node.data?.inSlots || []).some((slot) => slot?.path) ||
-                            (node.data?.outSlots || []).some((slot) => slot?.path)
+                            !node.data?.isSkillClone &&
+                            !node.data?.isStateClone &&
+                            (node.type === "parallelLane" ||
+                                node.data?.autoParallelLaneCompound ||
+                                (node.data?.inSlots || []).some((slot) => slot?.path) ||
+                                (node.data?.outSlots || []).some((slot) => slot?.path))
                     );
                     void rustWorkflowDocument.syncRemovedStates(
                         [...semanticRemovalIds],
-                        { forceFull: forceFullSemanticSync }
+                        {
+                            forceFull: forceFullSemanticSync,
+                            referenceStateIds,
+                            referenceSourceIds,
+                        }
                     );
                 }
             }

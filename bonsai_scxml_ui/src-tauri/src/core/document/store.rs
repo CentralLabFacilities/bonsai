@@ -531,4 +531,56 @@ mod tests {
             .any(|slot| slot.key == "Manual" && slot.xpath == "/manual"));
     }
 
+    #[test]
+    fn replacing_editor_positions_updates_only_state_metadata() {
+        let store = WorkflowDocumentStore::default();
+        assert_eq!(store.replace(sample_workflow()).unwrap(), 1);
+
+        let result = store
+            .apply(
+                Some(1),
+                WorkflowCommandDto::ReplaceStateEditorPositions {
+                    state_id: "a".into(),
+                    positions: vec![
+                        EditorPositionDto {
+                            x: 10.0,
+                            y: 20.0,
+                            instance_id: Some("original".into()),
+                            clone_type: None,
+                        },
+                        EditorPositionDto {
+                            x: 110.0,
+                            y: 220.0,
+                            instance_id: Some("ref-1".into()),
+                            clone_type: Some("skill".into()),
+                        },
+                    ],
+                },
+            )
+            .unwrap();
+
+        assert_eq!(result.revision, 2);
+        assert_eq!(result.changed_state_ids, vec!["a"]);
+
+        let snapshot = store.snapshot().unwrap().unwrap();
+        let state = snapshot
+            .workflow
+            .states
+            .iter()
+            .find(|state| state.id == "a")
+            .unwrap();
+        assert_eq!(state.editor.x, 10.0);
+        assert_eq!(state.editor.y, 20.0);
+        assert_eq!(state.editor.positions.len(), 2);
+        assert_eq!(
+            state.editor.positions[1].instance_id.as_deref(),
+            Some("ref-1")
+        );
+        assert_eq!(
+            state.editor.positions[1].clone_type.as_deref(),
+            Some("skill")
+        );
+        assert_eq!(snapshot.workflow.states.len(), 2);
+    }
+
 }

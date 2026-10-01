@@ -143,6 +143,45 @@ const normalizeEdge = (edge) => ({
 });
 
 
+export const buildRustStateEditorPositions = ({
+    nodes = [],
+    edges = [],
+    stateId,
+} = {}) => {
+    const canonicalId = String(stateId || "").trim();
+    if (!canonicalId) return null;
+
+    const exportGraph = prepareGraphForScxml(nodes || [], edges || []);
+    const state = exportGraph.nodes.find((node) => node.id === canonicalId);
+    if (!state) return null;
+
+    const clonePositions = Array.isArray(state.data?.editorClonePositions)
+        ? state.data.editorClonePositions
+        : [];
+
+    const positions = clonePositions.length > 0
+        ? clonePositions
+        : [{
+            x: Number(state.position?.x || 0),
+            y: Number(state.position?.y || 0),
+            instanceId: null,
+            cloneType: null,
+        }];
+
+    return positions.map((position) => ({
+        x: Number(position?.x || 0),
+        y: Number(position?.y || 0),
+        instanceId: position?.instanceId
+            ? String(position.instanceId)
+            : null,
+        cloneType: position?.cloneType
+            ? String(position.cloneType)
+            : position?.isSkillClone
+                ? "skill"
+                : null,
+    }));
+};
+
 export const buildRustDataModelEntries = (globalDataModel = []) =>
     (globalDataModel || []).map((entry) => ({
         id: String(entry?.id || ""),

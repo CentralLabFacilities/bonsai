@@ -7,6 +7,7 @@ import {
 import {
     buildRustEditorExportRequest,
     buildRustSlotsSnapshot,
+    buildRustStateEditorPositions,
     buildRustStateParameters,
 } from "../utils/scxmlRustExport";
 import { buildRustTransitionSyncPlan } from "../utils/rustTransitionSync";
@@ -138,6 +139,30 @@ export function useRustWorkflowDocument({
         [enqueue, replaceNow]
     );
 
+    const syncStateEditorPositions = useCallback(
+        (stateId) =>
+            enqueue(async () => {
+                if (!isTauri() || !stateId) return null;
+                await waitForEditorCommit();
+
+                const editorState = editorStateRef.current || {};
+                const positions = buildRustStateEditorPositions({
+                    ...editorState,
+                    stateId,
+                });
+                if (!positions) {
+                    return replaceNow(editorState, null);
+                }
+
+                return applyCommandNow({
+                    type: "replaceStateEditorPositions",
+                    stateId,
+                    positions,
+                });
+            }),
+        [applyCommandNow, enqueue, replaceNow]
+    );
+
     const syncStatePosition = useCallback(
         (stateId, previousParentId = null) =>
             enqueue(async () => {
@@ -154,8 +179,25 @@ export function useRustWorkflowDocument({
                 const isReference = Boolean(
                     node.data?.isSkillClone || node.data?.isStateClone
                 );
+                if (isReference) {
+                    const sourceStateId = String(
+                        node.data?.cloneOfNodeId || ""
+                    ).trim();
+                    const positions = buildRustStateEditorPositions({
+                        ...(editorStateRef.current || {}),
+                        stateId: sourceStateId,
+                    });
+                    if (!sourceStateId || !positions) {
+                        return replaceNow(editorStateRef.current, null);
+                    }
+                    return applyCommandNow({
+                        type: "replaceStateEditorPositions",
+                        stateId: sourceStateId,
+                        positions,
+                    });
+                }
+
                 const requiresSemanticRebuild =
-                    isReference ||
                     node.type === "parallelLane" ||
                     currentParentId !== (previousParentId || null);
 
@@ -241,7 +283,14 @@ export function useRustWorkflowDocument({
     );
 
     const syncRemovedStates = useCallback(
-        (stateIds, { forceFull = false } = {}) =>
+        (
+            stateIds,
+            {
+                forceFull = false,
+                referenceStateIds = [],
+                referenceSourceIds = [],
+            } = {}
+        ) =>
             enqueue(async () => {
                 if (!isTauri()) return null;
                 const ids = Array.from(
@@ -251,17 +300,63 @@ export function useRustWorkflowDocument({
                             .filter(Boolean)
                     )
                 );
-                if (ids.length === 0) return null;
+                if (ids.length === 0 && referenceSourceIds.length === 0) {
+                    return null;
+                }
 
                 if (forceFull) {
                     await waitForEditorCommit();
                     return replaceNow(editorStateRef.current, null);
                 }
 
-                return applyCommandNow({
-                    type: "removeStates",
-                    stateIds: ids,
-                });
+                const referenceIds = new Set(
+                    (Array.isArray(referenceStateIds)
+                        ? referenceStateIds
+                        : [referenceStateIds]
+                    )
+                        .map((id) => String(id || "").trim())
+                        .filter(Boolean)
+                );
+                const semanticIds = ids.filter((id) => !referenceIds.has(id));
+
+                let result = null;
+                if (semanticIds.length > 0) {
+                    result = await applyCommandNow({
+                        type: "removeStates",
+                        stateIds: semanticIds,
+                    });
+                }
+
+                const sourceIds = Array.from(
+                    new Set(
+                        (Array.isArray(referenceSourceIds)
+                            ? referenceSourceIds
+                            : [referenceSourceIds]
+                        )
+                            .map((id) => String(id || "").trim())
+                            .filter(
+                                (id) =>
+                                    id && !semanticIds.includes(id)
+                            )
+                    )
+                );
+                if (sourceIds.length === 0) return result;
+
+                await waitForEditorCommit();
+                const editorState = editorStateRef.current || {};
+                for (const sourceStateId of sourceIds) {
+                    const positions = buildRustStateEditorPositions({
+                        ...editorState,
+                        stateId: sourceStateId,
+                    });
+                    if (!positions) continue;
+                    result = await applyCommandNow({
+                        type: "replaceStateEditorPositions",
+                        stateId: sourceStateId,
+                        positions,
+                    });
+                }
+                return result;
             }),
         [applyCommandNow, enqueue, replaceNow]
     );
@@ -330,6 +425,7 @@ export function useRustWorkflowDocument({
         applyWorkflowCommand,
         syncEditorState,
         syncEditorStateAfterCommit,
+        syncStateEditorPositions,
         syncStatePosition,
         syncStateParameters,
         syncSlotsAfterCommit,

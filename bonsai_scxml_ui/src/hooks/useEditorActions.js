@@ -19,6 +19,7 @@ export function useEditorActions(options) {
         setActiveTab: options.setActiveTab,
         applyWorkflowCommand: options.applyWorkflowCommand,
         syncEditorStateAfterCommit: options.syncEditorStateAfterCommit,
+        syncStateEditorPositions: options.syncStateEditorPositions,
     });
 
     const slotActions = useEditorSlotActions({
