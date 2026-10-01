@@ -12,7 +12,10 @@ use crate::core::model::{
 };
 
 use super::reparent::{move_editor_state, update_editor_position};
-use super::types::{StateSlotsCommandDto, TargetedTransitionCommandDto, WorkflowCommandDto};
+use super::types::{
+    ParallelLaneEditorPatchDto, StateSlotsCommandDto, TargetedTransitionCommandDto,
+    WorkflowCommandDto,
+};
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct WorkflowCommandChanges {
@@ -21,6 +24,7 @@ pub(crate) struct WorkflowCommandChanges {
     pub data_model_changed: bool,
     pub slot_declarations_changed: bool,
     pub index_changed: bool,
+    pub parallel_lane_updates: Vec<ParallelLaneEditorPatchDto>,
 }
 
 pub(crate) fn apply_command(
@@ -56,9 +60,20 @@ pub(crate) fn apply_command(
         WorkflowCommandDto::MoveEditorState {
             state_id,
             parent_state_id,
+            source_lane,
+            target_lane,
             x,
             y,
-        } => move_editor_state(workflow, index, state_id, parent_state_id, x, y),
+        } => move_editor_state(
+            workflow,
+            index,
+            state_id,
+            parent_state_id,
+            source_lane,
+            target_lane,
+            x,
+            y,
+        ),
         WorkflowCommandDto::RemoveStates { state_ids } => {
             remove_states(workflow, index, state_ids)
         }

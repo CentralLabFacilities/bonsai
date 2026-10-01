@@ -950,13 +950,6 @@ export function useNodeDrag({
                 );
             }
 
-            const sourceParallel = sourceLane
-                ? currentNodes.find(
-                    (candidate) =>
-                        candidate.id === sourceLane.parentId
-                )
-                : null;
-
             const targetParallel = targetLane
                 ? currentNodes.find(
                     (candidate) =>
@@ -1021,41 +1014,6 @@ export function useNodeDrag({
                         );
                     }
                 }
-
-                const storedInitialId = currentLane.data?.initialChildId;
-                const initialMember =
-                    members.find((member) => member.id === storedInitialId) ||
-                    members.find((member) => member.data?.isInitial) ||
-                    members[0] ||
-                    null;
-                const initialChildId = initialMember?.id || null;
-
-                nextNodes = nextNodes.map((candidate) => {
-                    if (candidate.id === currentLane.id) {
-                        return {
-                            ...candidate,
-                            data: {
-                                ...(candidate.data || {}),
-                                initialChildId,
-                            },
-                        };
-                    }
-
-                    if (
-                        candidate.parentId === currentLane.id &&
-                        isParallelLaneSkillCandidate(candidate)
-                    ) {
-                        return {
-                            ...candidate,
-                            data: {
-                                ...(candidate.data || {}),
-                                isInitial: candidate.id === initialChildId,
-                            },
-                        };
-                    }
-
-                    return candidate;
-                });
 
                 const parallel = nextNodes.find(
                     (candidate) => candidate.id === currentLane.parentId
@@ -1125,17 +1083,6 @@ export function useNodeDrag({
                             y: dropPoint.y,
                         },
                     selected: false,
-                    // Initial-state membership only has meaning inside the
-                    // container that owns that state. A node leaving a
-                    // Parallel lane may also have come from a Compound nested
-                    // inside that lane, so clear the flag here in the final
-                    // top-level drop path as well. Otherwise that nested case
-                    // bypasses the Compound reparenting branch above and the
-                    // node incorrectly remains initial at the root level.
-                    data: {
-                        ...(draggedNode.data || {}),
-                        isInitial: false,
-                    },
                 });
             } else {
                 nextNodes.push({

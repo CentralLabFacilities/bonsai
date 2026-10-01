@@ -265,6 +265,49 @@ export const buildRustSlotsSnapshot = ({
     };
 };
 
+export const buildRustParallelLaneMoveContext = ({
+    nodes = [],
+    laneId,
+} = {}) => {
+    const id = String(laneId || "").trim();
+    if (!id) return null;
+
+    const lane = (nodes || []).find(
+        (candidate) => candidate?.id === id && candidate?.type === "parallelLane"
+    );
+    if (!lane?.parentId) return null;
+
+    // Auto-managed lane Compounds still need the structural exporter. Their
+    // promotion/demotion rules are a separate editor topology operation from
+    // direct Parallel-lane membership.
+    const hasAutoWrapper = (nodes || []).some(
+        (candidate) =>
+            candidate?.parentId === id &&
+            candidate?.type === "compound" &&
+            (candidate?.data?.autoParallelLaneCompound ||
+                candidate?.className === "compound-in-lane")
+    );
+    if (hasAutoWrapper) return null;
+
+    const memberStateIds = (nodes || [])
+        .filter(
+            (candidate) =>
+                candidate?.parentId === id &&
+                candidate?.type !== "slot" &&
+                candidate?.type !== "parallelLane" &&
+                !candidate?.data?.isSkillClone &&
+                !candidate?.data?.isStateClone &&
+                !candidate?.data?.isSlotClone
+        )
+        .map((candidate) => String(candidate.id || "").trim())
+        .filter(Boolean);
+
+    return {
+        lane: normalizeNode(lane),
+        memberStateIds,
+    };
+};
+
 export const buildRustEditorNodeSnapshots = ({
     nodes = [],
     edges = [],

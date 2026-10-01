@@ -24,6 +24,18 @@ pub(crate) struct WorkflowMetadataPatchDto {
     pub initial_scxml_state_id: Option<String>,
 }
 
+#[derive(Debug, Clone, serde::Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ParallelLaneEditorPatchDto {
+    pub lane_id: String,
+    #[serde(default)]
+    pub parent_parallel_id: String,
+    #[serde(default)]
+    pub initial_child_id: Option<String>,
+    #[serde(default)]
+    pub member_state_ids: Vec<String>,
+}
+
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct WorkflowPatchDto {
@@ -40,6 +52,8 @@ pub(crate) struct WorkflowPatchDto {
     pub data_model: Option<Vec<DataModelEntryDto>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub slot_declarations: Option<Vec<SlotDeclarationDto>>,
+    #[serde(default)]
+    pub parallel_lane_updates: Vec<ParallelLaneEditorPatchDto>,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -75,6 +89,16 @@ pub(crate) struct TargetedTransitionCommandDto {
     #[serde(default)]
     #[serde(rename = "targetInstanceId")]
     pub target_instance_id: Option<String>,
+}
+
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ParallelLaneMoveContextDto {
+    pub lane: EditorExportNodeDto,
+    #[serde(default)]
+    #[serde(rename = "memberStateIds")]
+    pub member_state_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -130,6 +154,12 @@ pub(crate) enum WorkflowCommandDto {
         #[serde(default)]
         #[serde(rename = "parentStateId")]
         parent_state_id: Option<String>,
+        #[serde(default)]
+        #[serde(rename = "sourceLane")]
+        source_lane: Option<ParallelLaneMoveContextDto>,
+        #[serde(default)]
+        #[serde(rename = "targetLane")]
+        target_lane: Option<ParallelLaneMoveContextDto>,
         x: f64,
         y: f64,
     },

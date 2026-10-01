@@ -1,11 +1,13 @@
 use std::collections::HashSet;
 
+use crate::core::editor_export::build_inserted_state;
 use crate::core::model::{
     EditorPosition, State, StateId, StateKind, Transition, Workflow, WorkflowIndex,
 };
 use crate::core::transitions::events::scxml_transition_event;
 
 use super::commands::WorkflowCommandChanges;
+use super::types::{ParallelLaneEditorPatchDto, ParallelLaneMoveContextDto};
 
 pub(super) fn update_editor_position(state: &mut State, x: f64, y: f64) {
     state.editor.x = x;
@@ -287,11 +289,270 @@ fn recalculate_transition_owners(
     Ok(changed)
 }
 
+
+fn lane_state_name(context: &ParallelLaneMoveContextDto) -> String {
+    let lane = State::from_dto(build_inserted_state(&context.lane));
+    lane.scxml_id
+}
+
+fn lane_parallel_id(context: &ParallelLaneMoveContextDto) -> Result<StateId, String> {
+    if context.lane.node_type != "parallelLane" {
+        return Err(format!(
+            "Editor lane '{}' is not a Parallel lane",
+            context.lane.id
+        ));
+    }
+    let parent_id = context
+        .lane
+        .parent_id
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| format!("Parallel lane '{}' has no parent Parallel", context.lane.id))?;
+    Ok(StateId::from(parent_id))
+}
+
+fn lane_member_ids(context: &ParallelLaneMoveContextDto) -> Result<Vec<StateId>, String> {
+    let mut seen = HashSet::new();
+    let mut members = Vec::new();
+    for raw_id in &context.member_state_ids {
+        let id = StateId::from(raw_id.as_str());
+        if id.as_str().is_empty() {
+            continue;
+        }
+        if !seen.insert(id.clone()) {
+            return Err(format!(
+                "Parallel lane '{}' contains duplicate state '{}'",
+                context.lane.id, id
+            ));
+        }
+        members.push(id);
+    }
+    Ok(members)
+}
+
+fn reconcile_parallel_lane(
+    workflow: &mut Workflow,
+    context: &ParallelLaneMoveContextDto,
+) -> Result<(Vec<String>, ParallelLaneEditorPatchDto), String> {
+    let lane_id = StateId::from(context.lane.id.as_str());
+    if lane_id.as_str().is_empty() {
+        return Err("Parallel lane id must not be empty".into());
+    }
+    let parallel_id = lane_parallel_id(context)?;
+    let members = lane_member_ids(context)?;
+    if members.iter().any(|member_id| member_id == &lane_id) {
+        return Err(format!(
+            "Parallel lane '{}' cannot contain itself",
+            context.lane.id
+        ));
+    }
+
+    let parallel = workflow
+        .states
+        .iter()
+        .find(|state| state.id == parallel_id)
+        .ok_or_else(|| format!("Unknown parent Parallel '{}'", parallel_id))?;
+    if parallel.kind != StateKind::Parallel {
+        return Err(format!(
+            "Parallel lane '{}' parent '{}' is not a Parallel state",
+            context.lane.id, parallel.scxml_id
+        ));
+    }
+
+    for member_id in &members {
+        if !workflow.states.iter().any(|state| state.id == *member_id) {
+            return Err(format!(
+                "Unknown Parallel lane member '{}' in lane '{}'",
+                member_id, context.lane.id
+            ));
+        }
+    }
+
+    let lane_scxml_id = lane_state_name(context);
+    let flatten = members.len() == 1
+        && workflow
+            .states
+            .iter()
+            .find(|state| state.id == members[0])
+            .is_some_and(|state| state.scxml_id == lane_scxml_id);
+
+    let existing_lane = workflow.states.iter().position(|state| state.id == lane_id);
+    let existing_initial = existing_lane
+        .and_then(|position| workflow.states[position].initial_child_id.clone())
+        .filter(|id| members.contains(id));
+    let flagged_initial = members.iter().find(|member_id| {
+        workflow
+            .states
+            .iter()
+            .find(|state| state.id == **member_id)
+            .is_some_and(|state| state.is_initial)
+    }).cloned();
+    let initial_child_id = existing_initial
+        .or(flagged_initial)
+        .or_else(|| members.first().cloned());
+
+    let mut changed = Vec::new();
+
+    if flatten {
+        if let Some(position) = existing_lane {
+            let unexpected_child = workflow.states.iter().find(|state| {
+                state.parent_id.as_ref() == Some(&lane_id) && !members.contains(&state.id)
+            });
+            if let Some(child) = unexpected_child {
+                return Err(format!(
+                    "Parallel lane '{}' contains semantic child '{}' that is not present in the editor lane context",
+                    context.lane.id, child.id
+                ));
+            }
+            if workflow.transitions.iter().any(|transition| {
+                transition.source_state_id == lane_id
+                    || transition.target_state_id.as_ref() == Some(&lane_id)
+            }) {
+                return Err(format!(
+                    "Flattening Parallel lane '{}' requires transition retargeting",
+                    context.lane.id
+                ));
+            }
+            workflow.states.remove(position);
+            changed.push(lane_id.as_str().to_string());
+        }
+
+        let member_id = &members[0];
+        let member = workflow
+            .states
+            .iter_mut()
+            .find(|state| state.id == *member_id)
+            .ok_or_else(|| format!("Unknown Parallel lane member '{}'", member_id))?;
+        if member.parent_id.as_ref() != Some(&parallel_id) || member.is_initial {
+            member.parent_id = Some(parallel_id.clone());
+            member.is_initial = false;
+            changed.push(member.id.as_str().to_string());
+        }
+    } else {
+        if existing_lane.is_none() {
+            let mut lane = State::from_dto(build_inserted_state(&context.lane));
+            lane.id = lane_id.clone();
+            lane.kind = StateKind::ParallelLane;
+            lane.parent_id = Some(parallel_id.clone());
+            lane.is_initial = false;
+            lane.initial_child_id = None;
+            lane.initial_child_scxml_id = None;
+            workflow.states.push(lane);
+            changed.push(lane_id.as_str().to_string());
+        } else if let Some(position) = workflow.states.iter().position(|state| state.id == lane_id) {
+            let lane = &mut workflow.states[position];
+            if lane.kind != StateKind::ParallelLane || lane.parent_id.as_ref() != Some(&parallel_id) {
+                lane.kind = StateKind::ParallelLane;
+                lane.parent_id = Some(parallel_id.clone());
+                changed.push(lane_id.as_str().to_string());
+            }
+        }
+
+        let unexpected_child = workflow.states.iter().find(|state| {
+            state.parent_id.as_ref() == Some(&lane_id) && !members.contains(&state.id)
+        });
+        if let Some(child) = unexpected_child {
+            return Err(format!(
+                "Parallel lane '{}' contains semantic child '{}' that is not present in the editor lane context",
+                context.lane.id, child.id
+            ));
+        }
+
+        for member_id in &members {
+            let member = workflow
+                .states
+                .iter_mut()
+                .find(|state| state.id == *member_id)
+                .ok_or_else(|| format!("Unknown Parallel lane member '{}'", member_id))?;
+            let should_be_initial = initial_child_id.as_ref() == Some(member_id);
+            if member.parent_id.as_ref() != Some(&lane_id) || member.is_initial != should_be_initial {
+                member.parent_id = Some(lane_id.clone());
+                member.is_initial = should_be_initial;
+                changed.push(member.id.as_str().to_string());
+            }
+        }
+
+        let selected_scxml_id = initial_child_id.as_ref().and_then(|selected_id| {
+            workflow
+                .states
+                .iter()
+                .find(|state| state.id == *selected_id)
+                .map(|state| state.scxml_id.clone())
+        });
+        let lane = workflow
+            .states
+            .iter_mut()
+            .find(|state| state.id == lane_id)
+            .ok_or_else(|| format!("Parallel lane '{}' disappeared during normalization", lane_id))?;
+        if lane.initial_child_id != initial_child_id
+            || lane.initial_child_scxml_id != selected_scxml_id
+        {
+            lane.initial_child_id = initial_child_id.clone();
+            lane.initial_child_scxml_id = selected_scxml_id;
+            changed.push(lane.id.as_str().to_string());
+        }
+    }
+
+    changed.sort();
+    changed.dedup();
+    Ok((
+        changed,
+        ParallelLaneEditorPatchDto {
+            lane_id: lane_id.as_str().to_string(),
+            parent_parallel_id: parallel_id.as_str().to_string(),
+            initial_child_id: initial_child_id.map(|id| id.as_str().to_string()),
+            member_state_ids: members
+                .iter()
+                .map(|id| id.as_str().to_string())
+                .collect(),
+        },
+    ))
+}
+
+fn validate_non_parallel_target(
+    workflow: &Workflow,
+    index: &WorkflowIndex,
+    moving_id: &StateId,
+    parent_id: Option<&StateId>,
+) -> Result<(), String> {
+    let Some(parent_id) = parent_id else {
+        return Ok(());
+    };
+    if parent_id == moving_id {
+        return Err("A state cannot be its own parent".into());
+    }
+    let parent = index
+        .state(workflow, parent_id)
+        .ok_or_else(|| format!("Unknown parent state '{parent_id}'"))?;
+    if parent.kind != StateKind::Compound || has_parallel_scope(workflow, index, parent_id) {
+        return Err(format!(
+            "State '{}' can only be incrementally moved into a non-Parallel Compound",
+            index
+                .state(workflow, moving_id)
+                .map(|state| state.scxml_id.as_str())
+                .unwrap_or(moving_id.as_str())
+        ));
+    }
+    if is_state_within(workflow, index, parent_id, moving_id) {
+        return Err(format!(
+            "Moving '{}' into '{}' would create a parent cycle",
+            index
+                .state(workflow, moving_id)
+                .map(|state| state.scxml_id.as_str())
+                .unwrap_or(moving_id.as_str()),
+            parent.scxml_id
+        ));
+    }
+    Ok(())
+}
+
 pub(super) fn move_editor_state(
     workflow: &mut Workflow,
     index: &WorkflowIndex,
     state_id: String,
     parent_state_id: Option<String>,
+    source_lane: Option<ParallelLaneMoveContextDto>,
+    target_lane: Option<ParallelLaneMoveContextDto>,
     x: f64,
     y: f64,
 ) -> Result<WorkflowCommandChanges, String> {
@@ -299,38 +560,24 @@ pub(super) fn move_editor_state(
     let state_position = index
         .state_position(&id)
         .ok_or_else(|| format!("Unknown state '{id}'"))?;
-    if workflow.states[state_position].kind == StateKind::ParallelLane
-        || has_parallel_scope(workflow, index, &id)
-    {
+    if workflow.states[state_position].kind == StateKind::ParallelLane {
+        return Err("Parallel lane helper states are not draggable".into());
+    }
+
+    let has_lane_context = source_lane.is_some() || target_lane.is_some();
+    if !has_lane_context && has_parallel_scope(workflow, index, &id) {
         return Err(
-            "Parallel-scoped states must be moved through the structural editor exporter".into(),
+            "Parallel-scoped states must include Parallel lane context or use the structural editor exporter".into(),
         );
     }
 
     let next_parent_id = parent_state_id.map(StateId::from);
-    if let Some(parent_id) = next_parent_id.as_ref() {
-        if parent_id == &id {
-            return Err("A state cannot be its own parent".into());
-        }
-        let parent = index
-            .state(workflow, parent_id)
-            .ok_or_else(|| format!("Unknown parent state '{parent_id}'"))?;
-        if parent.kind != StateKind::Compound || has_parallel_scope(workflow, index, parent_id) {
-            return Err(format!(
-                "State '{}' can only be incrementally moved into a non-Parallel Compound",
-                workflow.states[state_position].scxml_id
-            ));
-        }
-        if is_state_within(workflow, index, parent_id, &id) {
-            return Err(format!(
-                "Moving '{}' into '{}' would create a parent cycle",
-                workflow.states[state_position].scxml_id, parent.scxml_id
-            ));
-        }
+    if target_lane.is_none() {
+        validate_non_parallel_target(workflow, index, &id, next_parent_id.as_ref())?;
     }
 
     let previous_parent_id = workflow.states[state_position].parent_id.clone();
-    if previous_parent_id == next_parent_id {
+    if !has_lane_context && previous_parent_id == next_parent_id {
         update_editor_position(&mut workflow.states[state_position], x, y);
         return Ok(WorkflowCommandChanges {
             changed_state_ids: vec![id.as_str().to_string()],
@@ -343,20 +590,42 @@ pub(super) fn move_editor_state(
     // case the stored workflow must remain untouched so the frontend bridge can
     // safely fall back to a structural resync.
     let mut candidate = workflow.clone();
-    candidate.states[state_position].parent_id = next_parent_id.clone();
+    let temporary_target_parent = if let Some(target_lane) = target_lane.as_ref() {
+        Some(lane_parallel_id(target_lane)?)
+    } else {
+        next_parent_id.clone()
+    };
+    candidate.states[state_position].parent_id = temporary_target_parent;
     update_editor_position(&mut candidate.states[state_position], x, y);
 
     let mut changed_state_ids = vec![id.as_str().to_string()];
-    changed_state_ids.extend(normalize_initial_scope(
-        &mut candidate,
-        previous_parent_id.as_ref(),
-        false,
-    ));
-    changed_state_ids.extend(normalize_initial_scope(
-        &mut candidate,
-        next_parent_id.as_ref(),
-        true,
-    ));
+    let mut parallel_lane_updates = Vec::new();
+
+    if source_lane.is_none() {
+        changed_state_ids.extend(normalize_initial_scope(
+            &mut candidate,
+            previous_parent_id.as_ref(),
+            false,
+        ));
+    }
+
+    if let Some(source_lane) = source_lane.as_ref() {
+        let (lane_changes, lane_patch) = reconcile_parallel_lane(&mut candidate, source_lane)?;
+        changed_state_ids.extend(lane_changes);
+        parallel_lane_updates.push(lane_patch);
+    }
+
+    if let Some(target_lane) = target_lane.as_ref() {
+        let (lane_changes, lane_patch) = reconcile_parallel_lane(&mut candidate, target_lane)?;
+        changed_state_ids.extend(lane_changes);
+        parallel_lane_updates.push(lane_patch);
+    } else {
+        changed_state_ids.extend(normalize_initial_scope(
+            &mut candidate,
+            next_parent_id.as_ref(),
+            true,
+        ));
+    }
 
     let changed_transition_ids = recalculate_transition_owners(&mut candidate)?;
     *workflow = candidate;
@@ -367,6 +636,7 @@ pub(super) fn move_editor_state(
         changed_state_ids,
         changed_transition_ids,
         index_changed: true,
+        parallel_lane_updates,
         ..WorkflowCommandChanges::default()
     })
 }

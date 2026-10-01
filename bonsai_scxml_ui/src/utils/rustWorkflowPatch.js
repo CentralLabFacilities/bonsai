@@ -192,13 +192,22 @@ export const applyRustWorkflowStatePatch = (
     const changedById = new Map(
         (patch.states || []).map((state) => [String(state?.id || ""), state])
     );
+    const parallelLaneUpdates = new Map(
+        (patch.parallelLaneUpdates || []).map((lane) => [
+            String(lane?.laneId || ""),
+            lane,
+        ])
+    );
 
     let changed = false;
     const nextNodes = [];
 
     for (const node of currentNodes || []) {
         const canonicalId = String(node?.data?.cloneOfNodeId || node?.id || "");
-        if (removed.has(canonicalId)) {
+        if (
+            removed.has(canonicalId) &&
+            !(mode === "move" && node?.type === "parallelLane")
+        ) {
             changed = true;
             continue;
         }
@@ -218,7 +227,8 @@ export const applyRustWorkflowStatePatch = (
         }
 
         const shouldApplyPosition =
-            mode === "all" || mode === "position" || mode === "move";
+            (mode === "all" || mode === "position" || mode === "move") &&
+            !(mode === "move" && node?.type === "parallelLane");
         const primaryPosition = shouldApplyPosition
             ? getPrimaryEditorPosition(state)
             : null;
@@ -231,13 +241,58 @@ export const applyRustWorkflowStatePatch = (
 
         nextNodes.push({
             ...node,
-            ...(mode === "move"
-                ? { parentId: state?.parentId || undefined }
-                : {}),
+            // React Flow parentage is editor topology. In particular, an
+            // atomic Parallel lane is flattened semantically in Rust while its
+            // visual lane helper remains the React parent. The optimistic drag
+            // has already committed the correct visual parent, so a move patch
+            // must not overwrite it with the flatter semantic parent.
             position: nextPosition,
             data: stateDataPatch(node, state, mode),
         });
         changed = true;
+    }
+
+    if (mode === "move" && parallelLaneUpdates.size > 0) {
+        const laneMembers = new Map();
+        parallelLaneUpdates.forEach((lane, laneId) => {
+            const initialChildId = lane?.initialChildId
+                ? String(lane.initialChildId)
+                : null;
+            for (const memberId of lane?.memberStateIds || []) {
+                laneMembers.set(String(memberId), { laneId, initialChildId });
+            }
+        });
+
+        for (let index = 0; index < nextNodes.length; index += 1) {
+            const node = nextNodes[index];
+            const lane = parallelLaneUpdates.get(String(node?.id || ""));
+            if (lane && node?.type === "parallelLane") {
+                nextNodes[index] = {
+                    ...node,
+                    data: {
+                        ...(node.data || {}),
+                        initialChildId: lane?.initialChildId || null,
+                    },
+                };
+                changed = true;
+                continue;
+            }
+
+            const membership = laneMembers.get(String(node?.id || ""));
+            if (membership && node?.parentId === membership.laneId) {
+                const isInitial = node.id === membership.initialChildId;
+                if (Boolean(node?.data?.isInitial) !== isInitial) {
+                    nextNodes[index] = {
+                        ...node,
+                        data: {
+                            ...(node.data || {}),
+                            isInitial,
+                        },
+                    };
+                    changed = true;
+                }
+            }
+        }
     }
 
     return changed ? nextNodes : currentNodes;

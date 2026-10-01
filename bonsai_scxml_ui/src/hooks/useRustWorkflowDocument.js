@@ -8,6 +8,7 @@ import {
     buildRustEditorExportRequest,
     buildRustEditorNodeSnapshots,
     buildRustEditorStructureSnapshot,
+    buildRustParallelLaneMoveContext,
     buildRustSlotsSnapshot,
     buildRustStateEditorPositions,
     buildRustStateParameters,
@@ -406,10 +407,48 @@ export function useRustWorkflowDocument({
                     currentParentId !== (previousParentId || null);
 
                 if (parentChanged) {
+                    const previousParentNode = previousParentId
+                        ? currentNodes.find(
+                            (candidate) => candidate.id === previousParentId
+                        )
+                        : null;
+                    const currentParentNode = currentParentId
+                        ? currentNodes.find(
+                            (candidate) => candidate.id === currentParentId
+                        )
+                        : null;
+
+                    const sourceLane =
+                        previousParentNode?.type === "parallelLane"
+                            ? buildRustParallelLaneMoveContext({
+                                nodes: currentNodes,
+                                laneId: previousParentId,
+                            })
+                            : null;
+                    const targetLane =
+                        currentParentNode?.type === "parallelLane"
+                            ? buildRustParallelLaneMoveContext({
+                                nodes: currentNodes,
+                                laneId: currentParentId,
+                            })
+                            : null;
+
+                    // Lanes containing an editor-managed auto Compound still
+                    // use the canonical structure exporter until that wrapper
+                    // topology is represented directly by a Rust command.
+                    if (
+                        (previousParentNode?.type === "parallelLane" && !sourceLane) ||
+                        (currentParentNode?.type === "parallelLane" && !targetLane)
+                    ) {
+                        return syncEditorStructureNow(editorStateRef.current);
+                    }
+
                     return applyCommandNow({
                         type: "moveEditorState",
                         stateId,
                         parentStateId: currentParentId,
+                        sourceLane,
+                        targetLane,
                         x: Number(node.position?.x || 0),
                         y: Number(node.position?.y || 0),
                     });
@@ -422,7 +461,7 @@ export function useRustWorkflowDocument({
                     y: Number(node.position?.y || 0),
                 });
             }),
-        [applyCommandNow, enqueue, replaceNow]
+        [applyCommandNow, enqueue, replaceNow, syncEditorStructureNow]
     );
 
     const syncStateParameters = useCallback(
