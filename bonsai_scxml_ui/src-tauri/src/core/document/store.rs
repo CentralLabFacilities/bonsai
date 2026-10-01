@@ -1424,6 +1424,7 @@ mod tests {
                     source_lane: None,
                     target_lane: Some(ParallelLaneMoveContextDto {
                         lane: lane_node.clone(),
+                        wrapper: None,
                         member_state_ids: vec!["a".into(), "b".into()],
                     }),
                     x: 80.0,
@@ -1466,6 +1467,7 @@ mod tests {
                     parent_state_id: None,
                     source_lane: Some(ParallelLaneMoveContextDto {
                         lane: lane_node,
+                        wrapper: None,
                         member_state_ids: vec!["a".into()],
                     }),
                     target_lane: None,
@@ -1498,5 +1500,126 @@ mod tests {
             .unwrap();
         assert_eq!(b.parent_id, None);
     }
+
+    #[test]
+    fn moving_state_into_auto_parallel_lane_compound_stays_incremental() {
+        let store = WorkflowDocumentStore::default();
+        let workflow = Workflow {
+            states: vec![
+                State {
+                    id: StateId::from("parallel"),
+                    scxml_id: "Parallel".into(),
+                    label: "Parallel".into(),
+                    kind: StateKind::Parallel,
+                    ..sample_state_defaults()
+                },
+                State {
+                    id: StateId::from("lane"),
+                    scxml_id: "Lane".into(),
+                    label: "Lane".into(),
+                    kind: StateKind::ParallelLane,
+                    parent_id: Some(StateId::from("parallel")),
+                    initial_child_id: Some(StateId::from("wrapper")),
+                    initial_child_scxml_id: Some("lane_1".into()),
+                    ..sample_state_defaults()
+                },
+                State {
+                    id: StateId::from("wrapper"),
+                    scxml_id: "lane_1".into(),
+                    label: "lane_1".into(),
+                    kind: StateKind::Compound,
+                    parent_id: Some(StateId::from("lane")),
+                    initial_child_id: Some(StateId::from("a")),
+                    initial_child_scxml_id: Some("A".into()),
+                    ..sample_state_defaults()
+                },
+                State {
+                    id: StateId::from("a"),
+                    scxml_id: "A".into(),
+                    label: "A".into(),
+                    kind: StateKind::Skill,
+                    parent_id: Some(StateId::from("wrapper")),
+                    is_initial: true,
+                    ..sample_state_defaults()
+                },
+                State {
+                    id: StateId::from("b"),
+                    scxml_id: "B".into(),
+                    label: "B".into(),
+                    kind: StateKind::Skill,
+                    ..sample_state_defaults()
+                },
+            ],
+            ..Workflow::default()
+        };
+        assert_eq!(store.replace(workflow).unwrap(), 1);
+
+        let lane_node = EditorExportNodeDto {
+            id: "lane".into(),
+            node_type: "parallelLane".into(),
+            parent_id: Some("parallel".into()),
+            label: "Lane".into(),
+            full_skill_name: "Lane".into(),
+            ..EditorExportNodeDto::default()
+        };
+        let wrapper_node = EditorExportNodeDto {
+            id: "wrapper".into(),
+            node_type: "compound".into(),
+            parent_id: Some("lane".into()),
+            label: "lane_1".into(),
+            full_skill_name: "lane_1".into(),
+            initial_child_id: Some("a".into()),
+            ..EditorExportNodeDto::default()
+        };
+
+        let result = store
+            .apply(
+                Some(1),
+                WorkflowCommandDto::MoveEditorState {
+                    state_id: "b".into(),
+                    parent_state_id: Some("wrapper".into()),
+                    source_lane: None,
+                    target_lane: Some(ParallelLaneMoveContextDto {
+                        lane: lane_node,
+                        wrapper: Some(wrapper_node),
+                        member_state_ids: vec!["a".into(), "b".into()],
+                    }),
+                    x: 120.0,
+                    y: 20.0,
+                },
+            )
+            .unwrap();
+
+        assert_eq!(result.revision, 2);
+        assert_eq!(result.patch.parallel_lane_updates.len(), 1);
+        assert_eq!(
+            result.patch.parallel_lane_updates[0].initial_child_id.as_deref(),
+            Some("wrapper")
+        );
+
+        let snapshot = store.snapshot().unwrap().unwrap();
+        let b = snapshot
+            .workflow
+            .states
+            .iter()
+            .find(|state| state.id == "b")
+            .unwrap();
+        assert_eq!(b.parent_id.as_deref(), Some("wrapper"));
+        let wrapper = snapshot
+            .workflow
+            .states
+            .iter()
+            .find(|state| state.id == "wrapper")
+            .unwrap();
+        assert_eq!(wrapper.initial_child_id.as_deref(), Some("a"));
+        let lane = snapshot
+            .workflow
+            .states
+            .iter()
+            .find(|state| state.id == "lane")
+            .unwrap();
+        assert_eq!(lane.initial_child_id.as_deref(), Some("wrapper"));
+    }
+
 
 }

@@ -97,6 +97,8 @@ pub(crate) struct TargetedTransitionCommandDto {
 pub(crate) struct ParallelLaneMoveContextDto {
     pub lane: EditorExportNodeDto,
     #[serde(default)]
+    pub wrapper: Option<EditorExportNodeDto>,
+    #[serde(default)]
     #[serde(rename = "memberStateIds")]
     pub member_state_ids: Vec<String>,
 }

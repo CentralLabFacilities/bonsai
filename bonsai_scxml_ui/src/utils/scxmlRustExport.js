@@ -277,22 +277,18 @@ export const buildRustParallelLaneMoveContext = ({
     );
     if (!lane?.parentId) return null;
 
-    // Auto-managed lane Compounds still need the structural exporter. Their
-    // promotion/demotion rules are a separate editor topology operation from
-    // direct Parallel-lane membership.
-    const hasAutoWrapper = (nodes || []).some(
+    const wrapper = (nodes || []).find(
         (candidate) =>
             candidate?.parentId === id &&
             candidate?.type === "compound" &&
             (candidate?.data?.autoParallelLaneCompound ||
                 candidate?.className === "compound-in-lane")
     );
-    if (hasAutoWrapper) return null;
-
+    const semanticParentId = wrapper?.id || id;
     const memberStateIds = (nodes || [])
         .filter(
             (candidate) =>
-                candidate?.parentId === id &&
+                candidate?.parentId === semanticParentId &&
                 candidate?.type !== "slot" &&
                 candidate?.type !== "parallelLane" &&
                 !candidate?.data?.isSkillClone &&
@@ -304,6 +300,7 @@ export const buildRustParallelLaneMoveContext = ({
 
     return {
         lane: normalizeNode(lane),
+        wrapper: wrapper ? normalizeNode(wrapper) : null,
         memberStateIds,
     };
 };
