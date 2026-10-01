@@ -16,6 +16,7 @@ export function useEditorSlotActions({
     setManualSlots,
     setSelectedNodeId,
     checkSlotConnection,
+    syncSlotsAfterCommit,
 }) {
     const updateSlotPath = useCallback(
         (slotNode, nextPath) => {
@@ -108,6 +109,7 @@ export function useEditorSlotActions({
                 updatedManualSlots,
                 updatedSlotNodes
             );
+            void syncSlotsAfterCommit?.();
             return true;
         },
         [
@@ -118,6 +120,7 @@ export function useEditorSlotActions({
             setManualSlots,
             setSelectedNodeId,
             checkSlotConnection,
+            syncSlotsAfterCommit,
         ]
     );
 
@@ -186,6 +189,7 @@ export function useEditorSlotActions({
             setNodes(updatedNodes);
             setManualSlots(updatedManualSlots);
             checkSlotConnection(updatedNodes, updatedManualSlots);
+            void syncSlotsAfterCommit?.();
             return true;
         },
         [
@@ -194,6 +198,7 @@ export function useEditorSlotActions({
             setNodes,
             setManualSlots,
             checkSlotConnection,
+            syncSlotsAfterCommit,
         ]
     );
 
@@ -250,6 +255,7 @@ export function useEditorSlotActions({
             }
 
             checkSlotConnection(updatedNodes, updatedManualSlots);
+            void syncSlotsAfterCommit?.();
             return newSlot;
         },
         [
@@ -258,6 +264,7 @@ export function useEditorSlotActions({
             setNodes,
             setManualSlots,
             checkSlotConnection,
+            syncSlotsAfterCommit,
         ]
     );
 

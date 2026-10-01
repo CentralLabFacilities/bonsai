@@ -1,11 +1,12 @@
 use std::collections::{HashMap, HashSet};
 
+use crate::core::editor_export::types::{EditorExportSlotDeclarationDto, EditorExportSlotDto};
 use crate::core::model::{
-    Assignment, DataModelEntry, EditorPosition, State, StateId, Transition, TransitionId, Workflow,
-    WorkflowIndex,
+    Assignment, DataModelEntry, EditorPosition, Parameter, Slot, SlotDeclaration, State, StateId,
+    Transition, TransitionId, Workflow, WorkflowIndex,
 };
 
-use super::types::{TargetedTransitionCommandDto, WorkflowCommandDto};
+use super::types::{StateSlotsCommandDto, TargetedTransitionCommandDto, WorkflowCommandDto};
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct WorkflowCommandChanges {
@@ -61,6 +62,19 @@ pub(crate) fn apply_command(
                 ..WorkflowCommandChanges::default()
             })
         }
+        WorkflowCommandDto::ReplaceStateParameters {
+            state_id,
+            parameters,
+        } => replace_state_parameters(workflow, index, state_id, parameters),
+        WorkflowCommandDto::ReplaceSlotsSnapshot {
+            states,
+            extra_slot_declarations,
+        } => replace_slots_snapshot(
+            workflow,
+            index,
+            states,
+            extra_slot_declarations,
+        ),
         WorkflowCommandDto::UpdateTransitionEvent {
             transition_id,
             event,
@@ -85,6 +99,190 @@ pub(crate) fn apply_command(
             source_state_id,
             transitions,
         ),
+    }
+}
+
+fn replace_state_parameters(
+    workflow: &mut Workflow,
+    index: &WorkflowIndex,
+    state_id: String,
+    parameters: Vec<crate::core::model::ParameterDto>,
+) -> Result<WorkflowCommandChanges, String> {
+    let id = StateId::from(state_id);
+    let position = index
+        .state_position(&id)
+        .ok_or_else(|| format!("Unknown state '{id}'"))?;
+
+    workflow.states[position].parameters = parameters
+        .into_iter()
+        .map(|parameter| Parameter {
+            key: parameter.key,
+            type_name: parameter.type_name,
+            required: parameter.required,
+            default_value: parameter.default_value,
+            description: parameter.description,
+            expression: parameter.expression,
+        })
+        .collect();
+
+    Ok(WorkflowCommandChanges {
+        changed_state_ids: vec![id.as_str().to_string()],
+        ..WorkflowCommandChanges::default()
+    })
+}
+
+fn replace_slots_snapshot(
+    workflow: &mut Workflow,
+    index: &WorkflowIndex,
+    states: Vec<StateSlotsCommandDto>,
+    extra_slot_declarations: Vec<EditorExportSlotDeclarationDto>,
+) -> Result<WorkflowCommandChanges, String> {
+    let mut changed_state_ids = Vec::new();
+    let mut declarations = Vec::new();
+    let mut seen_declarations = HashSet::new();
+
+    for state_slots in states {
+        let state_id = StateId::from(state_slots.state_id);
+        let position = index
+            .state_position(&state_id)
+            .ok_or_else(|| format!("Unknown state '{state_id}'"))?;
+
+        let state_name = if !state_slots.state_name.trim().is_empty() {
+            state_slots.state_name.trim().to_string()
+        } else {
+            workflow.states[position].scxml_id.clone()
+        };
+
+        workflow.states[position].input_slots = state_slots
+            .input_slots
+            .iter()
+            .map(slot_from_editor)
+            .collect();
+        workflow.states[position].output_slots = state_slots
+            .output_slots
+            .iter()
+            .map(slot_from_editor)
+            .collect();
+        changed_state_ids.push(state_id.as_str().to_string());
+
+        for slot in state_slots
+            .input_slots
+            .iter()
+            .chain(state_slots.output_slots.iter())
+        {
+            if let Some(declaration) = declaration_from_editor_slot(slot, &state_name) {
+                push_unique_slot_declaration(
+                    &mut declarations,
+                    &mut seen_declarations,
+                    declaration,
+                );
+            }
+        }
+    }
+
+    for declaration in extra_slot_declarations {
+        let key = declaration.key.trim().to_string();
+        let state = declaration.state.trim().to_string();
+        let xpath = normalize_xpath(&declaration.xpath);
+        if key.is_empty() || state.is_empty() || xpath.is_empty() {
+            continue;
+        }
+        push_unique_slot_declaration(
+            &mut declarations,
+            &mut seen_declarations,
+            SlotDeclaration {
+                key,
+                state,
+                xpath,
+                inherited: declaration.inherited,
+            },
+        );
+    }
+
+    workflow.slot_declarations = declarations;
+    changed_state_ids.sort();
+    changed_state_ids.dedup();
+
+    Ok(WorkflowCommandChanges {
+        changed_state_ids,
+        ..WorkflowCommandChanges::default()
+    })
+}
+
+fn slot_from_editor(slot: &EditorExportSlotDto) -> Slot {
+    Slot {
+        key: slot.key.clone(),
+        type_name: slot.type_name.clone(),
+        description: slot.description.clone(),
+        path: normalize_xpath(&slot.path),
+        inherited: slot.inherited.then(|| {
+            if !slot.inherited_xpath.trim().is_empty() {
+                normalize_xpath(&slot.inherited_xpath)
+            } else {
+                slot.inherited_state.trim().to_string()
+            }
+        }),
+    }
+}
+
+fn declaration_from_editor_slot(
+    slot: &EditorExportSlotDto,
+    state_name: &str,
+) -> Option<SlotDeclaration> {
+    if slot.path.trim().is_empty() {
+        return None;
+    }
+
+    let key = slot.key.trim().to_string();
+    if key.is_empty() {
+        return None;
+    }
+
+    let inherited = slot.inherited;
+    let state = if inherited && !slot.inherited_state.trim().is_empty() {
+        slot.inherited_state.trim().to_string()
+    } else {
+        state_name.to_string()
+    };
+    let xpath = if inherited && !slot.inherited_xpath.trim().is_empty() {
+        normalize_xpath(&slot.inherited_xpath)
+    } else {
+        normalize_xpath(&slot.path)
+    };
+    if state.is_empty() || xpath.is_empty() {
+        return None;
+    }
+
+    Some(SlotDeclaration {
+        key,
+        state,
+        xpath,
+        inherited,
+    })
+}
+
+fn push_unique_slot_declaration(
+    declarations: &mut Vec<SlotDeclaration>,
+    seen: &mut HashSet<String>,
+    declaration: SlotDeclaration,
+) {
+    let key = format!(
+        "{}|{}|{}|{}",
+        declaration.inherited, declaration.key, declaration.state, declaration.xpath
+    );
+    if seen.insert(key) {
+        declarations.push(declaration);
+    }
+}
+
+fn normalize_xpath(value: &str) -> String {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        String::new()
+    } else if trimmed.starts_with('/') {
+        trimmed.to_string()
+    } else {
+        format!("/{trimmed}")
     }
 }
 

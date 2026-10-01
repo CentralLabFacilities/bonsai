@@ -132,10 +132,13 @@ fn command_result(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::super::types::TargetedTransitionCommandDto;
+    use super::super::types::{StateSlotsCommandDto, TargetedTransitionCommandDto};
+    use crate::core::editor_export::types::{
+        EditorExportSlotDeclarationDto, EditorExportSlotDto,
+    };
     use crate::core::model::{
-        AssignmentDto, EditorMetadataDto, EditorPositionDto, State, StateDto, StateId, StateKind,
-        StateKindDto, Transition, TransitionId,
+        AssignmentDto, EditorMetadataDto, EditorPositionDto, ParameterDto, State, StateDto,
+        StateId, StateKind, StateKindDto, Transition, TransitionId,
     };
 
     fn sample_workflow() -> Workflow {
@@ -455,6 +458,77 @@ mod tests {
         assert_eq!(child.scxml_id, "Speak");
         assert_eq!(child.full_skill_name.as_deref(), Some("skills.Talk#Speak"));
         assert_eq!(snapshot.workflow.transitions[0].event, "Speak.success");
+    }
+
+    #[test]
+    fn parameter_and_slot_snapshots_update_without_replacing_workflow() {
+        let store = WorkflowDocumentStore::default();
+        assert_eq!(store.replace(sample_workflow()).unwrap(), 1);
+
+        let parameter_result = store
+            .apply(
+                Some(1),
+                WorkflowCommandDto::ReplaceStateParameters {
+                    state_id: "a".into(),
+                    parameters: vec![ParameterDto {
+                        key: "speed".into(),
+                        expression: "2".into(),
+                        ..ParameterDto::default()
+                    }],
+                },
+            )
+            .unwrap();
+        assert_eq!(parameter_result.revision, 2);
+        assert_eq!(parameter_result.changed_state_ids, vec!["a"]);
+
+        let slot_result = store
+            .apply(
+                Some(2),
+                WorkflowCommandDto::ReplaceSlotsSnapshot {
+                    states: vec![StateSlotsCommandDto {
+                        state_id: "a".into(),
+                        state_name: "A".into(),
+                        input_slots: vec![EditorExportSlotDto {
+                            key: "Model".into(),
+                            type_name: "Object".into(),
+                            path: "/model".into(),
+                            ..EditorExportSlotDto::default()
+                        }],
+                        output_slots: vec![],
+                    }],
+                    extra_slot_declarations: vec![EditorExportSlotDeclarationDto {
+                        key: "Manual".into(),
+                        state: "A".into(),
+                        xpath: "/manual".into(),
+                        inherited: false,
+                    }],
+                },
+            )
+            .unwrap();
+        assert_eq!(slot_result.revision, 3);
+
+        let snapshot = store.snapshot().unwrap().unwrap();
+        let state = snapshot
+            .workflow
+            .states
+            .iter()
+            .find(|state| state.id == "a")
+            .unwrap();
+        assert_eq!(state.parameters.len(), 1);
+        assert_eq!(state.parameters[0].key, "speed");
+        assert_eq!(state.input_slots.len(), 1);
+        assert_eq!(state.input_slots[0].path, "/model");
+        assert_eq!(snapshot.workflow.slot_declarations.len(), 2);
+        assert!(snapshot
+            .workflow
+            .slot_declarations
+            .iter()
+            .any(|slot| slot.key == "Model" && slot.xpath == "/model"));
+        assert!(snapshot
+            .workflow
+            .slot_declarations
+            .iter()
+            .any(|slot| slot.key == "Manual" && slot.xpath == "/manual"));
     }
 
 }

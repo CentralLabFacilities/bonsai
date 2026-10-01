@@ -29,6 +29,7 @@ export function useEditorActions(options) {
         setManualSlots: options.setManualSlots,
         setSelectedNodeId: options.setSelectedNodeId,
         checkSlotConnection: options.checkSlotConnection,
+        syncSlotsAfterCommit: options.syncSlotsAfterCommit,
     });
 
 
@@ -39,6 +40,8 @@ export function useEditorActions(options) {
         checkSlotConnection: options.checkSlotConnection,
         applyWorkflowCommand: options.applyWorkflowCommand,
         syncEditorStateAfterCommit: options.syncEditorStateAfterCommit,
+        syncStateParameters: options.syncStateParameters,
+        syncSlotsAfterCommit: options.syncSlotsAfterCommit,
     });
 
     const dataModelActions = useEditorDataModelActions({

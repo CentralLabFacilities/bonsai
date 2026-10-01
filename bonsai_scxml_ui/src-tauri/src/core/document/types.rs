@@ -1,4 +1,5 @@
-use crate::core::model::{AssignmentDto, DataModelEntryDto, StateDto, WorkflowDto};
+use crate::core::editor_export::types::{EditorExportSlotDeclarationDto, EditorExportSlotDto};
+use crate::core::model::{AssignmentDto, DataModelEntryDto, ParameterDto, StateDto, WorkflowDto};
 
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -35,6 +36,21 @@ pub(crate) struct TargetedTransitionCommandDto {
     #[serde(default)]
     #[serde(rename = "targetInstanceId")]
     pub target_instance_id: Option<String>,
+}
+
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StateSlotsCommandDto {
+    #[serde(rename = "stateId")]
+    pub state_id: String,
+    #[serde(default)]
+    #[serde(rename = "stateName")]
+    pub state_name: String,
+    #[serde(default)]
+    pub input_slots: Vec<EditorExportSlotDto>,
+    #[serde(default)]
+    pub output_slots: Vec<EditorExportSlotDto>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -91,6 +107,19 @@ pub(crate) enum WorkflowCommandDto {
     ReplaceDataModel {
         #[serde(default)]
         entries: Vec<DataModelEntryDto>,
+    },
+    ReplaceStateParameters {
+        #[serde(rename = "stateId")]
+        state_id: String,
+        #[serde(default)]
+        parameters: Vec<ParameterDto>,
+    },
+    ReplaceSlotsSnapshot {
+        #[serde(default)]
+        states: Vec<StateSlotsCommandDto>,
+        #[serde(default)]
+        #[serde(rename = "extraSlotDeclarations")]
+        extra_slot_declarations: Vec<EditorExportSlotDeclarationDto>,
     },
     UpdateTransitionEvent {
         #[serde(rename = "transitionId")]

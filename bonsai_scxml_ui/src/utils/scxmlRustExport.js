@@ -90,13 +90,7 @@ const normalizeNode = (node) => {
             ? String(node.data.initialChildId)
             : null,
         initialSubState: String(node?.data?.initialSubState || ""),
-        parameters: (node?.data?.params || [])
-            .filter(
-                (parameter) =>
-                    String(parameter?.expr || "").trim() !== "" ||
-                    String(parameter?.default || "").trim() !== ""
-            )
-            .map(normalizeParameter),
+        parameters: buildRustStateParameters(node?.data?.params || []),
         inputSlots: (node?.data?.inSlots || []).map(normalizeSlot),
         outputSlots: (node?.data?.outSlots || []).map(normalizeSlot),
         onEntry: normalizeAssignments(onEntry),
@@ -154,6 +148,47 @@ export const buildRustDataModelEntries = (globalDataModel = []) =>
         id: String(entry?.id || ""),
         expression: serializeEditorValueForScxml(entry?.expr ?? ""),
     }));
+
+export const buildRustStateParameters = (parameters = []) =>
+    (Array.isArray(parameters) ? parameters : [])
+        .filter(
+            (parameter) =>
+                String(parameter?.expr || "").trim() !== "" ||
+                String(parameter?.default || "").trim() !== ""
+        )
+        .map(normalizeParameter);
+
+export const buildRustSlotsSnapshot = ({
+    nodes = [],
+    edges = [],
+    manualSlots = [],
+} = {}) => {
+    const exportGraph = prepareGraphForScxml(nodes || [], edges || []);
+    const states = exportGraph.nodes.map((node) => {
+        const normalized = normalizeNode(node);
+        return {
+            stateId: normalized.id,
+            stateName:
+                normalized.fullSkillName || normalized.label || normalized.id,
+            inputSlots: normalized.inputSlots,
+            outputSlots: normalized.outputSlots,
+        };
+    });
+
+    return {
+        states,
+        extraSlotDeclarations: (manualSlots || []).map((slot) => {
+            const inherited =
+                slot?.slotKind === "inheritSlot" || Boolean(slot?.inherited);
+            return {
+                key: String(slot?.key || ""),
+                state: String(slot?.inherited?.state || slot?.state || ""),
+                xpath: String(slot?.inherited?.xpath || slot?.path || ""),
+                inherited,
+            };
+        }),
+    };
+};
 
 export const buildRustEditorExportRequest = ({
     nodes,

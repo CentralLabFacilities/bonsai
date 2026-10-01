@@ -567,6 +567,7 @@ function AppContent() {
         updateNodeName,
         updateNodeSource,
         updateNodeParameter,
+        commitNodeParameters,
         updateStateActions,
         updateSendEvents,
         updateSkillSlotPath,
@@ -597,6 +598,8 @@ function AppContent() {
             rustWorkflowDocument.syncEditorStateAfterCommit,
         syncTransitionsForSource:
             rustWorkflowDocument.syncTransitionsForSource,
+        syncStateParameters: rustWorkflowDocument.syncStateParameters,
+        syncSlotsAfterCommit: rustWorkflowDocument.syncSlotsAfterCommit,
     });
 
     const {
@@ -3663,6 +3666,7 @@ function AppContent() {
 
                 return updatedNodes;
             });
+            void rustWorkflowDocument.syncStateConfigurationAfterCommit(nodeId);
         } catch (error) {
             console.error("Error updating skill from parameters:", error);
         }
@@ -4884,7 +4888,10 @@ function AppContent() {
                                     }
                                 }}
 
-                                onUpdateParameterBlur={updateEventsFromParameters}
+                                onUpdateParameterBlur={(nodeId) => {
+                                    commitNodeParameters(nodeId);
+                                    updateEventsFromParameters(nodeId);
+                                }}
                                 globalDataModel={selectedActionDataModel}
                                 actionValueVariables={selectedActionExpressionVariables}
                                 onUpdateStateActions={updateStateActions}

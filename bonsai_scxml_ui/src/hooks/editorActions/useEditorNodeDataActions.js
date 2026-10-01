@@ -16,6 +16,8 @@ export function useEditorNodeDataActions({
     checkSlotConnection,
     applyWorkflowCommand,
     syncEditorStateAfterCommit,
+    syncStateParameters,
+    syncSlotsAfterCommit,
 }) {
     const updateNodeName = useCallback(
         (nodeId, name, commit = false) => {
@@ -197,6 +199,21 @@ export function useEditorNodeDataActions({
         [nodes, setNodes]
     );
 
+    const commitNodeParameters = useCallback(
+        (nodeId, parameterOverride = null) => {
+            if (!nodeId) return;
+            const node = nodes.find((candidate) => candidate.id === nodeId);
+            if (!node && !Array.isArray(parameterOverride)) return;
+            void syncStateParameters?.(
+                nodeId,
+                Array.isArray(parameterOverride)
+                    ? parameterOverride
+                    : node?.data?.params || []
+            );
+        },
+        [nodes, syncStateParameters]
+    );
+
     const updateStateActions = useCallback(
         (nodeId, actionType, assignments) => {
             if (!nodeId || !actionType) return;
@@ -370,18 +387,20 @@ export function useEditorNodeDataActions({
                     requestAnimationFrame(() =>
                         checkSlotConnection(updatedNodes)
                     );
+                    void syncSlotsAfterCommit?.();
                 }
 
                 return updatedNodes;
             });
         },
-        [setNodes, checkSlotConnection]
+        [setNodes, checkSlotConnection, syncSlotsAfterCommit]
     );
 
     return {
         updateNodeName,
         updateNodeSource,
         updateNodeParameter,
+        commitNodeParameters,
         updateStateActions,
         updateSendEvents,
         updateSkillSlotPath,

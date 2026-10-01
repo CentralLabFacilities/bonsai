@@ -4,7 +4,11 @@ import {
     isTauri,
     replaceActiveEditorWorkflowDocument,
 } from "../tauri-client";
-import { buildRustEditorExportRequest } from "../utils/scxmlRustExport";
+import {
+    buildRustEditorExportRequest,
+    buildRustSlotsSnapshot,
+    buildRustStateParameters,
+} from "../utils/scxmlRustExport";
 import { buildRustTransitionSyncPlan } from "../utils/rustTransitionSync";
 
 const isRevisionConflict = (error) =>
@@ -169,6 +173,73 @@ export function useRustWorkflowDocument({
         [applyCommandNow, enqueue, replaceNow]
     );
 
+    const syncStateParameters = useCallback(
+        (stateId, parameters = null) =>
+            enqueue(async () => {
+                if (!isTauri() || !stateId) return null;
+
+                let parameterList = parameters;
+                if (!Array.isArray(parameterList)) {
+                    const node = (editorStateRef.current?.nodes || []).find(
+                        (candidate) => candidate.id === stateId
+                    );
+                    if (!node) {
+                        return replaceNow(editorStateRef.current, null);
+                    }
+                    parameterList = node.data?.params || [];
+                }
+
+                return applyCommandNow({
+                    type: "replaceStateParameters",
+                    stateId,
+                    parameters: buildRustStateParameters(parameterList),
+                });
+            }),
+        [applyCommandNow, enqueue, replaceNow]
+    );
+
+    const syncSlotsAfterCommit = useCallback(
+        () =>
+            enqueue(async () => {
+                if (!isTauri()) return null;
+                await waitForEditorCommit();
+                const editorState = editorStateRef.current || {};
+                return applyCommandNow({
+                    type: "replaceSlotsSnapshot",
+                    ...buildRustSlotsSnapshot(editorState),
+                });
+            }),
+        [applyCommandNow, enqueue]
+    );
+
+    const syncStateConfigurationAfterCommit = useCallback(
+        (stateId) =>
+            enqueue(async () => {
+                if (!isTauri() || !stateId) return null;
+                await waitForEditorCommit();
+
+                const editorState = editorStateRef.current || {};
+                const node = (editorState.nodes || []).find(
+                    (candidate) => candidate.id === stateId
+                );
+                if (!node) {
+                    return replaceNow(editorState, null);
+                }
+
+                let result = await applyCommandNow({
+                    type: "replaceStateParameters",
+                    stateId,
+                    parameters: buildRustStateParameters(node.data?.params || []),
+                });
+                result = await applyCommandNow({
+                    type: "replaceSlotsSnapshot",
+                    ...buildRustSlotsSnapshot(editorState),
+                });
+                return result;
+            }),
+        [applyCommandNow, enqueue, replaceNow]
+    );
+
     const syncRemovedStates = useCallback(
         (stateIds, { forceFull = false } = {}) =>
             enqueue(async () => {
@@ -260,6 +331,9 @@ export function useRustWorkflowDocument({
         syncEditorState,
         syncEditorStateAfterCommit,
         syncStatePosition,
+        syncStateParameters,
+        syncSlotsAfterCommit,
+        syncStateConfigurationAfterCommit,
         syncRemovedStates,
         syncTransitionsForSource,
         syncTransitionSources,
