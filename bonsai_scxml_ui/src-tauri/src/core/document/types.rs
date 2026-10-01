@@ -1,4 +1,6 @@
-use crate::core::editor_export::types::{EditorExportSlotDeclarationDto, EditorExportSlotDto};
+use crate::core::editor_export::types::{
+    EditorExportEdgeDto, EditorExportNodeDto, EditorExportSlotDeclarationDto, EditorExportSlotDto,
+};
 use crate::core::model::{
     AssignmentDto, DataModelEntryDto, EditorPositionDto, ParameterDto, StateDto, WorkflowDto,
 };
@@ -149,5 +151,11 @@ pub(crate) enum WorkflowCommandDto {
         source_state_id: String,
         #[serde(default)]
         transitions: Vec<TargetedTransitionCommandDto>,
+    },
+    ReplaceEditorStructure {
+        #[serde(default)]
+        nodes: Vec<EditorExportNodeDto>,
+        #[serde(default)]
+        edges: Vec<EditorExportEdgeDto>,
     },
 }

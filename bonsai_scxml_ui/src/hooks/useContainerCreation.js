@@ -29,7 +29,7 @@ export function useContainerCreation({
     setActiveTab,
     setContextMenu,
     updateNodeInternals,
-    syncEditorStateAfterCommit,
+    syncEditorStructureAfterCommit,
 }) {
     const selectedNodesCacheRef = useRef([]);
     const selectionNodesDependency = isDraggingNode ? null : nodes;
@@ -151,8 +151,8 @@ export function useContainerCreation({
 
             return [...updatedNodes, newLaneNode];
         });
-        void syncEditorStateAfterCommit?.();
-    }, [setNodes, syncEditorStateAfterCommit]);
+        void syncEditorStructureAfterCommit?.();
+    }, [setNodes, syncEditorStructureAfterCommit]);
 
     const handleCreateEmptyCompound = (pos) => {
         const compoundId = getNodeId();
@@ -180,7 +180,7 @@ export function useContainerCreation({
         setSelectedNodeId(compoundId); // <-- Details-Panel direkt öffnen
         setActiveTab("allgemein");
         setContextMenu(null);
-        void syncEditorStateAfterCommit?.();
+        void syncEditorStructureAfterCommit?.();
     };
 
     const handleCreateEmptyParallel = (pos) => {
@@ -239,7 +239,7 @@ export function useContainerCreation({
         setSelectedNodeId(parallelId);
         setActiveTab("allgemein");
         setContextMenu(null);
-        void syncEditorStateAfterCommit?.();
+        void syncEditorStructureAfterCommit?.();
     };
 
     const getSelectionBoundingBox = (selectedList) => {
@@ -635,7 +635,7 @@ export function useContainerCreation({
         setActiveTab(
             "allgemein"
         );
-        void syncEditorStateAfterCommit?.();
+        void syncEditorStructureAfterCommit?.();
     };
 
     const handleCreateParallelFromSelected = () => {
@@ -1032,7 +1032,7 @@ export function useContainerCreation({
         setEdges(normalizedGraph.edges);
         setSelectedNodeId(parallelId);
         setActiveTab("allgemein");
-        void syncEditorStateAfterCommit?.();
+        void syncEditorStructureAfterCommit?.();
     };
 
     return {

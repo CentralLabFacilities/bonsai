@@ -802,8 +802,8 @@ function AppContent() {
         setActiveTab,
         setContextMenu,
         updateNodeInternals,
-        syncEditorStateAfterCommit:
-            rustWorkflowDocument.syncEditorStateAfterCommit,
+        syncEditorStructureAfterCommit:
+            rustWorkflowDocument.syncEditorStructureAfterCommit,
     });
 
     const {
@@ -2925,19 +2925,28 @@ function AppContent() {
                                 )
                         )
                     );
-                    const forceFullSemanticSync = removedNodes.some(
+                    const removedSemanticNodes = removedNodes.filter(
                         (node) =>
                             !node.data?.isSkillClone &&
-                            !node.data?.isStateClone &&
-                            (node.type === "parallelLane" ||
-                                node.data?.autoParallelLaneCompound ||
-                                (node.data?.inSlots || []).some((slot) => slot?.path) ||
-                                (node.data?.outSlots || []).some((slot) => slot?.path))
+                            !node.data?.isStateClone
                     );
+                    const forceFullSemanticSync = removedSemanticNodes.some(
+                        (node) =>
+                            (node.data?.inSlots || []).some((slot) => slot?.path) ||
+                            (node.data?.outSlots || []).some((slot) => slot?.path)
+                    );
+                    const forceStructureSync =
+                        !forceFullSemanticSync &&
+                        removedSemanticNodes.some(
+                            (node) =>
+                                node.type === "parallelLane" ||
+                                node.data?.autoParallelLaneCompound
+                        );
                     void rustWorkflowDocument.syncRemovedStates(
                         [...semanticRemovalIds],
                         {
                             forceFull: forceFullSemanticSync,
+                            forceStructure: forceStructureSync,
                             referenceStateIds,
                             referenceSourceIds,
                         }

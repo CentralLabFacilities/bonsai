@@ -229,17 +229,27 @@ export const buildRustSlotsSnapshot = ({
     };
 };
 
+export const buildRustEditorStructureSnapshot = ({
+    nodes = [],
+    edges = [],
+} = {}) => {
+    const exportGraph = prepareGraphForScxml(nodes || [], edges || []);
+    return {
+        nodes: exportGraph.nodes.map(normalizeNode),
+        edges: exportGraph.edges.map(normalizeEdge),
+    };
+};
+
 export const buildRustEditorExportRequest = ({
     nodes,
     edges,
     globalDataModel,
     manualSlots,
 }) => {
-    const exportGraph = prepareGraphForScxml(nodes || [], edges || []);
+    const structure = buildRustEditorStructureSnapshot({ nodes, edges });
 
     return {
-        nodes: exportGraph.nodes.map(normalizeNode),
-        edges: exportGraph.edges.map(normalizeEdge),
+        ...structure,
         dataModel: buildRustDataModelEntries(globalDataModel),
         extraSlotDeclarations: (manualSlots || []).map((slot) => {
             const inherited =

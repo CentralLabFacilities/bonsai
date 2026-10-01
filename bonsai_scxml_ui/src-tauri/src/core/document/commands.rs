@@ -1,6 +1,9 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::core::editor_export::types::{EditorExportSlotDeclarationDto, EditorExportSlotDto};
+use crate::core::editor_export::{build_workflow_from_editor, EditorExportRequestDto};
+use crate::core::editor_export::types::{
+    EditorExportEdgeDto, EditorExportNodeDto, EditorExportSlotDeclarationDto, EditorExportSlotDto,
+};
 use crate::core::model::{
     Assignment, DataModelEntry, EditorPosition, Parameter, Slot, SlotDeclaration, State, StateId,
     Transition, TransitionId, Workflow, WorkflowIndex,
@@ -103,7 +106,76 @@ pub(crate) fn apply_command(
             source_state_id,
             transitions,
         ),
+        WorkflowCommandDto::ReplaceEditorStructure { nodes, edges } => {
+            replace_editor_structure(workflow, nodes, edges)
+        },
     }
+}
+
+fn replace_editor_structure(
+    workflow: &mut Workflow,
+    nodes: Vec<EditorExportNodeDto>,
+    edges: Vec<EditorExportEdgeDto>,
+) -> Result<WorkflowCommandChanges, String> {
+    let previous_state_ids = workflow
+        .states
+        .iter()
+        .map(|state| state.id.as_str().to_string())
+        .collect::<HashSet<_>>();
+    let previous_transition_ids = workflow
+        .transitions
+        .iter()
+        .map(|transition| transition.id.as_str().to_string())
+        .collect::<HashSet<_>>();
+
+    // Structural editor mutations intentionally do not carry workflow-global
+    // datamodel/manual-slot payloads. Rebuild SCXML ownership (parents,
+    // parallel-lane flattening and container-hoisted transitions) from the
+    // normalized editor graph, then retain those unrelated document sections
+    // from the already-loaded Rust workflow.
+    let preserved_name = workflow.name.clone();
+    let preserved_data_model = workflow.data_model.clone();
+    let preserved_slot_declarations = workflow.slot_declarations.clone();
+
+    let mut rebuilt = build_workflow_from_editor(&EditorExportRequestDto {
+        nodes,
+        edges,
+        data_model: Vec::new(),
+        extra_slot_declarations: Vec::new(),
+    })?;
+    rebuilt.name = preserved_name;
+    rebuilt.data_model = preserved_data_model;
+    rebuilt.slot_declarations = preserved_slot_declarations;
+
+    let mut changed_state_ids = previous_state_ids;
+    changed_state_ids.extend(
+        rebuilt
+            .states
+            .iter()
+            .map(|state| state.id.as_str().to_string()),
+    );
+    let mut changed_state_ids = changed_state_ids.into_iter().collect::<Vec<_>>();
+    changed_state_ids.sort();
+
+    let mut changed_transition_ids = previous_transition_ids;
+    changed_transition_ids.extend(
+        rebuilt
+            .transitions
+            .iter()
+            .map(|transition| transition.id.as_str().to_string()),
+    );
+    let mut changed_transition_ids =
+        changed_transition_ids.into_iter().collect::<Vec<_>>();
+    changed_transition_ids.sort();
+
+    *workflow = rebuilt;
+
+    Ok(WorkflowCommandChanges {
+        changed_state_ids,
+        changed_transition_ids,
+        index_changed: true,
+        ..WorkflowCommandChanges::default()
+    })
 }
 
 fn replace_state_parameters(

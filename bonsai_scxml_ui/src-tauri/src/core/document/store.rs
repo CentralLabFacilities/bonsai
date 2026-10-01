@@ -134,11 +134,13 @@ mod tests {
     use super::*;
     use super::super::types::{StateSlotsCommandDto, TargetedTransitionCommandDto};
     use crate::core::editor_export::types::{
-        EditorExportSlotDeclarationDto, EditorExportSlotDto,
+        EditorExportEdgeDto, EditorExportNodeDto, EditorExportSlotDeclarationDto,
+        EditorExportSlotDto,
     };
     use crate::core::model::{
-        AssignmentDto, EditorMetadataDto, EditorPositionDto, ParameterDto, State, StateDto,
-        StateId, StateKind, StateKindDto, Transition, TransitionId,
+        AssignmentDto, DataModelEntry, EditorMetadataDto, EditorPositionDto, ParameterDto,
+        SlotDeclaration, State, StateDto, StateId, StateKind, StateKindDto, Transition,
+        TransitionId,
     };
 
     fn sample_workflow() -> Workflow {
@@ -529,6 +531,86 @@ mod tests {
             .slot_declarations
             .iter()
             .any(|slot| slot.key == "Manual" && slot.xpath == "/manual"));
+    }
+
+    #[test]
+    fn replacing_editor_structure_rebuilds_container_semantics_and_preserves_globals() {
+        let store = WorkflowDocumentStore::default();
+        let mut workflow = sample_workflow();
+        workflow.data_model = vec![DataModelEntry {
+            id: "counter".into(),
+            type_name: None,
+            expression: "1".into(),
+        }];
+        workflow.slot_declarations = vec![SlotDeclaration {
+            key: "Manual".into(),
+            state: "A".into(),
+            xpath: "/manual".into(),
+            inherited: false,
+        }];
+        assert_eq!(store.replace(workflow).unwrap(), 1);
+
+        let node = |id: &str, node_type: &str, parent_id: Option<&str>| {
+            EditorExportNodeDto {
+                id: id.into(),
+                node_type: node_type.into(),
+                parent_id: parent_id.map(str::to_string),
+                label: id.into(),
+                full_skill_name: id.into(),
+                ..EditorExportNodeDto::default()
+            }
+        };
+        let mut compound = node("container", "compound", None);
+        compound.is_initial = true;
+        compound.initial_child_id = Some("a".into());
+        let mut child = node("a", "custom", Some("container"));
+        child.label = "A".into();
+        child.full_skill_name = "A".into();
+        child.is_initial = true;
+        let mut outside = node("b", "custom", None);
+        outside.label = "B".into();
+        outside.full_skill_name = "B".into();
+
+        let result = store
+            .apply(
+                Some(1),
+                WorkflowCommandDto::ReplaceEditorStructure {
+                    nodes: vec![compound, child, outside],
+                    edges: vec![EditorExportEdgeDto {
+                        id: "edge-a-b".into(),
+                        source: "a".into(),
+                        target: "b".into(),
+                        source_handle: "success".into(),
+                        ..EditorExportEdgeDto::default()
+                    }],
+                },
+            )
+            .unwrap();
+        assert_eq!(result.revision, 2);
+
+        let snapshot = store.snapshot().unwrap().unwrap();
+        let child = snapshot
+            .workflow
+            .states
+            .iter()
+            .find(|state| state.id == "a")
+            .unwrap();
+        assert_eq!(child.parent_id.as_deref(), Some("container"));
+
+        let transition = snapshot
+            .workflow
+            .transitions
+            .iter()
+            .find(|transition| transition.id == "edge-a-b")
+            .unwrap();
+        assert_eq!(transition.source_state_id, "container");
+        assert_eq!(transition.event, "A.success");
+        assert_eq!(transition.target_state_id.as_deref(), Some("b"));
+
+        assert_eq!(snapshot.workflow.data_model.len(), 1);
+        assert_eq!(snapshot.workflow.data_model[0].id, "counter");
+        assert_eq!(snapshot.workflow.slot_declarations.len(), 1);
+        assert_eq!(snapshot.workflow.slot_declarations[0].key, "Manual");
     }
 
     #[test]

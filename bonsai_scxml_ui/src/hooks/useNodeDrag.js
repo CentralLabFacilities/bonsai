@@ -421,16 +421,24 @@ export function useNodeDrag({
                         .filter((sourceId) => sourceId && !idsToDelete.has(sourceId))
                 )
             );
-            const forceFullSemanticSync = currentNodes.some(
+            const removedSemanticNodes = currentNodes.filter(
                 (candidate) =>
                     idsToDelete.has(candidate.id) &&
                     !candidate.data?.isSkillClone &&
-                    !candidate.data?.isStateClone &&
-                    (candidate.type === "parallelLane" ||
-                        candidate.data?.autoParallelLaneCompound ||
-                        (candidate.data?.inSlots || []).some((slot) => slot?.path) ||
-                        (candidate.data?.outSlots || []).some((slot) => slot?.path))
+                    !candidate.data?.isStateClone
             );
+            const forceFullSemanticSync = removedSemanticNodes.some(
+                (candidate) =>
+                    (candidate.data?.inSlots || []).some((slot) => slot?.path) ||
+                    (candidate.data?.outSlots || []).some((slot) => slot?.path)
+            );
+            const forceStructureSync =
+                !forceFullSemanticSync &&
+                removedSemanticNodes.some(
+                    (candidate) =>
+                        candidate.type === "parallelLane" ||
+                        candidate.data?.autoParallelLaneCompound
+                );
 
             setNodes((allNodes) =>
                 allNodes
@@ -495,6 +503,7 @@ export function useNodeDrag({
 
             void syncRemovedStates?.([...idsToDelete], {
                 forceFull: forceFullSemanticSync,
+                forceStructure: forceStructureSync,
                 referenceStateIds,
                 referenceSourceIds,
             });

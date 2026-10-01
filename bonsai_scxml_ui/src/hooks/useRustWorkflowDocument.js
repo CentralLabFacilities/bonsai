@@ -6,6 +6,7 @@ import {
 } from "../tauri-client";
 import {
     buildRustEditorExportRequest,
+    buildRustEditorStructureSnapshot,
     buildRustSlotsSnapshot,
     buildRustStateEditorPositions,
     buildRustStateParameters,
@@ -120,6 +121,20 @@ export function useRustWorkflowDocument({
         [replaceNow, resyncFromEditor]
     );
 
+    const syncEditorStructureNow = useCallback(
+        async (editorState = null) => {
+            if (!isTauri()) return null;
+            const structure = buildRustEditorStructureSnapshot(
+                editorState || editorStateRef.current || {}
+            );
+            return applyCommandNow({
+                type: "replaceEditorStructure",
+                ...structure,
+            });
+        },
+        [applyCommandNow]
+    );
+
     const syncEditorState = useCallback(
         (editorState = null) =>
             enqueue(async () => {
@@ -137,6 +152,16 @@ export function useRustWorkflowDocument({
                 return replaceNow(editorStateRef.current, null);
             }),
         [enqueue, replaceNow]
+    );
+
+    const syncEditorStructureAfterCommit = useCallback(
+        () =>
+            enqueue(async () => {
+                if (!isTauri()) return null;
+                await waitForEditorCommit();
+                return syncEditorStructureNow(editorStateRef.current);
+            }),
+        [enqueue, syncEditorStructureNow]
     );
 
     const syncStateEditorPositions = useCallback(
@@ -202,7 +227,7 @@ export function useRustWorkflowDocument({
                     currentParentId !== (previousParentId || null);
 
                 if (requiresSemanticRebuild) {
-                    return replaceNow(editorStateRef.current, null);
+                    return syncEditorStructureNow(editorStateRef.current);
                 }
 
                 return applyCommandNow({
@@ -212,7 +237,7 @@ export function useRustWorkflowDocument({
                     y: Number(node.position?.y || 0),
                 });
             }),
-        [applyCommandNow, enqueue, replaceNow]
+        [applyCommandNow, enqueue, replaceNow, syncEditorStructureNow]
     );
 
     const syncStateParameters = useCallback(
@@ -287,6 +312,7 @@ export function useRustWorkflowDocument({
             stateIds,
             {
                 forceFull = false,
+                forceStructure = false,
                 referenceStateIds = [],
                 referenceSourceIds = [],
             } = {}
@@ -307,6 +333,10 @@ export function useRustWorkflowDocument({
                 if (forceFull) {
                     await waitForEditorCommit();
                     return replaceNow(editorStateRef.current, null);
+                }
+                if (forceStructure) {
+                    await waitForEditorCommit();
+                    return syncEditorStructureNow(editorStateRef.current);
                 }
 
                 const referenceIds = new Set(
@@ -358,7 +388,7 @@ export function useRustWorkflowDocument({
                 }
                 return result;
             }),
-        [applyCommandNow, enqueue, replaceNow]
+        [applyCommandNow, enqueue, replaceNow, syncEditorStructureNow]
     );
 
     const applyWorkflowCommand = useCallback(
@@ -425,6 +455,7 @@ export function useRustWorkflowDocument({
         applyWorkflowCommand,
         syncEditorState,
         syncEditorStateAfterCommit,
+        syncEditorStructureAfterCommit,
         syncStateEditorPositions,
         syncStatePosition,
         syncStateParameters,
