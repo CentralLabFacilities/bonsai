@@ -27,9 +27,7 @@ import {
     isTauri,
     initApiProxy,
 } from "./tauri-client.js";
-import { collectInheritedSlotUsages } from "./utils/editorGraph";
 import {
-    getNodeId,
     COLLAPSED_CONTAINER_WIDTH,
     COLLAPSED_CONTAINER_HEIGHT,
     getAbsoluteNodePosition,
@@ -38,9 +36,6 @@ import {
     layoutStateContainerForExpansion,
 } from "./utils/editorGeometry";
 import {
-    getSharedScxmlStateId,
-    normalizeSharedScxmlStateIdentity,
-    ensureSharedEditorInstanceIds,
     getLocalDataModelEntries,
     collectDescendantGlobals,
 } from "./utils/editorScxml";
@@ -73,12 +68,8 @@ import { useEditorFind } from "./hooks/useEditorFind";
 import { useGlobalEditorShortcuts } from "./hooks/useGlobalEditorShortcuts";
 import { useEditorLibraryDrop } from "./hooks/useEditorLibraryDrop";
 import { useEditorFlowChanges } from "./hooks/useEditorFlowChanges";
+import { useEditorLibraryItems } from "./hooks/useEditorLibraryItems";
 import { isEditorCloneNode } from "./utils/editorClones";
-import {
-    inspectWorkflowForEditorSource,
-    loadWorkflowForEditor,
-    projectWorkflowInspectionForEditor,
-} from "./utils/workflowLoader";
 import "./App.css";
 
 // Initialize API proxy for Tauri desktop mode (intercepts /api/* fetch calls)
@@ -643,6 +634,26 @@ function AppContent() {
         onStateMachineLoadEnd: endStateMachineLoad,
     });
 
+    const {
+        handleOpenBehaviorFile,
+        createBehaviorNode,
+        createNode,
+        getPackageSkillEvent,
+    } = useEditorLibraryItems({
+        skills,
+        nodes,
+        tabs,
+        behaviorDirectories,
+        fetchSkillData,
+        hydrateSubMachineInheritedSlots,
+        handleOpenSubMachine,
+        switchTab,
+        openTab,
+        checkSlotConnection,
+        beginStateMachineLoad,
+        endStateMachineLoad,
+    });
+
     const descendantGlobalDataModel = useMemo(() => {
         const blockedIds = [
             ...(inheritedGlobalDataModel || []),
@@ -877,170 +888,6 @@ function AppContent() {
         handleOpenSubMachine,
         handleToggleContainerCollapse,
     });
-
-    const handleOpenBehaviorFile = useCallback(
-        async (behavior) => {
-            if (!behavior?.source) return;
-
-            beginStateMachineLoad(
-                behavior.name?.replace(/\.(xml|scxml)$/i, "") || "State machine"
-            );
-            await new Promise((resolve) =>
-                window.requestAnimationFrame(() =>
-                    window.requestAnimationFrame(resolve)
-                )
-            );
-
-            try {
-                // behavior.source remains ${KEY}/... for SCXML portability.
-                // Rust resolves and caches the referenced workflow for local access.
-                const loaded = await inspectWorkflowForEditorSource({
-                    src: behavior.source,
-                    directories: behaviorDirectories,
-                    currentFilePath: null,
-                });
-
-                const tabId = `tab-behavior-${loaded.path || behavior.source}`;
-                const existingTab = tabs.find(
-                    (tab) => tab.id === tabId
-                );
-
-                if (existingTab) {
-                    switchTab(tabId);
-                    return;
-                }
-
-                const parsed = await projectWorkflowInspectionForEditor(loaded, {
-                    fetchSkillData,
-                    getNodeId,
-                });
-                const parsedNodes = ensureSharedEditorInstanceIds(
-                    (await hydrateSubMachineInheritedSlots(
-                        parsed.nodes,
-                        loaded.path
-                    )).map(normalizeSharedScxmlStateIdentity)
-                );
-
-                const newTabObj = {
-                    id: tabId,
-                    title:
-                        behavior.name?.replace(
-                            /\.(xml|scxml)$/i,
-                            ""
-                        ) || loaded.fileName,
-                    fileName: loaded.fileName,
-                    fileHandle: null,
-                    filePath: loaded.path,
-                    sourcePath: behavior.source,
-                    nodes: parsedNodes,
-                    edges: parsed.edges,
-                    slotNodes: [],
-                    slotEdges: [],
-                    manualSlots: [],
-                    parentTabId: null,
-                    selectedNodeId: null,
-                    viewport: null,
-                    inheritedGlobalDataModel: [],
-                    globalDataModel: parsed.globalDataModel,
-                };
-
-                openTab(newTabObj, {
-                    fit: true,
-                    fitOptions: { duration: 300 },
-                });
-                checkSlotConnection(
-                    parsedNodes,
-                    [],
-                    parsed.editorSlotNodes || []
-                );
-
-            } catch (error) {
-                console.error(
-                    "Could not open behavior:",
-                    error
-                );
-                alert(
-                    `Could not open behavior:\n${error.message}`
-                );
-            } finally {
-                endStateMachineLoad();
-            }
-        },
-        [
-            behaviorDirectories,
-            tabs,
-            beginStateMachineLoad,
-            endStateMachineLoad,
-            fetchSkillData,
-            hydrateSubMachineInheritedSlots,
-            switchTab,
-            openTab,
-            checkSlotConnection,
-        ]
-    );
-
-    const createBehaviorNode = useCallback(
-        async (behavior, position) => {
-            const baseName = String(
-                behavior?.name || "Behavior"
-            ).replace(/\.(xml|scxml)$/i, "");
-
-            let behaviorEvents = [];
-            let inheritedSlots = [];
-            let localDataModel = [];
-
-            try {
-                if (behavior?.source) {
-                    const loaded = await loadWorkflowForEditor({
-                        src: behavior.source,
-                        directories: behaviorDirectories,
-                        currentFilePath: null,
-                        fetchSkillData,
-                        getNodeId,
-                    });
-                    const parsedBehavior = loaded.parsed;
-
-                    behaviorEvents = loaded.behaviorExitEvents || [];
-                    inheritedSlots = collectInheritedSlotUsages(
-                        parsedBehavior.nodes,
-                        loaded.inheritedSlotDeclarations || []
-                    );
-                    localDataModel = getLocalDataModelEntries(
-                        parsedBehavior.globalDataModel
-                    );
-                }
-            } catch (error) {
-                console.warn(
-                    `Could not inspect behavior exits for ${behavior?.source || baseName}:`,
-                    error
-                );
-            }
-
-            // A Sub-SM exposes exactly the events forwarded by Nop states
-            // inside the child machine. Do not invent generic success/failure
-            // tokens: an empty child interface should remain visibly empty.
-            const events = behaviorEvents.map((eventId) => ({ id: eventId }));
-
-            return {
-                id: getNodeId(),
-                position,
-                type: "submachine",
-                data: {
-                    label: baseName,
-                    fullSkillName: baseName,
-                    src: behavior.source,
-                    isInitial: false,
-                    events,
-                    inheritedSlots,
-                    localDataModel,
-                    onEntry: [],
-                    onExit: [],
-                    onOpenSubMachine: handleOpenSubMachine,
-                },
-            };
-        },
-        [behaviorDirectories, fetchSkillData, handleOpenSubMachine]
-    );
 
     const selectedRawNode = useMemo(
         () =>
@@ -1416,142 +1263,6 @@ function AppContent() {
         switchTab,
         setActiveMode,
     });
-
-    const createNameforSkill = (fullSkillName) => {
-        const label = fullSkillName.split(".").pop();
-        const count = nodes.filter(
-            (n) => !isEditorCloneNode(n) && n.data?.label === label
-        ).length;
-        return `${fullSkillName}#${count + 1}`;
-    };
-
-    const getPackageSkillEvent = (pkgName) => {
-        if (!pkgName) return [];
-        return (skills.skills || []).filter((s) => s.includes(`skills.${pkgName}`));
-    };
-
-    const createNode = async (selectedSkill, nodeid, position) => {
-        const data = (await fetchSkillData(selectedSkill)) || {};
-        const baseSkillLabel =
-            selectedSkill.split(".").pop() || selectedSkill;
-        const isFinalSkill =
-            baseSkillLabel.toLowerCase() === "end" ||
-            baseSkillLabel.toLowerCase() === "fatal";
-
-        let sharedEditorInstanceId;
-        if (isFinalSkill) {
-            const sharedStateId = selectedSkill.split("#")[0];
-            const usedIds = new Set(
-                nodes
-                    .filter((node) => {
-                        const candidate = normalizeSharedScxmlStateIdentity(node);
-                        return getSharedScxmlStateId(candidate) === sharedStateId;
-                    })
-                    .map((node) => String(node.data?.editorInstanceId || "").trim())
-                    .filter(Boolean)
-            );
-
-            let index = 1;
-            while (usedIds.has(String(index))) index += 1;
-            sharedEditorInstanceId = String(index);
-        }
-
-        return {
-            id: nodeid,
-            position,
-            type: "custom",
-            data: {
-                label: baseSkillLabel,
-                fullSkillName: isFinalSkill
-                    ? selectedSkill.split("#")[0]
-                    : createNameforSkill(selectedSkill),
-                ...(isFinalSkill
-                    ? {
-                        scxmlStateId: selectedSkill.split("#")[0],
-                        editorInstanceId: sharedEditorInstanceId,
-                    }
-                    : {}),
-                description: data.description || "",
-                isInitial: false,
-                isFinal: isFinalSkill,
-                src: "",
-                onEntry: [],
-                onExit: [],
-                events: [
-                    ...(data.events || []).map((e) => ({
-                        id: e.event,
-                        description: e.description || "",
-                        selectedPackage: "",
-                        selectedSkill: "",
-                        target: null,
-                        cond: "",
-                        assignments: [],
-                        assignLocation: "",
-                        assignExpr: "",
-                    })),
-
-                    ...(selectedSkill.split(".").pop() !== "End" &&
-                    selectedSkill.split(".").pop() !== "Fatal"
-                        ? [
-                            {
-                                id: "fatal",
-                                selectedPackage: "",
-                                selectedSkill: "",
-                                target: null,
-                                cond: "",
-                                assignments: [],
-                                assignLocation: "",
-                                assignExpr: "",
-                            },
-                        ]
-                        : []),
-
-                    ...(selectedSkill.split(".").pop() !== "End" &&
-                    selectedSkill.split(".").pop() !== "Fatal"
-                        ? [
-                            {
-                                id: "*",
-                                selectedPackage: "",
-                                selectedSkill: "",
-                                target: null,
-                                cond: "",
-                                assignments: [],
-                                assignLocation: "",
-                                assignExpr: "",
-                            },
-                        ]
-                        : []),
-                ],
-
-                sensors: data.sensors || [],
-                actuators: data.actuator || data.actuators || [],
-
-                inSlots: (data.inSlots || []).map((s) => ({
-                    key: s.key,
-                    type: s.type,
-                    description: s.description || "",
-                    path: "",
-                    inherited: null,
-                })),
-
-                outSlots: (data.outSlots || []).map((s) => ({
-                    key: s.key,
-                    type: s.type,
-                    description: s.description || "",
-                    path: "",
-                    inherited: null,
-                })),
-
-                params: (data.params || []).map((p) => ({
-                    key: p.key,
-                    type: p.type,
-                    required: p.required,
-                    default: p.default,
-                    description: p.description || "",
-                })),
-            },
-        };
-    };
 
     const {
         handleNodesChange,
