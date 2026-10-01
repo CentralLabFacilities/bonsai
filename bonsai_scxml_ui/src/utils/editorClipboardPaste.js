@@ -6,7 +6,6 @@ import {
 } from "./editorGeometry";
 import {
     ensureSharedEditorInstanceIds,
-    getForwardingNopScxmlStateId,
     getSharedScxmlStateKey,
     normalizeSharedScxmlStateIdentity,
 } from "./editorScxml";
@@ -115,12 +114,6 @@ export const buildCopiedGraphPaste = ({
         idMap.set(node.id, getNodeId());
     });
 
-    const usedFullSkillNames = new Set(
-        nodes
-            .map((node) => String(node.data?.fullSkillName || ""))
-            .filter(Boolean)
-    );
-
     const usedSharedInstanceIds = new Map();
     ensureSharedEditorInstanceIds(nodes).forEach((node) => {
         const sharedKey = getSharedScxmlStateKey(node);
@@ -152,70 +145,16 @@ export const buildCopiedGraphPaste = ({
         return instanceId;
     };
 
-    const allocateFullSkillName = (node, data) => {
+    const refreshSharedEditorIdentity = (node, data) => {
         if (node.type !== "custom") return data;
-        if (data?.isSkillClone) return data;
-
-        const current = String(data?.fullSkillName || "").trim();
-        if (!current) return data;
-
-        const base = current.split("#")[0];
-        const skillName = base.split(".").pop()?.toLowerCase() || "";
-
-        if (skillName === "end" || skillName === "fatal") {
-            const normalizedData = {
-                ...data,
-                label: skillName === "end" ? "End" : "Fatal",
-                scxmlStateId: data?.scxmlStateId || base,
-                fullSkillName: base,
-                isFinal: true,
-            };
-
-            return {
-                ...normalizedData,
-                editorInstanceId: allocateSharedEditorInstanceId(normalizedData),
-            };
-        }
-
-        if (skillName === "nop" && data?.isBehaviorExit) {
-            const sentEvents = Array.isArray(data?.behaviorExitEvents)
-                ? data.behaviorExitEvents.filter(Boolean)
-                : [];
-
-            const normalizedData = {
-                ...data,
-                label:
-                    sentEvents.length > 0
-                        ? sentEvents.join(", ")
-                        : data?.label || "Nop",
-                fullSkillName: base,
-            };
-
-            const normalizedScxmlStateId = getForwardingNopScxmlStateId(
-                { type: "custom", data: normalizedData },
-                sentEvents[0] || ""
-            );
-
-            normalizedData.behaviorExitScxmlStateId = normalizedScxmlStateId;
-            normalizedData.scxmlStateId = normalizedScxmlStateId;
-
-            return {
-                ...normalizedData,
-                editorInstanceId: allocateSharedEditorInstanceId(normalizedData),
-            };
-        }
-
-        let index = 1;
-        let candidate = `${base}#${index}`;
-        while (usedFullSkillNames.has(candidate)) {
-            index += 1;
-            candidate = `${base}#${index}`;
-        }
-
-        usedFullSkillNames.add(candidate);
+        const candidateNode = normalizeSharedScxmlStateIdentity({
+            type: "custom",
+            data,
+        });
+        if (!getSharedScxmlStateKey(candidateNode)) return data;
         return {
             ...data,
-            fullSkillName: candidate,
+            editorInstanceId: allocateSharedEditorInstanceId(data),
         };
     };
 
@@ -274,11 +213,10 @@ export const buildCopiedGraphPaste = ({
             data.editorInstanceId = createEditorReferenceId();
         }
 
-        data = allocateFullSkillName(node, data);
-
-        if (data.isInitial) {
-            data.isInitial = false;
-        }
+        // Shared End/Fatal/forwarding visual instances need a fresh editor
+        // instance id, but semantic naming/initial-state decisions now belong
+        // to the Rust paste command.
+        data = refreshSharedEditorIdentity(node, data);
 
         return {
             ...node,
@@ -375,6 +313,42 @@ export const buildCopiedGraphPaste = ({
         pastedSlotAliases[0] ||
         null;
 
+    const semanticClipboardNodes = clipboard.nodes.filter(
+        (node) =>
+            node.type !== "parallelLane" &&
+            !node.data?.isSkillClone &&
+            !node.data?.isStateClone
+    );
+    const stateMappings = semanticClipboardNodes.map((node) => ({
+        sourceId: String(node.id || ""),
+        targetId: String(idMap.get(node.id) || ""),
+    }));
+    const pastedNodeById = new Map(
+        pastedNodes.map((node) => [String(node.id || ""), node])
+    );
+    const transitionMappings = clipboard.edges.map((edge, index) => {
+        const targetNode = pastedNodeById.get(
+            String(idMap.get(edge.target) || "")
+        );
+        return {
+            sourceId: String(edge.id || ""),
+            targetId: String(pastedEdges[index]?.id || ""),
+            targetInstanceId: targetNode?.data?.editorInstanceId
+                ? String(targetNode.data.editorInstanceId)
+                : null,
+        };
+    });
+    const semanticTargetIds = new Set(
+        stateMappings.map((mapping) => mapping.targetId)
+    );
+    const statePositions = pastedNodes
+        .filter((node) => semanticTargetIds.has(String(node.id || "")))
+        .map((node) => ({
+            stateId: String(node.id || ""),
+            x: Number(node.position?.x || 0),
+            y: Number(node.position?.y || 0),
+        }));
+
     return {
         pastedNodes,
         pastedEdges,
@@ -384,5 +358,10 @@ export const buildCopiedGraphPaste = ({
         nextSlotNodes,
         nextEdges,
         firstPastedNode,
+        pasteCommand: {
+            stateMappings,
+            transitionMappings,
+            positions: statePositions,
+        },
     };
 };

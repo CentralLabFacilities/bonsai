@@ -11,6 +11,7 @@ use crate::core::model::{
     StateKind, Transition, TransitionId, TransitionSource, Workflow, WorkflowIndex,
 };
 
+use super::paste::paste_editor_subgraph;
 use super::reparent::{
     move_editor_state, reconcile_parallel_lane_command, update_editor_position,
 };
@@ -83,6 +84,16 @@ pub(crate) fn apply_command(
         WorkflowCommandDto::WrapEditorStates { container, groups } => {
             wrap_editor_states(workflow, index, container, groups)
         }
+        WorkflowCommandDto::PasteEditorSubgraph {
+            state_mappings,
+            transition_mappings,
+            positions,
+        } => paste_editor_subgraph(
+            workflow,
+            state_mappings,
+            transition_mappings,
+            positions,
+        ),
         WorkflowCommandDto::RemoveStates { state_ids } => {
             remove_states(workflow, index, state_ids)
         }

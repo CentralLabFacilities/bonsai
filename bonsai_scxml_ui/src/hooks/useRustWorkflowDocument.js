@@ -69,6 +69,8 @@ const getCanonicalPatchPolicy = (command) => {
         case "reconcileParallelLane":
         case "wrapEditorStates":
             return { stateMode: "move", applyTransitions: true };
+        case "pasteEditorSubgraph":
+            return { stateMode: "all", applyTransitions: true };
         case "addState":
         case "replaceEditorStructure":
             return { stateMode: "all", applyTransitions: true };
@@ -467,6 +469,33 @@ export function useRustWorkflowDocument({
         [applyCommandNow, enqueue, syncEditorStructureNow]
     );
 
+    const syncPastedEditorSubgraphAfterCommit = useCallback(
+        (pasteCommand) =>
+            enqueue(async () => {
+                if (!isTauri() || !pasteCommand) return null;
+                await waitForEditorCommit();
+
+                const stateMappings = Array.isArray(pasteCommand.stateMappings)
+                    ? pasteCommand.stateMappings
+                    : [];
+                if (stateMappings.length === 0) return null;
+
+                return applyCommandNow({
+                    type: "pasteEditorSubgraph",
+                    stateMappings,
+                    transitionMappings: Array.isArray(
+                        pasteCommand.transitionMappings
+                    )
+                        ? pasteCommand.transitionMappings
+                        : [],
+                    positions: Array.isArray(pasteCommand.positions)
+                        ? pasteCommand.positions
+                        : [],
+                });
+            }),
+        [applyCommandNow, enqueue]
+    );
+
     const syncStateEditorPositions = useCallback(
         (stateId) =>
             enqueue(async () => {
@@ -825,6 +854,7 @@ export function useRustWorkflowDocument({
         syncInsertedEditorStatesAfterCommit,
         syncInsertedParallelLaneStateAfterCommit,
         syncWrappedContainerAfterCommit,
+        syncPastedEditorSubgraphAfterCommit,
         syncStateEditorPositions,
         syncStatePosition,
         syncStateParameters,

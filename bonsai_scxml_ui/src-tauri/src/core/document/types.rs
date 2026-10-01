@@ -120,6 +120,32 @@ pub(crate) struct WrapEditorGroupDto {
     pub state_ids: Vec<String>,
 }
 
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct PasteEditorIdMappingDto {
+    pub source_id: String,
+    pub target_id: String,
+}
+
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct PasteEditorTransitionMappingDto {
+    pub source_id: String,
+    pub target_id: String,
+    #[serde(default)]
+    pub target_instance_id: Option<String>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct PasteEditorPositionDto {
+    pub state_id: String,
+    pub x: f64,
+    pub y: f64,
+}
+
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct StateSlotsCommandDto {
@@ -189,6 +215,16 @@ pub(crate) enum WorkflowCommandDto {
         container: EditorExportNodeDto,
         #[serde(default)]
         groups: Vec<WrapEditorGroupDto>,
+    },
+    PasteEditorSubgraph {
+        #[serde(default)]
+        #[serde(rename = "stateMappings")]
+        state_mappings: Vec<PasteEditorIdMappingDto>,
+        #[serde(default)]
+        #[serde(rename = "transitionMappings")]
+        transition_mappings: Vec<PasteEditorTransitionMappingDto>,
+        #[serde(default)]
+        positions: Vec<PasteEditorPositionDto>,
     },
     RemoveStates {
         #[serde(default)]

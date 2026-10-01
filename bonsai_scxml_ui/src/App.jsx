@@ -387,11 +387,10 @@ function AppContent() {
         checkSlotConnection,
         updateNodeInternals,
         screenToFlowPosition,
-        syncEditorStructureAfterCommit:
-            rustWorkflowDocument.syncEditorStructureAfterCommit,
+        syncPastedEditorSubgraphAfterCommit:
+            rustWorkflowDocument.syncPastedEditorSubgraphAfterCommit,
         syncStateEditorPositions:
             rustWorkflowDocument.syncStateEditorPositions,
-        syncSlotsAfterCommit: rustWorkflowDocument.syncSlotsAfterCommit,
     });
     const previousActiveModeRef = useRef(activeMode);
 

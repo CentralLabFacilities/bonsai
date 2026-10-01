@@ -35,9 +35,8 @@ export const useEditorClipboard = ({
     checkSlotConnection,
     updateNodeInternals,
     screenToFlowPosition,
-    syncEditorStructureAfterCommit,
+    syncPastedEditorSubgraphAfterCommit,
     syncStateEditorPositions,
-    syncSlotsAfterCommit,
 }) => {
     const graphClipboardRef = useRef(null);
     const [hasGraphClipboard, setHasGraphClipboard] = useState(() =>
@@ -454,6 +453,7 @@ export const useEditorClipboard = ({
                 nextSlotNodes,
                 nextEdges,
                 firstPastedNode,
+                pasteCommand,
             } = buildCopiedGraphPaste({
                 clipboard,
                 nodes,
@@ -482,18 +482,23 @@ export const useEditorClipboard = ({
                 });
             });
             if (pastedIds.size > 0) {
-                void syncEditorStructureAfterCommit?.();
+                void syncPastedEditorSubgraphAfterCommit?.(pasteCommand);
 
-                const pastedNodesUseSlots = nextNodes.some(
-                    (node) =>
-                        pastedIds.has(node.id) &&
-                        [...(node.data?.inSlots || []), ...(node.data?.outSlots || [])].some(
-                            (slot) => String(slot?.path || "").trim()
+                // Visual references are not semantic states. Their positions
+                // remain attached to the canonical source state in Rust.
+                const referenceSourceIds = new Set(
+                    nextNodes
+                        .filter(
+                            (node) =>
+                                pastedIds.has(node.id) &&
+                                (node.data?.isSkillClone || node.data?.isStateClone)
                         )
+                        .map((node) => String(node.data?.cloneOfNodeId || "").trim())
+                        .filter(Boolean)
                 );
-                if (pastedNodesUseSlots) {
-                    void syncSlotsAfterCommit?.();
-                }
+                referenceSourceIds.forEach((sourceId) => {
+                    void syncStateEditorPositions?.(sourceId);
+                });
             }
 
             return true;
@@ -652,9 +657,8 @@ export const useEditorClipboard = ({
         checkSlotConnection,
         updateNodeInternals,
         screenToFlowPosition,
-        syncEditorStructureAfterCommit,
+        syncPastedEditorSubgraphAfterCommit,
         syncStateEditorPositions,
-        syncSlotsAfterCommit,
     ]);
 
     const resolvePendingSkillPaste = useCallback((choice) => {
