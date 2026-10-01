@@ -16,6 +16,7 @@ pub(crate) struct WorkflowCommandChanges {
     pub changed_state_ids: Vec<String>,
     pub changed_transition_ids: Vec<String>,
     pub data_model_changed: bool,
+    pub slot_declarations_changed: bool,
     pub index_changed: bool,
 }
 
@@ -359,6 +360,7 @@ fn replace_slots_snapshot(
 
     Ok(WorkflowCommandChanges {
         changed_state_ids,
+        slot_declarations_changed: true,
         ..WorkflowCommandChanges::default()
     })
 }
@@ -581,9 +583,11 @@ fn rename_state(
         }
     }
 
+    let mut slot_declarations_changed = false;
     for slot in workflow.slot_declarations.iter_mut() {
         if slot.state == previous_scxml_id {
             slot.state = normalized_scxml_id.to_string();
+            slot_declarations_changed = true;
         }
     }
 
@@ -630,6 +634,7 @@ fn rename_state(
     Ok(WorkflowCommandChanges {
         changed_state_ids: vec![id.as_str().to_string()],
         changed_transition_ids: changed_transitions,
+        slot_declarations_changed,
         index_changed: true,
         ..WorkflowCommandChanges::default()
     })
@@ -801,9 +806,12 @@ fn remove_states(
     // those eagerly for incremental deletions. Inherited-slot ownership is
     // still rebuilt through the full-sync fallback used by the frontend when
     // deleting a slot-bearing state.
+    let slot_declaration_count_before = workflow.slot_declarations.len();
     workflow
         .slot_declarations
         .retain(|slot| !removed_scxml_ids.contains(&slot.state));
+    let slot_declarations_changed =
+        workflow.slot_declarations.len() != slot_declaration_count_before;
 
     workflow.states.retain(|state| !removed.contains(&state.id));
 
@@ -894,6 +902,7 @@ fn remove_states(
     Ok(WorkflowCommandChanges {
         changed_state_ids,
         changed_transition_ids: removed_transition_ids,
+        slot_declarations_changed,
         index_changed: true,
         ..WorkflowCommandChanges::default()
     })

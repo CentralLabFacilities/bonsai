@@ -98,7 +98,7 @@ impl State {
         }
     }
 
-    fn to_dto(&self) -> super::StateDto {
+    pub(crate) fn to_dto(&self) -> super::StateDto {
         super::StateDto {
             id: self.id.as_str().to_string(),
             scxml_id: self.scxml_id.clone(),
@@ -173,7 +173,7 @@ impl Transition {
         }
     }
 
-    fn to_dto(&self) -> TransitionDto {
+    pub(crate) fn to_dto(&self) -> TransitionDto {
         TransitionDto {
             id: self.id.as_str().to_string(),
             source_state_id: self.source_state_id.as_str().to_string(),
@@ -239,7 +239,7 @@ impl SlotDeclaration {
         }
     }
 
-    fn to_dto(&self) -> SlotDeclarationDto {
+    pub(crate) fn to_dto(&self) -> SlotDeclarationDto {
         SlotDeclarationDto {
             key: self.key.clone(),
             state: self.state.clone(),

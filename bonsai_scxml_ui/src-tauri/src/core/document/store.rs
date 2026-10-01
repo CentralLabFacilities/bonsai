@@ -1,9 +1,12 @@
 use std::sync::RwLock;
 
-use crate::core::model::{Workflow, WorkflowIndex};
+use crate::core::model::{StateId, TransitionId, Workflow, WorkflowIndex};
 
 use super::commands::{apply_command, WorkflowCommandChanges};
-use super::types::{WorkflowCommandDto, WorkflowCommandResultDto, WorkflowDocumentSnapshotDto};
+use super::types::{
+    WorkflowCommandDto, WorkflowCommandResultDto, WorkflowDocumentSnapshotDto,
+    WorkflowMetadataPatchDto, WorkflowPatchDto,
+};
 
 #[derive(Default)]
 pub(crate) struct WorkflowDocumentStore {
@@ -115,17 +118,81 @@ fn snapshot_from_state(state: &StoreState) -> Option<WorkflowDocumentSnapshotDto
 
 fn command_result(
     state: &StoreState,
-    changes: WorkflowCommandChanges,
+    mut changes: WorkflowCommandChanges,
 ) -> Result<WorkflowCommandResultDto, String> {
-    if state.active.is_none() {
-        return Err("No active workflow document is loaded".to_string());
+    let stored = state
+        .active
+        .as_ref()
+        .ok_or_else(|| "No active workflow document is loaded".to_string())?;
+
+    changes.changed_state_ids.sort();
+    changes.changed_state_ids.dedup();
+    changes.changed_transition_ids.sort();
+    changes.changed_transition_ids.dedup();
+
+    let mut changed_states = Vec::new();
+    let mut removed_state_ids = Vec::new();
+    for raw_id in &changes.changed_state_ids {
+        let id = StateId::from(raw_id.as_str());
+        if let Some(state) = stored.index.state(&stored.workflow, &id) {
+            changed_states.push(state.to_dto());
+        } else {
+            removed_state_ids.push(raw_id.clone());
+        }
     }
+
+    let mut changed_transitions = Vec::new();
+    let mut removed_transition_ids = Vec::new();
+    for raw_id in &changes.changed_transition_ids {
+        let id = TransitionId::from(raw_id.as_str());
+        if let Some(transition) = stored.index.transition(&stored.workflow, &id) {
+            changed_transitions.push(transition.to_dto());
+        } else {
+            removed_transition_ids.push(raw_id.clone());
+        }
+    }
+
+    let data_model = changes.data_model_changed.then(|| {
+        stored
+            .workflow
+            .data_model
+            .iter()
+            .map(|entry| entry.to_dto())
+            .collect::<Vec<_>>()
+    });
+    let slot_declarations = changes.slot_declarations_changed.then(|| {
+        stored
+            .workflow
+            .slot_declarations
+            .iter()
+            .map(|slot| slot.to_dto())
+            .collect::<Vec<_>>()
+    });
+
+    let patch = WorkflowPatchDto {
+        metadata: WorkflowMetadataPatchDto {
+            name: stored.workflow.name.clone(),
+            initial_state_id: stored
+                .workflow
+                .initial_state_id
+                .as_ref()
+                .map(|id| id.as_str().to_string()),
+            initial_scxml_state_id: stored.workflow.initial_scxml_state_id.clone(),
+        },
+        states: changed_states,
+        removed_state_ids,
+        transitions: changed_transitions,
+        removed_transition_ids,
+        data_model,
+        slot_declarations,
+    };
 
     Ok(WorkflowCommandResultDto {
         revision: state.revision,
         changed_state_ids: changes.changed_state_ids,
         changed_transition_ids: changes.changed_transition_ids,
         data_model_changed: changes.data_model_changed,
+        patch,
     })
 }
 
@@ -386,7 +453,7 @@ mod tests {
         });
         assert_eq!(store.replace(workflow).unwrap(), 1);
 
-        store
+        let result = store
             .apply(
                 Some(1),
                 WorkflowCommandDto::RemoveStates {
@@ -394,6 +461,14 @@ mod tests {
                 },
             )
             .unwrap();
+
+        assert_eq!(result.patch.removed_state_ids, vec!["child"]);
+        assert_eq!(result.patch.removed_transition_ids, vec!["hoisted"]);
+        assert!(result
+            .patch
+            .states
+            .iter()
+            .any(|state| state.id == "a"));
 
         let snapshot = store.snapshot().unwrap().unwrap();
         assert!(snapshot.workflow.states.iter().all(|state| state.id != "child"));
@@ -482,6 +557,11 @@ mod tests {
             .unwrap();
         assert_eq!(parameter_result.revision, 2);
         assert_eq!(parameter_result.changed_state_ids, vec!["a"]);
+        assert_eq!(parameter_result.patch.states.len(), 1);
+        assert_eq!(parameter_result.patch.states[0].id, "a");
+        assert_eq!(parameter_result.patch.states[0].parameters.len(), 1);
+        assert!(parameter_result.patch.data_model.is_none());
+        assert!(parameter_result.patch.slot_declarations.is_none());
 
         let slot_result = store
             .apply(
@@ -508,6 +588,16 @@ mod tests {
             )
             .unwrap();
         assert_eq!(slot_result.revision, 3);
+        assert_eq!(slot_result.patch.states.len(), 1);
+        assert_eq!(slot_result.patch.states[0].id, "a");
+        assert_eq!(
+            slot_result
+                .patch
+                .slot_declarations
+                .as_ref()
+                .map(Vec::len),
+            Some(2)
+        );
 
         let snapshot = store.snapshot().unwrap().unwrap();
         let state = snapshot
@@ -531,6 +621,31 @@ mod tests {
             .slot_declarations
             .iter()
             .any(|slot| slot.key == "Manual" && slot.xpath == "/manual"));
+    }
+
+    #[test]
+    fn data_model_command_returns_concrete_patch_payload() {
+        let store = WorkflowDocumentStore::default();
+        assert_eq!(store.replace(sample_workflow()).unwrap(), 1);
+
+        let result = store
+            .apply(
+                Some(1),
+                WorkflowCommandDto::ReplaceDataModel {
+                    entries: vec![crate::core::model::DataModelEntryDto {
+                        id: "counter".into(),
+                        type_name: Some("int".into()),
+                        expression: "1".into(),
+                    }],
+                },
+            )
+            .unwrap();
+
+        assert!(result.data_model_changed);
+        let data_model = result.patch.data_model.as_ref().unwrap();
+        assert_eq!(data_model.len(), 1);
+        assert_eq!(data_model[0].id, "counter");
+        assert!(result.patch.metadata.initial_state_id.is_none());
     }
 
     #[test]

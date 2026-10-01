@@ -2,7 +2,8 @@ use crate::core::editor_export::types::{
     EditorExportEdgeDto, EditorExportNodeDto, EditorExportSlotDeclarationDto, EditorExportSlotDto,
 };
 use crate::core::model::{
-    AssignmentDto, DataModelEntryDto, EditorPositionDto, ParameterDto, StateDto, WorkflowDto,
+    AssignmentDto, DataModelEntryDto, EditorPositionDto, ParameterDto, SlotDeclarationDto,
+    StateDto, TransitionDto, WorkflowDto,
 };
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -14,14 +15,46 @@ pub(crate) struct WorkflowDocumentSnapshotDto {
 
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
+pub(crate) struct WorkflowMetadataPatchDto {
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub initial_state_id: Option<String>,
+    #[serde(default)]
+    pub initial_scxml_state_id: Option<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct WorkflowPatchDto {
+    pub metadata: WorkflowMetadataPatchDto,
+    #[serde(default)]
+    pub states: Vec<StateDto>,
+    #[serde(default)]
+    pub removed_state_ids: Vec<String>,
+    #[serde(default)]
+    pub transitions: Vec<TransitionDto>,
+    #[serde(default)]
+    pub removed_transition_ids: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub data_model: Option<Vec<DataModelEntryDto>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub slot_declarations: Option<Vec<SlotDeclarationDto>>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct WorkflowCommandResultDto {
     pub revision: u64,
+    /// Retained for compatibility while the frontend migrates to the concrete
+    /// patch payload below.
     #[serde(default)]
     pub changed_state_ids: Vec<String>,
     #[serde(default)]
     pub changed_transition_ids: Vec<String>,
     #[serde(default)]
     pub data_model_changed: bool,
+    pub patch: WorkflowPatchDto,
 }
 
 
