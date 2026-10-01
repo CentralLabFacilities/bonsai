@@ -15,7 +15,7 @@ export function useEditorNodeDataActions({
     setEdges,
     checkSlotConnection,
     applyWorkflowCommand,
-    syncEditorStateAfterCommit,
+    syncStateEditorPositions,
     syncStateParameters,
     syncSlotsAfterCommit,
 }) {
@@ -95,14 +95,13 @@ export function useEditorNodeDataActions({
                 sourceNode.type === "submachine";
 
             if (isContainerOrSub) {
-                if (!cleanName) {
-                    void syncEditorStateAfterCommit?.();
-                    return;
-                }
+                // The editor exporter falls back to the stable node id when a
+                // container label is empty. Express the same canonical identity
+                // directly in Rust instead of replacing the full workflow.
                 void applyWorkflowCommand?.({
                     type: "renameState",
                     stateId: nodeId,
-                    scxmlId: cleanName,
+                    scxmlId: cleanName || nodeId,
                     label: cleanName,
                     fullSkillName: cleanName,
                 });
@@ -114,10 +113,10 @@ export function useEditorNodeDataActions({
             const skillType = baseSkillName.split(".").pop().toLowerCase();
 
             // For Nop/Fatal/End this field is an editor-only instance id used
-            // to disambiguate visual references. It lives in editor metadata,
-            // so refresh the semantic projection instead of renaming the SCXML state.
+            // to disambiguate visual references. Only the persisted editor
+            // positions change; the semantic state identity stays untouched.
             if (["nop", "fatal", "end"].includes(skillType)) {
-                void syncEditorStateAfterCommit?.();
+                void syncStateEditorPositions?.(nodeId);
                 return;
             }
 
@@ -136,7 +135,7 @@ export function useEditorNodeDataActions({
             nodes,
             setNodes,
             applyWorkflowCommand,
-            syncEditorStateAfterCommit,
+            syncStateEditorPositions,
         ]
     );
 

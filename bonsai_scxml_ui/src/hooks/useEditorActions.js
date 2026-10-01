@@ -41,7 +41,7 @@ export function useEditorActions(options) {
         setEdges: options.setEdges,
         checkSlotConnection: options.checkSlotConnection,
         applyWorkflowCommand: options.applyWorkflowCommand,
-        syncEditorStructureAfterCommit: options.syncEditorStructureAfterCommit,
+        syncStateEditorPositions: options.syncStateEditorPositions,
         syncStateParameters: options.syncStateParameters,
         syncSlotsAfterCommit: options.syncSlotsAfterCommit,
     });

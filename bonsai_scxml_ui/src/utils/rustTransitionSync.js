@@ -4,7 +4,6 @@ import {
     getLogicalEdgeSourceId,
     getSemanticTransitionTarget,
 } from "./transitionSemantics";
-import { getScxmlTransitionEvent } from "./transitionEvents";
 import {
     serializeEditorConditionForScxml,
     serializeEditorValueForScxml,
@@ -72,9 +71,9 @@ const hasUnrepresentedTargetEvents = (
 
 /**
  * Build the smallest safe Rust document update for one logical transition
- * source. Root-level executable states can replace their targeted transitions
- * directly. Container/nested transitions request a transition-projection rebuild
- * because SCXML hoists those transitions to container states.
+ * source. The frontend supplies logical edges; Rust owns the SCXML transition
+ * owner for root, nested, and container-scoped transitions. Full projection is
+ * now reserved for malformed/incomplete editor state recovery only.
  */
 export const buildRustTransitionSyncPlan = ({
     nodes = [],
@@ -85,27 +84,22 @@ export const buildRustTransitionSyncPlan = ({
     if (!normalizedSourceId) return { mode: "noop" };
 
     const nodeById = new Map(nodes.map((node) => [node.id, node]));
-    const sourceNode = nodeById.get(normalizedSourceId);
-    if (!sourceNode) return { mode: "full" };
+    const visualSourceNode = nodeById.get(normalizedSourceId);
+    const logicalSourceId = String(
+        visualSourceNode?.data?.isSkillClone || visualSourceNode?.data?.isStateClone
+            ? visualSourceNode?.data?.cloneOfNodeId || ""
+            : normalizedSourceId
+    ).trim();
+    const sourceNode = nodeById.get(logicalSourceId);
+    if (!sourceNode || !logicalSourceId) return { mode: "full" };
 
-    // References and nested/container states require the structure-aware
-    // transition projection: their visual edge source is not necessarily the
-    // SCXML transition owner.
-    if (
-        sourceNode.parentId ||
-        sourceNode.type === "compound" ||
-        sourceNode.type === "parallel" ||
-        sourceNode.type === "parallelLane" ||
-        sourceNode.data?.isSkillClone ||
-        sourceNode.data?.isStateClone
-    ) {
-        return { mode: "full" };
-    }
-
+    // The frontend reports the logical source and its visible transitions. Rust
+    // now owns whether those transitions stay on the state or are hoisted to a
+    // Compound/Parallel SCXML owner.
     const semanticEdges = edges.filter(
         (edge) =>
             isSemanticTransitionEdge(edge) &&
-            String(getLogicalEdgeSourceId(edge) || "") === normalizedSourceId
+            String(getLogicalEdgeSourceId(edge) || "") === logicalSourceId
     );
 
     if (
@@ -119,10 +113,6 @@ export const buildRustTransitionSyncPlan = ({
         return { mode: "full" };
     }
 
-    const sourceSkillName =
-        sourceNode.data?.fullSkillName ||
-        sourceNode.data?.label ||
-        sourceNode.id;
     const transitions = [];
 
     for (const edge of semanticEdges) {
@@ -141,9 +131,10 @@ export const buildRustTransitionSyncPlan = ({
         transitions.push({
             id: String(edge.id || ""),
             targetStateId: String(targetStateId),
-            event:
-                importedRawEvent ||
-                getScxmlTransitionEvent(exitToken, sourceSkillName),
+            // Rust derives the final SCXML event from the logical source and
+            // current hierarchy. Preserve an imported raw event only as input
+            // compatibility; ownership recalculation remains backend-owned.
+            event: importedRawEvent || exitToken,
             sourceHandle: exitToken,
             condition: serializeEditorConditionForScxml(
                 edge?.data?.cond || ""
@@ -163,7 +154,7 @@ export const buildRustTransitionSyncPlan = ({
         mode: "command",
         command: {
             type: "replaceTargetedTransitions",
-            sourceStateId: normalizedSourceId,
+            sourceStateId: logicalSourceId,
             transitions,
         },
     };

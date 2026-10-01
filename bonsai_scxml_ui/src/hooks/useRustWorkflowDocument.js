@@ -72,7 +72,6 @@ const getCanonicalPatchPolicy = (command) => {
         case "pasteEditorSubgraph":
             return { stateMode: "all", applyTransitions: true };
         case "addState":
-        case "replaceEditorStructure":
             return { stateMode: "all", applyTransitions: true };
         default:
             return { stateMode: "none", applyTransitions: false };
@@ -254,20 +253,6 @@ export function useRustWorkflowDocument({
         [applyCanonicalPatch, replaceNow, resyncFromEditor]
     );
 
-    const syncEditorStructureNow = useCallback(
-        async (editorState = null) => {
-            if (!isTauri()) return null;
-            const structure = buildRustEditorStructureSnapshot(
-                editorState || editorStateRef.current || {}
-            );
-            return applyCommandNow({
-                type: "replaceEditorStructure",
-                ...structure,
-            });
-        },
-        [applyCommandNow]
-    );
-
     const syncEditorTransitionsNow = useCallback(
         async (editorState = null) => {
             if (!isTauri()) return null;
@@ -302,16 +287,6 @@ export function useRustWorkflowDocument({
         [enqueue, replaceNow]
     );
 
-    const syncEditorStructureAfterCommit = useCallback(
-        () =>
-            enqueue(async () => {
-                if (!isTauri()) return null;
-                await waitForEditorCommit();
-                return syncEditorStructureNow(editorStateRef.current);
-            }),
-        [enqueue, syncEditorStructureNow]
-    );
-
     const syncInsertedEditorStatesAfterCommit = useCallback(
         (stateIds) =>
             enqueue(async () => {
@@ -338,7 +313,7 @@ export function useRustWorkflowDocument({
                 // not an isolated semantic add. Fall back to the full structural
                 // exporter, which owns lane flattening/promotion semantics.
                 if (insertedNodes.length !== requestedIds.length) {
-                    return syncEditorStructureNow(editorState);
+                    return replaceNow(editorState, null);
                 }
 
                 return applyCommandNow({
@@ -346,7 +321,7 @@ export function useRustWorkflowDocument({
                     nodes: insertedNodes,
                 });
             }),
-        [applyCommandNow, enqueue, syncEditorStructureNow]
+        [applyCommandNow, enqueue, replaceNow]
     );
 
 
@@ -363,7 +338,7 @@ export function useRustWorkflowDocument({
                     laneId,
                 });
                 if (!context) {
-                    return syncEditorStructureNow(editorState);
+                    return replaceNow(editorState, null);
                 }
 
                 const [insertedNode] = buildRustEditorNodeSnapshots({
@@ -371,7 +346,7 @@ export function useRustWorkflowDocument({
                     stateIds: [stateId],
                 });
                 if (!insertedNode) {
-                    return syncEditorStructureNow(editorState);
+                    return replaceNow(editorState, null);
                 }
 
                 // A visual Parallel lane may be flattened in the semantic
@@ -390,7 +365,7 @@ export function useRustWorkflowDocument({
                     context,
                 });
             }),
-        [applyCommandNow, enqueue, syncEditorStructureNow]
+        [applyCommandNow, enqueue, replaceNow]
     );
 
 
@@ -406,7 +381,7 @@ export function useRustWorkflowDocument({
                     (candidate) => candidate.id === containerId
                 );
                 if (!containerNode || !["compound", "parallel"].includes(containerNode.type)) {
-                    return syncEditorStructureNow(editorState);
+                    return replaceNow(editorState, null);
                 }
 
                 const [container] = buildRustEditorNodeSnapshots({
@@ -414,7 +389,7 @@ export function useRustWorkflowDocument({
                     stateIds: [containerId],
                 });
                 if (!container) {
-                    return syncEditorStructureNow(editorState);
+                    return replaceNow(editorState, null);
                 }
 
                 let groups;
@@ -457,7 +432,7 @@ export function useRustWorkflowDocument({
                 }
 
                 if (groups.length === 0 || groups.some((group) => group.stateIds.length === 0)) {
-                    return syncEditorStructureNow(editorState);
+                    return replaceNow(editorState, null);
                 }
 
                 return applyCommandNow({
@@ -466,7 +441,7 @@ export function useRustWorkflowDocument({
                     groups,
                 });
             }),
-        [applyCommandNow, enqueue, syncEditorStructureNow]
+        [applyCommandNow, enqueue, replaceNow]
     );
 
     const syncPastedEditorSubgraphAfterCommit = useCallback(
@@ -690,7 +665,6 @@ export function useRustWorkflowDocument({
             stateIds,
             {
                 refreshSlots = false,
-                forceStructure = false,
                 referenceStateIds = [],
                 referenceSourceIds = [],
             } = {}
@@ -728,10 +702,7 @@ export function useRustWorkflowDocument({
                     return committedEditorState;
                 };
 
-                if (forceStructure) {
-                    const editorState = await getCommittedEditorState();
-                    result = await syncEditorStructureNow(editorState);
-                } else if (semanticIds.length > 0) {
+                if (semanticIds.length > 0) {
                     result = await applyCommandNow({
                         type: "removeStates",
                         stateIds: semanticIds,
@@ -744,12 +715,6 @@ export function useRustWorkflowDocument({
                         type: "replaceSlotsSnapshot",
                         ...buildRustSlotsSnapshot(editorState),
                     });
-                }
-
-                // A structure refresh already rebuilds canonical reference
-                // positions from the committed editor graph.
-                if (forceStructure) {
-                    return result;
                 }
 
                 const sourceIds = Array.from(
@@ -782,7 +747,7 @@ export function useRustWorkflowDocument({
                 }
                 return result;
             }),
-        [applyCommandNow, enqueue, syncEditorStructureNow]
+        [applyCommandNow, enqueue]
     );
 
     const applyWorkflowCommand = useCallback(
@@ -850,7 +815,6 @@ export function useRustWorkflowDocument({
     return {
         applyWorkflowCommand,
         syncEditorState,
-        syncEditorStructureAfterCommit,
         syncInsertedEditorStatesAfterCommit,
         syncInsertedParallelLaneStateAfterCommit,
         syncWrappedContainerAfterCommit,

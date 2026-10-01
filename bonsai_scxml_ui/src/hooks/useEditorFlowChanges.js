@@ -166,16 +166,10 @@ export function useEditorFlowChanges({
                             (node.data?.inSlots || []).some((slot) => slot?.path) ||
                             (node.data?.outSlots || []).some((slot) => slot?.path)
                     );
-                    const forceStructureSync = removedSemanticNodes.some(
-                        (node) =>
-                            node.type === "parallelLane" ||
-                            node.data?.autoParallelLaneCompound
-                    );
                     void syncRemovedStates(
                         [...semanticRemovalIds],
                         {
                             refreshSlots,
-                            forceStructure: forceStructureSync,
                             referenceStateIds,
                             referenceSourceIds,
                         }

@@ -433,6 +433,60 @@ mod tests {
         assert_eq!(replacement.logical_sources[0].handle, "error");
     }
 
+
+    #[test]
+    fn replacing_nested_targeted_transitions_lets_rust_own_hoisting() {
+        let store = WorkflowDocumentStore::default();
+        let mut workflow = sample_workflow();
+        workflow.states.push(State {
+            id: StateId::from("compound"),
+            scxml_id: "Group".into(),
+            label: "Group".into(),
+            kind: StateKind::Compound,
+            initial_child_id: Some(StateId::from("a")),
+            initial_child_scxml_id: Some("A".into()),
+            ..sample_state_defaults()
+        });
+        workflow
+            .states
+            .iter_mut()
+            .find(|state| state.id == StateId::from("a"))
+            .unwrap()
+            .parent_id = Some(StateId::from("compound"));
+        assert_eq!(store.replace(workflow).unwrap(), 1);
+
+        store
+            .apply(
+                Some(1),
+                WorkflowCommandDto::ReplaceTargetedTransitions {
+                    source_state_id: "a".into(),
+                    transitions: vec![TargetedTransitionCommandDto {
+                        id: "nested".into(),
+                        target_state_id: "b".into(),
+                        event: "success".into(),
+                        source_handle: "success".into(),
+                        condition: String::new(),
+                        assignments: vec![],
+                        target_instance_id: None,
+                    }],
+                },
+            )
+            .unwrap();
+
+        let snapshot = store.snapshot().unwrap().unwrap();
+        let transition = snapshot
+            .workflow
+            .transitions
+            .iter()
+            .find(|transition| transition.id == "nested")
+            .unwrap();
+        assert_eq!(transition.source_state_id.as_str(), "compound");
+        assert_eq!(transition.event, "A.success");
+        assert_eq!(transition.logical_sources.len(), 1);
+        assert_eq!(transition.logical_sources[0].state_id.as_str(), "a");
+        assert_eq!(transition.logical_sources[0].handle, "success");
+    }
+
     #[test]
     fn add_state_and_position_updates_are_incremental() {
         let store = WorkflowDocumentStore::default();

@@ -339,8 +339,6 @@ function AppContent() {
         checkSlotConnection,
         updateNodeInternals,
         applyWorkflowCommand: rustWorkflowDocument.applyWorkflowCommand,
-        syncEditorStructureAfterCommit:
-            rustWorkflowDocument.syncEditorStructureAfterCommit,
         syncInsertedParallelLaneStateAfterCommit:
             rustWorkflowDocument.syncInsertedParallelLaneStateAfterCommit,
         syncStateEditorPositions:
@@ -464,8 +462,6 @@ function AppContent() {
         syncStateEditorPositions:
             rustWorkflowDocument.syncStateEditorPositions,
         syncRemovedStates: rustWorkflowDocument.syncRemovedStates,
-        syncEditorStructureAfterCommit:
-            rustWorkflowDocument.syncEditorStructureAfterCommit,
     });
 
     const semanticNodes = useEditorGraphMaintenance({
