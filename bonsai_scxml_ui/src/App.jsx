@@ -30,15 +30,11 @@ import {
 import {
     COLLAPSED_CONTAINER_WIDTH,
     COLLAPSED_CONTAINER_HEIGHT,
-    getAbsoluteNodePosition,
     fitCompoundAndAncestorCompounds,
     growParallelToLaneContents,
     layoutStateContainerForExpansion,
 } from "./utils/editorGeometry";
-import {
-    getLocalDataModelEntries,
-    collectDescendantGlobals,
-} from "./utils/editorScxml";
+import { collectDescendantGlobals } from "./utils/editorScxml";
 import { useEditorHistory } from "./hooks/useEditorHistory";
 import { useNodeInteraction } from "./hooks/useNodeInteraction";
 import { useSlotGraph } from "./hooks/useSlotGraph";
@@ -69,7 +65,7 @@ import { useGlobalEditorShortcuts } from "./hooks/useGlobalEditorShortcuts";
 import { useEditorLibraryDrop } from "./hooks/useEditorLibraryDrop";
 import { useEditorFlowChanges } from "./hooks/useEditorFlowChanges";
 import { useEditorLibraryItems } from "./hooks/useEditorLibraryItems";
-import { isEditorCloneNode } from "./utils/editorClones";
+import { useEditorDetailsController } from "./hooks/useEditorDetailsController";
 import "./App.css";
 
 // Initialize API proxy for Tauri desktop mode (intercepts /api/* fetch calls)
@@ -897,28 +893,6 @@ function AppContent() {
         [semanticNodes, semanticSlotNodes, selectedNodeId]
     );
 
-    // Keep a clicked slot selected as the slot itself. Previously slot nodes
-    // were converted to the first skill that used the path, which prevented a
-    // dedicated slot detail view and made multi-skill slots ambiguous.
-    const selectedNode = selectedRawNode;
-
-    const selectedCloneSourceNode = useMemo(() => {
-        if (!isEditorCloneNode(selectedNode)) return null;
-        return semanticNodes.find(
-            (node) => node.id === selectedNode.data?.cloneOfNodeId
-        ) || null;
-    }, [selectedNode, semanticNodes]);
-
-    const selectedNodeClones = useMemo(() => {
-        if (!selectedNode || isEditorCloneNode(selectedNode)) return [];
-
-        return semanticNodes.filter(
-            (node) =>
-                node.id !== selectedNode.id &&
-                node.data?.cloneOfNodeId === selectedNode.id
-        );
-    }, [selectedNode, semanticNodes]);
-
     const {
         selectedSlotDetails,
         canvasSlotPathOptions,
@@ -940,170 +914,39 @@ function AppContent() {
         behaviorDirectories,
     });
 
-    const handleMoveContainerTransition = useCallback(
-        (edgeId, direction) => {
-            if (
-                !selectedNode ||
-                (selectedNode.type !== "compound" &&
-                    selectedNode.type !== "parallel")
-            ) {
-                return;
-            }
-
-            moveContainerTransition(
-                selectedNode.id,
-                selectedContainerOutgoingTransitions,
-                edgeId,
-                direction
-            );
-        },
-        [
-            selectedNode,
-            selectedContainerOutgoingTransitions,
-            moveContainerTransition,
-        ]
-    );
-
-    const handleNavigateCloneSource = useCallback((nodeId) => {
-        if (!nodeId) return;
-
-        const flowNodes = getNodes();
-        const byId = new Map(flowNodes.map((node) => [node.id, node]));
-        const collapsedAncestors = [];
-        let parentId = byId.get(nodeId)?.parentId;
-        const visited = new Set();
-
-        while (parentId && !visited.has(parentId)) {
-            visited.add(parentId);
-            const parent = byId.get(parentId);
-            if (!parent) break;
-            if (
-                (parent.type === "compound" || parent.type === "parallel") &&
-                parent.data?.isCollapsed
-            ) {
-                collapsedAncestors.push(parent.id);
-            }
-            parentId = parent.parentId;
-        }
-
-        collapsedAncestors.reverse().forEach((containerId) =>
-            handleToggleContainerCollapse(containerId)
-        );
-
-        clearAllEdgeSelection();
-        selectEditorNode(nodeId, { kind: "node", tab: null });
-
-        window.setTimeout(() => {
-            const flowNode = getNodes().find((node) => node.id === nodeId);
-            if (!flowNode) {
-                fitView({
-                    nodes: [{ id: nodeId }],
-                    padding: 0.8,
-                    maxZoom: 1.2,
-                    duration: 250,
-                });
-                return;
-            }
-
-            const position = getAbsoluteNodePosition(
-                flowNode,
-                getNodes()
-            );
-            const width =
-                Number(flowNode.measured?.width) ||
-                Number(flowNode.width) ||
-                220;
-            const height =
-                Number(flowNode.measured?.height) ||
-                Number(flowNode.height) ||
-                90;
-
-            setCenter(
-                position.x + width / 2,
-                position.y + height / 2,
-                { zoom: 1, duration: 300 }
-            );
-        }, 40);
-    }, [
-        clearAllEdgeSelection,
-        fitView,
-        getNodes,
-        handleToggleContainerCollapse,
-        selectEditorNode,
-        setCenter,
-    ]);
-
-
-
-    // OnEntry/OnExit has asymmetric scope for sub-state-machines:
-    // - assignment location belongs to the child machine's local datamodel
-    // - assignment expression is evaluated in the parent workflow scope
-    const selectedActionDataModel = useMemo(() => {
-        if (!selectedNode || selectedNode.type !== "submachine") {
-            return availableDataModelParameters;
-        }
-
-        const srcFileName = String(selectedNode.data?.src || "")
-            .split(/[\\/]/)
-            .pop()
-            ?.replace(/\.(xml|scxml)$/i, "");
-
-        // Prefer the live child tab when the sub-state machine is currently
-        // open. This means Entry/Exit assignment locations immediately track
-        // edits to the child machine's own datamodel.
-        const childTab = tabs.find((tab) => {
-            if (tab.parentTabId !== activeTabId) return false;
-
-            const tabFileName = String(tab.fileName || "")
-                .split(/[\\/]/)
-                .pop()
-                ?.replace(/\.(xml|scxml)$/i, "");
-
-            return (
-                (tab.sourcePath &&
-                    String(tab.sourcePath) === String(selectedNode.data?.src || "")) ||
-                String(tab.title || "") === String(selectedNode.data?.label || "") ||
-                (srcFileName && tabFileName === srcFileName)
-            );
-        });
-
-        if (childTab) {
-            return getLocalDataModelEntries(childTab.globalDataModel);
-        }
-
-        // A behavior that has not been opened yet is hydrated with its local
-        // datamodel when its source file is inspected. Never fall back to the
-        // parent's datamodel for a sub-state-machine action.
-        return getLocalDataModelEntries(
-            selectedNode.data?.localDataModel || []
-        );
-    }, [
+    const {
         selectedNode,
+        selectedCloneSourceNode,
+        selectedNodeClones,
+        selectedActionDataModel,
+        selectedActionExpressionVariables,
+        hasInitialNode,
+        handleMoveContainerTransition,
+        handleNavigateCloneSource,
+        handleUpdateSelectedSlotPath,
+        handleUpdateSelectedSlotInherited,
+        handleSelectSlotAccessSkill,
+        handleNavigateAncestorSlot,
+    } = useEditorDetailsController({
+        selectedRawNode,
+        semanticNodes,
         tabs,
         activeTabId,
         availableDataModelParameters,
-    ]);
-
-    const selectedActionExpressionVariables = useMemo(() => {
-        // The expression of an action attached to a sub-state-machine is
-        // evaluated by the parent state machine. Therefore @variable
-        // references must come from the parent/current workflow, not from the
-        // child machine whose local datamodel supplies `location`.
-        return availableDataModelParameters;
-    }, [availableDataModelParameters]);
-
-    const selectedInitialScopeParentId =
-        selectedNode?.parentId || null;
-
-    const hasInitialNode = useMemo(
-        () =>
-            semanticNodes.some(
-                (node) =>
-                    Boolean(node.data?.isInitial) &&
-                    (node.parentId || null) === selectedInitialScopeParentId
-            ),
-        [semanticNodes, selectedInitialScopeParentId]
-    );
+        selectedContainerOutgoingTransitions,
+        moveContainerTransition,
+        getNodes,
+        handleToggleContainerCollapse,
+        clearAllEdgeSelection,
+        selectEditorNode,
+        fitView,
+        setCenter,
+        setHoveredSlotAccessNodeId,
+        switchTab,
+        setRightPanelTab,
+        updateSlotPath,
+        updateSlotInherited,
+    });
 
     const handleProblemClick = useProblemNavigation({
         edges,
@@ -1333,17 +1176,6 @@ function AppContent() {
         getNodes,
         setCenter,
     });
-
-    const handleUpdateSelectedSlotPath = useCallback(
-        (nextPath) => updateSlotPath(selectedRawNode, nextPath),
-        [selectedRawNode, updateSlotPath]
-    );
-
-    const handleUpdateSelectedSlotInherited = useCallback(
-        (shouldInherit) =>
-            updateSlotInherited(selectedRawNode, shouldInherit),
-        [selectedRawNode, updateSlotInherited]
-    );
 
     const handleCreateManualSlot = createManualSlot;
 
@@ -2058,105 +1890,8 @@ function AppContent() {
                                 onHoverSlotAccessSkill={(nodeId) =>
                                     setHoveredSlotAccessNodeId(nodeId || null)
                                 }
-                                onSelectSlotAccessSkill={(nodeId) => {
-                                    if (!nodeId) return;
-
-                                    setHoveredSlotAccessNodeId(null);
-                                    clearAllEdgeSelection();
-                                    selectEditorNode(nodeId, {
-                                        kind: "node",
-                                        tab: null,
-                                    });
-
-                                    // Selection alone is easy to miss in a large graph. Move
-                                    // the viewport to the clicked Accessed-by skill as well.
-                                    window.setTimeout(() => {
-                                        const flowNode = getNodes().find(
-                                            (node) => node.id === nodeId
-                                        );
-                                        if (!flowNode) {
-                                            fitView({
-                                                nodes: [{ id: nodeId }],
-                                                padding: 0.8,
-                                                maxZoom: 1.2,
-                                                duration: 250,
-                                            });
-                                            return;
-                                        }
-
-                                        const position =
-                                            flowNode.positionAbsolute ||
-                                            flowNode.position ||
-                                            { x: 0, y: 0 };
-                                        const width =
-                                            Number(flowNode.measured?.width) ||
-                                            Number(flowNode.width) ||
-                                            220;
-                                        const height =
-                                            Number(flowNode.measured?.height) ||
-                                            Number(flowNode.height) ||
-                                            90;
-
-                                        setCenter(
-                                            position.x + width / 2,
-                                            position.y + height / 2,
-                                            { zoom: 1, duration: 300 }
-                                        );
-                                    }, 50);
-                                }}
-                                onNavigateAncestorSlot={(tabId, nodeId = null) => {
-                                    if (!tabId) return;
-
-                                    if (tabId !== activeTabId) {
-                                        switchTab(tabId);
-                                    }
-                                    setRightPanelTab("details");
-
-                                    if (!nodeId) return;
-
-                                    // Wait until the parent tab's graph has been installed,
-                                    // then select and center the hierarchy writer there.
-                                    window.setTimeout(() => {
-                                        selectEditorNode(nodeId, {
-                                            kind: "node",
-                                            allowMissing: true,
-                                            tab: null,
-                                        });
-
-                                        window.setTimeout(() => {
-                                            const flowNode = getNodes().find(
-                                                (node) => node.id === nodeId
-                                            );
-                                            if (!flowNode) {
-                                                fitView({
-                                                    nodes: [{ id: nodeId }],
-                                                    padding: 0.8,
-                                                    maxZoom: 1.2,
-                                                    duration: 250,
-                                                });
-                                                return;
-                                            }
-
-                                            const position =
-                                                flowNode.positionAbsolute ||
-                                                flowNode.position ||
-                                                { x: 0, y: 0 };
-                                            const width =
-                                                Number(flowNode.measured?.width) ||
-                                                Number(flowNode.width) ||
-                                                220;
-                                            const height =
-                                                Number(flowNode.measured?.height) ||
-                                                Number(flowNode.height) ||
-                                                90;
-                                            setCenter(
-                                                position.x + width / 2,
-                                                position.y + height / 2,
-                                                { zoom: 1, duration: 300 }
-                                            );
-                                        }, 60);
-                                    }, tabId === activeTabId ? 0 : 80);
-                                }}
+                                onSelectSlotAccessSkill={handleSelectSlotAccessSkill}
+                                onNavigateAncestorSlot={handleNavigateAncestorSlot}
                                 parameterFocusRequest={parameterFocusRequest}
                                 slotFocusRequest={slotFocusRequest}
                                 transitionFocusRequest={transitionFocusRequest}
