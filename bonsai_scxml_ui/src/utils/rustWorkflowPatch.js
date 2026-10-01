@@ -1,0 +1,327 @@
+import {
+    deserializeScxmlConditionForEditor,
+    deserializeScxmlValueForEditor,
+    deserializeStateDatamodelValueForEditor,
+} from "./valueTypes";
+import { getTransitionExitToken } from "./transitionEvents";
+
+const toEditorAssignment = (assignment) => ({
+    location: String(assignment?.location || ""),
+    expr: deserializeScxmlValueForEditor(assignment?.expression || ""),
+});
+
+const getPrimaryEditorPosition = (state) => {
+    const positions = Array.isArray(state?.editor?.positions)
+        ? state.editor.positions
+        : [];
+    return (
+        positions.find((position) => !position?.cloneType) ||
+        positions[0] ||
+        (state?.editor
+            ? {
+                  x: state.editor.x,
+                  y: state.editor.y,
+              }
+            : null)
+    );
+};
+
+const mergeParameters = (current = [], canonical = []) => {
+    const byKey = new Map(
+        (canonical || []).map((parameter) => [String(parameter?.key || ""), parameter])
+    );
+    const seen = new Set();
+
+    const merged = (current || []).map((parameter) => {
+        const key = String(parameter?.key || "");
+        const canonicalParameter = byKey.get(key);
+        seen.add(key);
+
+        // Rust's editor projection intentionally stores only configured
+        // parameter values. Missing keys therefore mean "configured value was
+        // cleared", not that the skill definition disappeared.
+        if (!canonicalParameter) {
+            return {
+                ...parameter,
+                expr: "",
+            };
+        }
+
+        return {
+            ...parameter,
+            ...(canonicalParameter.typeName
+                ? { type: canonicalParameter.typeName }
+                : {}),
+            ...(canonicalParameter.description
+                ? { description: canonicalParameter.description }
+                : {}),
+            ...(canonicalParameter.defaultValue !== undefined &&
+            canonicalParameter.defaultValue !== null
+                ? { default: canonicalParameter.defaultValue }
+                : {}),
+            ...(canonicalParameter.required !== undefined
+                ? { required: Boolean(canonicalParameter.required) }
+                : {}),
+            expr: deserializeStateDatamodelValueForEditor(
+                canonicalParameter.expression || ""
+            ),
+        };
+    });
+
+    // This primarily matters for states loaded directly from Rust before the
+    // skill API has supplied a matching parameter definition. Preserve enough
+    // metadata for the editor to display the canonical value.
+    (canonical || []).forEach((parameter) => {
+        const key = String(parameter?.key || "");
+        if (!key || seen.has(key)) return;
+        merged.push({
+            key,
+            type: parameter?.typeName || "",
+            required: Boolean(parameter?.required),
+            default: parameter?.defaultValue ?? "",
+            description: parameter?.description || "",
+            expr: deserializeStateDatamodelValueForEditor(
+                parameter?.expression || ""
+            ),
+        });
+    });
+
+    return merged;
+};
+
+const mergeSlots = (current = [], canonical = [], stateName = "") => {
+    const currentByIdentity = new Map(
+        (current || []).map((slot) => [
+            `${String(slot?.key || "")}\u0000${String(slot?.type || "")}`,
+            slot,
+        ])
+    );
+
+    return (canonical || []).map((slot) => {
+        const identity = `${String(slot?.key || "")}\u0000${String(
+            slot?.typeName || ""
+        )}`;
+        const existing =
+            currentByIdentity.get(identity) ||
+            (current || []).find(
+                (candidate) => String(candidate?.key || "") === String(slot?.key || "")
+            ) ||
+            {};
+        const inheritedValue = String(slot?.inherited || "").trim();
+
+        return {
+            ...existing,
+            key: String(slot?.key || ""),
+            type: slot?.typeName || existing.type || "",
+            description: slot?.description || existing.description || "",
+            path: String(slot?.path || ""),
+            inherited: inheritedValue
+                ? {
+                      ...(existing.inherited || {}),
+                      state:
+                          existing.inherited?.state ||
+                          stateName ||
+                          "",
+                      xpath: inheritedValue,
+                  }
+                : null,
+        };
+    });
+};
+
+const stateDataPatch = (node, state, mode = "all") => {
+    const currentData = node?.data || {};
+    const stateName =
+        state?.fullSkillName || state?.scxmlId || state?.label || node?.id || "";
+    const next = { ...currentData };
+
+    if (mode === "all" || mode === "identity" || mode === "label") {
+        if (state?.label !== undefined) next.label = state.label;
+    }
+    if (mode === "all" || mode === "identity") {
+        if (state?.fullSkillName !== undefined && state?.fullSkillName !== null) {
+            next.fullSkillName = state.fullSkillName;
+        }
+        if (currentData.scxmlStateId !== undefined) {
+            next.scxmlStateId = state?.scxmlId || currentData.scxmlStateId;
+        }
+    }
+    if (mode === "all" || mode === "source") {
+        next.src = state?.source || "";
+    }
+    if (mode === "all" || mode === "initial") {
+        next.isInitial = Boolean(state?.isInitial);
+        next.isFinal = Boolean(state?.isFinal);
+        next.initialChildId = state?.initialChildId || null;
+        next.initialSubState = state?.initialChildScxmlId || "";
+    }
+    if (mode === "all" || mode === "parameters") {
+        next.params = mergeParameters(
+            currentData.params || [],
+            state?.parameters || []
+        );
+    }
+    if (mode === "all" || mode === "slots") {
+        next.inSlots = mergeSlots(
+            currentData.inSlots || [],
+            state?.inputSlots || [],
+            stateName
+        );
+        next.outSlots = mergeSlots(
+            currentData.outSlots || [],
+            state?.outputSlots || [],
+            stateName
+        );
+    }
+    if (mode === "all") {
+        next.onEntry = (state?.onEntry || []).map(toEditorAssignment);
+        next.onExit = (state?.onExit || []).map(toEditorAssignment);
+    }
+
+    return next;
+};
+
+export const applyRustWorkflowStatePatch = (
+    currentNodes = [],
+    patch = null,
+    { mode = "all" } = {}
+) => {
+    if (!patch) return currentNodes;
+
+    const removed = new Set(patch.removedStateIds || []);
+    const changedById = new Map(
+        (patch.states || []).map((state) => [String(state?.id || ""), state])
+    );
+
+    let changed = false;
+    const nextNodes = [];
+
+    for (const node of currentNodes || []) {
+        const canonicalId = String(node?.data?.cloneOfNodeId || node?.id || "");
+        if (removed.has(canonicalId)) {
+            changed = true;
+            continue;
+        }
+
+        // Visual references/aliases inherit their display name via the normal
+        // graph-maintenance hook. Do not overwrite their intentionally sparse
+        // data object with a full semantic state payload.
+        const state = changedById.get(String(node?.id || ""));
+        if (
+            !state ||
+            mode === "none" ||
+            node?.data?.isSkillClone ||
+            node?.data?.isStateClone
+        ) {
+            nextNodes.push(node);
+            continue;
+        }
+
+        const shouldApplyPosition = mode === "all" || mode === "position";
+        const primaryPosition = shouldApplyPosition
+            ? getPrimaryEditorPosition(state)
+            : null;
+        const nextPosition = primaryPosition
+            ? {
+                  x: Number(primaryPosition.x || 0),
+                  y: Number(primaryPosition.y || 0),
+              }
+            : node.position;
+
+        nextNodes.push({
+            ...node,
+            position: nextPosition,
+            data: stateDataPatch(node, state, mode),
+        });
+        changed = true;
+    }
+
+    return changed ? nextNodes : currentNodes;
+};
+
+const edgeLabelFor = (sourceHandle, condition) => {
+    const handle = String(sourceHandle || "success");
+    const cond = String(condition || "").trim();
+    return cond ? `${handle} [${cond}]` : handle;
+};
+
+export const applyRustWorkflowTransitionPatch = (
+    currentEdges = [],
+    currentNodes = [],
+    patch = null,
+    { applyChanges = true } = {}
+) => {
+    if (!patch) return currentEdges;
+
+    const removed = new Set(patch.removedTransitionIds || []);
+    const transitionsById = new Map(
+        (patch.transitions || []).map((transition) => [
+            String(transition?.id || ""),
+            transition,
+        ])
+    );
+    const nodesById = new Map((currentNodes || []).map((node) => [node.id, node]));
+
+    let changed = false;
+    const nextEdges = [];
+
+    for (const edge of currentEdges || []) {
+        if (removed.has(String(edge?.id || ""))) {
+            changed = true;
+            continue;
+        }
+
+        const transition = applyChanges
+            ? transitionsById.get(String(edge?.id || ""))
+            : null;
+        if (!transition) {
+            nextEdges.push(edge);
+            continue;
+        }
+
+        const sourceNode = nodesById.get(edge.source);
+        const sourceSkillName = sourceNode?.data?.fullSkillName || "";
+        const sourceHandle = getTransitionExitToken(
+            transition.event || edge.sourceHandle || "success",
+            sourceSkillName
+        );
+        const condition = deserializeScxmlConditionForEditor(
+            transition.condition || ""
+        );
+        const assignments = (transition.assignments || []).map(toEditorAssignment);
+
+        nextEdges.push({
+            ...edge,
+            sourceHandle,
+            label: edge?.data?.boundaryInternalEdge
+                ? edge.label
+                : edgeLabelFor(sourceHandle, condition),
+            data: {
+                ...(edge.data || {}),
+                cond: condition,
+                assignments,
+                assign: assignments[0] || null,
+                editorTargetInstanceId:
+                    transition.targetInstanceId ||
+                    edge.data?.editorTargetInstanceId ||
+                    "",
+                ...(edge.data?.boundaryImportedRawEvent !== undefined
+                    ? { boundaryImportedRawEvent: transition.event || "" }
+                    : {}),
+            },
+        });
+        changed = true;
+    }
+
+    return changed ? nextEdges : currentEdges;
+};
+
+export const applyRustWorkflowDataModelPatch = (current = [], patch = null) => {
+    if (!patch || !Array.isArray(patch.dataModel)) return current;
+
+    return patch.dataModel.map((entry) => ({
+        id: String(entry?.id || ""),
+        ...(entry?.typeName ? { type: entry.typeName } : {}),
+        expr: deserializeScxmlValueForEditor(entry?.expression || ""),
+    }));
+};

@@ -546,6 +546,9 @@ function AppContent() {
         edges,
         globalDataModel,
         manualSlots,
+        setNodes,
+        setEdges,
+        setGlobalDataModel,
     });
 
     const {

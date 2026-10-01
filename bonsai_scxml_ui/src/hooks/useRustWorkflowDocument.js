@@ -12,6 +12,11 @@ import {
     buildRustStateParameters,
 } from "../utils/scxmlRustExport";
 import { buildRustTransitionSyncPlan } from "../utils/rustTransitionSync";
+import {
+    applyRustWorkflowDataModelPatch,
+    applyRustWorkflowStatePatch,
+    applyRustWorkflowTransitionPatch,
+} from "../utils/rustWorkflowPatch";
 
 const isRevisionConflict = (error) =>
     String(error?.message || error || "")
@@ -26,6 +31,41 @@ const waitForEditorCommit = () =>
         }
         window.requestAnimationFrame(() => resolve());
     });
+
+const getCanonicalPatchPolicy = (command) => {
+    switch (command?.type) {
+        case "setRootInitial":
+        case "setStateInitialChild":
+            return { stateMode: "initial", applyTransitions: false };
+        case "renameState":
+            return { stateMode: "identity", applyTransitions: true };
+        case "setStateLabel":
+            return { stateMode: "label", applyTransitions: false };
+        case "setStateSource":
+            return { stateMode: "source", applyTransitions: false };
+        case "updateStateEditorPosition":
+        case "replaceStateEditorPositions":
+            return { stateMode: "position", applyTransitions: false };
+        case "replaceStateParameters":
+            return { stateMode: "parameters", applyTransitions: false };
+        case "replaceSlotsSnapshot":
+            return { stateMode: "slots", applyTransitions: false };
+        case "replaceDataModel":
+            return { stateMode: "none", applyTransitions: false };
+        case "updateTransitionEvent":
+        case "updateTransitionTarget":
+        case "replaceTargetedTransitions":
+        case "replaceEditorTransitions":
+            return { stateMode: "none", applyTransitions: true };
+        case "removeStates":
+            return { stateMode: "none", applyTransitions: false };
+        case "addState":
+        case "replaceEditorStructure":
+            return { stateMode: "all", applyTransitions: true };
+        default:
+            return { stateMode: "none", applyTransitions: false };
+    }
+};
 
 /**
  * Keeps the Rust-owned semantic Workflow aligned with the active React Flow
@@ -42,6 +82,9 @@ export function useRustWorkflowDocument({
     edges,
     globalDataModel,
     manualSlots,
+    setNodes,
+    setEdges,
+    setGlobalDataModel,
 }) {
     const revisionRef = useRef(null);
     const readyRef = useRef(false);
@@ -62,6 +105,73 @@ export function useRustWorkflowDocument({
         queueRef.current = next.catch(() => undefined);
         return next;
     }, []);
+
+    const applyCanonicalPatch = useCallback(
+        (result, command) => {
+            const patch = result?.patch;
+            if (!patch) return;
+            const policy = getCanonicalPatchPolicy(command);
+
+            // Merge Rust's canonical semantic result back into the existing
+            // React Flow projection. The patch utilities deliberately preserve
+            // view-only topology (Parallel lanes, boundary helpers, callbacks,
+            // selection, etc.) instead of replacing the graph with the flatter
+            // semantic Rust model.
+            const current = editorStateRef.current || {};
+            const nextNodes = applyRustWorkflowStatePatch(
+                current.nodes || [],
+                patch,
+                { mode: policy.stateMode }
+            );
+            const nextEdges = applyRustWorkflowTransitionPatch(
+                current.edges || [],
+                nextNodes,
+                patch,
+                { applyChanges: policy.applyTransitions }
+            );
+            const nextDataModel = applyRustWorkflowDataModelPatch(
+                current.globalDataModel || [],
+                patch
+            );
+
+            editorStateRef.current = {
+                ...current,
+                nodes: nextNodes,
+                edges: nextEdges,
+                globalDataModel: nextDataModel,
+            };
+
+            if (
+                (patch.states?.length || 0) > 0 ||
+                (patch.removedStateIds?.length || 0) > 0
+            ) {
+                setNodes?.((currentNodes) =>
+                    applyRustWorkflowStatePatch(currentNodes, patch, {
+                        mode: policy.stateMode,
+                    })
+                );
+            }
+            if (
+                (patch.transitions?.length || 0) > 0 ||
+                (patch.removedTransitionIds?.length || 0) > 0
+            ) {
+                setEdges?.((currentEdges) =>
+                    applyRustWorkflowTransitionPatch(
+                        currentEdges,
+                        editorStateRef.current?.nodes || nextNodes,
+                        patch,
+                        { applyChanges: policy.applyTransitions }
+                    )
+                );
+            }
+            if (Array.isArray(patch.dataModel)) {
+                setGlobalDataModel?.((currentDataModel) =>
+                    applyRustWorkflowDataModelPatch(currentDataModel, patch)
+                );
+            }
+        },
+        [setEdges, setGlobalDataModel, setNodes]
+    );
 
     const replaceNow = useCallback(async (editorState, expectedRevision = null) => {
         if (!isTauri()) return null;
@@ -113,12 +223,13 @@ export function useRustWorkflowDocument({
                     revisionRef.current
                 );
                 revisionRef.current = result?.revision ?? revisionRef.current;
+                applyCanonicalPatch(result, command);
                 return result;
             } catch (error) {
                 return resyncFromEditor(error);
             }
         },
-        [replaceNow, resyncFromEditor]
+        [applyCanonicalPatch, replaceNow, resyncFromEditor]
     );
 
     const syncEditorStructureNow = useCallback(
