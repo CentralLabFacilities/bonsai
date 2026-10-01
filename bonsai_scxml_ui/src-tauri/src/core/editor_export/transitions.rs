@@ -6,7 +6,9 @@ use crate::core::transitions::events::scxml_transition_event;
 use super::{
     helpers::{assignment, node_kind, state_name},
     index::ExportIndex,
-    types::{EditorExportEdgeDto, EditorExportEventDto, EditorExportNodeDto, EditorExportRequestDto},
+    types::{
+        EditorExportEdgeDto, EditorExportEventDto, EditorExportNodeDto, EditorExportRequestDto,
+    },
 };
 
 fn edge_event(edge: &EditorExportEdgeDto, source: Option<&&EditorExportNodeDto>) -> String {
@@ -20,6 +22,53 @@ fn edge_event(edge: &EditorExportEdgeDto, source: Option<&&EditorExportNodeDto>)
     scxml_transition_event(raw, &source.map(|node| state_name(node)).unwrap_or_default())
 }
 
+fn edge_logical_sources(
+    edge: &EditorExportEdgeDto,
+    fallback_state_id: &str,
+    fallback_handle: &str,
+) -> Vec<crate::core::model::TransitionSourceDto> {
+    let mut seen = HashSet::new();
+    let mut sources = edge
+        .logical_sources
+        .iter()
+        .filter_map(|source| {
+            let state_id = source.state_id.trim();
+            let handle = source.handle.trim();
+            if state_id.is_empty() || handle.is_empty() {
+                return None;
+            }
+            let key = (state_id.to_string(), handle.to_string());
+            seen.insert(key.clone()).then_some(crate::core::model::TransitionSourceDto {
+                state_id: key.0,
+                handle: key.1,
+            })
+        })
+        .collect::<Vec<_>>();
+
+    if sources.is_empty() && !fallback_state_id.trim().is_empty() {
+        sources.push(crate::core::model::TransitionSourceDto {
+            state_id: fallback_state_id.trim().to_string(),
+            handle: if fallback_handle.trim().is_empty() {
+                "success".to_string()
+            } else {
+                fallback_handle.trim().to_string()
+            },
+        });
+    }
+
+    sources
+}
+
+fn direct_logical_source(
+    state_id: &str,
+    handle: &str,
+) -> Vec<crate::core::model::TransitionSourceDto> {
+    vec![crate::core::model::TransitionSourceDto {
+        state_id: state_id.to_string(),
+        handle: handle.to_string(),
+    }]
+}
+
 fn transition_key(transition: &TransitionDto) -> String {
     let assignments = transition
         .assignments
@@ -31,6 +80,26 @@ fn transition_key(transition: &TransitionDto) -> String {
         "{}\u{1e}{}\u{1e}{}\u{1e}{}",
         transition.event, transition.target_scxml_id, transition.condition, assignments
     )
+}
+
+fn push_transition_with_merged_sources(
+    result: &mut Vec<TransitionDto>,
+    seen: &mut HashMap<String, usize>,
+    transition: TransitionDto,
+) {
+    let key = transition_key(&transition);
+    if let Some(existing_index) = seen.get(&key).copied() {
+        let existing = &mut result[existing_index];
+        for source in transition.logical_sources {
+            if !existing.logical_sources.contains(&source) {
+                existing.logical_sources.push(source);
+            }
+        }
+        return;
+    }
+
+    seen.insert(key, result.len());
+    result.push(transition);
 }
 
 fn target_details(target_id: &str, index: &ExportIndex<'_>) -> (Option<String>, String) {
@@ -63,7 +132,14 @@ fn build_normal_transitions(
     }
 
     let container_id = index.nearest_container_ancestor(node);
-    let mut combined: Vec<(String, String, String, Vec<crate::core::model::AssignmentDto>, String)> = Vec::new();
+    let mut combined: Vec<(
+        String,
+        String,
+        String,
+        Vec<crate::core::model::AssignmentDto>,
+        String,
+        Vec<crate::core::model::TransitionSourceDto>,
+    )> = Vec::new();
 
     for edge in request.edges.iter().filter(|edge| edge.source == node.id) {
         if let Some(container_id) = container_id {
@@ -78,12 +154,14 @@ fn build_normal_transitions(
         } else {
             "success".into()
         };
+        let logical_sources = edge_logical_sources(edge, &node.id, &raw_event);
         combined.push((
             raw_event,
             edge.target.clone(),
             edge.condition.clone(),
             edge.assignments.iter().map(assignment).collect(),
             edge.id.clone(),
+            logical_sources,
         ));
     }
 
@@ -102,7 +180,7 @@ fn build_normal_transitions(
             .get(event.target.as_str())
             .map(|target| state_name(target))
             .unwrap_or_else(|| event.target.clone());
-        let already_exists = combined.iter().any(|(existing_event, target, _, _, _)| {
+        let already_exists = combined.iter().any(|(existing_event, target, _, _, _, _)| {
             let existing_target_name = index
                 .nodes_by_id
                 .get(target.as_str())
@@ -114,18 +192,20 @@ fn build_normal_transitions(
         if already_exists {
             continue;
         }
+        let logical_sources = direct_logical_source(&node.id, &raw_event);
         combined.push((
             raw_event,
             event.target.clone(),
             event.condition.clone(),
             event.assignments.iter().map(assignment).collect(),
             format!("event-{}-{event_index}", node.id),
+            logical_sources,
         ));
     }
 
     combined
         .into_iter()
-        .filter_map(|(raw_event, target_id, condition, assignments, id)| {
+        .filter_map(|(raw_event, target_id, condition, assignments, id, logical_sources)| {
             if target_id.trim().is_empty() {
                 return None;
             }
@@ -135,6 +215,7 @@ fn build_normal_transitions(
                 source_state_id: node.id.clone(),
                 target_state_id,
                 target_scxml_id,
+                logical_sources,
                 event: scxml_transition_event(&raw_event, &state_name(node)),
                 condition,
                 assignments,
@@ -179,7 +260,7 @@ fn build_container_transitions(
     });
 
     let mut result = Vec::new();
-    let mut seen = HashSet::new();
+    let mut seen = HashMap::new();
 
     for (_, edge) in leaving {
         let source = index.nodes_by_id.get(edge.source.as_str());
@@ -209,15 +290,14 @@ fn build_container_transitions(
             source_state_id: node.id.clone(),
             target_state_id,
             target_scxml_id,
+            logical_sources: edge_logical_sources(edge, &edge.source, raw_handle),
             event: full_event,
             condition: edge.condition.clone(),
             assignments: edge.assignments.iter().map(assignment).collect(),
             sent_events: Vec::new(),
             target_instance_id: None,
         };
-        if seen.insert(transition_key(&transition)) {
-            result.push(transition);
-        }
+        push_transition_with_merged_sources(&mut result, &mut seen, transition);
     }
 
     for (event_index, event) in node.events.iter().enumerate() {
@@ -237,15 +317,14 @@ fn build_container_transitions(
             source_state_id: node.id.clone(),
             target_state_id,
             target_scxml_id,
+            logical_sources: direct_logical_source(&node.id, &raw_event),
             event: raw_event,
             condition: event.condition.clone(),
             assignments: event.assignments.iter().map(assignment).collect(),
             sent_events: Vec::new(),
             target_instance_id: None,
         };
-        if seen.insert(transition_key(&transition)) {
-            result.push(transition);
-        }
+        push_transition_with_merged_sources(&mut result, &mut seen, transition);
     }
 
     result
@@ -288,6 +367,7 @@ fn build_behavior_exit_transition(node: &EditorExportNodeDto) -> Vec<TransitionD
         source_state_id: node.id.clone(),
         target_state_id: None,
         target_scxml_id: String::new(),
+        logical_sources: direct_logical_source(&node.id, &trigger_event),
         event: trigger_event,
         condition: String::new(),
         assignments: Vec::new(),

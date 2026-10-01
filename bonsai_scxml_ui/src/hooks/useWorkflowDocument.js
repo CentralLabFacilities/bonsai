@@ -6,7 +6,6 @@ import { getNodeId } from "../utils/editorGeometry";
 import {
     ensureSharedEditorInstanceIds,
     normalizeSharedScxmlStateIdentity,
-    prepareGraphForScxml,
 } from "../utils/editorScxml";
 
 const showSavedToast = () => {
@@ -52,63 +51,6 @@ const showSavedToast = () => {
         toast.style.transform = "translate(-50%, 8px)";
         window.setTimeout(() => toast.remove(), 160);
     }, 1200);
-};
-
-const requestBrowserFile = async () => {
-    if (typeof window === "undefined") return null;
-
-    if ("showOpenFilePicker" in window) {
-        const [handle] = await window.showOpenFilePicker({
-            types: [
-                {
-                    description: "XML/SCXML",
-                    accept: {
-                        "application/xml": [".xml", ".scxml"],
-                    },
-                },
-            ],
-            multiple: false,
-        });
-        const file = await handle.getFile();
-        return { file, fileHandle: handle };
-    }
-
-    return new Promise((resolve) => {
-        const input = document.createElement("input");
-        input.type = "file";
-        input.accept = ".scxml,.xml";
-        input.style.display = "none";
-
-        const cleanup = () => input.remove();
-        input.addEventListener(
-            "change",
-            () => {
-                const file = input.files?.[0] || null;
-                cleanup();
-                resolve(file ? { file, fileHandle: null } : null);
-            },
-            { once: true }
-        );
-
-        document.body.appendChild(input);
-        input.click();
-
-        // Browsers do not consistently dispatch `change` when the picker is
-        // cancelled. Remove the temporary input when focus returns and no file
-        // was selected; resolving twice is harmless because Promises ignore it.
-        window.addEventListener(
-            "focus",
-            () => {
-                window.setTimeout(() => {
-                    if (!input.files?.length) {
-                        cleanup();
-                        resolve(null);
-                    }
-                }, 0);
-            },
-            { once: true }
-        );
-    });
 };
 
 /**
@@ -243,28 +185,20 @@ export function useWorkflowDocument({
 
     const handleOpenDocument = useCallback(async () => {
         try {
-            if (isDesktop) {
-                const filePath = await openFile();
-                if (!filePath) return null;
-
-                const content = await readFile(filePath);
-                if (!content) return null;
-
-                const fileName = filePath.split(/[\\/]/).pop() || "workflow.xml";
-                await applyImportedDocument({ content, filePath, fileName });
-                return filePath;
+            if (!isDesktop) {
+                alert("Opening SCXML requires the Rust/Tauri desktop backend.");
+                return null;
             }
 
-            const selected = await requestBrowserFile();
-            if (!selected?.file) return null;
+            const filePath = await openFile();
+            if (!filePath) return null;
 
-            const content = await selected.file.text();
-            await applyImportedDocument({
-                content,
-                fileName: selected.file.name,
-                fileHandle: selected.fileHandle,
-            });
-            return selected.file.name;
+            const content = await readFile(filePath);
+            if (!content) return null;
+
+            const fileName = filePath.split(/[\\/]/).pop() || "workflow.xml";
+            await applyImportedDocument({ content, filePath, fileName });
+            return filePath;
         } catch (error) {
             if (error?.name === "AbortError") return null;
             console.error("Import error:", error);
@@ -292,89 +226,47 @@ export function useWorkflowDocument({
                 setSaveStatus("saving");
 
                 try {
-                    let xml;
-                    if (isDesktop) {
-                        // Desktop serialization is Rust-owned. If it fails, let
-                        // the surrounding save error handling surface the issue
-                        // instead of silently saving different JavaScript output.
-                        xml = await serializeEditorGraphWithRust({
-                            nodes,
-                            edges,
-                            globalDataModel,
-                            manualSlots,
-                        });
-                    } else {
-                        // Browser-only compatibility path. Keep the legacy JS
-                        // serializer out of the desktop editor's eager bundle.
-                        const { generateXmlString } = await import(
-                            "../utils/scxmlExport"
-                        );
-                        const exportGraph = prepareGraphForScxml(nodes, edges);
-                        xml = generateXmlString(
-                            exportGraph.nodes,
-                            exportGraph.edges,
-                            globalDataModel,
-                            [],
-                            manualSlots
+                    if (!isDesktop) {
+                        throw new Error(
+                            "Saving SCXML requires the Rust/Tauri desktop backend."
                         );
                     }
+
+                    const xml = await serializeEditorGraphWithRust({
+                        nodes,
+                        edges,
+                        globalDataModel,
+                        manualSlots,
+                    });
 
                     const defaultName =
                         activeTab?.fileName ||
                         `${activeTab?.title || "workflow"}.xml`;
 
-                    let result;
-                    if (isDesktop) {
-                        const desktopResult = await saveFile(
-                            xml,
-                            forceSaveAs ? null : activeTab?.filePath,
-                            defaultName
+                    const desktopResult = await saveFile(
+                        xml,
+                        forceSaveAs ? null : activeTab?.filePath,
+                        defaultName
+                    );
+                    const result = {
+                        success: Boolean(desktopResult?.success),
+                        fileName: desktopResult?.file_name || defaultName,
+                        filePath: desktopResult?.path || null,
+                    };
+                    if (result.success) {
+                        const cleanTitle = result.fileName.replace(
+                            /\.(xml|scxml)$/i,
+                            ""
                         );
-                        result = {
-                            success: Boolean(desktopResult?.success),
-                            fileName: desktopResult?.file_name || defaultName,
-                            filePath: desktopResult?.path || null,
-                        };
-                        if (result.success) {
-                            const cleanTitle = result.fileName.replace(
-                                /\.(xml|scxml)$/i,
-                                ""
-                            );
-                            updateActiveTab({
-                                title: cleanTitle,
-                                fileName: result.fileName,
-                                filePath: result.filePath,
-                                nodes,
-                                edges,
-                                manualSlots,
-                                globalDataModel,
-                            });
-                        }
-                    } else {
-                        const { saveScxmlFile } = await import(
-                            "../utils/scxmlExport"
-                        );
-                        result = await saveScxmlFile(
-                            xml,
-                            forceSaveAs ? null : activeTab?.fileHandle,
-                            defaultName
-                        );
-                        if (result?.success) {
-                            const cleanTitle = result.fileName.replace(
-                                /\.(xml|scxml)$/i,
-                                ""
-                            );
-                            updateActiveTab({
-                                title: cleanTitle,
-                                fileName: result.fileName,
-                                fileHandle:
-                                    result.handle || activeTab?.fileHandle || null,
-                                nodes,
-                                edges,
-                                manualSlots,
-                                globalDataModel,
-                            });
-                        }
+                        updateActiveTab({
+                            title: cleanTitle,
+                            fileName: result.fileName,
+                            filePath: result.filePath,
+                            nodes,
+                            edges,
+                            manualSlots,
+                            globalDataModel,
+                        });
                     }
 
                     if (result?.success) {

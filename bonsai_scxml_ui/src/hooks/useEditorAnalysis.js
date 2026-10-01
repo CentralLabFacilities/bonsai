@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-    buildEditorProblems,
-    getAncestorSlotSourcesByPath,
     getSlotPathFromNode,
     normalizeSlotPath,
     normalizeSlotType,
@@ -11,10 +9,7 @@ import {
     buildSlotAncestryRequest,
     slotAncestryResponseToMap,
 } from "../utils/slotAnalysis";
-import {
-    analyzeContainerOutgoingTransitionsInJavascript,
-    buildTransitionAnalysisRequest,
-} from "../utils/transitionAnalysis";
+import { buildTransitionAnalysisRequest } from "../utils/transitionAnalysisRequest";
 import {
     analyzeEditorTransitions,
     isTauri,
@@ -69,13 +64,9 @@ export function useEditorAnalysis({
         };
 
         if (!isTauri()) {
-            commit(
-                getAncestorSlotSourcesByPath(tabs, activeTabId, {
-                    nodes: semanticNodes,
-                    slotNodes: semanticSlotNodes,
-                    manualSlots,
-                })
-            );
+            // Browser/Vite mode is UI-only. Semantic ancestry is owned by the
+            // Rust backend and is intentionally unavailable without Tauri.
+            commit(new Map());
             return () => {
                 cancelled = true;
             };
@@ -157,15 +148,10 @@ export function useEditorAnalysis({
             );
         };
 
-        const analyzeWithJavascript = () =>
-            analyzeContainerOutgoingTransitionsInJavascript({
-                selectedNode: selectedRawNode,
-                nodes: semanticNodes,
-                edges,
-            });
-
         if (!isTauri()) {
-            commit(analyzeWithJavascript());
+            // Browser/Vite mode is UI-only. Container transition semantics are
+            // resolved exclusively by the Rust backend.
+            commit([]);
             return () => {
                 cancelled = true;
             };
@@ -385,21 +371,10 @@ export function useEditorAnalysis({
             setEditorProblems(next);
         };
 
-        const validateWithJavascript = () =>
-            buildEditorProblems(
-                semanticNodes,
-                edges,
-                globalDataModel,
-                behaviorDirectories,
-                isBehaviorWorkflow,
-                manualSlots,
-                ancestorSlotSourcesByPath,
-                semanticSlotNodes,
-                availableDataModel
-            );
-
         if (!isTauri()) {
-            commitProblems(validateWithJavascript());
+            // Browser/Vite mode intentionally has no semantic validator. Rust
+            // is the single source of truth for workflow validation.
+            commitProblems([]);
             return () => {
                 cancelled = true;
             };

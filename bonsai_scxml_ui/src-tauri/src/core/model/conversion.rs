@@ -4,8 +4,8 @@ use super::{
     Assignment, AssignmentDto, DataModelEntry, DataModelEntryDto, EditorEdgeTarget,
     EditorEdgeTargetDto, EditorMetadata, EditorMetadataDto, EditorPosition, EditorPositionDto,
     ExitEvent, ExitEventDto, Parameter, ParameterDto, Slot, SlotDeclaration, SlotDeclarationDto,
-    SlotDto, State, StateId, StateKind, StateKindDto, Transition, TransitionDto, Workflow,
-    WorkflowDto,
+    SlotDto, State, StateId, StateKind, StateKindDto, Transition, TransitionDto, TransitionSource,
+    TransitionSourceDto, Workflow, WorkflowDto,
 };
 
 impl Workflow {
@@ -161,6 +161,11 @@ impl Transition {
             source_state_id: dto.source_state_id.into(),
             target_state_id: dto.target_state_id.map(StateId::from),
             target_scxml_id: dto.target_scxml_id,
+            logical_sources: dto
+                .logical_sources
+                .into_iter()
+                .map(TransitionSource::from_dto)
+                .collect(),
             event: dto.event,
             condition: dto.condition,
             assignments: dto
@@ -182,11 +187,32 @@ impl Transition {
                 .as_ref()
                 .map(|id| id.as_str().to_string()),
             target_scxml_id: self.target_scxml_id.clone(),
+            logical_sources: self
+                .logical_sources
+                .iter()
+                .map(TransitionSource::to_dto)
+                .collect(),
             event: self.event.clone(),
             condition: self.condition.clone(),
             assignments: self.assignments.iter().map(Assignment::to_dto).collect(),
             sent_events: self.sent_events.clone(),
             target_instance_id: self.target_instance_id.clone(),
+        }
+    }
+}
+
+impl TransitionSource {
+    fn from_dto(dto: TransitionSourceDto) -> Self {
+        Self {
+            state_id: dto.state_id.into(),
+            handle: dto.handle,
+        }
+    }
+
+    fn to_dto(&self) -> TransitionSourceDto {
+        TransitionSourceDto {
+            state_id: self.state_id.as_str().to_string(),
+            handle: self.handle.clone(),
         }
     }
 }
@@ -423,7 +449,21 @@ mod tests {
                 on_exit: vec![],
                 editor: EditorMetadataDto::default(),
             }],
-            transitions: vec![],
+            transitions: vec![TransitionDto {
+                id: "transition-1".into(),
+                source_state_id: "state-1".into(),
+                target_state_id: Some("state-1".into()),
+                target_scxml_id: "Talk".into(),
+                logical_sources: vec![TransitionSourceDto {
+                    state_id: "state-1".into(),
+                    handle: "success".into(),
+                }],
+                event: "Talk.success".into(),
+                condition: String::new(),
+                assignments: vec![],
+                sent_events: vec![],
+                target_instance_id: None,
+            }],
             data_model: vec![DataModelEntryDto {
                 id: "message".into(),
                 type_name: Some("String".into()),
@@ -439,6 +479,15 @@ mod tests {
         assert_eq!(round_trip.initial_state_id, dto.initial_state_id);
         assert_eq!(round_trip.states[0].id, dto.states[0].id);
         assert_eq!(round_trip.states[0].events[0].id, "success");
+        assert_eq!(round_trip.transitions[0].logical_sources.len(), 1);
+        assert_eq!(
+            round_trip.transitions[0].logical_sources[0].state_id,
+            "state-1"
+        );
+        assert_eq!(
+            round_trip.transitions[0].logical_sources[0].handle,
+            "success"
+        );
         assert_eq!(round_trip.data_model[0].expression, "'hello'");
     }
 

@@ -1,5 +1,5 @@
 import { MarkerType } from "@xyflow/react";
-import { isTauri, parseScxmlWorkflow } from "../tauri-client.js";
+import { parseScxmlWorkflow } from "../tauri-client.js";
 import { workflowDtoToScxmlDocument } from "./scxmlRustDocument.js";
 import { getLayoutedElements } from "./layoutUtils";
 import { parseStateAssignments } from "./stateActions.js";
@@ -649,34 +649,6 @@ const parseBehaviorExitForwarding = (stateElem, fullSkillName) => {
     };
 };
 
-export const extractBehaviorExitEventsFromScxml = (xmlText) => {
-    const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(normalizeLegacyScxmlComments(xmlText), "application/xml");
-    const parserError = xmlDoc.getElementsByTagName("parsererror")[0];
-
-    if (parserError) {
-        return [];
-    }
-
-    const sentEvents = [];
-
-    Array.from(xmlDoc.getElementsByTagName("state")).forEach((stateElem) => {
-        const stateId = stateElem.getAttribute("id") || "";
-        const behaviorExit = parseBehaviorExitForwarding(
-            stateElem,
-            stateId
-        );
-
-        (behaviorExit?.sentEvents || []).forEach((eventName) => {
-            if (eventName && !sentEvents.includes(eventName)) {
-                sentEvents.push(eventName);
-            }
-        });
-    });
-
-    return sentEvents;
-};
-
 export const parseScxmlFile = async (
     xmlText,
     fetchSkillData,
@@ -686,33 +658,18 @@ export const parseScxmlFile = async (
     const normalizedXml = normalizeLegacyScxmlComments(xmlText);
     let xmlDoc;
 
-    if (isTauri()) {
-        // Desktop: Rust is the authoritative SCXML parser. The returned
-        // semantic WorkflowDto is projected onto the tiny Element facade used
-        // by the existing React Flow import code below.
-        try {
-            const workflow =
-                parsedWorkflow || (await parseScxmlWorkflow(normalizedXml));
-            xmlDoc = workflowDtoToScxmlDocument(workflow);
-        } catch (error) {
-            throw new Error(
-                "Fehler in der XML-Struktur:\n" +
-                    String(error?.message || error || "Unknown SCXML parse error")
-            );
-        }
-    } else {
-        // Browser/dev fallback until the semantic adapter becomes the only
-        // supported import boundary.
-        const parser = new DOMParser();
-        xmlDoc = parser.parseFromString(normalizedXml, "application/xml");
-
-        const parserError = xmlDoc.getElementsByTagName("parsererror")[0];
-        if (parserError) {
-            throw new Error(
-                "Fehler in der XML-Struktur:\n" +
-                    parserError.textContent.slice(0, 200)
-            );
-        }
+    // Rust is the single authoritative SCXML parser. Its semantic WorkflowDto
+    // is projected onto the small Element facade consumed by the React Flow
+    // import adapter below.
+    try {
+        const workflow =
+            parsedWorkflow || (await parseScxmlWorkflow(normalizedXml));
+        xmlDoc = workflowDtoToScxmlDocument(workflow);
+    } catch (error) {
+        throw new Error(
+            "Fehler in der XML-Struktur:\n" +
+                String(error?.message || error || "Unknown SCXML parse error")
+        );
     }
 
     const scxmlElem = xmlDoc.getElementsByTagName("scxml")[0];

@@ -57,7 +57,6 @@ pub(crate) struct WorkflowCommandResultDto {
     pub patch: WorkflowPatchDto,
 }
 
-
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct TargetedTransitionCommandDto {
@@ -67,6 +66,9 @@ pub(crate) struct TargetedTransitionCommandDto {
     #[serde(default)]
     pub event: String,
     #[serde(default)]
+    #[serde(rename = "sourceHandle")]
+    pub source_handle: String,
+    #[serde(default)]
     pub condition: String,
     #[serde(default)]
     pub assignments: Vec<AssignmentDto>,
@@ -74,7 +76,6 @@ pub(crate) struct TargetedTransitionCommandDto {
     #[serde(rename = "targetInstanceId")]
     pub target_instance_id: Option<String>,
 }
-
 
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]

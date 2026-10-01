@@ -210,7 +210,7 @@ mod tests {
     use crate::core::model::{
         AssignmentDto, DataModelEntry, EditorMetadataDto, EditorPositionDto, ParameterDto,
         SlotDeclaration, State, StateDto, StateId, StateKind, StateKindDto, Transition,
-        TransitionId,
+        TransitionId, TransitionSource,
     };
 
     fn sample_workflow() -> Workflow {
@@ -364,6 +364,7 @@ mod tests {
                 source_state_id: StateId::from("a"),
                 target_state_id: Some(StateId::from("b")),
                 target_scxml_id: "B".into(),
+                logical_sources: vec![],
                 event: "A.success".into(),
                 condition: String::new(),
                 assignments: vec![],
@@ -375,6 +376,7 @@ mod tests {
                 source_state_id: StateId::from("a"),
                 target_state_id: None,
                 target_scxml_id: String::new(),
+                logical_sources: vec![],
                 event: "Nop.fatal".into(),
                 condition: String::new(),
                 assignments: vec![],
@@ -393,6 +395,7 @@ mod tests {
                         id: "new".into(),
                         target_state_id: "b".into(),
                         event: "A.error".into(),
+                        source_handle: "error".into(),
                         condition: "@retry".into(),
                         assignments: vec![AssignmentDto {
                             location: "counter".into(),
@@ -421,6 +424,9 @@ mod tests {
         assert_eq!(replacement.event, "A.error");
         assert_eq!(replacement.target_state_id.as_deref(), Some("b"));
         assert_eq!(replacement.target_instance_id.as_deref(), Some("ref-1"));
+        assert_eq!(replacement.logical_sources.len(), 1);
+        assert_eq!(replacement.logical_sources[0].state_id, "a");
+        assert_eq!(replacement.logical_sources[0].handle, "error");
     }
 
     #[test]
@@ -515,6 +521,10 @@ mod tests {
             source_state_id: StateId::from("a"),
             target_state_id: Some(StateId::from("b")),
             target_scxml_id: "B".into(),
+            logical_sources: vec![TransitionSource {
+                state_id: StateId::from("child"),
+                handle: "success".into(),
+            }],
             event: "Talk.success".into(),
             condition: String::new(),
             assignments: vec![],
@@ -557,6 +567,80 @@ mod tests {
     }
 
     #[test]
+    fn removing_one_of_multiple_logical_sources_keeps_shared_transition() {
+        let store = WorkflowDocumentStore::default();
+        let mut workflow = sample_workflow();
+        workflow.states[0].kind = StateKind::Compound;
+        workflow.states.extend([
+            State {
+                id: StateId::from("child-a"),
+                scxml_id: "Talk".into(),
+                label: "Talk A".into(),
+                kind: StateKind::Skill,
+                parent_id: Some(StateId::from("a")),
+                ..sample_state_defaults()
+            },
+            State {
+                id: StateId::from("child-b"),
+                scxml_id: "Talk".into(),
+                label: "Talk B".into(),
+                kind: StateKind::Skill,
+                parent_id: Some(StateId::from("a")),
+                ..sample_state_defaults()
+            },
+        ]);
+        workflow.transitions.push(Transition {
+            id: TransitionId::from("shared"),
+            source_state_id: StateId::from("a"),
+            target_state_id: Some(StateId::from("b")),
+            target_scxml_id: "B".into(),
+            logical_sources: vec![
+                TransitionSource {
+                    state_id: StateId::from("child-a"),
+                    handle: "success".into(),
+                },
+                TransitionSource {
+                    state_id: StateId::from("child-b"),
+                    handle: "success".into(),
+                },
+            ],
+            event: "Talk.success".into(),
+            condition: String::new(),
+            assignments: vec![],
+            sent_events: vec![],
+            target_instance_id: None,
+        });
+        assert_eq!(store.replace(workflow).unwrap(), 1);
+
+        let result = store
+            .apply(
+                Some(1),
+                WorkflowCommandDto::RemoveStates {
+                    state_ids: vec!["child-a".into()],
+                },
+            )
+            .unwrap();
+        let patched_transition = result
+            .patch
+            .transitions
+            .iter()
+            .find(|transition| transition.id == "shared")
+            .expect("retained shared transition should be patched");
+        assert_eq!(patched_transition.logical_sources.len(), 1);
+        assert_eq!(patched_transition.logical_sources[0].state_id, "child-b");
+
+        let snapshot = store.snapshot().unwrap().unwrap();
+        let transition = snapshot
+            .workflow
+            .transitions
+            .iter()
+            .find(|transition| transition.id == "shared")
+            .unwrap();
+        assert_eq!(transition.logical_sources.len(), 1);
+        assert_eq!(transition.logical_sources[0].state_id, "child-b");
+    }
+
+    #[test]
     fn renaming_nested_state_updates_hoisted_transition_event() {
         let store = WorkflowDocumentStore::default();
         let mut workflow = sample_workflow();
@@ -575,6 +659,10 @@ mod tests {
             source_state_id: StateId::from("a"),
             target_state_id: Some(StateId::from("b")),
             target_scxml_id: "B".into(),
+            logical_sources: vec![TransitionSource {
+                state_id: StateId::from("child"),
+                handle: "success".into(),
+            }],
             event: "Talk.success".into(),
             condition: String::new(),
             assignments: vec![],
@@ -789,6 +877,9 @@ mod tests {
             .find(|transition| transition.id == "edge-a-b")
             .unwrap();
         assert_eq!(transition.source_state_id, "container");
+        assert_eq!(transition.logical_sources.len(), 1);
+        assert_eq!(transition.logical_sources[0].state_id, "a");
+        assert_eq!(transition.logical_sources[0].handle, "success");
         assert_eq!(transition.event, "A.success");
         assert_eq!(transition.target_state_id.as_deref(), Some("b"));
 
@@ -963,6 +1054,7 @@ mod tests {
             source_state_id: StateId::from("container"),
             target_state_id: Some(StateId::from("outside")),
             target_scxml_id: "Outside".into(),
+            logical_sources: vec![],
             event: "Talk.success".into(),
             condition: String::new(),
             assignments: vec![],
@@ -1024,6 +1116,9 @@ mod tests {
         let transition = &snapshot.workflow.transitions[0];
         assert_eq!(transition.id, "edge-talk-out");
         assert_eq!(transition.source_state_id, "container");
+        assert_eq!(transition.logical_sources.len(), 1);
+        assert_eq!(transition.logical_sources[0].state_id, "talk");
+        assert_eq!(transition.logical_sources[0].handle, "error");
         assert_eq!(transition.event, "Talk.error");
         assert_eq!(transition.target_state_id.as_deref(), Some("outside"));
 

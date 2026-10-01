@@ -178,6 +178,7 @@ fn parse_state(
             source_state_id: internal_id.clone(),
             target_state_id: None,
             target_scxml_id: non_empty(transition.attr("target")).unwrap_or_default(),
+            logical_sources: vec![],
             event: transition.attr("event").unwrap_or_default().trim().to_string(),
             condition: transition.attr("cond").unwrap_or_default().trim().to_string(),
             assignments: parse_direct_assignments(transition),

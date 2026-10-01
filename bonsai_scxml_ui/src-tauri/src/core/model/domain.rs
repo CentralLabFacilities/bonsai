@@ -49,11 +49,20 @@ pub(crate) struct Transition {
     pub source_state_id: StateId,
     pub target_state_id: Option<StateId>,
     pub target_scxml_id: String,
+    /// Editor provenance retained independently from the SCXML transition
+    /// owner so structural commands can recalculate container hoisting.
+    pub logical_sources: Vec<TransitionSource>,
     pub event: String,
     pub condition: String,
     pub assignments: Vec<Assignment>,
     pub sent_events: Vec<String>,
     pub target_instance_id: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct TransitionSource {
+    pub state_id: StateId,
+    pub handle: String,
 }
 
 #[derive(Debug, Clone, Default)]

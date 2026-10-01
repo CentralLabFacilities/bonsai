@@ -1,5 +1,4 @@
 import {
-    isTauri,
     parseRuntimeLogText,
     prepareRuntimeReplayCacheRust,
 } from "../tauri-client.js";
@@ -157,37 +156,19 @@ const hydrateRuntimeReplayCache = (cache, contexts = []) => ({
     contexts,
 });
 
-/**
- * Parse a runtime log through the Rust backend in desktop mode. Browser mode
- * keeps the JavaScript implementation, while Tauri treats Rust as authoritative.
- */
-export const parseRuntimeLogForReplay = async (text = "") => {
-    if (!isTauri()) {
-        const { parseSkillStateMachineLog } = await import("./runtimeLog");
-        return parseSkillStateMachineLog(text);
-    }
-
-    return await parseRuntimeLogText(text);
-};
+/** Parse a runtime log through the authoritative Rust backend. */
+export const parseRuntimeLogForReplay = async (text = "") =>
+    await parseRuntimeLogText(text);
 
 /**
- * Prepare the complete runtime replay cache in Rust in desktop mode. React
- * only projects the current editor graph into a compact semantic DTO and then
- * rehydrates Map/Set indexes expected by the existing playback UI.
+ * Prepare the complete runtime replay cache in Rust. React only projects the
+ * current editor graph into a compact semantic DTO and rehydrates UI indexes.
  */
 export const prepareRuntimeReplayCacheForReplay = async (
     runtimeLog = {},
     contexts = [],
     { onProgress, yieldControl } = {}
 ) => {
-    if (!isTauri()) {
-        const { prepareRuntimeReplayCache } = await import("./runtimeLog");
-        return prepareRuntimeReplayCache(runtimeLog, contexts, {
-            onProgress,
-            yieldControl,
-        });
-    }
-
     const report = async (phase, progress) => {
         onProgress?.({ phase, progress });
         if (yieldControl) await yieldControl();

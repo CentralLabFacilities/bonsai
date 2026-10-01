@@ -164,12 +164,6 @@ export const getDirectCompoundForNode = (node, allNodes) => {
     return parent?.type === "compound" ? parent : null;
 };
 
-export const fitCompoundToChildren = (allNodes, compoundId) => {
-    const context = createContainerGeometryContext(allNodes);
-    fitCompoundToChildrenInContext(context, compoundId);
-    return context.nodes;
-};
-
 const fitCompoundToChildrenInContext = (context, compoundId) => {
     const compound = context.byId.get(compoundId);
     if (!compound || compound.type !== "compound") return;
@@ -466,30 +460,6 @@ export const canTargetAcrossStateBoundaries = (sourceNode, targetNode, allNodes 
 
 export const getTransitionTargetHandleForNode = (node) =>
     node?.type === "parallel" ? "target" : "transition-target";
-
-export const getDescendantNodeIds = (rootId, allNodes = []) => {
-    const childrenByParent = new Map();
-
-    (allNodes || []).forEach((node) => {
-        if (!node?.parentId) return;
-        if (!childrenByParent.has(node.parentId)) {
-            childrenByParent.set(node.parentId, []);
-        }
-        childrenByParent.get(node.parentId).push(node.id);
-    });
-
-    const descendants = new Set();
-    const queue = [...(childrenByParent.get(rootId) || [])];
-
-    while (queue.length > 0) {
-        const id = queue.shift();
-        if (!id || descendants.has(id)) continue;
-        descendants.add(id);
-        queue.push(...(childrenByParent.get(id) || []));
-    }
-
-    return descendants;
-};
 
 export const orderNodesParentsFirst = (allNodes) => {
     const byId = new Map(
@@ -1330,22 +1300,6 @@ export const resolveNodeCollisionsAndRefit = (
  * 2+       -> all states live inside one normal compound
  * Existing compounds are never auto-dissolved.
  */
-export const getNextParallelLaneCompoundName = (allNodes) => {
-    const usedNames = new Set(
-        (allNodes || [])
-            .flatMap((node) => [node.data?.label, node.data?.fullSkillName])
-            .filter(Boolean)
-            .map(String)
-    );
-
-    let index = 1;
-    while (usedNames.has(`lane_${index}`)) {
-        index += 1;
-    }
-
-    return `lane_${index}`;
-};
-
 const normalizeParallelLaneCompoundsImpl = (allNodes) => {
     if (!Array.isArray(allNodes) || allNodes.length === 0) {
         return allNodes;

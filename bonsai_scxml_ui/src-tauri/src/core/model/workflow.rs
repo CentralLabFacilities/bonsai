@@ -93,6 +93,12 @@ pub(crate) struct TransitionDto {
     pub target_state_id: Option<String>,
     /// Original SCXML `target` attribute.
     pub target_scxml_id: String,
+    /// Logical editor sources before SCXML container hoisting. A Compound
+    /// transition such as `Talk.success` can still originate from the inner
+    /// Talk state. Multiple sources are retained when one visual boundary
+    /// transition represents equivalent exits from more than one state.
+    #[serde(default)]
+    pub logical_sources: Vec<TransitionSourceDto>,
     #[serde(default)]
     pub event: String,
     #[serde(default)]
@@ -107,6 +113,14 @@ pub(crate) struct TransitionDto {
     /// same SCXML target state.
     #[serde(default)]
     pub target_instance_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct TransitionSourceDto {
+    pub state_id: String,
+    #[serde(default)]
+    pub handle: String,
 }
 
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
@@ -203,7 +217,6 @@ pub(crate) struct EditorMetadataDto {
     #[serde(default)]
     pub reference_id: Option<u32>,
 }
-
 
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]

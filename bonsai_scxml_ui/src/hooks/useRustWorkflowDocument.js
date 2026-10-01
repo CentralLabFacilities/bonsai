@@ -59,7 +59,9 @@ const getCanonicalPatchPolicy = (command) => {
         case "replaceEditorTransitions":
             return { stateMode: "none", applyTransitions: true };
         case "removeStates":
-            return { stateMode: "none", applyTransitions: false };
+            // Deletions can also prune one logical source from a shared
+            // boundary transition, so apply Rust's retained-transition patch.
+            return { stateMode: "none", applyTransitions: true };
         case "insertEditorStates":
             return { stateMode: "initial", applyTransitions: false };
         case "addState":

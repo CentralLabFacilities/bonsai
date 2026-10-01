@@ -111,34 +111,22 @@ export default function EditorCanvas({
 
         const generateCode = async () => {
             try {
-                let xml;
-                if (isTauri()) {
-                    // Code View must show the same canonical SCXML that the
-                    // desktop save path writes. Rust remains the single
-                    // semantic serializer in Tauri.
-                    xml = await serializeEditorGraphWithRust({
-                        nodes,
-                        edges,
-                        globalDataModel,
-                        manualSlots,
-                    });
-                } else {
-                    // Keep the legacy serializer available for browser/dev
-                    // mode without eagerly loading it in the desktop bundle.
-                    const [{ prepareGraphForScxml }, { generateXmlString }] =
-                        await Promise.all([
-                            import("../utils/editorScxml"),
-                            import("../utils/scxmlExport"),
-                        ]);
-                    const exportGraph = prepareGraphForScxml(nodes, edges);
-                    xml = generateXmlString(
-                        exportGraph.nodes,
-                        exportGraph.edges,
-                        globalDataModel,
-                        [],
-                        manualSlots
-                    );
+                if (!isTauri()) {
+                    if (!cancelled) {
+                        setCodeString(
+                            "<!-- SCXML Code View requires the Rust/Tauri backend. -->"
+                        );
+                    }
+                    return;
                 }
+
+                // Code View uses the same canonical Rust serializer as Save.
+                const xml = await serializeEditorGraphWithRust({
+                    nodes,
+                    edges,
+                    globalDataModel,
+                    manualSlots,
+                });
 
                 if (!cancelled) setCodeString(xml);
             } catch (error) {

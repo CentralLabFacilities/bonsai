@@ -8,7 +8,7 @@ use crate::core::editor_export::types::{
 };
 use crate::core::model::{
     Assignment, DataModelEntry, EditorPosition, Parameter, Slot, SlotDeclaration, State, StateId,
-    Transition, TransitionId, Workflow, WorkflowIndex,
+    Transition, TransitionId, TransitionSource, Workflow, WorkflowIndex,
 };
 
 use super::types::{StateSlotsCommandDto, TargetedTransitionCommandDto, WorkflowCommandDto};
@@ -618,10 +618,17 @@ fn rename_state(
         // Compound/Parallel boundary transitions are stored on the container,
         // but their event keeps the originating child identity (Child.event).
         // Keep that identity aligned when the child state is renamed.
+        let originates_from_renamed_state = transition
+            .logical_sources
+            .iter()
+            .any(|source| source.state_id == id);
+        let legacy_hoisted_match = transition.logical_sources.is_empty()
+            && (transition.source_state_id == id
+                || source_ancestors.contains(&transition.source_state_id));
+
         if !previous_scxml_id.is_empty()
             && transition.event.starts_with(&previous_event_prefix)
-            && (transition.source_state_id == id
-                || source_ancestors.contains(&transition.source_state_id))
+            && (originates_from_renamed_state || legacy_hoisted_match)
         {
             transition.event = format!(
                 "{}{}",
@@ -852,15 +859,51 @@ fn remove_states(
         .map(|state| state.scxml_id.clone())
         .collect::<HashSet<_>>();
 
+    let provenance_removed_transition_ids = workflow
+        .transitions
+        .iter()
+        .filter(|transition| {
+            !transition.logical_sources.is_empty()
+                && transition
+                    .logical_sources
+                    .iter()
+                    .all(|source| removed.contains(&source.state_id))
+        })
+        .map(|transition| transition.id.clone())
+        .collect::<HashSet<_>>();
+
+    // One SCXML boundary transition can represent equivalent exits from more
+    // than one logical child. Removing one child must keep the transition as
+    // long as another logical source still exists. Keep track of retained
+    // transitions whose provenance changed so the canonical patch updates the
+    // frontend as well.
+    let mut provenance_changed_transition_ids = Vec::new();
+    for transition in workflow.transitions.iter_mut() {
+        let source_count_before = transition.logical_sources.len();
+        transition
+            .logical_sources
+            .retain(|source| !removed.contains(&source.state_id));
+        if !transition.logical_sources.is_empty()
+            && transition.logical_sources.len() != source_count_before
+        {
+            provenance_changed_transition_ids.push(transition.id.as_str().to_string());
+        }
+    }
+
     let mut removed_transition_ids = Vec::new();
     workflow.transitions.retain(|transition| {
         let direct = removed.contains(&transition.source_state_id)
             || transition
                 .target_state_id
                 .as_ref()
-                .is_some_and(|target| removed.contains(target));
+                .is_some_and(|target| removed.contains(target))
+            || provenance_removed_transition_ids.contains(&transition.id);
 
+        // Compatibility for parsed/legacy snapshots that do not carry editor
+        // transition provenance yet. Editor-exported transitions use the
+        // explicit logical source list above.
         let hoisted = !direct
+            && transition.logical_sources.is_empty()
             && removed_state_info.iter().any(|(scxml_id, ancestors)| {
                 !scxml_id.is_empty()
                     && transition.event.starts_with(&format!("{scxml_id}."))
@@ -988,12 +1031,13 @@ fn remove_states(
     );
     changed_state_ids.sort();
     changed_state_ids.dedup();
-    removed_transition_ids.sort();
-    removed_transition_ids.dedup();
+    provenance_changed_transition_ids.extend(removed_transition_ids);
+    provenance_changed_transition_ids.sort();
+    provenance_changed_transition_ids.dedup();
 
     Ok(WorkflowCommandChanges {
         changed_state_ids,
-        changed_transition_ids: removed_transition_ids,
+        changed_transition_ids: provenance_changed_transition_ids,
         slot_declarations_changed,
         index_changed: true,
         ..WorkflowCommandChanges::default()
@@ -1202,13 +1246,27 @@ fn replace_targeted_transitions(
         let target = index
             .state(workflow, &target_id)
             .ok_or_else(|| format!("Unknown transition target state '{target_id}'"))?;
+        let event = transition.event.trim().to_string();
+        let source_handle = if transition.source_handle.trim().is_empty() {
+            event
+                .rsplit_once('.')
+                .map(|(_, handle)| handle)
+                .unwrap_or(event.as_str())
+                .to_string()
+        } else {
+            transition.source_handle.trim().to_string()
+        };
 
         replacements.push(Transition {
             id: transition_id,
             source_state_id: source_id.clone(),
             target_state_id: Some(target_id),
             target_scxml_id: target.scxml_id.clone(),
-            event: transition.event.trim().to_string(),
+            logical_sources: vec![TransitionSource {
+                state_id: source_id.clone(),
+                handle: source_handle,
+            }],
+            event,
             condition: transition.condition,
             assignments: transition
                 .assignments

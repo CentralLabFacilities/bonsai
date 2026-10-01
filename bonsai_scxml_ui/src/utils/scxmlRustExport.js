@@ -126,6 +126,41 @@ const normalizeNode = (node) => {
     };
 };
 
+const normalizeLogicalTransitionSources = (edge) => {
+    const stored = Array.isArray(edge?.data?.boundaryOriginalSources)
+        ? edge.data.boundaryOriginalSources
+              .map((source) => ({
+                  stateId: String(
+                      source?.sourceId || source?.nodeId || source?.id || ""
+                  ),
+                  handle: String(
+                      source?.sourceHandle || source?.handle || ""
+                  ),
+              }))
+              .filter((source) => source.stateId && source.handle)
+        : [];
+
+    if (stored.length > 0) return stored;
+
+    const stateId = String(
+        edge?.data?.boundaryOriginalSource ||
+        edge?.data?.compoundOriginalSource ||
+        edge?.data?.parallelOriginalSource ||
+        edge?.source ||
+        ""
+    );
+    const handle = String(
+        edge?.data?.boundaryOriginalSourceHandle ||
+        edge?.data?.compoundOriginalSourceHandle ||
+        edge?.data?.parallelOriginalSourceHandle ||
+        edge?.sourceHandle ||
+        edge?.label ||
+        "success"
+    );
+
+    return stateId ? [{ stateId, handle }] : [];
+};
+
 const normalizeEdge = (edge) => ({
     id: String(edge?.id || ""),
     source: String(edge?.source || ""),
@@ -140,6 +175,7 @@ const normalizeEdge = (edge) => ({
             : [],
     importedRawEvent: String(edge?.data?.boundaryImportedRawEvent || ""),
     editorTargetInstanceId: String(edge?.data?.editorTargetInstanceId || ""),
+    logicalSources: normalizeLogicalTransitionSources(edge),
 });
 
 

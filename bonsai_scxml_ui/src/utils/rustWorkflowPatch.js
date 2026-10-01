@@ -239,6 +239,55 @@ export const applyRustWorkflowStatePatch = (
     return changed ? nextNodes : currentNodes;
 };
 
+const transitionLogicalSources = (transition) =>
+    (Array.isArray(transition?.logicalSources) ? transition.logicalSources : [])
+        .map((source) => ({
+            sourceId: String(source?.stateId || "").trim(),
+            sourceHandle: String(source?.handle || "").trim(),
+        }))
+        .filter((source) => source.sourceId && source.sourceHandle);
+
+const applyLogicalSourcesToBoundaryData = (edge, transition, data) => {
+    const logicalSources = transitionLogicalSources(transition);
+    if (logicalSources.length === 0) return data;
+
+    const hasBoundaryMetadata = Boolean(
+        edge?.data?.boundaryOriginalSource ||
+        edge?.data?.compoundOriginalSource ||
+        edge?.data?.parallelOriginalSource ||
+        Array.isArray(edge?.data?.boundaryOriginalSources)
+    );
+    const sourceOwnerDiffers =
+        String(transition?.sourceStateId || "").trim() &&
+        String(transition?.sourceStateId || "").trim() !==
+            logicalSources[0].sourceId;
+    if (!hasBoundaryMetadata && !sourceOwnerDiffers) return data;
+
+    const primary = logicalSources[0];
+    const nextData = {
+        ...data,
+        boundaryOriginalSource: primary.sourceId,
+        boundaryOriginalSourceHandle: primary.sourceHandle,
+    };
+
+    if (logicalSources.length > 1) {
+        nextData.boundaryOriginalSources = logicalSources;
+    } else {
+        delete nextData.boundaryOriginalSources;
+    }
+
+    if (edge?.data?.compoundOriginalSource !== undefined) {
+        nextData.compoundOriginalSource = primary.sourceId;
+        nextData.compoundOriginalSourceHandle = primary.sourceHandle;
+    }
+    if (edge?.data?.parallelOriginalSource !== undefined) {
+        nextData.parallelOriginalSource = primary.sourceId;
+        nextData.parallelOriginalSourceHandle = primary.sourceHandle;
+    }
+
+    return nextData;
+};
+
 const edgeLabelFor = (sourceHandle, condition) => {
     const handle = String(sourceHandle || "success");
     const cond = String(condition || "").trim();
@@ -281,22 +330,22 @@ export const applyRustWorkflowTransitionPatch = (
 
         const sourceNode = nodesById.get(edge.source);
         const sourceSkillName = sourceNode?.data?.fullSkillName || "";
-        const sourceHandle = getTransitionExitToken(
-            transition.event || edge.sourceHandle || "success",
-            sourceSkillName
-        );
+        const logicalSources = transitionLogicalSources(transition);
+        const sourceHandle =
+            logicalSources[0]?.sourceHandle ||
+            getTransitionExitToken(
+                transition.event || edge.sourceHandle || "success",
+                sourceSkillName
+            );
         const condition = deserializeScxmlConditionForEditor(
             transition.condition || ""
         );
         const assignments = (transition.assignments || []).map(toEditorAssignment);
 
-        nextEdges.push({
-            ...edge,
-            sourceHandle,
-            label: edge?.data?.boundaryInternalEdge
-                ? edge.label
-                : edgeLabelFor(sourceHandle, condition),
-            data: {
+        const nextData = applyLogicalSourcesToBoundaryData(
+            edge,
+            transition,
+            {
                 ...(edge.data || {}),
                 cond: condition,
                 assignments,
@@ -308,7 +357,16 @@ export const applyRustWorkflowTransitionPatch = (
                 ...(edge.data?.boundaryImportedRawEvent !== undefined
                     ? { boundaryImportedRawEvent: transition.event || "" }
                     : {}),
-            },
+            }
+        );
+
+        nextEdges.push({
+            ...edge,
+            sourceHandle,
+            label: edge?.data?.boundaryInternalEdge
+                ? edge.label
+                : edgeLabelFor(sourceHandle, condition),
+            data: nextData,
         });
         changed = true;
     }

@@ -178,6 +178,7 @@ mod tests {
             source_state_id: StateId::from("child"),
             target_state_id: Some(StateId::from("root")),
             target_scxml_id: "Root".into(),
+            logical_sources: vec![],
             event: "Child.success".into(),
             condition: String::new(),
             assignments: vec![],

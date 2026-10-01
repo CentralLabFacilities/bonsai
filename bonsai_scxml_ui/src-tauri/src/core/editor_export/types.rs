@@ -81,6 +81,18 @@ pub(crate) struct EditorExportEdgeDto {
     pub imported_raw_event: String,
     #[serde(default)]
     pub editor_target_instance_id: String,
+    /// Logical editor sources before Compound/Parallel boundary routing.
+    #[serde(default)]
+    pub logical_sources: Vec<EditorTransitionSourceDto>,
+}
+
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct EditorTransitionSourceDto {
+    #[serde(default)]
+    pub state_id: String,
+    #[serde(default)]
+    pub handle: String,
 }
 
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]

@@ -124,87 +124,10 @@ export async function listBehaviorDirectory(key, path) {
 }
 
 /**
- * Resolve a symbolic Behavior Library source to the real local path.
- *
- * Example:
- *   src: ${ROBOCUP}/planning/SetupPlanning.xml
- *   ROBOCUP: /home/user/robocup_ws/robocup
- *
- * becomes:
- *   /home/user/robocup_ws/robocup/planning/SetupPlanning.xml
- *
- * The symbolic source itself is NOT changed in the workflow. This resolver
- * is only used when accessing the file on disk.
- */
-export function resolveBehaviorSourcePath(src, directories = []) {
-  const value = String(src || '').trim();
-
-  const match = value.match(/^\$\{([^}]+)\}(?:[\\/](.*))?$/);
-
-  if (!match) {
-    return {
-      path: value,
-      key: null,
-    };
-  }
-
-  const key = match[1].trim().toUpperCase();
-  const relativePath = String(match[2] || '')
-      .replace(/^[\\/]+/, '');
-
-  const mapping = directories.find(
-      (directory) =>
-          String(directory?.key || '').trim().toUpperCase() === key,
-  );
-
-  if (!mapping) {
-    throw new Error(
-        `Behavior Library key ${key} is not configured.`,
-    );
-  }
-
-  const root = String(mapping.path || '')
-      .trim()
-      .replace(/[\\/]+$/, '');
-
-  if (!root) {
-    throw new Error(
-        `Behavior Library key ${key} does not have a directory path.`,
-    );
-  }
-
-  return {
-    path: relativePath ? `${root}/${relativePath}` : root,
-    key,
-  };
-}
-
-/**
- * Read a workflow directly from disk.
- *
- * ${KEY}/... is expanded to the configured Behavior Library path before
- * anything is sent to the Tauri filesystem command.
- */
-export async function readWorkflowSource(
-    src,
-    directories = [],
-    currentFilePath = null,
-) {
-  const resolved = resolveBehaviorSourcePath(src, directories);
-
-  return await invoke('read_workflow_source', {
-    // The Rust side receives the real local path, never the symbolic ${KEY}.
-    src: resolved.path,
-    directories: [],
-    currentFilePath,
-  });
-}
-
-/**
  * Resolve, read and inspect one workflow in Rust.
  *
- * Unlike readWorkflowSource(), this keeps the symbolic ${KEY}/... source all
- * the way to Rust. The backend resolves it, caches the parsed WorkflowDto by
+ * This keeps the symbolic ${KEY}/... source all the way to Rust. The backend
+ * resolves it, caches the parsed WorkflowDto by
  * canonical path + modification time and returns the semantic interface
  * metadata together with the file contents.
  */
@@ -253,19 +176,6 @@ export async function parseScxmlWorkflow(xml) {
 }
 
 /**
- * Serialize the Rust workflow domain model back to SCXML.
- */
-export async function serializeScxmlWorkflow(workflow) {
-  if (!isTauri()) {
-    throw new Error('Rust SCXML serialization is only available in the Tauri app.');
-  }
-
-  return await invoke('serialize_scxml_workflow', {
-    workflow,
-  });
-}
-
-/**
  * Serialize the current editor graph through the Rust semantic export layer.
  * The payload is a compact serializable snapshot without React callbacks or
  * rendering-only objects.
@@ -287,31 +197,6 @@ export async function serializeEditorWorkflow(request) {
  * Flow nodes. This keeps callbacks, geometry and transient UI state out of IPC.
  */
 /**
- * Return the revisioned semantic workflow currently owned by Rust.
- * This is primarily the bridge for incremental editor commands; React Flow
- * remains the visual projection.
- */
-export async function getActiveWorkflowDocument() {
-  if (!isTauri()) {
-    throw new Error('Rust workflow document state is only available in the Tauri app.');
-  }
-
-  return await invoke('get_active_workflow_document');
-}
-
-/** Replace the Rust-owned semantic document, optionally using optimistic locking. */
-export async function replaceActiveWorkflowDocument(workflow, expectedRevision = null) {
-  if (!isTauri()) {
-    throw new Error('Rust workflow document state is only available in the Tauri app.');
-  }
-
-  return await invoke('replace_active_workflow_document', {
-    workflow,
-    expectedRevision,
-  });
-}
-
-/**
  * Replace the Rust-owned document from the current editor graph snapshot.
  * Unlike serialization this does not generate XML; it only normalizes the
  * editor projection into the semantic Rust Workflow model and returns the new
@@ -329,12 +214,6 @@ export async function replaceActiveEditorWorkflowDocument(
     request,
     expectedRevision,
   });
-}
-
-/** Clear the Rust-owned active workflow document. */
-export async function clearActiveWorkflowDocument() {
-  if (!isTauri()) return;
-  await invoke('clear_active_workflow_document');
 }
 
 /**
@@ -396,8 +275,8 @@ export async function analyzeEditorTransitions(request) {
 /**
  * Parse a SkillStateMachine runtime log in Rust.
  *
- * The returned object intentionally matches parseSkillStateMachineLog() from
- * runtimeLog.js so the replay resolver can be migrated independently.
+ * The returned object is the canonical runtime-log DTO consumed by the
+ * React replay controller.
  */
 export async function parseRuntimeLogText(text) {
   if (!isTauri()) {

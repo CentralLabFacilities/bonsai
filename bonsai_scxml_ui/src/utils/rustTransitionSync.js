@@ -144,6 +144,7 @@ export const buildRustTransitionSyncPlan = ({
             event:
                 importedRawEvent ||
                 getScxmlTransitionEvent(exitToken, sourceSkillName),
+            sourceHandle: exitToken,
             condition: serializeEditorConditionForScxml(
                 edge?.data?.cond || ""
             ),

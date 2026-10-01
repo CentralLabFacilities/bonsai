@@ -49,7 +49,7 @@ mod tests {
     use super::build_workflow_from_editor;
     use crate::core::editor_export::types::{
         EditorBehaviorExitTransitionDto, EditorExportEdgeDto, EditorExportNodeDto,
-        EditorExportRequestDto,
+        EditorExportRequestDto, EditorTransitionSourceDto,
     };
 
     fn node(id: &str, node_type: &str, parent: Option<&str>) -> EditorExportNodeDto {
@@ -103,7 +103,93 @@ mod tests {
         let workflow = build_workflow_from_editor(&request).unwrap();
         assert_eq!(workflow.transitions.len(), 1);
         assert_eq!(workflow.transitions[0].source_state_id, "compound");
+        assert_eq!(workflow.transitions[0].logical_sources.len(), 1);
+        assert_eq!(workflow.transitions[0].logical_sources[0].state_id, "Talk");
+        assert_eq!(workflow.transitions[0].logical_sources[0].handle, "error");
         assert_eq!(workflow.transitions[0].event, "Talk.error");
+    }
+
+    #[test]
+    fn preserves_multiple_logical_sources_for_one_boundary_transition() {
+        let request = EditorExportRequestDto {
+            nodes: vec![
+                node("compound", "compound", None),
+                node("talk-a", "custom", Some("compound")),
+                node("talk-b", "custom", Some("compound")),
+                node("outside", "custom", None),
+            ],
+            edges: vec![EditorExportEdgeDto {
+                id: "edge-shared".into(),
+                source: "talk-a".into(),
+                target: "outside".into(),
+                source_handle: "success".into(),
+                logical_sources: vec![
+                    EditorTransitionSourceDto {
+                        state_id: "talk-a".into(),
+                        handle: "success".into(),
+                    },
+                    EditorTransitionSourceDto {
+                        state_id: "talk-b".into(),
+                        handle: "success".into(),
+                    },
+                ],
+                ..EditorExportEdgeDto::default()
+            }],
+            ..EditorExportRequestDto::default()
+        };
+
+        let workflow = build_workflow_from_editor(&request).unwrap();
+        assert_eq!(workflow.transitions.len(), 1);
+        assert_eq!(workflow.transitions[0].source_state_id, "compound");
+        assert_eq!(workflow.transitions[0].logical_sources.len(), 2);
+        assert_eq!(workflow.transitions[0].logical_sources[0].state_id, "talk-a");
+        assert_eq!(workflow.transitions[0].logical_sources[1].state_id, "talk-b");
+    }
+
+    #[test]
+    fn merges_logical_sources_when_equivalent_boundary_edges_collapse() {
+        let mut talk_a = node("talk-a", "custom", Some("compound"));
+        talk_a.full_skill_name = "Talk".into();
+        let mut talk_b = node("talk-b", "custom", Some("compound"));
+        talk_b.full_skill_name = "Talk".into();
+        let request = EditorExportRequestDto {
+            nodes: vec![
+                node("compound", "compound", None),
+                talk_a,
+                talk_b,
+                node("outside", "custom", None),
+            ],
+            edges: vec![
+                EditorExportEdgeDto {
+                    id: "edge-a".into(),
+                    source: "talk-a".into(),
+                    target: "outside".into(),
+                    source_handle: "success".into(),
+                    ..EditorExportEdgeDto::default()
+                },
+                EditorExportEdgeDto {
+                    id: "edge-b".into(),
+                    source: "talk-b".into(),
+                    target: "outside".into(),
+                    source_handle: "success".into(),
+                    ..EditorExportEdgeDto::default()
+                },
+            ],
+            ..EditorExportRequestDto::default()
+        };
+
+        let workflow = build_workflow_from_editor(&request).unwrap();
+        assert_eq!(workflow.transitions.len(), 1);
+        assert_eq!(workflow.transitions[0].event, "Talk.success");
+        assert_eq!(workflow.transitions[0].logical_sources.len(), 2);
+        assert!(workflow.transitions[0]
+            .logical_sources
+            .iter()
+            .any(|source| source.state_id == "talk-a"));
+        assert!(workflow.transitions[0]
+            .logical_sources
+            .iter()
+            .any(|source| source.state_id == "talk-b"));
     }
 
     #[test]
