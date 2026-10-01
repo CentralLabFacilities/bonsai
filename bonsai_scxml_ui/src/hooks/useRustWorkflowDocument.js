@@ -64,6 +64,8 @@ const getCanonicalPatchPolicy = (command) => {
             return { stateMode: "none", applyTransitions: true };
         case "insertEditorStates":
             return { stateMode: "initial", applyTransitions: false };
+        case "moveEditorState":
+            return { stateMode: "move", applyTransitions: true };
         case "addState":
         case "replaceEditorStructure":
             return { stateMode: "all", applyTransitions: true };
@@ -400,12 +402,17 @@ export function useRustWorkflowDocument({
                     });
                 }
 
-                const requiresSemanticRebuild =
-                    node.type === "parallelLane" ||
+                const parentChanged =
                     currentParentId !== (previousParentId || null);
 
-                if (requiresSemanticRebuild) {
-                    return syncEditorStructureNow(editorStateRef.current);
+                if (parentChanged) {
+                    return applyCommandNow({
+                        type: "moveEditorState",
+                        stateId,
+                        parentStateId: currentParentId,
+                        x: Number(node.position?.x || 0),
+                        y: Number(node.position?.y || 0),
+                    });
                 }
 
                 return applyCommandNow({
@@ -415,7 +422,7 @@ export function useRustWorkflowDocument({
                     y: Number(node.position?.y || 0),
                 });
             }),
-        [applyCommandNow, enqueue, replaceNow, syncEditorStructureNow]
+        [applyCommandNow, enqueue, replaceNow]
     );
 
     const syncStateParameters = useCallback(

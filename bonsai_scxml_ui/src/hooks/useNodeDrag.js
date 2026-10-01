@@ -772,20 +772,6 @@ export function useNodeDrag({
                             parentId: undefined,
                             extent: undefined,
                             position: absolute,
-                            // Initial-state membership is scoped to the
-                            // Compound the node came from. Carrying that flag
-                            // across a reparent can create a second top-level
-                            // initial state or overwrite the target Compound's
-                            // existing initial state. Clear it here; the normal
-                            // Compound initial-state normalization will choose
-                            // the appropriate initial child for the old/new
-                            // container after the drop.
-                            data: sourceCompound
-                                ? {
-                                    ...(c.data || {}),
-                                    isInitial: false,
-                                }
-                                : c.data,
                         }
                         : c
                 );
@@ -862,273 +848,17 @@ export function useNodeDrag({
 
 
 
-                /*
-                 * Keep outgoing compound transitions consistent when a child
-                 * state is moved into, out of, or between compounds.
-                 *
-                 * The persisted/logical transition remains the external edge.
-                 * A separate display edge connects the real child state to the
-                 * matching exit point on the compound boundary.
-                 */
-                let rewrittenEdges = [...edges];
-
-                if (sourceCompound) {
-                    const oldCompoundExitIds = new Set(
-                        rewrittenEdges
-                            .filter(
-                                (edge) =>
-                                    edge.data?.compoundOriginalSource ===
-                                    draggedNode.id
-                            )
-                            .map(
-                                (edge) =>
-                                    edge.data?.compoundExitId ||
-                                    edge.sourceHandle
-                            )
-                            .filter(Boolean)
-                    );
-
-                    // Remove the old child -> compound boundary helper edges.
-                    rewrittenEdges = rewrittenEdges.filter(
-                        (edge) =>
-                            !(
-                                edge.data?.compoundInternalEdge &&
-                                edge.source === draggedNode.id &&
-                                edge.target === sourceCompound.id
-                            )
-                    );
-
-                    // Turn the external compound edges back into ordinary
-                    // transitions from the actual child before potentially
-                    // wrapping them for the new compound below.
-                    rewrittenEdges = rewrittenEdges.map((edge) => {
-                        if (
-                            edge.data?.compoundOriginalSource !==
-                            draggedNode.id
-                        ) {
-                            return edge;
-                        }
-
-                        const restoredHandle =
-                            edge.data?.compoundOriginalSourceHandle ||
-                            edge.sourceHandle ||
-                            "success";
-
-                        const restoredData = {
-                            ...(edge.data || {}),
-                        };
-
-                        delete restoredData.compoundOriginalSource;
-                        delete restoredData.compoundOriginalSourceHandle;
-                        delete restoredData.compoundExitId;
-
-                        return {
-                            ...edge,
-                            source: draggedNode.id,
-                            sourceHandle: restoredHandle,
-                            label: edge.label || restoredHandle,
-                            data: restoredData,
-                        };
-                    });
-
-                    // Remove exit points that belonged to this child from the
-                    // old compound. Other child exits stay untouched.
-                    next = next.map((candidate) => {
-                        if (candidate.id !== sourceCompound.id) {
-                            return candidate;
-                        }
-
-                        return {
-                            ...candidate,
-                            data: {
-                                ...candidate.data,
-                                events: (
-                                    candidate.data?.events || []
-                                ).filter(
-                                    (event) =>
-                                        event.sourceNodeId !==
-                                        draggedNode.id &&
-                                        !oldCompoundExitIds.has(event.id)
-                                ),
-                            },
-                        };
-                    });
-                }
-
-                if (targetCompound) {
-                    const targetMemberIds = new Set(
-                        next
-                            .filter(
-                                (candidate) =>
-                                    candidate.parentId ===
-                                    targetCompound.id
-                            )
-                            .map((candidate) => candidate.id)
-                    );
-
-                    const baseName =
-                        draggedNode.data?.label ||
-                        draggedNode.data?.fullSkillName
-                            ?.split("#")[0]
-                            ?.split(".")
-                            ?.pop() ||
-                        "state";
-
-                    const compoundEventsById = new Map(
-                        (
-                            next.find(
-                                (candidate) =>
-                                    candidate.id === targetCompound.id
-                            )?.data?.events || []
-                        ).map((event) => [
-                            String(event.id),
-                            event,
-                        ])
-                    );
-
-                    const internalEdgesByExitId = new Map();
-
-                    rewrittenEdges = rewrittenEdges.map((edge) => {
-                        if (
-                            edge.source !== draggedNode.id ||
-                            edge.data?.compoundInternalEdge
-                        ) {
-                            return edge;
-                        }
-
-                        // A transition between two children of the same
-                        // compound remains an ordinary internal transition.
-                        if (
-                            targetMemberIds.has(edge.target) ||
-                            edge.target === targetCompound.id
-                        ) {
-                            return edge;
-                        }
-
-                        const originalHandleId = String(
-                            edge.sourceHandle || "success"
-                        );
-                        const compoundExitId =
-                            `${draggedNode.id}-${originalHandleId}`;
-                        const exitLabel =
-                            `${baseName}.${originalHandleId}`;
-
-                        if (
-                            !compoundEventsById.has(compoundExitId)
-                        ) {
-                            compoundEventsById.set(
-                                compoundExitId,
-                                {
-                                    id: compoundExitId,
-                                    name: exitLabel,
-                                    rawEvent: exitLabel,
-                                    target: edge.target,
-                                    sourceNodeId: draggedNode.id,
-                                    transitionHandleId:
-                                    originalHandleId,
-                                }
-                            );
-                        }
-
-                        if (
-                            !internalEdgesByExitId.has(
-                                compoundExitId
-                            )
-                        ) {
-                            internalEdgesByExitId.set(
-                                compoundExitId,
-                                {
-                                    id:
-                                        `edge-internal-compound-${draggedNode.id}-` +
-                                        `${originalHandleId}-${targetCompound.id}-` +
-                                        crypto.randomUUID(),
-                                    source: draggedNode.id,
-                                    target: targetCompound.id,
-                                    sourceHandle:
-                                    originalHandleId,
-                                    targetHandle:
-                                        `target-${compoundExitId}`,
-                                    type: "smoothstep",
-                                    selectable: false,
-                                    focusable: false,
-                                    style: {
-                                        strokeDasharray: "4 4",
-                                        stroke: "#0284c7",
-                                        strokeWidth: 1.5,
-                                    },
-                                    data: {
-                                        compoundInternalEdge: true,
-                                        compoundExitId,
-                                    },
-                                }
-                            );
-                        }
-
-                        return {
-                            ...edge,
-                            source: targetCompound.id,
-                            sourceHandle: compoundExitId,
-                            label:
-                                edge.label ||
-                                originalHandleId,
-                            data: {
-                                ...(edge.data || {}),
-                                compoundOriginalSource:
-                                draggedNode.id,
-                                compoundOriginalSourceHandle:
-                                originalHandleId,
-                                compoundExitId,
-                            },
-                        };
-                    });
-
-                    rewrittenEdges.push(
-                        ...internalEdgesByExitId.values()
-                    );
-
-                    const nextCompoundEvents = [
-                        ...compoundEventsById.values(),
-                    ].filter(
-                        (event) =>
-                            String(event?.id || "") !== "compound-entry"
-                    );
-
-                    next = next.map((candidate) =>
-                        candidate.id === targetCompound.id
-                            ? {
-                                ...candidate,
-                                data: {
-                                    ...candidate.data,
-                                    events: nextCompoundEvents,
-                                },
-                            }
-                            : candidate
-                    );
-                }
-
-                // Events can change the exit gutter width, so do one final
-                // fit after the compound transition metadata has been updated.
-                if (sourceCompound?.id) {
-                    next = fitCompoundAndAncestorCompounds(
-                        next,
-                        sourceCompound.id
-                    );
-                }
-
-                if (targetCompound?.id) {
-                    next = fitCompoundAndAncestorCompounds(
-                        next,
-                        targetCompound.id
-                    );
-                }
-
+                // Boundary helpers are a visual projection of the semantic
+                // transition source/target plus the current containment tree.
+                // Rebuild them once from the canonical logical-source metadata
+                // instead of manually unwrapping/rewrapping Compound exits here.
                 const collisionResolved = resolveNodeCollisionsAndRefit(
                     next,
                     draggedNode.id
                 );
                 const rebuilt = rebuildBoundaryTransitions(
                     collisionResolved,
-                    rewrittenEdges
+                    edges
                 );
                 setEdges(rebuilt.edges);
 
@@ -1378,6 +1108,8 @@ export function useNodeDrag({
                             edge.data?.parallelOriginalSource ===
                             draggedNode.id ||
                             edge.data?.parallelOriginalTarget ===
+                            draggedNode.id ||
+                            edge.data?.boundaryOriginalTarget ===
                             draggedNode.id
                         )
                 );
@@ -1428,206 +1160,61 @@ export function useNodeDrag({
             let nextEdges = edges;
 
             if (sourceLane) {
-                const internalHandles = nextEdges
-                    .filter(
-                        (edge) =>
-                            edge.source === draggedNode.id &&
-                            edge.target === sourceLane.id &&
-                            edge.id.startsWith("edge-internal-")
-                    )
-                    .map((edge) => edge.sourceHandle);
-
-                // Interne Verbindungen zum alten Lane-Rand entfernen.
-                nextEdges = nextEdges
-                    .filter(
-                        (edge) =>
-                            !(
-                                edge.source === draggedNode.id &&
-                                edge.target === sourceLane.id &&
-                                edge.id.startsWith(
-                                    "edge-internal-"
-                                )
-                            )
-                    )
-                    .map((edge) => {
-                        if (
-                            edge.data?.parallelOriginalSource ===
-                            draggedNode.id
-                        ) {
-                            return {
-                                ...edge,
-                                source: draggedNode.id,
-                                data: {
-                                    ...edge.data,
-                                    parallelOriginalSource:
-                                    undefined,
-                                },
-                            };
-                        }
-
-                        if (
-                            edge.data?.parallelOriginalTarget ===
-                            draggedNode.id
-                        ) {
-                            return {
-                                ...edge,
-                                target: draggedNode.id,
-                                targetHandle: null,
-                                data: {
-                                    ...edge.data,
-                                    parallelOriginalTarget:
-                                    undefined,
-                                },
-                            };
-                        }
-
+                // Outgoing lane exits are reconstructed below from logical
+                // boundary provenance. Only incoming transitions need an
+                // explicit visual target restore when the state leaves the
+                // Parallel; the generic boundary projector is source-side.
+                nextEdges = nextEdges.map((edge) => {
+                    const logicalTarget =
+                        edge.data?.boundaryOriginalTarget ||
+                        edge.data?.parallelOriginalTarget;
+                    if (logicalTarget !== draggedNode.id) {
                         return edge;
-                    });
+                    }
 
-                const stillUsedHandles = new Set(
-                    nextEdges
-                        .filter(
-                            (edge) =>
-                                edge.target === sourceLane.id &&
-                                edge.id.startsWith(
-                                    "edge-internal-"
-                                )
-                        )
-                        .map((edge) => edge.sourceHandle)
-                );
+                    const data = { ...(edge.data || {}) };
+                    delete data.parallelOriginalTarget;
+                    delete data.boundaryOriginalTarget;
 
-                nextNodes = nextNodes.map((candidate) =>
-                    candidate.id === sourceLane.id
-                        ? {
-                            ...candidate,
-                            data: {
-                                ...candidate.data,
-                                events: (
-                                    candidate.data?.events || []
-                                ).filter(
-                                    (item) =>
-                                        !internalHandles.includes(
-                                            item.id
-                                        ) ||
-                                        stillUsedHandles.has(
-                                            item.id
-                                        )
-                                ),
-                            },
-                        }
-                        : candidate
-                );
+                    return {
+                        ...edge,
+                        target: draggedNode.id,
+                        targetHandle: null,
+                        data,
+                    };
+                });
             }
 
             if (targetLane && targetParallel) {
-                const outgoingIds = new Set(
-                    nextEdges
-                        .filter(
-                            (edge) =>
-                                edge.source === draggedNode.id &&
-                                edge.target !== targetLane.id
-                        )
-                        .map((edge) => edge.id)
-                );
-
-                const incomingIds = new Set(
-                    nextEdges
-                        .filter(
-                            (edge) =>
-                                edge.target === draggedNode.id &&
-                                edge.source !== draggedNode.id
-                        )
-                        .map((edge) => edge.id)
-                );
-
-                const internalEdges = [];
-                const laneEvents = [
-                    ...(targetLane.data?.events || []),
-                ];
-
+                // Source-side Parallel exits are rebuilt generically below.
+                // Incoming transitions still render against the Parallel
+                // boundary, while retaining the logical target state.
                 nextEdges = nextEdges.map((edge) => {
-                    if (outgoingIds.has(edge.id)) {
-                        const handleId =
-                            edge.sourceHandle || "success";
+                    const targetsDraggedState =
+                        edge.target === draggedNode.id ||
+                        edge.data?.parallelOriginalTarget === draggedNode.id ||
+                        edge.data?.boundaryOriginalTarget === draggedNode.id;
+                    const logicalSourceId =
+                        edge.data?.boundaryOriginalSource ||
+                        edge.data?.compoundOriginalSource ||
+                        edge.data?.parallelOriginalSource ||
+                        edge.source;
 
-                        if (
-                            !laneEvents.some(
-                                (item) => item.id === handleId
-                            )
-                        ) {
-                            const baseName =
-                                draggedNode.data?.label ||
-                                draggedNode.data
-                                    ?.fullSkillName ||
-                                "state";
-
-                            laneEvents.push({
-                                id: handleId,
-                                name: `${baseName}.${handleId}`,
-                                rawEvent: `${baseName}.${handleId}`,
-                                target: edge.target,
-                            });
-                        }
-
-                        internalEdges.push({
-                            id:
-                                `edge-internal-${draggedNode.id}-` +
-                                `${handleId}-${targetLane.id}`,
-                            source: draggedNode.id,
-                            target: targetLane.id,
-                            sourceHandle: handleId,
-                            targetHandle: `target-${handleId}`,
-                            style: {
-                                strokeDasharray: "4 4",
-                                stroke: "#0284c7",
-                                strokeWidth: 1.5,
-                            },
-                            type: "smoothstep",
-                        });
-
-                        return {
-                            ...edge,
-                            source: targetLane.id,
-                            data: {
-                                ...edge.data,
-                                parallelOriginalSource:
-                                draggedNode.id,
-                            },
-                        };
+                    if (!targetsDraggedState || logicalSourceId === draggedNode.id) {
+                        return edge;
                     }
 
-                    if (incomingIds.has(edge.id)) {
-                        return {
-                            ...edge,
-                            target: targetParallel.id,
-                            targetHandle: "target",
-                            data: {
-                                ...edge.data,
-                                parallelOriginalTarget:
-                                draggedNode.id,
-                            },
-                        };
-                    }
-
-                    return edge;
+                    return {
+                        ...edge,
+                        target: targetParallel.id,
+                        targetHandle: "target",
+                        data: {
+                            ...(edge.data || {}),
+                            boundaryOriginalTarget: draggedNode.id,
+                            parallelOriginalTarget: draggedNode.id,
+                        },
+                    };
                 });
-
-                nextEdges = [
-                    ...nextEdges,
-                    ...internalEdges,
-                ];
-
-                nextNodes = nextNodes.map((candidate) =>
-                    candidate.id === targetLane.id
-                        ? {
-                            ...candidate,
-                            data: {
-                                ...candidate.data,
-                                events: laneEvents,
-                            },
-                        }
-                        : candidate
-                );
             }
 
             // React Flow benötigt Parent-Nodes vor ihren Children. Rebuild

@@ -11,6 +11,7 @@ use crate::core::model::{
     Transition, TransitionId, TransitionSource, Workflow, WorkflowIndex,
 };
 
+use super::reparent::{move_editor_state, update_editor_position};
 use super::types::{StateSlotsCommandDto, TargetedTransitionCommandDto, WorkflowCommandDto};
 
 #[derive(Debug, Clone, Default)]
@@ -52,6 +53,12 @@ pub(crate) fn apply_command(
         WorkflowCommandDto::InsertEditorStates { nodes } => {
             insert_editor_states(workflow, nodes)
         }
+        WorkflowCommandDto::MoveEditorState {
+            state_id,
+            parent_state_id,
+            x,
+            y,
+        } => move_editor_state(workflow, index, state_id, parent_state_id, x, y),
         WorkflowCommandDto::RemoveStates { state_ids } => {
             remove_states(workflow, index, state_ids)
         }
@@ -739,6 +746,7 @@ fn insert_editor_states(
     Ok(changes)
 }
 
+
 fn add_state(
     workflow: &mut Workflow,
     index: &WorkflowIndex,
@@ -1055,25 +1063,7 @@ fn update_state_editor_position(
     let position = index
         .state_position(&id)
         .ok_or_else(|| format!("Unknown state '{id}'"))?;
-    let editor = &mut workflow.states[position].editor;
-    editor.x = x;
-    editor.y = y;
-
-    if let Some(primary) = editor
-        .positions
-        .iter_mut()
-        .find(|position| position.clone_type.is_none())
-    {
-        primary.x = x;
-        primary.y = y;
-    } else {
-        editor.positions.insert(0, EditorPosition {
-            x,
-            y,
-            instance_id: None,
-            clone_type: None,
-        });
-    }
+    update_editor_position(&mut workflow.states[position], x, y);
 
     Ok(WorkflowCommandChanges {
         changed_state_ids: vec![id.as_str().to_string()],

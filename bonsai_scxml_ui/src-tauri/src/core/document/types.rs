@@ -124,6 +124,15 @@ pub(crate) enum WorkflowCommandDto {
         #[serde(default)]
         nodes: Vec<EditorExportNodeDto>,
     },
+    MoveEditorState {
+        #[serde(rename = "stateId")]
+        state_id: String,
+        #[serde(default)]
+        #[serde(rename = "parentStateId")]
+        parent_state_id: Option<String>,
+        x: f64,
+        y: f64,
+    },
     RemoveStates {
         #[serde(default)]
         #[serde(rename = "stateIds")]

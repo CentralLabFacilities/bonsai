@@ -1188,4 +1188,181 @@ mod tests {
         assert_eq!(snapshot.workflow.states.len(), 2);
     }
 
+    #[test]
+    fn moving_editor_state_reparents_and_normalizes_initial_scopes() {
+        let store = WorkflowDocumentStore::default();
+        let mut workflow = Workflow {
+            initial_state_id: Some(StateId::from("a")),
+            initial_scxml_state_id: Some("A".into()),
+            states: vec![
+                State {
+                    id: StateId::from("a"),
+                    scxml_id: "A".into(),
+                    label: "A".into(),
+                    kind: StateKind::Skill,
+                    is_initial: true,
+                    ..sample_state_defaults()
+                },
+                State {
+                    id: StateId::from("b"),
+                    scxml_id: "B".into(),
+                    label: "B".into(),
+                    kind: StateKind::Skill,
+                    ..sample_state_defaults()
+                },
+                State {
+                    id: StateId::from("container"),
+                    scxml_id: "Container".into(),
+                    label: "Container".into(),
+                    kind: StateKind::Compound,
+                    initial_child_id: Some(StateId::from("inside")),
+                    initial_child_scxml_id: Some("Inside".into()),
+                    ..sample_state_defaults()
+                },
+                State {
+                    id: StateId::from("inside"),
+                    scxml_id: "Inside".into(),
+                    label: "Inside".into(),
+                    kind: StateKind::Skill,
+                    parent_id: Some(StateId::from("container")),
+                    is_initial: true,
+                    ..sample_state_defaults()
+                },
+            ],
+            ..Workflow::default()
+        };
+        workflow.transitions.push(Transition {
+            id: TransitionId::from("edge-a-b"),
+            source_state_id: StateId::from("a"),
+            target_state_id: Some(StateId::from("b")),
+            target_scxml_id: "B".into(),
+            logical_sources: vec![TransitionSource {
+                state_id: StateId::from("a"),
+                handle: "success".into(),
+            }],
+            event: "A.success".into(),
+            condition: String::new(),
+            assignments: vec![],
+            sent_events: vec![],
+            target_instance_id: None,
+        });
+        assert_eq!(store.replace(workflow).unwrap(), 1);
+
+        let result = store
+            .apply(
+                Some(1),
+                WorkflowCommandDto::MoveEditorState {
+                    state_id: "a".into(),
+                    parent_state_id: Some("container".into()),
+                    x: 25.0,
+                    y: 35.0,
+                },
+            )
+            .unwrap();
+        assert_eq!(result.revision, 2);
+
+        let snapshot = store.snapshot().unwrap().unwrap();
+        let moved = snapshot
+            .workflow
+            .states
+            .iter()
+            .find(|state| state.id == "a")
+            .unwrap();
+        assert_eq!(moved.parent_id.as_deref(), Some("container"));
+        assert!(!moved.is_initial);
+        assert_eq!(moved.editor.x, 25.0);
+        assert_eq!(moved.editor.y, 35.0);
+
+        // A was the old root initial. Rust chooses the next remaining root
+        // state, while preserving the target Compound's existing initial child.
+        assert_eq!(snapshot.workflow.initial_state_id.as_deref(), Some("b"));
+        let inside = snapshot
+            .workflow
+            .states
+            .iter()
+            .find(|state| state.id == "inside")
+            .unwrap();
+        assert!(inside.is_initial);
+        let container = snapshot
+            .workflow
+            .states
+            .iter()
+            .find(|state| state.id == "container")
+            .unwrap();
+        assert_eq!(container.initial_child_id.as_deref(), Some("inside"));
+
+        // A now exits its Compound, so the Compound owns the SCXML transition
+        // while provenance continues to identify A.success as the logical exit.
+        let transition = &snapshot.workflow.transitions[0];
+        assert_eq!(transition.source_state_id, "container");
+        assert_eq!(transition.event, "A.success");
+        assert_eq!(transition.logical_sources[0].state_id, "a");
+    }
+
+    #[test]
+    fn moving_editor_state_into_empty_compound_makes_it_initial() {
+        let store = WorkflowDocumentStore::default();
+        let workflow = Workflow {
+            initial_state_id: Some(StateId::from("root")),
+            initial_scxml_state_id: Some("Root".into()),
+            states: vec![
+                State {
+                    id: StateId::from("root"),
+                    scxml_id: "Root".into(),
+                    label: "Root".into(),
+                    kind: StateKind::Skill,
+                    is_initial: true,
+                    ..sample_state_defaults()
+                },
+                State {
+                    id: StateId::from("moved"),
+                    scxml_id: "Moved".into(),
+                    label: "Moved".into(),
+                    kind: StateKind::Skill,
+                    ..sample_state_defaults()
+                },
+                State {
+                    id: StateId::from("container"),
+                    scxml_id: "Container".into(),
+                    label: "Container".into(),
+                    kind: StateKind::Compound,
+                    ..sample_state_defaults()
+                },
+            ],
+            ..Workflow::default()
+        };
+        assert_eq!(store.replace(workflow).unwrap(), 1);
+
+        store
+            .apply(
+                Some(1),
+                WorkflowCommandDto::MoveEditorState {
+                    state_id: "moved".into(),
+                    parent_state_id: Some("container".into()),
+                    x: 10.0,
+                    y: 20.0,
+                },
+            )
+            .unwrap();
+
+        let snapshot = store.snapshot().unwrap().unwrap();
+        let moved = snapshot
+            .workflow
+            .states
+            .iter()
+            .find(|state| state.id == "moved")
+            .unwrap();
+        let container = snapshot
+            .workflow
+            .states
+            .iter()
+            .find(|state| state.id == "container")
+            .unwrap();
+        assert!(moved.is_initial);
+        assert_eq!(container.initial_child_id.as_deref(), Some("moved"));
+        assert_eq!(container.initial_child_scxml_id.as_deref(), Some("Moved"));
+        assert_eq!(snapshot.workflow.initial_state_id.as_deref(), Some("root"));
+    }
+
+
 }

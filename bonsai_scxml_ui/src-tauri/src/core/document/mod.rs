@@ -1,4 +1,5 @@
 mod commands;
+mod reparent;
 mod store;
 mod types;
 

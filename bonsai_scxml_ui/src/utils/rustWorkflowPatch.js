@@ -149,7 +149,7 @@ const stateDataPatch = (node, state, mode = "all") => {
     if (mode === "all" || mode === "source") {
         next.src = state?.source || "";
     }
-    if (mode === "all" || mode === "initial") {
+    if (mode === "all" || mode === "initial" || mode === "move") {
         next.isInitial = Boolean(state?.isInitial);
         next.isFinal = Boolean(state?.isFinal);
         next.initialChildId = state?.initialChildId || null;
@@ -217,7 +217,8 @@ export const applyRustWorkflowStatePatch = (
             continue;
         }
 
-        const shouldApplyPosition = mode === "all" || mode === "position";
+        const shouldApplyPosition =
+            mode === "all" || mode === "position" || mode === "move";
         const primaryPosition = shouldApplyPosition
             ? getPrimaryEditorPosition(state)
             : null;
@@ -230,6 +231,9 @@ export const applyRustWorkflowStatePatch = (
 
         nextNodes.push({
             ...node,
+            ...(mode === "move"
+                ? { parentId: state?.parentId || undefined }
+                : {}),
             position: nextPosition,
             data: stateDataPatch(node, state, mode),
         });
