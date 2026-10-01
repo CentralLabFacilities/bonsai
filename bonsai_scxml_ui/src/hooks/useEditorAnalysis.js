@@ -90,17 +90,11 @@ export function useEditorAnalysis({
                 );
                 commit(slotAncestryResponseToMap(response));
             } catch (error) {
-                console.warn(
-                    "Rust slot ancestry failed; using frontend fallback:",
-                    error
-                );
-                commit(
-                    getAncestorSlotSourcesByPath(tabs, activeTabId, {
-                        nodes: semanticNodes,
-                        slotNodes: semanticSlotNodes,
-                        manualSlots,
-                    })
-                );
+                console.error("Rust slot ancestry failed:", error);
+                // Desktop mode treats Rust as the semantic authority. Do not
+                // silently project a second implementation after an IPC/backend
+                // failure because that can hide Rust/JavaScript divergence.
+                commit(new Map());
             }
         }, 30);
 
@@ -180,11 +174,10 @@ export function useEditorAnalysis({
         analyzeEditorTransitions(transitionAnalysisRequest)
             .then(commit)
             .catch((error) => {
-                console.warn(
-                    "Rust transition analysis failed; using frontend fallback:",
-                    error
-                );
-                commit(analyzeWithJavascript());
+                console.error("Rust transition analysis failed:", error);
+                // Avoid displaying stale or independently-derived semantics in
+                // desktop mode when the authoritative Rust analysis fails.
+                commit([]);
             });
 
         return () => {
@@ -419,11 +412,19 @@ export function useEditorAnalysis({
                 const next = await validateEditorWorkflow(validationRequest);
                 commitProblems(Array.isArray(next) ? next : []);
             } catch (error) {
-                console.error(
-                    "Rust editor validation failed; using JavaScript fallback:",
-                    error
+                console.error("Rust editor validation failed:", error);
+                const message = String(
+                    error?.message || error || "Unknown Rust validation error"
                 );
-                commitProblems(validateWithJavascript());
+                commitProblems([
+                    {
+                        id: "rust-validation-failed",
+                        severity: "error",
+                        category: "Workflow",
+                        title: "Workflow validation unavailable",
+                        message: `Rust validation failed: ${message}`,
+                    },
+                ]);
             }
         }, 40);
 

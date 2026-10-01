@@ -300,30 +300,15 @@ export function useWorkflowDocument({
                 try {
                     let xml;
                     if (isDesktop) {
-                        try {
-                            xml = await serializeEditorGraphWithRust({
-                                nodes,
-                                edges,
-                                globalDataModel,
-                                manualSlots,
-                            });
-                        } catch (error) {
-                            // Keep a compatibility escape hatch while the Rust
-                            // exporter is rolled out. Unsupported snapshots must
-                            // never prevent the user from saving the workflow.
-                            console.warn(
-                                "Rust SCXML serialization failed; using JavaScript fallback.",
-                                error
-                            );
-                            const exportGraph = prepareGraphForScxml(nodes, edges);
-                            xml = generateXmlString(
-                                exportGraph.nodes,
-                                exportGraph.edges,
-                                globalDataModel,
-                                [],
-                                manualSlots
-                            );
-                        }
+                        // Desktop serialization is Rust-owned. If it fails, let
+                        // the surrounding save error handling surface the issue
+                        // instead of silently saving different JavaScript output.
+                        xml = await serializeEditorGraphWithRust({
+                            nodes,
+                            edges,
+                            globalDataModel,
+                            manualSlots,
+                        });
                     } else {
                         const exportGraph = prepareGraphForScxml(nodes, edges);
                         xml = generateXmlString(

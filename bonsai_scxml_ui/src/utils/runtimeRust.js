@@ -162,24 +162,15 @@ const hydrateRuntimeReplayCache = (cache, contexts = []) => ({
 });
 
 /**
- * Parse a runtime log through the Rust backend in desktop mode while keeping
- * the historical JavaScript parser as browser/error fallback during the
- * migration. The DTO returned by Rust matches parseSkillStateMachineLog().
+ * Parse a runtime log through the Rust backend in desktop mode. Browser mode
+ * keeps the JavaScript implementation, while Tauri treats Rust as authoritative.
  */
 export const parseRuntimeLogForReplay = async (text = "") => {
     if (!isTauri()) {
         return parseSkillStateMachineLog(text);
     }
 
-    try {
-        return await parseRuntimeLogText(text);
-    } catch (error) {
-        console.error(
-            "Rust runtime-log parsing failed; falling back to JavaScript parser.",
-            error
-        );
-        return parseSkillStateMachineLog(text);
-    }
+    return await parseRuntimeLogText(text);
 };
 
 /**
@@ -204,25 +195,14 @@ export const prepareRuntimeReplayCacheForReplay = async (
         if (yieldControl) await yieldControl();
     };
 
-    try {
-        await report("Preparing replay context…", 0.22);
-        const request = buildRuntimeReplayRequest(runtimeLog, contexts);
+    await report("Preparing replay context…", 0.22);
+    const request = buildRuntimeReplayRequest(runtimeLog, contexts);
 
-        await report("Resolving runtime replay in Rust…", 0.36);
-        const cache = await prepareRuntimeReplayCacheRust(request);
+    await report("Resolving runtime replay in Rust…", 0.36);
+    const cache = await prepareRuntimeReplayCacheRust(request);
 
-        await report("Hydrating replay indexes…", 0.96);
-        const hydrated = hydrateRuntimeReplayCache(cache, contexts);
-        await report("Replay ready", 1);
-        return hydrated;
-    } catch (error) {
-        console.error(
-            "Rust runtime replay preparation failed; falling back to JavaScript resolver.",
-            error
-        );
-        return prepareRuntimeReplayCacheJs(runtimeLog, contexts, {
-            onProgress,
-            yieldControl,
-        });
-    }
+    await report("Hydrating replay indexes…", 0.96);
+    const hydrated = hydrateRuntimeReplayCache(cache, contexts);
+    await report("Replay ready", 1);
+    return hydrated;
 };
