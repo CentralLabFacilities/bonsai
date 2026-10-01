@@ -32,7 +32,7 @@ export function useEditorNodeActions({
     setRightPanelTab,
     setActiveTab,
     applyWorkflowCommand,
-    syncEditorStateAfterCommit,
+    syncEditorStructureAfterCommit,
     syncStateEditorPositions,
 }) {
     const selectEditorNode = useCallback(
@@ -181,7 +181,7 @@ export function useEditorNodeActions({
             setNodes((currentNodes) =>
                 currentNodes.map((node) => {
                     if (
-                        parentNode?.type === "compound" &&
+                        ["compound", "parallelLane"].includes(parentNode?.type) &&
                         node.id === parentId
                     ) {
                         return {
@@ -216,19 +216,21 @@ export function useEditorNodeActions({
                     type: "setRootInitial",
                     stateId: selected.id,
                 });
-            } else if (
-                parentNode?.type === "compound" &&
-                !parentNode.data?.autoParallelLaneCompound
-            ) {
+            } else if (parentNode?.type === "compound") {
+                // Automatic Parallel-lane compounds are real semantic states in
+                // Rust. Their initial child can therefore use the same focused
+                // command as every other Compound instead of forcing a document
+                // rebuild.
                 void applyWorkflowCommand?.({
                     type: "setStateInitialChild",
                     parentStateId: parentId,
                     stateId: selected.id,
                 });
             }
-            // Parallel lanes are flattened by the semantic exporter in some
-            // layouts, so their initial child stays local until lane commands
-            // are represented directly in the Rust model.
+            // A direct Parallel lane has at most one executable child; otherwise
+            // normalizeParallelLaneCompounds wraps its members in the semantic
+            // Compound handled above. Atomic one-child lanes may be flattened by
+            // Rust, so there is no independent semantic initial choice to sync.
         },
         [nodes, setNodes, applyWorkflowCommand]
     );
@@ -312,10 +314,7 @@ export function useEditorNodeActions({
                 return orderNodesParentsFirst(nextNodes);
             });
 
-            if (
-                parent.type === "compound" &&
-                !parent.data?.autoParallelLaneCompound
-            ) {
+            if (parent.type === "compound") {
                 void applyWorkflowCommand?.({
                     type: "addState",
                     state: {
@@ -357,10 +356,11 @@ export function useEditorNodeActions({
                     },
                 });
             } else {
-                // Parallel lanes can be flattened into their only child by the
-                // semantic exporter. Rebuild that small structural case instead
-                // of guessing whether the lane itself currently exists in Rust.
-                void syncEditorStateAfterCommit?.();
+                // Adding directly to a Parallel lane can change whether that lane
+                // is flattened or represented by an automatic Compound. Rebuild
+                // only the semantic structure; workflow-global datamodel/slots
+                // stay owned by the existing Rust document.
+                void syncEditorStructureAfterCommit?.();
             }
 
             // Keep the previous App.jsx behavior: once an add-state action is
@@ -377,7 +377,7 @@ export function useEditorNodeActions({
             setRightPanelTab,
             setActiveTab,
             applyWorkflowCommand,
-            syncEditorStateAfterCommit,
+            syncEditorStructureAfterCommit,
         ]
     );
 

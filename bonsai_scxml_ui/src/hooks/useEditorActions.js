@@ -18,7 +18,7 @@ export function useEditorActions(options) {
         setRightPanelTab: options.setRightPanelTab,
         setActiveTab: options.setActiveTab,
         applyWorkflowCommand: options.applyWorkflowCommand,
-        syncEditorStateAfterCommit: options.syncEditorStateAfterCommit,
+        syncEditorStructureAfterCommit: options.syncEditorStructureAfterCommit,
         syncStateEditorPositions: options.syncStateEditorPositions,
     });
 

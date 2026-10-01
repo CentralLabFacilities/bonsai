@@ -599,6 +599,8 @@ function AppContent() {
         applyWorkflowCommand: rustWorkflowDocument.applyWorkflowCommand,
         syncEditorStateAfterCommit:
             rustWorkflowDocument.syncEditorStateAfterCommit,
+        syncEditorStructureAfterCommit:
+            rustWorkflowDocument.syncEditorStructureAfterCommit,
         syncStateEditorPositions:
             rustWorkflowDocument.syncStateEditorPositions,
         syncTransitionsForSource:
@@ -4365,7 +4367,7 @@ function AppContent() {
 
                                 setSelectedNodeId(newNode.id);
                                 refreshBehaviorSlots();
-                                void rustWorkflowDocument.syncEditorStateAfterCommit();
+                                void rustWorkflowDocument.syncEditorStructureAfterCommit();
                                 return;
                             }
 
@@ -4554,7 +4556,7 @@ function AppContent() {
 
                                 setSelectedNodeId(newNode.id);
                                 refreshBehaviorSlots();
-                                void rustWorkflowDocument.syncEditorStateAfterCommit();
+                                void rustWorkflowDocument.syncEditorStructureAfterCommit();
                                 return;
                             }
 
@@ -4575,7 +4577,7 @@ function AppContent() {
                             );
                             setSelectedNodeId(newNode.id);
                             refreshBehaviorSlots();
-                            void rustWorkflowDocument.syncEditorStateAfterCommit();
+                            void rustWorkflowDocument.syncEditorStructureAfterCommit();
                         }}
                     >
                         <EditorCanvas
