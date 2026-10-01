@@ -3,10 +3,6 @@ import {
     parseRuntimeLogText,
     prepareRuntimeReplayCacheRust,
 } from "../tauri-client.js";
-import {
-    parseSkillStateMachineLog,
-    prepareRuntimeReplayCache as prepareRuntimeReplayCacheJs,
-} from "./runtimeLog";
 
 const normalize = (value) => String(value ?? "").trim();
 
@@ -167,6 +163,7 @@ const hydrateRuntimeReplayCache = (cache, contexts = []) => ({
  */
 export const parseRuntimeLogForReplay = async (text = "") => {
     if (!isTauri()) {
+        const { parseSkillStateMachineLog } = await import("./runtimeLog");
         return parseSkillStateMachineLog(text);
     }
 
@@ -184,7 +181,8 @@ export const prepareRuntimeReplayCacheForReplay = async (
     { onProgress, yieldControl } = {}
 ) => {
     if (!isTauri()) {
-        return prepareRuntimeReplayCacheJs(runtimeLog, contexts, {
+        const { prepareRuntimeReplayCache } = await import("./runtimeLog");
+        return prepareRuntimeReplayCache(runtimeLog, contexts, {
             onProgress,
             yieldControl,
         });

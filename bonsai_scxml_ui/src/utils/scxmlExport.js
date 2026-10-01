@@ -703,21 +703,6 @@ ${statesXml}
 };
 
 /**
- * Tauri desktop save: uses file path directly (no dialog) or shows save-as dialog.
- */
-export const saveScxmlFileTauri = async (xmlString, filePath = null, defaultName = "workflow.xml") => {
-    const { saveFile } = await import('../tauri-client.js');
-
-    const result = await saveFile(xmlString, filePath, defaultName);
-
-    return {
-        success: result.success,
-        fileName: result.file_name || defaultName,
-        filePath: result.path || null,
-    };
-};
-
-/**
  * Browser-mode save (File System Access API or download fallback).
  */
 export const saveScxmlFile = async (xmlString, fileHandle = null, defaultName = "workflow.xml") => {
@@ -766,20 +751,4 @@ export const saveScxmlFile = async (xmlString, fileHandle = null, defaultName = 
     URL.revokeObjectURL(url);
 
     return { success: true, fileName: downloadName };
-};
-
-/**
- * Tauri desktop open: returns file path.
- */
-export const openScxmlFileTauri = async () => {
-    const { openFile } = await import('../tauri-client.js');
-    return await openFile();
-};
-
-/**
- * Read file content by path (for Tauri).
- */
-export const readScxmlFileContent = async (filePath) => {
-    const { readFile } = await import('../tauri-client.js');
-    return await readFile(filePath);
 };

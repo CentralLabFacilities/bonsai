@@ -1,11 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-    saveScxmlFile,
-    saveScxmlFileTauri,
-    openScxmlFileTauri,
-    readScxmlFileContent,
-    generateXmlString,
-} from "../utils/scxmlExport";
+import { openFile, readFile, saveFile } from "../tauri-client";
 import { parseScxmlFile } from "../utils/scxmlImport";
 import { serializeEditorGraphWithRust } from "../utils/scxmlRustExport";
 import { getNodeId } from "../utils/editorGeometry";
@@ -250,10 +244,10 @@ export function useWorkflowDocument({
     const handleOpenDocument = useCallback(async () => {
         try {
             if (isDesktop) {
-                const filePath = await openScxmlFileTauri();
+                const filePath = await openFile();
                 if (!filePath) return null;
 
-                const content = await readScxmlFileContent(filePath);
+                const content = await readFile(filePath);
                 if (!content) return null;
 
                 const fileName = filePath.split(/[\\/]/).pop() || "workflow.xml";
@@ -310,6 +304,11 @@ export function useWorkflowDocument({
                             manualSlots,
                         });
                     } else {
+                        // Browser-only compatibility path. Keep the legacy JS
+                        // serializer out of the desktop editor's eager bundle.
+                        const { generateXmlString } = await import(
+                            "../utils/scxmlExport"
+                        );
                         const exportGraph = prepareGraphForScxml(nodes, edges);
                         xml = generateXmlString(
                             exportGraph.nodes,
@@ -326,12 +325,17 @@ export function useWorkflowDocument({
 
                     let result;
                     if (isDesktop) {
-                        result = await saveScxmlFileTauri(
+                        const desktopResult = await saveFile(
                             xml,
                             forceSaveAs ? null : activeTab?.filePath,
                             defaultName
                         );
-                        if (result?.success) {
+                        result = {
+                            success: Boolean(desktopResult?.success),
+                            fileName: desktopResult?.file_name || defaultName,
+                            filePath: desktopResult?.path || null,
+                        };
+                        if (result.success) {
                             const cleanTitle = result.fileName.replace(
                                 /\.(xml|scxml)$/i,
                                 ""
@@ -347,6 +351,9 @@ export function useWorkflowDocument({
                             });
                         }
                     } else {
+                        const { saveScxmlFile } = await import(
+                            "../utils/scxmlExport"
+                        );
                         result = await saveScxmlFile(
                             xml,
                             forceSaveAs ? null : activeTab?.fileHandle,

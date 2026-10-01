@@ -1,4 +1,4 @@
-import { memo, useMemo, useRef } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import {
     FiEye,
     FiEyeOff,
@@ -28,8 +28,8 @@ import StateCloneNode from "./StateCloneNode";
 import ParallelLaneNode from "./ParallelLaneNode";
 import EditableTransitionEdge from "./EditableTransitionEdge";
 import CodeView from "./CodeView";
-import { prepareGraphForScxml } from "../utils/editorScxml";
-import { generateXmlString } from "../utils/scxmlExport";
+import { isTauri } from "../tauri-client";
+import { serializeEditorGraphWithRust } from "../utils/scxmlRustExport";
 
 const nodeTypes = {
     custom: memo(CustomNode),
@@ -55,6 +55,7 @@ export default function EditorCanvas({
     nodes,
     edges,
     globalDataModel,
+    manualSlots,
     visibleNodes,
     visibleEdges,
     smartRoutingNodes,
@@ -100,15 +101,60 @@ export default function EditorCanvas({
     onRuntimeDelayChange,
 }) {
     const runtimeLogInputRef = useRef(null);
-    const codeString = useMemo(() => {
-        if (activeMode !== "code") return "";
-        const exportGraph = prepareGraphForScxml(nodes, edges);
-        return generateXmlString(
-            exportGraph.nodes,
-            exportGraph.edges,
-            globalDataModel
-        );
-    }, [activeMode, nodes, edges, globalDataModel]);
+    const [codeString, setCodeString] = useState("");
+
+    useEffect(() => {
+        if (activeMode !== "code") return undefined;
+
+        let cancelled = false;
+        setCodeString("<!-- Generating SCXML… -->");
+
+        const generateCode = async () => {
+            try {
+                let xml;
+                if (isTauri()) {
+                    // Code View must show the same canonical SCXML that the
+                    // desktop save path writes. Rust remains the single
+                    // semantic serializer in Tauri.
+                    xml = await serializeEditorGraphWithRust({
+                        nodes,
+                        edges,
+                        globalDataModel,
+                        manualSlots,
+                    });
+                } else {
+                    // Keep the legacy serializer available for browser/dev
+                    // mode without eagerly loading it in the desktop bundle.
+                    const [{ prepareGraphForScxml }, { generateXmlString }] =
+                        await Promise.all([
+                            import("../utils/editorScxml"),
+                            import("../utils/scxmlExport"),
+                        ]);
+                    const exportGraph = prepareGraphForScxml(nodes, edges);
+                    xml = generateXmlString(
+                        exportGraph.nodes,
+                        exportGraph.edges,
+                        globalDataModel,
+                        [],
+                        manualSlots
+                    );
+                }
+
+                if (!cancelled) setCodeString(xml);
+            } catch (error) {
+                console.error("Could not generate Code View SCXML:", error);
+                if (!cancelled) {
+                    const message = String(error?.message || error || "Unknown error");
+                    setCodeString(`<!-- Could not generate SCXML: ${message} -->`);
+                }
+            }
+        };
+
+        void generateCode();
+        return () => {
+            cancelled = true;
+        };
+    }, [activeMode, nodes, edges, globalDataModel, manualSlots]);
 
     if (activeMode === "code") {
         return (

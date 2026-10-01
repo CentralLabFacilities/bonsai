@@ -91,7 +91,7 @@ import { rebuildBoundaryTransitionsIncremental } from "./utils/boundaryTransitio
 import { isEditorCloneNode } from "./utils/editorClones";
 import { isWildcardTransitionEvent } from "./utils/transitionEvents";
 import { getOverviewLayoutNodeSize } from "./utils/layoutUtils";
-import { buildRuntimeReplayContexts } from "./utils/runtimeLog";
+import { buildRuntimeReplayContexts } from "./utils/runtimeReplayContexts";
 import {
     parseRuntimeLogForReplay,
     prepareRuntimeReplayCacheForReplay,
@@ -4590,6 +4590,7 @@ function AppContent() {
                             nodes={nodes}
                             edges={edges}
                             globalDataModel={globalDataModel}
+                            manualSlots={manualSlots}
                             visibleNodes={playbackVisibleNodes}
                             visibleEdges={playbackVisibleEdges}
                             smartRoutingNodes={smartRoutingNodes}
