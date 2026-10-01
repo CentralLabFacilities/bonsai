@@ -21,18 +21,14 @@ import CreateSubMachineModal from "./components/CreateSubMachineModal";
 import EditorCanvas from "./components/EditorCanvas";
 import WorkflowTabBar from "./components/WorkflowTabBar";
 import EditorFindOverlay from "./components/EditorFindOverlay";
+import EditorShortcutHelp from "./components/EditorShortcutHelp";
 import HintPage from "./components/HintPage";
 
 import {
     isTauri,
     initApiProxy,
 } from "./tauri-client.js";
-import {
-    normalizeSlotPath,
-    collectInheritedSlotUsages,
-    EDITOR_SHORTCUTS,
-    FIND_SHORTCUTS,
-} from "./utils/editorGraph";
+import { collectInheritedSlotUsages } from "./utils/editorGraph";
 import {
     getNodeId,
     COLLAPSED_CONTAINER_WIDTH,
@@ -87,6 +83,8 @@ import { useProblemNavigation } from "./hooks/useProblemNavigation";
 import { useEditorSelectionController } from "./hooks/useEditorSelectionController";
 import { useEditorContextMenu } from "./hooks/useEditorContextMenu";
 import { useRuntimeReplay } from "./hooks/useRuntimeReplay";
+import { useEditorFind } from "./hooks/useEditorFind";
+import { useGlobalEditorShortcuts } from "./hooks/useGlobalEditorShortcuts";
 import { rebuildBoundaryTransitionsIncremental } from "./utils/boundaryTransitions";
 import { isEditorCloneNode } from "./utils/editorClones";
 import { isWildcardTransitionEvent } from "./utils/transitionEvents";
@@ -216,14 +214,6 @@ function AppContent() {
     // React Flow may still emit remove changes for the old visual edges; keep
     // those edge IDs here so that follow-up removal events can be ignored.
     const remappedSlotCloneEdgeIdsRef = useRef(new Set());
-    // Editor-wide Find (Ctrl+F): searches skill/behavior nodes and slot paths
-    // in the currently active workflow.
-    const [isFindOpen, setIsFindOpen] = useState(false);
-    const [findQuery, setFindQuery] = useState("");
-    const [findResultIndex, setFindResultIndex] = useState(0);
-    const findInputRef = useRef(null);
-    const findPanelRef = useRef(null);
-    const [isShortcutHelpOpen, setIsShortcutHelpOpen] = useState(false);
     const [isHintPageOpen, setIsHintPageOpen] = useState(false);
 
     const [activeMode, setActiveMode] = useState("overview");
@@ -735,63 +725,6 @@ function AppContent() {
 
 
 
-
-    // Ctrl+F opens the graph search instead of the browser's page search.
-    // Workflow-tab cycling (Ctrl+Tab / Ctrl+Shift+Tab) is owned by
-    // useWorkflowTabs so tab lifecycle and navigation stay together.
-    useEffect(() => {
-        const handleEditorFindShortcut = (event) => {
-            if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
-            if (String(event.key || "").toLowerCase() !== "f") return;
-
-            const target = event.target;
-            const insideCodeEditor =
-                target instanceof Element &&
-                Boolean(target.closest(".monaco-editor, .cm-editor"));
-
-            // Preserve the native editor search when the user is actively
-            // editing code. Everywhere else Ctrl+F searches the graph.
-            if (insideCodeEditor) return;
-
-            event.preventDefault();
-            setIsFindOpen(true);
-        };
-
-        window.addEventListener("keydown", handleEditorFindShortcut, true);
-        return () =>
-            window.removeEventListener("keydown", handleEditorFindShortcut, true);
-    }, []);
-
-    useEffect(() => {
-        if (!isFindOpen) return;
-
-        requestAnimationFrame(() => {
-            findInputRef.current?.focus();
-            findInputRef.current?.select();
-        });
-    }, [isFindOpen]);
-
-    // Dismiss the editor search as soon as the user clicks anywhere outside
-    // the search panel. Capture phase makes this work reliably even when the
-    // click lands on React Flow or another component that stops propagation.
-    useEffect(() => {
-        if (!isFindOpen) return;
-
-        const handlePointerDownOutsideFind = (event) => {
-            const panel = findPanelRef.current;
-            if (panel && !panel.contains(event.target)) {
-                setIsFindOpen(false);
-            }
-        };
-
-        document.addEventListener("pointerdown", handlePointerDownOutsideFind, true);
-        return () =>
-            document.removeEventListener(
-                "pointerdown",
-                handlePointerDownOutsideFind,
-                true
-            );
-    }, [isFindOpen]);
 
     // Hilfsfunktion: Bounding Box um alle ausgewählten Nodes berechnen
 
@@ -2197,141 +2130,29 @@ function AppContent() {
 
     const handleCreateManualSlot = createManualSlot;
 
-    const findResults = useMemo(() => {
-        const query = findQuery.trim().toLowerCase();
-        if (!query) return [];
-
-        const results = [];
-
-        // Search real executable nodes. Compound/Parallel are structural
-        // containers and are intentionally omitted from "skill" results.
-        semanticNodes.forEach((node) => {
-            if (node.type !== "custom" && node.type !== "submachine") return;
-
-            const label = String(node.data?.label || node.id);
-            const fullName = String(node.data?.fullSkillName || "");
-            const src = String(node.data?.src || "");
-            const haystack = `${label} ${fullName} ${src}`.toLowerCase();
-
-            if (!haystack.includes(query)) return;
-
-            results.push({
-                kind: node.type === "submachine" ? "behavior" : "skill",
-                id: node.id,
-                label,
-                detail: fullName || src || node.id,
-            });
-        });
-
-        const slotPaths = new Map();
-        const addSlotPath = (path, type = "Unknown") => {
-            const cleanPath = normalizeSlotPath(path);
-            if (!cleanPath) return;
-
-            const existing = slotPaths.get(cleanPath);
-            slotPaths.set(cleanPath, {
-                path: cleanPath,
-                type:
-                    existing?.type && existing.type !== "Unknown"
-                        ? existing.type
-                        : type || "Unknown",
-            });
-        };
-
-        (slotNodes || []).forEach((node) =>
-            addSlotPath(
-                node.data?.path || node.data?.label,
-                node.data?.slotType
-            )
-        );
-        (manualSlots || []).forEach((slot) =>
-            addSlotPath(slot.path, slot.type)
-        );
-        semanticNodes.forEach((node) => {
-            [
-                ...(node.data?.inSlots || []),
-                ...(node.data?.outSlots || []),
-                ...(node.data?.inheritedSlots || []),
-            ].forEach((slot) => addSlotPath(slot.path, slot.type));
-        });
-
-        [...slotPaths.values()].forEach((slot) => {
-            const displayPath = `/${slot.path}`;
-            const haystack = `${displayPath} ${slot.type || ""}`.toLowerCase();
-            if (!haystack.includes(query)) return;
-
-            results.push({
-                kind: "slot",
-                id: `slot-${slot.path}`,
-                label: displayPath,
-                detail: slot.type || "Unknown",
-            });
-        });
-
-        return results.slice(0, 50);
-    }, [findQuery, semanticNodes, slotNodes, manualSlots]);
-
-    useEffect(() => {
-        setFindResultIndex(0);
-    }, [findQuery]);
-
-    const focusFindResult = useCallback(
-        (result) => {
-            if (!result) return;
-
-            clearAllEdgeSelection();
-
-            if (result.kind === "slot") {
-                if (activeMode === "event") {
-                    setActiveMode("slots");
-                }
-
-                // Ensure a slot node exists even when the slot view has not
-                // been opened since loading/importing this workflow.
-                checkSlotConnection(nodes, manualSlots);
-
-                window.setTimeout(() => {
-                    selectEditorNode(result.id, {
-                        kind: "slot",
-                        allowMissing: true,
-                        openDetails: false,
-                        tab: null,
-                    });
-
-                    fitView({
-                        nodes: [{ id: result.id }],
-                        padding: 0.8,
-                        maxZoom: 1.35,
-                        duration: 250,
-                    });
-                }, 40);
-            } else {
-                selectEditorNode(result.id, {
-                    kind: "node",
-                    tab: null,
-                });
-
-                window.setTimeout(() => {
-                    fitView({
-                        nodes: [{ id: result.id }],
-                        padding: 0.8,
-                        maxZoom: 1.35,
-                        duration: 250,
-                    });
-                }, 0);
-            }
-
-            setIsFindOpen(false);
-        },
-        [
-            activeMode,
-            nodes,
-            manualSlots,
-            selectEditorNode,
-            fitView,
-            clearAllEdgeSelection,
-        ]
-    );
+    const {
+        isFindOpen,
+        setIsFindOpen,
+        findQuery,
+        setFindQuery,
+        findResultIndex,
+        setFindResultIndex,
+        findInputRef,
+        findPanelRef,
+        findResults,
+        focusFindResult,
+    } = useEditorFind({
+        activeMode,
+        setActiveMode,
+        semanticNodes,
+        slotNodes,
+        manualSlots,
+        nodes,
+        clearAllEdgeSelection,
+        checkSlotConnection,
+        selectEditorNode,
+        fitView,
+    });
 
     const {
         handleOpenDocument,
@@ -2358,219 +2179,33 @@ function AppContent() {
         syncRustDocument: rustWorkflowDocument.syncEditorState,
     });
 
-    // Global editor shortcuts that depend on actions declared above. Keep the
-    // listener stable while dragging; live editor state is read from a ref so
-    // node position updates do not remove/re-add a window listener every frame.
-    const globalShortcutStateRef = useRef(null);
-    globalShortcutStateRef.current = {
+    const {
+        isShortcutHelpOpen,
+        setIsShortcutHelpOpen,
+    } = useGlobalEditorShortcuts({
         activeMode,
+        setActiveMode,
         activeTabId,
         contextMenu,
+        setContextMenu,
         isDrawerOpen: drawerData.isOpen,
+        setDrawerData,
         isCreateSlotModalOpen,
+        setIsCreateSlotModalOpen,
         isFindOpen,
-        isShortcutHelpOpen,
+        setIsFindOpen,
         nodes,
         slotNodes,
         fitView,
         clearAllEdgeSelection,
+        clearEditorNodeSelection,
         handleAddNewTab,
         handleCloseTab,
         canGoFocusBack,
         canGoFocusForward,
         goFocusBack,
         goFocusForward,
-    };
-
-    useEffect(() => {
-        const isTypingTarget = (target) => {
-            if (!(target instanceof Element)) return false;
-
-            return Boolean(
-                target.closest(
-                    'input, textarea, select, [contenteditable="true"], .monaco-editor, .cm-editor'
-                )
-            );
-        };
-
-        const handleGlobalShortcut = (event) => {
-            const live = globalShortcutStateRef.current;
-            if (!live) return;
-
-            const {
-                activeMode: liveActiveMode,
-                activeTabId: liveActiveTabId,
-                contextMenu: liveContextMenu,
-                isDrawerOpen,
-                isCreateSlotModalOpen: liveCreateSlotModalOpen,
-                isFindOpen: liveFindOpen,
-                isShortcutHelpOpen: liveShortcutHelpOpen,
-                nodes: liveNodes,
-                slotNodes: liveSlotNodes,
-                fitView: liveFitView,
-                clearAllEdgeSelection: liveClearAllEdgeSelection,
-                handleAddNewTab: liveHandleAddNewTab,
-                handleCloseTab: liveHandleCloseTab,
-                canGoFocusBack: liveCanGoFocusBack,
-                canGoFocusForward: liveCanGoFocusForward,
-                goFocusBack: liveGoFocusBack,
-                goFocusForward: liveGoFocusForward,
-            } = live;
-
-            const clearGraphSelection = () => {
-                clearEditorNodeSelection();
-                liveClearAllEdgeSelection();
-            };
-
-            const key = String(event.key || "").toLowerCase();
-            const hasModifier = event.ctrlKey || event.metaKey;
-
-            if (
-                event.altKey &&
-                !hasModifier &&
-                !event.shiftKey &&
-                (key === "arrowleft" || key === "arrowright")
-            ) {
-                const canNavigate =
-                    key === "arrowleft"
-                        ? liveCanGoFocusBack
-                        : liveCanGoFocusForward;
-
-                event.preventDefault();
-                if (!canNavigate) return;
-
-                if (key === "arrowleft") {
-                    liveGoFocusBack();
-                } else {
-                    liveGoFocusForward();
-                }
-                return;
-            }
-
-            // Escape is useful even while focus is inside the search field.
-            if (key === "escape") {
-                if (liveFindOpen) {
-                    event.preventDefault();
-                    setIsFindOpen(false);
-                    return;
-                }
-
-                if (liveContextMenu) {
-                    event.preventDefault();
-                    setContextMenu(null);
-                    return;
-                }
-
-                if (isDrawerOpen) {
-                    event.preventDefault();
-                    setDrawerData((previous) => ({
-                        ...previous,
-                        isOpen: false,
-                    }));
-                    return;
-                }
-
-                if (liveCreateSlotModalOpen) {
-                    event.preventDefault();
-                    setIsCreateSlotModalOpen(false);
-                    return;
-                }
-
-                if (liveShortcutHelpOpen) {
-                    event.preventDefault();
-                    setIsShortcutHelpOpen(false);
-                    return;
-                }
-
-                if (!isTypingTarget(event.target) && liveActiveMode !== "code") {
-                    event.preventDefault();
-                    clearGraphSelection();
-                }
-                return;
-            }
-
-            if (hasModifier && !event.altKey) {
-                if (key === "n") {
-                    event.preventDefault();
-                    liveHandleAddNewTab();
-                    return;
-                }
-
-                if (key === "w") {
-                    event.preventDefault();
-                    liveHandleCloseTab(liveActiveTabId);
-                    return;
-                }
-
-                if (key === "1") {
-                    event.preventDefault();
-                    setActiveMode("event");
-                    return;
-                }
-
-                if (key === "2") {
-                    event.preventDefault();
-                    setActiveMode("slots");
-                    return;
-                }
-
-                if (key === "3") {
-                    event.preventDefault();
-                    setActiveMode("overview");
-                    return;
-                }
-
-                return;
-            }
-
-            if (isTypingTarget(event.target) || liveActiveMode === "code") return;
-            if (event.altKey || hasModifier || key !== "f") return;
-
-            event.preventDefault();
-
-            if (event.shiftKey) {
-                const selectedIds = [
-                    ...liveNodes
-                        .filter((node) => node.selected)
-                        .map((node) => node.id),
-                    ...(
-                        liveActiveMode === "slots" || liveActiveMode === "overview"
-                            ? liveSlotNodes
-                                .filter((node) => node.selected)
-                                .map((node) => node.id)
-                            : []
-                    ),
-                ];
-
-                if (selectedIds.length === 0) return;
-
-                liveFitView({
-                    nodes: selectedIds.map((id) => ({ id })),
-                    padding: 0.55,
-                    maxZoom: 1.3,
-                    duration: 250,
-                });
-                return;
-            }
-
-            liveFitView({
-                padding: 0.2,
-                duration: 250,
-            });
-        };
-
-        window.addEventListener("keydown", handleGlobalShortcut);
-        return () =>
-            window.removeEventListener("keydown", handleGlobalShortcut);
-    }, [
-        clearEditorNodeSelection,
-        setIsFindOpen,
-        setContextMenu,
-        setDrawerData,
-        setIsCreateSlotModalOpen,
-        setIsShortcutHelpOpen,
-        setActiveMode,
-    ]);
+    });
 
     return (
         <div className="container">
@@ -3702,161 +3337,10 @@ function AppContent() {
                 ?
             </button>
 
-            <div
-                className="nodrag nopan"
-                onMouseEnter={() => setIsShortcutHelpOpen(true)}
-                onMouseLeave={() => setIsShortcutHelpOpen(false)}
-                onFocusCapture={() => setIsShortcutHelpOpen(true)}
-                onBlurCapture={(event) => {
-                    if (!event.currentTarget.contains(event.relatedTarget)) {
-                        setIsShortcutHelpOpen(false);
-                    }
-                }}
-                style={{
-                    position: "fixed",
-                    right: 18,
-                    bottom: 18,
-                    zIndex: 5200,
-                }}
-            >
-                {isShortcutHelpOpen && (
-                    <div
-                        role="tooltip"
-                        style={{
-                            position: "absolute",
-                            right: 0,
-                            bottom: 44,
-                            width: 360,
-                            maxWidth: "calc(100vw - 36px)",
-                            maxHeight: "min(650px, calc(100vh - 90px))",
-                            overflowY: "auto",
-                            padding: 12,
-                            border: "1px solid #475569",
-                            borderRadius: 9,
-                            background: "#111827",
-                            color: "#e2e8f0",
-                            boxShadow: "0 14px 35px rgba(0, 0, 0, 0.38)",
-                            fontSize: 12,
-                            pointerEvents: "auto",
-                        }}
-                    >
-                        <div
-                            style={{
-                                marginBottom: 9,
-                                fontSize: 12,
-                                fontWeight: 700,
-                                color: "#f8fafc",
-                            }}
-                        >
-                            Keyboard shortcuts
-                        </div>
-
-                        {EDITOR_SHORTCUTS.map((shortcut) => (
-                            <div
-                                key={shortcut.keys}
-                                style={{
-                                    display: "grid",
-                                    gridTemplateColumns: "145px 1fr",
-                                    alignItems: "center",
-                                    gap: 10,
-                                    minHeight: 28,
-                                }}
-                            >
-                                <kbd
-                                    style={{
-                                        justifySelf: "start",
-                                        padding: "3px 6px",
-                                        border: "1px solid #475569",
-                                        borderBottomColor: "#64748b",
-                                        borderRadius: 5,
-                                        background: "#0f172a",
-                                        color: "#cbd5e1",
-                                        fontFamily: "inherit",
-                                        fontSize: 10,
-                                        whiteSpace: "nowrap",
-                                    }}
-                                >
-                                    {shortcut.keys}
-                                </kbd>
-                                <span style={{ color: "#cbd5e1" }}>
-                                    {shortcut.action}
-                                </span>
-                            </div>
-                        ))}
-
-                        <div
-                            style={{
-                                margin: "8px 0 5px",
-                                paddingTop: 8,
-                                borderTop: "1px solid #334155",
-                                color: "#94a3b8",
-                                fontSize: 10,
-                                fontWeight: 700,
-                                textTransform: "uppercase",
-                                letterSpacing: "0.04em",
-                            }}
-                        >
-                            In search
-                        </div>
-
-                        {FIND_SHORTCUTS.map((shortcut) => (
-                            <div
-                                key={shortcut.keys}
-                                style={{
-                                    display: "grid",
-                                    gridTemplateColumns: "145px 1fr",
-                                    alignItems: "center",
-                                    gap: 10,
-                                    minHeight: 26,
-                                }}
-                            >
-                                <kbd
-                                    style={{
-                                        justifySelf: "start",
-                                        padding: "3px 6px",
-                                        border: "1px solid #475569",
-                                        borderRadius: 5,
-                                        background: "#0f172a",
-                                        color: "#cbd5e1",
-                                        fontFamily: "inherit",
-                                        fontSize: 10,
-                                        whiteSpace: "nowrap",
-                                    }}
-                                >
-                                    {shortcut.keys}
-                                </kbd>
-                                <span style={{ color: "#cbd5e1" }}>
-                                    {shortcut.action}
-                                </span>
-                            </div>
-                        ))}
-                    </div>
-                )}
-
-                <button
-                    type="button"
-                    aria-label="Show keyboard shortcuts"
-                    aria-expanded={isShortcutHelpOpen}
-                    title="Keyboard shortcuts"
-                    style={{
-                        width: 34,
-                        height: 34,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        border: "1px solid #475569",
-                        borderRadius: 8,
-                        background: "#111827",
-                        color: "#cbd5e1",
-                        boxShadow: "0 6px 18px rgba(0, 0, 0, 0.28)",
-                        cursor: "help",
-                        fontSize: 18,
-                        lineHeight: 1,
-                    }}
-                >
-                    ⌨
-                </button>
-            </div>
+            <EditorShortcutHelp
+                isOpen={isShortcutHelpOpen}
+                setIsOpen={setIsShortcutHelpOpen}
+            />
 
             {tabPathTooltip &&
                 createPortal(
