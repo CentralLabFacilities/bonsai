@@ -945,6 +945,7 @@ function AppContent() {
         setSelectedNodeId,
         setRightPanelTab,
         updateNodeInternals,
+        syncRustDocument: rustWorkflowDocument.syncEditorState,
     });
 
 

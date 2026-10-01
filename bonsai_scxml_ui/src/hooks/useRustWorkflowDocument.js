@@ -89,6 +89,8 @@ export function useRustWorkflowDocument({
     const revisionRef = useRef(null);
     const readyRef = useRef(false);
     const queueRef = useRef(Promise.resolve());
+    const documentGenerationRef = useRef(0);
+    const activeQueueGenerationRef = useRef(0);
     const editorStateRef = useRef(null);
 
     editorStateRef.current = {
@@ -98,10 +100,13 @@ export function useRustWorkflowDocument({
         manualSlots,
     };
 
-    const enqueue = useCallback((operation) => {
+    const enqueue = useCallback((operation, generation = documentGenerationRef.current) => {
         const next = queueRef.current
             .catch(() => undefined)
-            .then(operation);
+            .then(() => {
+                activeQueueGenerationRef.current = generation;
+                return operation();
+            });
         queueRef.current = next.catch(() => undefined);
         return next;
     }, []);
@@ -223,7 +228,12 @@ export function useRustWorkflowDocument({
                     revisionRef.current
                 );
                 revisionRef.current = result?.revision ?? revisionRef.current;
-                applyCanonicalPatch(result, command);
+                if (
+                    activeQueueGenerationRef.current ===
+                    documentGenerationRef.current
+                ) {
+                    applyCanonicalPatch(result, command);
+                }
                 return result;
             } catch (error) {
                 return resyncFromEditor(error);
@@ -261,11 +271,22 @@ export function useRustWorkflowDocument({
     );
 
     const syncEditorState = useCallback(
-        (editorState = null) =>
-            enqueue(async () => {
+        (editorState = null) => {
+            // A full document replacement establishes a new semantic document
+            // generation. Commands that were queued for the previous document
+            // may still complete in Rust, but their canonical patches must not
+            // be projected into the newer React document. This also makes tab
+            // switches, file loads and history restoration safe while IPC work
+            // from the previous editor state is still draining.
+            const generation = documentGenerationRef.current + 1;
+            documentGenerationRef.current = generation;
+            const snapshot = editorState || editorStateRef.current;
+
+            return enqueue(async () => {
                 if (!isTauri()) return null;
-                return replaceNow(editorState || editorStateRef.current, null);
-            }),
+                return replaceNow(snapshot, null);
+            }, generation);
+        },
         [enqueue, replaceNow]
     );
 
@@ -579,6 +600,7 @@ export function useRustWorkflowDocument({
     );
 
     const invalidate = useCallback(() => {
+        documentGenerationRef.current += 1;
         readyRef.current = false;
         revisionRef.current = null;
     }, []);

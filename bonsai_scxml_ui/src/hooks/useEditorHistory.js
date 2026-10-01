@@ -116,6 +116,7 @@ export function useEditorHistory({
     setSelectedNodeId,
     setRightPanelTab,
     updateNodeInternals,
+    syncRustDocument,
 }) {
     const historyRef = useRef([]);
     const historyIndexRef = useRef(-1);
@@ -375,14 +376,43 @@ export function useEditorHistory({
             )
         );
 
+        const restoredEdges = cloneGraphValue(snapshot.edges || []).map((edge) => ({
+            ...edge,
+            selected: false,
+        }));
+        const restoredSlotNodes = cloneGraphValue(snapshot.slotNodes || []).map((node) => ({
+            ...node,
+            selected: false,
+        }));
+        const restoredSlotEdges = cloneGraphValue(snapshot.slotEdges || []).map((edge) => ({
+            ...edge,
+            selected: false,
+        }));
+        const restoredManualSlots = cloneGraphValue(snapshot.manualSlots || []);
+        const restoredGlobalDataModel = cloneGraphValue(snapshot.globalDataModel || []);
+
         setNodes(restoredNodes);
-        setEdges(cloneGraphValue(snapshot.edges || []).map((edge) => ({ ...edge, selected: false })));
-        setSlotNodes(cloneGraphValue(snapshot.slotNodes || []).map((node) => ({ ...node, selected: false })));
-        setSlotEdges(cloneGraphValue(snapshot.slotEdges || []).map((edge) => ({ ...edge, selected: false })));
-        setManualSlots(cloneGraphValue(snapshot.manualSlots || []));
-        setGlobalDataModel(cloneGraphValue(snapshot.globalDataModel || []));
+        setEdges(restoredEdges);
+        setSlotNodes(restoredSlotNodes);
+        setSlotEdges(restoredSlotEdges);
+        setManualSlots(restoredManualSlots);
+        setGlobalDataModel(restoredGlobalDataModel);
         setSelectedNodeId(null);
         setRightPanelTab("datamodel");
+
+        // Undo/redo restores the complete editor document atomically. Mirror
+        // that exact snapshot into the Rust-owned semantic document instead of
+        // leaving Rust at the revision that existed before the history jump.
+        // Passing the restored values explicitly also avoids depending on a
+        // later React render to refresh the bridge refs.
+        void syncRustDocument?.({
+            nodes: restoredNodes,
+            edges: restoredEdges,
+            manualSlots: restoredManualSlots,
+            globalDataModel: restoredGlobalDataModel,
+        }).catch((error) => {
+            console.warn("Failed to synchronize Rust document after history restore.", error);
+        });
 
         requestAnimationFrame(() => {
             restoredNodes.forEach((node) => updateNodeInternals(node.id));
@@ -397,6 +427,7 @@ export function useEditorHistory({
         setSelectedNodeId,
         setRightPanelTab,
         updateNodeInternals,
+        syncRustDocument,
     ]);
 
     const flushPendingHistorySnapshot = useCallback(() => {
