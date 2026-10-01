@@ -1,6 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::core::editor_export::{build_workflow_from_editor, EditorExportRequestDto};
+use crate::core::editor_export::{
+    build_inserted_state, build_workflow_from_editor, EditorExportRequestDto,
+};
 use crate::core::editor_export::types::{
     EditorExportEdgeDto, EditorExportNodeDto, EditorExportSlotDeclarationDto, EditorExportSlotDto,
 };
@@ -47,6 +49,9 @@ pub(crate) fn apply_command(
             full_skill_name,
         ),
         WorkflowCommandDto::AddState { state } => add_state(workflow, index, state),
+        WorkflowCommandDto::InsertEditorStates { nodes } => {
+            insert_editor_states(workflow, nodes)
+        }
         WorkflowCommandDto::RemoveStates { state_ids } => {
             remove_states(workflow, index, state_ids)
         }
@@ -638,6 +643,93 @@ fn rename_state(
         index_changed: true,
         ..WorkflowCommandChanges::default()
     })
+}
+
+fn merge_command_changes(
+    target: &mut WorkflowCommandChanges,
+    source: WorkflowCommandChanges,
+) {
+    target.changed_state_ids.extend(source.changed_state_ids);
+    target
+        .changed_transition_ids
+        .extend(source.changed_transition_ids);
+    target.data_model_changed |= source.data_model_changed;
+    target.slot_declarations_changed |= source.slot_declarations_changed;
+    target.index_changed |= source.index_changed;
+}
+
+fn insert_editor_states(
+    workflow: &mut Workflow,
+    nodes: Vec<EditorExportNodeDto>,
+) -> Result<WorkflowCommandChanges, String> {
+    if nodes.is_empty() {
+        return Ok(WorkflowCommandChanges::default());
+    }
+
+    let mut pending = nodes;
+    let mut changes = WorkflowCommandChanges::default();
+
+    while !pending.is_empty() {
+        let existing_ids = workflow
+            .states
+            .iter()
+            .map(|state| state.id.as_str().to_string())
+            .collect::<HashSet<_>>();
+        let pending_ids = pending
+            .iter()
+            .map(|node| node.id.clone())
+            .collect::<HashSet<_>>();
+
+        let next_index = pending.iter().position(|node| match node.parent_id.as_deref() {
+            None => true,
+            Some(parent_id) => existing_ids.contains(parent_id),
+        });
+
+        let Some(next_index) = next_index else {
+            let unresolved = pending
+                .iter()
+                .map(|node| {
+                    let parent = node.parent_id.as_deref().unwrap_or("<root>");
+                    format!("{} -> {}", node.id, parent)
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            let unknown_parents = pending
+                .iter()
+                .filter_map(|node| node.parent_id.as_deref())
+                .filter(|parent_id| {
+                    !existing_ids.contains(*parent_id) && !pending_ids.contains(*parent_id)
+                })
+                .map(str::to_string)
+                .collect::<Vec<_>>();
+
+            return if unknown_parents.is_empty() {
+                Err(format!(
+                    "Inserted editor states contain a parent cycle or invalid ordering: {unresolved}"
+                ))
+            } else {
+                Err(format!(
+                    "Inserted editor states reference unknown parent(s): {}",
+                    unknown_parents.join(", ")
+                ))
+            };
+        };
+
+        let node = pending.remove(next_index);
+        if node.node_type == "parallelLane" && node.parent_id.is_none() {
+            return Err(format!(
+                "Parallel lane '{}' must have a Parallel parent",
+                node.id
+            ));
+        }
+
+        let dynamic_index = WorkflowIndex::new(workflow);
+        let delta = add_state(workflow, &dynamic_index, build_inserted_state(&node))?;
+        merge_command_changes(&mut changes, delta);
+    }
+
+    changes.index_changed = true;
+    Ok(changes)
 }
 
 fn add_state(

@@ -119,6 +119,10 @@ pub(crate) enum WorkflowCommandDto {
     AddState {
         state: StateDto,
     },
+    InsertEditorStates {
+        #[serde(default)]
+        nodes: Vec<EditorExportNodeDto>,
+    },
     RemoveStates {
         #[serde(default)]
         #[serde(rename = "stateIds")]

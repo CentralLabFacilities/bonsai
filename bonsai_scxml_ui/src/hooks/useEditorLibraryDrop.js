@@ -30,6 +30,7 @@ export function useEditorLibraryDrop({
     setNodes,
     setSelectedNodeId,
     syncEditorStructureAfterCommit,
+    syncInsertedEditorStatesAfterCommit,
 }) {
     const handleLibraryDragOver = useCallback(
         (event) => {
@@ -212,7 +213,7 @@ export function useEditorLibraryDrop({
 
                 setSelectedNodeId(newNode.id);
                 refreshBehaviorSlots();
-                void syncEditorStructureAfterCommit();
+                void syncInsertedEditorStatesAfterCommit?.(newNode.id);
                 return;
             }
 
@@ -402,7 +403,7 @@ export function useEditorLibraryDrop({
             );
             setSelectedNodeId(newNode.id);
             refreshBehaviorSlots();
-            void syncEditorStructureAfterCommit();
+            void syncInsertedEditorStatesAfterCommit?.(newNode.id);
         },
         [
             activeMode,
@@ -417,6 +418,7 @@ export function useEditorLibraryDrop({
             setParallelDropTargetId,
             setSelectedNodeId,
             syncEditorStructureAfterCommit,
+            syncInsertedEditorStatesAfterCommit,
         ]
     );
 

@@ -288,6 +288,73 @@ mod tests {
         assert!(error.contains("revision conflict"));
     }
     #[test]
+    fn inserting_editor_states_builds_semantic_states_incrementally() {
+        let store = WorkflowDocumentStore::default();
+        assert_eq!(store.replace(Workflow::default()).unwrap(), 1);
+
+        let parallel = EditorExportNodeDto {
+            id: "parallel".into(),
+            node_type: "parallel".into(),
+            label: "parallel_1".into(),
+            full_skill_name: "parallel_1".into(),
+            is_initial: true,
+            x: 100.0,
+            y: 200.0,
+            ..EditorExportNodeDto::default()
+        };
+        let lane_1 = EditorExportNodeDto {
+            id: "lane-1".into(),
+            node_type: "parallelLane".into(),
+            parent_id: Some("parallel".into()),
+            label: "Lane_1".into(),
+            full_skill_name: "Lane_1".into(),
+            ..EditorExportNodeDto::default()
+        };
+        let lane_2 = EditorExportNodeDto {
+            id: "lane-2".into(),
+            node_type: "parallelLane".into(),
+            parent_id: Some("parallel".into()),
+            label: "Lane_2".into(),
+            full_skill_name: "Lane_2".into(),
+            ..EditorExportNodeDto::default()
+        };
+
+        // Children deliberately precede their parent: the command must resolve
+        // the insertion order itself instead of relying on React Flow ordering.
+        let result = store
+            .apply(
+                Some(1),
+                WorkflowCommandDto::InsertEditorStates {
+                    nodes: vec![lane_1, lane_2, parallel],
+                },
+            )
+            .unwrap();
+        assert_eq!(result.revision, 2);
+
+        let snapshot = store.snapshot().unwrap().unwrap();
+        assert_eq!(snapshot.workflow.initial_state_id.as_deref(), Some("parallel"));
+        assert_eq!(snapshot.workflow.states.len(), 3);
+        for lane_id in ["lane-1", "lane-2"] {
+            let lane = snapshot
+                .workflow
+                .states
+                .iter()
+                .find(|state| state.id == lane_id)
+                .unwrap();
+            assert_eq!(lane.parent_id.as_deref(), Some("parallel"));
+        }
+
+        let parallel = snapshot
+            .workflow
+            .states
+            .iter()
+            .find(|state| state.id == "parallel")
+            .unwrap();
+        assert_eq!(parallel.editor.x, 100.0);
+        assert_eq!(parallel.editor.y, 200.0);
+    }
+
+    #[test]
     fn replacing_targeted_transitions_preserves_targetless_behavior_exits() {
         let store = WorkflowDocumentStore::default();
         let mut workflow = sample_workflow();

@@ -30,6 +30,7 @@ export function useContainerCreation({
     setContextMenu,
     updateNodeInternals,
     syncEditorStructureAfterCommit,
+    syncInsertedEditorStatesAfterCommit,
 }) {
     const selectedNodesCacheRef = useRef([]);
     const selectionNodesDependency = isDraggingNode ? null : nodes;
@@ -60,6 +61,7 @@ export function useContainerCreation({
     }, [selectionNodesDependency]);
 
     const handleAddLaneToParallel = useCallback((parallelId) => {
+        const newLaneId = getNodeId();
         setNodes((nds) => {
             const parallelNode = nds.find((n) => n.id === parallelId);
             if (!parallelNode) return nds;
@@ -77,7 +79,6 @@ export function useContainerCreation({
             const headerHeight = PARALLEL_HEADER_HEIGHT;
             const buttonReserve = PARALLEL_BOTTOM_PADDING;
 
-            const newLaneId = getNodeId();
             const newLaneName = `Lane_${laneIndex + 1}`;
             const containerWidth =
                 Number(parallelNode.style?.width) || 420;
@@ -151,8 +152,8 @@ export function useContainerCreation({
 
             return [...updatedNodes, newLaneNode];
         });
-        void syncEditorStructureAfterCommit?.();
-    }, [setNodes, syncEditorStructureAfterCommit]);
+        void syncInsertedEditorStatesAfterCommit?.(newLaneId);
+    }, [setNodes, syncInsertedEditorStatesAfterCommit]);
 
     const handleCreateEmptyCompound = (pos) => {
         const compoundId = getNodeId();
@@ -180,7 +181,7 @@ export function useContainerCreation({
         setSelectedNodeId(compoundId); // <-- Details-Panel direkt öffnen
         setActiveTab("allgemein");
         setContextMenu(null);
-        void syncEditorStructureAfterCommit?.();
+        void syncInsertedEditorStatesAfterCommit?.(compoundId);
     };
 
     const handleCreateEmptyParallel = (pos) => {
@@ -206,8 +207,11 @@ export function useContainerCreation({
             },
         };
 
+        const lane1Id = getNodeId();
+        const lane2Id = getNodeId();
+
         const lane1 = {
-            id: getNodeId(),
+            id: lane1Id,
             position: { x: 0, y: headerHeight },
             parentId: parallelId,
             extent: "parent",
@@ -219,7 +223,7 @@ export function useContainerCreation({
         };
 
         const lane2 = {
-            id: getNodeId(),
+            id: lane2Id,
             position: { x: 0, y: headerHeight + laneHeight },
             parentId: parallelId,
             extent: "parent",
@@ -239,7 +243,11 @@ export function useContainerCreation({
         setSelectedNodeId(parallelId);
         setActiveTab("allgemein");
         setContextMenu(null);
-        void syncEditorStructureAfterCommit?.();
+        void syncInsertedEditorStatesAfterCommit?.([
+            parallelId,
+            lane1Id,
+            lane2Id,
+        ]);
     };
 
     const getSelectionBoundingBox = (selectedList) => {

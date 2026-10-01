@@ -6,6 +6,7 @@ import {
 } from "../tauri-client";
 import {
     buildRustEditorExportRequest,
+    buildRustEditorNodeSnapshots,
     buildRustEditorStructureSnapshot,
     buildRustSlotsSnapshot,
     buildRustStateEditorPositions,
@@ -59,6 +60,8 @@ const getCanonicalPatchPolicy = (command) => {
             return { stateMode: "none", applyTransitions: true };
         case "removeStates":
             return { stateMode: "none", applyTransitions: false };
+        case "insertEditorStates":
+            return { stateMode: "initial", applyTransitions: false };
         case "addState":
         case "replaceEditorStructure":
             return { stateMode: "all", applyTransitions: true };
@@ -298,6 +301,43 @@ export function useRustWorkflowDocument({
                 return syncEditorStructureNow(editorStateRef.current);
             }),
         [enqueue, syncEditorStructureNow]
+    );
+
+    const syncInsertedEditorStatesAfterCommit = useCallback(
+        (stateIds) =>
+            enqueue(async () => {
+                if (!isTauri()) return null;
+
+                const requestedIds = Array.from(
+                    new Set(
+                        (Array.isArray(stateIds) ? stateIds : [stateIds])
+                            .map((id) => String(id || "").trim())
+                            .filter(Boolean)
+                    )
+                );
+                if (requestedIds.length === 0) return null;
+
+                await waitForEditorCommit();
+                const editorState = editorStateRef.current || {};
+                const insertedNodes = buildRustEditorNodeSnapshots({
+                    ...editorState,
+                    stateIds: requestedIds,
+                });
+
+                // If normalization removed one of the requested nodes (for
+                // example an imported atomic Parallel lane), the insertion is
+                // not an isolated semantic add. Fall back to the full structural
+                // exporter, which owns lane flattening/promotion semantics.
+                if (insertedNodes.length !== requestedIds.length) {
+                    return syncEditorStructureNow(editorState);
+                }
+
+                return applyCommandNow({
+                    type: "insertEditorStates",
+                    nodes: insertedNodes,
+                });
+            }),
+        [applyCommandNow, enqueue, syncEditorStructureNow]
     );
 
     const syncStateEditorPositions = useCallback(
@@ -609,6 +649,7 @@ export function useRustWorkflowDocument({
         applyWorkflowCommand,
         syncEditorState,
         syncEditorStructureAfterCommit,
+        syncInsertedEditorStatesAfterCommit,
         syncStateEditorPositions,
         syncStatePosition,
         syncStateParameters,

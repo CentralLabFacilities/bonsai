@@ -229,6 +229,25 @@ export const buildRustSlotsSnapshot = ({
     };
 };
 
+export const buildRustEditorNodeSnapshots = ({
+    nodes = [],
+    edges = [],
+    stateIds = [],
+} = {}) => {
+    const requestedIds = (Array.isArray(stateIds) ? stateIds : [stateIds])
+        .map((id) => String(id || "").trim())
+        .filter(Boolean);
+    if (requestedIds.length === 0) return [];
+
+    const exportGraph = prepareGraphForScxml(nodes || [], edges || []);
+    const byId = new Map(exportGraph.nodes.map((node) => [node.id, node]));
+
+    return requestedIds
+        .map((stateId) => byId.get(stateId))
+        .filter(Boolean)
+        .map(normalizeNode);
+};
+
 export const buildRustEditorStructureSnapshot = ({
     nodes = [],
     edges = [],

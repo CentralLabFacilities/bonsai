@@ -552,6 +552,8 @@ function AppContent() {
         updateNodeInternals,
         syncEditorStructureAfterCommit:
             rustWorkflowDocument.syncEditorStructureAfterCommit,
+        syncInsertedEditorStatesAfterCommit:
+            rustWorkflowDocument.syncInsertedEditorStatesAfterCommit,
     });
 
     const {
@@ -1246,6 +1248,8 @@ function AppContent() {
         setSelectedNodeId,
         syncEditorStructureAfterCommit:
             rustWorkflowDocument.syncEditorStructureAfterCommit,
+        syncInsertedEditorStatesAfterCommit:
+            rustWorkflowDocument.syncInsertedEditorStatesAfterCommit,
     });
 
     const {
