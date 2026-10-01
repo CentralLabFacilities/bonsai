@@ -597,8 +597,6 @@ function AppContent() {
         checkSlotConnection,
         updateNodeInternals,
         applyWorkflowCommand: rustWorkflowDocument.applyWorkflowCommand,
-        syncEditorStateAfterCommit:
-            rustWorkflowDocument.syncEditorStateAfterCommit,
         syncEditorStructureAfterCommit:
             rustWorkflowDocument.syncEditorStructureAfterCommit,
         syncStateEditorPositions:
@@ -723,8 +721,8 @@ function AppContent() {
         syncStateEditorPositions:
             rustWorkflowDocument.syncStateEditorPositions,
         syncRemovedStates: rustWorkflowDocument.syncRemovedStates,
-        syncEditorStateAfterCommit:
-            rustWorkflowDocument.syncEditorStateAfterCommit,
+        syncEditorStructureAfterCommit:
+            rustWorkflowDocument.syncEditorStructureAfterCommit,
     });
 
     const semanticNodes = useEditorGraphMaintenance({
@@ -2938,22 +2936,20 @@ function AppContent() {
                             !node.data?.isSkillClone &&
                             !node.data?.isStateClone
                     );
-                    const forceFullSemanticSync = removedSemanticNodes.some(
+                    const refreshSlots = removedSemanticNodes.some(
                         (node) =>
                             (node.data?.inSlots || []).some((slot) => slot?.path) ||
                             (node.data?.outSlots || []).some((slot) => slot?.path)
                     );
-                    const forceStructureSync =
-                        !forceFullSemanticSync &&
-                        removedSemanticNodes.some(
-                            (node) =>
-                                node.type === "parallelLane" ||
-                                node.data?.autoParallelLaneCompound
-                        );
+                    const forceStructureSync = removedSemanticNodes.some(
+                        (node) =>
+                            node.type === "parallelLane" ||
+                            node.data?.autoParallelLaneCompound
+                    );
                     void rustWorkflowDocument.syncRemovedStates(
                         [...semanticRemovalIds],
                         {
-                            forceFull: forceFullSemanticSync,
+                            refreshSlots,
                             forceStructure: forceStructureSync,
                             referenceStateIds,
                             referenceSourceIds,

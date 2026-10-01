@@ -269,16 +269,6 @@ export function useRustWorkflowDocument({
         [enqueue, replaceNow]
     );
 
-    const syncEditorStateAfterCommit = useCallback(
-        () =>
-            enqueue(async () => {
-                if (!isTauri()) return null;
-                await waitForEditorCommit();
-                return replaceNow(editorStateRef.current, null);
-            }),
-        [enqueue, replaceNow]
-    );
-
     const syncEditorStructureAfterCommit = useCallback(
         () =>
             enqueue(async () => {
@@ -436,7 +426,7 @@ export function useRustWorkflowDocument({
         (
             stateIds,
             {
-                forceFull = false,
+                refreshSlots = false,
                 forceStructure = false,
                 referenceStateIds = [],
                 referenceSourceIds = [],
@@ -455,15 +445,6 @@ export function useRustWorkflowDocument({
                     return null;
                 }
 
-                if (forceFull) {
-                    await waitForEditorCommit();
-                    return replaceNow(editorStateRef.current, null);
-                }
-                if (forceStructure) {
-                    await waitForEditorCommit();
-                    return syncEditorStructureNow(editorStateRef.current);
-                }
-
                 const referenceIds = new Set(
                     (Array.isArray(referenceStateIds)
                         ? referenceStateIds
@@ -475,11 +456,37 @@ export function useRustWorkflowDocument({
                 const semanticIds = ids.filter((id) => !referenceIds.has(id));
 
                 let result = null;
-                if (semanticIds.length > 0) {
+                let committedEditorState = null;
+                const getCommittedEditorState = async () => {
+                    if (!committedEditorState) {
+                        await waitForEditorCommit();
+                        committedEditorState = editorStateRef.current || {};
+                    }
+                    return committedEditorState;
+                };
+
+                if (forceStructure) {
+                    const editorState = await getCommittedEditorState();
+                    result = await syncEditorStructureNow(editorState);
+                } else if (semanticIds.length > 0) {
                     result = await applyCommandNow({
                         type: "removeStates",
                         stateIds: semanticIds,
                     });
+                }
+
+                if (refreshSlots) {
+                    const editorState = await getCommittedEditorState();
+                    result = await applyCommandNow({
+                        type: "replaceSlotsSnapshot",
+                        ...buildRustSlotsSnapshot(editorState),
+                    });
+                }
+
+                // A structure refresh already rebuilds canonical reference
+                // positions from the committed editor graph.
+                if (forceStructure) {
+                    return result;
                 }
 
                 const sourceIds = Array.from(
@@ -497,8 +504,7 @@ export function useRustWorkflowDocument({
                 );
                 if (sourceIds.length === 0) return result;
 
-                await waitForEditorCommit();
-                const editorState = editorStateRef.current || {};
+                const editorState = await getCommittedEditorState();
                 for (const sourceStateId of sourceIds) {
                     const positions = buildRustStateEditorPositions({
                         ...editorState,
@@ -513,7 +519,7 @@ export function useRustWorkflowDocument({
                 }
                 return result;
             }),
-        [applyCommandNow, enqueue, replaceNow, syncEditorStructureNow]
+        [applyCommandNow, enqueue, syncEditorStructureNow]
     );
 
     const applyWorkflowCommand = useCallback(
@@ -580,7 +586,6 @@ export function useRustWorkflowDocument({
     return {
         applyWorkflowCommand,
         syncEditorState,
-        syncEditorStateAfterCommit,
         syncEditorStructureAfterCommit,
         syncStateEditorPositions,
         syncStatePosition,

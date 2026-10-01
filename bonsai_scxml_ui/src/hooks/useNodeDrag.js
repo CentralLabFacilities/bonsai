@@ -46,7 +46,7 @@ export function useNodeDrag({
     syncStatePosition,
     syncStateEditorPositions,
     syncRemovedStates,
-    syncEditorStateAfterCommit,
+    syncEditorStructureAfterCommit,
 }) {
     const [parallelDropTargetId, setParallelDropTargetId] = useState(null);
     const [compoundDropTargetId, setCompoundDropTargetId] = useState(null);
@@ -427,18 +427,16 @@ export function useNodeDrag({
                     !candidate.data?.isSkillClone &&
                     !candidate.data?.isStateClone
             );
-            const forceFullSemanticSync = removedSemanticNodes.some(
+            const refreshSlots = removedSemanticNodes.some(
                 (candidate) =>
                     (candidate.data?.inSlots || []).some((slot) => slot?.path) ||
                     (candidate.data?.outSlots || []).some((slot) => slot?.path)
             );
-            const forceStructureSync =
-                !forceFullSemanticSync &&
-                removedSemanticNodes.some(
-                    (candidate) =>
-                        candidate.type === "parallelLane" ||
-                        candidate.data?.autoParallelLaneCompound
-                );
+            const forceStructureSync = removedSemanticNodes.some(
+                (candidate) =>
+                    candidate.type === "parallelLane" ||
+                    candidate.data?.autoParallelLaneCompound
+            );
 
             setNodes((allNodes) =>
                 allNodes
@@ -502,7 +500,7 @@ export function useNodeDrag({
             );
 
             void syncRemovedStates?.([...idsToDelete], {
-                forceFull: forceFullSemanticSync,
+                refreshSlots,
                 forceStructure: forceStructureSync,
                 referenceStateIds,
                 referenceSourceIds,
@@ -607,7 +605,7 @@ export function useNodeDrag({
             if (referenceSourceId) {
                 void syncStateEditorPositions?.(referenceSourceId);
             } else {
-                void syncEditorStateAfterCommit?.();
+                void syncEditorStructureAfterCommit?.();
             }
             setDraggingNodeId(null);
             setIsDraggingNode(false);
@@ -1720,7 +1718,7 @@ export function useNodeDrag({
         syncStatePosition,
         syncStateEditorPositions,
         syncRemovedStates,
-        syncEditorStateAfterCommit,
+        syncEditorStructureAfterCommit,
     ]);
 
     return {
