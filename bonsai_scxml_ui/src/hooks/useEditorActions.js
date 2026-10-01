@@ -18,6 +18,7 @@ export function useEditorActions(options) {
         setRightPanelTab: options.setRightPanelTab,
         setActiveTab: options.setActiveTab,
         applyWorkflowCommand: options.applyWorkflowCommand,
+        syncEditorStateAfterCommit: options.syncEditorStateAfterCommit,
     });
 
     const slotActions = useEditorSlotActions({
@@ -37,6 +38,7 @@ export function useEditorActions(options) {
         setEdges: options.setEdges,
         checkSlotConnection: options.checkSlotConnection,
         applyWorkflowCommand: options.applyWorkflowCommand,
+        syncEditorStateAfterCommit: options.syncEditorStateAfterCommit,
     });
 
     const dataModelActions = useEditorDataModelActions({

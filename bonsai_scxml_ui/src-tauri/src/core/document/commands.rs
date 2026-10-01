@@ -1,7 +1,8 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::core::model::{
-    Assignment, DataModelEntry, StateId, Transition, TransitionId, Workflow, WorkflowIndex,
+    Assignment, DataModelEntry, EditorPosition, State, StateId, Transition, TransitionId, Workflow,
+    WorkflowIndex,
 };
 
 use super::types::{TargetedTransitionCommandDto, WorkflowCommandDto};
@@ -31,7 +32,22 @@ pub(crate) fn apply_command(
             state_id,
             scxml_id,
             label,
-        } => rename_state(workflow, index, state_id, scxml_id, label),
+            full_skill_name,
+        } => rename_state(
+            workflow,
+            index,
+            state_id,
+            scxml_id,
+            label,
+            full_skill_name,
+        ),
+        WorkflowCommandDto::AddState { state } => add_state(workflow, index, state),
+        WorkflowCommandDto::RemoveStates { state_ids } => {
+            remove_states(workflow, index, state_ids)
+        }
+        WorkflowCommandDto::UpdateStateEditorPosition { state_id, x, y } => {
+            update_state_editor_position(workflow, index, state_id, x, y)
+        }
         WorkflowCommandDto::SetStateLabel { state_id, label } => {
             set_state_label(workflow, index, state_id, label)
         }
@@ -169,6 +185,7 @@ fn rename_state(
     state_id: String,
     scxml_id: String,
     label: Option<String>,
+    full_skill_name: Option<String>,
 ) -> Result<WorkflowCommandChanges, String> {
     let id = StateId::from(state_id);
     let position = index
@@ -179,9 +196,14 @@ fn rename_state(
         return Err("SCXML state id must not be empty".to_string());
     }
 
+    let previous_scxml_id = workflow.states[position].scxml_id.clone();
     workflow.states[position].scxml_id = normalized_scxml_id.to_string();
     if let Some(label) = label {
         workflow.states[position].label = label;
+    }
+    if let Some(full_skill_name) = full_skill_name {
+        workflow.states[position].full_skill_name =
+            (!full_skill_name.trim().is_empty()).then_some(full_skill_name);
     }
 
     if workflow.initial_state_id.as_ref() == Some(&id) {
@@ -192,12 +214,63 @@ fn rename_state(
         if parent.initial_child_id.as_ref() == Some(&id) {
             parent.initial_child_scxml_id = Some(normalized_scxml_id.to_string());
         }
+        for route in parent.editor.edge_targets.iter_mut() {
+            if route.target_scxml_id == previous_scxml_id {
+                route.target_scxml_id = normalized_scxml_id.to_string();
+            }
+            let previous_route_prefix = format!("{}.", previous_scxml_id.trim());
+            if !previous_scxml_id.is_empty() && route.event.starts_with(&previous_route_prefix) {
+                route.event = format!(
+                    "{}.{}",
+                    normalized_scxml_id,
+                    &route.event[previous_route_prefix.len()..]
+                );
+            }
+        }
+    }
+
+    for slot in workflow.slot_declarations.iter_mut() {
+        if slot.state == previous_scxml_id {
+            slot.state = normalized_scxml_id.to_string();
+        }
+    }
+
+    let previous_event_prefix = format!("{}.", previous_scxml_id.trim());
+    let next_event_prefix = format!("{}.", normalized_scxml_id);
+    let mut source_ancestors = HashSet::new();
+    let mut current_parent = index.parent_of(workflow, &id);
+    while let Some(parent_id) = current_parent {
+        if !source_ancestors.insert(parent_id.clone()) {
+            break;
+        }
+        current_parent = index.parent_of(workflow, parent_id);
     }
 
     let mut changed_transitions = Vec::new();
     for transition in workflow.transitions.iter_mut() {
+        let mut changed = false;
         if transition.target_state_id.as_ref() == Some(&id) {
             transition.target_scxml_id = normalized_scxml_id.to_string();
+            changed = true;
+        }
+
+        // Compound/Parallel boundary transitions are stored on the container,
+        // but their event keeps the originating child identity (Child.event).
+        // Keep that identity aligned when the child state is renamed.
+        if !previous_scxml_id.is_empty()
+            && transition.event.starts_with(&previous_event_prefix)
+            && (transition.source_state_id == id
+                || source_ancestors.contains(&transition.source_state_id))
+        {
+            transition.event = format!(
+                "{}{}",
+                next_event_prefix,
+                &transition.event[previous_event_prefix.len()..]
+            );
+            changed = true;
+        }
+
+        if changed {
             changed_transitions.push(transition.id.as_str().to_string());
         }
     }
@@ -206,6 +279,307 @@ fn rename_state(
         changed_state_ids: vec![id.as_str().to_string()],
         changed_transition_ids: changed_transitions,
         index_changed: true,
+        ..WorkflowCommandChanges::default()
+    })
+}
+
+fn add_state(
+    workflow: &mut Workflow,
+    index: &WorkflowIndex,
+    state_dto: crate::core::model::StateDto,
+) -> Result<WorkflowCommandChanges, String> {
+    let state = State::from_dto(state_dto);
+    if state.id.as_str().trim().is_empty() {
+        return Err("State id must not be empty".to_string());
+    }
+    if state.scxml_id.trim().is_empty() {
+        return Err("SCXML state id must not be empty".to_string());
+    }
+    if index.state_position(&state.id).is_some() {
+        return Err(format!("State '{}' already exists", state.id));
+    }
+
+    if let Some(parent_id) = state.parent_id.as_ref() {
+        index
+            .state(workflow, parent_id)
+            .ok_or_else(|| format!("Unknown parent state '{parent_id}'"))?;
+    }
+
+    let new_id = state.id.clone();
+    let new_scxml_id = state.scxml_id.clone();
+    let parent_id = state.parent_id.clone();
+    let make_initial = state.is_initial;
+    workflow.states.push(state);
+
+    let mut changed = vec![new_id.as_str().to_string()];
+    if make_initial {
+        if let Some(parent_id) = parent_id.as_ref() {
+            if let Some(parent_position) = index.state_position(parent_id) {
+                workflow.states[parent_position].initial_child_id = Some(new_id.clone());
+                workflow.states[parent_position].initial_child_scxml_id =
+                    Some(new_scxml_id.clone());
+                changed.push(parent_id.as_str().to_string());
+            }
+            for sibling in workflow
+                .states
+                .iter_mut()
+                .filter(|candidate| candidate.parent_id.as_ref() == Some(parent_id))
+            {
+                sibling.is_initial = sibling.id == new_id;
+                changed.push(sibling.id.as_str().to_string());
+            }
+        } else {
+            workflow.initial_state_id = Some(new_id.clone());
+            workflow.initial_scxml_state_id = Some(new_scxml_id);
+            for root in workflow.states.iter_mut().filter(|candidate| candidate.parent_id.is_none()) {
+                root.is_initial = root.id == new_id;
+                changed.push(root.id.as_str().to_string());
+            }
+        }
+    }
+
+    changed.sort();
+    changed.dedup();
+    Ok(WorkflowCommandChanges {
+        changed_state_ids: changed,
+        index_changed: true,
+        ..WorkflowCommandChanges::default()
+    })
+}
+
+fn remove_states(
+    workflow: &mut Workflow,
+    index: &WorkflowIndex,
+    state_ids: Vec<String>,
+) -> Result<WorkflowCommandChanges, String> {
+    let requested = state_ids
+        .into_iter()
+        .map(StateId::from)
+        .filter(|id| index.state_position(id).is_some())
+        .collect::<HashSet<_>>();
+    if requested.is_empty() {
+        return Ok(WorkflowCommandChanges::default());
+    }
+
+    let mut removed = requested;
+    let mut expanded = true;
+    while expanded {
+        expanded = false;
+        for state in &workflow.states {
+            if removed.contains(&state.id) {
+                continue;
+            }
+            if state
+                .parent_id
+                .as_ref()
+                .is_some_and(|parent_id| removed.contains(parent_id))
+            {
+                removed.insert(state.id.clone());
+                expanded = true;
+            }
+        }
+    }
+
+    let removed_state_info = workflow
+        .states
+        .iter()
+        .filter(|state| removed.contains(&state.id))
+        .map(|state| {
+            let mut ancestors = HashSet::new();
+            let mut current = index.parent_of(workflow, &state.id);
+            while let Some(parent_id) = current {
+                if !ancestors.insert(parent_id.clone()) {
+                    break;
+                }
+                current = index.parent_of(workflow, parent_id);
+            }
+            (state.scxml_id.clone(), ancestors)
+        })
+        .collect::<Vec<_>>();
+    let removed_scxml_ids = workflow
+        .states
+        .iter()
+        .filter(|state| removed.contains(&state.id))
+        .map(|state| state.scxml_id.clone())
+        .collect::<HashSet<_>>();
+
+    let mut removed_transition_ids = Vec::new();
+    workflow.transitions.retain(|transition| {
+        let direct = removed.contains(&transition.source_state_id)
+            || transition
+                .target_state_id
+                .as_ref()
+                .is_some_and(|target| removed.contains(target));
+
+        let hoisted = !direct
+            && removed_state_info.iter().any(|(scxml_id, ancestors)| {
+                !scxml_id.is_empty()
+                    && transition.event.starts_with(&format!("{scxml_id}."))
+                    && ancestors.contains(&transition.source_state_id)
+            });
+
+        if direct || hoisted {
+            removed_transition_ids.push(transition.id.as_str().to_string());
+            false
+        } else {
+            true
+        }
+    });
+
+    for state in workflow.states.iter_mut() {
+        if removed.contains(&state.id) {
+            continue;
+        }
+        let state_id = state.id.clone();
+        state.editor.edge_targets.retain(|route| {
+            let targets_removed_state =
+                removed_scxml_ids.contains(&route.target_scxml_id);
+            let originates_from_removed_child = removed_state_info.iter().any(
+                |(scxml_id, ancestors)| {
+                    !scxml_id.is_empty()
+                        && route.event.starts_with(&format!("{scxml_id}."))
+                        && ancestors.contains(&state_id)
+                },
+            );
+            !targets_removed_state && !originates_from_removed_child
+        });
+    }
+
+    // Normal slot declarations point at the owning state's SCXML id. Clean
+    // those eagerly for incremental deletions. Inherited-slot ownership is
+    // still rebuilt through the full-sync fallback used by the frontend when
+    // deleting a slot-bearing state.
+    workflow
+        .slot_declarations
+        .retain(|slot| !removed_scxml_ids.contains(&slot.state));
+
+    workflow.states.retain(|state| !removed.contains(&state.id));
+
+    if workflow
+        .initial_state_id
+        .as_ref()
+        .is_some_and(|id| removed.contains(id))
+    {
+        let next_root = workflow
+            .states
+            .iter()
+            .find(|state| state.parent_id.is_none())
+            .map(|state| (state.id.clone(), state.scxml_id.clone()));
+        workflow.initial_state_id = next_root.as_ref().map(|(id, _)| id.clone());
+        workflow.initial_scxml_state_id = next_root.map(|(_, scxml_id)| scxml_id);
+    }
+
+    let remaining_ids = workflow
+        .states
+        .iter()
+        .map(|state| state.id.clone())
+        .collect::<HashSet<_>>();
+    let first_child_by_parent = workflow
+        .states
+        .iter()
+        .filter_map(|state| {
+            state
+                .parent_id
+                .as_ref()
+                .map(|parent_id| (parent_id.clone(), (state.id.clone(), state.scxml_id.clone())))
+        })
+        .fold(HashMap::new(), |mut acc, (parent_id, child)| {
+            acc.entry(parent_id).or_insert(child);
+            acc
+        });
+    let mut parent_initial_updates = Vec::new();
+    for parent in workflow.states.iter_mut() {
+        let invalid_initial = parent
+            .initial_child_id
+            .as_ref()
+            .is_some_and(|id| !remaining_ids.contains(id));
+        if !invalid_initial {
+            continue;
+        }
+
+        let replacement = first_child_by_parent.get(&parent.id).cloned();
+        parent.initial_child_id = replacement.as_ref().map(|(id, _)| id.clone());
+        parent.initial_child_scxml_id = replacement.map(|(_, scxml_id)| scxml_id);
+        parent_initial_updates.push(parent.id.clone());
+    }
+
+    let root_initial = workflow.initial_state_id.clone();
+    let parent_initials = workflow
+        .states
+        .iter()
+        .filter_map(|state| {
+            state
+                .initial_child_id
+                .as_ref()
+                .map(|child_id| (state.id.clone(), child_id.clone()))
+        })
+        .collect::<Vec<_>>();
+    for state in workflow.states.iter_mut() {
+        let should_be_initial = if let Some(parent_id) = state.parent_id.as_ref() {
+            parent_initials
+                .iter()
+                .any(|(candidate_parent, child_id)| candidate_parent == parent_id && child_id == &state.id)
+        } else {
+            root_initial.as_ref() == Some(&state.id)
+        };
+        state.is_initial = should_be_initial;
+    }
+
+    let mut changed_state_ids = removed
+        .iter()
+        .map(|id| id.as_str().to_string())
+        .collect::<Vec<_>>();
+    changed_state_ids.extend(
+        parent_initial_updates
+            .into_iter()
+            .map(|id| id.as_str().to_string()),
+    );
+    changed_state_ids.sort();
+    changed_state_ids.dedup();
+    removed_transition_ids.sort();
+    removed_transition_ids.dedup();
+
+    Ok(WorkflowCommandChanges {
+        changed_state_ids,
+        changed_transition_ids: removed_transition_ids,
+        index_changed: true,
+        ..WorkflowCommandChanges::default()
+    })
+}
+
+fn update_state_editor_position(
+    workflow: &mut Workflow,
+    index: &WorkflowIndex,
+    state_id: String,
+    x: f64,
+    y: f64,
+) -> Result<WorkflowCommandChanges, String> {
+    let id = StateId::from(state_id);
+    let position = index
+        .state_position(&id)
+        .ok_or_else(|| format!("Unknown state '{id}'"))?;
+    let editor = &mut workflow.states[position].editor;
+    editor.x = x;
+    editor.y = y;
+
+    if let Some(primary) = editor
+        .positions
+        .iter_mut()
+        .find(|position| position.clone_type.is_none())
+    {
+        primary.x = x;
+        primary.y = y;
+    } else {
+        editor.positions.insert(0, EditorPosition {
+            x,
+            y,
+            instance_id: None,
+            clone_type: None,
+        });
+    }
+
+    Ok(WorkflowCommandChanges {
+        changed_state_ids: vec![id.as_str().to_string()],
         ..WorkflowCommandChanges::default()
     })
 }

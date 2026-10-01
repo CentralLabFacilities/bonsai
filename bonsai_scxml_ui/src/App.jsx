@@ -593,6 +593,8 @@ function AppContent() {
         checkSlotConnection,
         updateNodeInternals,
         applyWorkflowCommand: rustWorkflowDocument.applyWorkflowCommand,
+        syncEditorStateAfterCommit:
+            rustWorkflowDocument.syncEditorStateAfterCommit,
         syncTransitionsForSource:
             rustWorkflowDocument.syncTransitionsForSource,
     });
@@ -633,6 +635,8 @@ function AppContent() {
         checkSlotConnection,
         updateNodeInternals,
         screenToFlowPosition,
+        syncEditorStateAfterCommit:
+            rustWorkflowDocument.syncEditorStateAfterCommit,
     });
     const previousActiveModeRef = useRef(activeMode);
 
@@ -702,6 +706,10 @@ function AppContent() {
         setHoveredEditorEdgeId,
         screenToFlowPosition,
         getNodes,
+        syncStatePosition: rustWorkflowDocument.syncStatePosition,
+        syncRemovedStates: rustWorkflowDocument.syncRemovedStates,
+        syncEditorStateAfterCommit:
+            rustWorkflowDocument.syncEditorStateAfterCommit,
     });
 
     const semanticNodes = useEditorGraphMaintenance({
@@ -787,6 +795,8 @@ function AppContent() {
         setActiveTab,
         setContextMenu,
         updateNodeInternals,
+        syncEditorStateAfterCommit:
+            rustWorkflowDocument.syncEditorStateAfterCommit,
     });
 
     const {
@@ -2866,6 +2876,43 @@ function AppContent() {
                             };
                         })
                     );
+
+                    // React Flow may report only a removed parent while its
+                    // descendants disappear with it. Expand the semantic
+                    // removal set here so Rust also sees the full subtree and
+                    // so slot/reference fallbacks inspect every removed state.
+                    const semanticRemovalIds = new Set(removedNodeIds);
+                    let expandedRemovalSet = true;
+                    while (expandedRemovalSet) {
+                        expandedRemovalSet = false;
+                        nodes.forEach((node) => {
+                            if (semanticRemovalIds.has(node.id)) return;
+                            if (
+                                node.parentId &&
+                                semanticRemovalIds.has(node.parentId)
+                            ) {
+                                semanticRemovalIds.add(node.id);
+                                expandedRemovalSet = true;
+                            }
+                        });
+                    }
+
+                    const removedNodes = nodes.filter((node) =>
+                        semanticRemovalIds.has(node.id)
+                    );
+                    const forceFullSemanticSync = removedNodes.some(
+                        (node) =>
+                            node.type === "parallelLane" ||
+                            node.data?.autoParallelLaneCompound ||
+                            node.data?.isSkillClone ||
+                            node.data?.isStateClone ||
+                            (node.data?.inSlots || []).some((slot) => slot?.path) ||
+                            (node.data?.outSlots || []).some((slot) => slot?.path)
+                    );
+                    void rustWorkflowDocument.syncRemovedStates(
+                        [...semanticRemovalIds],
+                        { forceFull: forceFullSemanticSync }
+                    );
                 }
             }
             if (slotChanges.length > 0) {
@@ -2921,8 +2968,10 @@ function AppContent() {
             onSlotNodesChange,
             setEdges,
             setNodes,
+            nodes,
             slotNodes,
             setSlotEdges,
+            rustWorkflowDocument.syncRemovedStates,
         ]
     );
 
@@ -4274,6 +4323,7 @@ function AppContent() {
 
                                 setSelectedNodeId(newNode.id);
                                 refreshBehaviorSlots();
+                                void rustWorkflowDocument.syncEditorStateAfterCommit();
                                 return;
                             }
 
@@ -4462,6 +4512,7 @@ function AppContent() {
 
                                 setSelectedNodeId(newNode.id);
                                 refreshBehaviorSlots();
+                                void rustWorkflowDocument.syncEditorStateAfterCommit();
                                 return;
                             }
 
@@ -4482,6 +4533,7 @@ function AppContent() {
                             );
                             setSelectedNodeId(newNode.id);
                             refreshBehaviorSlots();
+                            void rustWorkflowDocument.syncEditorStateAfterCommit();
                         }}
                     >
                         <EditorCanvas
@@ -4801,7 +4853,10 @@ function AppContent() {
                                     setNodeAsInitial(selectedNode.id)
                                 }
                                 onUpdateName={(name) =>
-                                    updateNodeName(selectedNode.id, name)
+                                    updateNodeName(selectedNode.id, name, false)
+                                }
+                                onUpdateNameCommit={(name) =>
+                                    updateNodeName(selectedNode.id, name, true)
                                 }
                                 onUpdateSrc={updateNodeSource}
                                 onUpdateEvent={updateNodeEvent}

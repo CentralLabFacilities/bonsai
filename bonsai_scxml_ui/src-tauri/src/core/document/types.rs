@@ -1,4 +1,4 @@
-use crate::core::model::{AssignmentDto, DataModelEntryDto, WorkflowDto};
+use crate::core::model::{AssignmentDto, DataModelEntryDto, StateDto, WorkflowDto};
 
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -59,6 +59,23 @@ pub(crate) enum WorkflowCommandDto {
         scxml_id: String,
         #[serde(default)]
         label: Option<String>,
+        #[serde(default)]
+        #[serde(rename = "fullSkillName")]
+        full_skill_name: Option<String>,
+    },
+    AddState {
+        state: StateDto,
+    },
+    RemoveStates {
+        #[serde(default)]
+        #[serde(rename = "stateIds")]
+        state_ids: Vec<String>,
+    },
+    UpdateStateEditorPosition {
+        #[serde(rename = "stateId")]
+        state_id: String,
+        x: f64,
+        y: f64,
     },
     SetStateLabel {
         #[serde(rename = "stateId")]

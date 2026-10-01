@@ -43,6 +43,9 @@ export function useNodeDrag({
     setHoveredEditorEdgeId,
     screenToFlowPosition,
     getNodes,
+    syncStatePosition,
+    syncRemovedStates,
+    syncEditorStateAfterCommit,
 }) {
     const [parallelDropTargetId, setParallelDropTargetId] = useState(null);
     const [compoundDropTargetId, setCompoundDropTargetId] = useState(null);
@@ -62,6 +65,7 @@ export function useNodeDrag({
 
     const dragContainerIndexRef = useRef({ lanes: [], compounds: [] });
     const dragOriginContainerRef = useRef(null);
+    const dragOriginParentIdRef = useRef(null);
 
     const buildDragContainerIndex = useCallback((currentNodes) => {
         const currentNodeById = new Map(
@@ -175,6 +179,7 @@ export function useNodeDrag({
             dragOriginContainerRef.current = null;
         }
 
+        dragOriginParentIdRef.current = node.parentId || null;
         setDraggingNodeId(node.id);
         setIsDraggingNode(true);
         setHoveredEditorEdgeId(null);
@@ -366,8 +371,10 @@ export function useNodeDrag({
         }
         pendingNodeDragRef.current = null;
         const dragOriginContainer = dragOriginContainerRef.current;
+        const dragOriginParentId = dragOriginParentIdRef.current;
         dragContainerIndexRef.current = { lanes: [], compounds: [] };
         dragOriginContainerRef.current = null;
+        dragOriginParentIdRef.current = null;
 
         const element = document.elementFromPoint(
             event.clientX,
@@ -375,83 +382,43 @@ export function useNodeDrag({
         );
 
         if (element?.closest(".trash-bin-dropzone")) {
-            setNodes((currentNodes) => {
-                const idsToDelete = new Set([node.id]);
-                let foundNew = true;
+            const currentNodes = getNodes();
+            const idsToDelete = new Set([node.id]);
+            let foundNew = true;
 
-                while (foundNew) {
-                    foundNew = false;
+            while (foundNew) {
+                foundNew = false;
+                currentNodes.forEach((candidate) => {
+                    const isDescendant =
+                        candidate.parentId && idsToDelete.has(candidate.parentId);
+                    const isCloneOfDeletedState =
+                        (candidate.data?.isSkillClone || candidate.data?.isStateClone) &&
+                        idsToDelete.has(candidate.data?.cloneOfNodeId);
 
-                    currentNodes.forEach((candidate) => {
-                        const isDescendant =
-                            candidate.parentId &&
-                            idsToDelete.has(candidate.parentId);
-                        const isCloneOfDeletedState =
-                            (candidate.data?.isSkillClone || candidate.data?.isStateClone) &&
-                            idsToDelete.has(candidate.data?.cloneOfNodeId);
-
-                        if (
-                            (isDescendant || isCloneOfDeletedState) &&
-                            !idsToDelete.has(candidate.id)
-                        ) {
-                            idsToDelete.add(candidate.id);
-                            foundNew = true;
-                        }
-                    });
-                }
-
-                setEdges((currentEdges) =>
-                    currentEdges.filter(
-                        (edge) =>
-                            !idsToDelete.has(edge.source) &&
-                            !idsToDelete.has(edge.target) &&
-                            !idsToDelete.has(
-                                edge.data?.boundaryOriginalSource
-                            ) &&
-                            !idsToDelete.has(
-                                edge.data?.compoundOriginalSource
-                            ) &&
-                            !idsToDelete.has(
-                                edge.data?.compoundOriginalTarget
-                            ) &&
-                            !idsToDelete.has(
-                                edge.data?.parallelOriginalSource
-                            ) &&
-                            !idsToDelete.has(
-                                edge.data?.parallelOriginalTarget
-                            )
-                    )
-                );
-
-                setSlotEdges((currentEdges) => {
-                    const updatedEdges = currentEdges.filter(
-                        (edge) =>
-                            !idsToDelete.has(edge.source) &&
-                            !idsToDelete.has(edge.target)
-                    );
-
-                    setSlotNodes((currentSlotNodes) =>
-                        currentSlotNodes.filter((slotNode) =>
-                            updatedEdges.some(
-                                (edge) =>
-                                    edge.source === slotNode.id ||
-                                    edge.target === slotNode.id
-                            )
-                        )
-                    );
-
-                    return updatedEdges;
+                    if (
+                        (isDescendant || isCloneOfDeletedState) &&
+                        !idsToDelete.has(candidate.id)
+                    ) {
+                        idsToDelete.add(candidate.id);
+                        foundNew = true;
+                    }
                 });
+            }
 
-                setSelectedNodeId((id) =>
-                    idsToDelete.has(id) ? null : id
-                );
+            const forceFullSemanticSync = currentNodes.some(
+                (candidate) =>
+                    idsToDelete.has(candidate.id) &&
+                    (candidate.type === "parallelLane" ||
+                        candidate.data?.autoParallelLaneCompound ||
+                        candidate.data?.isSkillClone ||
+                        candidate.data?.isStateClone ||
+                        (candidate.data?.inSlots || []).some((slot) => slot?.path) ||
+                        (candidate.data?.outSlots || []).some((slot) => slot?.path))
+            );
 
-                return currentNodes
-                    .filter(
-                        (candidate) =>
-                            !idsToDelete.has(candidate.id)
-                    )
+            setNodes((allNodes) =>
+                allNodes
+                    .filter((candidate) => !idsToDelete.has(candidate.id))
                     .map((candidate) => {
                         if (
                             candidate.type !== "compound" &&
@@ -470,7 +437,48 @@ export function useNodeDrag({
                                 ),
                             },
                         };
-                    });
+                    })
+            );
+
+            setEdges((currentEdges) =>
+                currentEdges.filter(
+                    (edge) =>
+                        !idsToDelete.has(edge.source) &&
+                        !idsToDelete.has(edge.target) &&
+                        !idsToDelete.has(edge.data?.boundaryOriginalSource) &&
+                        !idsToDelete.has(edge.data?.compoundOriginalSource) &&
+                        !idsToDelete.has(edge.data?.compoundOriginalTarget) &&
+                        !idsToDelete.has(edge.data?.parallelOriginalSource) &&
+                        !idsToDelete.has(edge.data?.parallelOriginalTarget)
+                )
+            );
+
+            setSlotEdges((currentEdges) => {
+                const updatedEdges = currentEdges.filter(
+                    (edge) =>
+                        !idsToDelete.has(edge.source) &&
+                        !idsToDelete.has(edge.target)
+                );
+
+                setSlotNodes((currentSlotNodes) =>
+                    currentSlotNodes.filter((slotNode) =>
+                        updatedEdges.some(
+                            (edge) =>
+                                edge.source === slotNode.id ||
+                                edge.target === slotNode.id
+                        )
+                    )
+                );
+
+                return updatedEdges;
+            });
+
+            setSelectedNodeId((id) =>
+                idsToDelete.has(id) ? null : id
+            );
+
+            void syncRemovedStates?.([...idsToDelete], {
+                forceFull: forceFullSemanticSync,
             });
 
             setDraggingNodeId(null);
@@ -566,6 +574,7 @@ export function useNodeDrag({
                 return nextNodes;
             });
 
+            void syncEditorStateAfterCommit?.();
             setDraggingNodeId(null);
             setIsDraggingNode(false);
             setIsOverTrash(false);
@@ -1658,6 +1667,8 @@ export function useNodeDrag({
             });
         }
 
+        void syncStatePosition?.(node.id, dragOriginParentId);
+
         setDraggingNodeId(null);
         setIsDraggingNode(false);
         setIsOverTrash(false);
@@ -1672,6 +1683,9 @@ export function useNodeDrag({
         setEdges,
         setSlotEdges,
         setSlotNodes,
+        syncStatePosition,
+        syncRemovedStates,
+        syncEditorStateAfterCommit,
     ]);
 
     return {

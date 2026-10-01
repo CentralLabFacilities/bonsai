@@ -32,6 +32,7 @@ export function useEditorNodeActions({
     setRightPanelTab,
     setActiveTab,
     applyWorkflowCommand,
+    syncEditorStateAfterCommit,
 }) {
     const selectEditorNode = useCallback(
         (nodeId, options = {}) => {
@@ -141,6 +142,9 @@ export function useEditorNodeActions({
             setSelectedNodeId(cloneNode.id);
             setRightPanelTab("details");
             setActiveTab(sourceNode.type === "slot" ? "slots" : "allgemein");
+            if (sourceNode.type !== "slot") {
+                void syncEditorStateAfterCommit?.();
+            }
             return cloneNode;
         },
         [
@@ -149,6 +153,7 @@ export function useEditorNodeActions({
             setSelectedNodeId,
             setRightPanelTab,
             setActiveTab,
+            syncEditorStateAfterCommit,
         ]
     );
 
@@ -231,59 +236,57 @@ export function useEditorNodeActions({
         (parentId) => {
             if (!parentId) return null;
 
+            const parent = nodes.find((node) => node.id === parentId);
+            if (
+                !parent ||
+                !["compound", "parallelLane"].includes(parent.type)
+            ) {
+                return null;
+            }
+
             const newNodeId = getNodeId();
+            const children = nodes.filter(
+                (node) =>
+                    node.parentId === parentId &&
+                    node.type !== "parallelLane"
+            );
+            const stateCount = nodes.filter((node) =>
+                String(node.data?.label || "").startsWith("state_")
+            ).length;
+            const stateName = `state_${stateCount + 1}`;
+            const isFirstChild = children.length === 0;
+            const childX =
+                parent.type === "compound" ? COMPOUND_PADDING_X : 24;
+            const childStartY =
+                parent.type === "compound"
+                    ? COMPOUND_HEADER_HEIGHT + 18
+                    : PARALLEL_LANE_CHILD_TOP_INSET;
+            const nextY = children.reduce((maxY, child) => {
+                const size = getOverviewLayoutNodeSize(child);
+                return Math.max(
+                    maxY,
+                    Number(child.position?.y || 0) + size.height + 18
+                );
+            }, childStartY);
+
+            const newState = {
+                id: newNodeId,
+                type: "compound",
+                parentId,
+                extent: "parent",
+                expandParent: true,
+                position: { x: childX, y: nextY },
+                style: { width: 300, height: 180 },
+                selected: true,
+                data: {
+                    label: stateName,
+                    fullSkillName: stateName,
+                    isInitial: isFirstChild,
+                    events: [],
+                },
+            };
+
             setNodes((currentNodes) => {
-                const parent = currentNodes.find(
-                    (node) => node.id === parentId
-                );
-                if (
-                    !parent ||
-                    !["compound", "parallelLane"].includes(parent.type)
-                ) {
-                    return currentNodes;
-                }
-
-                const children = currentNodes.filter(
-                    (node) =>
-                        node.parentId === parentId &&
-                        node.type !== "parallelLane"
-                );
-                const stateCount = currentNodes.filter((node) =>
-                    String(node.data?.label || "").startsWith("state_")
-                ).length;
-                const stateName = `state_${stateCount + 1}`;
-                const isFirstChild = children.length === 0;
-                const childX =
-                    parent.type === "compound" ? COMPOUND_PADDING_X : 24;
-                const childStartY =
-                    parent.type === "compound"
-                        ? COMPOUND_HEADER_HEIGHT + 18
-                        : PARALLEL_LANE_CHILD_TOP_INSET;
-                const nextY = children.reduce((maxY, child) => {
-                    const size = getOverviewLayoutNodeSize(child);
-                    return Math.max(
-                        maxY,
-                        Number(child.position?.y || 0) + size.height + 18
-                    );
-                }, childStartY);
-
-                const newState = {
-                    id: newNodeId,
-                    type: "compound",
-                    parentId,
-                    extent: "parent",
-                    expandParent: true,
-                    position: { x: childX, y: nextY },
-                    style: { width: 300, height: 180 },
-                    selected: true,
-                    data: {
-                        label: stateName,
-                        fullSkillName: stateName,
-                        isInitial: isFirstChild,
-                        events: [],
-                    },
-                };
-
                 const withSelection = currentNodes.map((node) => ({
                     ...node,
                     selected: false,
@@ -308,6 +311,57 @@ export function useEditorNodeActions({
                 return orderNodesParentsFirst(nextNodes);
             });
 
+            if (
+                parent.type === "compound" &&
+                !parent.data?.autoParallelLaneCompound
+            ) {
+                void applyWorkflowCommand?.({
+                    type: "addState",
+                    state: {
+                        id: newNodeId,
+                        scxmlId: stateName,
+                        label: stateName,
+                        kind: "compound",
+                        fullSkillName: stateName,
+                        source: null,
+                        parentId,
+                        initialChildId: null,
+                        initialChildScxmlId: null,
+                        isInitial: isFirstChild,
+                        isFinal: false,
+                        events: [],
+                        inputSlots: [],
+                        outputSlots: [],
+                        parameters: [],
+                        onEntry: [],
+                        onExit: [],
+                        editor: {
+                            x: childX,
+                            y: nextY,
+                            positions: [
+                                {
+                                    x: childX,
+                                    y: nextY,
+                                    instanceId: null,
+                                    cloneType: null,
+                                },
+                            ],
+                            edgeTargets: [],
+                            width: null,
+                            height: null,
+                            collapsed: false,
+                            referenceOf: null,
+                            referenceId: null,
+                        },
+                    },
+                });
+            } else {
+                // Parallel lanes can be flattened into their only child by the
+                // semantic exporter. Rebuild that small structural case instead
+                // of guessing whether the lane itself currently exists in Rust.
+                void syncEditorStateAfterCommit?.();
+            }
+
             // Keep the previous App.jsx behavior: once an add-state action is
             // issued, focus the newly allocated id immediately.
             setSelectedNodeId(newNodeId);
@@ -315,7 +369,15 @@ export function useEditorNodeActions({
             setActiveTab("allgemein");
             return newNodeId;
         },
-        [setNodes, setSelectedNodeId, setRightPanelTab, setActiveTab]
+        [
+            nodes,
+            setNodes,
+            setSelectedNodeId,
+            setRightPanelTab,
+            setActiveTab,
+            applyWorkflowCommand,
+            syncEditorStateAfterCommit,
+        ]
     );
 
     return {

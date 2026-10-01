@@ -772,6 +772,7 @@ function DetailsPanel({
                           getPackageSkillEvent,
                           onSetInitial,
                           onUpdateName,
+                          onUpdateNameCommit,
                           onUpdateEvent,
                           availableTargetNodes = [],
                           onSetEventTarget,
@@ -1505,6 +1506,9 @@ function DetailsPanel({
                                         onChange={(e) =>
                                             onUpdateName(e.target.value)
                                         }
+                                        onBlur={(e) =>
+                                            onUpdateNameCommit?.(e.target.value)
+                                        }
                                     />
                                 </div>
 
@@ -1566,6 +1570,9 @@ function DetailsPanel({
                                     onChange={(e) =>
                                         onUpdateName(e.target.value)
                                     }
+                                    onBlur={(e) =>
+                                        onUpdateNameCommit?.(e.target.value)
+                                    }
                                 />
                             </div>
                         ) : (
@@ -1608,6 +1615,9 @@ function DetailsPanel({
                                         }
                                         onChange={(e) =>
                                             onUpdateName(e.target.value)
+                                        }
+                                        onBlur={(e) =>
+                                            onUpdateNameCommit?.(e.target.value)
                                         }
                                     />
                                 </div>

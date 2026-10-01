@@ -124,6 +124,77 @@ export function useRustWorkflowDocument({
         [enqueue, replaceNow]
     );
 
+    const syncEditorStateAfterCommit = useCallback(
+        () =>
+            enqueue(async () => {
+                if (!isTauri()) return null;
+                await waitForEditorCommit();
+                return replaceNow(editorStateRef.current, null);
+            }),
+        [enqueue, replaceNow]
+    );
+
+    const syncStatePosition = useCallback(
+        (stateId, previousParentId = null) =>
+            enqueue(async () => {
+                if (!isTauri() || !stateId) return null;
+                await waitForEditorCommit();
+
+                const currentNodes = editorStateRef.current?.nodes || [];
+                const node = currentNodes.find((candidate) => candidate.id === stateId);
+                if (!node) {
+                    return replaceNow(editorStateRef.current, null);
+                }
+
+                const currentParentId = node.parentId || null;
+                const isReference = Boolean(
+                    node.data?.isSkillClone || node.data?.isStateClone
+                );
+                const requiresSemanticRebuild =
+                    isReference ||
+                    node.type === "parallelLane" ||
+                    currentParentId !== (previousParentId || null);
+
+                if (requiresSemanticRebuild) {
+                    return replaceNow(editorStateRef.current, null);
+                }
+
+                return applyCommandNow({
+                    type: "updateStateEditorPosition",
+                    stateId,
+                    x: Number(node.position?.x || 0),
+                    y: Number(node.position?.y || 0),
+                });
+            }),
+        [applyCommandNow, enqueue, replaceNow]
+    );
+
+    const syncRemovedStates = useCallback(
+        (stateIds, { forceFull = false } = {}) =>
+            enqueue(async () => {
+                if (!isTauri()) return null;
+                const ids = Array.from(
+                    new Set(
+                        (Array.isArray(stateIds) ? stateIds : [stateIds])
+                            .map((id) => String(id || "").trim())
+                            .filter(Boolean)
+                    )
+                );
+                if (ids.length === 0) return null;
+
+                if (forceFull) {
+                    await waitForEditorCommit();
+                    return replaceNow(editorStateRef.current, null);
+                }
+
+                return applyCommandNow({
+                    type: "removeStates",
+                    stateIds: ids,
+                });
+            }),
+        [applyCommandNow, enqueue, replaceNow]
+    );
+
     const applyWorkflowCommand = useCallback(
         (command) => enqueue(() => applyCommandNow(command)),
         [applyCommandNow, enqueue]
@@ -187,6 +258,9 @@ export function useRustWorkflowDocument({
     return {
         applyWorkflowCommand,
         syncEditorState,
+        syncEditorStateAfterCommit,
+        syncStatePosition,
+        syncRemovedStates,
         syncTransitionsForSource,
         syncTransitionSources,
         invalidate,

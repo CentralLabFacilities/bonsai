@@ -75,7 +75,7 @@ impl Workflow {
 }
 
 impl State {
-    fn from_dto(dto: super::StateDto) -> Self {
+    pub(crate) fn from_dto(dto: super::StateDto) -> Self {
         Self {
             id: dto.id.into(),
             scxml_id: dto.scxml_id,

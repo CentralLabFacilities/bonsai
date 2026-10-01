@@ -35,6 +35,7 @@ export const useEditorClipboard = ({
     checkSlotConnection,
     updateNodeInternals,
     screenToFlowPosition,
+    syncEditorStateAfterCommit,
 }) => {
     const graphClipboardRef = useRef(null);
     const [hasGraphClipboard, setHasGraphClipboard] = useState(() =>
@@ -386,6 +387,7 @@ export const useEditorClipboard = ({
                 requestAnimationFrame(() => {
                     updateNodeInternals(cloneNode.id);
                 });
+                void syncEditorStateAfterCommit?.();
 
                 return true;
             }
@@ -477,6 +479,9 @@ export const useEditorClipboard = ({
                     updateNodeInternals(node.id);
                 });
             });
+            if (pastedIds.size > 0) {
+                void syncEditorStateAfterCommit?.();
+            }
 
             return true;
         };
@@ -634,6 +639,7 @@ export const useEditorClipboard = ({
         checkSlotConnection,
         updateNodeInternals,
         screenToFlowPosition,
+        syncEditorStateAfterCommit,
     ]);
 
     const resolvePendingSkillPaste = useCallback((choice) => {

@@ -15,10 +15,14 @@ export function useEditorNodeDataActions({
     setEdges,
     checkSlotConnection,
     applyWorkflowCommand,
+    syncEditorStateAfterCommit,
 }) {
     const updateNodeName = useCallback(
-        (nodeId, name) => {
+        (nodeId, name, commit = false) => {
             if (!nodeId) return;
+
+            const sourceNode = nodes.find((node) => node.id === nodeId);
+            if (!sourceNode) return;
 
             setNodes((currentNodes) =>
                 currentNodes.map((node) => {
@@ -79,8 +83,59 @@ export function useEditorNodeDataActions({
                     };
                 })
             );
+
+            if (!commit) return;
+
+            const cleanName = String(name || "").trim();
+            const isContainerOrSub =
+                sourceNode.type === "compound" ||
+                sourceNode.type === "parallel" ||
+                sourceNode.type === "submachine";
+
+            if (isContainerOrSub) {
+                if (!cleanName) {
+                    void syncEditorStateAfterCommit?.();
+                    return;
+                }
+                void applyWorkflowCommand?.({
+                    type: "renameState",
+                    stateId: nodeId,
+                    scxmlId: cleanName,
+                    label: cleanName,
+                    fullSkillName: cleanName,
+                });
+                return;
+            }
+
+            const fullSkillName = String(sourceNode.data?.fullSkillName || "");
+            const baseSkillName = fullSkillName.split("#")[0] || String(sourceNode.data?.label || "");
+            const skillType = baseSkillName.split(".").pop().toLowerCase();
+
+            // For Nop/Fatal/End this field is an editor-only instance id used
+            // to disambiguate visual references. It lives in editor metadata,
+            // so refresh the semantic projection instead of renaming the SCXML state.
+            if (["nop", "fatal", "end"].includes(skillType)) {
+                void syncEditorStateAfterCommit?.();
+                return;
+            }
+
+            const nextFullSkillName = cleanName
+                ? `${baseSkillName}#${cleanName}`
+                : baseSkillName;
+            void applyWorkflowCommand?.({
+                type: "renameState",
+                stateId: nodeId,
+                scxmlId: nextFullSkillName,
+                label: null,
+                fullSkillName: nextFullSkillName,
+            });
         },
-        [setNodes]
+        [
+            nodes,
+            setNodes,
+            applyWorkflowCommand,
+            syncEditorStateAfterCommit,
+        ]
     );
 
     const updateNodeSource = useCallback(

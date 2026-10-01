@@ -133,7 +133,10 @@ fn command_result(
 mod tests {
     use super::*;
     use super::super::types::TargetedTransitionCommandDto;
-    use crate::core::model::{AssignmentDto, State, StateId, StateKind, Transition, TransitionId};
+    use crate::core::model::{
+        AssignmentDto, EditorMetadataDto, EditorPositionDto, State, StateDto, StateId, StateKind,
+        StateKindDto, Transition, TransitionId,
+    };
 
     fn sample_workflow() -> Workflow {
         Workflow {
@@ -276,6 +279,182 @@ mod tests {
         assert_eq!(replacement.event, "A.error");
         assert_eq!(replacement.target_state_id.as_deref(), Some("b"));
         assert_eq!(replacement.target_instance_id.as_deref(), Some("ref-1"));
+    }
+
+    #[test]
+    fn add_state_and_position_updates_are_incremental() {
+        let store = WorkflowDocumentStore::default();
+        let mut workflow = sample_workflow();
+        workflow.states[0].kind = StateKind::Compound;
+        assert_eq!(store.replace(workflow).unwrap(), 1);
+
+        let result = store
+            .apply(
+                Some(1),
+                WorkflowCommandDto::AddState {
+                    state: StateDto {
+                        id: "child".into(),
+                        scxml_id: "state_1".into(),
+                        label: "state_1".into(),
+                        kind: StateKindDto::Compound,
+                        full_skill_name: Some("state_1".into()),
+                        source: None,
+                        parent_id: Some("a".into()),
+                        initial_child_id: None,
+                        initial_child_scxml_id: None,
+                        is_initial: true,
+                        is_final: false,
+                        events: vec![],
+                        input_slots: vec![],
+                        output_slots: vec![],
+                        parameters: vec![],
+                        on_entry: vec![],
+                        on_exit: vec![],
+                        editor: EditorMetadataDto {
+                            x: 10.0,
+                            y: 20.0,
+                            positions: vec![EditorPositionDto {
+                                x: 10.0,
+                                y: 20.0,
+                                instance_id: None,
+                                clone_type: None,
+                            }],
+                            ..EditorMetadataDto::default()
+                        },
+                    },
+                },
+            )
+            .unwrap();
+        assert_eq!(result.revision, 2);
+
+        let result = store
+            .apply(
+                Some(2),
+                WorkflowCommandDto::UpdateStateEditorPosition {
+                    state_id: "child".into(),
+                    x: 42.0,
+                    y: 84.0,
+                },
+            )
+            .unwrap();
+        assert_eq!(result.revision, 3);
+
+        let snapshot = store.snapshot().unwrap().unwrap();
+        let child = snapshot
+            .workflow
+            .states
+            .iter()
+            .find(|state| state.id == "child")
+            .unwrap();
+        assert_eq!(child.parent_id.as_deref(), Some("a"));
+        assert!(child.is_initial);
+        assert_eq!(child.editor.x, 42.0);
+        assert_eq!(child.editor.y, 84.0);
+        assert_eq!(snapshot.workflow.states[0].initial_child_id.as_deref(), Some("child"));
+    }
+
+    #[test]
+    fn removing_nested_state_removes_hoisted_container_transition() {
+        let store = WorkflowDocumentStore::default();
+        let mut workflow = sample_workflow();
+        workflow.states[0].kind = StateKind::Compound;
+        workflow.states.push(State {
+            id: StateId::from("child"),
+            scxml_id: "Talk".into(),
+            label: "Talk".into(),
+            kind: StateKind::Skill,
+            parent_id: Some(StateId::from("a")),
+            ..sample_state_defaults()
+        });
+        workflow.states[0].initial_child_id = Some(StateId::from("child"));
+        workflow.states[0].initial_child_scxml_id = Some("Talk".into());
+        workflow.transitions.push(Transition {
+            id: TransitionId::from("hoisted"),
+            source_state_id: StateId::from("a"),
+            target_state_id: Some(StateId::from("b")),
+            target_scxml_id: "B".into(),
+            event: "Talk.success".into(),
+            condition: String::new(),
+            assignments: vec![],
+            sent_events: vec![],
+            target_instance_id: None,
+        });
+        assert_eq!(store.replace(workflow).unwrap(), 1);
+
+        store
+            .apply(
+                Some(1),
+                WorkflowCommandDto::RemoveStates {
+                    state_ids: vec!["child".into()],
+                },
+            )
+            .unwrap();
+
+        let snapshot = store.snapshot().unwrap().unwrap();
+        assert!(snapshot.workflow.states.iter().all(|state| state.id != "child"));
+        assert!(snapshot
+            .workflow
+            .transitions
+            .iter()
+            .all(|transition| transition.id != "hoisted"));
+        let parent = snapshot
+            .workflow
+            .states
+            .iter()
+            .find(|state| state.id == "a")
+            .unwrap();
+        assert!(parent.initial_child_id.is_none());
+    }
+
+    #[test]
+    fn renaming_nested_state_updates_hoisted_transition_event() {
+        let store = WorkflowDocumentStore::default();
+        let mut workflow = sample_workflow();
+        workflow.states[0].kind = StateKind::Compound;
+        workflow.states.push(State {
+            id: StateId::from("child"),
+            scxml_id: "Talk".into(),
+            label: "Talk".into(),
+            kind: StateKind::Skill,
+            full_skill_name: Some("skills.Talk#Talk".into()),
+            parent_id: Some(StateId::from("a")),
+            ..sample_state_defaults()
+        });
+        workflow.transitions.push(Transition {
+            id: TransitionId::from("hoisted"),
+            source_state_id: StateId::from("a"),
+            target_state_id: Some(StateId::from("b")),
+            target_scxml_id: "B".into(),
+            event: "Talk.success".into(),
+            condition: String::new(),
+            assignments: vec![],
+            sent_events: vec![],
+            target_instance_id: None,
+        });
+        assert_eq!(store.replace(workflow).unwrap(), 1);
+
+        store
+            .apply(
+                Some(1),
+                WorkflowCommandDto::RenameState {
+                    state_id: "child".into(),
+                    scxml_id: "Speak".into(),
+                    label: None,
+                    full_skill_name: Some("skills.Talk#Speak".into()),
+                },
+            )
+            .unwrap();
+
+        let snapshot = store.snapshot().unwrap().unwrap();
+        let child = snapshot
+            .workflow
+            .states
+            .iter()
+            .find(|state| state.id == "child")
+            .unwrap();
+        assert_eq!(child.scxml_id, "Speak");
+        assert_eq!(child.full_skill_name.as_deref(), Some("skills.Talk#Speak"));
+        assert_eq!(snapshot.workflow.transitions[0].event, "Speak.success");
     }
 
 }

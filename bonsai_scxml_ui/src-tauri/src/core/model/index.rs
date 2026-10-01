@@ -107,6 +107,36 @@ impl WorkflowIndex {
             .map(Vec::as_slice)
             .unwrap_or(&[])
     }
+
+    pub(crate) fn parent_of<'a>(
+        &self,
+        workflow: &'a Workflow,
+        state_id: &StateId,
+    ) -> Option<&'a StateId> {
+        self.state(workflow, state_id)?.parent_id.as_ref()
+    }
+
+    pub(crate) fn is_ancestor_of(
+        &self,
+        workflow: &Workflow,
+        ancestor_id: &StateId,
+        state_id: &StateId,
+    ) -> bool {
+        let mut current = self.parent_of(workflow, state_id);
+        let mut visited = std::collections::HashSet::new();
+
+        while let Some(parent_id) = current {
+            if parent_id == ancestor_id {
+                return true;
+            }
+            if !visited.insert(parent_id.clone()) {
+                return false;
+            }
+            current = self.parent_of(workflow, parent_id);
+        }
+
+        false
+    }
 }
 
 #[cfg(test)]
@@ -170,5 +200,19 @@ mod tests {
             index.state(&workflow, &StateId::from("child")).map(|state| state.scxml_id.as_str()),
             Some("Child")
         );
+        assert_eq!(
+            index.parent_of(&workflow, &StateId::from("child")),
+            Some(&StateId::from("root"))
+        );
+        assert!(index.is_ancestor_of(
+            &workflow,
+            &StateId::from("root"),
+            &StateId::from("child")
+        ));
+        assert!(!index.is_ancestor_of(
+            &workflow,
+            &StateId::from("child"),
+            &StateId::from("root")
+        ));
     }
 }
