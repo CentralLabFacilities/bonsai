@@ -79,7 +79,13 @@ export function useSlotGraph({
                 const duplicate = requiredByChildren.some(
                     (entry) =>
                         entry?.childNodeId === requirement.childNodeId &&
-                        entry?.access === requirement.access
+                        entry?.access === requirement.access &&
+                        entry?.slotKey === requirement.slotKey &&
+                        entry?.slotPath === requirement.slotPath &&
+                        entry?.skillNodeId === requirement.skillNodeId &&
+                        entry?.skillName === requirement.skillName &&
+                        JSON.stringify(entry?.subMachinePath || []) ===
+                            JSON.stringify(requirement.subMachinePath || [])
                 );
 
                 if (!duplicate) {
@@ -135,23 +141,51 @@ export function useSlotGraph({
 
             if (node.type === "submachine") {
                 (node.data.inheritedSlots || []).forEach((slot) => {
-                    registerSlotUsage(
-                        {
-                            path: slot.path,
-                            type: slot.type || "Unknown",
-                        },
-                        {
-                            accessNodeId: node.id,
-                            requiredByChild: {
-                                childNodeId: node.id,
-                                childLabel:
-                                    node.data?.label ||
-                                    node.data?.fullSkillName ||
-                                    "Sub-state machine",
-                                access: slot.access || "inherit",
+                    const concreteSkillAccesses = Array.isArray(
+                        slot.skillAccesses
+                    )
+                        ? slot.skillAccesses
+                        : [];
+                    const requirements =
+                        concreteSkillAccesses.length > 0
+                            ? concreteSkillAccesses
+                            : [null];
+
+                    requirements.forEach((skillAccess) => {
+                        registerSlotUsage(
+                            {
+                                path: slot.path,
+                                type: slot.type || "Unknown",
                             },
-                        }
-                    );
+                            {
+                                accessNodeId: node.id,
+                                requiredByChild: {
+                                    childNodeId: node.id,
+                                    childLabel:
+                                        node.data?.label ||
+                                        node.data?.fullSkillName ||
+                                        "Sub-state machine",
+                                    access: slot.access || "inherit",
+                                    slotKey: slot.key || "",
+                                    slotPath: slot.path || "",
+                                    skillNodeId:
+                                        skillAccess?.skillNodeId || null,
+                                    skillName:
+                                        skillAccess?.skillName || null,
+                                    subMachinePath: Array.isArray(
+                                        slot.subMachinePath
+                                    )
+                                        ? slot.subMachinePath
+                                        : [],
+                                    description:
+                                        skillAccess?.description ||
+                                        slot.description ||
+                                        "",
+                                    type: slot.type || "Unknown",
+                                },
+                            }
+                        );
+                    });
                 });
             }
         });
@@ -370,7 +404,15 @@ export function useSlotGraph({
                         return (
                             entry?.childNodeId === nextEntry?.childNodeId &&
                             entry?.childLabel === nextEntry?.childLabel &&
-                            entry?.access === nextEntry?.access
+                            entry?.access === nextEntry?.access &&
+                            entry?.slotKey === nextEntry?.slotKey &&
+                            entry?.slotPath === nextEntry?.slotPath &&
+                            entry?.skillNodeId === nextEntry?.skillNodeId &&
+                            entry?.skillName === nextEntry?.skillName &&
+                            entry?.description === nextEntry?.description &&
+                            entry?.type === nextEntry?.type &&
+                            JSON.stringify(entry?.subMachinePath || []) ===
+                                JSON.stringify(nextEntry?.subMachinePath || [])
                         );
                     });
 

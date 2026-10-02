@@ -64,7 +64,7 @@ export const normalizeAssignmentExpressionForScxml = (value) => {
     let expression = String(value ?? "").trim();
     if (!expression) return "";
 
-    // Keep a direct editor variable reference marked until scxmlExport serializes
+    // Keep a direct editor variable reference marked until the Rust SCXML serializer handles
     // it. The exporter knows that @foo is a reference and emits foo without
     // turning it into the string literal 'foo'.
     if (/^@[A-Za-z_#][A-Za-z0-9_:#.\-]*$/.test(expression)) {

@@ -183,6 +183,18 @@ export default function ParallelNode({ id, data, selected = false }) {
                 <strong className="parallel-title">{data.label || id}</strong>
             </div>
 
+            {isCollapsed &&
+                (data.mode === "slots" || data.mode === "overview") && (
+                    <Handle
+                        id="collapsed-slot-source"
+                        type="source"
+                        position={Position.Bottom}
+                        className="collapsed-slot-source-handle"
+                        isConnectableStart={false}
+                        isConnectableEnd={false}
+                    />
+                )}
+
             {isCollapsed && collapsedVisibleHandles.map((event, index) => (
                 <Handle
                     key={`collapsed-parallel-source-${event.id}`}

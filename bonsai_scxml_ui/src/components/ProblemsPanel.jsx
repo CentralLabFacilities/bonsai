@@ -1,3 +1,4 @@
+import { memo } from "react";
 import {
     FiAlertCircle,
     FiAlertTriangle,
@@ -25,7 +26,7 @@ function SeverityIcon({ severity }) {
     return <FiAlertCircle aria-hidden="true" />;
 }
 
-export default function ProblemsPanel({
+function ProblemsPanel({
     problems = [],
     onProblemClick,
 }) {
@@ -162,3 +163,5 @@ export default function ProblemsPanel({
         </div>
     );
 }
+
+export default memo(ProblemsPanel, (previous, next) => previous.problems === next.problems);

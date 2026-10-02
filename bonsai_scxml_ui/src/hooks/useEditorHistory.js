@@ -1,10 +1,4 @@
 import { useCallback, useEffect, useRef } from "react";
-import {
-    growAllStateContainersToContents,
-    normalizeCompoundInitialStates,
-    normalizeContainerAutoExpansion,
-    normalizeParallelLaneCompounds,
-} from "../utils/editorGeometry";
 
 const cloneGraphValue = (value) => {
     if (Array.isArray(value)) return value.map(cloneGraphValue);
@@ -116,6 +110,7 @@ export function useEditorHistory({
     setSelectedNodeId,
     setRightPanelTab,
     updateNodeInternals,
+    syncRustDocument,
 }) {
     const historyRef = useRef([]);
     const historyIndexRef = useRef(-1);
@@ -319,7 +314,16 @@ export function useEditorHistory({
         }
 
         if (applyingHistoryRef.current) {
-            applyingHistoryRef.current = false;
+            // All state setters used by a history restore are normally batched,
+            // but React Flow can still emit one extra derived update. Only
+            // consume the restore guard once the live graph has converged on
+            // the history entry; otherwise that extra update gets recorded as
+            // a new branch and destroys redo / traps Ctrl+Z on one step.
+            const restoredSnapshot = createHistorySnapshot();
+            const currentEntry = historyRef.current[historyIndexRef.current];
+            if (snapshotsEqual(currentEntry?.snapshot, restoredSnapshot)) {
+                applyingHistoryRef.current = false;
+            }
             return;
         }
 
@@ -362,27 +366,96 @@ export function useEditorHistory({
         }
         applyingHistoryRef.current = true;
 
-        const restoredNodes = normalizeCompoundInitialStates(
-            growAllStateContainersToContents(
-                normalizeParallelLaneCompounds(
-                    normalizeContainerAutoExpansion(
-                        cloneGraphValue(snapshot.nodes || []).map((node) => ({
-                            ...node,
-                            selected: false,
-                        }))
-                    )
-                )
-            )
+        // Restore the exact saved document. Geometry normalization here used
+        // to mutate the snapshot during undo, which immediately created a new
+        // history entry and made redo impossible.
+        const restoredNodes = cloneGraphValue(snapshot.nodes || []).map((node) => ({
+            ...node,
+            selected: false,
+        }));
+
+        const restoredEdges = cloneGraphValue(snapshot.edges || []).map((edge) => ({
+            ...edge,
+            selected: false,
+        }));
+        const restoredSlotNodes = cloneGraphValue(snapshot.slotNodes || []).map((node) => ({
+            ...node,
+            selected: false,
+        }));
+        const restoredSlotEdges = cloneGraphValue(snapshot.slotEdges || []).map((edge) => ({
+            ...edge,
+            selected: false,
+        }));
+        const restoredManualSlots = cloneGraphValue(snapshot.manualSlots || []);
+        const restoredGlobalDataModel = cloneGraphValue(snapshot.globalDataModel || []);
+
+        const primeGraphCache = (cacheRef, liveItems, snapshotItems) => {
+            cacheRef.current = new Map(
+                (liveItems || []).map((item, index) => [
+                    item?.id ?? `__index_${index}`,
+                    {
+                        source: item,
+                        snapshot: snapshotItems?.[index],
+                    },
+                ])
+            );
+        };
+
+        // Prime the structural-sharing caches with the historical objects so
+        // the next effect recognizes the restored state by identity instead
+        // of treating it as a fresh edit.
+        primeGraphCache(
+            nodeHistoryCacheRef,
+            restoredNodes,
+            snapshot.nodes || []
         );
+        primeGraphCache(
+            edgeHistoryCacheRef,
+            restoredEdges,
+            snapshot.edges || []
+        );
+        primeGraphCache(
+            slotNodeHistoryCacheRef,
+            restoredSlotNodes,
+            snapshot.slotNodes || []
+        );
+        primeGraphCache(
+            slotEdgeHistoryCacheRef,
+            restoredSlotEdges,
+            snapshot.slotEdges || []
+        );
+        manualSlotsHistoryCacheRef.current = {
+            source: restoredManualSlots,
+            snapshot: snapshot.manualSlots || [],
+        };
+        dataModelHistoryCacheRef.current = {
+            source: restoredGlobalDataModel,
+            snapshot: snapshot.globalDataModel || [],
+        };
+        lastCreatedSnapshotRef.current = snapshot;
 
         setNodes(restoredNodes);
-        setEdges(cloneGraphValue(snapshot.edges || []).map((edge) => ({ ...edge, selected: false })));
-        setSlotNodes(cloneGraphValue(snapshot.slotNodes || []).map((node) => ({ ...node, selected: false })));
-        setSlotEdges(cloneGraphValue(snapshot.slotEdges || []).map((edge) => ({ ...edge, selected: false })));
-        setManualSlots(cloneGraphValue(snapshot.manualSlots || []));
-        setGlobalDataModel(cloneGraphValue(snapshot.globalDataModel || []));
+        setEdges(restoredEdges);
+        setSlotNodes(restoredSlotNodes);
+        setSlotEdges(restoredSlotEdges);
+        setManualSlots(restoredManualSlots);
+        setGlobalDataModel(restoredGlobalDataModel);
         setSelectedNodeId(null);
         setRightPanelTab("datamodel");
+
+        // Undo/redo restores the complete editor document atomically. Mirror
+        // that exact snapshot into the Rust-owned semantic document instead of
+        // leaving Rust at the revision that existed before the history jump.
+        // Passing the restored values explicitly also avoids depending on a
+        // later React render to refresh the bridge refs.
+        void syncRustDocument?.({
+            nodes: restoredNodes,
+            edges: restoredEdges,
+            manualSlots: restoredManualSlots,
+            globalDataModel: restoredGlobalDataModel,
+        }).catch((error) => {
+            console.warn("Failed to synchronize Rust document after history restore.", error);
+        });
 
         requestAnimationFrame(() => {
             restoredNodes.forEach((node) => updateNodeInternals(node.id));
@@ -397,6 +470,7 @@ export function useEditorHistory({
         setSelectedNodeId,
         setRightPanelTab,
         updateNodeInternals,
+        syncRustDocument,
     ]);
 
     const flushPendingHistorySnapshot = useCallback(() => {

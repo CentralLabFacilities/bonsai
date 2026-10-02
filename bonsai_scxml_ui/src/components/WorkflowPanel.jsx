@@ -135,13 +135,15 @@ function WorkflowPanel({
                                 onChange={(event) =>
                                     onUpdateGlobalParam(
                                         index,
-                                        event.target.value
+                                        event.target.value,
+                                        false
                                     )
                                 }
                                 onBlur={(event) =>
                                     onUpdateGlobalParam(
                                         index,
-                                        normalizeDatamodelValue(event.target.value)
+                                        normalizeDatamodelValue(event.target.value),
+                                        true
                                     )
                                 }
                                 onKeyDown={(event) => {

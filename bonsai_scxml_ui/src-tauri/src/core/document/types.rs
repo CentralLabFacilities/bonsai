@@ -1,0 +1,273 @@
+use crate::core::editor_export::types::{
+    EditorExportEdgeDto, EditorExportNodeDto, EditorExportSlotDeclarationDto, EditorExportSlotDto,
+};
+use crate::core::model::{
+    AssignmentDto, DataModelEntryDto, EditorPositionDto, ParameterDto, SlotDeclarationDto,
+    StateDto, TransitionDto, WorkflowDto,
+};
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct WorkflowDocumentSnapshotDto {
+    pub revision: u64,
+    pub workflow: WorkflowDto,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct WorkflowMetadataPatchDto {
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub initial_state_id: Option<String>,
+    #[serde(default)]
+    pub initial_scxml_state_id: Option<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ParallelLaneEditorPatchDto {
+    pub lane_id: String,
+    #[serde(default)]
+    pub parent_parallel_id: String,
+    #[serde(default)]
+    pub initial_child_id: Option<String>,
+    #[serde(default)]
+    pub member_state_ids: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wrapper_state_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wrapper_label: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wrapper_initial_child_id: Option<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct WorkflowPatchDto {
+    pub metadata: WorkflowMetadataPatchDto,
+    #[serde(default)]
+    pub states: Vec<StateDto>,
+    #[serde(default)]
+    pub removed_state_ids: Vec<String>,
+    #[serde(default)]
+    pub transitions: Vec<TransitionDto>,
+    #[serde(default)]
+    pub removed_transition_ids: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub data_model: Option<Vec<DataModelEntryDto>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub slot_declarations: Option<Vec<SlotDeclarationDto>>,
+    #[serde(default)]
+    pub parallel_lane_updates: Vec<ParallelLaneEditorPatchDto>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct WorkflowCommandResultDto {
+    pub revision: u64,
+    pub patch: WorkflowPatchDto,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct TargetedTransitionCommandDto {
+    pub id: String,
+    #[serde(rename = "targetStateId")]
+    pub target_state_id: String,
+    #[serde(default)]
+    pub event: String,
+    #[serde(default)]
+    #[serde(rename = "sourceHandle")]
+    pub source_handle: String,
+    #[serde(default)]
+    pub condition: String,
+    #[serde(default)]
+    pub assignments: Vec<AssignmentDto>,
+    #[serde(default)]
+    #[serde(rename = "targetInstanceId")]
+    pub target_instance_id: Option<String>,
+}
+
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ParallelLaneMoveContextDto {
+    pub lane: EditorExportNodeDto,
+    #[serde(default)]
+    pub wrapper: Option<EditorExportNodeDto>,
+    #[serde(default)]
+    #[serde(rename = "memberStateIds")]
+    pub member_state_ids: Vec<String>,
+}
+
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct WrapEditorGroupDto {
+    #[serde(default)]
+    pub lane: Option<ParallelLaneMoveContextDto>,
+    #[serde(default)]
+    #[serde(rename = "stateIds")]
+    pub state_ids: Vec<String>,
+}
+
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct PasteEditorIdMappingDto {
+    pub source_id: String,
+    pub target_id: String,
+}
+
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct PasteEditorTransitionMappingDto {
+    pub source_id: String,
+    pub target_id: String,
+    #[serde(default)]
+    pub target_instance_id: Option<String>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct PasteEditorPositionDto {
+    pub state_id: String,
+    pub x: f64,
+    pub y: f64,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StateSlotsCommandDto {
+    #[serde(rename = "stateId")]
+    pub state_id: String,
+    #[serde(default)]
+    #[serde(rename = "stateName")]
+    pub state_name: String,
+    #[serde(default)]
+    pub input_slots: Vec<EditorExportSlotDto>,
+    #[serde(default)]
+    pub output_slots: Vec<EditorExportSlotDto>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub(crate) enum WorkflowCommandDto {
+    SetRootInitial {
+        #[serde(default)]
+        #[serde(rename = "stateId")]
+        state_id: Option<String>,
+    },
+    SetStateInitialChild {
+        #[serde(rename = "parentStateId")]
+        parent_state_id: String,
+        #[serde(default)]
+        #[serde(rename = "stateId")]
+        state_id: Option<String>,
+    },
+    RenameState {
+        #[serde(rename = "stateId")]
+        state_id: String,
+        #[serde(rename = "scxmlId")]
+        scxml_id: String,
+        #[serde(default)]
+        label: Option<String>,
+        #[serde(default)]
+        #[serde(rename = "fullSkillName")]
+        full_skill_name: Option<String>,
+    },
+    AddState {
+        state: StateDto,
+    },
+    InsertEditorStates {
+        #[serde(default)]
+        nodes: Vec<EditorExportNodeDto>,
+    },
+    MoveEditorState {
+        #[serde(rename = "stateId")]
+        state_id: String,
+        #[serde(default)]
+        #[serde(rename = "parentStateId")]
+        parent_state_id: Option<String>,
+        #[serde(default)]
+        #[serde(rename = "sourceLane")]
+        source_lane: Option<ParallelLaneMoveContextDto>,
+        #[serde(default)]
+        #[serde(rename = "targetLane")]
+        target_lane: Option<ParallelLaneMoveContextDto>,
+        x: f64,
+        y: f64,
+    },
+    ReconcileParallelLane {
+        context: ParallelLaneMoveContextDto,
+    },
+    WrapEditorStates {
+        container: EditorExportNodeDto,
+        #[serde(default)]
+        groups: Vec<WrapEditorGroupDto>,
+    },
+    PasteEditorSubgraph {
+        #[serde(default)]
+        #[serde(rename = "stateMappings")]
+        state_mappings: Vec<PasteEditorIdMappingDto>,
+        #[serde(default)]
+        #[serde(rename = "transitionMappings")]
+        transition_mappings: Vec<PasteEditorTransitionMappingDto>,
+        #[serde(default)]
+        positions: Vec<PasteEditorPositionDto>,
+    },
+    RemoveStates {
+        #[serde(default)]
+        #[serde(rename = "stateIds")]
+        state_ids: Vec<String>,
+    },
+    UpdateStateEditorPosition {
+        #[serde(rename = "stateId")]
+        state_id: String,
+        x: f64,
+        y: f64,
+    },
+    ReplaceStateEditorPositions {
+        #[serde(rename = "stateId")]
+        state_id: String,
+        #[serde(default)]
+        positions: Vec<EditorPositionDto>,
+    },
+    SetStateSource {
+        #[serde(rename = "stateId")]
+        state_id: String,
+        #[serde(default)]
+        source: Option<String>,
+    },
+    ReplaceDataModel {
+        #[serde(default)]
+        entries: Vec<DataModelEntryDto>,
+    },
+    ReplaceStateParameters {
+        #[serde(rename = "stateId")]
+        state_id: String,
+        #[serde(default)]
+        parameters: Vec<ParameterDto>,
+    },
+    ReplaceSlotsSnapshot {
+        #[serde(default)]
+        states: Vec<StateSlotsCommandDto>,
+        #[serde(default)]
+        #[serde(rename = "extraSlotDeclarations")]
+        extra_slot_declarations: Vec<EditorExportSlotDeclarationDto>,
+    },
+    ReplaceTargetedTransitions {
+        #[serde(rename = "sourceStateId")]
+        source_state_id: String,
+        #[serde(default)]
+        transitions: Vec<TargetedTransitionCommandDto>,
+    },
+    ReplaceEditorTransitions {
+        #[serde(default)]
+        nodes: Vec<EditorExportNodeDto>,
+        #[serde(default)]
+        edges: Vec<EditorExportEdgeDto>,
+    },
+}

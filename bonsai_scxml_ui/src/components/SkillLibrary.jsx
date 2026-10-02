@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
     FiSearch,
@@ -11,6 +11,151 @@ import {
 import { MdAssistantNavigation } from "react-icons/md";
 import { FaHandPaper } from "react-icons/fa";
 import { GoPackage } from "react-icons/go";
+
+
+const SkillDescriptionTooltip = React.memo(
+    forwardRef(function SkillDescriptionTooltip(
+        { fetchSkillData, refreshVersion },
+        ref
+    ) {
+        const [tooltip, setTooltip] = useState(null);
+        const descriptionCacheRef = useRef(new Map());
+        const pendingRequestsRef = useRef(new Map());
+        const generationRef = useRef(0);
+
+        useEffect(() => {
+            generationRef.current += 1;
+            descriptionCacheRef.current.clear();
+            pendingRequestsRef.current.clear();
+            setTooltip(null);
+        }, [refreshVersion]);
+
+        const requestDescription = (skill) => {
+            if (descriptionCacheRef.current.has(skill)) {
+                return Promise.resolve(descriptionCacheRef.current.get(skill));
+            }
+
+            if (pendingRequestsRef.current.has(skill)) {
+                return pendingRequestsRef.current.get(skill);
+            }
+
+            const generation = generationRef.current;
+            const request = (async () => {
+                try {
+                    // Keep the complete skill identifier here. fetchSkillData() and
+                    // every other editor call use the full name returned by
+                    // /api/skills; stripping the `skills.` prefix can point at the
+                    // wrong API entry and leave the hover description empty.
+                    const data = fetchSkillData
+                        ? await fetchSkillData(skill)
+                        : await fetch(`/api/skill/${encodeURIComponent(skill)}`).then(
+                            (response) => {
+                                if (!response.ok) {
+                                    throw new Error(
+                                        `Server returned ${response.status}`
+                                    );
+                                }
+                                return response.json();
+                            }
+                        );
+
+                    const description = String(data?.description || "").trim();
+                    if (generation === generationRef.current) {
+                        descriptionCacheRef.current.set(skill, description);
+                    }
+                    return description;
+                } catch (error) {
+                    console.error(
+                        `Could not load description for ${skill}:`,
+                        error
+                    );
+                    if (generation === generationRef.current) {
+                        descriptionCacheRef.current.set(skill, "");
+                    }
+                    return "";
+                } finally {
+                    if (generation === generationRef.current) {
+                        pendingRequestsRef.current.delete(skill);
+                    }
+                }
+            })();
+
+            pendingRequestsRef.current.set(skill, request);
+            return request;
+        };
+
+        useImperativeHandle(
+            ref,
+            () => ({
+                show({ skill, left, top }) {
+                    if (!skill) return;
+
+                    if (descriptionCacheRef.current.has(skill)) {
+                        setTooltip({
+                            skill,
+                            left,
+                            top,
+                            loading: false,
+                            description: descriptionCacheRef.current.get(skill),
+                        });
+                        return;
+                    }
+
+                    setTooltip({
+                        skill,
+                        left,
+                        top,
+                        loading: true,
+                        description: "",
+                    });
+
+                    const requestGeneration = generationRef.current;
+                    requestDescription(skill).then((description) => {
+                        if (requestGeneration !== generationRef.current) return;
+                        setTooltip((current) => {
+                            if (current?.skill !== skill) return current;
+                            return {
+                                ...current,
+                                loading: false,
+                                description,
+                            };
+                        });
+                    });
+                },
+                hide(skill = null) {
+                    setTooltip((current) => {
+                        if (!current) return null;
+                        if (skill && current.skill !== skill) return current;
+                        return null;
+                    });
+                },
+            }),
+            [fetchSkillData]
+        );
+
+        if (!tooltip) return null;
+
+        return createPortal(
+            <div
+                className="skill-description-tooltip"
+                style={{
+                    left: tooltip.left,
+                    top: tooltip.top,
+                }}
+            >
+                <div className="skill-tooltip-name">
+                    {tooltip.skill.split(".").pop()}
+                </div>
+                <div className="skill-tooltip-text">
+                    {tooltip.loading
+                        ? "Loading description..."
+                        : tooltip.description || "No description available."}
+                </div>
+            </div>,
+            document.body
+        );
+    })
+);
 
 function SkillLibrary({
                           searchText,
@@ -34,67 +179,7 @@ function SkillLibrary({
                           isReloadingSkills = false,
                           refreshVersion = 0,
                       }) {
-    const [skillDescriptions, setSkillDescriptions] = useState({});
-    const [loadingDescription, setLoadingDescription] = useState(null);
-    const [skillTooltip, setSkillTooltip] = useState(null);
-
-    useEffect(() => {
-        setSkillDescriptions({});
-        setSkillTooltip(null);
-        setLoadingDescription(null);
-    }, [refreshVersion]);
-
-    const getApiSkillName = (skill) => {
-        if (!skill) return "";
-        return skill.includes("skills.")
-            ? skill.split("skills.")[1]
-            : skill;
-    };
-
-    const loadSkillDescription = async (skill) => {
-        if (
-            !skill ||
-            Object.prototype.hasOwnProperty.call(skillDescriptions, skill)
-        ) {
-            return;
-        }
-
-        setLoadingDescription(skill);
-
-        try {
-            const apiName = getApiSkillName(skill);
-
-            const data = fetchSkillData
-                ? await fetchSkillData(apiName)
-                : await fetch(`/api/skill/${apiName}`).then((response) => {
-                    if (!response.ok) {
-                        throw new Error(
-                            `Server returned ${response.status}`
-                        );
-                    }
-                    return response.json();
-                });
-
-            setSkillDescriptions((previous) => ({
-                ...previous,
-                [skill]: data?.description?.trim() || "",
-            }));
-        } catch (error) {
-            console.error(
-                `Could not load description for ${skill}:`,
-                error
-            );
-
-            setSkillDescriptions((previous) => ({
-                ...previous,
-                [skill]: "",
-            }));
-        } finally {
-            setLoadingDescription((current) =>
-                current === skill ? null : current
-            );
-        }
-    };
+    const skillTooltipRef = useRef(null);
 
     const handleSkillMouseEnter = (event, skill) => {
         const rect = event.currentTarget.getBoundingClientRect();
@@ -133,19 +218,15 @@ function SkillLibrary({
 
         top = Math.max(viewportPadding, top);
 
-        setSkillTooltip({
+        skillTooltipRef.current?.show({
             skill,
             left,
             top,
         });
-
-        loadSkillDescription(skill);
     };
 
     const handleSkillMouseLeave = (skill) => {
-        setSkillTooltip((current) =>
-            current?.skill === skill ? null : current
-        );
+        skillTooltipRef.current?.hide(skill);
     };
 
     const renderSkill = (skill, key = skill) => (
@@ -522,35 +603,34 @@ function SkillLibrary({
                 </div>
             </aside>
 
-            {skillTooltip &&
-                createPortal(
-                    <div
-                        className="skill-description-tooltip"
-                        style={{
-                            left: skillTooltip.left,
-                            top: skillTooltip.top,
-                        }}
-                    >
-                        <div className="skill-tooltip-name">
-                            {skillTooltip.skill
-                                .split(".")
-                                .pop()}
-                        </div>
-
-                        <div className="skill-tooltip-text">
-                            {loadingDescription ===
-                            skillTooltip.skill
-                                ? "Loading description..."
-                                : skillDescriptions[
-                                    skillTooltip.skill
-                                    ] ||
-                                "No description available."}
-                        </div>
-                    </div>,
-                    document.body
-                )}
+            <SkillDescriptionTooltip
+                ref={skillTooltipRef}
+                fetchSkillData={fetchSkillData}
+                refreshVersion={refreshVersion}
+            />
         </>
     );
 }
 
-export default SkillLibrary;
+const areSkillLibraryPropsEqual = (previous, next) => {
+    const stableDataProps = [
+        "searchText",
+        "activeFilter",
+        "packages",
+        "selectedPackage",
+        "searchedSkills",
+        "packageSkills",
+        "filteredSkills",
+        "subPackages",
+        "selectedSubPackage",
+        "directSkills",
+        "activeLibraryTab",
+        "isReloadingSkills",
+        "refreshVersion",
+        "fetchSkillData",
+    ];
+
+    return stableDataProps.every((key) => previous[key] === next[key]);
+};
+
+export default React.memo(SkillLibrary, areSkillLibraryPropsEqual);

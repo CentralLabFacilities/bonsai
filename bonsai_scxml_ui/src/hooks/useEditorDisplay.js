@@ -159,7 +159,14 @@ export function useEditorDisplay({
     );
 
     const cloneGroupByNodeId = useMemo(() => {
-        const visualNodes = [...(nodes || []), ...(injectedSlotNodes || [])];
+        // Clone/reference relationships are semantic and do not depend on live
+        // x/y positions. semanticNodes stays stable while React Flow drags a
+        // node, preventing this complete clone-group index from rebuilding on
+        // every pointer frame.
+        const visualNodes = [
+            ...(semanticNodes || []),
+            ...(injectedSlotNodes || []),
+        ];
         const visualNodeById = new Map(
             visualNodes.map((node) => [node.id, node])
         );
@@ -200,7 +207,7 @@ export function useEditorDisplay({
         });
 
         return groups;
-    }, [nodes, injectedSlotNodes]);
+    }, [semanticNodes, injectedSlotNodes]);
 
     const selectedVisualNodeIdSet = useMemo(() => {
         const ids = new Set(selectedNodeIdSet);
@@ -297,6 +304,20 @@ export function useEditorDisplay({
         [edges]
     );
 
+    // Node positions change on every React Flow drag frame. Transition
+    // normalization only needs structural node metadata (type/collapse/parent),
+    // so keep the last pre-drag node index until the drop completes. Otherwise
+    // every pointer move invalidates the complete transition/slot render cache.
+    const transitionNodeByIdRef = useRef(nodeById);
+    const transitionNodeById = useMemo(() => {
+        if (isDraggingNode && transitionNodeByIdRef.current) {
+            return transitionNodeByIdRef.current;
+        }
+
+        transitionNodeByIdRef.current = nodeById;
+        return nodeById;
+    }, [nodeById, isDraggingNode]);
+
     // Build the complete transition render model once for the loaded graph.
     // Visibility/hover changes must never force normalization or routing to run
     // again; those interactions only select entries from this cache below.
@@ -307,11 +328,11 @@ export function useEditorDisplay({
 
                 const collapsedSource = getCollapsedTransitionSource(
                     normalizedEdge,
-                    nodeById
+                    transitionNodeById
                 );
                 if (
                     collapsedSource &&
-                    nodeById.get(collapsedSource.nodeId)?.type === "parallel"
+                    transitionNodeById.get(collapsedSource.nodeId)?.type === "parallel"
                 ) {
                     normalizedEdge = {
                         ...normalizedEdge,
@@ -321,7 +342,7 @@ export function useEditorDisplay({
                 }
 
                 if (!normalizedEdge.targetHandle) {
-                    const targetNode = nodeById.get(normalizedEdge.target);
+                    const targetNode = transitionNodeById.get(normalizedEdge.target);
 
                     if (
                         targetNode &&
@@ -370,7 +391,7 @@ export function useEditorDisplay({
 
                 return normalizedEdge;
             }),
-        [transitionStructureEdges, nodeById]
+        [transitionStructureEdges, transitionNodeById]
     );
 
     const routingGeometryNodesRef = useRef([]);
@@ -410,6 +431,13 @@ export function useEditorDisplay({
     // Slot nodes are included only in modes where they are actually rendered.
     const manualRoutingNodesRef = useRef([]);
     const manualRoutingNodes = useMemo(() => {
+        // The provider snapshot is intentionally static while dragging. Return
+        // it before even constructing/comparing injected node arrays; the live
+        // dragged endpoint is handled by React Flow itself.
+        if (isDraggingNode && manualRoutingNodesRef.current.length > 0) {
+            return manualRoutingNodesRef.current;
+        }
+
         const requestedNodes =
             activeMode === "slots" || activeMode === "overview"
                 ? [...injectedNodes, ...injectedSlotNodes]
@@ -437,7 +465,7 @@ export function useEditorDisplay({
 
         manualRoutingNodesRef.current = requestedNodes;
         return requestedNodes;
-    }, [activeMode, injectedNodes, injectedSlotNodes]);
+    }, [activeMode, injectedNodes, injectedSlotNodes, isDraggingNode]);
 
     // Build the expensive routing geometry once per real geometry change.
     // Previously the compound-avoidance pass repeatedly walked parent chains
@@ -673,7 +701,7 @@ export function useEditorDisplay({
                 return;
             }
 
-            const targetNode = nodeById.get(edge.target);
+            const targetNode = transitionNodeById.get(edge.target);
             if (!targetNode || !["custom", "submachine"].includes(targetNode.type)) {
                 return;
             }
@@ -689,7 +717,7 @@ export function useEditorDisplay({
                 .filter((edgeIds) => edgeIds.length === 1)
                 .map((edgeIds) => edgeIds[0])
         );
-    }, [normalizedTransitionEdges, nodeById]);
+    }, [normalizedTransitionEdges, transitionNodeById]);
 
     const smartTransitionEdges = useMemo(
         () =>
@@ -747,7 +775,7 @@ export function useEditorDisplay({
     // cheap Bezier path once the graph crosses this threshold. Focused/selected
     // transitions still use the full smart-routed, labelled representation.
     const useLightweightBackgroundTransitions =
-        smartTransitionEdges.length >= 300;
+        isDraggingNode || smartTransitionEdges.length >= 180;
 
     // Cache all presentation variants independently from React Flow selection.
     // Selecting one edge used to rebuild base/focused objects for the complete
@@ -813,6 +841,10 @@ export function useEditorDisplay({
                     ? { ...fullDetailEdge.markerEnd, color }
                     : fullDetailEdge.markerEnd,
             };
+            // Detail-panel/programmatic hover still uses the React projection.
+            // Keep its moving-dash feedback; ordinary canvas hover is handled
+            // imperatively in EditorCanvas and therefore does not rebuild this
+            // cache on every pointer enter/leave.
             const focusedEdge = {
                 ...withEdgeClassName(
                     withEdgeClassName(
@@ -990,13 +1022,48 @@ export function useEditorDisplay({
         () =>
             slotStructureEdges.map((edge) => {
                 const access = edge.data?.access === "write" ? "write" : "read";
+                let collapsedSourceId = null;
+
+                if (hiddenNodeIds.has(edge.source)) {
+                    let current = transitionNodeById.get(edge.source);
+                    const visited = new Set();
+
+                    while (current?.parentId && !visited.has(current.parentId)) {
+                        visited.add(current.parentId);
+                        const parent = transitionNodeById.get(current.parentId);
+                        if (!parent) break;
+
+                        if (
+                            (parent.type === "compound" || parent.type === "parallel") &&
+                            parent.data?.isCollapsed &&
+                            !hiddenNodeIds.has(parent.id)
+                        ) {
+                            collapsedSourceId = parent.id;
+                        }
+
+                        current = parent;
+                    }
+                }
 
                 return {
                     ...edge,
+                    source: collapsedSourceId || edge.source,
+                    sourceHandle: collapsedSourceId
+                        ? "collapsed-slot-source"
+                        : edge.sourceHandle,
                     type: "smartTransition",
                     data: {
                         ...(edge.data || {}),
+                        ...(collapsedSourceId
+                            ? { collapsedSlotOriginalSource: edge.source }
+                            : {}),
                         access,
+                        // During a node drag, obstacle routing is deliberately
+                        // suspended. React Flow still moves connected endpoints
+                        // live, but uses the cheap Bezier presentation until drop.
+                        ...(isDraggingNode
+                            ? { lightweightBackgroundRouting: true }
+                            : {}),
                         // Slot edges use the same geometry-only obstacle cache;
                         // in Slot/Overview mode it already includes slot nodes.
                         routingNodes: manualRoutingNodes,
@@ -1023,7 +1090,10 @@ export function useEditorDisplay({
             }),
         [
             slotStructureEdges,
+            hiddenNodeIds,
+            transitionNodeById,
             manualRoutingNodes,
+            isDraggingNode,
             updatePersistentEdgeControlPoints,
             controlPointInsertRequest,
             onControlPointContextMenu,
@@ -1460,12 +1530,29 @@ export function useEditorDisplay({
             ];
         }
 
-        // This pass runs only when dragging starts/stops. Hover focus is now
-        // handled by CSS classes, so it no longer clones every visible edge.
+        // Dragging is the hottest interaction path in the editor. Keeping every
+        // transition/slot edge mounted means React Flow still has to maintain a
+        // very large SVG tree while only one node is moving. During the drag,
+        // keep just the edges that actually belong to the dragged node (plus
+        // explicitly selected edges). The full cached edge graph is restored
+        // once on drag stop. This changes presentation only; semantic edges are
+        // never removed from the editor model.
         if (isDraggingNode) {
-            nextVisibleEdges = nextVisibleEdges.map((edge) =>
-                edge.animated ? { ...edge, animated: false } : edge
-            );
+            nextVisibleEdges = nextVisibleEdges
+                .filter((edge) => {
+                    if (edge.selected) return true;
+
+                    const connectedNodeIds = new Set([
+                        ...getTransitionEdgeNodeIds(edge),
+                        ...getSlotEdgeNodeIds(edge),
+                    ]);
+                    return [...connectedNodeIds].some((nodeId) =>
+                        edgeFocusNodeIds.has(nodeId)
+                    );
+                })
+                .map((edge) =>
+                    edge.animated ? { ...edge, animated: false } : edge
+                );
         }
 
         if (hiddenNodeIds.size > 0) {

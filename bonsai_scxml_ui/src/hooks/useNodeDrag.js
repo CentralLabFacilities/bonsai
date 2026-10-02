@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { resolveCollisionScope } from "../utils/nodeCollisions";
 import { rebuildBoundaryTransitions } from "../utils/boundaryTransitions";
 import { getOverviewLayoutNodeSize } from "../utils/layoutUtils";
+import { createEditorNodeIndex } from "../utils/editorGraph";
 import {
     COMPOUND_HEADER_HEIGHT,
     COMPOUND_PADDING_X,
@@ -10,10 +11,7 @@ import {
     PARALLEL_NODE_GAP,
     PARALLEL_LANE_CHILD_TOP_INSET,
     fitCompoundAndAncestorCompounds,
-    getAbsoluteNodePosition,
-    getDirectCompoundForNode,
     getCompoundExitGutterWidth,
-    getLaneForNode,
     getNodeSize,
     growParallelToLaneContents,
     isParallelLaneSkillCandidate,
@@ -43,6 +41,9 @@ export function useNodeDrag({
     setHoveredEditorEdgeId,
     screenToFlowPosition,
     getNodes,
+    syncStatePosition,
+    syncStateEditorPositions,
+    syncRemovedStates,
 }) {
     const [parallelDropTargetId, setParallelDropTargetId] = useState(null);
     const [compoundDropTargetId, setCompoundDropTargetId] = useState(null);
@@ -60,30 +61,22 @@ export function useNodeDrag({
         }
     }, []);
 
-    const dragContainerIndexRef = useRef({ lanes: [], compounds: [] });
+    const dragContainerIndexRef = useRef({
+        lanes: [],
+        compounds: [],
+        allTargets: [],
+        compoundTargets: [],
+        byId: new Map(),
+    });
+    const dragTrashBoundsRef = useRef(null);
     const dragOriginContainerRef = useRef(null);
+    const dragOriginParentIdRef = useRef(null);
 
     const buildDragContainerIndex = useCallback((currentNodes) => {
-        const currentNodeById = new Map(
-            currentNodes.map((node) => [node.id, node])
-        );
-
-        const getAncestorIds = (node) => {
-            const result = new Set();
-            let parentId = node?.parentId;
-            const seen = new Set();
-
-            while (parentId && !seen.has(parentId)) {
-                seen.add(parentId);
-                result.add(parentId);
-                parentId = currentNodeById.get(parentId)?.parentId;
-            }
-
-            return result;
-        };
+        const graphIndex = createEditorNodeIndex(currentNodes);
 
         const toBounds = (node) => {
-            const absolute = getAbsoluteNodePosition(node, currentNodes);
+            const absolute = graphIndex.getAbsolutePosition(node);
             const size =
                 node.type === "parallelLane"
                     ? {
@@ -91,7 +84,7 @@ export function useNodeDrag({
                           height: Number(node.style?.height) || 110,
                       }
                     : getNodeSize(node);
-            const ancestorIds = getAncestorIds(node);
+            const ancestorIds = graphIndex.getAncestorIds(node);
 
             return {
                 id: node.id,
@@ -120,7 +113,26 @@ export function useNodeDrag({
         });
 
         compounds.sort((a, b) => b.depth - a.depth);
-        return { lanes, compounds };
+        lanes.sort((a, b) => b.depth - a.depth);
+
+        // Candidate ordering is static for the duration of a drag. Build it
+        // once instead of allocating/filtering/sorting all containers on each
+        // pointer frame. Deepest containers come first so the first hit is the
+        // correct nested drop target.
+        const allTargets = [...compounds, ...lanes].sort(
+            (a, b) => b.depth - a.depth
+        );
+        const byId = new Map(
+            [...compounds, ...lanes].map((entry) => [entry.id, entry])
+        );
+
+        return {
+            lanes,
+            compounds,
+            allTargets,
+            compoundTargets: compounds,
+            byId,
+        };
     }, []);
 
     const handleNodeDragStart = useCallback((event, node) => {
@@ -134,29 +146,48 @@ export function useNodeDrag({
         // hit-test index once here instead of deriving signatures from the
         // full nodes array on every pointer-driven position update.
         const currentNodes = getNodes();
+        const graphIndex = createEditorNodeIndex(currentNodes);
         dragContainerIndexRef.current = buildDragContainerIndex(currentNodes);
+
+        // DOM hit-testing (elementFromPoint) can force browser style/layout
+        // work. The trash zone does not move during a node drag, so snapshot
+        // its viewport bounds once and use a numeric point-in-rect test later.
+        const trashElement = document.querySelector(".trash-bin-dropzone");
+        const trashRect = trashElement?.getBoundingClientRect?.();
+        dragTrashBoundsRef.current = trashRect
+            ? {
+                  left: trashRect.left,
+                  right: trashRect.right,
+                  top: trashRect.top,
+                  bottom: trashRect.bottom,
+              }
+            : null;
 
         // Prefer the immediate Compound boundary when a skill is nested in a
         // Compound that itself lives inside a Parallel lane. If there is no
         // direct Compound parent, the lane boundary becomes the sticky one.
-        const sourceCompound = getDirectCompoundForNode(node, currentNodes);
+        const immediateParent = node.parentId
+            ? graphIndex.byId.get(node.parentId)
+            : null;
+        const sourceCompound =
+            immediateParent?.type === "compound" ? immediateParent : null;
         const sourceLane = sourceCompound
             ? null
-            : getLaneForNode(node, currentNodes);
+            : graphIndex.findAncestor(
+                node,
+                (candidate) => candidate.type === "parallelLane"
+            );
         const sourceContainer = sourceCompound || sourceLane;
         if (sourceContainer) {
-            const absolute = getAbsoluteNodePosition(sourceContainer, currentNodes);
+            const absolute = graphIndex.getAbsolutePosition(sourceContainer);
             const size = sourceLane
                 ? {
                     width: Number(sourceLane.style?.width) || 420,
                     height: Number(sourceLane.style?.height) || 110,
                 }
                 : getNodeSize(sourceCompound);
-            const immediateParent = currentNodes.find(
-                (candidate) => candidate.id === node.parentId
-            );
             const parentAbsolute = immediateParent
-                ? getAbsoluteNodePosition(immediateParent, currentNodes)
+                ? graphIndex.getAbsolutePosition(immediateParent)
                 : { x: 0, y: 0 };
             const nodeSize = getNodeSize(node);
 
@@ -175,16 +206,14 @@ export function useNodeDrag({
             dragOriginContainerRef.current = null;
         }
 
+        dragOriginParentIdRef.current = node.parentId || null;
         setDraggingNodeId(node.id);
         setIsDraggingNode(true);
         setHoveredEditorEdgeId(null);
 
         // Nodes innerhalb einer Lane dürfen vorübergehend den
         // bisherigen Parent verlassen.
-        if (
-            getLaneForNode(node, currentNodes) ||
-            getDirectCompoundForNode(node, currentNodes)
-        ) {
+        if (sourceLane || sourceCompound) {
             setNodes((allNodes) =>
                 allNodes.map((candidate) =>
                     candidate.id === node.id
@@ -206,11 +235,22 @@ export function useNodeDrag({
         const pending = pendingNodeDragRef.current;
         if (!pending) return;
 
-        const { clientX, clientY, nodeId, nodeType, isEditorClone } = pending;
+        const {
+            clientX,
+            clientY,
+            flowX,
+            flowY,
+            nodeId,
+            nodeType,
+            isEditorClone,
+        } = pending;
+        const trashBounds = dragTrashBoundsRef.current;
         const isOverTrash = Boolean(
-            document
-                .elementFromPoint(clientX, clientY)
-                ?.closest(".trash-bin-dropzone")
+            trashBounds &&
+            clientX >= trashBounds.left &&
+            clientX <= trashBounds.right &&
+            clientY >= trashBounds.top &&
+            clientY <= trashBounds.bottom
         );
 
         setIsOverTrash(isOverTrash);
@@ -224,25 +264,28 @@ export function useNodeDrag({
             return;
         }
 
-        const pointerPosition = screenToFlowPosition({
-            x: clientX,
-            y: clientY,
-        });
+        const pointerPosition = { x: flowX, y: flowY };
         const containsPointer = (entry) =>
-            pointerPosition.x >= entry.x &&
-            pointerPosition.x <= entry.x + entry.width &&
-            pointerPosition.y >= entry.y &&
-            pointerPosition.y <= entry.y + entry.height;
+            flowX >= entry.x &&
+            flowX <= entry.x + entry.width &&
+            flowY >= entry.y &&
+            flowY <= entry.y + entry.height;
         const canUseTarget = (entry) =>
             entry.id !== nodeId && !entry.ancestorIds.has(nodeId);
 
         const dragContainerIndex = dragContainerIndexRef.current;
-        const hoveredContainer = [
-            ...dragContainerIndex.compounds,
-            ...(nodeType !== "parallel" ? dragContainerIndex.lanes : []),
-        ]
-            .filter((entry) => canUseTarget(entry) && containsPointer(entry))
-            .sort((a, b) => b.depth - a.depth)[0] || null;
+        const candidates =
+            nodeType === "parallel"
+                ? dragContainerIndex.compoundTargets
+                : dragContainerIndex.allTargets;
+        let hoveredContainer = null;
+        for (let index = 0; index < candidates.length; index += 1) {
+            const entry = candidates[index];
+            if (canUseTarget(entry) && containsPointer(entry)) {
+                hoveredContainer = entry;
+                break;
+            }
+        }
 
         let hoveredLane =
             hoveredContainer?.type === "parallelLane"
@@ -264,24 +307,32 @@ export function useNodeDrag({
             pointInsideBounds(pointerPosition, origin, CONTAINER_EXIT_RESISTANCE)
         ) {
             if (origin.kind === "compound") {
-                effectiveCompound = dragContainerIndex.compounds.find(
-                    (entry) => entry.id === origin.id
-                ) || origin;
+                effectiveCompound =
+                    dragContainerIndex.byId.get(origin.id) || origin;
             } else if (origin.kind === "parallelLane" && nodeType !== "parallel") {
-                hoveredLane = dragContainerIndex.lanes.find(
-                    (entry) => entry.id === origin.id
-                ) || origin;
+                hoveredLane =
+                    dragContainerIndex.byId.get(origin.id) || origin;
             }
         }
 
         setCompoundDropTargetId(effectiveCompound?.id || null);
         setParallelDropTargetId(hoveredLane?.id || null);
-    }, [screenToFlowPosition]);
+    }, []);
 
     const handleNodeDrag = useCallback((event, draggedNode) => {
+        // Convert coordinates once per pointer event. The previous path did
+        // this here for sticky-container clamping and again in the RAF drop
+        // target pass.
+        const pointerPosition = screenToFlowPosition({
+            x: event.clientX,
+            y: event.clientY,
+        });
+
         pendingNodeDragRef.current = {
             clientX: event.clientX,
             clientY: event.clientY,
+            flowX: pointerPosition.x,
+            flowY: pointerPosition.y,
             nodeId: draggedNode.id,
             nodeType: draggedNode.type,
             isEditorClone: Boolean(
@@ -301,10 +352,6 @@ export function useNodeDrag({
             draggedNode.type === "custom" &&
             !(draggedNode.data?.isSkillClone || draggedNode.data?.isStateClone)
         ) {
-            const pointerPosition = screenToFlowPosition({
-                x: event.clientX,
-                y: event.clientY,
-            });
             const isOutsideContainer = !pointInsideBounds(
                 pointerPosition,
                 origin,
@@ -366,8 +413,17 @@ export function useNodeDrag({
         }
         pendingNodeDragRef.current = null;
         const dragOriginContainer = dragOriginContainerRef.current;
-        dragContainerIndexRef.current = { lanes: [], compounds: [] };
+        const dragOriginParentId = dragOriginParentIdRef.current;
+        dragContainerIndexRef.current = {
+            lanes: [],
+            compounds: [],
+            allTargets: [],
+            compoundTargets: [],
+            byId: new Map(),
+        };
+        dragTrashBoundsRef.current = null;
         dragOriginContainerRef.current = null;
+        dragOriginParentIdRef.current = null;
 
         const element = document.elementFromPoint(
             event.clientX,
@@ -375,83 +431,68 @@ export function useNodeDrag({
         );
 
         if (element?.closest(".trash-bin-dropzone")) {
-            setNodes((currentNodes) => {
-                const idsToDelete = new Set([node.id]);
-                let foundNew = true;
-
-                while (foundNew) {
-                    foundNew = false;
-
-                    currentNodes.forEach((candidate) => {
-                        const isDescendant =
-                            candidate.parentId &&
-                            idsToDelete.has(candidate.parentId);
-                        const isCloneOfDeletedState =
-                            (candidate.data?.isSkillClone || candidate.data?.isStateClone) &&
-                            idsToDelete.has(candidate.data?.cloneOfNodeId);
-
-                        if (
-                            (isDescendant || isCloneOfDeletedState) &&
-                            !idsToDelete.has(candidate.id)
-                        ) {
-                            idsToDelete.add(candidate.id);
-                            foundNew = true;
-                        }
-                    });
+            const currentNodes = getNodes();
+            const graphIndex = createEditorNodeIndex(currentNodes);
+            const clonesBySource = new Map();
+            currentNodes.forEach((candidate) => {
+                if (
+                    !(candidate.data?.isSkillClone || candidate.data?.isStateClone) ||
+                    !candidate.data?.cloneOfNodeId
+                ) {
+                    return;
                 }
 
-                setEdges((currentEdges) =>
-                    currentEdges.filter(
-                        (edge) =>
-                            !idsToDelete.has(edge.source) &&
-                            !idsToDelete.has(edge.target) &&
-                            !idsToDelete.has(
-                                edge.data?.boundaryOriginalSource
-                            ) &&
-                            !idsToDelete.has(
-                                edge.data?.compoundOriginalSource
-                            ) &&
-                            !idsToDelete.has(
-                                edge.data?.compoundOriginalTarget
-                            ) &&
-                            !idsToDelete.has(
-                                edge.data?.parallelOriginalSource
-                            ) &&
-                            !idsToDelete.has(
-                                edge.data?.parallelOriginalTarget
-                            )
-                    )
-                );
+                const sourceId = candidate.data.cloneOfNodeId;
+                if (!clonesBySource.has(sourceId)) {
+                    clonesBySource.set(sourceId, []);
+                }
+                clonesBySource.get(sourceId).push(candidate);
+            });
 
-                setSlotEdges((currentEdges) => {
-                    const updatedEdges = currentEdges.filter(
-                        (edge) =>
-                            !idsToDelete.has(edge.source) &&
-                            !idsToDelete.has(edge.target)
-                    );
+            const idsToDelete = new Set();
+            const pendingIds = [node.id];
+            for (let index = 0; index < pendingIds.length; index += 1) {
+                const currentId = pendingIds[index];
+                if (!currentId || idsToDelete.has(currentId)) continue;
 
-                    setSlotNodes((currentSlotNodes) =>
-                        currentSlotNodes.filter((slotNode) =>
-                            updatedEdges.some(
-                                (edge) =>
-                                    edge.source === slotNode.id ||
-                                    edge.target === slotNode.id
-                            )
-                        )
-                    );
-
-                    return updatedEdges;
+                idsToDelete.add(currentId);
+                graphIndex.getChildren(currentId).forEach((child) => {
+                    if (!idsToDelete.has(child.id)) pendingIds.push(child.id);
                 });
+                (clonesBySource.get(currentId) || []).forEach((clone) => {
+                    if (!idsToDelete.has(clone.id)) pendingIds.push(clone.id);
+                });
+            }
 
-                setSelectedNodeId((id) =>
-                    idsToDelete.has(id) ? null : id
-                );
-
-                return currentNodes
-                    .filter(
-                        (candidate) =>
-                            !idsToDelete.has(candidate.id)
-                    )
+            const removedReferenceNodes = currentNodes.filter(
+                (candidate) =>
+                    idsToDelete.has(candidate.id) &&
+                    (candidate.data?.isSkillClone || candidate.data?.isStateClone)
+            );
+            const referenceStateIds = removedReferenceNodes.map(
+                (candidate) => candidate.id
+            );
+            const referenceSourceIds = Array.from(
+                new Set(
+                    removedReferenceNodes
+                        .map((candidate) => candidate.data?.cloneOfNodeId)
+                        .filter((sourceId) => sourceId && !idsToDelete.has(sourceId))
+                )
+            );
+            const removedSemanticNodes = currentNodes.filter(
+                (candidate) =>
+                    idsToDelete.has(candidate.id) &&
+                    !candidate.data?.isSkillClone &&
+                    !candidate.data?.isStateClone
+            );
+            const refreshSlots = removedSemanticNodes.some(
+                (candidate) =>
+                    (candidate.data?.inSlots || []).some((slot) => slot?.path) ||
+                    (candidate.data?.outSlots || []).some((slot) => slot?.path)
+            );
+            setNodes((allNodes) =>
+                allNodes
+                    .filter((candidate) => !idsToDelete.has(candidate.id))
                     .map((candidate) => {
                         if (
                             candidate.type !== "compound" &&
@@ -470,7 +511,52 @@ export function useNodeDrag({
                                 ),
                             },
                         };
-                    });
+                    })
+            );
+
+            setEdges((currentEdges) =>
+                currentEdges.filter(
+                    (edge) =>
+                        !idsToDelete.has(edge.source) &&
+                        !idsToDelete.has(edge.target) &&
+                        !idsToDelete.has(edge.data?.boundaryOriginalSource) &&
+                        !idsToDelete.has(edge.data?.compoundOriginalSource) &&
+                        !idsToDelete.has(edge.data?.compoundOriginalTarget) &&
+                        !idsToDelete.has(edge.data?.parallelOriginalSource) &&
+                        !idsToDelete.has(edge.data?.parallelOriginalTarget)
+                )
+            );
+
+            setSlotEdges((currentEdges) => {
+                const updatedEdges = currentEdges.filter(
+                    (edge) =>
+                        !idsToDelete.has(edge.source) &&
+                        !idsToDelete.has(edge.target)
+                );
+
+                const connectedNodeIds = new Set();
+                updatedEdges.forEach((edge) => {
+                    if (edge.source) connectedNodeIds.add(edge.source);
+                    if (edge.target) connectedNodeIds.add(edge.target);
+                });
+
+                setSlotNodes((currentSlotNodes) =>
+                    currentSlotNodes.filter((slotNode) =>
+                        connectedNodeIds.has(slotNode.id)
+                    )
+                );
+
+                return updatedEdges;
+            });
+
+            setSelectedNodeId((id) =>
+                idsToDelete.has(id) ? null : id
+            );
+
+            void syncRemovedStates?.([...idsToDelete], {
+                refreshSlots,
+                referenceStateIds,
+                referenceSourceIds,
             });
 
             setDraggingNodeId(null);
@@ -498,25 +584,21 @@ export function useNodeDrag({
         // for references to states in later Parallel lanes and also matches the
         // way reference metadata is reconstructed on SCXML import.
         if (node.data?.isSkillClone || node.data?.isStateClone) {
+            const referenceSourceId = String(
+                node.data?.cloneOfNodeId || ""
+            ).trim();
             setNodes((currentNodes) => {
-                const liveNode = currentNodes.find(
-                    (candidate) => candidate.id === node.id
-                );
-                const sourceNode = currentNodes.find(
-                    (candidate) =>
-                        candidate.id === liveNode?.data?.cloneOfNodeId
-                );
+                const graphIndex = createEditorNodeIndex(currentNodes);
+                const liveNode = graphIndex.byId.get(node.id);
+                const sourceNode = liveNode?.data?.cloneOfNodeId
+                    ? graphIndex.byId.get(liveNode.data.cloneOfNodeId)
+                    : null;
 
                 if (!liveNode) return currentNodes;
 
-                const absolute = getAbsoluteNodePosition(
-                    liveNode,
-                    currentNodes
-                );
+                const absolute = graphIndex.getAbsolutePosition(liveNode);
                 const sourceParent = sourceNode?.parentId
-                    ? currentNodes.find(
-                        (candidate) => candidate.id === sourceNode.parentId
-                    )
+                    ? graphIndex.byId.get(sourceNode.parentId)
                     : null;
 
                 let nextNodes = currentNodes.map((candidate) => {
@@ -532,9 +614,8 @@ export function useNodeDrag({
                         };
                     }
 
-                    const parentAbsolute = getAbsoluteNodePosition(
-                        sourceParent,
-                        currentNodes
+                    const parentAbsolute = graphIndex.getAbsolutePosition(
+                        sourceParent
                     );
                     return {
                         ...candidate,
@@ -566,6 +647,9 @@ export function useNodeDrag({
                 return nextNodes;
             });
 
+            if (referenceSourceId) {
+                void syncStateEditorPositions?.(referenceSourceId);
+            }
             setDraggingNodeId(null);
             setIsDraggingNode(false);
             setIsOverTrash(false);
@@ -580,18 +664,18 @@ export function useNodeDrag({
         });
 
         setNodes((currentNodes) => {
-            const draggedNode = currentNodes.find(
-                (candidate) => candidate.id === node.id
-            );
+            const graphIndex = createEditorNodeIndex(currentNodes);
+            const draggedNode = graphIndex.byId.get(node.id);
 
             if (!draggedNode) {
                 return currentNodes;
             }
 
-            const sourceCompound = getDirectCompoundForNode(
-                draggedNode,
-                currentNodes
-            );
+            const draggedParent = draggedNode.parentId
+                ? graphIndex.byId.get(draggedNode.parentId)
+                : null;
+            const sourceCompound =
+                draggedParent?.type === "compound" ? draggedParent : null;
 
             const targetContainer = findDropContainerAtPoint(
                 dropPoint,
@@ -615,11 +699,11 @@ export function useNodeDrag({
             // Compound wrapper. The lane is the conceptual hit target, but its
             // wrapper is the actual semantic parent for inserted/moved states.
             if (targetLaneAtDrop) {
-                const laneWrapper = currentNodes.find(
-                    (candidate) =>
-                        candidate.parentId === targetLaneAtDrop.id &&
+                const laneWrapper = graphIndex
+                    .getChildren(targetLaneAtDrop.id)
+                    .find((candidate) =>
                         isAutoParallelLaneCompound(candidate)
-                );
+                    );
 
                 if (laneWrapper) {
                     targetCompound = laneWrapper;
@@ -718,10 +802,7 @@ export function useNodeDrag({
                 (sourceCompound || targetCompound) &&
                 (targetCompound || !targetLaneAtDrop)
             ) {
-                const absolute = getAbsoluteNodePosition(
-                    draggedNode,
-                    currentNodes
-                );
+                const absolute = graphIndex.getAbsolutePosition(draggedNode);
 
                 // Zunächst aus aktuellem Parent lösen
                 let next = currentNodes.map((c) =>
@@ -731,30 +812,13 @@ export function useNodeDrag({
                             parentId: undefined,
                             extent: undefined,
                             position: absolute,
-                            // Initial-state membership is scoped to the
-                            // Compound the node came from. Carrying that flag
-                            // across a reparent can create a second top-level
-                            // initial state or overwrite the target Compound's
-                            // existing initial state. Clear it here; the normal
-                            // Compound initial-state normalization will choose
-                            // the appropriate initial child for the old/new
-                            // container after the drop.
-                            data: sourceCompound
-                                ? {
-                                    ...(c.data || {}),
-                                    isInitial: false,
-                                }
-                                : c.data,
                         }
                         : c
                 );
 
                 if (targetCompound) {
                     const compoundPosition =
-                        getAbsoluteNodePosition(
-                            targetCompound,
-                            currentNodes
-                        );
+                        graphIndex.getAbsolutePosition(targetCompound);
 
                     // Absolute Position der Node in eine
                     // relative Compound-Position umrechnen
@@ -821,282 +885,26 @@ export function useNodeDrag({
 
 
 
-                /*
-                 * Keep outgoing compound transitions consistent when a child
-                 * state is moved into, out of, or between compounds.
-                 *
-                 * The persisted/logical transition remains the external edge.
-                 * A separate display edge connects the real child state to the
-                 * matching exit point on the compound boundary.
-                 */
-                let rewrittenEdges = [...edges];
-
-                if (sourceCompound) {
-                    const oldCompoundExitIds = new Set(
-                        rewrittenEdges
-                            .filter(
-                                (edge) =>
-                                    edge.data?.compoundOriginalSource ===
-                                    draggedNode.id
-                            )
-                            .map(
-                                (edge) =>
-                                    edge.data?.compoundExitId ||
-                                    edge.sourceHandle
-                            )
-                            .filter(Boolean)
-                    );
-
-                    // Remove the old child -> compound boundary helper edges.
-                    rewrittenEdges = rewrittenEdges.filter(
-                        (edge) =>
-                            !(
-                                edge.data?.compoundInternalEdge &&
-                                edge.source === draggedNode.id &&
-                                edge.target === sourceCompound.id
-                            )
-                    );
-
-                    // Turn the external compound edges back into ordinary
-                    // transitions from the actual child before potentially
-                    // wrapping them for the new compound below.
-                    rewrittenEdges = rewrittenEdges.map((edge) => {
-                        if (
-                            edge.data?.compoundOriginalSource !==
-                            draggedNode.id
-                        ) {
-                            return edge;
-                        }
-
-                        const restoredHandle =
-                            edge.data?.compoundOriginalSourceHandle ||
-                            edge.sourceHandle ||
-                            "success";
-
-                        const restoredData = {
-                            ...(edge.data || {}),
-                        };
-
-                        delete restoredData.compoundOriginalSource;
-                        delete restoredData.compoundOriginalSourceHandle;
-                        delete restoredData.compoundExitId;
-
-                        return {
-                            ...edge,
-                            source: draggedNode.id,
-                            sourceHandle: restoredHandle,
-                            label: edge.label || restoredHandle,
-                            data: restoredData,
-                        };
-                    });
-
-                    // Remove exit points that belonged to this child from the
-                    // old compound. Other child exits stay untouched.
-                    next = next.map((candidate) => {
-                        if (candidate.id !== sourceCompound.id) {
-                            return candidate;
-                        }
-
-                        return {
-                            ...candidate,
-                            data: {
-                                ...candidate.data,
-                                events: (
-                                    candidate.data?.events || []
-                                ).filter(
-                                    (event) =>
-                                        event.sourceNodeId !==
-                                        draggedNode.id &&
-                                        !oldCompoundExitIds.has(event.id)
-                                ),
-                            },
-                        };
-                    });
-                }
-
-                if (targetCompound) {
-                    const targetMemberIds = new Set(
-                        next
-                            .filter(
-                                (candidate) =>
-                                    candidate.parentId ===
-                                    targetCompound.id
-                            )
-                            .map((candidate) => candidate.id)
-                    );
-
-                    const baseName =
-                        draggedNode.data?.label ||
-                        draggedNode.data?.fullSkillName
-                            ?.split("#")[0]
-                            ?.split(".")
-                            ?.pop() ||
-                        "state";
-
-                    const compoundEventsById = new Map(
-                        (
-                            next.find(
-                                (candidate) =>
-                                    candidate.id === targetCompound.id
-                            )?.data?.events || []
-                        ).map((event) => [
-                            String(event.id),
-                            event,
-                        ])
-                    );
-
-                    const internalEdgesByExitId = new Map();
-
-                    rewrittenEdges = rewrittenEdges.map((edge) => {
-                        if (
-                            edge.source !== draggedNode.id ||
-                            edge.data?.compoundInternalEdge
-                        ) {
-                            return edge;
-                        }
-
-                        // A transition between two children of the same
-                        // compound remains an ordinary internal transition.
-                        if (
-                            targetMemberIds.has(edge.target) ||
-                            edge.target === targetCompound.id
-                        ) {
-                            return edge;
-                        }
-
-                        const originalHandleId = String(
-                            edge.sourceHandle || "success"
-                        );
-                        const compoundExitId =
-                            `${draggedNode.id}-${originalHandleId}`;
-                        const exitLabel =
-                            `${baseName}.${originalHandleId}`;
-
-                        if (
-                            !compoundEventsById.has(compoundExitId)
-                        ) {
-                            compoundEventsById.set(
-                                compoundExitId,
-                                {
-                                    id: compoundExitId,
-                                    name: exitLabel,
-                                    rawEvent: exitLabel,
-                                    target: edge.target,
-                                    sourceNodeId: draggedNode.id,
-                                    transitionHandleId:
-                                    originalHandleId,
-                                }
-                            );
-                        }
-
-                        if (
-                            !internalEdgesByExitId.has(
-                                compoundExitId
-                            )
-                        ) {
-                            internalEdgesByExitId.set(
-                                compoundExitId,
-                                {
-                                    id:
-                                        `edge-internal-compound-${draggedNode.id}-` +
-                                        `${originalHandleId}-${targetCompound.id}-` +
-                                        crypto.randomUUID(),
-                                    source: draggedNode.id,
-                                    target: targetCompound.id,
-                                    sourceHandle:
-                                    originalHandleId,
-                                    targetHandle:
-                                        `target-${compoundExitId}`,
-                                    type: "smoothstep",
-                                    selectable: false,
-                                    focusable: false,
-                                    style: {
-                                        strokeDasharray: "4 4",
-                                        stroke: "#0284c7",
-                                        strokeWidth: 1.5,
-                                    },
-                                    data: {
-                                        compoundInternalEdge: true,
-                                        compoundExitId,
-                                    },
-                                }
-                            );
-                        }
-
-                        return {
-                            ...edge,
-                            source: targetCompound.id,
-                            sourceHandle: compoundExitId,
-                            label:
-                                edge.label ||
-                                originalHandleId,
-                            data: {
-                                ...(edge.data || {}),
-                                compoundOriginalSource:
-                                draggedNode.id,
-                                compoundOriginalSourceHandle:
-                                originalHandleId,
-                                compoundExitId,
-                            },
-                        };
-                    });
-
-                    rewrittenEdges.push(
-                        ...internalEdgesByExitId.values()
-                    );
-
-                    const nextCompoundEvents = [
-                        ...compoundEventsById.values(),
-                    ].filter(
-                        (event) =>
-                            String(event?.id || "") !== "compound-entry"
-                    );
-
-                    next = next.map((candidate) =>
-                        candidate.id === targetCompound.id
-                            ? {
-                                ...candidate,
-                                data: {
-                                    ...candidate.data,
-                                    events: nextCompoundEvents,
-                                },
-                            }
-                            : candidate
-                    );
-                }
-
-                // Events can change the exit gutter width, so do one final
-                // fit after the compound transition metadata has been updated.
-                if (sourceCompound?.id) {
-                    next = fitCompoundAndAncestorCompounds(
-                        next,
-                        sourceCompound.id
-                    );
-                }
-
-                if (targetCompound?.id) {
-                    next = fitCompoundAndAncestorCompounds(
-                        next,
-                        targetCompound.id
-                    );
-                }
-
+                // Boundary helpers are a visual projection of the semantic
+                // transition source/target plus the current containment tree.
+                // Rebuild them once from the canonical logical-source metadata
+                // instead of manually unwrapping/rewrapping Compound exits here.
                 const collisionResolved = resolveNodeCollisionsAndRefit(
                     next,
                     draggedNode.id
                 );
                 const rebuilt = rebuildBoundaryTransitions(
                     collisionResolved,
-                    rewrittenEdges
+                    edges
                 );
                 setEdges(rebuilt.edges);
 
                 return rebuilt.nodes;
             }
 
-            const sourceLane = getLaneForNode(
+            const sourceLane = graphIndex.findAncestor(
                 draggedNode,
-                currentNodes
+                (candidate) => candidate.type === "parallelLane"
             );
 
             let targetLane = targetLaneAtDrop;
@@ -1130,16 +938,14 @@ export function useNodeDrag({
                 );
 
                 if (resistedLaneDrop && sourceLane) {
-                    const laneAbsolute = getAbsoluteNodePosition(
-                        sourceLane,
-                        currentNodes
+                    const laneAbsolute = graphIndex.getAbsolutePosition(
+                        sourceLane
                     );
                     const laneWidth = Number(sourceLane.style?.width) || 420;
                     const laneHeight = Number(sourceLane.style?.height) || 110;
                     const draggedSize = getNodeSize(draggedNode);
-                    const desiredAbsolute = getAbsoluteNodePosition(
-                        draggedNode,
-                        currentNodes
+                    const desiredAbsolute = graphIndex.getAbsolutePosition(
+                        draggedNode
                     );
                     const padding = 16;
                     const clampedAbsolute = {
@@ -1152,11 +958,11 @@ export function useNodeDrag({
                             Math.max(laneAbsolute.y + padding, desiredAbsolute.y)
                         ),
                     };
-                    const immediateParent = currentNodes.find(
-                        (candidate) => candidate.id === draggedNode.parentId
-                    );
+                    const immediateParent = draggedNode.parentId
+                        ? graphIndex.byId.get(draggedNode.parentId)
+                        : null;
                     const parentAbsolute = immediateParent
-                        ? getAbsoluteNodePosition(immediateParent, currentNodes)
+                        ? graphIndex.getAbsolutePosition(immediateParent)
                         : { x: 0, y: 0 };
 
                     next = next.map((candidate) =>
@@ -1179,24 +985,11 @@ export function useNodeDrag({
                 );
             }
 
-            const sourceParallel = sourceLane
-                ? currentNodes.find(
-                    (candidate) =>
-                        candidate.id === sourceLane.parentId
-                )
-                : null;
-
             const targetParallel = targetLane
-                ? currentNodes.find(
-                    (candidate) =>
-                        candidate.id === targetLane.parentId
-                )
+                ? graphIndex.byId.get(targetLane.parentId)
                 : null;
 
-            const absolutePosition = getAbsoluteNodePosition(
-                draggedNode,
-                currentNodes
-            );
+            const absolutePosition = graphIndex.getAbsolutePosition(draggedNode);
 
             let nextNodes = currentNodes.filter(
                 (candidate) => candidate.id !== draggedNode.id
@@ -1205,29 +998,23 @@ export function useNodeDrag({
             const normalizeLane = (lane, nodeToArrangeId = null) => {
                 if (!lane) return;
 
-                const currentLane =
-                    nextNodes.find((candidate) => candidate.id === lane.id) ||
-                    lane;
-                let members = nextNodes.filter(
-                    (candidate) =>
-                        candidate.parentId === currentLane.id &&
-                        isParallelLaneSkillCandidate(candidate)
-                );
+                let nextIndex = createEditorNodeIndex(nextNodes);
+                const currentLane = nextIndex.byId.get(lane.id) || lane;
+                const members = nextIndex
+                    .getChildren(currentLane.id)
+                    .filter(isParallelLaneSkillCandidate);
 
                 if (nodeToArrangeId) {
-                    const newNode = members.find(
-                        (member) => member.id === nodeToArrangeId
-                    );
+                    const newNode = nextIndex.byId.get(nodeToArrangeId);
 
-                    if (newNode) {
-                        const existingMembers = members.filter(
-                            (member) => member.id !== nodeToArrangeId
-                        );
+                    if (newNode?.parentId === currentLane.id) {
                         const newX =
-                            25 + existingMembers.reduce((x, member) => {
-                                const size = getOverviewLayoutNodeSize(member);
-                                return x + size.width + PARALLEL_NODE_GAP;
-                            }, 0);
+                            25 + members
+                                .filter((member) => member.id !== nodeToArrangeId)
+                                .reduce((x, member) => {
+                                    const size = getOverviewLayoutNodeSize(member);
+                                    return x + size.width + PARALLEL_NODE_GAP;
+                                }, 0);
 
                         nextNodes = nextNodes.map((candidate) =>
                             candidate.id === nodeToArrangeId
@@ -1243,52 +1030,11 @@ export function useNodeDrag({
                                 }
                                 : candidate
                         );
-                        members = nextNodes.filter(
-                            (candidate) =>
-                                candidate.parentId === currentLane.id &&
-                                isParallelLaneSkillCandidate(candidate)
-                        );
+                        nextIndex = createEditorNodeIndex(nextNodes);
                     }
                 }
 
-                const storedInitialId = currentLane.data?.initialChildId;
-                const initialMember =
-                    members.find((member) => member.id === storedInitialId) ||
-                    members.find((member) => member.data?.isInitial) ||
-                    members[0] ||
-                    null;
-                const initialChildId = initialMember?.id || null;
-
-                nextNodes = nextNodes.map((candidate) => {
-                    if (candidate.id === currentLane.id) {
-                        return {
-                            ...candidate,
-                            data: {
-                                ...(candidate.data || {}),
-                                initialChildId,
-                            },
-                        };
-                    }
-
-                    if (
-                        candidate.parentId === currentLane.id &&
-                        isParallelLaneSkillCandidate(candidate)
-                    ) {
-                        return {
-                            ...candidate,
-                            data: {
-                                ...(candidate.data || {}),
-                                isInitial: candidate.id === initialChildId,
-                            },
-                        };
-                    }
-
-                    return candidate;
-                });
-
-                const parallel = nextNodes.find(
-                    (candidate) => candidate.id === currentLane.parentId
-                );
+                const parallel = nextIndex.byId.get(currentLane.parentId);
                 if (!parallel) return;
 
                 nextNodes = growParallelToLaneContents(
@@ -1300,11 +1046,12 @@ export function useNodeDrag({
             if (targetLane) {
                 const targetParent = targetLane;
 
-                // Absolute Position des Parents bestimmen
+                // Absolute Position des Parents bestimmen. The temporary
+                // node index avoids walking the full node array for each
+                // ancestor in nested parallel/compound structures.
                 const parentAbsolutePosition =
-                    getAbsoluteNodePosition(
-                        targetParent,
-                        nextNodes
+                    createEditorNodeIndex(nextNodes).getAbsolutePosition(
+                        targetParent
                     );
 
                 nextNodes.push({
@@ -1337,6 +1084,8 @@ export function useNodeDrag({
                             edge.data?.parallelOriginalSource ===
                             draggedNode.id ||
                             edge.data?.parallelOriginalTarget ===
+                            draggedNode.id ||
+                            edge.data?.boundaryOriginalTarget ===
                             draggedNode.id
                         )
                 );
@@ -1352,17 +1101,6 @@ export function useNodeDrag({
                             y: dropPoint.y,
                         },
                     selected: false,
-                    // Initial-state membership only has meaning inside the
-                    // container that owns that state. A node leaving a
-                    // Parallel lane may also have come from a Compound nested
-                    // inside that lane, so clear the flag here in the final
-                    // top-level drop path as well. Otherwise that nested case
-                    // bypasses the Compound reparenting branch above and the
-                    // node incorrectly remains initial at the root level.
-                    data: {
-                        ...(draggedNode.data || {}),
-                        isInitial: false,
-                    },
                 });
             } else {
                 nextNodes.push({
@@ -1385,208 +1123,140 @@ export function useNodeDrag({
             }
 
             let nextEdges = edges;
+            const crossesParallelLanes = Boolean(
+                sourceLane &&
+                targetLane &&
+                sourceLane.id !== targetLane.id
+            );
 
-            if (sourceLane) {
-                const internalHandles = nextEdges
-                    .filter(
-                        (edge) =>
-                            edge.source === draggedNode.id &&
-                            edge.target === sourceLane.id &&
-                            edge.id.startsWith("edge-internal-")
-                    )
-                    .map((edge) => edge.sourceHandle);
-
-                // Interne Verbindungen zum alten Lane-Rand entfernen.
+            if (crossesParallelLanes) {
+                // Parallel lanes are independent regions. Carrying an
+                // incoming/outgoing transition to another lane changes its
+                // semantics, so the move deliberately disconnects the state.
+                // Rust applies the same rule transactionally; doing it here as
+                // well keeps the optimistic editor graph in sync immediately.
                 nextEdges = nextEdges
-                    .filter(
-                        (edge) =>
-                            !(
-                                edge.source === draggedNode.id &&
-                                edge.target === sourceLane.id &&
-                                edge.id.startsWith(
-                                    "edge-internal-"
-                                )
-                            )
-                    )
                     .map((edge) => {
-                        if (
-                            edge.data?.parallelOriginalSource ===
-                            draggedNode.id
-                        ) {
-                            return {
-                                ...edge,
-                                source: draggedNode.id,
-                                data: {
-                                    ...edge.data,
-                                    parallelOriginalSource:
-                                    undefined,
-                                },
-                            };
-                        }
+                        const targetsDraggedState =
+                            edge.target === draggedNode.id ||
+                            edge.data?.boundaryOriginalTarget === draggedNode.id ||
+                            edge.data?.compoundOriginalTarget === draggedNode.id ||
+                            edge.data?.parallelOriginalTarget === draggedNode.id;
+                        if (targetsDraggedState) return null;
 
-                        if (
-                            edge.data?.parallelOriginalTarget ===
-                            draggedNode.id
-                        ) {
-                            return {
-                                ...edge,
-                                target: draggedNode.id,
-                                targetHandle: null,
-                                data: {
-                                    ...edge.data,
-                                    parallelOriginalTarget:
-                                    undefined,
-                                },
-                            };
-                        }
-
-                        return edge;
-                    });
-
-                const stillUsedHandles = new Set(
-                    nextEdges
-                        .filter(
-                            (edge) =>
-                                edge.target === sourceLane.id &&
-                                edge.id.startsWith(
-                                    "edge-internal-"
-                                )
+                        const logicalSources = Array.isArray(
+                            edge.data?.boundaryOriginalSources
                         )
-                        .map((edge) => edge.sourceHandle)
-                );
+                            ? edge.data.boundaryOriginalSources
+                            : [];
+                        const remainingLogicalSources = logicalSources.filter(
+                            (source) =>
+                                (source?.sourceId || source?.nodeId || source?.id) !==
+                                draggedNode.id
+                        );
+                        const removedSharedSource =
+                            logicalSources.length >
+                            remainingLogicalSources.length;
 
-                nextNodes = nextNodes.map((candidate) =>
-                    candidate.id === sourceLane.id
-                        ? {
-                            ...candidate,
-                            data: {
-                                ...candidate.data,
-                                events: (
-                                    candidate.data?.events || []
-                                ).filter(
-                                    (item) =>
-                                        !internalHandles.includes(
-                                            item.id
-                                        ) ||
-                                        stillUsedHandles.has(
-                                            item.id
-                                        )
-                                ),
-                            },
+                        if (removedSharedSource && remainingLogicalSources.length > 0) {
+                            const primary = remainingLogicalSources[0];
+                            const primaryId =
+                                primary?.sourceId || primary?.nodeId || primary?.id;
+                            const primaryHandle =
+                                primary?.sourceHandle || primary?.handle || "success";
+                            const data = {
+                                ...(edge.data || {}),
+                                boundaryOriginalSources: remainingLogicalSources,
+                            };
+                            [
+                                "boundaryOriginalSource",
+                                "boundaryOriginalSourceHandle",
+                                "boundaryExitId",
+                                "compoundOriginalSource",
+                                "compoundOriginalSourceHandle",
+                                "compoundExitId",
+                                "parallelOriginalSource",
+                                "parallelOriginalSourceHandle",
+                                "parallelExitId",
+                            ].forEach((key) => delete data[key]);
+
+                            return {
+                                ...edge,
+                                source: primaryId,
+                                sourceHandle: primaryHandle,
+                                label: primaryHandle,
+                                data,
+                            };
                         }
-                        : candidate
-                );
+
+                        // Boundary projected edges are owned by the container exit
+                        // reconstruction logic. Do not remove them just because their
+                        // logical source lives below the dragged node.
+                        const sourcesDraggedState =
+                            edge.source === draggedNode.id ||
+                            removedSharedSource;
+
+                        return sourcesDraggedState ? null : edge;
+                    })
+                    .filter(Boolean);
             }
 
-            if (targetLane && targetParallel) {
-                const outgoingIds = new Set(
-                    nextEdges
-                        .filter(
-                            (edge) =>
-                                edge.source === draggedNode.id &&
-                                edge.target !== targetLane.id
-                        )
-                        .map((edge) => edge.id)
-                );
-
-                const incomingIds = new Set(
-                    nextEdges
-                        .filter(
-                            (edge) =>
-                                edge.target === draggedNode.id &&
-                                edge.source !== draggedNode.id
-                        )
-                        .map((edge) => edge.id)
-                );
-
-                const internalEdges = [];
-                const laneEvents = [
-                    ...(targetLane.data?.events || []),
-                ];
-
+            if (sourceLane && !crossesParallelLanes) {
+                // Outgoing lane exits are reconstructed below from logical
+                // boundary provenance. Only incoming transitions need an
+                // explicit visual target restore when the state leaves the
+                // Parallel; the generic boundary projector is source-side.
                 nextEdges = nextEdges.map((edge) => {
-                    if (outgoingIds.has(edge.id)) {
-                        const handleId =
-                            edge.sourceHandle || "success";
-
-                        if (
-                            !laneEvents.some(
-                                (item) => item.id === handleId
-                            )
-                        ) {
-                            const baseName =
-                                draggedNode.data?.label ||
-                                draggedNode.data
-                                    ?.fullSkillName ||
-                                "state";
-
-                            laneEvents.push({
-                                id: handleId,
-                                name: `${baseName}.${handleId}`,
-                                rawEvent: `${baseName}.${handleId}`,
-                                target: edge.target,
-                            });
-                        }
-
-                        internalEdges.push({
-                            id:
-                                `edge-internal-${draggedNode.id}-` +
-                                `${handleId}-${targetLane.id}`,
-                            source: draggedNode.id,
-                            target: targetLane.id,
-                            sourceHandle: handleId,
-                            targetHandle: `target-${handleId}`,
-                            style: {
-                                strokeDasharray: "4 4",
-                                stroke: "#0284c7",
-                                strokeWidth: 1.5,
-                            },
-                            type: "smoothstep",
-                        });
-
-                        return {
-                            ...edge,
-                            source: targetLane.id,
-                            data: {
-                                ...edge.data,
-                                parallelOriginalSource:
-                                draggedNode.id,
-                            },
-                        };
+                    const logicalTarget =
+                        edge.data?.boundaryOriginalTarget ||
+                        edge.data?.parallelOriginalTarget;
+                    if (logicalTarget !== draggedNode.id) {
+                        return edge;
                     }
 
-                    if (incomingIds.has(edge.id)) {
-                        return {
-                            ...edge,
-                            target: targetParallel.id,
-                            targetHandle: "target",
-                            data: {
-                                ...edge.data,
-                                parallelOriginalTarget:
-                                draggedNode.id,
-                            },
-                        };
-                    }
+                    const data = { ...(edge.data || {}) };
+                    delete data.parallelOriginalTarget;
+                    delete data.boundaryOriginalTarget;
 
-                    return edge;
+                    return {
+                        ...edge,
+                        target: draggedNode.id,
+                        targetHandle: null,
+                        data,
+                    };
                 });
+            }
 
-                nextEdges = [
-                    ...nextEdges,
-                    ...internalEdges,
-                ];
+            if (targetLane && targetParallel && !crossesParallelLanes) {
+                // Source-side Parallel exits are rebuilt generically below.
+                // Incoming transitions still render against the Parallel
+                // boundary, while retaining the logical target state.
+                nextEdges = nextEdges.map((edge) => {
+                    const targetsDraggedState =
+                        edge.target === draggedNode.id ||
+                        edge.data?.parallelOriginalTarget === draggedNode.id ||
+                        edge.data?.boundaryOriginalTarget === draggedNode.id;
+                    const logicalSourceId =
+                        edge.data?.boundaryOriginalSource ||
+                        edge.data?.compoundOriginalSource ||
+                        edge.data?.parallelOriginalSource ||
+                        edge.source;
 
-                nextNodes = nextNodes.map((candidate) =>
-                    candidate.id === targetLane.id
-                        ? {
-                            ...candidate,
-                            data: {
-                                ...candidate.data,
-                                events: laneEvents,
-                            },
-                        }
-                        : candidate
-                );
+                    if (!targetsDraggedState || logicalSourceId === draggedNode.id) {
+                        return edge;
+                    }
+
+                    return {
+                        ...edge,
+                        target: targetParallel.id,
+                        targetHandle: "target",
+                        data: {
+                            ...(edge.data || {}),
+                            boundaryOriginalTarget: draggedNode.id,
+                            parallelOriginalTarget: draggedNode.id,
+                        },
+                    };
+                });
             }
 
             // React Flow benötigt Parent-Nodes vor ihren Children. Rebuild
@@ -1658,6 +1328,8 @@ export function useNodeDrag({
             });
         }
 
+        void syncStatePosition?.(node.id, dragOriginParentId);
+
         setDraggingNodeId(null);
         setIsDraggingNode(false);
         setIsOverTrash(false);
@@ -1672,7 +1344,10 @@ export function useNodeDrag({
         setEdges,
         setSlotEdges,
         setSlotNodes,
-    ]);
+        syncStatePosition,
+        syncStateEditorPositions,
+        syncRemovedStates,
+        ]);
 
     return {
         parallelDropTargetId,

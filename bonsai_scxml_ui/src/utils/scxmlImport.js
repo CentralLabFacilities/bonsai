@@ -1,4 +1,6 @@
 import { MarkerType } from "@xyflow/react";
+import { parseScxmlWorkflow } from "../tauri-client.js";
+import { workflowDtoToScxmlDocument } from "./scxmlRustDocument.js";
 import { getLayoutedElements } from "./layoutUtils";
 import { parseStateAssignments } from "./stateActions.js";
 import { getTransitionExitToken } from "./transitionEvents.js";
@@ -647,42 +649,27 @@ const parseBehaviorExitForwarding = (stateElem, fullSkillName) => {
     };
 };
 
-export const extractBehaviorExitEventsFromScxml = (xmlText) => {
-    const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(normalizeLegacyScxmlComments(xmlText), "application/xml");
-    const parserError = xmlDoc.getElementsByTagName("parsererror")[0];
+export const parseScxmlFile = async (
+    xmlText,
+    fetchSkillData,
+    getNodeId,
+    parsedWorkflow = null
+) => {
+    const normalizedXml = normalizeLegacyScxmlComments(xmlText);
+    let xmlDoc;
 
-    if (parserError) {
-        return [];
-    }
-
-    const sentEvents = [];
-
-    Array.from(xmlDoc.getElementsByTagName("state")).forEach((stateElem) => {
-        const stateId = stateElem.getAttribute("id") || "";
-        const behaviorExit = parseBehaviorExitForwarding(
-            stateElem,
-            stateId
+    // Rust is the single authoritative SCXML parser. Its semantic WorkflowDto
+    // is projected onto the small Element facade consumed by the React Flow
+    // import adapter below.
+    try {
+        const workflow =
+            parsedWorkflow || (await parseScxmlWorkflow(normalizedXml));
+        xmlDoc = workflowDtoToScxmlDocument(workflow);
+    } catch (error) {
+        throw new Error(
+            "Fehler in der XML-Struktur:\n" +
+                String(error?.message || error || "Unknown SCXML parse error")
         );
-
-        (behaviorExit?.sentEvents || []).forEach((eventName) => {
-            if (eventName && !sentEvents.includes(eventName)) {
-                sentEvents.push(eventName);
-            }
-        });
-    });
-
-    return sentEvents;
-};
-
-export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
-    const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(normalizeLegacyScxmlComments(xmlText), "application/xml");
-
-    // 1. Prüfen auf XML-Syntaxfehler
-    const parserError = xmlDoc.getElementsByTagName("parsererror")[0];
-    if (parserError) {
-        throw new Error("Fehler in der XML-Struktur:\n" + parserError.textContent.slice(0, 200));
     }
 
     const scxmlElem = xmlDoc.getElementsByTagName("scxml")[0];
@@ -1268,7 +1255,7 @@ export const parseScxmlFile = async (xmlText, fetchSkillData, getNodeId) => {
                 extent: "parent",
                 type: "parallelLane",
                 draggable: false,
-                selectable: false,
+                selectable: true,
                 style: {
                     width: containerWidth,
                     height: laneHeight,

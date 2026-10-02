@@ -1,12 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
     FiActivity,
+    FiArrowDown,
+    FiArrowUp,
     FiChevronDown,
     FiDatabase,
     FiExternalLink,
     FiLayers,
     FiLink2,
+    FiPlus,
     FiSend,
+    FiTrash2,
     FiX,
 } from "react-icons/fi";
 import StateActionsEditor from "./StateActionsEditor";
@@ -166,12 +170,15 @@ function SlotDetailsPanel({
                               onSelectSkill,
                               onHoverSkill,
                               onNavigateAncestorSlot,
+                              onNavigateDescendantSkill,
                           }) {
     const initialPath =
         selectedNode.data?.path ||
         selectedNode.data?.label ||
         "";
     const [pathDraft, setPathDraft] = useState(initialPath);
+    const [sourceHierarchyExpanded, setSourceHierarchyExpanded] = useState(true);
+    const [accessedByExpanded, setAccessedByExpanded] = useState(true);
 
     const slotType =
         slotDetails?.dataType ||
@@ -180,6 +187,42 @@ function SlotDetailsPanel({
     const accessTypes = slotDetails?.accessTypes || [];
     const skillAccesses = slotDetails?.skillAccesses || [];
     const ancestorSlotAccesses = slotDetails?.ancestorSlotAccesses || [];
+    const descendantSkillAccesses = slotDetails?.descendantSkillAccesses || [];
+    const childSlotAccesses = slotDetails?.childSlotAccesses || [];
+    const parentSourceHierarchyEntries = ancestorSlotAccesses;
+    const nestedSourceHierarchyEntries = [
+        ...descendantSkillAccesses,
+        ...childSlotAccesses,
+    ];
+    const sourceHierarchyEntries = [
+        ...parentSourceHierarchyEntries,
+        ...nestedSourceHierarchyEntries,
+    ];
+    const nestedSourceHierarchyGroups = (() => {
+        const groups = new Map();
+
+        nestedSourceHierarchyEntries.forEach((access) => {
+            const hierarchy = Array.isArray(access?.subMachinePath)
+                ? access.subMachinePath.filter(Boolean)
+                : [];
+            const fallbackLabel = access?.childLabel || "Sub-state machine";
+            const hierarchyLabel =
+                hierarchy.length > 0
+                    ? hierarchy.join(" › ")
+                    : fallbackLabel;
+
+            if (!groups.has(hierarchyLabel)) {
+                groups.set(hierarchyLabel, {
+                    label: hierarchyLabel,
+                    entries: [],
+                });
+            }
+            groups.get(hierarchyLabel).entries.push(access);
+        });
+
+        return [...groups.values()];
+    })();
+    const hasSourceHierarchy = sourceHierarchyEntries.length > 0;
     const isInherited = Boolean(
         slotDetails?.isInherited ??
         selectedNode.data?.currentMachineInherited
@@ -292,113 +335,318 @@ function SlotDetailsPanel({
                     </div>
                 </section>
 
-                {isInherited && (
-                    <section className="slot-access-section">
-                        <div className="slot-section-heading">
-                            <div>
-                                <div className="slot-section-title">Source hierarchy</div>
-                                <div className="slot-section-subtitle">
-                                    Writers and inheritSlot hops through parent state machines
+                {(isInherited || hasSourceHierarchy) && (
+                    <section className="slot-access-section slot-source-hierarchy-section">
+                        <div className="slot-section-heading slot-section-heading-collapsible">
+                            <button
+                                type="button"
+                                className="slot-section-toggle"
+                                aria-expanded={sourceHierarchyExpanded}
+                                onClick={() =>
+                                    setSourceHierarchyExpanded((expanded) => !expanded)
+                                }
+                            >
+                                <FiChevronDown
+                                    className={`slot-section-chevron ${
+                                        sourceHierarchyExpanded ? "" : "is-collapsed"
+                                    }`}
+                                    aria-hidden="true"
+                                />
+                                <div>
+                                    <div className="slot-section-title">Source hierarchy</div>
+                                    <div className="slot-section-subtitle">
+                                        Slot sources above this state machine and consumers in nested sub-state machines
+                                    </div>
                                 </div>
-                            </div>
+                            </button>
                             <span className="slot-access-count">
-                                {ancestorSlotAccesses.length}
+                                {sourceHierarchyEntries.length}
                             </span>
                         </div>
 
-                        <div className="slot-list slot-access-list">
-                            {ancestorSlotAccesses.length > 0 ? (
-                                ancestorSlotAccesses.map((access, index) => {
-                                    const isInheritanceHop =
-                                        access.hierarchyKind === "inherit" ||
-                                        access.access === "inherit";
+                        {sourceHierarchyExpanded && (
+                            <div className="slot-source-hierarchy-list">
+                            {parentSourceHierarchyEntries.length > 0 && (
+                                <div className="slot-hierarchy-group">
+                                    <div className="slot-hierarchy-group-heading">
+                                        <div>
+                                            <div className="slot-hierarchy-group-title">
+                                                Parent state machines
+                                            </div>
+                                            <div className="slot-hierarchy-group-subtitle">
+                                                Sources inherited from machines above the current state machine
+                                            </div>
+                                        </div>
+                                        <span className="slot-hierarchy-group-count">
+                                            {parentSourceHierarchyEntries.length}
+                                        </span>
+                                    </div>
 
-                                    return (
-                                        <div
-                                            className={`slot-text-field compact-slot-card ${
-                                                isInheritanceHop
-                                                    ? "compact-slot-read"
-                                                    : "compact-slot-write"
-                                            } slot-access-skill-card`}
-                                            key={`ancestor-${access.parentTabId}-${access.nodeId || "slot"}-${access.key}-${index}`}
-                                            role="button"
-                                            tabIndex={0}
-                                            title={`Open ${access.parentMachineName}`}
-                                            onClick={() =>
-                                                onNavigateAncestorSlot?.(access.parentTabId, access.nodeId || null)
-                                            }
-                                            onKeyDown={(event) => {
-                                                if (event.key === "Enter" || event.key === " ") {
-                                                    event.preventDefault();
-                                                    onNavigateAncestorSlot?.(access.parentTabId, access.nodeId || null);
-                                                }
-                                            }}
-                                        >
-                                            <div className="compact-slot-header">
-                                                <div className="compact-slot-name">
-                                                    {access.parentMachineName}
-                                                </div>
-                                                <div className="compact-slot-badges">
-                                                    <span
-                                                        className={`slot-access-badge ${
+                                    <div className="slot-list slot-access-list slot-hierarchy-group-list">
+                                        {parentSourceHierarchyEntries.map((access, index) => {
+                                            const isInheritanceHop =
+                                                access.hierarchyKind === "inherit" ||
+                                                access.access === "inherit";
+
+                                            return (
+                                                <div
+                                                    className={`slot-text-field compact-slot-card ${
+                                                        isInheritanceHop
+                                                            ? "compact-slot-read"
+                                                            : "compact-slot-write"
+                                                    } slot-access-skill-card`}
+                                                    key={`ancestor-${access.parentTabId}-${access.nodeId || "slot"}-${access.key}-${index}`}
+                                                    role="button"
+                                                    tabIndex={0}
+                                                    title={`Open ${access.parentMachineName}`}
+                                                    onClick={() =>
+                                                        onNavigateAncestorSlot?.(
+                                                            access.parentTabId,
+                                                            access.nodeId || null
+                                                        )
+                                                    }
+                                                    onKeyDown={(event) => {
+                                                        if (
+                                                            event.key === "Enter" ||
+                                                            event.key === " "
+                                                        ) {
+                                                            event.preventDefault();
+                                                            onNavigateAncestorSlot?.(
+                                                                access.parentTabId,
+                                                                access.nodeId || null
+                                                            );
+                                                        }
+                                                    }}
+                                                >
+                                                    <div className="compact-slot-header">
+                                                        <div className="compact-slot-name">
+                                                            {access.parentMachineName}
+                                                        </div>
+                                                        <div className="compact-slot-badges">
+                                                            <span
+                                                                className={`slot-access-badge ${
+                                                                    isInheritanceHop
+                                                                        ? "slot-access-read"
+                                                                        : "slot-access-write"
+                                                                }`}
+                                                            >
+                                                                {isInheritanceHop
+                                                                    ? "inheritSlot"
+                                                                    : "Write"}
+                                                            </span>
+                                                            <FiExternalLink aria-hidden="true" />
+                                                        </div>
+                                                    </div>
+
+                                                    <MetadataRow
+                                                        label={isInheritanceHop ? "Path" : "Skill"}
+                                                        value={
                                                             isInheritanceHop
-                                                                ? "slot-access-read"
-                                                                : "slot-access-write"
-                                                        }`}
-                                                    >
-                                                        {isInheritanceHop ? "inheritSlot" : "Write"}
+                                                                ? access.path
+                                                                : access.skillName
+                                                        }
+                                                    />
+                                                    {!isInheritanceHop && (
+                                                        <MetadataRow label="Key" value={access.key} />
+                                                    )}
+                                                    <MetadataRow label="Type" value={access.type} />
+                                                    {access.description && (
+                                                        <MetadataRow
+                                                            label="Description"
+                                                            value={access.description}
+                                                        />
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
+                            {nestedSourceHierarchyGroups.length > 0 && (
+                                <div className="slot-hierarchy-group">
+                                    <div className="slot-hierarchy-group-heading">
+                                        <div>
+                                            <div className="slot-hierarchy-group-title">
+                                                Nested sub-state machines
+                                            </div>
+                                            <div className="slot-hierarchy-group-subtitle">
+                                                Skills below the current state machine that consume this slot
+                                            </div>
+                                        </div>
+                                        <span className="slot-hierarchy-group-count">
+                                            {nestedSourceHierarchyEntries.length}
+                                        </span>
+                                    </div>
+
+                                    <div className="slot-hierarchy-nested-groups">
+                                        {nestedSourceHierarchyGroups.map((group, groupIndex) => (
+                                            <div
+                                                className="slot-hierarchy-machine-group"
+                                                key={`${group.label}-${groupIndex}`}
+                                            >
+                                                <div className="slot-hierarchy-machine-heading">
+                                                    <FiLayers aria-hidden="true" />
+                                                    <span>{group.label}</span>
+                                                    <span className="slot-hierarchy-machine-count">
+                                                        {group.entries.length}
                                                     </span>
-                                                    <FiExternalLink aria-hidden="true" />
+                                                </div>
+
+                                                <div className="slot-list slot-access-list slot-hierarchy-group-list">
+                                                    {group.entries.map((access, index) => {
+                                                        const isDescendantSkillAccess =
+                                                            access.sourceKind === "descendant-skill";
+                                                        const isChildAccess = Boolean(access.childLabel);
+
+                                                        if (isDescendantSkillAccess) {
+                                                            const accessLabel =
+                                                                access.access === "read"
+                                                                    ? "Read"
+                                                                    : access.access === "write"
+                                                                        ? "Write"
+                                                                        : "Inherit";
+
+                                                            return (
+                                                                <div
+                                                                    className={`slot-text-field compact-slot-card compact-slot-${
+                                                                        access.access === "write"
+                                                                            ? "write"
+                                                                            : "read"
+                                                                    } slot-access-skill-card`}
+                                                                    key={`descendant-skill-${access.childNodeId || "child"}-${access.nodeId || access.skillName}-${access.key}-${index}`}
+                                                                    role="button"
+                                                                    tabIndex={0}
+                                                                    title={`Open ${access.skillName} in ${group.label}`}
+                                                                    onClick={() =>
+                                                                        onNavigateDescendantSkill?.(access)
+                                                                    }
+                                                                    onKeyDown={(event) => {
+                                                                        if (
+                                                                            event.key === "Enter" ||
+                                                                            event.key === " "
+                                                                        ) {
+                                                                            event.preventDefault();
+                                                                            onNavigateDescendantSkill?.(access);
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    <div className="compact-slot-header">
+                                                                        <div className="compact-slot-name">
+                                                                            {access.skillName}
+                                                                        </div>
+                                                                        <div className="compact-slot-badges">
+                                                                            <span
+                                                                                className={`slot-access-badge ${
+                                                                                    access.access === "write"
+                                                                                        ? "slot-access-write"
+                                                                                        : "slot-access-read"
+                                                                                }`}
+                                                                            >
+                                                                                {accessLabel}
+                                                                            </span>
+                                                                            <span className="slot-access-badge">
+                                                                                Sub-SM
+                                                                            </span>
+                                                                            <FiExternalLink
+                                                                                className="slot-access-open-icon"
+                                                                                aria-hidden="true"
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                    <MetadataRow
+                                                                        label="Slot"
+                                                                        value={access.key || access.slotPath}
+                                                                    />
+                                                                    <MetadataRow
+                                                                        label="Type"
+                                                                        value={access.type}
+                                                                    />
+                                                                    {access.description && (
+                                                                        <MetadataRow
+                                                                            label="Description"
+                                                                            value={access.description}
+                                                                        />
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        }
+
+                                                        if (isChildAccess) {
+                                                            return (
+                                                                <div
+                                                                    className="slot-text-field compact-slot-card compact-slot-read slot-access-skill-card"
+                                                                    key={`source-child-${access.childNodeId}-${index}`}
+                                                                >
+                                                                    <div className="compact-slot-header">
+                                                                        <div className="compact-slot-name">
+                                                                            {access.childLabel}
+                                                                        </div>
+                                                                        <span className="slot-access-badge">
+                                                                            inherit
+                                                                        </span>
+                                                                    </div>
+                                                                    <MetadataRow
+                                                                        label="Slot"
+                                                                        value={
+                                                                            access.slotKey ||
+                                                                            access.slotPath
+                                                                        }
+                                                                    />
+                                                                </div>
+                                                            );
+                                                        }
+
+                                                        return null;
+                                                    })}
                                                 </div>
                                             </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
-                                            <MetadataRow
-                                                label={isInheritanceHop ? "Path" : "Skill"}
-                                                value={
-                                                    isInheritanceHop
-                                                        ? access.path
-                                                        : access.skillName
-                                                }
-                                            />
-                                            {!isInheritanceHop && (
-                                                <MetadataRow label="Key" value={access.key} />
-                                            )}
-                                            <MetadataRow label="Type" value={access.type} />
-                                            {access.description && (
-                                                <MetadataRow
-                                                    label="Description"
-                                                    value={access.description}
-                                                />
-                                            )}
-                                        </div>
-                                    );
-                                })
-                            ) : (
+                            {sourceHierarchyEntries.length === 0 && (
                                 <div className="slot-access-empty-state">
                                     <FiLayers />
                                     <span>
-                                        No writer was found through the parent state-machine hierarchy.
+                                        No inherited source or sub-state-machine consumer was found for this slot.
                                     </span>
                                 </div>
                             )}
-                        </div>
+                            </div>
+                        )}
                     </section>
                 )}
 
                 <section className="slot-access-section">
-                    <div className="slot-section-heading">
-                        <div>
-                            <div className="slot-section-title">Accessed by</div>
-                            <div className="slot-section-subtitle">
-                                Skills connected to this slot
+                    <div className="slot-section-heading slot-section-heading-collapsible">
+                        <button
+                            type="button"
+                            className="slot-section-toggle"
+                            aria-expanded={accessedByExpanded}
+                            onClick={() => setAccessedByExpanded((expanded) => !expanded)}
+                        >
+                            <FiChevronDown
+                                className={`slot-section-chevron ${
+                                    accessedByExpanded ? "" : "is-collapsed"
+                                }`}
+                                aria-hidden="true"
+                            />
+                            <div>
+                                <div className="slot-section-title">Accessed by</div>
+                                <div className="slot-section-subtitle">
+                                    Skills connected to this slot
+                                </div>
                             </div>
-                        </div>
+                        </button>
                         <span className="slot-access-count">
                             {skillAccesses.length}
                         </span>
                     </div>
 
-                    <div className="slot-list slot-access-list">
+                    {accessedByExpanded && (
+                        <div className="slot-list slot-access-list">
                         {skillAccesses.length > 0 ? (
                             skillAccesses.map((access, index) => (
                                 <div
@@ -448,7 +696,8 @@ function SlotDetailsPanel({
                                 <span>No skill currently accesses this slot.</span>
                             </div>
                         )}
-                    </div>
+                        </div>
+                    )}
                 </section>
             </div>
         </aside>
@@ -763,6 +1012,153 @@ function getEditableExitTokens(events, includeImplicitFatal = false) {
     return sortExitTokens(editable);
 }
 
+
+function ParallelLaneRow({
+                             lane,
+                             index,
+                             laneCount,
+                             onRename,
+                             onMove,
+                             onDelete,
+                         }) {
+    const laneLabel = String(lane?.data?.label || `Lane_${index + 1}`);
+    const [nameDraft, setNameDraft] = useState(laneLabel);
+
+    useEffect(() => {
+        setNameDraft(laneLabel);
+    }, [lane.id, laneLabel]);
+
+    const commitName = () => {
+        const nextName = String(nameDraft || "").trim();
+        onRename?.(lane.id, nextName);
+    };
+
+    const childCount = Number(lane?.childCount || 0);
+
+    return (
+        <div className="parallel-lane-editor-card">
+            <div className="parallel-lane-editor-index" aria-hidden="true">
+                {index + 1}
+            </div>
+
+            <div className="parallel-lane-editor-main">
+                <div className="parallel-lane-editor-label-row">
+                    <span className="parallel-lane-editor-label">Lane name</span>
+                    <span className="parallel-lane-editor-meta">
+                        {childCount === 1 ? "1 state" : `${childCount} states`}
+                    </span>
+                </div>
+
+                <input
+                    className="parallel-lane-editor-input"
+                    type="text"
+                    value={nameDraft}
+                    placeholder={`Lane_${index + 1}`}
+                    spellCheck="false"
+                    onChange={(event) => setNameDraft(event.target.value)}
+                    onBlur={commitName}
+                    onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                            event.preventDefault();
+                            event.currentTarget.blur();
+                        } else if (event.key === "Escape") {
+                            event.preventDefault();
+                            setNameDraft(laneLabel);
+                            event.currentTarget.blur();
+                        }
+                    }}
+                />
+            </div>
+
+            <div className="parallel-lane-editor-actions">
+                <button
+                    type="button"
+                    className="parallel-lane-editor-action"
+                    title="Move lane up"
+                    aria-label={`Move ${laneLabel} up`}
+                    disabled={index === 0}
+                    onClick={() => onMove?.(lane.id, "up")}
+                >
+                    <FiArrowUp size={14} />
+                </button>
+                <button
+                    type="button"
+                    className="parallel-lane-editor-action"
+                    title="Move lane down"
+                    aria-label={`Move ${laneLabel} down`}
+                    disabled={index >= laneCount - 1}
+                    onClick={() => onMove?.(lane.id, "down")}
+                >
+                    <FiArrowDown size={14} />
+                </button>
+                <button
+                    type="button"
+                    className="parallel-lane-editor-action parallel-lane-editor-delete"
+                    title={laneCount <= 1 ? "A parallel needs at least one lane" : "Delete lane and its contents"}
+                    aria-label={`Delete ${laneLabel}`}
+                    disabled={laneCount <= 1}
+                    onClick={() => onDelete?.(lane.id)}
+                >
+                    <FiTrash2 size={13} />
+                </button>
+            </div>
+        </div>
+    );
+}
+
+function ParallelLaneEditor({
+                                lanes = [],
+                                onAdd,
+                                onRename,
+                                onMove,
+                                onDelete,
+                            }) {
+    return (
+        <section className="parallel-lane-editor">
+            <div className="parallel-lane-editor-header">
+                <div>
+                    <div className="parallel-lane-editor-title-row">
+                        <h3>Lanes</h3>
+                        <span className="parallel-lane-count-badge">{lanes.length}</span>
+                    </div>
+                    <p>
+                        Rename and arrange the parallel branches. Reordering a lane keeps its states with it.
+                    </p>
+                </div>
+
+                <button
+                    type="button"
+                    className="parallel-lane-add-button"
+                    onClick={() => onAdd?.()}
+                >
+                    <FiPlus size={14} />
+                    Add lane
+                </button>
+            </div>
+
+            <div className="parallel-lane-editor-list">
+                {lanes.map((lane, index) => (
+                    <ParallelLaneRow
+                        key={lane.id}
+                        lane={lane}
+                        index={index}
+                        laneCount={lanes.length}
+                        onRename={onRename}
+                        onMove={onMove}
+                        onDelete={onDelete}
+                    />
+                ))}
+
+                {lanes.length === 0 && (
+                    <div className="parallel-lane-editor-empty">
+                        This parallel has no lanes yet. Add one to create its first branch.
+                    </div>
+                )}
+            </div>
+        </section>
+    );
+}
+
 function DetailsPanel({
                           selectedNode,
                           hasInitialNode,
@@ -772,6 +1168,7 @@ function DetailsPanel({
                           getPackageSkillEvent,
                           onSetInitial,
                           onUpdateName,
+                          onUpdateNameCommit,
                           onUpdateEvent,
                           availableTargetNodes = [],
                           onSetEventTarget,
@@ -792,6 +1189,7 @@ function DetailsPanel({
                           onSelectSlotAccessSkill,
                           onHoverSlotAccessSkill,
                           onNavigateAncestorSlot,
+                          onNavigateDescendantSlotSkill,
                           parameterFocusRequest,
                           slotFocusRequest,
                           transitionFocusRequest,
@@ -805,6 +1203,11 @@ function DetailsPanel({
                           onNavigateTransitionNode,
                           onHoverTransitionNode,
                           onOpenTransitionPanel,
+                          parallelLanes = [],
+                          onAddParallelLane,
+                          onRenameParallelLane,
+                          onMoveParallelLane,
+                          onDeleteParallelLane,
                       }) {
     const isSubMachine =
         selectedNode.type === "submachine" ||
@@ -1083,6 +1486,7 @@ function DetailsPanel({
                 onSelectSkill={onSelectSlotAccessSkill}
                 onHoverSkill={onHoverSlotAccessSkill}
                 onNavigateAncestorSlot={onNavigateAncestorSlot}
+                onNavigateDescendantSkill={onNavigateDescendantSlotSkill}
             />
         );
     }
@@ -1505,6 +1909,9 @@ function DetailsPanel({
                                         onChange={(e) =>
                                             onUpdateName(e.target.value)
                                         }
+                                        onBlur={(e) =>
+                                            onUpdateNameCommit?.(e.target.value)
+                                        }
                                     />
                                 </div>
 
@@ -1521,7 +1928,15 @@ function DetailsPanel({
                                         onChange={(e) =>
                                             onUpdateSrc?.(
                                                 selectedNode.id,
-                                                e.target.value
+                                                e.target.value,
+                                                false
+                                            )
+                                        }
+                                        onBlur={(e) =>
+                                            onUpdateSrc?.(
+                                                selectedNode.id,
+                                                e.target.value,
+                                                true
                                             )
                                         }
                                     />
@@ -1546,20 +1961,35 @@ function DetailsPanel({
                                 </button>
                             </>
                         ) : isContainerState ? (
-                            <div className="field-row">
-                                <label className="field-label">
-                                    Name:
-                                </label>
+                            <>
+                                <div className="field-row">
+                                    <label className="field-label">
+                                        Name:
+                                    </label>
 
-                                <input
-                                    className="text-field"
-                                    type="text"
-                                    value={selectedNode.data.label || ""}
-                                    onChange={(e) =>
-                                        onUpdateName(e.target.value)
-                                    }
-                                />
-                            </div>
+                                    <input
+                                        className="text-field"
+                                        type="text"
+                                        value={selectedNode.data.label || ""}
+                                        onChange={(e) =>
+                                            onUpdateName(e.target.value)
+                                        }
+                                        onBlur={(e) =>
+                                            onUpdateNameCommit?.(e.target.value)
+                                        }
+                                    />
+                                </div>
+
+                                {selectedNode.type === "parallel" && (
+                                    <ParallelLaneEditor
+                                        lanes={parallelLanes}
+                                        onAdd={onAddParallelLane}
+                                        onRename={onRenameParallelLane}
+                                        onMove={onMoveParallelLane}
+                                        onDelete={onDeleteParallelLane}
+                                    />
+                                )}
+                            </>
                         ) : (
                             <>
                                 <div className="field-row">
@@ -1600,6 +2030,9 @@ function DetailsPanel({
                                         }
                                         onChange={(e) =>
                                             onUpdateName(e.target.value)
+                                        }
+                                        onBlur={(e) =>
+                                            onUpdateNameCommit?.(e.target.value)
                                         }
                                     />
                                 </div>
@@ -2255,4 +2688,28 @@ function DetailsPanel({
     );
 }
 
-export default DetailsPanel;
+const areDetailsPanelPropsEqual = (previous, next) => {
+    const stableDataProps = [
+        "selectedNode",
+        "hasInitialNode",
+        "activeTab",
+        "packages",
+        "availableTargetNodes",
+        "availableSlotPaths",
+        "globalDataModel",
+        "actionValueVariables",
+        "slotDetails",
+        "parameterFocusRequest",
+        "slotFocusRequest",
+        "transitionFocusRequest",
+        "cloneSourceNode",
+        "cloneNodes",
+        "containerOutgoingTransitions",
+        "skillOutgoingTransitions",
+        "parallelLanes",
+    ];
+
+    return stableDataProps.every((key) => previous[key] === next[key]);
+};
+
+export default memo(DetailsPanel, areDetailsPanelPropsEqual);

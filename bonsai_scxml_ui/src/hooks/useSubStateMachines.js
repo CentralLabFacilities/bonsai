@@ -1,11 +1,6 @@
 import { useCallback, useRef } from "react";
-import { parseScxmlFile, extractBehaviorExitEventsFromScxml } from "../utils/scxmlImport";
-import { DEFAULT_PREFIX_CONFIG, resolveSrcPath } from "../config/prefixMapping";
-import { isTauri, readWorkflowSource, saveFile } from "../tauri-client.js";
-import {
-    extractInheritedSlotsFromScxml,
-    collectInheritedSlotUsages,
-} from "../utils/editorGraph";
+import { isTauri, saveFile } from "../tauri-client.js";
+import { collectInheritedSlotUsages } from "../utils/editorGraph";
 import { getNodeId } from "../utils/editorGeometry";
 import {
     getLocalDataModelEntries,
@@ -13,7 +8,12 @@ import {
     normalizeSharedScxmlStateIdentity,
     prepareGraphForScxml,
 } from "../utils/editorScxml";
-import { generateXmlString } from "../utils/scxmlExport";
+import { serializeEditorGraphWithRust } from "../utils/scxmlRustExport";
+import {
+    inspectWorkflowForEditorSource,
+    loadWorkflowForEditor,
+    projectWorkflowInspectionForEditor,
+} from "../utils/workflowLoader";
 
 const IS_DESKTOP = isTauri();
 
@@ -65,12 +65,15 @@ const writeNewSubMachineFile = async ({ filePath, nodes = [], edges = [] }) => {
 
     let xml = buildEmptySubMachineXml();
     if (nodes.length > 0) {
-        const exportGraph = prepareGraphForScxml(nodes, edges);
-        xml = generateXmlString(
-            exportGraph.nodes,
-            exportGraph.edges,
-            DEFAULT_CHILD_DATA_MODEL
-        ) || xml;
+        // Creating a populated Sub-SM is a persisted semantic operation. In
+        // desktop mode Rust is authoritative, so serialization errors abort the
+        // creation instead of writing independently-generated JavaScript XML.
+        xml = await serializeEditorGraphWithRust({
+            nodes,
+            edges,
+            globalDataModel: DEFAULT_CHILD_DATA_MODEL,
+            manualSlots: [],
+        });
     }
 
     const result = await saveFile(xml, filePath, "Create Sub-State-Machine");
@@ -137,42 +140,20 @@ export function useSubStateMachines({
     nodes,
     edges,
     selectedNodes,
-    slotNodes,
-    slotEdges,
-    manualSlots,
     tabs,
-    setTabs,
     activeTabId,
-    setActiveTabId,
     switchTab,
+    openTab,
     globalDataModel,
-    setGlobalDataModel,
     inheritedGlobalDataModel,
-    setInheritedGlobalDataModel,
     behaviorDirectories,
     fetchSkillData,
-    setNodes,
-    setEdges,
-    setSlotNodes,
-    setSlotEdges,
-    setManualSlots,
-    selectedNodeId,
-    setSelectedNodeId,
-    getViewport,
     setActiveTab,
     setContextMenu,
-    fitView,
     checkSlotConnection,
     onStateMachineLoadStart,
     onStateMachineLoadEnd,
 }) {
-    const captureCurrentViewport = () => {
-        try {
-            return getViewport?.() || null;
-        } catch {
-            return null;
-        }
-    };
 
     const hydrateSubMachineInheritedSlots = async (
         targetNodes,
@@ -185,34 +166,17 @@ export function useSubStateMachines({
                 }
 
                 try {
-                    let xmlText = "";
-
-                    if (IS_DESKTOP) {
-                        const loaded = await readWorkflowSource(
-                            node.data.src,
-                            behaviorDirectories,
-                            parentFilePath
-                        );
-                        xmlText = loaded.content || "";
-                    } else {
-                        const resolvedUrl = resolveSrcPath(
-                            node.data.src,
-                            DEFAULT_PREFIX_CONFIG
-                        );
-                        const response = await fetch(resolvedUrl);
-                        if (!response.ok) return node;
-                        xmlText = await response.text();
-                    }
-
-                    const behaviorExitEvents =
-                        extractBehaviorExitEventsFromScxml(xmlText);
-                    const declaredInheritedSlots =
-                        extractInheritedSlotsFromScxml(xmlText);
-                    const parsedChild = await parseScxmlFile(
-                        xmlText,
+                    const loaded = await loadWorkflowForEditor({
+                        src: node.data.src,
+                        directories: behaviorDirectories,
+                        currentFilePath: parentFilePath,
                         fetchSkillData,
-                        getNodeId
-                    );
+                        getNodeId,
+                    });
+                    const behaviorExitEvents = loaded.behaviorExitEvents || [];
+                    const declaredInheritedSlots =
+                        loaded.inheritedSlotDeclarations || [];
+                    const parsedChild = loaded.parsed;
                     const inheritedSlots = collectInheritedSlotUsages(
                         parsedChild.nodes,
                         declaredInheritedSlots
@@ -297,37 +261,18 @@ export function useSubStateMachines({
 
         let tabId = `tab-sub-${baseName}`;
         let resolvedFilePath = null;
-        let xmlText = "";
 
         try {
-            if (IS_DESKTOP) {
-                // Keep srcPath symbolic in SCXML, but resolve ${KEY} to the
-                // configured local directory before reading from disk.
-                const loaded = await readWorkflowSource(
-                    srcPath,
-                    behaviorDirectories,
-                    currentTab?.filePath || null
-                );
-
-                xmlText = loaded.content;
-                resolvedFilePath = loaded.path;
+            // Inspect first so an already-open tab can be selected without
+            // rebuilding its React Flow projection or refetching skill data.
+            const inspection = await inspectWorkflowForEditorSource({
+                src: srcPath,
+                directories: behaviorDirectories,
+                currentFilePath: currentTab?.filePath || null,
+            });
+            resolvedFilePath = inspection.path;
+            if (resolvedFilePath) {
                 tabId = `tab-sub-${resolvedFilePath}`;
-            } else {
-                // Browser compatibility only. The desktop app resolves
-                // ${KEY}/... directly from the Behavior Library.
-                const resolvedUrl = resolveSrcPath(
-                    srcPath,
-                    DEFAULT_PREFIX_CONFIG
-                );
-                const response = await fetch(resolvedUrl);
-
-                if (!response.ok) {
-                    throw new Error(
-                        `Server returned status ${response.status} (${response.statusText})`
-                    );
-                }
-
-                xmlText = await response.text();
             }
 
             const existingTab = tabs.find((tab) => tab.id === tabId);
@@ -336,22 +281,20 @@ export function useSubStateMachines({
                 return;
             }
 
-            if (!xmlText || !xmlText.includes("<scxml")) {
+            if (!inspection.content || !inspection.content.includes("<scxml")) {
                 throw new Error(
                     "The selected file does not contain a valid <scxml> document."
                 );
             }
 
             const discoveredBehaviorExitEvents =
-                extractBehaviorExitEventsFromScxml(xmlText);
+                inspection.behaviorExitEvents || [];
             const declaredInheritedSlots =
-                extractInheritedSlotsFromScxml(xmlText);
-
-            const parsed = await parseScxmlFile(
-                xmlText,
+                inspection.inheritedSlotDeclarations || [];
+            const parsed = await projectWorkflowInspectionForEditor(inspection, {
                 fetchSkillData,
-                getNodeId
-            );
+                getNodeId,
+            });
             const discoveredInheritedSlots =
                 collectInheritedSlotUsages(
                     parsed.nodes,
@@ -464,46 +407,17 @@ export function useSubStateMachines({
                 globalDataModel: parsed.globalDataModel,
             };
 
-            const parentViewport = captureCurrentViewport();
-            setTabs((prev) => [
-                ...prev.map((tab) =>
-                    tab.id === activeTabId
-                        ? {
-                            ...tab,
-                            nodes: syncedParentNodes,
-                            edges,
-                            slotNodes,
-                            slotEdges,
-                            manualSlots,
-                            globalDataModel,
-                            inheritedGlobalDataModel,
-                            selectedNodeId: selectedNodeId || null,
-                            viewport: parentViewport || tab.viewport || null,
-                        }
-                        : tab
-                ),
-                newTabObj,
-            ]);
-
-            setActiveTabId(tabId);
-            setNodes(parsedNodes);
-            setEdges(parsed.edges);
-            setSlotNodes([]);
-            setSlotEdges([]);
-            setManualSlots([]);
-            setGlobalDataModel(parsed.globalDataModel);
-            setInheritedGlobalDataModel(inheritedForChild);
-            setSelectedNodeId(null);
+            openTab(newTabObj, {
+                currentTabPatch: { nodes: syncedParentNodes },
+                fit: true,
+                fitOptions: { duration: 300 },
+            });
             checkSlotConnection(
                 parsedNodes,
                 [],
                 parsed.editorSlotNodes || []
             );
 
-            setTimeout(
-                () => fitView({ padding: 0.2, duration: 300 }),
-                100
-            );
         } catch (err) {
             console.error("Sub-Machine loading error:", err);
             alert(
@@ -581,38 +495,12 @@ export function useSubStateMachines({
             // Save the new Sub-SM node in the parent tab before switching to
             // the child. Otherwise returning to the parent can restore the old
             // snapshot without the freshly created node.
-            const parentViewport = captureCurrentViewport();
-            setTabs((prevTabs) => [
-                ...prevTabs.map((tab) =>
-                    tab.id === activeTabId
-                        ? {
-                            ...tab,
-                            nodes: parentNodes,
-                            edges,
-                            slotNodes,
-                            slotEdges,
-                            manualSlots,
-                            globalDataModel,
-                            inheritedGlobalDataModel,
-                            selectedNodeId: selectedNodeId || null,
-                            viewport: parentViewport || tab.viewport || null,
-                        }
-                        : tab
-                ),
-                newTabObj,
-            ]);
-
+            openTab(newTabObj, {
+                currentTabPatch: { nodes: parentNodes },
+                fit: true,
+                fitOptions: { duration: 300 },
+            });
             setContextMenu(null);
-            setActiveTabId(newTabId);
-            setNodes([]);
-            setEdges([]);
-            setSlotNodes([]);
-            setSlotEdges([]);
-            setManualSlots([]);
-            setGlobalDataModel(DEFAULT_CHILD_DATA_MODEL);
-            setInheritedGlobalDataModel(inheritedForChild);
-            setSelectedNodeId(null);
-            setTimeout(() => fitView({ padding: 0.2, duration: 300 }), 80);
             return true;
         } catch (error) {
             console.error("Could not create sub-state-machine:", error);
@@ -749,38 +637,15 @@ export function useSubStateMachines({
                 globalDataModel: DEFAULT_CHILD_DATA_MODEL,
             };
 
-            const parentViewport = captureCurrentViewport();
-            setTabs((prevTabs) => [
-                ...prevTabs.map((tab) =>
-                    tab.id === activeTabId
-                        ? {
-                            ...tab,
-                            nodes: remainingParentNodes,
-                            edges: updatedParentEdges,
-                            slotNodes,
-                            slotEdges,
-                            manualSlots,
-                            globalDataModel,
-                            inheritedGlobalDataModel,
-                            selectedNodeId: selectedNodeId || null,
-                            viewport: parentViewport || tab.viewport || null,
-                        }
-                        : tab
-                ),
-                newTabObj,
-            ]);
-
-            setActiveTabId(newTabId);
-            setNodes(subTabNodes);
-            setEdges(subTabEdges);
-            setSlotNodes([]);
-            setSlotEdges([]);
-            setManualSlots([]);
-            setGlobalDataModel(DEFAULT_CHILD_DATA_MODEL);
-            setInheritedGlobalDataModel(inheritedForChild);
-            setSelectedNodeId(null);
+            openTab(newTabObj, {
+                currentTabPatch: {
+                    nodes: remainingParentNodes,
+                    edges: updatedParentEdges,
+                },
+                fit: true,
+                fitOptions: { duration: 300 },
+            });
             checkSlotConnection(subTabNodes);
-            setTimeout(() => fitView({ padding: 0.2, duration: 300 }), 80);
             return true;
         } catch (error) {
             console.error("Could not create sub-state-machine:", error);

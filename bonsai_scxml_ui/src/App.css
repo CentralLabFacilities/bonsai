@@ -1590,6 +1590,38 @@
     border-bottom: none;
 }
 
+.parallel-lane-node {
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+.parallel-lane-name {
+    position: absolute;
+    top: 7px;
+    left: 10px;
+    z-index: 18;
+    max-width: calc(100% - 32px);
+    padding: 2px 7px;
+    border: 1px solid rgba(2, 132, 199, 0.28);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.9);
+    color: #0369a1;
+    font-size: 9px;
+    font-weight: 750;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: auto;
+    cursor: pointer;
+}
+
+.parallel-lane-selected .parallel-lane-name {
+    box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2);
+    border-color: rgba(2, 132, 199, 0.6);
+}
+
 .parallel-add-lane-btn {
     position: absolute;
     bottom: 4px;
@@ -4863,6 +4895,36 @@
     border: 1px solid rgba(6, 182, 212, 0.4);
 }
 
+.slot-node-provenance-access {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 5px;
+    width: 100%;
+    max-width: 190px;
+    color: #cbd5e1;
+    font-size: 8.5px;
+    line-height: 1.25;
+}
+
+.slot-node-provenance-access > span:first-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.slot-node-provenance-access strong {
+    color: #e2e8f0;
+    font-weight: 800;
+}
+
+.slot-node-provenance-access > span:last-child {
+    color: #94a3b8;
+    text-transform: uppercase;
+    font-size: 7.5px;
+    letter-spacing: 0.35px;
+}
+
 /* ==========================================================================
    FLOATING "NEW SLOT" BUTTON (top-right of Slot Mode canvas)
    ========================================================================== */
@@ -6041,6 +6103,52 @@
     align-items: center;
     justify-content: space-between;
     gap: 12px;
+}
+
+.slot-section-heading-collapsible {
+    min-width: 0;
+}
+
+.slot-section-toggle {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 4px 3px 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.slot-section-toggle:hover .slot-section-title,
+.slot-section-toggle:focus-visible .slot-section-title {
+    color: #ffffff;
+}
+
+.slot-section-toggle:focus-visible {
+    outline: 1px solid rgba(56, 189, 248, 0.55);
+    outline-offset: 3px;
+}
+
+.slot-section-chevron {
+    flex: 0 0 auto;
+    width: 15px;
+    height: 15px;
+    color: #94a3b8;
+    transition: transform 140ms ease, color 140ms ease;
+}
+
+.slot-section-toggle:hover .slot-section-chevron {
+    color: #cbd5e1;
+}
+
+.slot-section-chevron.is-collapsed {
+    transform: rotate(-90deg);
 }
 
 .slot-section-title {
@@ -7338,6 +7446,17 @@
     pointer-events: auto;
 }
 
+.collapsed-slot-source-handle {
+    left: 50% !important;
+    bottom: -5px !important;
+    top: auto !important;
+    width: 9px !important;
+    height: 9px !important;
+    border: 2px solid #ffffff !important;
+    background: #64748b !important;
+    pointer-events: none !important;
+}
+
 .parallel-group-container.collapsed-container .parallel-title,
 .compound-frame-node.collapsed-container .compound-frame-title {
     min-width: 0;
@@ -7391,17 +7510,27 @@
     opacity: 1;
 }
 
+/* Focused user transitions keep the familiar moving-dash animation. Canvas
+   hover now adds the animated class directly to only the connected mounted
+   edges, avoiding a React graph update just to start/stop this effect. */
+.react-flow.editor-edge-focus-mode
+.react-flow__edge.editor-user-transition-edge.editor-edge-focus-active.animated
+.react-flow__edge-path {
+    stroke-dasharray: 5 !important;
+}
 
 /*
- * Node focus is paint-only for large graphs. The display hook marks only the
- * handful of context nodes; CSS dims the rest. This avoids mapping and cloning
- * every node whenever the pointer moves across a large state machine.
+ * Hover focus must stay extremely cheap because this selector can affect every
+ * mounted node at once. CSS filters (especially animated grayscale) force a
+ * separate compositing/paint pass for many node layers and were the dominant
+ * cost when moving the pointer between states. Use opacity only and change it
+ * immediately; the hovered/context nodes still receive their explicit outline.
  */
 .react-flow.editor-node-focus-mode
 .react-flow__node:not(.editor-node-context-visible):not(.selected) {
-    opacity: 0.42;
-    filter: grayscale(0.72);
-    transition: opacity 120ms ease, filter 120ms ease;
+    opacity: 0.48;
+    filter: none !important;
+    transition: none !important;
 }
 
 .react-flow.editor-node-focus-mode
@@ -7409,7 +7538,8 @@
 .react-flow.editor-node-focus-mode
 .react-flow__node.selected {
     opacity: 1;
-    filter: none;
+    filter: none !important;
+    transition: none !important;
 }
 
 .context-menu-divider {
@@ -7534,16 +7664,16 @@
     box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.20);
 }
 
-/* Slot labels are clickable in overview mode. Earlier layout rules disable
+/* Slot labels are clickable in overview and slot mode. Earlier layout rules disable
    pointer events on these labels so the connection handles remain easy to
-   drag; enable them only in overview mode, where clicking a slot opens it. */
-.costum-node.mode-overview.has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-entry[role="button"] {
+   drag; enable them in the two modes where clicking a slot opens it. */
+:is(.costum-node.mode-overview, .costum-node.mode-slots).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-entry[role="button"] {
     pointer-events: auto;
     outline: none;
     cursor: pointer;
 }
 
-.costum-node.mode-overview.has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-entry[role="button"] .node-slot-key {
+:is(.costum-node.mode-overview, .costum-node.mode-slots).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-entry[role="button"] .node-slot-key {
     padding: 2px 4px;
     border-radius: 4px;
     transition:
@@ -7552,14 +7682,14 @@
             color 0.12s ease;
 }
 
-.costum-node.mode-overview.has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-entry[role="button"]:hover .node-slot-key,
-.costum-node.mode-overview.has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-entry[role="button"]:focus .node-slot-key {
+:is(.costum-node.mode-overview, .costum-node.mode-slots).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-entry[role="button"]:hover .node-slot-key,
+:is(.costum-node.mode-overview, .costum-node.mode-slots).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-entry[role="button"]:focus .node-slot-key {
     background: rgba(148, 163, 184, 0.13);
     box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.12);
     color: #f1f5f9;
 }
 
-.costum-node.mode-overview.has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-entry[role="button"]:active .node-slot-key {
+:is(.costum-node.mode-overview, .costum-node.mode-slots).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-entry[role="button"]:active .node-slot-key {
     background: rgba(56, 189, 248, 0.16);
     box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.22);
 }
@@ -8288,4 +8418,406 @@
     color: #64748b;
     font-size: 11px;
     font-variant-numeric: tabular-nums;
+}
+
+/* ==========================================================================
+   PARALLEL LANE MANAGER
+   ========================================================================== */
+.parallel-lane-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 10px;
+    padding: 12px;
+    border: 1px solid #334155;
+    border-radius: 9px;
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.72), rgba(15, 23, 42, 0.46));
+}
+
+.parallel-lane-editor-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.parallel-lane-editor-title-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.parallel-lane-editor-title-row h3 {
+    margin: 0;
+    color: #f8fafc;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.parallel-lane-editor-header p {
+    max-width: 360px;
+    margin: 4px 0 0;
+    color: #94a3b8;
+    font-size: 10.5px;
+    line-height: 1.4;
+}
+
+.parallel-lane-count-badge {
+    display: inline-flex;
+    min-width: 20px;
+    height: 20px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 6px;
+    border: 1px solid rgba(56, 189, 248, 0.32);
+    border-radius: 999px;
+    background: rgba(14, 165, 233, 0.12);
+    color: #7dd3fc;
+    font-size: 10px;
+    font-weight: 800;
+}
+
+.parallel-lane-add-button {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    min-height: 30px;
+    padding: 0 9px;
+    border: 1px solid #0ea5e9;
+    border-radius: 6px;
+    background: rgba(2, 132, 199, 0.18);
+    color: #e0f2fe;
+    font-size: 10.5px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.parallel-lane-add-button:hover {
+    border-color: #38bdf8;
+    background: rgba(2, 132, 199, 0.3);
+    color: #ffffff;
+}
+
+.parallel-lane-editor-list {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.parallel-lane-editor-card {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 9px;
+    padding: 8px;
+    border: 1px solid #334155;
+    border-left: 3px solid #0284c7;
+    border-radius: 7px;
+    background: #111827;
+    transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
+}
+
+.parallel-lane-editor-card:hover {
+    border-color: #475569;
+    border-left-color: #38bdf8;
+    background: #131d2d;
+}
+
+.parallel-lane-editor-index {
+    display: flex;
+    width: 26px;
+    height: 26px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    background: #0f172a;
+    color: #7dd3fc;
+    font-size: 10px;
+    font-weight: 800;
+}
+
+.parallel-lane-editor-main {
+    min-width: 0;
+}
+
+.parallel-lane-editor-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.parallel-lane-editor-label {
+    color: #cbd5e1;
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.parallel-lane-editor-meta {
+    color: #64748b;
+    font-size: 9.5px;
+    white-space: nowrap;
+}
+
+.parallel-lane-editor-input {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 6px 7px;
+    border: 1px solid #334155;
+    border-radius: 5px;
+    outline: none;
+    background: #0b1220;
+    color: #f8fafc;
+    font-size: 11.5px;
+    font-weight: 600;
+}
+
+.parallel-lane-editor-input:hover {
+    border-color: #475569;
+}
+
+.parallel-lane-editor-input:focus {
+    border-color: #38bdf8;
+    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.1);
+}
+
+.parallel-lane-editor-actions {
+    display: grid;
+    grid-template-columns: 26px 26px;
+    gap: 4px;
+}
+
+.parallel-lane-editor-action {
+    display: inline-flex;
+    width: 26px;
+    height: 24px;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid #334155;
+    border-radius: 5px;
+    background: #172033;
+    color: #cbd5e1;
+    cursor: pointer;
+}
+
+.parallel-lane-editor-action:hover:not(:disabled) {
+    border-color: #38bdf8;
+    background: rgba(14, 165, 233, 0.12);
+    color: #e0f2fe;
+}
+
+.parallel-lane-editor-action:disabled {
+    opacity: 0.32;
+    cursor: not-allowed;
+}
+
+.parallel-lane-editor-delete {
+    grid-column: 1 / -1;
+    width: 56px;
+    border-color: rgba(239, 68, 68, 0.28);
+    background: rgba(127, 29, 29, 0.12);
+    color: #fca5a5;
+}
+
+.parallel-lane-editor-delete:hover:not(:disabled) {
+    border-color: #ef4444;
+    background: rgba(239, 68, 68, 0.14);
+    color: #fecaca;
+}
+
+.parallel-lane-editor-empty {
+    padding: 14px 10px;
+    border: 1px dashed #334155;
+    border-radius: 7px;
+    color: #64748b;
+    font-size: 10.5px;
+    line-height: 1.45;
+    text-align: center;
+}
+
+/* ==========================================================================
+   SLOT SOURCE HIERARCHY GROUPING
+   Keep large inheritance trees contained and visually separate parent
+   state machines from consumers in nested sub-state machines.
+   ========================================================================== */
+.slot-source-hierarchy-section {
+    flex: 0 0 auto;
+    min-height: 0;
+}
+
+.slot-source-hierarchy-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-height: clamp(220px, 38vh, 420px);
+    min-height: 0;
+    padding-right: 4px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+}
+
+.slot-hierarchy-group {
+    display: flex;
+    flex: 0 0 auto;
+    min-width: 0;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px;
+    border: 1px solid rgba(148, 163, 184, 0.15);
+    border-radius: 9px;
+    background: rgba(15, 23, 42, 0.24);
+}
+
+.slot-hierarchy-group-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.slot-hierarchy-group-title {
+    color: #dbe4f0;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.035em;
+    text-transform: uppercase;
+}
+
+.slot-hierarchy-group-subtitle {
+    margin-top: 2px;
+    color: #738398;
+    font-size: 9px;
+    line-height: 1.35;
+}
+
+.slot-hierarchy-group-count,
+.slot-hierarchy-machine-count {
+    display: inline-flex;
+    flex: 0 0 auto;
+    min-width: 20px;
+    height: 20px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 6px;
+    border: 1px solid rgba(148, 163, 184, 0.17);
+    border-radius: 999px;
+    background: rgba(30, 41, 59, 0.62);
+    color: #9eacc0;
+    font-size: 9px;
+    font-weight: 800;
+}
+
+.slot-hierarchy-group-list {
+    gap: 6px;
+}
+
+.slot-hierarchy-group-list .compact-slot-card {
+    margin-bottom: 0;
+}
+
+.slot-hierarchy-nested-groups {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+}
+
+.slot-hierarchy-machine-group {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.slot-hierarchy-machine-group + .slot-hierarchy-machine-group {
+    padding-top: 9px;
+    border-top: 1px solid rgba(148, 163, 184, 0.11);
+}
+
+.slot-hierarchy-machine-heading {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 6px;
+    color: #aab7ca;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.slot-hierarchy-machine-heading svg {
+    flex: 0 0 auto;
+    color: #818cf8;
+    font-size: 11px;
+}
+
+.slot-hierarchy-machine-heading > span:not(.slot-hierarchy-machine-count) {
+    min-width: 0;
+    flex: 1;
+    overflow-wrap: anywhere;
+}
+
+.slot-hierarchy-machine-count {
+    margin-left: auto;
+}
+
+/* Interaction fast path --------------------------------------------------
+ * Pan/zoom is a compositor-heavy operation on large SVG/HTML canvases. Keep
+ * React out of the viewport lifecycle and temporarily skip expensive labels
+ * and decorative effects while the viewport is moving. Transition paths stay
+ * visible so zooming never makes the graph topology disappear. */
+.react-flow.editor-viewport-moving .react-flow__edgelabel-renderer {
+    visibility: hidden !important;
+}
+
+/* Keep edges visible while zooming, but pause their dashed flow animation
+ * until the viewport settles. This avoids paying for SVG dash animation and
+ * viewport transforms at the same time without hiding the transitions. */
+.react-flow.editor-viewport-moving
+    .react-flow__edge.animated
+    .react-flow__edge-path {
+    animation-play-state: paused !important;
+}
+
+.react-flow.editor-viewport-moving .react-flow__node {
+    transition: none !important;
+}
+
+.react-flow.editor-viewport-moving :is(
+    .costum-node,
+    .submachine-node,
+    .compound-frame-node,
+    .parallel-group-container,
+    .parallel-lane-node,
+    .slot-node,
+    .state-clone-node
+) {
+    box-shadow: none !important;
+    filter: none !important;
+    transition: none !important;
+    animation: none !important;
+}
+
+/* The semantic graph keeps every edge in memory, but useEditorDisplay now
+ * supplies only drag-relevant edges to React Flow while a node is moving. Keep
+ * the remaining node chrome cheap as well. */
+.react-flow.editor-node-dragging :is(
+    .costum-node,
+    .submachine-node,
+    .compound-frame-node,
+    .parallel-group-container,
+    .parallel-lane-node,
+    .slot-node,
+    .state-clone-node
+) {
+    transition: none !important;
+    animation: none !important;
 }

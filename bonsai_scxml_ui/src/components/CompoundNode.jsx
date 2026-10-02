@@ -104,6 +104,18 @@ function CompoundNode({ id, data = {}, selected = false }) {
                 </strong>
             </div>
 
+            {isCollapsed &&
+                (data.mode === "slots" || data.mode === "overview") && (
+                    <Handle
+                        id="collapsed-slot-source"
+                        type="source"
+                        position={Position.Bottom}
+                        className="collapsed-slot-source-handle"
+                        isConnectableStart={false}
+                        isConnectableEnd={false}
+                    />
+                )}
+
             {!isCollapsed && uniqueEvents.length > 0 && (
                 <div className="compound-frame-exits">
                     {uniqueEvents.map((event) => {

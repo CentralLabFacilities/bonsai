@@ -1,7 +1,7 @@
 import React from "react";
 import { Handle, Position } from "@xyflow/react";
 
-export default function ParallelLaneNode({ data = {} }) {
+export default function ParallelLaneNode({ id, data = {}, selected = false }) {
     const events = Array.isArray(data.events) ? data.events : [];
     const uniqueEvents = [];
     const seen = new Set();
@@ -15,6 +15,7 @@ export default function ParallelLaneNode({ data = {} }) {
 
     return (
         <div
+            className={`parallel-lane-node ${selected ? "parallel-lane-selected" : ""}`}
             style={{
                 width: "100%",
                 height: "100%",
@@ -23,6 +24,13 @@ export default function ParallelLaneNode({ data = {} }) {
                 pointerEvents: "none",
             }}
         >
+            <div
+                className="parallel-lane-name nodrag nopan"
+                title={data.label || id || "Parallel lane"}
+            >
+                {data.label || id || "Lane"}
+            </div>
+
             {/* Display-only entry point for this parallel branch. */}
             <Handle
                 type="source"
