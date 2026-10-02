@@ -152,7 +152,9 @@ pub(super) fn wrap_editor_states(
     candidate.states.push(container);
 
     let mut changed_state_ids = vec![container_id.as_str().to_string()];
+    let mut changed_transition_ids = Vec::new();
     let mut lane_updates = Vec::<ParallelLaneEditorPatchDto>::new();
+    let mut promoted_initial_target: Option<(StateId, String)> = None;
 
     match candidate
         .states
@@ -192,6 +194,13 @@ pub(super) fn wrap_editor_states(
                     .find(|state| state.id == *initial_id)
                     .map(|state| state.scxml_id.clone())
             });
+            if let (Some(initial_id), Some(initial_scxml_id)) =
+                (requested_initial.as_ref(), initial_scxml_id.as_ref())
+            {
+                promoted_initial_target =
+                    Some((initial_id.clone(), initial_scxml_id.clone()));
+            }
+
             if let Some(container) = candidate
                 .states
                 .iter_mut()
@@ -243,6 +252,40 @@ pub(super) fn wrap_editor_states(
         _ => unreachable!(),
     }
 
+    // Wrapping the selected initial state into a Compound promotes external
+    // incoming transitions to the new Compound. Internal transitions between
+    // wrapped children still target the child directly. This mirrors SCXML
+    // compound entry semantics and keeps the visible incoming edge attached
+    // to the container after wrapping.
+    if let Some((initial_id, initial_scxml_id)) = promoted_initial_target {
+        for transition in &mut candidate.transitions {
+            let targets_initial =
+                transition.target_state_id.as_ref() == Some(&initial_id)
+                    || (transition.target_state_id.is_none()
+                        && transition.target_scxml_id == initial_scxml_id);
+            if !targets_initial {
+                continue;
+            }
+
+            let source_is_wrapped = if transition.logical_sources.is_empty() {
+                selected_set.contains(&transition.source_state_id)
+            } else {
+                transition
+                    .logical_sources
+                    .iter()
+                    .all(|source| selected_set.contains(&source.state_id))
+            };
+
+            if source_is_wrapped {
+                continue;
+            }
+
+            transition.target_state_id = Some(container_id.clone());
+            transition.target_scxml_id = container_scxml_id.clone();
+            changed_transition_ids.push(transition.id.as_str().to_string());
+        }
+    }
+
     if was_initial {
         changed_state_ids.extend(set_previous_scope_initial(
             &mut candidate,
@@ -252,11 +295,13 @@ pub(super) fn wrap_editor_states(
         ));
     }
 
-    let changed_transition_ids = recalculate_transition_owners(&mut candidate)?;
+    changed_transition_ids.extend(recalculate_transition_owners(&mut candidate)?);
     *workflow = candidate;
 
     changed_state_ids.sort();
     changed_state_ids.dedup();
+    changed_transition_ids.sort();
+    changed_transition_ids.dedup();
     Ok(WorkflowCommandChanges {
         changed_state_ids,
         changed_transition_ids,

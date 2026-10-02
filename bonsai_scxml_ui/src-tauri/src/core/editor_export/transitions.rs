@@ -131,7 +131,6 @@ fn build_normal_transitions(
         return Vec::new();
     }
 
-    let container_id = index.nearest_container_ancestor(node);
     let mut combined: Vec<(
         String,
         String,
@@ -142,10 +141,8 @@ fn build_normal_transitions(
     )> = Vec::new();
 
     for edge in request.edges.iter().filter(|edge| edge.source == node.id) {
-        if let Some(container_id) = container_id {
-            if !index.is_strict_descendant(&edge.target, container_id) {
-                continue;
-            }
+        if index.transition_owner_id(&edge.source, &edge.target) != Some(node.id.as_str()) {
+            continue;
         }
         let raw_event = if !edge.source_handle.trim().is_empty() {
             edge.source_handle.clone()
@@ -169,10 +166,8 @@ fn build_normal_transitions(
         if event.target.trim().is_empty() {
             continue;
         }
-        if let Some(container_id) = container_id {
-            if !index.is_strict_descendant(&event.target, container_id) {
-                continue;
-            }
+        if index.transition_owner_id(&node.id, &event.target) != Some(node.id.as_str()) {
+            continue;
         }
         let raw_event = first_event_name(event);
         let target_name = index
@@ -245,7 +240,10 @@ fn build_container_transitions(
         .filter_map(|(edge_index, edge)| {
             let source_inside = index.is_inside_container(&edge.source, &node.id);
             let target_inside = index.is_inside_container(&edge.target, &node.id);
-            (source_inside && !target_inside).then_some((edge_index, edge))
+            let owns_transition =
+                index.transition_owner_id(&edge.source, &edge.target) == Some(node.id.as_str());
+            (source_inside && !target_inside && owns_transition)
+                .then_some((edge_index, edge))
         })
         .collect::<Vec<_>>();
 

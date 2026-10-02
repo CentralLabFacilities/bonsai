@@ -2266,9 +2266,14 @@ export function useTransitionGraph({
                     );
                 }
             );
-            void syncTransitionsForSource?.(
-                drawerData.containerNodeId || drawerData.sourceNodeId
-            );
+            // Container exits are visually owned by the border but
+            // semantically owned by their real child source(s). Sync those
+            // logical sources, not the selected container id, otherwise Rust
+            // keeps the previous target and the border-to-target edge can
+            // disappear again on the next canonical refresh.
+            affectedSourceIds.forEach((sourceId) => {
+                void syncTransitionsForSource?.(sourceId);
+            });
 
             setDrawerData((previous) => ({
                 ...previous,

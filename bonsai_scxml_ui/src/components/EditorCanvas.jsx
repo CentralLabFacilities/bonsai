@@ -29,7 +29,10 @@ import ParallelLaneNode from "./ParallelLaneNode";
 import EditableTransitionEdge from "./EditableTransitionEdge";
 import CodeView from "./CodeView";
 import { isTauri } from "../tauri-client";
-import { serializeEditorGraphWithRust } from "../utils/scxmlRustExport";
+import {
+    buildFallbackEditorScxml,
+    serializeEditorGraphWithRust,
+} from "../utils/scxmlRustExport";
 
 const nodeTypes = {
     custom: memo(CustomNode),
@@ -114,7 +117,10 @@ export default function EditorCanvas({
                 if (!isTauri()) {
                     if (!cancelled) {
                         setCodeString(
-                            "<!-- SCXML Code View requires the Rust/Tauri backend. -->"
+                            buildFallbackEditorScxml(
+                                { nodes, edges, globalDataModel, manualSlots },
+                                "Rust/Tauri backend unavailable"
+                            )
                         );
                     }
                     return;
@@ -132,8 +138,12 @@ export default function EditorCanvas({
             } catch (error) {
                 console.error("Could not generate Code View SCXML:", error);
                 if (!cancelled) {
-                    const message = String(error?.message || error || "Unknown error");
-                    setCodeString(`<!-- Could not generate SCXML: ${message} -->`);
+                    setCodeString(
+                        buildFallbackEditorScxml(
+                            { nodes, edges, globalDataModel, manualSlots },
+                            error
+                        )
+                    );
                 }
             }
         };
@@ -558,7 +568,7 @@ export default function EditorCanvas({
                                 </>
                             )}
 
-                            {!contextMenu.isStructuralNode && contextMenu.canDelete && (
+                            {contextMenu.canDelete && (
                                 <>
                                     <div className="context-menu-divider" aria-hidden="true" />
                                     <button

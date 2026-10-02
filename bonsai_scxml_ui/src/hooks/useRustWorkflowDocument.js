@@ -14,6 +14,7 @@ import {
     buildRustStateParameters,
 } from "../utils/scxmlRustExport";
 import { buildRustTransitionSyncPlan } from "../utils/rustTransitionSync";
+import { rebuildBoundaryTransitions } from "../utils/boundaryTransitions";
 import {
     applyRustWorkflowDataModelPatch,
     applyRustWorkflowStatePatch,
@@ -167,14 +168,24 @@ export function useRustWorkflowDocument({
                 (patch.transitions?.length || 0) > 0 ||
                 (patch.removedTransitionIds?.length || 0) > 0
             ) {
-                setEdges?.((currentEdges) =>
-                    applyRustWorkflowTransitionPatch(
+                setEdges?.((currentEdges) => {
+                    const patchedEdges = applyRustWorkflowTransitionPatch(
                         currentEdges,
                         editorStateRef.current?.nodes || nextNodes,
                         patch,
                         { applyChanges: policy.applyTransitions }
-                    )
-                );
+                    );
+
+                    // Rust patches update logical transitions. Boundary edges
+                    // (child -> compound border -> target) are a visual
+                    // projection and must be rebuilt afterwards. Otherwise the
+                    // internal boundary helper survives while the container
+                    // exit edge can disappear.
+                    return rebuildBoundaryTransitions(
+                        editorStateRef.current?.nodes || nextNodes,
+                        patchedEdges
+                    ).edges;
+                });
             }
             if (Array.isArray(patch.dataModel)) {
                 setGlobalDataModel?.((currentDataModel) =>

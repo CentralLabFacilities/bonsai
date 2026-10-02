@@ -1095,8 +1095,85 @@ export function useNodeDrag({
             }
 
             let nextEdges = edges;
+            const crossesParallelLanes = Boolean(
+                sourceLane &&
+                targetLane &&
+                sourceLane.id !== targetLane.id
+            );
 
-            if (sourceLane) {
+            if (crossesParallelLanes) {
+                // Parallel lanes are independent regions. Carrying an
+                // incoming/outgoing transition to another lane changes its
+                // semantics, so the move deliberately disconnects the state.
+                // Rust applies the same rule transactionally; doing it here as
+                // well keeps the optimistic editor graph in sync immediately.
+                nextEdges = nextEdges
+                    .map((edge) => {
+                        const targetsDraggedState =
+                            edge.target === draggedNode.id ||
+                            edge.data?.boundaryOriginalTarget === draggedNode.id ||
+                            edge.data?.compoundOriginalTarget === draggedNode.id ||
+                            edge.data?.parallelOriginalTarget === draggedNode.id;
+                        if (targetsDraggedState) return null;
+
+                        const logicalSources = Array.isArray(
+                            edge.data?.boundaryOriginalSources
+                        )
+                            ? edge.data.boundaryOriginalSources
+                            : [];
+                        const remainingLogicalSources = logicalSources.filter(
+                            (source) =>
+                                (source?.sourceId || source?.nodeId || source?.id) !==
+                                draggedNode.id
+                        );
+                        const removedSharedSource =
+                            logicalSources.length >
+                            remainingLogicalSources.length;
+
+                        if (removedSharedSource && remainingLogicalSources.length > 0) {
+                            const primary = remainingLogicalSources[0];
+                            const primaryId =
+                                primary?.sourceId || primary?.nodeId || primary?.id;
+                            const primaryHandle =
+                                primary?.sourceHandle || primary?.handle || "success";
+                            const data = {
+                                ...(edge.data || {}),
+                                boundaryOriginalSources: remainingLogicalSources,
+                            };
+                            [
+                                "boundaryOriginalSource",
+                                "boundaryOriginalSourceHandle",
+                                "boundaryExitId",
+                                "compoundOriginalSource",
+                                "compoundOriginalSourceHandle",
+                                "compoundExitId",
+                                "parallelOriginalSource",
+                                "parallelOriginalSourceHandle",
+                                "parallelExitId",
+                            ].forEach((key) => delete data[key]);
+
+                            return {
+                                ...edge,
+                                source: primaryId,
+                                sourceHandle: primaryHandle,
+                                label: primaryHandle,
+                                data,
+                            };
+                        }
+
+                        // Boundary projected edges are owned by the container exit
+                        // reconstruction logic. Do not remove them just because their
+                        // logical source lives below the dragged node.
+                        const sourcesDraggedState =
+                            edge.source === draggedNode.id ||
+                            removedSharedSource;
+
+                        return sourcesDraggedState ? null : edge;
+                    })
+                    .filter(Boolean);
+            }
+
+            if (sourceLane && !crossesParallelLanes) {
                 // Outgoing lane exits are reconstructed below from logical
                 // boundary provenance. Only incoming transitions need an
                 // explicit visual target restore when the state leaves the
@@ -1122,7 +1199,7 @@ export function useNodeDrag({
                 });
             }
 
-            if (targetLane && targetParallel) {
+            if (targetLane && targetParallel && !crossesParallelLanes) {
                 // Source-side Parallel exits are rebuilt generically below.
                 // Incoming transitions still render against the Parallel
                 // boundary, while retaining the logical target state.

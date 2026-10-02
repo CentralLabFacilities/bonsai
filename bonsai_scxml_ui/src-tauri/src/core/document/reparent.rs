@@ -874,6 +874,65 @@ fn validate_non_parallel_target(
     Ok(())
 }
 
+fn remove_transitions_for_cross_lane_move(
+    workflow: &mut Workflow,
+    moved_id: &StateId,
+) -> Vec<String> {
+    let moved_scxml_id = workflow
+        .states
+        .iter()
+        .find(|state| &state.id == moved_id)
+        .map(|state| state.scxml_id.clone())
+        .unwrap_or_default();
+    let mut changed = Vec::new();
+    let mut retained = Vec::with_capacity(workflow.transitions.len());
+
+    for mut transition in workflow.transitions.drain(..) {
+        let transition_id = transition.id.as_str().to_string();
+        let targets_moved_state = transition.target_state_id.as_ref() == Some(moved_id);
+        let directly_owned_by_moved_state = &transition.source_state_id == moved_id;
+        let legacy_hoisted_from_moved_state =
+            transition.logical_sources.is_empty()
+                && !moved_scxml_id.is_empty()
+                && transition
+                    .event
+                    .starts_with(&format!("{moved_scxml_id}."));
+        let source_count_before = transition.logical_sources.len();
+        transition
+            .logical_sources
+            .retain(|source| &source.state_id != moved_id);
+        let removed_logical_source = transition.logical_sources.len() != source_count_before;
+
+        if targets_moved_state
+            || directly_owned_by_moved_state
+            || legacy_hoisted_from_moved_state
+            || (removed_logical_source && transition.logical_sources.is_empty())
+        {
+            changed.push(transition_id);
+            continue;
+        }
+
+        if removed_logical_source {
+            changed.push(transition_id);
+        }
+        retained.push(transition);
+    }
+
+    workflow.transitions = retained;
+
+    if !moved_scxml_id.is_empty() {
+        let event_prefix = format!("{moved_scxml_id}.");
+        for state in &mut workflow.states {
+            state.editor.edge_targets.retain(|route| {
+                route.target_scxml_id != moved_scxml_id
+                    && !route.event.starts_with(&event_prefix)
+            });
+        }
+    }
+
+    changed
+}
+
 pub(super) fn move_editor_state(
     workflow: &mut Workflow,
     index: &WorkflowIndex,
@@ -900,6 +959,10 @@ pub(super) fn move_editor_state(
     }
 
     let next_parent_id = parent_state_id.map(StateId::from);
+    let crosses_parallel_lanes = source_lane
+        .as_ref()
+        .zip(target_lane.as_ref())
+        .is_some_and(|(source, target)| source.lane.id != target.lane.id);
     if target_lane.is_none() {
         validate_non_parallel_target(workflow, index, &id, next_parent_id.as_ref())?;
     }
@@ -955,7 +1018,19 @@ pub(super) fn move_editor_state(
         ));
     }
 
-    let changed_transition_ids = recalculate_transition_owners(&mut candidate)?;
+    // Parallel lanes are independent concurrent regions. A transition attached
+    // to a state in one lane cannot be carried across to a different lane by a
+    // drag because its old source/target semantics no longer describe the
+    // workflow. Drop those transitions transactionally with the move instead
+    // of silently re-owning them on the new lane.
+    let mut changed_transition_ids = if crosses_parallel_lanes {
+        remove_transitions_for_cross_lane_move(&mut candidate, &id)
+    } else {
+        Vec::new()
+    };
+    changed_transition_ids.extend(recalculate_transition_owners(&mut candidate)?);
+    changed_transition_ids.sort();
+    changed_transition_ids.dedup();
     *workflow = candidate;
 
     changed_state_ids.sort();

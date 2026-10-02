@@ -294,6 +294,14 @@ export function useContainerCreation({
             nodes.filter((node) => node.type === "compound").length + 1
         }`;
         const selectedIds = new Set(selectedNodes.map((node) => node.id));
+        const selectedInitialNode =
+            selectedNodes.find((node) => node.data?.isInitial) ||
+            selectedNodes[0] ||
+            null;
+        const selectedInitialId = selectedInitialNode?.id || null;
+        const selectionContainedInitial = Boolean(
+            selectedNodes.some((node) => node.data?.isInitial)
+        );
 
         const compoundNode = {
             id: compoundId,
@@ -316,6 +324,8 @@ export function useContainerCreation({
             data: {
                 label: compoundName,
                 fullSkillName: compoundName,
+                isInitial: selectionContainedInitial,
+                initialChildId: selectedInitialId,
                 events: [],
                 onEntry: [],
                 onExit: [],
@@ -334,6 +344,10 @@ export function useContainerCreation({
                     y:
                         node.position.y -
                         (minY - padding - headerOffset),
+                },
+                data: {
+                    ...(node.data || {}),
+                    isInitial: node.id === selectedInitialId,
                 },
                 selected: false,
             };
@@ -356,10 +370,28 @@ export function useContainerCreation({
                 !selectedIds.has(semanticSource) &&
                 selectedIds.has(semanticTarget)
             ) {
+                // Entering the newly wrapped initial state is semantically the
+                // same as entering the Compound itself. Keep that transition
+                // as a real incoming Compound edge so wrapping cannot make it
+                // disappear. Direct entries to non-initial children retain
+                // their child target in editor-only metadata.
+                if (semanticTarget === selectedInitialId) {
+                    const data = { ...(edge.data || {}) };
+                    delete data.boundaryOriginalTarget;
+                    delete data.compoundOriginalTarget;
+                    delete data.parallelOriginalTarget;
+                    return {
+                        ...edge,
+                        target: compoundId,
+                        targetHandle: "transition-target",
+                        data,
+                    };
+                }
+
                 return {
                     ...edge,
                     target: compoundId,
-                    targetHandle: "target",
+                    targetHandle: "transition-target",
                     data: {
                         ...(edge.data || {}),
                         boundaryOriginalTarget: semanticTarget,
@@ -526,7 +558,7 @@ export function useContainerCreation({
                 expandParent: true,
                 type: "parallelLane",
                 draggable: false,
-                selectable: false,
+                selectable: true,
                 style: {
                     width: containerWidth,
                     height: laneHeight,

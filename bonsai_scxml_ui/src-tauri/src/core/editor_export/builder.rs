@@ -1,4 +1,6 @@
-use crate::core::model::{DataModelEntryDto, Workflow, WorkflowDto};
+use std::collections::{HashMap, HashSet};
+
+use crate::core::model::{DataModelEntryDto, TransitionDto, Workflow, WorkflowDto};
 
 use super::{
     index::ExportIndex,
@@ -7,6 +9,37 @@ use super::{
     transitions::{build_edge_target_routes, build_transitions},
     types::EditorExportRequestDto,
 };
+
+fn make_transition_ids_unique(mut transitions: Vec<TransitionDto>) -> Vec<TransitionDto> {
+    let mut used = HashSet::new();
+    let mut next_suffix = HashMap::<String, u32>::new();
+
+    for transition in &mut transitions {
+        let base = if transition.id.trim().is_empty() {
+            "transition".to_string()
+        } else {
+            transition.id.clone()
+        };
+
+        if used.insert(base.clone()) {
+            transition.id = base.clone();
+            next_suffix.entry(base).or_insert(2);
+            continue;
+        }
+
+        let counter = next_suffix.entry(base.clone()).or_insert(2);
+        loop {
+            let candidate = format!("{base}__{}", *counter);
+            *counter += 1;
+            if used.insert(candidate.clone()) {
+                transition.id = candidate;
+                break;
+            }
+        }
+    }
+
+    transitions
+}
 
 pub(crate) fn build_workflow_from_editor(
     request: &EditorExportRequestDto,
@@ -30,7 +63,11 @@ pub(crate) fn build_workflow_from_editor(
         initial_state_id: root_initial.map(|state| state.id.clone()),
         initial_scxml_state_id: root_initial.map(|state| state.scxml_id.clone()),
         states,
-        transitions: build_transitions(request, &index),
+        // Editor edge ids are normally unique, but malformed/legacy graphs and
+        // nested boundary projections must never make Code View fail.  The
+        // semantic transition list is canonicalized here before model
+        // validation so serialization always has unique internal ids.
+        transitions: make_transition_ids_unique(build_transitions(request, &index)),
         data_model: request
             .data_model
             .iter()
@@ -107,6 +144,63 @@ mod tests {
         assert_eq!(workflow.transitions[0].logical_sources[0].state_id, "Talk");
         assert_eq!(workflow.transitions[0].logical_sources[0].handle, "error");
         assert_eq!(workflow.transitions[0].event, "Talk.error");
+    }
+
+    #[test]
+    fn nested_container_exit_is_emitted_once_by_outermost_owner() {
+        let request = EditorExportRequestDto {
+            nodes: vec![
+                node("outer", "compound", None),
+                node("inner", "compound", Some("outer")),
+                node("Talk", "custom", Some("inner")),
+                node("Outside", "custom", None),
+            ],
+            edges: vec![EditorExportEdgeDto {
+                id: "edge-1".into(),
+                source: "Talk".into(),
+                target: "Outside".into(),
+                source_handle: "success".into(),
+                ..EditorExportEdgeDto::default()
+            }],
+            ..EditorExportRequestDto::default()
+        };
+
+        let workflow = build_workflow_from_editor(&request).unwrap();
+        assert_eq!(workflow.transitions.len(), 1);
+        assert_eq!(workflow.transitions[0].source_state_id, "outer");
+        assert_eq!(workflow.transitions[0].id.as_str(), "edge-1");
+    }
+
+    #[test]
+    fn duplicate_editor_edge_ids_are_made_unique_for_serialization() {
+        let request = EditorExportRequestDto {
+            nodes: vec![
+                node("A", "custom", None),
+                node("B", "custom", None),
+                node("C", "custom", None),
+            ],
+            edges: vec![
+                EditorExportEdgeDto {
+                    id: "edge-duplicate".into(),
+                    source: "A".into(),
+                    target: "B".into(),
+                    source_handle: "success".into(),
+                    ..EditorExportEdgeDto::default()
+                },
+                EditorExportEdgeDto {
+                    id: "edge-duplicate".into(),
+                    source: "A".into(),
+                    target: "C".into(),
+                    source_handle: "error".into(),
+                    ..EditorExportEdgeDto::default()
+                },
+            ],
+            ..EditorExportRequestDto::default()
+        };
+
+        let workflow = build_workflow_from_editor(&request).unwrap();
+        assert_eq!(workflow.transitions.len(), 2);
+        assert_ne!(workflow.transitions[0].id, workflow.transitions[1].id);
     }
 
     #[test]

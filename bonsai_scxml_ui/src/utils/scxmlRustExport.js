@@ -361,3 +361,143 @@ export const buildRustEditorExportRequest = ({
 
 export const serializeEditorGraphWithRust = async (editorState) =>
     serializeEditorWorkflow(buildRustEditorExportRequest(editorState));
+
+const escapeFallbackXmlAttribute = (value) =>
+    String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/"/g, "&quot;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+
+const sanitizeFallbackXmlComment = (value) =>
+    String(value ?? "Unknown serializer error")
+        .replace(/--+/g, "—")
+        .replace(/-$/g, "–")
+        .replace(/[\r\n]+/g, " ")
+        .trim();
+
+// Code View is also a recovery surface for malformed/legacy editor state. If
+// the canonical Rust serializer rejects that state, keep Code View useful by
+// emitting a minimal, transition-free SCXML snapshot instead of an error-only
+// comment. The fallback intentionally uses editor ids because they are unique
+// even when semantic names/transition ids are not.
+const buildFallbackEditorScxmlUnsafe = (editorState = {}, error = null) => {
+    let sourceNodes = Array.isArray(editorState.nodes) ? editorState.nodes : [];
+
+    try {
+        const prepared = prepareGraphForScxml(
+            sourceNodes,
+            Array.isArray(editorState.edges) ? editorState.edges : []
+        );
+        if (Array.isArray(prepared?.nodes)) {
+            sourceNodes = prepared.nodes;
+        }
+    } catch (prepareError) {
+        // The emergency serializer must not depend on graph normalization
+        // succeeding. Raw editor nodes still provide a useful recovery view.
+        console.warn("Could not normalize graph for fallback SCXML:", prepareError);
+    }
+
+    const allById = new Map(sourceNodes.map((node) => [node.id, node]));
+    const isStructuralNode = (node) =>
+        node?.type === "parallelLane" ||
+        Boolean(node?.data?.autoParallelLaneCompound) ||
+        Boolean(node?.data?.isSkillClone) ||
+        Boolean(node?.data?.isStateClone) ||
+        Boolean(node?.data?.isSlotClone) ||
+        node?.type === "slot";
+    const semanticNodes = sourceNodes.filter((node) => !isStructuralNode(node));
+    const semanticIds = new Set(semanticNodes.map((node) => node.id));
+
+    const resolveSemanticParentId = (node) => {
+        let parentId = node?.parentId || null;
+        const visited = new Set();
+
+        while (parentId && !visited.has(parentId)) {
+            visited.add(parentId);
+            if (semanticIds.has(parentId)) return parentId;
+            parentId = allById.get(parentId)?.parentId || null;
+        }
+
+        return null;
+    };
+
+    const childrenByParent = new Map();
+    semanticNodes.forEach((node) => {
+        const parentId = resolveSemanticParentId(node);
+        if (!childrenByParent.has(parentId)) childrenByParent.set(parentId, []);
+        childrenByParent.get(parentId).push(node);
+    });
+
+    childrenByParent.forEach((children) => {
+        children.sort(
+            (left, right) =>
+                Number(left.position?.y || 0) - Number(right.position?.y || 0) ||
+                Number(left.position?.x || 0) - Number(right.position?.x || 0) ||
+                String(left.id).localeCompare(String(right.id))
+        );
+    });
+
+    const renderNode = (node, depth) => {
+        const indent = "  ".repeat(depth);
+        const children = childrenByParent.get(node.id) || [];
+        const tag = node.type === "parallel" ? "parallel" : "state";
+        const id = escapeFallbackXmlAttribute(node.id || "state");
+        const initialChild =
+            children.find((child) => child.id === node.data?.initialChildId) ||
+            children.find((child) => child.data?.isInitial) ||
+            null;
+        const initialAttribute =
+            tag === "state" && initialChild
+                ? ` initial="${escapeFallbackXmlAttribute(initialChild.id)}"`
+                : "";
+
+        if (children.length === 0) {
+            return `${indent}<${tag} id="${id}"${initialAttribute}/>`;
+        }
+
+        return [
+            `${indent}<${tag} id="${id}"${initialAttribute}>`,
+            ...children.map((child) => renderNode(child, depth + 1)),
+            `${indent}</${tag}>`,
+        ].join("\n");
+    };
+
+    const roots = childrenByParent.get(null) || [];
+    const initialRoot = roots.find((node) => node.data?.isInitial) || roots[0] || null;
+    const initialAttribute = initialRoot
+        ? ` initial="${escapeFallbackXmlAttribute(initialRoot.id)}"`
+        : "";
+    const reason = sanitizeFallbackXmlComment(
+        error?.message || error || "Canonical Rust serialization unavailable"
+    );
+
+    return [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        `<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0"${initialAttribute}>`,
+        `  <!-- Recovery SCXML: transitions were omitted because canonical serialization failed: ${reason} -->`,
+        ...roots.map((node) => renderNode(node, 1)),
+        "</scxml>",
+    ].join("\n");
+};
+
+export const buildFallbackEditorScxml = (editorState = {}, error = null) => {
+    try {
+        return buildFallbackEditorScxmlUnsafe(editorState, error);
+    } catch (fallbackError) {
+        console.error("Emergency SCXML fallback also failed:", fallbackError);
+        const reason = sanitizeFallbackXmlComment(
+            error?.message ||
+                error ||
+                fallbackError?.message ||
+                fallbackError ||
+                "Canonical serialization unavailable"
+        );
+        return [
+            '<?xml version="1.0" encoding="UTF-8"?>',
+            '<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0">',
+            `  <!-- Recovery SCXML: editor structure could not be recovered: ${reason} -->`,
+            '</scxml>',
+        ].join("\n");
+    }
+};

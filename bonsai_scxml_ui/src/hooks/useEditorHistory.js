@@ -1,8 +1,4 @@
 import { useCallback, useEffect, useRef } from "react";
-import {
-    growAllStateContainersToContents,
-    normalizeContainerAutoExpansion,
-} from "../utils/editorGeometry";
 
 const cloneGraphValue = (value) => {
     if (Array.isArray(value)) return value.map(cloneGraphValue);
@@ -318,7 +314,16 @@ export function useEditorHistory({
         }
 
         if (applyingHistoryRef.current) {
-            applyingHistoryRef.current = false;
+            // All state setters used by a history restore are normally batched,
+            // but React Flow can still emit one extra derived update. Only
+            // consume the restore guard once the live graph has converged on
+            // the history entry; otherwise that extra update gets recorded as
+            // a new branch and destroys redo / traps Ctrl+Z on one step.
+            const restoredSnapshot = createHistorySnapshot();
+            const currentEntry = historyRef.current[historyIndexRef.current];
+            if (snapshotsEqual(currentEntry?.snapshot, restoredSnapshot)) {
+                applyingHistoryRef.current = false;
+            }
             return;
         }
 
@@ -361,14 +366,13 @@ export function useEditorHistory({
         }
         applyingHistoryRef.current = true;
 
-        const restoredNodes = growAllStateContainersToContents(
-            normalizeContainerAutoExpansion(
-                cloneGraphValue(snapshot.nodes || []).map((node) => ({
-                    ...node,
-                    selected: false,
-                }))
-            )
-        );
+        // Restore the exact saved document. Geometry normalization here used
+        // to mutate the snapshot during undo, which immediately created a new
+        // history entry and made redo impossible.
+        const restoredNodes = cloneGraphValue(snapshot.nodes || []).map((node) => ({
+            ...node,
+            selected: false,
+        }));
 
         const restoredEdges = cloneGraphValue(snapshot.edges || []).map((edge) => ({
             ...edge,
@@ -384,6 +388,51 @@ export function useEditorHistory({
         }));
         const restoredManualSlots = cloneGraphValue(snapshot.manualSlots || []);
         const restoredGlobalDataModel = cloneGraphValue(snapshot.globalDataModel || []);
+
+        const primeGraphCache = (cacheRef, liveItems, snapshotItems) => {
+            cacheRef.current = new Map(
+                (liveItems || []).map((item, index) => [
+                    item?.id ?? `__index_${index}`,
+                    {
+                        source: item,
+                        snapshot: snapshotItems?.[index],
+                    },
+                ])
+            );
+        };
+
+        // Prime the structural-sharing caches with the historical objects so
+        // the next effect recognizes the restored state by identity instead
+        // of treating it as a fresh edit.
+        primeGraphCache(
+            nodeHistoryCacheRef,
+            restoredNodes,
+            snapshot.nodes || []
+        );
+        primeGraphCache(
+            edgeHistoryCacheRef,
+            restoredEdges,
+            snapshot.edges || []
+        );
+        primeGraphCache(
+            slotNodeHistoryCacheRef,
+            restoredSlotNodes,
+            snapshot.slotNodes || []
+        );
+        primeGraphCache(
+            slotEdgeHistoryCacheRef,
+            restoredSlotEdges,
+            snapshot.slotEdges || []
+        );
+        manualSlotsHistoryCacheRef.current = {
+            source: restoredManualSlots,
+            snapshot: snapshot.manualSlots || [],
+        };
+        dataModelHistoryCacheRef.current = {
+            source: restoredGlobalDataModel,
+            snapshot: snapshot.globalDataModel || [],
+        };
+        lastCreatedSnapshotRef.current = snapshot;
 
         setNodes(restoredNodes);
         setEdges(restoredEdges);

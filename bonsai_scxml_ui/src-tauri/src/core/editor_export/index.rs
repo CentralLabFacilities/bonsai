@@ -110,22 +110,37 @@ impl<'a> ExportIndex<'a> {
         false
     }
 
-    pub(super) fn nearest_container_ancestor(
+    /// Resolve the single semantic owner for an editor transition.
+    ///
+    /// A transition that leaves nested containers belongs to the outermost
+    /// Compound/Parallel boundary it exits.  Older exporter code inspected
+    /// every container independently, which meant the same editor edge could
+    /// be emitted once for each exited ancestor and therefore reuse the same
+    /// transition id multiple times.
+    pub(super) fn transition_owner_id(
         &self,
-        node: &EditorExportNodeDto,
+        source_id: &str,
+        target_id: &str,
     ) -> Option<&'a str> {
-        let mut parent_id = node.parent_id.as_deref();
+        let source = self.nodes_by_id.get(source_id).copied()?;
+        let mut owner = source.id.as_str();
+        let mut parent_id = source.parent_id.as_deref();
         let mut visited = HashSet::new();
+
         while let Some(id) = parent_id {
             if !visited.insert(id) {
                 return None;
             }
+
             let parent = self.nodes_by_id.get(id).copied()?;
-            if matches!(parent.node_type.as_str(), "compound" | "parallel") {
-                return Some(parent.id.as_str());
+            if matches!(parent.node_type.as_str(), "compound" | "parallel")
+                && !self.is_inside_container(target_id, id)
+            {
+                owner = parent.id.as_str();
             }
             parent_id = parent.parent_id.as_deref();
         }
-        None
+
+        Some(owner)
     }
 }

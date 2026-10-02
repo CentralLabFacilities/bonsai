@@ -179,7 +179,11 @@ export function useEditorContextMenu({
             }
 
             if (clickedNode) {
-                if (!clickedNode.selected) {
+                // Preserve an existing multi-selection when opening the context menu.
+                // React Flow already keeps the selected set; right-click must not collapse it.
+                const preserveSelection = clickedNode.selected && selectedNodes.length > 1;
+
+                if (!clickedNode.selected || !preserveSelection) {
                     if (clickedNode.type === "slot") {
                         setNodes((currentNodes) =>
                             currentNodes.map((node) => ({
@@ -214,6 +218,13 @@ export function useEditorContextMenu({
                     ? nodes.find((node) => node.id === clickedNode.parentId)
                     : null;
                 const isStructuralLane = clickedNode.type === "parallelLane";
+                const siblingLaneCount = isStructuralLane
+                    ? nodes.filter(
+                          (node) =>
+                              node.type === "parallelLane" &&
+                              node.parentId === clickedNode.parentId
+                      ).length
+                    : 0;
                 const isStructuralHelper = Boolean(
                     clickedNode.data?.autoParallelLaneCompound
                 );
@@ -262,6 +273,10 @@ export function useEditorContextMenu({
                     flowPosition: flowPos,
                     nodeId: clickedNode.id,
                     nodeType: clickedNode.type,
+                    selectedNodeIds: preserveSelection
+                        ? selectedNodes.map((node) => node.id)
+                        : [clickedNode.id],
+                    selectedNodeCount: preserveSelection ? selectedNodes.length : 1,
                     title: getContextNodeLabel(clickedNode),
                     isStructuralNode: isStructuralLane || isStructuralHelper,
                     addStateTargets,
@@ -291,7 +306,9 @@ export function useEditorContextMenu({
                         clickedNode.type !== "slot",
                     canAddState: addStateTargets.length > 0,
                     canAddLane: clickedNode.type === "parallel",
-                    canDelete: !isStructuralHelper && !isStructuralLane,
+                    canDelete:
+                        !isStructuralHelper &&
+                        (!isStructuralLane || siblingLaneCount > 1),
                 });
                 return;
             }
@@ -314,6 +331,7 @@ export function useEditorContextMenu({
             setSelectedNodeId,
             setSlotNodes,
             slotNodes,
+            selectedNodes,
         ]
     );
 
