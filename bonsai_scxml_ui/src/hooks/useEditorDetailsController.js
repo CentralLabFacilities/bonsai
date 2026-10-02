@@ -1,7 +1,75 @@
 import { useCallback, useMemo } from "react";
-import { getAbsoluteNodePosition } from "../utils/editorGeometry";
+import {
+    COLLAPSED_CONTAINER_HEIGHT,
+    COLLAPSED_CONTAINER_WIDTH,
+    getAbsoluteNodePosition,
+    layoutStateContainerForExpansion,
+} from "../utils/editorGeometry";
 import { getLocalDataModelEntries } from "../utils/editorScxml";
 import { isEditorCloneNode } from "../utils/editorClones";
+
+const nextEditorFrame = () =>
+    new Promise((resolve) => {
+        if (typeof window === "undefined") {
+            resolve();
+            return;
+        }
+        window.requestAnimationFrame(() =>
+            window.requestAnimationFrame(() => window.setTimeout(resolve, 0))
+        );
+    });
+
+const normalizeMachineIdentity = (value) =>
+    String(value || "")
+        .trim()
+        .replace(/\\/g, "/")
+        .split("/")
+        .pop()
+        ?.replace(/\.(xml|scxml)$/i, "")
+        .toLowerCase() || "";
+
+const findSubMachineByIdentity = (nodes, identity, preferredNodeId = null) => {
+    const candidates = (nodes || []).filter((node) => node?.type === "submachine");
+    if (preferredNodeId) {
+        const exactId = candidates.find((node) => node.id === preferredNodeId);
+        if (exactId) return exactId;
+    }
+
+    const wanted = normalizeMachineIdentity(identity);
+    if (!wanted) return null;
+
+    return candidates.find((node) => {
+        const identities = [
+            node.data?.label,
+            node.data?.fullSkillName,
+            node.data?.src,
+        ].map(normalizeMachineIdentity);
+        return identities.includes(wanted);
+    }) || null;
+};
+
+const findSkillByIdentity = (nodes, nodeId, skillName) => {
+    if (nodeId) {
+        const exact = (nodes || []).find((node) => node.id === nodeId);
+        if (exact) return exact;
+    }
+
+    const wanted = String(skillName || "").trim();
+    if (!wanted) return null;
+    const wantedShort = wanted.split("#")[0].split(".").pop();
+
+    return (nodes || []).find((node) => {
+        const fullName = String(node.data?.fullSkillName || "").trim();
+        const label = String(node.data?.label || "").trim();
+        const shortName = fullName.split("#")[0].split(".").pop();
+        return (
+            fullName === wanted ||
+            label === wanted ||
+            shortName === wantedShort ||
+            label === wantedShort
+        );
+    }) || null;
+};
 
 export function useEditorDetailsController({
     selectedRawNode,
@@ -12,6 +80,8 @@ export function useEditorDetailsController({
     selectedContainerOutgoingTransitions,
     moveContainerTransition,
     getNodes,
+    setNodes,
+    updateNodeInternals,
     handleToggleContainerCollapse,
     clearAllEdgeSelection,
     selectEditorNode,
@@ -19,6 +89,7 @@ export function useEditorDetailsController({
     setCenter,
     setHoveredSlotAccessNodeId,
     switchTab,
+    handleOpenSubMachine,
     setRightPanelTab,
     updateSlotPath,
     updateSlotInherited,
@@ -202,53 +273,275 @@ export function useEditorDetailsController({
         [selectedRawNode, updateSlotInherited]
     );
 
-    const handleSelectSlotAccessSkill = useCallback(
-        (nodeId) => {
-            if (!nodeId) return;
+    const expandAncestorsForNavigation = useCallback(
+        async (targetNode) => {
+            if (!targetNode?.id) return;
 
-            setHoveredSlotAccessNodeId(null);
-            clearAllEdgeSelection();
-            selectEditorNode(nodeId, {
-                kind: "node",
-                tab: null,
-            });
+            const currentNodes = getNodes();
+            const byId = new Map(currentNodes.map((node) => [node.id, node]));
+            const containersToExpand = [];
+            const visited = new Set();
+            let parentId = targetNode.parentId || null;
 
-            window.setTimeout(() => {
-                const flowNode = getNodes().find((node) => node.id === nodeId);
-                if (!flowNode) {
-                    fitView({
-                        nodes: [{ id: nodeId }],
-                        padding: 0.8,
-                        maxZoom: 1.2,
-                        duration: 250,
-                    });
-                    return;
+            while (parentId && !visited.has(parentId)) {
+                visited.add(parentId);
+                const parent = byId.get(parentId);
+                if (!parent) break;
+
+                if (parent.type === "compound" || parent.type === "parallel") {
+                    const width =
+                        Number(parent.width) ||
+                        Number(parent.measured?.width) ||
+                        Number(parent.style?.width) ||
+                        0;
+                    const height =
+                        Number(parent.height) ||
+                        Number(parent.measured?.height) ||
+                        Number(parent.style?.height) ||
+                        0;
+                    const hasCollapsedFootprint =
+                        width <= COLLAPSED_CONTAINER_WIDTH + 1 &&
+                        height <= COLLAPSED_CONTAINER_HEIGHT + 1;
+
+                    if (parent.data?.isCollapsed || hasCollapsedFootprint) {
+                        containersToExpand.push(parent.id);
+                    }
                 }
 
-                const position =
-                    flowNode.positionAbsolute || flowNode.position || { x: 0, y: 0 };
-                const width =
-                    Number(flowNode.measured?.width) ||
-                    Number(flowNode.width) ||
-                    220;
-                const height =
-                    Number(flowNode.measured?.height) ||
-                    Number(flowNode.height) ||
-                    90;
+                parentId = parent.parentId || null;
+            }
 
-                setCenter(position.x + width / 2, position.y + height / 2, {
-                    zoom: 1,
-                    duration: 300,
+            if (containersToExpand.length === 0) return;
+
+            const containerIds = new Set(containersToExpand);
+            const deepestContainerId = containersToExpand[0];
+
+            // Navigation can cross tabs and several nested collapsed containers
+            // at once. Expanding them through the normal toggle one-by-one can
+            // leave React Flow between layout states, making children reappear
+            // while their parent still has the compact collapsed dimensions.
+            // Restore every ancestor in one semantic update, then run the normal
+            // expansion layout once over the complete now-visible hierarchy.
+            setNodes((nodesBeforeExpansion) => {
+                const physicallyExpanded = nodesBeforeExpansion.map((node) => {
+                    if (!containerIds.has(node.id)) return node;
+                    if (node.type !== "compound" && node.type !== "parallel") {
+                        return node;
+                    }
+
+                    const savedSize = node.data?.expandedContainerSize || {};
+                    const fallbackWidth = node.type === "compound" ? 320 : 420;
+                    const fallbackHeight = node.type === "compound" ? 220 : 295;
+                    const restoredWidth = Math.max(
+                        Number(savedSize.width) || 0,
+                        fallbackWidth
+                    );
+                    const restoredHeight = Math.max(
+                        Number(savedSize.height) || 0,
+                        fallbackHeight
+                    );
+                    const restoredStyle = {
+                        ...(node.style || {}),
+                        width: restoredWidth,
+                        height: restoredHeight,
+                    };
+
+                    if (savedSize.minHeight == null) {
+                        delete restoredStyle.minHeight;
+                    } else {
+                        restoredStyle.minHeight = savedSize.minHeight;
+                    }
+
+                    return {
+                        ...node,
+                        width: restoredWidth,
+                        height: restoredHeight,
+                        style: restoredStyle,
+                        data: {
+                            ...(node.data || {}),
+                            isCollapsed: false,
+                        },
+                    };
                 });
-            }, 50);
+
+                return layoutStateContainerForExpansion(
+                    physicallyExpanded,
+                    deepestContainerId
+                );
+            });
+
+            await nextEditorFrame();
+
+            const containerIdsToRefresh = getNodes()
+                .filter((node) =>
+                    ["compound", "parallel", "parallelLane"].includes(
+                        node.type
+                    )
+                )
+                .map((node) => node.id);
+
+            if (containerIdsToRefresh.length === 0) {
+                containersToExpand.forEach((containerId) =>
+                    updateNodeInternals(containerId)
+                );
+            } else {
+                containerIdsToRefresh.forEach((containerId) =>
+                    updateNodeInternals(containerId)
+                );
+            }
+
+            await nextEditorFrame();
+        },
+        [getNodes, setNodes, updateNodeInternals]
+    );
+
+    const focusSlotAccessNode = useCallback(
+        async (nodeId, skillName = "") => {
+            const currentNodes = getNodes();
+            const targetNode = findSkillByIdentity(
+                currentNodes,
+                nodeId,
+                skillName
+            );
+            const resolvedNodeId = targetNode?.id || nodeId;
+            if (!resolvedNodeId) return;
+
+            if (targetNode) {
+                await expandAncestorsForNavigation(targetNode);
+            }
+
+            clearAllEdgeSelection();
+            selectEditorNode(resolvedNodeId, {
+                kind: "node",
+                allowMissing: true,
+                tab: null,
+            });
+            setRightPanelTab("details");
+
+            await nextEditorFrame();
+            const flowNodes = getNodes();
+            const flowNode = findSkillByIdentity(
+                flowNodes,
+                resolvedNodeId,
+                skillName
+            );
+
+            if (!flowNode) {
+                fitView({
+                    nodes: [{ id: resolvedNodeId }],
+                    padding: 0.8,
+                    maxZoom: 1.2,
+                    duration: 250,
+                });
+                return;
+            }
+
+            const position = getAbsoluteNodePosition(flowNode, flowNodes);
+            const width =
+                Number(flowNode.measured?.width) ||
+                Number(flowNode.width) ||
+                220;
+            const height =
+                Number(flowNode.measured?.height) ||
+                Number(flowNode.height) ||
+                90;
+
+            setCenter(position.x + width / 2, position.y + height / 2, {
+                zoom: 1,
+                duration: 300,
+            });
         },
         [
             clearAllEdgeSelection,
+            expandAncestorsForNavigation,
             fitView,
             getNodes,
             selectEditorNode,
             setCenter,
+            setRightPanelTab,
+        ]
+    );
+
+    const handleSelectSlotAccessSkill = useCallback(
+        (nodeId) => {
+            if (!nodeId) return;
+            setHoveredSlotAccessNodeId(null);
+            void focusSlotAccessNode(nodeId);
+        },
+        [focusSlotAccessNode, setHoveredSlotAccessNodeId]
+    );
+
+    const handleNavigateDescendantSlotSkill = useCallback(
+        async (access) => {
+            if (!access) return;
+
+            setHoveredSlotAccessNodeId(null);
+            setRightPanelTab("details");
+
+            const targetNodeId = access.nodeId || access.skillNodeId || null;
+            const targetSkillName = access.skillName || "";
+
+            if (access.sourceTabId) {
+                if (access.sourceTabId !== activeTabId) {
+                    switchTab(access.sourceTabId);
+                    await nextEditorFrame();
+                }
+                await focusSlotAccessNode(targetNodeId, targetSkillName);
+                return;
+            }
+
+            const machinePath = Array.isArray(access.subMachinePath)
+                ? access.subMachinePath.filter(Boolean)
+                : [];
+
+            let currentNodes = getNodes();
+            let subMachineNode = findSubMachineByIdentity(
+                currentNodes,
+                machinePath[0] || access.childLabel,
+                access.childNodeId || null
+            );
+
+            if (!subMachineNode?.data?.src) {
+                await focusSlotAccessNode(targetNodeId, targetSkillName);
+                return;
+            }
+
+            const steps = Math.max(machinePath.length, 1);
+            for (let index = 0; index < steps; index += 1) {
+                if (!subMachineNode?.data?.src) break;
+
+                await handleOpenSubMachine?.(
+                    subMachineNode.data.src,
+                    subMachineNode.data?.label ||
+                        subMachineNode.data?.fullSkillName ||
+                        machinePath[index] ||
+                        "Sub-state machine"
+                );
+                await nextEditorFrame();
+
+                currentNodes = getNodes();
+                const isFinalMachine = index >= steps - 1;
+                if (isFinalMachine) break;
+
+                const nextIdentity = machinePath[index + 1];
+                subMachineNode = findSubMachineByIdentity(
+                    currentNodes,
+                    nextIdentity
+                );
+
+                if (!subMachineNode) break;
+            }
+
+            await focusSlotAccessNode(targetNodeId, targetSkillName);
+        },
+        [
+            activeTabId,
+            focusSlotAccessNode,
+            getNodes,
+            handleOpenSubMachine,
             setHoveredSlotAccessNodeId,
+            setRightPanelTab,
+            switchTab,
         ]
     );
 
@@ -326,6 +619,7 @@ export function useEditorDetailsController({
         handleUpdateSelectedSlotPath,
         handleUpdateSelectedSlotInherited,
         handleSelectSlotAccessSkill,
+        handleNavigateDescendantSlotSkill,
         handleNavigateAncestorSlot,
     };
 }

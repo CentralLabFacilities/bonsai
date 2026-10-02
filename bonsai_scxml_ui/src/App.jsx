@@ -534,6 +534,9 @@ function AppContent() {
         selectedNodes,
         handleCreateEmptyCompound,
         handleAddLaneToParallel,
+        handleRenameParallelLane,
+        handleMoveParallelLane,
+        handleDeleteParallelLane,
         handleCreateEmptyParallel,
         handleCreateCompoundFromSelected,
         handleCreateParallelFromSelected,
@@ -551,6 +554,8 @@ function AppContent() {
             rustWorkflowDocument.syncInsertedEditorStatesAfterCommit,
         syncWrappedContainerAfterCommit:
             rustWorkflowDocument.syncWrappedContainerAfterCommit,
+        syncEditorStateAfterCommit:
+            rustWorkflowDocument.syncEditorStateAfterCommit,
     });
 
     const {
@@ -892,6 +897,51 @@ function AppContent() {
         [semanticNodes, semanticSlotNodes, selectedNodeId]
     );
 
+    const selectedParallelLanes = useMemo(() => {
+        if (!selectedRawNode || selectedRawNode.type !== "parallel") {
+            return [];
+        }
+
+        const directLanes = semanticNodes.filter(
+            (node) =>
+                node.type === "parallelLane" &&
+                node.parentId === selectedRawNode.id
+        );
+
+        const childrenByParent = new Map();
+        semanticNodes.forEach((node) => {
+            if (!node.parentId) return;
+            if (!childrenByParent.has(node.parentId)) {
+                childrenByParent.set(node.parentId, []);
+            }
+            childrenByParent.get(node.parentId).push(node);
+        });
+
+        const countSemanticDescendants = (parentId) => {
+            let count = 0;
+            const stack = [...(childrenByParent.get(parentId) || [])];
+            while (stack.length > 0) {
+                const child = stack.pop();
+                if (!child) continue;
+                if (
+                    child.type !== "parallelLane" &&
+                    !child.data?.autoParallelLaneCompound &&
+                    !child.data?.isSkillClone &&
+                    !child.data?.isStateClone
+                ) {
+                    count += 1;
+                }
+                stack.push(...(childrenByParent.get(child.id) || []));
+            }
+            return count;
+        };
+
+        return directLanes.map((lane) => ({
+            ...lane,
+            childCount: countSemanticDescendants(lane.id),
+        }));
+    }, [selectedRawNode, semanticNodes]);
+
     const {
         selectedSlotDetails,
         canvasSlotPathOptions,
@@ -925,6 +975,7 @@ function AppContent() {
         handleUpdateSelectedSlotPath,
         handleUpdateSelectedSlotInherited,
         handleSelectSlotAccessSkill,
+        handleNavigateDescendantSlotSkill,
         handleNavigateAncestorSlot,
     } = useEditorDetailsController({
         selectedRawNode,
@@ -935,6 +986,8 @@ function AppContent() {
         selectedContainerOutgoingTransitions,
         moveContainerTransition,
         getNodes,
+        setNodes,
+        updateNodeInternals,
         handleToggleContainerCollapse,
         clearAllEdgeSelection,
         selectEditorNode,
@@ -942,6 +995,7 @@ function AppContent() {
         setCenter,
         setHoveredSlotAccessNodeId,
         switchTab,
+        handleOpenSubMachine,
         setRightPanelTab,
         updateSlotPath,
         updateSlotInherited,
@@ -1817,6 +1871,30 @@ function AppContent() {
                                         options
                                     );
                                 }}
+                                parallelLanes={selectedParallelLanes}
+                                onAddParallelLane={() =>
+                                    handleAddLaneToParallel(selectedNode.id)
+                                }
+                                onRenameParallelLane={(laneId, name) =>
+                                    handleRenameParallelLane(
+                                        selectedNode.id,
+                                        laneId,
+                                        name
+                                    )
+                                }
+                                onMoveParallelLane={(laneId, direction) =>
+                                    handleMoveParallelLane(
+                                        selectedNode.id,
+                                        laneId,
+                                        direction
+                                    )
+                                }
+                                onDeleteParallelLane={(laneId) =>
+                                    handleDeleteParallelLane(
+                                        selectedNode.id,
+                                        laneId
+                                    )
+                                }
                                 hasInitialNode={hasInitialNode}
                                 activeTab={activeTab}
                                 setActiveTab={setActiveTab}
@@ -1892,6 +1970,7 @@ function AppContent() {
                                     setHoveredSlotAccessNodeId(nodeId || null)
                                 }
                                 onSelectSlotAccessSkill={handleSelectSlotAccessSkill}
+                                onNavigateDescendantSlotSkill={handleNavigateDescendantSlotSkill}
                                 onNavigateAncestorSlot={handleNavigateAncestorSlot}
                                 parameterFocusRequest={parameterFocusRequest}
                                 slotFocusRequest={slotFocusRequest}

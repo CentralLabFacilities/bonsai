@@ -990,12 +990,41 @@ export function useEditorDisplay({
         () =>
             slotStructureEdges.map((edge) => {
                 const access = edge.data?.access === "write" ? "write" : "read";
+                let collapsedSourceId = null;
+
+                if (hiddenNodeIds.has(edge.source)) {
+                    let current = nodeById.get(edge.source);
+                    const visited = new Set();
+
+                    while (current?.parentId && !visited.has(current.parentId)) {
+                        visited.add(current.parentId);
+                        const parent = nodeById.get(current.parentId);
+                        if (!parent) break;
+
+                        if (
+                            (parent.type === "compound" || parent.type === "parallel") &&
+                            parent.data?.isCollapsed &&
+                            !hiddenNodeIds.has(parent.id)
+                        ) {
+                            collapsedSourceId = parent.id;
+                        }
+
+                        current = parent;
+                    }
+                }
 
                 return {
                     ...edge,
+                    source: collapsedSourceId || edge.source,
+                    sourceHandle: collapsedSourceId
+                        ? "collapsed-slot-source"
+                        : edge.sourceHandle,
                     type: "smartTransition",
                     data: {
                         ...(edge.data || {}),
+                        ...(collapsedSourceId
+                            ? { collapsedSlotOriginalSource: edge.source }
+                            : {}),
                         access,
                         // Slot edges use the same geometry-only obstacle cache;
                         // in Slot/Overview mode it already includes slot nodes.
@@ -1023,6 +1052,8 @@ export function useEditorDisplay({
             }),
         [
             slotStructureEdges,
+            hiddenNodeIds,
+            nodeById,
             manualRoutingNodes,
             updatePersistentEdgeControlPoints,
             controlPointInsertRequest,

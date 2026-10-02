@@ -19,6 +19,191 @@ import { rebuildBoundaryTransitions } from "../utils/boundaryTransitions";
 import { getOverviewLayoutNodeSize } from "../utils/layoutUtils";
 
 
+const MIN_PARALLEL_LANE_HEIGHT = 90;
+
+const getParallelLanes = (allNodes, parallelId) =>
+    (allNodes || [])
+        .filter(
+            (node) =>
+                node.type === "parallelLane" &&
+                node.parentId === parallelId
+        )
+        .sort(
+            (a, b) =>
+                Number(a.position?.y || 0) -
+                Number(b.position?.y || 0)
+        );
+
+const makeUniqueLaneName = (requestedName, siblingNames, fallbackName) => {
+    const usedNames = new Set(
+        (siblingNames || [])
+            .map((name) => String(name || "").trim())
+            .filter(Boolean)
+    );
+    const baseName = String(requestedName || "").trim() || fallbackName;
+
+    if (!usedNames.has(baseName)) return baseName;
+
+    let suffix = 2;
+    while (usedNames.has(`${baseName}_${suffix}`)) {
+        suffix += 1;
+    }
+    return `${baseName}_${suffix}`;
+};
+
+const collectDescendantIds = (allNodes, rootId) => {
+    const childrenByParent = new Map();
+    (allNodes || []).forEach((node) => {
+        if (!node.parentId) return;
+        if (!childrenByParent.has(node.parentId)) {
+            childrenByParent.set(node.parentId, []);
+        }
+        childrenByParent.get(node.parentId).push(node.id);
+    });
+
+    const result = new Set();
+    const stack = [rootId];
+    while (stack.length > 0) {
+        const nodeId = stack.pop();
+        if (!nodeId || result.has(nodeId)) continue;
+        result.add(nodeId);
+        (childrenByParent.get(nodeId) || []).forEach((childId) =>
+            stack.push(childId)
+        );
+    }
+    return result;
+};
+
+const reflowParallelLanes = (
+    allNodes,
+    parallelId,
+    orderedLaneIds = null
+) => {
+    const parallel = (allNodes || []).find((node) => node.id === parallelId);
+    if (!parallel) return allNodes;
+
+    let lanes = getParallelLanes(allNodes, parallelId);
+    if (Array.isArray(orderedLaneIds) && orderedLaneIds.length > 0) {
+        const rank = new Map(
+            orderedLaneIds.map((laneId, index) => [laneId, index])
+        );
+        lanes = [...lanes].sort(
+            (a, b) =>
+                (rank.get(a.id) ?? Number.MAX_SAFE_INTEGER) -
+                (rank.get(b.id) ?? Number.MAX_SAFE_INTEGER)
+        );
+    }
+
+    const parallelWidth = Number(parallel.style?.width) || 420;
+    let nextY = PARALLEL_HEADER_HEIGHT;
+    const laneUpdates = new Map();
+
+    lanes.forEach((lane, index) => {
+        const laneHeight = Math.max(
+            MIN_PARALLEL_LANE_HEIGHT,
+            Number(lane.style?.height) || 140
+        );
+        laneUpdates.set(lane.id, {
+            y: nextY,
+            width: parallelWidth,
+            height: laneHeight,
+            borderBottom:
+                index < lanes.length - 1
+                    ? "1.5px solid #0284c7"
+                    : "none",
+        });
+        nextY += laneHeight;
+    });
+
+    const parallelHeight = Math.max(
+        PARALLEL_HEADER_HEIGHT + PARALLEL_BOTTOM_PADDING,
+        nextY + PARALLEL_BOTTOM_PADDING
+    );
+    const laneNames = lanes.map(
+        (lane, index) => lane.data?.label || `Lane_${index + 1}`
+    );
+
+    return (allNodes || []).map((node) => {
+        const laneUpdate = laneUpdates.get(node.id);
+        if (laneUpdate) {
+            return {
+                ...node,
+                position: {
+                    ...node.position,
+                    x: 0,
+                    y: laneUpdate.y,
+                },
+                style: {
+                    ...(node.style || {}),
+                    width: laneUpdate.width,
+                    height: laneUpdate.height,
+                    borderBottom: laneUpdate.borderBottom,
+                },
+            };
+        }
+
+        if (node.id === parallelId) {
+            return {
+                ...node,
+                style: {
+                    ...(node.style || {}),
+                    height: parallelHeight,
+                },
+                data: {
+                    ...(node.data || {}),
+                    lanes: laneNames,
+                },
+            };
+        }
+
+        return node;
+    });
+};
+
+const reorderParallelLaneSubtrees = (
+    allNodes,
+    parallelId,
+    orderedLaneIds
+) => {
+    if (!Array.isArray(orderedLaneIds) || orderedLaneIds.length === 0) {
+        return allNodes;
+    }
+
+    const byParent = new Map();
+    (allNodes || []).forEach((node) => {
+        if (!node.parentId) return;
+        if (!byParent.has(node.parentId)) byParent.set(node.parentId, []);
+        byParent.get(node.parentId).push(node);
+    });
+
+    const collectPreorder = (rootId) => {
+        const root = (allNodes || []).find((node) => node.id === rootId);
+        if (!root) return [];
+        const result = [root];
+        (byParent.get(rootId) || []).forEach((child) => {
+            result.push(...collectPreorder(child.id));
+        });
+        return result;
+    };
+
+    const laneSubtrees = orderedLaneIds.map(collectPreorder);
+    const laneSubtreeIds = new Set(
+        laneSubtrees.flat().map((node) => node.id)
+    );
+    const remaining = (allNodes || []).filter(
+        (node) => !laneSubtreeIds.has(node.id)
+    );
+    const parallelIndex = remaining.findIndex(
+        (node) => node.id === parallelId
+    );
+    const insertionIndex = parallelIndex >= 0
+        ? parallelIndex + 1
+        : remaining.length;
+
+    remaining.splice(insertionIndex, 0, ...laneSubtrees.flat());
+    return orderNodesParentsFirst(remaining);
+};
+
 export function useContainerCreation({
     nodes,
     edges,
@@ -31,6 +216,7 @@ export function useContainerCreation({
     updateNodeInternals,
     syncInsertedEditorStatesAfterCommit,
     syncWrappedContainerAfterCommit,
+    syncEditorStateAfterCommit,
 }) {
     const selectedNodesCacheRef = useRef([]);
     const selectionNodesDependency = isDraggingNode ? null : nodes;
@@ -62,49 +248,36 @@ export function useContainerCreation({
 
     const handleAddLaneToParallel = useCallback((parallelId) => {
         const newLaneId = getNodeId();
-        setNodes((nds) => {
-            const parallelNode = nds.find((n) => n.id === parallelId);
-            if (!parallelNode) return nds;
+        setNodes((currentNodes) => {
+            const parallelNode = currentNodes.find((node) => node.id === parallelId);
+            if (!parallelNode) return currentNodes;
 
-            const existingLanes = nds
-                .filter(
-                    (n) =>
-                        n.parentId === parallelId &&
-                        n.type === "parallelLane"
-                )
-                .sort((a, b) => a.position.y - b.position.y);
-
-            const laneIndex = existingLanes.length;
-            const laneHeight = 170;
-            const headerHeight = PARALLEL_HEADER_HEIGHT;
-            const buttonReserve = PARALLEL_BOTTOM_PADDING;
-
-            const newLaneName = `Lane_${laneIndex + 1}`;
-            const containerWidth =
-                Number(parallelNode.style?.width) || 420;
-
-            // Ende der bisher letzten Lane bestimmen
-            const lastLane = existingLanes[existingLanes.length - 1];
-
-            const newLaneY = lastLane
-                ? Number(lastLane.position?.y || 0) +
-                Number(lastLane.style?.height || 140)
-                : headerHeight;
+            const existingLanes = getParallelLanes(currentNodes, parallelId);
+            const siblingNames = existingLanes.map((lane) => lane.data?.label);
+            let laneNumber = 1;
+            let proposedName = `Lane_${laneNumber}`;
+            const existingNameSet = new Set(
+                siblingNames.map((name) => String(name || "").trim())
+            );
+            while (existingNameSet.has(proposedName)) {
+                laneNumber += 1;
+                proposedName = `Lane_${laneNumber}`;
+            }
+            const newLaneName = proposedName;
+            const containerWidth = Number(parallelNode.style?.width) || 420;
 
             const newLaneNode = {
                 id: newLaneId,
-                position: {
-                    x: 0,
-                    y: newLaneY,
-                },
+                position: { x: 0, y: PARALLEL_HEADER_HEIGHT },
                 parentId: parallelId,
                 extent: "parent",
                 expandParent: true,
                 type: "parallelLane",
                 draggable: false,
+                selectable: true,
                 style: {
                     width: containerWidth,
-                    height: laneHeight,
+                    height: 170,
                     borderBottom: "none",
                 },
                 data: {
@@ -113,47 +286,180 @@ export function useContainerCreation({
                 },
             };
 
-            const newTotalHeight =
-                newLaneY + laneHeight + buttonReserve;
+            return reflowParallelLanes(
+                [...currentNodes, newLaneNode],
+                parallelId
+            );
+        });
 
-            const updatedNodes = nds.map((n) => {
-                if (n.id === parallelId) {
-                    return {
-                        ...n,
-                        style: {
-                            ...n.style,
-                            height: newTotalHeight,
-                        },
-                        data: {
-                            ...n.data,
-                            lanes: [
-                                ...(n.data.lanes || []),
-                                newLaneName,
-                            ],
-                        },
-                    };
-                }
+        if (syncEditorStateAfterCommit) {
+            void syncEditorStateAfterCommit();
+        } else {
+            void syncInsertedEditorStatesAfterCommit?.(newLaneId);
+        }
+    }, [
+        setNodes,
+        syncEditorStateAfterCommit,
+        syncInsertedEditorStatesAfterCommit,
+    ]);
 
-                // Die bisher letzte Lane bekommt jetzt die Trennlinie,
-                // weil danach die neue Lane kommt.
-                if (lastLane && n.id === lastLane.id) {
-                    return {
-                        ...n,
-                        style: {
-                            ...n.style,
-                            borderBottom:
-                                "1.5px solid #0284c7",
-                        },
-                    };
-                }
+    const handleRenameParallelLane = useCallback(
+        (parallelId, laneId, requestedName) => {
+            if (!parallelId || !laneId) return;
 
-                return n;
+            setNodes((currentNodes) => {
+                const lanes = getParallelLanes(currentNodes, parallelId);
+                const laneIndex = lanes.findIndex((lane) => lane.id === laneId);
+                if (laneIndex < 0) return currentNodes;
+
+                const fallbackName = `Lane_${laneIndex + 1}`;
+                const siblingNames = lanes
+                    .filter((lane) => lane.id !== laneId)
+                    .map((lane) => lane.data?.label);
+                const nextName = makeUniqueLaneName(
+                    requestedName,
+                    siblingNames,
+                    fallbackName
+                );
+
+                const renamed = currentNodes.map((node) =>
+                    node.id === laneId
+                        ? {
+                              ...node,
+                              data: {
+                                  ...(node.data || {}),
+                                  label: nextName,
+                              },
+                          }
+                        : node
+                );
+
+                return reflowParallelLanes(renamed, parallelId);
             });
 
-            return [...updatedNodes, newLaneNode];
-        });
-        void syncInsertedEditorStatesAfterCommit?.(newLaneId);
-    }, [setNodes, syncInsertedEditorStatesAfterCommit]);
+            void syncEditorStateAfterCommit?.();
+        },
+        [setNodes, syncEditorStateAfterCommit]
+    );
+
+    const handleMoveParallelLane = useCallback(
+        (parallelId, laneId, direction) => {
+            if (!parallelId || !laneId) return;
+
+            setNodes((currentNodes) => {
+                const lanes = getParallelLanes(currentNodes, parallelId);
+                const currentIndex = lanes.findIndex((lane) => lane.id === laneId);
+                if (currentIndex < 0) return currentNodes;
+
+                const nextIndex = direction === "up"
+                    ? currentIndex - 1
+                    : currentIndex + 1;
+                if (nextIndex < 0 || nextIndex >= lanes.length) {
+                    return currentNodes;
+                }
+
+                const orderedLaneIds = lanes.map((lane) => lane.id);
+                [orderedLaneIds[currentIndex], orderedLaneIds[nextIndex]] =
+                    [orderedLaneIds[nextIndex], orderedLaneIds[currentIndex]];
+
+                const reflowed = reflowParallelLanes(
+                    currentNodes,
+                    parallelId,
+                    orderedLaneIds
+                );
+                return reorderParallelLaneSubtrees(
+                    reflowed,
+                    parallelId,
+                    orderedLaneIds
+                );
+            });
+
+            window.requestAnimationFrame(() => updateNodeInternals?.(parallelId));
+            void syncEditorStateAfterCommit?.();
+        },
+        [setNodes, syncEditorStateAfterCommit, updateNodeInternals]
+    );
+
+    const handleDeleteParallelLane = useCallback(
+        (parallelId, laneId) => {
+            if (!parallelId || !laneId) return;
+
+            const lanes = getParallelLanes(nodes, parallelId);
+            if (lanes.length <= 1) return;
+
+            const removedIds = collectDescendantIds(nodes, laneId);
+            const nextNodesWithoutLane = nodes
+                .filter((node) => !removedIds.has(node.id))
+                .map((node) => {
+                    if (!Array.isArray(node.data?.events)) return node;
+                    const nextEvents = node.data.events.filter((event) => {
+                        const sourceIds = [
+                            event?.sourceNodeId,
+                            ...(Array.isArray(event?.sourceNodeIds)
+                                ? event.sourceNodeIds
+                                : []),
+                        ]
+                            .filter(Boolean)
+                            .map(String);
+                        return !sourceIds.some((sourceId) =>
+                            removedIds.has(sourceId)
+                        );
+                    });
+                    if (nextEvents.length === node.data.events.length) return node;
+                    return {
+                        ...node,
+                        data: {
+                            ...(node.data || {}),
+                            events: nextEvents,
+                        },
+                    };
+                });
+            const reflowedNodes = reflowParallelLanes(
+                nextNodesWithoutLane,
+                parallelId
+            );
+            const filteredEdges = edges.filter((edge) => {
+                const referencedNodeIds = [
+                    edge.source,
+                    edge.target,
+                    edge.data?.boundaryOriginalSource,
+                    edge.data?.compoundOriginalSource,
+                    edge.data?.parallelOriginalSource,
+                    edge.data?.boundaryOriginalTarget,
+                    edge.data?.compoundOriginalTarget,
+                    edge.data?.parallelOriginalTarget,
+                    ...(Array.isArray(edge.data?.boundaryOriginalSources)
+                        ? edge.data.boundaryOriginalSources.map(
+                              (entry) => entry?.sourceId
+                          )
+                        : []),
+                ]
+                    .filter(Boolean)
+                    .map(String);
+
+                return !referencedNodeIds.some((nodeId) =>
+                    removedIds.has(nodeId)
+                );
+            });
+            const rebuilt = rebuildBoundaryTransitions(
+                reflowedNodes,
+                filteredEdges
+            );
+
+            setNodes(rebuilt.nodes);
+            setEdges(rebuilt.edges);
+            window.requestAnimationFrame(() => updateNodeInternals?.(parallelId));
+            void syncEditorStateAfterCommit?.();
+        },
+        [
+            edges,
+            nodes,
+            setEdges,
+            setNodes,
+            syncEditorStateAfterCommit,
+            updateNodeInternals,
+        ]
+    );
 
     const handleCreateEmptyCompound = (pos) => {
         const compoundId = getNodeId();
@@ -649,6 +955,9 @@ export function useContainerCreation({
         selectedNodes,
         handleCreateEmptyCompound,
         handleAddLaneToParallel,
+        handleRenameParallelLane,
+        handleMoveParallelLane,
+        handleDeleteParallelLane,
         handleCreateEmptyParallel,
         handleCreateCompoundFromSelected,
         handleCreateParallelFromSelected,

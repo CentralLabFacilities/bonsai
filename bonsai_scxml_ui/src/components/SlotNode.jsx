@@ -194,6 +194,7 @@ function SlotNode({ id, data, selected = false }) {
                                     : "Inherited by sub-state"}
                         </div>
                     )}
+
                 </div>
             )}
         </div>

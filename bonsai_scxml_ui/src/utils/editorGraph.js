@@ -170,26 +170,82 @@ export const normalizeSlotType = (type) =>
 
 export const collectInheritedSlotUsages = (parsedNodes, declaredSlots = []) => {
     const usages = [];
-    const seen = new Set();
+    const usageByKey = new Map();
 
-    const addUsage = (slot, access, node) => {
-        const path = normalizeSlotPath(slot?.path);
+    const addUsage = (slot, access, node, subMachinePath = []) => {
+        const path = normalizeSlotPath(slot?.inherited?.xpath || slot?.path);
         if (!path) return;
 
-        const key = [access || "inherit", path, slot?.key || "", slot?.type || "Unknown"].join("|");
-        if (seen.has(key)) return;
-        seen.add(key);
-
-        usages.push({
-            key: slot?.key || "",
-            state:
-                slot?.inherited?.state ||
-                node?.data?.fullSkillName ||
-                node?.data?.label ||
-                "",
+        const nestedPath = Array.isArray(slot?.subMachinePath)
+            ? slot.subMachinePath.filter(Boolean)
+            : [];
+        const hierarchyPath = [...subMachinePath, ...nestedPath];
+        const resolvedAccess = access || slot?.access || null;
+        const usageKey = [
+            resolvedAccess || "inherit",
             path,
-            access,
-            type: slot?.type || "Unknown",
+            slot?.key || "",
+            slot?.type || "Unknown",
+            hierarchyPath.join("/"),
+        ].join("|");
+
+        let usage = usageByKey.get(usageKey);
+        if (!usage) {
+            usage = {
+                key: slot?.key || "",
+                state: slot?.inherited?.state || slot?.state || "",
+                path,
+                access: resolvedAccess,
+                type: slot?.type || "Unknown",
+                description: slot?.description || "",
+                subMachinePath: hierarchyPath,
+                skillAccesses: [],
+            };
+            usageByKey.set(usageKey, usage);
+            usages.push(usage);
+        }
+
+        const concreteSkillAccesses = Array.isArray(slot?.skillAccesses)
+            ? slot.skillAccesses
+            : [];
+        const nodeSkillNodeId = String(node?.id || slot?.skillNodeId || "").trim();
+        const nodeSkillName = String(
+            node?.data?.fullSkillName ||
+            node?.data?.label ||
+            slot?.skillName ||
+            nodeSkillNodeId ||
+            ""
+        ).trim();
+
+        const candidates = concreteSkillAccesses.length > 0
+            ? concreteSkillAccesses
+            : nodeSkillName
+                ? [{
+                    skillNodeId: nodeSkillNodeId || null,
+                    skillName: nodeSkillName,
+                    description: slot?.description || "",
+                }]
+                : [];
+
+        candidates.forEach((candidate) => {
+            const skillNodeId = String(candidate?.skillNodeId || "").trim();
+            const skillName = String(candidate?.skillName || "").trim();
+            if (!skillName) return;
+
+            const duplicate = usage.skillAccesses.some(
+                (entry) =>
+                    entry.skillNodeId === (skillNodeId || null) &&
+                    entry.skillName === skillName
+            );
+            if (duplicate) return;
+
+            usage.skillAccesses.push({
+                skillNodeId: skillNodeId || null,
+                skillName,
+                description:
+                    candidate?.description || slot?.description || "",
+            });
+            if (!usage.state) usage.state = skillName;
         });
     };
 
@@ -201,12 +257,27 @@ export const collectInheritedSlotUsages = (parsedNodes, declaredSlots = []) => {
         (node.data?.outSlots || []).forEach((slot) => {
             if (slot?.inherited) addUsage(slot, "write", node);
         });
+
+        // Hydrated nested Sub-SMs already expose their descendant consumers.
+        // Bubble those up without creating one visual inherited-slot edge per
+        // skill: concrete consumers live in skillAccesses on the usage.
+        if (node.type === "submachine") {
+            const subMachineLabel =
+                node.data?.label ||
+                node.data?.fullSkillName ||
+                node.data?.src ||
+                "Sub-state machine";
+
+            (node.data?.inheritedSlots || []).forEach((slot) => {
+                addUsage(slot, slot?.access || null, null, [subMachineLabel]);
+            });
+        }
     });
 
     // Keep an inherited slot visible even when its concrete read/write usage
     // cannot be resolved (for example because skill metadata is unavailable).
     (declaredSlots || []).forEach((slot) => {
-        const path = normalizeSlotPath(slot?.path);
+        const path = normalizeSlotPath(slot?.xpath || slot?.path);
         if (!path) return;
 
         const alreadyRepresented = usages.some(
@@ -218,7 +289,9 @@ export const collectInheritedSlotUsages = (parsedNodes, declaredSlots = []) => {
             ...slot,
             path,
             access: null,
-            type: "Unknown",
+            type: slot?.type || "Unknown",
+            subMachinePath: [],
+            skillAccesses: [],
         });
     });
 

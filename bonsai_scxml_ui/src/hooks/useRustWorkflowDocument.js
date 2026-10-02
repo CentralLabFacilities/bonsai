@@ -294,6 +294,20 @@ export function useRustWorkflowDocument({
         [enqueue, replaceNow]
     );
 
+    const syncEditorStateAfterCommit = useCallback(
+        () => {
+            const generation = documentGenerationRef.current + 1;
+            documentGenerationRef.current = generation;
+
+            return enqueue(async () => {
+                if (!isTauri()) return null;
+                await waitForEditorCommit();
+                return replaceNow(editorStateRef.current, null);
+            }, generation);
+        },
+        [enqueue, replaceNow]
+    );
+
     const syncInsertedEditorStatesAfterCommit = useCallback(
         (stateIds) =>
             enqueue(async () => {
@@ -822,6 +836,7 @@ export function useRustWorkflowDocument({
     return {
         applyWorkflowCommand,
         syncEditorState,
+        syncEditorStateAfterCommit,
         syncInsertedEditorStatesAfterCommit,
         syncInsertedParallelLaneStateAfterCommit,
         syncWrappedContainerAfterCommit,

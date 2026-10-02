@@ -180,6 +180,22 @@ function CustomNode({ id, data, selected }) {
     const overviewWidth = useMemo(() => {
         let requiredWidth = 0;
 
+        if (
+            data.isInitial &&
+            (mode === "overview" || mode === "slots")
+        ) {
+            const headerText = `${String(data.label || "")} ${String(
+                instanceId || ""
+            )}`.trim();
+            // INITIAL + SKILL + label + optional instance id all share one
+            // header row. Slot/overview auto-sizing used to shrink initial
+            // nodes back to the generic slot minimum, clipping those badges.
+            requiredWidth = Math.max(
+                requiredWidth,
+                Math.min(520, Math.max(260, 150 + headerText.length * 7))
+            );
+        }
+
         if (showParameters && parameterEntries.length > 0) {
             const longestRow = parameterEntries.reduce((longest, parameter) => {
                 const text = parameter.displayValue
@@ -229,6 +245,9 @@ function CustomNode({ id, data, selected }) {
         return requiredWidth || undefined;
     }, [
         data.label,
+        data.isInitial,
+        mode,
+        instanceId,
         parameterEntries,
         showParameters,
         showSlots,
@@ -720,6 +739,8 @@ function CustomNode({ id, data, selected }) {
 
                         <div className="node-slot-ports">
                             {slotEntries.map((entry) => {
+                                const slotLabelInteractive =
+                                    mode === "overview" || mode === "slots";
                                 const dragClass = getSlotHandleDragClass({
                                     drag: data.slotConnectionDrag,
                                     nodeId: id,
@@ -740,28 +761,28 @@ function CustomNode({ id, data, selected }) {
                                                     ? "node-slot-entry-inherited"
                                                     : ""
                                             } ${
-                                                mode === "overview"
+                                                slotLabelInteractive
                                                     ? "nodrag nopan"
                                                     : ""
                                             }`}
-                                            role={mode === "overview" ? "button" : undefined}
-                                            tabIndex={mode === "overview" ? 0 : undefined}
+                                            role={slotLabelInteractive ? "button" : undefined}
+                                            tabIndex={slotLabelInteractive ? 0 : undefined}
                                             title={`${
                                                 entry.access === "read"
                                                     ? "Read"
                                                     : "Write"
                                             } slot ${entry.key}${
-                                                mode === "overview"
+                                                slotLabelInteractive
                                                     ? " — click to edit path"
                                                     : ""
                                             }`}
                                             onMouseDown={
-                                                mode === "overview"
+                                                slotLabelInteractive
                                                     ? (event) => event.stopPropagation()
                                                     : undefined
                                             }
                                             onClick={
-                                                mode === "overview"
+                                                slotLabelInteractive
                                                     ? (event) => {
                                                         event.stopPropagation();
                                                         data.onOpenSlot?.(
@@ -773,7 +794,7 @@ function CustomNode({ id, data, selected }) {
                                                     : undefined
                                             }
                                             onKeyDown={
-                                                mode === "overview"
+                                                slotLabelInteractive
                                                     ? (event) => {
                                                         if (
                                                             event.key !== "Enter" &&
@@ -792,7 +813,7 @@ function CustomNode({ id, data, selected }) {
                                                     : undefined
                                             }
                                             style={
-                                                mode === "overview"
+                                                slotLabelInteractive
                                                     ? { cursor: "pointer" }
                                                     : undefined
                                             }
