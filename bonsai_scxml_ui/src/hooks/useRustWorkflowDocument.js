@@ -81,9 +81,10 @@ const getCanonicalPatchPolicy = (command) => {
  *
  * Local editor mutations remain immediate. Semantic Rust commands are queued
  * in the same order and guarded by the document revision. Tab/file switches
- * replace the Rust document from a compact editor snapshot. If an external
- * operation (for example Save) advanced the Rust revision, the bridge recovers
- * by replacing the semantic document from the already-updated editor state.
+ * replace the Rust document from a compact editor snapshot. Read-only
+ * operations such as Save and Code View do not touch the document revision;
+ * if another document mutation advances it unexpectedly, the bridge can still
+ * recover by replacing the semantic document from the current editor state.
  */
 export function useRustWorkflowDocument({
     nodes,
@@ -289,20 +290,6 @@ export function useRustWorkflowDocument({
             return enqueue(async () => {
                 if (!isTauri()) return null;
                 return replaceNow(snapshot, null);
-            }, generation);
-        },
-        [enqueue, replaceNow]
-    );
-
-    const syncEditorStateAfterCommit = useCallback(
-        () => {
-            const generation = documentGenerationRef.current + 1;
-            documentGenerationRef.current = generation;
-
-            return enqueue(async () => {
-                if (!isTauri()) return null;
-                await waitForEditorCommit();
-                return replaceNow(editorStateRef.current, null);
             }, generation);
         },
         [enqueue, replaceNow]
@@ -836,7 +823,6 @@ export function useRustWorkflowDocument({
     return {
         applyWorkflowCommand,
         syncEditorState,
-        syncEditorStateAfterCommit,
         syncInsertedEditorStatesAfterCommit,
         syncInsertedParallelLaneStateAfterCommit,
         syncWrappedContainerAfterCommit,

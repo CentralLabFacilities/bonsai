@@ -67,10 +67,12 @@ pub(crate) async fn serialize_scxml_workflow(
 #[tauri::command]
 pub(crate) async fn serialize_editor_workflow(
     request: EditorExportRequestDto,
-    store: State<'_, WorkflowDocumentStore>,
 ) -> Result<String, String> {
+    // Serialization is a read-only projection of the editor snapshot.
+    // Do not install the temporary export workflow into the revisioned
+    // document store: Save and Code View call this command frequently, and
+    // advancing the store revision here makes the next semantic editor
+    // command look stale and forces an unnecessary full resynchronization.
     let workflow = build_workflow_from_editor(&request)?;
-    let xml = serialize_scxml(&workflow)?;
-    store.replace(workflow)?;
-    Ok(xml)
+    serialize_scxml(&workflow)
 }
