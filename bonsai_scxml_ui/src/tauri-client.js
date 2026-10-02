@@ -242,6 +242,16 @@ export async function validateEditorWorkflow(request) {
   });
 }
 
+export async function validateActiveWorkflow(request) {
+  if (!isTauri()) {
+    throw new Error('Rust active workflow validation is only available in the Tauri app.');
+  }
+
+  return await invoke('validate_active_workflow', {
+    request,
+  });
+}
+
 /**
  * Resolve the inherited-slot source chain across open parent state machines.
  * The request contains only semantic slot/tab data; React Flow geometry and
@@ -253,6 +263,16 @@ export async function resolveEditorSlotAncestry(request) {
   }
 
   return await invoke('resolve_editor_slot_ancestry', {
+    request,
+  });
+}
+
+export async function resolveActiveEditorSlotAncestry(request) {
+  if (!isTauri()) {
+    throw new Error('Rust active slot ancestry is only available in the Tauri app.');
+  }
+
+  return await invoke('resolve_active_editor_slot_ancestry', {
     request,
   });
 }

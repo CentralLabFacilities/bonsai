@@ -27,14 +27,6 @@ impl XmlNode {
         self.direct_children(local_name).next()
     }
 
-    pub fn descendants<'a>(&'a self, local_name: &str, output: &mut Vec<&'a XmlNode>) {
-        for child in &self.children {
-            if child.local_name() == local_name {
-                output.push(child);
-            }
-            child.descendants(local_name, output);
-        }
-    }
 }
 
 pub(super) fn parse_document(input: &str) -> Result<XmlNode, String> {

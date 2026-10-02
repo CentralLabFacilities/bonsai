@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::core::model::{
-    EditorPosition, State, StateId, StateKind, Transition, TransitionId, TransitionSource, Workflow,
+    EditorPosition, State, StateId, StateKind, TransitionId, TransitionSource, Workflow,
 };
 
 use super::commands::WorkflowCommandChanges;
@@ -324,7 +324,7 @@ pub(super) fn paste_editor_subgraph(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::model::EditorMetadata;
+    use crate::core::model::{EditorMetadata, Transition};
 
     fn state(id: &str, name: &str, parent: Option<&str>, initial: bool) -> State {
         State {

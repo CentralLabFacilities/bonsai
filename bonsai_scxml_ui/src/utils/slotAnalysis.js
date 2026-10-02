@@ -130,3 +130,50 @@ export const slotAncestryResponseToMap = (response) => {
 
     return result;
 };
+
+/**
+ * Build the compact ancestry query used with the Rust-owned active workflow.
+ * The active tab itself is metadata-only; its semantic nodes/slots are read
+ * directly from WorkflowDocumentStore. Only parent state machines still cross
+ * IPC because they are separate open documents.
+ */
+export const buildActiveSlotAncestryRequest = ({
+    tabs = [],
+    activeTabId = null,
+}) => {
+    const tabsById = new Map((tabs || []).map((tab) => [tab?.id, tab]));
+    const relevantTabs = [];
+    const seen = new Set();
+    let currentTab = tabsById.get(activeTabId);
+    let isActive = true;
+
+    while (currentTab?.id && !seen.has(currentTab.id)) {
+        seen.add(currentTab.id);
+        if (isActive) {
+            relevantTabs.push({
+                id: String(currentTab.id || ""),
+                title: String(currentTab.title || ""),
+                fileName: String(currentTab.fileName || ""),
+                parentTabId: currentTab.parentTabId
+                    ? String(currentTab.parentTabId)
+                    : null,
+                nodes: [],
+                manualSlots: [],
+                slotNodes: [],
+            });
+            isActive = false;
+        } else {
+            relevantTabs.push(mapTab(currentTab));
+        }
+
+        currentTab = currentTab.parentTabId
+            ? tabsById.get(currentTab.parentTabId)
+            : null;
+    }
+
+    return {
+        tabs: relevantTabs,
+        activeTabId: activeTabId ? String(activeTabId) : null,
+        activeSnapshot: null,
+    };
+};

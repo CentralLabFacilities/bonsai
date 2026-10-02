@@ -63,6 +63,21 @@ impl WorkflowDocumentStore {
         Ok(snapshot_from_state(&state))
     }
 
+    /// Execute a read-only query against the authoritative workflow without
+    /// cloning or serializing the document. The read lock is held only for the
+    /// duration of the supplied query.
+    pub(crate) fn inspect_active<T>(
+        &self,
+        query: impl FnOnce(u64, &Workflow, &WorkflowIndex) -> T,
+    ) -> Result<T, String> {
+        let state = self.read()?;
+        let stored = state
+            .active
+            .as_ref()
+            .ok_or_else(|| "No active workflow document is loaded".to_string())?;
+        Ok(query(state.revision, &stored.workflow, &stored.index))
+    }
+
     pub(crate) fn apply(
         &self,
         expected_revision: Option<u64>,
@@ -132,12 +147,14 @@ fn command_result(
 
     let mut changed_states = Vec::new();
     let mut removed_state_ids = Vec::new();
-    for raw_id in &changes.changed_state_ids {
-        let id = StateId::from(raw_id.as_str());
-        if let Some(state) = stored.index.state(&stored.workflow, &id) {
-            changed_states.push(state.to_dto());
-        } else {
-            removed_state_ids.push(raw_id.clone());
+    if !changes.omit_state_patch {
+        for raw_id in &changes.changed_state_ids {
+            let id = StateId::from(raw_id.as_str());
+            if let Some(state) = stored.index.state(&stored.workflow, &id) {
+                changed_states.push(state.to_dto());
+            } else {
+                removed_state_ids.push(raw_id.clone());
+            }
         }
     }
 
@@ -769,9 +786,10 @@ mod tests {
             )
             .unwrap();
         assert_eq!(parameter_result.revision, 2);
-        assert_eq!(parameter_result.patch.states.len(), 1);
-        assert_eq!(parameter_result.patch.states[0].id, "a");
-        assert_eq!(parameter_result.patch.states[0].parameters.len(), 1);
+        // Parameter edits are applied optimistically in React. Rust persists
+        // them and advances the revision, but deliberately does not echo the
+        // same StateDto back across IPC.
+        assert!(parameter_result.patch.states.is_empty());
         assert!(parameter_result.patch.data_model.is_none());
         assert!(parameter_result.patch.slot_declarations.is_none());
 

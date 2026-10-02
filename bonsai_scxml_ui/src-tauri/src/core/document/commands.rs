@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::core::editor_export::{
     build_inserted_state, build_workflow_from_editor, EditorExportRequestDto,
@@ -29,6 +29,10 @@ pub(crate) struct WorkflowCommandChanges {
     pub data_model_changed: bool,
     pub slot_declarations_changed: bool,
     pub index_changed: bool,
+    /// The frontend already applied this state-only mutation optimistically.
+    /// Keep the changed ids for backend bookkeeping, but do not serialize the
+    /// same state back across IPC just to project it into React a second time.
+    pub omit_state_patch: bool,
     pub parallel_lane_updates: Vec<ParallelLaneEditorPatchDto>,
 }
 
@@ -243,6 +247,7 @@ fn replace_state_parameters(
 
     Ok(WorkflowCommandChanges {
         changed_state_ids: vec![id.as_str().to_string()],
+        omit_state_patch: true,
         ..WorkflowCommandChanges::default()
     })
 }
@@ -427,8 +432,14 @@ fn set_root_initial(
     workflow.initial_state_id = selected_id.clone();
     workflow.initial_scxml_state_id = selected_scxml_id;
 
+    let root_positions = index
+        .children_of(None)
+        .iter()
+        .filter_map(|id| index.state_position(id))
+        .collect::<Vec<_>>();
     let mut changed = Vec::new();
-    for state in workflow.states.iter_mut().filter(|state| state.parent_id.is_none()) {
+    for position in root_positions {
+        let state = &mut workflow.states[position];
         let should_be_initial = selected_id.as_ref() == Some(&state.id);
         if state.is_initial != should_be_initial {
             state.is_initial = should_be_initial;
@@ -473,12 +484,14 @@ fn set_state_initial_child(
     workflow.states[parent_position].initial_child_id = selected_id.clone();
     workflow.states[parent_position].initial_child_scxml_id = selected_scxml_id;
 
+    let child_positions = index
+        .children_of(Some(&parent_id))
+        .iter()
+        .filter_map(|id| index.state_position(id))
+        .collect::<Vec<_>>();
     let mut changed = vec![parent_id.as_str().to_string()];
-    for state in workflow
-        .states
-        .iter_mut()
-        .filter(|state| state.parent_id.as_ref() == Some(&parent_id))
-    {
+    for position in child_positions {
+        let state = &mut workflow.states[position];
         let should_be_initial = selected_id.as_ref() == Some(&state.id);
         if state.is_initial != should_be_initial {
             state.is_initial = should_be_initial;
@@ -563,8 +576,22 @@ fn rename_state(
         current_parent = index.parent_of(workflow, parent_id);
     }
 
+    // Only transitions that target the renamed state, are owned by it, or are
+    // hoisted to one of its ancestors can be affected by the rename. Using the
+    // cached relationship index avoids scanning the complete transition list.
+    let mut candidate_transition_ids = HashSet::new();
+    candidate_transition_ids.extend(index.incoming_to(&id).iter().cloned());
+    candidate_transition_ids.extend(index.outgoing_from(&id).iter().cloned());
+    for ancestor_id in &source_ancestors {
+        candidate_transition_ids.extend(index.outgoing_from(ancestor_id).iter().cloned());
+    }
+
     let mut changed_transitions = Vec::new();
-    for transition in workflow.transitions.iter_mut() {
+    for transition_id in candidate_transition_ids {
+        let Some(transition_position) = index.transition_position(&transition_id) else {
+            continue;
+        };
+        let transition = &mut workflow.transitions[transition_position];
         let mut changed = false;
         if transition.target_state_id.as_ref() == Some(&id) {
             transition.target_scxml_id = normalized_scxml_id.to_string();
@@ -744,18 +771,26 @@ fn add_state(
                     Some(new_scxml_id.clone());
                 changed.push(parent_id.as_str().to_string());
             }
-            for sibling in workflow
-                .states
-                .iter_mut()
-                .filter(|candidate| candidate.parent_id.as_ref() == Some(parent_id))
-            {
+            let sibling_positions = index
+                .children_of(Some(parent_id))
+                .iter()
+                .filter_map(|id| index.state_position(id))
+                .collect::<Vec<_>>();
+            for sibling_position in sibling_positions {
+                let sibling = &mut workflow.states[sibling_position];
                 sibling.is_initial = sibling.id == new_id;
                 changed.push(sibling.id.as_str().to_string());
             }
         } else {
             workflow.initial_state_id = Some(new_id.clone());
             workflow.initial_scxml_state_id = Some(new_scxml_id);
-            for root in workflow.states.iter_mut().filter(|candidate| candidate.parent_id.is_none()) {
+            let root_positions = index
+                .children_of(None)
+                .iter()
+                .filter_map(|id| index.state_position(id))
+                .collect::<Vec<_>>();
+            for root_position in root_positions {
+                let root = &mut workflow.states[root_position];
                 root.is_initial = root.id == new_id;
                 changed.push(root.id.as_str().to_string());
             }
@@ -785,29 +820,21 @@ fn remove_states(
         return Ok(WorkflowCommandChanges::default());
     }
 
+    // Expand the deletion set through the cached parent->children index rather
+    // than repeatedly rescanning every state until no more descendants appear.
     let mut removed = requested;
-    let mut expanded = true;
-    while expanded {
-        expanded = false;
-        for state in &workflow.states {
-            if removed.contains(&state.id) {
-                continue;
-            }
-            if state
-                .parent_id
-                .as_ref()
-                .is_some_and(|parent_id| removed.contains(parent_id))
-            {
-                removed.insert(state.id.clone());
-                expanded = true;
+    let mut pending = removed.iter().cloned().collect::<VecDeque<_>>();
+    while let Some(parent_id) = pending.pop_front() {
+        for child_id in index.children_of(Some(&parent_id)) {
+            if removed.insert(child_id.clone()) {
+                pending.push_back(child_id.clone());
             }
         }
     }
 
-    let removed_state_info = workflow
-        .states
+    let removed_state_info = removed
         .iter()
-        .filter(|state| removed.contains(&state.id))
+        .filter_map(|id| index.state(workflow, id))
         .map(|state| {
             let mut ancestors = HashSet::new();
             let mut current = index.parent_of(workflow, &state.id);
@@ -820,10 +847,9 @@ fn remove_states(
             (state.scxml_id.clone(), ancestors)
         })
         .collect::<Vec<_>>();
-    let removed_scxml_ids = workflow
-        .states
+    let removed_scxml_ids = removed
         .iter()
-        .filter(|state| removed.contains(&state.id))
+        .filter_map(|id| index.state(workflow, id))
         .map(|state| state.scxml_id.clone())
         .collect::<HashSet<_>>();
 
@@ -1027,6 +1053,7 @@ fn update_state_editor_position(
 
     Ok(WorkflowCommandChanges {
         changed_state_ids: vec![id.as_str().to_string()],
+        omit_state_patch: true,
         ..WorkflowCommandChanges::default()
     })
 }
@@ -1067,6 +1094,7 @@ fn replace_state_editor_positions(
 
     Ok(WorkflowCommandChanges {
         changed_state_ids: vec![id.as_str().to_string()],
+        omit_state_patch: true,
         ..WorkflowCommandChanges::default()
     })
 }

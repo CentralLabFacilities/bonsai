@@ -1,4 +1,108 @@
 
+
+export const createEditorNodeIndex = (nodes = []) => {
+    const nodeList = Array.isArray(nodes) ? nodes : [];
+    const byId = new Map();
+    const childrenByParent = new Map();
+
+    nodeList.forEach((node) => {
+        if (!node?.id) return;
+        byId.set(node.id, node);
+
+        if (node.parentId) {
+            if (!childrenByParent.has(node.parentId)) {
+                childrenByParent.set(node.parentId, []);
+            }
+            childrenByParent.get(node.parentId).push(node);
+        }
+    });
+
+    const ancestorIdsByNode = new Map();
+    const absolutePositionByNode = new Map();
+
+    const resolveNode = (nodeOrId) =>
+        typeof nodeOrId === "string" ? byId.get(nodeOrId) : nodeOrId;
+
+    const getChildren = (parentId) =>
+        childrenByParent.get(parentId) || [];
+
+    const getAncestorIds = (nodeOrId) => {
+        const node = resolveNode(nodeOrId);
+        if (!node?.id) return new Set();
+
+        const cached = ancestorIdsByNode.get(node.id);
+        if (cached) return cached;
+
+        const ancestorIds = new Set();
+        const visited = new Set();
+        let parentId = node.parentId;
+
+        while (parentId && !visited.has(parentId)) {
+            visited.add(parentId);
+            ancestorIds.add(parentId);
+            const parent = byId.get(parentId);
+            if (!parent) break;
+            parentId = parent.parentId;
+        }
+
+        ancestorIdsByNode.set(node.id, ancestorIds);
+        return ancestorIds;
+    };
+
+    const findAncestor = (nodeOrId, predicate) => {
+        const node = resolveNode(nodeOrId);
+        if (!node || typeof predicate !== "function") return null;
+
+        const visited = new Set();
+        let parentId = node.parentId;
+
+        while (parentId && !visited.has(parentId)) {
+            visited.add(parentId);
+            const parent = byId.get(parentId);
+            if (!parent) break;
+            if (predicate(parent)) return parent;
+            parentId = parent.parentId;
+        }
+
+        return null;
+    };
+
+    const getAbsolutePosition = (nodeOrId) => {
+        const node = resolveNode(nodeOrId);
+        if (!node?.id) return { x: 0, y: 0 };
+
+        const cached = absolutePositionByNode.get(node.id);
+        if (cached) return cached;
+
+        let x = Number(node.position?.x || 0);
+        let y = Number(node.position?.y || 0);
+        const visited = new Set();
+        let parentId = node.parentId;
+
+        while (parentId && !visited.has(parentId)) {
+            visited.add(parentId);
+            const parent = byId.get(parentId);
+            if (!parent) break;
+            x += Number(parent.position?.x || 0);
+            y += Number(parent.position?.y || 0);
+            parentId = parent.parentId;
+        }
+
+        const absolute = { x, y };
+        absolutePositionByNode.set(node.id, absolute);
+        return absolute;
+    };
+
+    return {
+        nodes: nodeList,
+        byId,
+        getChildren,
+        getAncestorIds,
+        findAncestor,
+        getAbsolutePosition,
+    };
+};
+
 export const withSmartTransitionRouting = (transitionEdges) =>
     transitionEdges.map((edge) => ({
         ...edge,

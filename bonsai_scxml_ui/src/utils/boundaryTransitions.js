@@ -1,10 +1,10 @@
 import { measureContainerTask } from "./containerPerf.js";
 import {
     COMPOUND_PADDING_X,
-    getCompoundChildrenRight,
     getCompoundExitGutterWidth,
-    isNodeInsideContainer,
+    getNodeSize,
 } from "./editorGeometry";
+import { createEditorNodeIndex } from "./editorGraph";
 
 const sourceIdOf = (edge) =>
     edge?.data?.boundaryOriginalSource ||
@@ -47,21 +47,21 @@ const semanticTargetIdOf = (edge) =>
     edge?.data?.parallelOriginalTarget ||
     edge?.target;
 
-const getExitedBoundaries = (sourceNode, targetNode, allNodes) => {
-    if (!sourceNode || !targetNode) return [];
-    const byId = new Map(allNodes.map((node) => [node.id, node]));
+const getExitedBoundaries = (sourceNode, targetNode, graphIndex) => {
+    if (!sourceNode || !targetNode || !graphIndex) return [];
+
     const steps = [];
     const visited = new Set();
     const seenParallelIds = new Set();
+    const targetAncestorIds = graphIndex.getAncestorIds(targetNode);
     let parentId = sourceNode.parentId;
 
     const targetIsInside = (container) =>
-        targetNode.id === container.id ||
-        isNodeInsideContainer(targetNode, container.id, allNodes);
+        targetNode.id === container.id || targetAncestorIds.has(container.id);
 
     while (parentId && !visited.has(parentId)) {
         visited.add(parentId);
-        const parent = byId.get(parentId);
+        const parent = graphIndex.byId.get(parentId);
         if (!parent) break;
 
         if (parent.type === "compound") {
@@ -76,7 +76,7 @@ const getExitedBoundaries = (sourceNode, targetNode, allNodes) => {
                 steps.push({ kind: "compound", anchor: parent, container: parent });
             }
         } else if (parent.type === "parallelLane") {
-            const parallel = byId.get(parent.parentId);
+            const parallel = graphIndex.byId.get(parent.parentId);
             if (
                 parallel?.type === "parallel" &&
                 !seenParallelIds.has(parallel.id)
@@ -133,7 +133,8 @@ const rebuildBoundaryTransitionsImpl = (sourceNodes = [], sourceEdges = []) => {
         data: node.data ? { ...node.data } : node.data,
         style: node.style ? { ...node.style } : node.style,
     }));
-    const byId = new Map(nodes.map((node) => [node.id, node]));
+    const graphIndex = createEditorNodeIndex(nodes);
+    const { byId } = graphIndex;
 
     // Remove only managed boundary events. API-defined normal skill events and
     // genuine container-level events remain untouched.
@@ -198,7 +199,7 @@ const rebuildBoundaryTransitionsImpl = (sourceNodes = [], sourceEdges = []) => {
                 steps: getExitedBoundaries(
                     byId.get(entry.sourceId),
                     semanticTargetNode,
-                    nodes
+                    graphIndex
                 ),
             }));
             const primaryPath = sourcePaths[0];
@@ -353,8 +354,17 @@ const rebuildBoundaryTransitionsImpl = (sourceNodes = [], sourceEdges = []) => {
         node.data = { ...(node.data || {}), events };
 
         if (node.type === "compound") {
+            const childrenRight = graphIndex
+                .getChildren(node.id)
+                .reduce((right, child) => {
+                    const size = getNodeSize(child);
+                    return Math.max(
+                        right,
+                        Number(child.position?.x || 0) + size.width
+                    );
+                }, COMPOUND_PADDING_X);
             const requiredWidth =
-                getCompoundChildrenRight(node.id, nodes) +
+                childrenRight +
                 COMPOUND_PADDING_X +
                 getCompoundExitGutterWidth(events);
             node.style = {

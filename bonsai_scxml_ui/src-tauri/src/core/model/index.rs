@@ -11,7 +11,6 @@ use super::{State, StateId, Transition, TransitionId, Workflow};
 pub(crate) struct WorkflowIndex {
     state_position_by_id: HashMap<StateId, usize>,
     transition_position_by_id: HashMap<TransitionId, usize>,
-    states_by_scxml_id: HashMap<String, Vec<StateId>>,
     children_by_parent: HashMap<Option<StateId>, Vec<StateId>>,
     outgoing_by_state: HashMap<StateId, Vec<TransitionId>>,
     incoming_by_state: HashMap<StateId, Vec<TransitionId>>,
@@ -25,11 +24,6 @@ impl WorkflowIndex {
             index
                 .state_position_by_id
                 .insert(state.id.clone(), position);
-            index
-                .states_by_scxml_id
-                .entry(state.scxml_id.clone())
-                .or_default()
-                .push(state.id.clone());
             index
                 .children_by_parent
                 .entry(state.parent_id.clone())
@@ -78,13 +72,6 @@ impl WorkflowIndex {
     ) -> Option<&'a Transition> {
         self.transition_position(id)
             .and_then(|position| workflow.transitions.get(position))
-    }
-
-    pub(crate) fn states_for_scxml_id(&self, scxml_id: &str) -> &[StateId] {
-        self.states_by_scxml_id
-            .get(scxml_id)
-            .map(Vec::as_slice)
-            .unwrap_or(&[])
     }
 
     pub(crate) fn children_of(&self, parent_id: Option<&StateId>) -> &[StateId] {
@@ -145,7 +132,7 @@ mod tests {
     use crate::core::model::{StateKind, Workflow};
 
     #[test]
-    fn indexes_parent_scxml_and_transition_relationships() {
+    fn indexes_parent_and_transition_relationships() {
         let root = State {
             id: StateId::from("root"),
             scxml_id: "Root".into(),
@@ -193,7 +180,6 @@ mod tests {
         };
         let index = WorkflowIndex::new(&workflow);
 
-        assert_eq!(index.states_for_scxml_id("Child"), &[StateId::from("child")]);
         assert_eq!(index.children_of(Some(&StateId::from("root"))), &[StateId::from("child")]);
         assert_eq!(index.outgoing_from(&StateId::from("child")), &[TransitionId::from("t1")]);
         assert_eq!(index.incoming_to(&StateId::from("root")), &[TransitionId::from("t1")]);

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { resolveCollisionScope } from "../utils/nodeCollisions";
 import { rebuildBoundaryTransitions } from "../utils/boundaryTransitions";
 import { getOverviewLayoutNodeSize } from "../utils/layoutUtils";
+import { createEditorNodeIndex } from "../utils/editorGraph";
 import {
     COMPOUND_HEADER_HEIGHT,
     COMPOUND_PADDING_X,
@@ -10,10 +11,7 @@ import {
     PARALLEL_NODE_GAP,
     PARALLEL_LANE_CHILD_TOP_INSET,
     fitCompoundAndAncestorCompounds,
-    getAbsoluteNodePosition,
-    getDirectCompoundForNode,
     getCompoundExitGutterWidth,
-    getLaneForNode,
     getNodeSize,
     growParallelToLaneContents,
     isParallelLaneSkillCandidate,
@@ -68,26 +66,10 @@ export function useNodeDrag({
     const dragOriginParentIdRef = useRef(null);
 
     const buildDragContainerIndex = useCallback((currentNodes) => {
-        const currentNodeById = new Map(
-            currentNodes.map((node) => [node.id, node])
-        );
-
-        const getAncestorIds = (node) => {
-            const result = new Set();
-            let parentId = node?.parentId;
-            const seen = new Set();
-
-            while (parentId && !seen.has(parentId)) {
-                seen.add(parentId);
-                result.add(parentId);
-                parentId = currentNodeById.get(parentId)?.parentId;
-            }
-
-            return result;
-        };
+        const graphIndex = createEditorNodeIndex(currentNodes);
 
         const toBounds = (node) => {
-            const absolute = getAbsoluteNodePosition(node, currentNodes);
+            const absolute = graphIndex.getAbsolutePosition(node);
             const size =
                 node.type === "parallelLane"
                     ? {
@@ -95,7 +77,7 @@ export function useNodeDrag({
                           height: Number(node.style?.height) || 110,
                       }
                     : getNodeSize(node);
-            const ancestorIds = getAncestorIds(node);
+            const ancestorIds = graphIndex.getAncestorIds(node);
 
             return {
                 id: node.id,
@@ -138,29 +120,34 @@ export function useNodeDrag({
         // hit-test index once here instead of deriving signatures from the
         // full nodes array on every pointer-driven position update.
         const currentNodes = getNodes();
+        const graphIndex = createEditorNodeIndex(currentNodes);
         dragContainerIndexRef.current = buildDragContainerIndex(currentNodes);
 
         // Prefer the immediate Compound boundary when a skill is nested in a
         // Compound that itself lives inside a Parallel lane. If there is no
         // direct Compound parent, the lane boundary becomes the sticky one.
-        const sourceCompound = getDirectCompoundForNode(node, currentNodes);
+        const immediateParent = node.parentId
+            ? graphIndex.byId.get(node.parentId)
+            : null;
+        const sourceCompound =
+            immediateParent?.type === "compound" ? immediateParent : null;
         const sourceLane = sourceCompound
             ? null
-            : getLaneForNode(node, currentNodes);
+            : graphIndex.findAncestor(
+                node,
+                (candidate) => candidate.type === "parallelLane"
+            );
         const sourceContainer = sourceCompound || sourceLane;
         if (sourceContainer) {
-            const absolute = getAbsoluteNodePosition(sourceContainer, currentNodes);
+            const absolute = graphIndex.getAbsolutePosition(sourceContainer);
             const size = sourceLane
                 ? {
                     width: Number(sourceLane.style?.width) || 420,
                     height: Number(sourceLane.style?.height) || 110,
                 }
                 : getNodeSize(sourceCompound);
-            const immediateParent = currentNodes.find(
-                (candidate) => candidate.id === node.parentId
-            );
             const parentAbsolute = immediateParent
-                ? getAbsoluteNodePosition(immediateParent, currentNodes)
+                ? graphIndex.getAbsolutePosition(immediateParent)
                 : { x: 0, y: 0 };
             const nodeSize = getNodeSize(node);
 
@@ -186,10 +173,7 @@ export function useNodeDrag({
 
         // Nodes innerhalb einer Lane dürfen vorübergehend den
         // bisherigen Parent verlassen.
-        if (
-            getLaneForNode(node, currentNodes) ||
-            getDirectCompoundForNode(node, currentNodes)
-        ) {
+        if (sourceLane || sourceCompound) {
             setNodes((allNodes) =>
                 allNodes.map((candidate) =>
                     candidate.id === node.id
@@ -383,25 +367,35 @@ export function useNodeDrag({
 
         if (element?.closest(".trash-bin-dropzone")) {
             const currentNodes = getNodes();
-            const idsToDelete = new Set([node.id]);
-            let foundNew = true;
+            const graphIndex = createEditorNodeIndex(currentNodes);
+            const clonesBySource = new Map();
+            currentNodes.forEach((candidate) => {
+                if (
+                    !(candidate.data?.isSkillClone || candidate.data?.isStateClone) ||
+                    !candidate.data?.cloneOfNodeId
+                ) {
+                    return;
+                }
 
-            while (foundNew) {
-                foundNew = false;
-                currentNodes.forEach((candidate) => {
-                    const isDescendant =
-                        candidate.parentId && idsToDelete.has(candidate.parentId);
-                    const isCloneOfDeletedState =
-                        (candidate.data?.isSkillClone || candidate.data?.isStateClone) &&
-                        idsToDelete.has(candidate.data?.cloneOfNodeId);
+                const sourceId = candidate.data.cloneOfNodeId;
+                if (!clonesBySource.has(sourceId)) {
+                    clonesBySource.set(sourceId, []);
+                }
+                clonesBySource.get(sourceId).push(candidate);
+            });
 
-                    if (
-                        (isDescendant || isCloneOfDeletedState) &&
-                        !idsToDelete.has(candidate.id)
-                    ) {
-                        idsToDelete.add(candidate.id);
-                        foundNew = true;
-                    }
+            const idsToDelete = new Set();
+            const pendingIds = [node.id];
+            for (let index = 0; index < pendingIds.length; index += 1) {
+                const currentId = pendingIds[index];
+                if (!currentId || idsToDelete.has(currentId)) continue;
+
+                idsToDelete.add(currentId);
+                graphIndex.getChildren(currentId).forEach((child) => {
+                    if (!idsToDelete.has(child.id)) pendingIds.push(child.id);
+                });
+                (clonesBySource.get(currentId) || []).forEach((clone) => {
+                    if (!idsToDelete.has(clone.id)) pendingIds.push(clone.id);
                 });
             }
 
@@ -475,13 +469,15 @@ export function useNodeDrag({
                         !idsToDelete.has(edge.target)
                 );
 
+                const connectedNodeIds = new Set();
+                updatedEdges.forEach((edge) => {
+                    if (edge.source) connectedNodeIds.add(edge.source);
+                    if (edge.target) connectedNodeIds.add(edge.target);
+                });
+
                 setSlotNodes((currentSlotNodes) =>
                     currentSlotNodes.filter((slotNode) =>
-                        updatedEdges.some(
-                            (edge) =>
-                                edge.source === slotNode.id ||
-                                edge.target === slotNode.id
-                        )
+                        connectedNodeIds.has(slotNode.id)
                     )
                 );
 
@@ -527,24 +523,17 @@ export function useNodeDrag({
                 node.data?.cloneOfNodeId || ""
             ).trim();
             setNodes((currentNodes) => {
-                const liveNode = currentNodes.find(
-                    (candidate) => candidate.id === node.id
-                );
-                const sourceNode = currentNodes.find(
-                    (candidate) =>
-                        candidate.id === liveNode?.data?.cloneOfNodeId
-                );
+                const graphIndex = createEditorNodeIndex(currentNodes);
+                const liveNode = graphIndex.byId.get(node.id);
+                const sourceNode = liveNode?.data?.cloneOfNodeId
+                    ? graphIndex.byId.get(liveNode.data.cloneOfNodeId)
+                    : null;
 
                 if (!liveNode) return currentNodes;
 
-                const absolute = getAbsoluteNodePosition(
-                    liveNode,
-                    currentNodes
-                );
+                const absolute = graphIndex.getAbsolutePosition(liveNode);
                 const sourceParent = sourceNode?.parentId
-                    ? currentNodes.find(
-                        (candidate) => candidate.id === sourceNode.parentId
-                    )
+                    ? graphIndex.byId.get(sourceNode.parentId)
                     : null;
 
                 let nextNodes = currentNodes.map((candidate) => {
@@ -560,9 +549,8 @@ export function useNodeDrag({
                         };
                     }
 
-                    const parentAbsolute = getAbsoluteNodePosition(
-                        sourceParent,
-                        currentNodes
+                    const parentAbsolute = graphIndex.getAbsolutePosition(
+                        sourceParent
                     );
                     return {
                         ...candidate,
@@ -611,18 +599,18 @@ export function useNodeDrag({
         });
 
         setNodes((currentNodes) => {
-            const draggedNode = currentNodes.find(
-                (candidate) => candidate.id === node.id
-            );
+            const graphIndex = createEditorNodeIndex(currentNodes);
+            const draggedNode = graphIndex.byId.get(node.id);
 
             if (!draggedNode) {
                 return currentNodes;
             }
 
-            const sourceCompound = getDirectCompoundForNode(
-                draggedNode,
-                currentNodes
-            );
+            const draggedParent = draggedNode.parentId
+                ? graphIndex.byId.get(draggedNode.parentId)
+                : null;
+            const sourceCompound =
+                draggedParent?.type === "compound" ? draggedParent : null;
 
             const targetContainer = findDropContainerAtPoint(
                 dropPoint,
@@ -646,11 +634,11 @@ export function useNodeDrag({
             // Compound wrapper. The lane is the conceptual hit target, but its
             // wrapper is the actual semantic parent for inserted/moved states.
             if (targetLaneAtDrop) {
-                const laneWrapper = currentNodes.find(
-                    (candidate) =>
-                        candidate.parentId === targetLaneAtDrop.id &&
+                const laneWrapper = graphIndex
+                    .getChildren(targetLaneAtDrop.id)
+                    .find((candidate) =>
                         isAutoParallelLaneCompound(candidate)
-                );
+                    );
 
                 if (laneWrapper) {
                     targetCompound = laneWrapper;
@@ -749,10 +737,7 @@ export function useNodeDrag({
                 (sourceCompound || targetCompound) &&
                 (targetCompound || !targetLaneAtDrop)
             ) {
-                const absolute = getAbsoluteNodePosition(
-                    draggedNode,
-                    currentNodes
-                );
+                const absolute = graphIndex.getAbsolutePosition(draggedNode);
 
                 // Zunächst aus aktuellem Parent lösen
                 let next = currentNodes.map((c) =>
@@ -768,10 +753,7 @@ export function useNodeDrag({
 
                 if (targetCompound) {
                     const compoundPosition =
-                        getAbsoluteNodePosition(
-                            targetCompound,
-                            currentNodes
-                        );
+                        graphIndex.getAbsolutePosition(targetCompound);
 
                     // Absolute Position der Node in eine
                     // relative Compound-Position umrechnen
@@ -855,9 +837,9 @@ export function useNodeDrag({
                 return rebuilt.nodes;
             }
 
-            const sourceLane = getLaneForNode(
+            const sourceLane = graphIndex.findAncestor(
                 draggedNode,
-                currentNodes
+                (candidate) => candidate.type === "parallelLane"
             );
 
             let targetLane = targetLaneAtDrop;
@@ -891,16 +873,14 @@ export function useNodeDrag({
                 );
 
                 if (resistedLaneDrop && sourceLane) {
-                    const laneAbsolute = getAbsoluteNodePosition(
-                        sourceLane,
-                        currentNodes
+                    const laneAbsolute = graphIndex.getAbsolutePosition(
+                        sourceLane
                     );
                     const laneWidth = Number(sourceLane.style?.width) || 420;
                     const laneHeight = Number(sourceLane.style?.height) || 110;
                     const draggedSize = getNodeSize(draggedNode);
-                    const desiredAbsolute = getAbsoluteNodePosition(
-                        draggedNode,
-                        currentNodes
+                    const desiredAbsolute = graphIndex.getAbsolutePosition(
+                        draggedNode
                     );
                     const padding = 16;
                     const clampedAbsolute = {
@@ -913,11 +893,11 @@ export function useNodeDrag({
                             Math.max(laneAbsolute.y + padding, desiredAbsolute.y)
                         ),
                     };
-                    const immediateParent = currentNodes.find(
-                        (candidate) => candidate.id === draggedNode.parentId
-                    );
+                    const immediateParent = draggedNode.parentId
+                        ? graphIndex.byId.get(draggedNode.parentId)
+                        : null;
                     const parentAbsolute = immediateParent
-                        ? getAbsoluteNodePosition(immediateParent, currentNodes)
+                        ? graphIndex.getAbsolutePosition(immediateParent)
                         : { x: 0, y: 0 };
 
                     next = next.map((candidate) =>
@@ -941,16 +921,10 @@ export function useNodeDrag({
             }
 
             const targetParallel = targetLane
-                ? currentNodes.find(
-                    (candidate) =>
-                        candidate.id === targetLane.parentId
-                )
+                ? graphIndex.byId.get(targetLane.parentId)
                 : null;
 
-            const absolutePosition = getAbsoluteNodePosition(
-                draggedNode,
-                currentNodes
-            );
+            const absolutePosition = graphIndex.getAbsolutePosition(draggedNode);
 
             let nextNodes = currentNodes.filter(
                 (candidate) => candidate.id !== draggedNode.id
@@ -959,29 +933,23 @@ export function useNodeDrag({
             const normalizeLane = (lane, nodeToArrangeId = null) => {
                 if (!lane) return;
 
-                const currentLane =
-                    nextNodes.find((candidate) => candidate.id === lane.id) ||
-                    lane;
-                let members = nextNodes.filter(
-                    (candidate) =>
-                        candidate.parentId === currentLane.id &&
-                        isParallelLaneSkillCandidate(candidate)
-                );
+                let nextIndex = createEditorNodeIndex(nextNodes);
+                const currentLane = nextIndex.byId.get(lane.id) || lane;
+                const members = nextIndex
+                    .getChildren(currentLane.id)
+                    .filter(isParallelLaneSkillCandidate);
 
                 if (nodeToArrangeId) {
-                    const newNode = members.find(
-                        (member) => member.id === nodeToArrangeId
-                    );
+                    const newNode = nextIndex.byId.get(nodeToArrangeId);
 
-                    if (newNode) {
-                        const existingMembers = members.filter(
-                            (member) => member.id !== nodeToArrangeId
-                        );
+                    if (newNode?.parentId === currentLane.id) {
                         const newX =
-                            25 + existingMembers.reduce((x, member) => {
-                                const size = getOverviewLayoutNodeSize(member);
-                                return x + size.width + PARALLEL_NODE_GAP;
-                            }, 0);
+                            25 + members
+                                .filter((member) => member.id !== nodeToArrangeId)
+                                .reduce((x, member) => {
+                                    const size = getOverviewLayoutNodeSize(member);
+                                    return x + size.width + PARALLEL_NODE_GAP;
+                                }, 0);
 
                         nextNodes = nextNodes.map((candidate) =>
                             candidate.id === nodeToArrangeId
@@ -997,17 +965,11 @@ export function useNodeDrag({
                                 }
                                 : candidate
                         );
-                        members = nextNodes.filter(
-                            (candidate) =>
-                                candidate.parentId === currentLane.id &&
-                                isParallelLaneSkillCandidate(candidate)
-                        );
+                        nextIndex = createEditorNodeIndex(nextNodes);
                     }
                 }
 
-                const parallel = nextNodes.find(
-                    (candidate) => candidate.id === currentLane.parentId
-                );
+                const parallel = nextIndex.byId.get(currentLane.parentId);
                 if (!parallel) return;
 
                 nextNodes = growParallelToLaneContents(
@@ -1019,11 +981,12 @@ export function useNodeDrag({
             if (targetLane) {
                 const targetParent = targetLane;
 
-                // Absolute Position des Parents bestimmen
+                // Absolute Position des Parents bestimmen. The temporary
+                // node index avoids walking the full node array for each
+                // ancestor in nested parallel/compound structures.
                 const parentAbsolutePosition =
-                    getAbsoluteNodePosition(
-                        targetParent,
-                        nextNodes
+                    createEditorNodeIndex(nextNodes).getAbsolutePosition(
+                        targetParent
                     );
 
                 nextNodes.push({

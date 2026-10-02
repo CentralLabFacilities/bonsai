@@ -52,9 +52,15 @@ const getCanonicalPatchPolicy = (command) => {
             return { stateMode: "source", applyTransitions: false };
         case "updateStateEditorPosition":
         case "replaceStateEditorPositions":
-            return { stateMode: "position", applyTransitions: false };
         case "replaceStateParameters":
-            return { stateMode: "parameters", applyTransitions: false };
+            // These commands are emitted after the React editor has already
+            // committed the exact value locally. Rust only needs to persist
+            // the semantic state and acknowledge the new document revision.
+            return {
+                stateMode: "none",
+                applyTransitions: false,
+                skipProjection: true,
+            };
         case "replaceSlotsSnapshot":
             return { stateMode: "slots", applyTransitions: false };
         case "replaceDataModel":
@@ -107,6 +113,8 @@ export function useRustWorkflowDocument({
     const documentGenerationRef = useRef(0);
     const activeQueueGenerationRef = useRef(0);
     const queueDepthRef = useRef(0);
+    const coalescedSequenceRef = useRef(new Map());
+    const readQuerySequenceRef = useRef(new Map());
     const editorStateRef = useRef(null);
 
     editorStateRef.current = {
@@ -139,11 +147,54 @@ export function useRustWorkflowDocument({
         return next;
     }, []);
 
+    /**
+     * Queue a latest-value-wins mutation without weakening the ordering of the
+     * command bridge. Every call keeps its original place in the queue, but a
+     * queued operation becomes a cheap no-op if a newer value for the same key
+     * was requested before it started. This is intentionally used only for
+     * latest-value editor snapshots (positions/parameters). State drag keys
+     * include their source parent, so reparenting across different container or
+     * lane boundaries is never collapsed into the same queue entry.
+     *
+     * Keeping the stale queue entries instead of physically removing/reordering
+     * them preserves the relative order of unrelated/structural commands while
+     * preventing obsolete snapshots from crossing IPC.
+     */
+    const enqueueLatest = useCallback(
+        (key, operation, generation = documentGenerationRef.current) => {
+            const generationKey = `${generation}:${String(key || "")}`;
+            const sequence =
+                (coalescedSequenceRef.current.get(generationKey) || 0) + 1;
+            coalescedSequenceRef.current.set(generationKey, sequence);
+
+            return enqueue(async () => {
+                if (
+                    coalescedSequenceRef.current.get(generationKey) !== sequence
+                ) {
+                    return null;
+                }
+
+                try {
+                    return await operation();
+                } finally {
+                    if (
+                        coalescedSequenceRef.current.get(generationKey) ===
+                        sequence
+                    ) {
+                        coalescedSequenceRef.current.delete(generationKey);
+                    }
+                }
+            }, generation);
+        },
+        [enqueue]
+    );
+
     const applyCanonicalPatch = useCallback(
         (result, command) => {
             const patch = result?.patch;
             if (!patch) return;
             const policy = getCanonicalPatchPolicy(command);
+            if (policy.skipProjection) return;
 
             // Merge Rust's canonical semantic result back into the existing
             // React Flow projection. The patch utilities deliberately preserve
@@ -532,7 +583,7 @@ export function useRustWorkflowDocument({
 
     const syncStateEditorPositions = useCallback(
         (stateId) =>
-            enqueue(async () => {
+            enqueueLatest(`editor-positions:${stateId}`, async () => {
                 if (!isTauri() || !stateId) return null;
                 await waitForEditorCommit();
 
@@ -551,110 +602,117 @@ export function useRustWorkflowDocument({
                     positions,
                 });
             }),
-        [applyCommandNow, enqueue, replaceNow]
+        [applyCommandNow, enqueueLatest, replaceNow]
     );
 
     const syncStatePosition = useCallback(
         (stateId, previousParentId = null) =>
-            enqueue(async () => {
-                if (!isTauri() || !stateId) return null;
-                await waitForEditorCommit();
+            enqueueLatest(
+                `position:${stateId}:from:${previousParentId || "root"}`,
+                async () => {
+                    if (!isTauri() || !stateId) return null;
+                    await waitForEditorCommit();
 
-                const currentNodes = editorStateRef.current?.nodes || [];
-                const node = currentNodes.find((candidate) => candidate.id === stateId);
-                if (!node) {
-                    return replaceNow(editorStateRef.current, null);
-                }
-
-                const currentParentId = node.parentId || null;
-                const isReference = Boolean(
-                    node.data?.isSkillClone || node.data?.isStateClone
-                );
-                if (isReference) {
-                    const sourceStateId = String(
-                        node.data?.cloneOfNodeId || ""
-                    ).trim();
-                    const positions = buildRustStateEditorPositions({
-                        ...(editorStateRef.current || {}),
-                        stateId: sourceStateId,
-                    });
-                    if (!sourceStateId || !positions) {
+                    const currentNodes = editorStateRef.current?.nodes || [];
+                    const node = currentNodes.find(
+                        (candidate) => candidate.id === stateId
+                    );
+                    if (!node) {
                         return replaceNow(editorStateRef.current, null);
                     }
-                    return applyCommandNow({
-                        type: "replaceStateEditorPositions",
-                        stateId: sourceStateId,
-                        positions,
-                    });
-                }
 
-                const parentChanged =
-                    currentParentId !== (previousParentId || null);
-
-                if (parentChanged) {
-                    const previousParentNode = previousParentId
-                        ? currentNodes.find(
-                            (candidate) => candidate.id === previousParentId
-                        )
-                        : null;
-                    const currentParentNode = currentParentId
-                        ? currentNodes.find(
-                            (candidate) => candidate.id === currentParentId
-                        )
-                        : null;
-
-                    const laneIdForParent = (parentNode) => {
-                        if (parentNode?.type === "parallelLane") {
-                            return parentNode.id;
+                    const currentParentId = node.parentId || null;
+                    const isReference = Boolean(
+                        node.data?.isSkillClone || node.data?.isStateClone
+                    );
+                    if (isReference) {
+                        const sourceStateId = String(
+                            node.data?.cloneOfNodeId || ""
+                        ).trim();
+                        const positions = buildRustStateEditorPositions({
+                            ...(editorStateRef.current || {}),
+                            stateId: sourceStateId,
+                        });
+                        if (!sourceStateId || !positions) {
+                            return replaceNow(editorStateRef.current, null);
                         }
-                        if (
-                            parentNode?.type === "compound" &&
-                            parentNode?.data?.autoParallelLaneCompound &&
-                            parentNode.parentId
-                        ) {
-                            return parentNode.parentId;
-                        }
-                        return null;
-                    };
-                    const sourceLaneId = laneIdForParent(previousParentNode);
-                    const targetLaneId = laneIdForParent(currentParentNode);
-                    const sourceLane = sourceLaneId
-                        ? buildRustParallelLaneMoveContext({
-                            nodes: currentNodes,
-                            laneId: sourceLaneId,
-                        })
-                        : null;
-                    const targetLane = targetLaneId
-                        ? buildRustParallelLaneMoveContext({
-                            nodes: currentNodes,
-                            laneId: targetLaneId,
-                        })
-                        : null;
+                        return applyCommandNow({
+                            type: "replaceStateEditorPositions",
+                            stateId: sourceStateId,
+                            positions,
+                        });
+                    }
+
+                    const parentChanged =
+                        currentParentId !== (previousParentId || null);
+
+                    if (parentChanged) {
+                        const previousParentNode = previousParentId
+                            ? currentNodes.find(
+                                  (candidate) =>
+                                      candidate.id === previousParentId
+                              )
+                            : null;
+                        const currentParentNode = currentParentId
+                            ? currentNodes.find(
+                                  (candidate) =>
+                                      candidate.id === currentParentId
+                              )
+                            : null;
+
+                        const laneIdForParent = (parentNode) => {
+                            if (parentNode?.type === "parallelLane") {
+                                return parentNode.id;
+                            }
+                            if (
+                                parentNode?.type === "compound" &&
+                                parentNode?.data?.autoParallelLaneCompound &&
+                                parentNode.parentId
+                            ) {
+                                return parentNode.parentId;
+                            }
+                            return null;
+                        };
+                        const sourceLaneId = laneIdForParent(previousParentNode);
+                        const targetLaneId = laneIdForParent(currentParentNode);
+                        const sourceLane = sourceLaneId
+                            ? buildRustParallelLaneMoveContext({
+                                  nodes: currentNodes,
+                                  laneId: sourceLaneId,
+                              })
+                            : null;
+                        const targetLane = targetLaneId
+                            ? buildRustParallelLaneMoveContext({
+                                  nodes: currentNodes,
+                                  laneId: targetLaneId,
+                              })
+                            : null;
+
+                        return applyCommandNow({
+                            type: "moveEditorState",
+                            stateId,
+                            parentStateId: currentParentId,
+                            sourceLane,
+                            targetLane,
+                            x: Number(node.position?.x || 0),
+                            y: Number(node.position?.y || 0),
+                        });
+                    }
 
                     return applyCommandNow({
-                        type: "moveEditorState",
+                        type: "updateStateEditorPosition",
                         stateId,
-                        parentStateId: currentParentId,
-                        sourceLane,
-                        targetLane,
                         x: Number(node.position?.x || 0),
                         y: Number(node.position?.y || 0),
                     });
                 }
-
-                return applyCommandNow({
-                    type: "updateStateEditorPosition",
-                    stateId,
-                    x: Number(node.position?.x || 0),
-                    y: Number(node.position?.y || 0),
-                });
-            }),
-        [applyCommandNow, enqueue, replaceNow]
+            ),
+        [applyCommandNow, enqueueLatest, replaceNow]
     );
 
     const syncStateParameters = useCallback(
         (stateId, parameters = null) =>
-            enqueue(async () => {
+            enqueueLatest(`parameters:${stateId}`, async () => {
                 if (!isTauri() || !stateId) return null;
 
                 let parameterList = parameters;
@@ -674,7 +732,7 @@ export function useRustWorkflowDocument({
                     parameters: buildRustStateParameters(parameterList),
                 });
             }),
-        [applyCommandNow, enqueue, replaceNow]
+        [applyCommandNow, enqueueLatest, replaceNow]
     );
 
     const syncSlotsAfterCommit = useCallback(
@@ -865,10 +923,52 @@ export function useRustWorkflowDocument({
         [syncTransitionSources]
     );
 
+    // Read-only queries wait for the current mutation queue as a barrier, but
+    // they are not inserted into that queue themselves. This guarantees that
+    // they observe every edit already queued at call time without making a
+    // potentially expensive validation/analysis query block later UI edits.
+    // Repeated queries with the same key are latest-value-wins.
+    const runReadQuery = useCallback((key, operation) => {
+        const generation = documentGenerationRef.current;
+        const generationKey = `${generation}:read:${String(key || "query")}`;
+        const sequence =
+            (readQuerySequenceRef.current.get(generationKey) || 0) + 1;
+        readQuerySequenceRef.current.set(generationKey, sequence);
+
+        const mutationBarrier = queueRef.current.catch(() => undefined);
+        return mutationBarrier.then(async () => {
+            if (
+                generation !== documentGenerationRef.current ||
+                readQuerySequenceRef.current.get(generationKey) !== sequence
+            ) {
+                return null;
+            }
+
+            try {
+                const result = await operation();
+                if (
+                    generation !== documentGenerationRef.current ||
+                    readQuerySequenceRef.current.get(generationKey) !== sequence
+                ) {
+                    return null;
+                }
+                return result;
+            } finally {
+                if (
+                    readQuerySequenceRef.current.get(generationKey) === sequence
+                ) {
+                    readQuerySequenceRef.current.delete(generationKey);
+                }
+            }
+        });
+    }, []);
+
     const invalidate = useCallback(() => {
         documentGenerationRef.current += 1;
         readyRef.current = false;
         revisionRef.current = null;
+        coalescedSequenceRef.current.clear();
+        readQuerySequenceRef.current.clear();
     }, []);
 
     return {
@@ -886,6 +986,7 @@ export function useRustWorkflowDocument({
         syncRemovedStates,
         syncTransitionsForSource,
         syncTransitionSources,
+        runReadQuery,
         invalidate,
         getRevision: () => revisionRef.current,
     };

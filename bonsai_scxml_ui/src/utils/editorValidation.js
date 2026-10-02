@@ -155,3 +155,52 @@ export const buildEditorValidationRequest = ({
         ancestorSlotSourcesByPath
     ),
 });
+
+/**
+ * Compact validation payload for the Rust-owned active document.
+ *
+ * Structural state, transitions, slots and the workflow datamodel already live
+ * in WorkflowDocumentStore. Only editor/skill-definition metadata that is not
+ * persisted there yet crosses IPC.
+ */
+export const buildActiveValidationRequest = ({
+    nodes = [],
+    availableDataModel = [],
+    behaviorDirectories = [],
+    isBehaviorWorkflow = false,
+    ancestorSlotSourcesByPath = new Map(),
+}) => ({
+    availableDataModel: (availableDataModel || []).map(mapVariable),
+    behaviorDirectoryKeys: (behaviorDirectories || [])
+        .map((directory) => String(directory?.key || "").trim().toUpperCase())
+        .filter(Boolean),
+    isBehaviorWorkflow: Boolean(isBehaviorWorkflow),
+    ancestorWriterSlotPaths: collectAncestorWriterSlotPaths(
+        ancestorSlotSourcesByPath
+    ),
+    nodeOverlays: (nodes || [])
+        .filter((node) => !isReferenceNode(node))
+        .map((node) => ({
+            id: String(node?.id || ""),
+            isCollapsed: Boolean(node?.data?.isCollapsed),
+            isBehaviorExit: Boolean(node?.data?.isBehaviorExit),
+            events: (node?.data?.events || []).map((event) => ({
+                id: String(event?.id || ""),
+                synthetic: Boolean(
+                    event?.editorImportedSynthetic ||
+                        event?.editorBoundarySynthetic
+                ),
+            })),
+            parameters: (node?.data?.params || []).map((parameter) => ({
+                key: String(parameter?.key || ""),
+                typeName: String(parameter?.type || ""),
+                required: Boolean(parameter?.required),
+                defaultValue: String(parameter?.default ?? ""),
+                expression: String(parameter?.expr ?? ""),
+            })),
+            onEntry: (node?.data?.onEntry || []).map(mapAssignment),
+            onExit: (node?.data?.onExit || []).map(mapAssignment),
+            hasLocalDataModel: Array.isArray(node?.data?.localDataModel),
+            localDataModel: (node?.data?.localDataModel || []).map(mapVariable),
+        })),
+});

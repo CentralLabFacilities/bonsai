@@ -961,6 +961,7 @@ function AppContent() {
         globalDataModel,
         availableDataModel: availableDataModelParameters,
         behaviorDirectories,
+        runRustReadQuery: rustWorkflowDocument.runReadQuery,
     });
 
     const {

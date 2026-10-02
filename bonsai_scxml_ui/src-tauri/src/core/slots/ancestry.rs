@@ -474,3 +474,158 @@ mod tests {
         assert!(entries.iter().any(|entry| entry.hierarchy_kind == "inherit"));
     }
 }
+
+fn workflow_node_type(kind: crate::core::model::StateKind) -> &'static str {
+    match kind {
+        crate::core::model::StateKind::Skill => "custom",
+        crate::core::model::StateKind::Compound => "compound",
+        crate::core::model::StateKind::Parallel => "parallel",
+        crate::core::model::StateKind::ParallelLane => "parallelLane",
+        crate::core::model::StateKind::Submachine => "submachine",
+        crate::core::model::StateKind::Final => "final",
+    }
+}
+
+fn slot_tab_from_workflow(
+    workflow: &crate::core::model::Workflow,
+    metadata: &SlotTabDto,
+) -> SlotTabDto {
+    let nodes = workflow
+        .states
+        .iter()
+        .map(|state| {
+            let input_slots = state
+                .input_slots
+                .iter()
+                .map(|slot| super::types::SkillSlotDto {
+                    key: slot.key.clone(),
+                    type_name: slot.type_name.clone(),
+                    description: slot.description.clone(),
+                    path: slot.path.clone(),
+                    inherited_path: slot.inherited.clone().unwrap_or_default(),
+                    is_inherited: slot.inherited.is_some(),
+                })
+                .collect::<Vec<_>>();
+            let output_slots = state
+                .output_slots
+                .iter()
+                .map(|slot| super::types::SkillSlotDto {
+                    key: slot.key.clone(),
+                    type_name: slot.type_name.clone(),
+                    description: slot.description.clone(),
+                    path: slot.path.clone(),
+                    inherited_path: slot.inherited.clone().unwrap_or_default(),
+                    is_inherited: slot.inherited.is_some(),
+                })
+                .collect::<Vec<_>>();
+
+            let mut inherited_slots = Vec::new();
+            if matches!(state.kind, crate::core::model::StateKind::Submachine) {
+                inherited_slots.extend(state.input_slots.iter().filter_map(|slot| {
+                    slot.inherited.as_ref().map(|inherited| {
+                        super::types::InheritedSlotUsageDto {
+                            key: slot.key.clone(),
+                            type_name: slot.type_name.clone(),
+                            description: slot.description.clone(),
+                            path: if slot.path.trim().is_empty() {
+                                inherited.clone()
+                            } else {
+                                slot.path.clone()
+                            },
+                            access: "read".into(),
+                        }
+                    })
+                }));
+                inherited_slots.extend(state.output_slots.iter().filter_map(|slot| {
+                    slot.inherited.as_ref().map(|inherited| {
+                        super::types::InheritedSlotUsageDto {
+                            key: slot.key.clone(),
+                            type_name: slot.type_name.clone(),
+                            description: slot.description.clone(),
+                            path: if slot.path.trim().is_empty() {
+                                inherited.clone()
+                            } else {
+                                slot.path.clone()
+                            },
+                            access: "write".into(),
+                        }
+                    })
+                }));
+            }
+
+            super::types::SlotNodeDto {
+                id: state.id.as_str().to_string(),
+                node_type: workflow_node_type(state.kind).to_string(),
+                label: state.label.clone(),
+                full_skill_name: state.full_skill_name.clone().unwrap_or_default(),
+                input_slots,
+                output_slots,
+                inherited_slots,
+            }
+        })
+        .collect();
+
+    let manual_slots = workflow
+        .slot_declarations
+        .iter()
+        .map(|slot| super::types::SlotDeclarationDto {
+            key: slot.key.clone(),
+            type_name: String::new(),
+            description: String::new(),
+            path: slot.xpath.clone(),
+            inherited_path: if slot.inherited {
+                slot.xpath.clone()
+            } else {
+                String::new()
+            },
+            slot_kind: if slot.inherited {
+                "inheritSlot".into()
+            } else {
+                "slot".into()
+            },
+            is_inherited: slot.inherited,
+        })
+        .collect();
+
+    SlotTabDto {
+        id: metadata.id.clone(),
+        title: metadata.title.clone(),
+        file_name: metadata.file_name.clone(),
+        parent_tab_id: metadata.parent_tab_id.clone(),
+        nodes,
+        manual_slots,
+        slot_nodes: Vec::new(),
+    }
+}
+
+/// Resolve ancestry using the Rust-owned active workflow for the current tab.
+/// Only ancestor tab snapshots still need to cross IPC because those documents
+/// are not simultaneously stored in WorkflowDocumentStore.
+pub(crate) fn build_active_slot_ancestry_request(
+    workflow: &crate::core::model::Workflow,
+    request: &SlotAncestryRequestDto,
+) -> SlotAncestryRequestDto {
+    let Some(active_tab_id) = request.active_tab_id.as_deref() else {
+        return request.clone();
+    };
+
+    let mut compact = request.clone();
+    let metadata = compact
+        .tabs
+        .iter()
+        .find(|tab| tab.id == active_tab_id)
+        .cloned()
+        .unwrap_or_else(|| SlotTabDto {
+            id: active_tab_id.to_string(),
+            ..Default::default()
+        });
+    let active = slot_tab_from_workflow(workflow, &metadata);
+
+    if let Some(index) = compact.tabs.iter().position(|tab| tab.id == active_tab_id) {
+        compact.tabs[index] = active;
+    } else {
+        compact.tabs.push(active);
+    }
+    compact.active_snapshot = None;
+    compact
+}

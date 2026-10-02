@@ -19,6 +19,44 @@ pub(crate) struct ValidationRequestDto {
     pub ancestor_writer_slot_paths: Vec<String>,
 }
 
+
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ActiveValidationRequestDto {
+    #[serde(default)]
+    pub available_data_model: Vec<ValidationVariableDto>,
+    #[serde(default)]
+    pub behavior_directory_keys: Vec<String>,
+    #[serde(default)]
+    pub is_behavior_workflow: bool,
+    #[serde(default)]
+    pub ancestor_writer_slot_paths: Vec<String>,
+    #[serde(default)]
+    pub node_overlays: Vec<ValidationNodeOverlayDto>,
+}
+
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ValidationNodeOverlayDto {
+    pub id: String,
+    #[serde(default)]
+    pub is_collapsed: bool,
+    #[serde(default)]
+    pub is_behavior_exit: bool,
+    #[serde(default)]
+    pub events: Vec<ValidationEventDto>,
+    #[serde(default)]
+    pub parameters: Vec<ValidationParameterDto>,
+    #[serde(default)]
+    pub on_entry: Vec<ValidationAssignmentDto>,
+    #[serde(default)]
+    pub on_exit: Vec<ValidationAssignmentDto>,
+    #[serde(default)]
+    pub has_local_data_model: bool,
+    #[serde(default)]
+    pub local_data_model: Vec<ValidationVariableDto>,
+}
+
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ValidationNodeDto {
