@@ -5,6 +5,7 @@ import {
     normalizeSlotType,
 } from "../utils/editorGraph";
 import { buildEditorValidationRequest } from "../utils/editorValidation";
+import { measureEditorAsync, measureEditorTask } from "../utils/editorPerf";
 import {
     buildSlotAncestryRequest,
     slotAncestryResponseToMap,
@@ -37,13 +38,22 @@ export function useEditorAnalysis({
 
     const slotAncestryRequest = useMemo(
         () =>
-            buildSlotAncestryRequest({
-                tabs,
-                activeTabId,
-                nodes: semanticNodes,
-                manualSlots,
-                slotNodes: semanticSlotNodes,
-            }),
+            measureEditorTask(
+                "Build slot ancestry request",
+                () =>
+                    buildSlotAncestryRequest({
+                        tabs,
+                        activeTabId,
+                        nodes: semanticNodes,
+                        manualSlots,
+                        slotNodes: semanticSlotNodes,
+                    }),
+                {
+                    tabs: tabs?.length || 0,
+                    nodes: semanticNodes?.length || 0,
+                    slotNodes: semanticSlotNodes?.length || 0,
+                }
+            ),
         [tabs, activeTabId, semanticNodes, manualSlots, semanticSlotNodes]
     );
 
@@ -76,8 +86,12 @@ export function useEditorAnalysis({
         // turn. Coalesce them so Rust receives only the final semantic snapshot.
         const timer = window.setTimeout(async () => {
             try {
-                const response = await resolveEditorSlotAncestry(
-                    slotAncestryRequest
+                const response = await measureEditorAsync(
+                    "IPC resolve slot ancestry",
+                    () => resolveEditorSlotAncestry(slotAncestryRequest),
+                    {
+                        tabs: slotAncestryRequest?.tabs?.length || 0,
+                    }
                 );
                 commit(slotAncestryResponseToMap(response));
             } catch (error) {
@@ -157,7 +171,14 @@ export function useEditorAnalysis({
             };
         }
 
-        analyzeEditorTransitions(transitionAnalysisRequest)
+        measureEditorAsync(
+            "IPC analyze container transitions",
+            () => analyzeEditorTransitions(transitionAnalysisRequest),
+            {
+                nodes: semanticNodes?.length || 0,
+                edges: edges?.length || 0,
+            }
+        )
             .then(commit)
             .catch((error) => {
                 console.error("Rust transition analysis failed:", error);
@@ -222,150 +243,10 @@ export function useEditorAnalysis({
             });
         });
 
-        const childSlotAccesses = selectedRawNode.data?.requiredByChildren || [];
-        childSlotAccesses.forEach((entry) => {
+        (selectedRawNode.data?.requiredByChildren || []).forEach((entry) => {
             if (entry?.access === "read" || entry?.access === "write") {
                 accessTypes.add(entry.access);
             }
-        });
-
-        const descendantSkillAccesses = [];
-        const unresolvedChildAccesses = [];
-        const seenDescendantAccesses = new Set();
-
-        childSlotAccesses.forEach((entry, index) => {
-            const skillName = String(entry?.skillName || "").trim();
-            if (!skillName) {
-                unresolvedChildAccesses.push(entry);
-                return;
-            }
-
-            const subMachinePath = [
-                entry?.childLabel,
-                ...(Array.isArray(entry?.subMachinePath)
-                    ? entry.subMachinePath
-                    : []),
-            ].filter(Boolean);
-            const key = [
-                subMachinePath.join("/"),
-                entry?.skillNodeId || skillName,
-                entry?.access || "inherit",
-                entry?.slotKey || entry?.slotPath || index,
-            ].join("|");
-            if (seenDescendantAccesses.has(key)) return;
-            seenDescendantAccesses.add(key);
-
-            descendantSkillAccesses.push({
-                nodeId: entry?.skillNodeId || null,
-                skillName,
-                key: entry?.slotKey || "",
-                type: entry?.type || selectedRawNode.data?.slotType || "Unknown",
-                description: entry?.description || "",
-                access: entry?.access || "inherit",
-                slotPath: entry?.slotPath || cleanPath,
-                childNodeId: entry?.childNodeId || null,
-                childLabel: entry?.childLabel || "Sub-state machine",
-                subMachinePath,
-                sourceKind: "descendant-skill",
-                hierarchyKind: "descendant",
-            });
-        });
-
-        // Open descendant tabs contain the full child graph, so include their
-        // concrete inherited-slot consumers as well. This catches deeper open
-        // Sub-SMs without recursively loading the entire behavior tree.
-        const childTabsByParent = new Map();
-        (tabs || []).forEach((tab) => {
-            if (!tab?.parentTabId) return;
-            const siblings = childTabsByParent.get(tab.parentTabId) || [];
-            siblings.push(tab);
-            childTabsByParent.set(tab.parentTabId, siblings);
-        });
-
-        const descendantQueue = (childTabsByParent.get(activeTabId) || []).map(
-            (tab) => ({
-                tab,
-                hierarchy: [tab.title || tab.fileName || "Sub-state machine"],
-            })
-        );
-        const visitedDescendantTabs = new Set();
-
-        while (descendantQueue.length > 0) {
-            const { tab, hierarchy } = descendantQueue.shift();
-            if (!tab?.id || visitedDescendantTabs.has(tab.id)) continue;
-            visitedDescendantTabs.add(tab.id);
-
-            (tab.nodes || []).forEach((node) => {
-                const skillName =
-                    node.data?.fullSkillName || node.data?.label || node.id;
-
-                const addOpenTabAccess = (slot, access, slotIndex) => {
-                    if (!slot?.inherited) return;
-                    accessTypes.add(access);
-                    const inheritedPath = normalizeSlotPath(
-                        slot?.inherited?.xpath || slot?.path
-                    );
-                    if (inheritedPath !== cleanPath) return;
-
-                    const key = [
-                        hierarchy.join("/"),
-                        node.id || skillName,
-                        access,
-                        slot?.key || slotIndex,
-                    ].join("|");
-                    if (seenDescendantAccesses.has(key)) return;
-                    seenDescendantAccesses.add(key);
-
-                    descendantSkillAccesses.push({
-                        nodeId: node.id,
-                        skillName,
-                        key:
-                            slot?.key ||
-                            `${access === "read" ? "input" : "output"} ${
-                                slotIndex + 1
-                            }`,
-                        type: slot?.type || "Unknown",
-                        description: slot?.description || "",
-                        access,
-                        slotPath: inheritedPath,
-                        childNodeId: null,
-                        childLabel: hierarchy[0] || "Sub-state machine",
-                        subMachinePath: hierarchy,
-                        sourceTabId: tab.id,
-                        sourceKind: "descendant-skill",
-                        hierarchyKind: "descendant",
-                    });
-                };
-
-                (node.data?.inSlots || []).forEach((slot, slotIndex) =>
-                    addOpenTabAccess(slot, "read", slotIndex)
-                );
-                (node.data?.outSlots || []).forEach((slot, slotIndex) =>
-                    addOpenTabAccess(slot, "write", slotIndex)
-                );
-            });
-
-            (childTabsByParent.get(tab.id) || []).forEach((childTab) => {
-                descendantQueue.push({
-                    tab: childTab,
-                    hierarchy: [
-                        ...hierarchy,
-                        childTab.title ||
-                            childTab.fileName ||
-                            "Sub-state machine",
-                    ],
-                });
-            });
-        }
-
-        descendantSkillAccesses.sort((left, right) => {
-            const leftPath = (left.subMachinePath || []).join(" / ");
-            const rightPath = (right.subMachinePath || []).join(" / ");
-            return (
-                leftPath.localeCompare(rightPath) ||
-                left.skillName.localeCompare(right.skillName) ||
-                String(left.access).localeCompare(String(right.access))
-            );
         });
 
         const nodeType = String(selectedRawNode.data?.slotType || "").trim();
@@ -387,16 +268,8 @@ export function useEditorAnalysis({
             isInherited: Boolean(selectedRawNode.data?.currentMachineInherited),
             skillAccesses,
             ancestorSlotAccesses,
-            descendantSkillAccesses,
-            childSlotAccesses: unresolvedChildAccesses,
         };
-    }, [
-        selectedRawNode,
-        semanticNodes,
-        ancestorSlotSourcesByPath,
-        tabs,
-        activeTabId,
-    ]);
+    }, [selectedRawNode, semanticNodes, ancestorSlotSourcesByPath]);
 
     const canvasSlotPathOptions = useMemo(() => {
         const options = new Map();
@@ -478,17 +351,26 @@ export function useEditorAnalysis({
 
     const validationRequest = useMemo(
         () =>
-            buildEditorValidationRequest({
-                nodes: semanticNodes,
-                edges,
-                globalDataModel,
-                availableDataModel,
-                behaviorDirectories,
-                isBehaviorWorkflow,
-                manualSlots,
-                ancestorSlotSourcesByPath,
-                currentSlotNodes: semanticSlotNodes,
-            }),
+            measureEditorTask(
+                "Build validation request",
+                () =>
+                    buildEditorValidationRequest({
+                        nodes: semanticNodes,
+                        edges,
+                        globalDataModel,
+                        availableDataModel,
+                        behaviorDirectories,
+                        isBehaviorWorkflow,
+                        manualSlots,
+                        ancestorSlotSourcesByPath,
+                        currentSlotNodes: semanticSlotNodes,
+                    }),
+                {
+                    nodes: semanticNodes?.length || 0,
+                    edges: edges?.length || 0,
+                    slots: semanticSlotNodes?.length || 0,
+                }
+            ),
         [
             semanticNodes,
             edges,
@@ -532,7 +414,14 @@ export function useEditorAnalysis({
         // state into a container updates several pieces of semantic state).
         const timer = window.setTimeout(async () => {
             try {
-                const next = await validateEditorWorkflow(validationRequest);
+                const next = await measureEditorAsync(
+                    "IPC validate editor workflow",
+                    () => validateEditorWorkflow(validationRequest),
+                    {
+                        nodes: semanticNodes?.length || 0,
+                        edges: edges?.length || 0,
+                    }
+                );
                 commitProblems(Array.isArray(next) ? next : []);
             } catch (error) {
                 console.error("Rust editor validation failed:", error);

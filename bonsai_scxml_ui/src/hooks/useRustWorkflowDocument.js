@@ -16,6 +16,12 @@ import {
 import { buildRustTransitionSyncPlan } from "../utils/rustTransitionSync";
 import { rebuildBoundaryTransitions } from "../utils/boundaryTransitions";
 import {
+    editorPerfNow,
+    logEditorQueueWait,
+    measureEditorAsync,
+    measureEditorTask,
+} from "../utils/editorPerf";
+import {
     applyRustWorkflowDataModelPatch,
     applyRustWorkflowStatePatch,
     applyRustWorkflowTransitionPatch,
@@ -100,6 +106,7 @@ export function useRustWorkflowDocument({
     const queueRef = useRef(Promise.resolve());
     const documentGenerationRef = useRef(0);
     const activeQueueGenerationRef = useRef(0);
+    const queueDepthRef = useRef(0);
     const editorStateRef = useRef(null);
 
     editorStateRef.current = {
@@ -110,11 +117,23 @@ export function useRustWorkflowDocument({
     };
 
     const enqueue = useCallback((operation, generation = documentGenerationRef.current) => {
+        const enqueuedAt = editorPerfNow();
+        queueDepthRef.current += 1;
+        const queuedDepth = queueDepthRef.current;
+
         const next = queueRef.current
             .catch(() => undefined)
-            .then(() => {
+            .then(async () => {
                 activeQueueGenerationRef.current = generation;
-                return operation();
+                logEditorQueueWait("Rust command queue wait", enqueuedAt, {
+                    queuedDepth,
+                    currentDepth: queueDepthRef.current,
+                });
+                try {
+                    return await operation();
+                } finally {
+                    queueDepthRef.current = Math.max(0, queueDepthRef.current - 1);
+                }
             });
         queueRef.current = next.catch(() => undefined);
         return next;
@@ -200,12 +219,28 @@ export function useRustWorkflowDocument({
     const replaceNow = useCallback(async (editorState, expectedRevision = null) => {
         if (!isTauri()) return null;
 
-        const request = buildRustEditorExportRequest(
-            editorState || editorStateRef.current || {}
+        const request = measureEditorTask(
+            "Build full Rust workflow snapshot",
+            () =>
+                buildRustEditorExportRequest(
+                    editorState || editorStateRef.current || {}
+                ),
+            {
+                nodes: (editorState || editorStateRef.current || {})?.nodes?.length || 0,
+                edges: (editorState || editorStateRef.current || {})?.edges?.length || 0,
+            }
         );
-        const snapshot = await replaceActiveEditorWorkflowDocument(
-            request,
-            expectedRevision
+        const snapshot = await measureEditorAsync(
+            "IPC replace active Rust workflow",
+            () =>
+                replaceActiveEditorWorkflowDocument(
+                    request,
+                    expectedRevision
+                ),
+            {
+                expectedRevision,
+                queueDepth: queueDepthRef.current,
+            }
         );
         revisionRef.current = snapshot?.revision ?? null;
         readyRef.current = true;
@@ -242,16 +277,32 @@ export function useRustWorkflowDocument({
             }
 
             try {
-                const result = await applyWorkflowCommandTauri(
-                    command,
-                    revisionRef.current
+                const commandType = String(command?.type || "unknown");
+                const result = await measureEditorAsync(
+                    `IPC Rust command: ${commandType}`,
+                    () =>
+                        applyWorkflowCommandTauri(
+                            command,
+                            revisionRef.current
+                        ),
+                    {
+                        revision: revisionRef.current,
+                        queueDepth: queueDepthRef.current,
+                    }
                 );
                 revisionRef.current = result?.revision ?? revisionRef.current;
                 if (
                     activeQueueGenerationRef.current ===
                     documentGenerationRef.current
                 ) {
-                    applyCanonicalPatch(result, command);
+                    measureEditorTask(
+                        `Apply Rust canonical patch: ${commandType}`,
+                        () => applyCanonicalPatch(result, command),
+                        {
+                            states: result?.patch?.states?.length || 0,
+                            transitions: result?.patch?.transitions?.length || 0,
+                        }
+                    );
                 }
                 return result;
             } catch (error) {
