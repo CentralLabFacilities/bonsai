@@ -177,6 +177,8 @@ function SlotDetailsPanel({
         selectedNode.data?.label ||
         "";
     const [pathDraft, setPathDraft] = useState(initialPath);
+    const [sourceHierarchyExpanded, setSourceHierarchyExpanded] = useState(true);
+    const [accessedByExpanded, setAccessedByExpanded] = useState(true);
 
     const slotType =
         slotDetails?.dataType ||
@@ -335,19 +337,35 @@ function SlotDetailsPanel({
 
                 {(isInherited || hasSourceHierarchy) && (
                     <section className="slot-access-section slot-source-hierarchy-section">
-                        <div className="slot-section-heading">
-                            <div>
-                                <div className="slot-section-title">Source hierarchy</div>
-                                <div className="slot-section-subtitle">
-                                    Slot sources above this state machine and consumers in nested sub-state machines
+                        <div className="slot-section-heading slot-section-heading-collapsible">
+                            <button
+                                type="button"
+                                className="slot-section-toggle"
+                                aria-expanded={sourceHierarchyExpanded}
+                                onClick={() =>
+                                    setSourceHierarchyExpanded((expanded) => !expanded)
+                                }
+                            >
+                                <FiChevronDown
+                                    className={`slot-section-chevron ${
+                                        sourceHierarchyExpanded ? "" : "is-collapsed"
+                                    }`}
+                                    aria-hidden="true"
+                                />
+                                <div>
+                                    <div className="slot-section-title">Source hierarchy</div>
+                                    <div className="slot-section-subtitle">
+                                        Slot sources above this state machine and consumers in nested sub-state machines
+                                    </div>
                                 </div>
-                            </div>
+                            </button>
                             <span className="slot-access-count">
                                 {sourceHierarchyEntries.length}
                             </span>
                         </div>
 
-                        <div className="slot-source-hierarchy-list">
+                        {sourceHierarchyExpanded && (
+                            <div className="slot-source-hierarchy-list">
                             {parentSourceHierarchyEntries.length > 0 && (
                                 <div className="slot-hierarchy-group">
                                     <div className="slot-hierarchy-group-heading">
@@ -596,24 +614,39 @@ function SlotDetailsPanel({
                                     </span>
                                 </div>
                             )}
-                        </div>
+                            </div>
+                        )}
                     </section>
                 )}
 
                 <section className="slot-access-section">
-                    <div className="slot-section-heading">
-                        <div>
-                            <div className="slot-section-title">Accessed by</div>
-                            <div className="slot-section-subtitle">
-                                Skills connected to this slot
+                    <div className="slot-section-heading slot-section-heading-collapsible">
+                        <button
+                            type="button"
+                            className="slot-section-toggle"
+                            aria-expanded={accessedByExpanded}
+                            onClick={() => setAccessedByExpanded((expanded) => !expanded)}
+                        >
+                            <FiChevronDown
+                                className={`slot-section-chevron ${
+                                    accessedByExpanded ? "" : "is-collapsed"
+                                }`}
+                                aria-hidden="true"
+                            />
+                            <div>
+                                <div className="slot-section-title">Accessed by</div>
+                                <div className="slot-section-subtitle">
+                                    Skills connected to this slot
+                                </div>
                             </div>
-                        </div>
+                        </button>
                         <span className="slot-access-count">
                             {skillAccesses.length}
                         </span>
                     </div>
 
-                    <div className="slot-list slot-access-list">
+                    {accessedByExpanded && (
+                        <div className="slot-list slot-access-list">
                         {skillAccesses.length > 0 ? (
                             skillAccesses.map((access, index) => (
                                 <div
@@ -663,7 +696,8 @@ function SlotDetailsPanel({
                                 <span>No skill currently accesses this slot.</span>
                             </div>
                         )}
-                    </div>
+                        </div>
+                    )}
                 </section>
             </div>
         </aside>

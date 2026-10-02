@@ -6105,6 +6105,52 @@
     gap: 12px;
 }
 
+.slot-section-heading-collapsible {
+    min-width: 0;
+}
+
+.slot-section-toggle {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 4px 3px 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.slot-section-toggle:hover .slot-section-title,
+.slot-section-toggle:focus-visible .slot-section-title {
+    color: #ffffff;
+}
+
+.slot-section-toggle:focus-visible {
+    outline: 1px solid rgba(56, 189, 248, 0.55);
+    outline-offset: 3px;
+}
+
+.slot-section-chevron {
+    flex: 0 0 auto;
+    width: 15px;
+    height: 15px;
+    color: #94a3b8;
+    transition: transform 140ms ease, color 140ms ease;
+}
+
+.slot-section-toggle:hover .slot-section-chevron {
+    color: #cbd5e1;
+}
+
+.slot-section-chevron.is-collapsed {
+    transform: rotate(-90deg);
+}
+
 .slot-section-title {
     color: #f8fafc;
     font-size: 13px;
