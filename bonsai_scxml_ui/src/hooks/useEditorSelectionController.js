@@ -59,7 +59,6 @@ export function useEditorSelectionController({
             clearAllEdgeSelection();
 
             const isParallelLaneStructure =
-                node.type === "parallelLane" ||
                 Boolean(node.data?.autoParallelLaneCompound) ||
                 node.className === "compound-in-lane";
 

@@ -3,6 +3,10 @@ import { applyEdgeChanges } from "@xyflow/react";
 
 import { rebuildBoundaryTransitionsIncremental } from "../utils/boundaryTransitions";
 import { isWildcardTransitionEvent } from "../utils/transitionEvents";
+import {
+    PARALLEL_BOTTOM_PADDING,
+    PARALLEL_HEADER_HEIGHT,
+} from "../utils/editorGeometry";
 
 /**
  * Owns the React Flow change pipeline that bridges visual graph changes back
@@ -53,7 +57,65 @@ export function useEditorFlowChanges({
                         .map((change) => change.id)
                 );
 
-                onNodesChange(graphChanges);
+                // A Parallel must retain at least one lane. Context-menu
+                // deletion already disables the final lane, but keyboard
+                // multi-delete can otherwise remove every lane in one batch.
+                const laneIdsByParallel = new Map();
+                nodes.forEach((node) => {
+                    if (node.type !== "parallelLane" || !node.parentId) return;
+                    if (!laneIdsByParallel.has(node.parentId)) {
+                        laneIdsByParallel.set(node.parentId, []);
+                    }
+                    laneIdsByParallel.get(node.parentId).push(node.id);
+                });
+                laneIdsByParallel.forEach((laneIds) => {
+                    const requestedLaneRemovals = laneIds.filter((laneId) =>
+                        removedNodeIds.has(laneId)
+                    );
+                    if (
+                        laneIds.length > 0 &&
+                        requestedLaneRemovals.length === laneIds.length
+                    ) {
+                        removedNodeIds.delete(laneIds[laneIds.length - 1]);
+                    }
+                });
+
+                // React Flow can emit only the removed parent for structural
+                // helpers. Expand the local removal too, not only the Rust
+                // command, so deleting a Parallel lane cannot leave invisible
+                // orphan children behind.
+                let expandedLocalRemoval = true;
+                while (expandedLocalRemoval) {
+                    expandedLocalRemoval = false;
+                    nodes.forEach((node) => {
+                        if (removedNodeIds.has(node.id)) return;
+                        if (node.parentId && removedNodeIds.has(node.parentId)) {
+                            removedNodeIds.add(node.id);
+                            expandedLocalRemoval = true;
+                        }
+                    });
+                }
+
+                const nonRemovalChanges = graphChanges.filter(
+                    (change) => change.type !== "remove"
+                );
+                const effectiveGraphChanges = [
+                    ...nonRemovalChanges,
+                    ...[...removedNodeIds].map((id) => ({ id, type: "remove" })),
+                ];
+
+                const affectedParallelIds = new Set(
+                    nodes
+                        .filter(
+                            (node) =>
+                                removedNodeIds.has(node.id) &&
+                                node.type === "parallelLane" &&
+                                node.parentId
+                        )
+                        .map((node) => node.parentId)
+                );
+
+                onNodesChange(effectiveGraphChanges);
 
                 if (removedNodeIds.size > 0) {
                     // Boundary transitions are drawn from a Compound/Parallel
@@ -115,25 +177,104 @@ export function useEditorFlowChanges({
                         })
                     );
 
+                    if (affectedParallelIds.size > 0) {
+                        setNodes((currentNodes) => {
+                            let nextNodes = currentNodes;
+
+                            affectedParallelIds.forEach((parallelId) => {
+                                const parallel = nextNodes.find(
+                                    (node) => node.id === parallelId
+                                );
+                                if (!parallel) return;
+
+                                const lanes = nextNodes
+                                    .filter(
+                                        (node) =>
+                                            node.type === "parallelLane" &&
+                                            node.parentId === parallelId
+                                    )
+                                    .sort(
+                                        (a, b) =>
+                                            Number(a.position?.y || 0) -
+                                            Number(b.position?.y || 0)
+                                    );
+                                if (lanes.length === 0) return;
+
+                                let nextY = PARALLEL_HEADER_HEIGHT;
+                                const laneUpdates = new Map();
+                                lanes.forEach((lane, index) => {
+                                    const laneHeight = Math.max(
+                                        90,
+                                        Number(lane.style?.height) || 140
+                                    );
+                                    laneUpdates.set(lane.id, {
+                                        y: nextY,
+                                        height: laneHeight,
+                                        borderBottom:
+                                            index < lanes.length - 1
+                                                ? "1.5px solid #0284c7"
+                                                : "none",
+                                    });
+                                    nextY += laneHeight;
+                                });
+
+                                const parallelHeight =
+                                    nextY + PARALLEL_BOTTOM_PADDING;
+                                const laneNames = lanes.map(
+                                    (lane, index) =>
+                                        lane.data?.label || `Lane_${index + 1}`
+                                );
+
+                                nextNodes = nextNodes.map((node) => {
+                                    const laneUpdate = laneUpdates.get(node.id);
+                                    if (laneUpdate) {
+                                        return {
+                                            ...node,
+                                            position: {
+                                                ...node.position,
+                                                x: 0,
+                                                y: laneUpdate.y,
+                                            },
+                                            style: {
+                                                ...(node.style || {}),
+                                                width:
+                                                    Number(parallel.style?.width) ||
+                                                    Number(node.style?.width) ||
+                                                    420,
+                                                height: laneUpdate.height,
+                                                borderBottom:
+                                                    laneUpdate.borderBottom,
+                                            },
+                                        };
+                                    }
+
+                                    if (node.id === parallelId) {
+                                        return {
+                                            ...node,
+                                            style: {
+                                                ...(node.style || {}),
+                                                height: parallelHeight,
+                                            },
+                                            data: {
+                                                ...(node.data || {}),
+                                                lanes: laneNames,
+                                            },
+                                        };
+                                    }
+
+                                    return node;
+                                });
+                            });
+
+                            return nextNodes;
+                        });
+                    }
+
                     // React Flow may report only a removed parent while its
                     // descendants disappear with it. Expand the semantic
                     // removal set here so Rust also sees the full subtree and
                     // so slot/reference fallbacks inspect every removed state.
                     const semanticRemovalIds = new Set(removedNodeIds);
-                    let expandedRemovalSet = true;
-                    while (expandedRemovalSet) {
-                        expandedRemovalSet = false;
-                        nodes.forEach((node) => {
-                            if (semanticRemovalIds.has(node.id)) return;
-                            if (
-                                node.parentId &&
-                                semanticRemovalIds.has(node.parentId)
-                            ) {
-                                semanticRemovalIds.add(node.id);
-                                expandedRemovalSet = true;
-                            }
-                        });
-                    }
 
                     const removedNodes = nodes.filter((node) =>
                         semanticRemovalIds.has(node.id)

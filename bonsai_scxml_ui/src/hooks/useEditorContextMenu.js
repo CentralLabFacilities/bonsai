@@ -179,11 +179,7 @@ export function useEditorContextMenu({
             }
 
             if (clickedNode) {
-                // Preserve an existing multi-selection when opening the context menu.
-                // React Flow already keeps the selected set; right-click must not collapse it.
-                const preserveSelection = clickedNode.selected && selectedNodes.length > 1;
-
-                if (!clickedNode.selected || !preserveSelection) {
+                if (!clickedNode.selected) {
                     if (clickedNode.type === "slot") {
                         setNodes((currentNodes) =>
                             currentNodes.map((node) => ({
@@ -273,10 +269,6 @@ export function useEditorContextMenu({
                     flowPosition: flowPos,
                     nodeId: clickedNode.id,
                     nodeType: clickedNode.type,
-                    selectedNodeIds: preserveSelection
-                        ? selectedNodes.map((node) => node.id)
-                        : [clickedNode.id],
-                    selectedNodeCount: preserveSelection ? selectedNodes.length : 1,
                     title: getContextNodeLabel(clickedNode),
                     isStructuralNode: isStructuralLane || isStructuralHelper,
                     addStateTargets,
@@ -331,7 +323,6 @@ export function useEditorContextMenu({
             setSelectedNodeId,
             setSlotNodes,
             slotNodes,
-            selectedNodes,
         ]
     );
 

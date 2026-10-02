@@ -1590,6 +1590,38 @@
     border-bottom: none;
 }
 
+.parallel-lane-node {
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+.parallel-lane-name {
+    position: absolute;
+    top: 7px;
+    left: 10px;
+    z-index: 18;
+    max-width: calc(100% - 32px);
+    padding: 2px 7px;
+    border: 1px solid rgba(2, 132, 199, 0.28);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.9);
+    color: #0369a1;
+    font-size: 9px;
+    font-weight: 750;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: auto;
+    cursor: pointer;
+}
+
+.parallel-lane-selected .parallel-lane-name {
+    box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2);
+    border-color: rgba(2, 132, 199, 0.6);
+}
+
 .parallel-add-lane-btn {
     position: absolute;
     bottom: 4px;

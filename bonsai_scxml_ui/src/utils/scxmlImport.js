@@ -1255,7 +1255,7 @@ export const parseScxmlFile = async (
                 extent: "parent",
                 type: "parallelLane",
                 draggable: false,
-                selectable: false,
+                selectable: true,
                 style: {
                     width: containerWidth,
                     height: laneHeight,
