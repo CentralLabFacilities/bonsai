@@ -553,4 +553,24 @@ function SkillLibrary({
     );
 }
 
-export default SkillLibrary;
+const areSkillLibraryPropsEqual = (previous, next) => {
+    const stableDataProps = [
+        "searchText",
+        "activeFilter",
+        "packages",
+        "selectedPackage",
+        "searchedSkills",
+        "packageSkills",
+        "filteredSkills",
+        "subPackages",
+        "selectedSubPackage",
+        "directSkills",
+        "activeLibraryTab",
+        "isReloadingSkills",
+        "refreshVersion",
+    ];
+
+    return stableDataProps.every((key) => previous[key] === next[key]);
+};
+
+export default React.memo(SkillLibrary, areSkillLibraryPropsEqual);

@@ -255,7 +255,11 @@ export function useEditorPresentationGraph({
     const unexposedTransitionHandlesByNodeId = useMemo(() => {
         const result = new Map();
 
-        nodes.forEach((node) => {
+        // This metadata depends on state/event semantics, not x/y geometry.
+        // semanticNodes is intentionally stable for the duration of a drag,
+        // so moving one node no longer rescans every state's exit tokens on
+        // every pointer frame.
+        semanticNodes.forEach((node) => {
             const outgoingHandles =
                 outgoingTransitionHandlesByNodeId.get(node.id)?.handles || [];
             if (outgoingHandles.length === 0) return;
@@ -302,7 +306,7 @@ export function useEditorPresentationGraph({
         });
 
         return result;
-    }, [nodes, outgoingTransitionHandlesByNodeId]);
+    }, [semanticNodes, outgoingTransitionHandlesByNodeId]);
 
     const collapsedParallelTransitionHandlesByNodeId = useMemo(() => {
         const result = new Map();
@@ -346,6 +350,39 @@ export function useEditorPresentationGraph({
     }, [edges, nodeById]);
 
 
+    const childTabBySubmachineNodeId = useMemo(() => {
+        const result = new Map();
+
+        semanticNodes.forEach((node) => {
+            if (node.type !== "submachine") return;
+
+            const srcFileName = String(node.data?.src || "")
+                .split(/[\\/]/)
+                .pop()
+                ?.replace(/\.(xml|scxml)$/i, "");
+
+            const childTab = tabs.find((tab) => {
+                if (tab.parentTabId !== activeTabId) return false;
+
+                const tabFileName = String(tab.fileName || "")
+                    .split(/[\\/]/)
+                    .pop()
+                    ?.replace(/\.(xml|scxml)$/i, "");
+
+                return (
+                    (tab.sourcePath &&
+                        String(tab.sourcePath) === String(node.data?.src || "")) ||
+                    String(tab.title || "") === String(node.data?.label || "") ||
+                    (srcFileName && tabFileName === srcFileName)
+                );
+            });
+
+            if (childTab) result.set(node.id, childTab);
+        });
+
+        return result;
+    }, [semanticNodes, tabs, activeTabId]);
+
     // Keep the injected React Flow node objects stable whenever the source
     // node itself did not change. During a drag React Flow normally replaces
     // only the moved node; recreating wrappers for every other node forces
@@ -376,30 +413,10 @@ export function useEditorPresentationGraph({
             const collapsedTransitionSignature = collapsedTransitionHandles
                 .map((event) => `${event.id}:${event.sourceNodeId}:${event.transitionHandleId}`)
                 .join("\u001f");
-            let childTab = null;
-
-            if (n.type === "submachine") {
-                const srcFileName = String(n.data?.src || "")
-                    .split(/[\\/]/)
-                    .pop()
-                    ?.replace(/\.(xml|scxml)$/i, "");
-
-                childTab = tabs.find((tab) => {
-                    if (tab.parentTabId !== activeTabId) return false;
-
-                    const tabFileName = String(tab.fileName || "")
-                        .split(/[\\/]/)
-                        .pop()
-                        ?.replace(/\.(xml|scxml)$/i, "");
-
-                    return (
-                        (tab.sourcePath &&
-                            String(tab.sourcePath) === String(n.data?.src || "")) ||
-                        String(tab.title || "") === String(n.data?.label || "") ||
-                        (srcFileName && tabFileName === srcFileName)
-                    );
-                }) || null;
-            }
+            const childTab =
+                n.type === "submachine"
+                    ? childTabBySubmachineNodeId.get(n.id) || null
+                    : null;
 
             const cached = previousCache.get(n.id);
             const childGlobalDataModel = childTab?.globalDataModel || null;
@@ -500,8 +517,7 @@ export function useEditorPresentationGraph({
         unexposedTransitionHandlesByNodeId,
         collapsedParallelTransitionHandlesByNodeId,
         reconnectableIncomingEdgeByNodeId,
-        tabs,
-        activeTabId,
+        childTabBySubmachineNodeId,
         activeMode,
         handleAddLaneToParallel,
         handleOpenStateActions,

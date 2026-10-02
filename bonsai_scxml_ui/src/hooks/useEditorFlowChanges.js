@@ -37,6 +37,15 @@ export function useEditorFlowChanges({
     // those edge IDs so the follow-up removal can be ignored once.
     const remappedSlotCloneEdgeIdsRef = useRef(new Set());
 
+    // React Flow replaces the nodes array for every live position update. The
+    // change handlers only need the full arrays for rare structural/removal
+    // work, so keep the latest values in refs rather than recreating both
+    // callbacks on every drag frame.
+    const nodesRef = useRef(nodes);
+    const slotNodesRef = useRef(slotNodes);
+    nodesRef.current = nodes;
+    slotNodesRef.current = slotNodes;
+
     const handleNodesChange = useCallback(
         (changes) => {
             const graphChanges = [];
@@ -51,17 +60,30 @@ export function useEditorFlowChanges({
             });
 
             if (graphChanges.length > 0) {
-                const removedNodeIds = new Set(
-                    graphChanges
-                        .filter((change) => change.type === "remove")
-                        .map((change) => change.id)
+                const removalChanges = graphChanges.filter(
+                    (change) => change.type === "remove"
                 );
+
+                // Position/dimension/selection changes are React Flow's hot
+                // path while a node is being dragged. None of the structural
+                // deletion bookkeeping below is relevant for those updates,
+                // yet the old implementation scanned the complete graph
+                // several times on every pointer frame. Forward ordinary
+                // visual changes immediately and reserve the expensive subtree
+                // cleanup for actual removals.
+                if (removalChanges.length === 0) {
+                    onNodesChange(graphChanges);
+                } else {
+                    const currentNodes = nodesRef.current;
+                    const removedNodeIds = new Set(
+                        removalChanges.map((change) => change.id)
+                    );
 
                 // A Parallel must retain at least one lane. Context-menu
                 // deletion already disables the final lane, but keyboard
                 // multi-delete can otherwise remove every lane in one batch.
                 const laneIdsByParallel = new Map();
-                nodes.forEach((node) => {
+                currentNodes.forEach((node) => {
                     if (node.type !== "parallelLane" || !node.parentId) return;
                     if (!laneIdsByParallel.has(node.parentId)) {
                         laneIdsByParallel.set(node.parentId, []);
@@ -87,7 +109,7 @@ export function useEditorFlowChanges({
                 let expandedLocalRemoval = true;
                 while (expandedLocalRemoval) {
                     expandedLocalRemoval = false;
-                    nodes.forEach((node) => {
+                    currentNodes.forEach((node) => {
                         if (removedNodeIds.has(node.id)) return;
                         if (node.parentId && removedNodeIds.has(node.parentId)) {
                             removedNodeIds.add(node.id);
@@ -105,7 +127,7 @@ export function useEditorFlowChanges({
                 ];
 
                 const affectedParallelIds = new Set(
-                    nodes
+                    currentNodes
                         .filter(
                             (node) =>
                                 removedNodeIds.has(node.id) &&
@@ -276,7 +298,7 @@ export function useEditorFlowChanges({
                     // so slot/reference fallbacks inspect every removed state.
                     const semanticRemovalIds = new Set(removedNodeIds);
 
-                    const removedNodes = nodes.filter((node) =>
+                    const removedNodes = currentNodes.filter((node) =>
                         semanticRemovalIds.has(node.id)
                     );
                     const removedReferenceNodes = removedNodes.filter(
@@ -316,13 +338,14 @@ export function useEditorFlowChanges({
                         }
                     );
                 }
+                }
             }
             if (slotChanges.length > 0) {
                 const removedSlotCloneIds = new Map();
                 slotChanges
                     .filter((change) => change.type === "remove")
                     .forEach((change) => {
-                        const removedNode = slotNodes.find(
+                        const removedNode = slotNodesRef.current.find(
                             (node) => node.id === change.id
                         );
                         if (
@@ -370,8 +393,6 @@ export function useEditorFlowChanges({
             onSlotNodesChange,
             setEdges,
             setNodes,
-            nodes,
-            slotNodes,
             setSlotEdges,
             syncRemovedStates,
         ]
@@ -406,6 +427,8 @@ export function useEditorFlowChanges({
                 );
 
                 if (removesTransition) {
+                    const currentNodes = nodesRef.current;
+
                     // Removing the visible external part of a boundary
                     // transition must also remove its editor-only helper edge
                     // and Compound/Parallel border event. Otherwise stale
@@ -477,7 +500,7 @@ export function useEditorFlowChanges({
                                     if (!sourceId || !sourceHandle) return;
                                     affectedTransitionSourceIds.add(sourceId);
 
-                                    const sourceNode = nodes.find(
+                                    const sourceNode = currentNodes.find(
                                         (node) => node.id === sourceId
                                     );
                                     const matchingEvents = (
@@ -535,8 +558,8 @@ export function useEditorFlowChanges({
 
                     const cleanedNodes =
                         removedTransientEventsByNode.size === 0
-                            ? nodes
-                            : nodes.map((node) => {
+                            ? currentNodes
+                            : currentNodes.map((node) => {
                                 const removedHandles =
                                     removedTransientEventsByNode.get(node.id);
                                 if (!removedHandles) return node;
@@ -654,7 +677,6 @@ export function useEditorFlowChanges({
         [
             slotEdges,
             edges,
-            nodes,
             onEdgesChange,
             onSlotEdgesChange,
             setNodes,

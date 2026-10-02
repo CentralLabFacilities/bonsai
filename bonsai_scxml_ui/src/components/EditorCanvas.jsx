@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     FiEye,
     FiEyeOff,
@@ -29,6 +29,7 @@ import ParallelLaneNode from "./ParallelLaneNode";
 import EditableTransitionEdge from "./EditableTransitionEdge";
 import CodeView from "./CodeView";
 import { isTauri } from "../tauri-client";
+import { getTransitionHighlightColor } from "../utils/editorGraph";
 import {
     buildFallbackEditorScxml,
     serializeEditorGraphWithRust,
@@ -47,6 +48,45 @@ const nodeTypes = {
 const edgeTypes = {
     smartTransition: EditableTransitionEdge,
 };
+
+const getHoverEdgeNodeIds = (edge) => {
+    const ids = [
+        edge?.source,
+        edge?.target,
+        edge?.data?.skillNodeId,
+        edge?.data?.slotNodeId,
+        edge?.data?.canonicalSlotNodeId,
+        edge?.data?.boundaryOriginalSource,
+        edge?.data?.boundaryOriginalTarget,
+        edge?.data?.compoundOriginalSource,
+        edge?.data?.compoundOriginalTarget,
+        edge?.data?.parallelOriginalSource,
+        edge?.data?.parallelOriginalTarget,
+    ];
+
+    if (Array.isArray(edge?.data?.boundaryOriginalSources)) {
+        edge.data.boundaryOriginalSources.forEach((source) => {
+            ids.push(source?.sourceId || source?.nodeId || source?.id);
+        });
+    }
+
+    return [...new Set(ids.filter(Boolean))];
+};
+
+const getHoverTransitionColor = (edge) => {
+    const semanticHandle =
+        edge?.data?.boundaryOriginalSourceHandle ||
+        edge?.data?.compoundOriginalSourceHandle ||
+        edge?.data?.parallelOriginalSourceHandle ||
+        edge?.sourceHandle ||
+        edge?.label;
+    return getTransitionHighlightColor(semanticHandle);
+};
+
+const escapeDataId = (value) =>
+    String(value ?? "")
+        .replace(/\\/g, "\\\\")
+        .replace(/"/g, '\\"');
 
 export default function EditorCanvas({
     activeMode,
@@ -84,10 +124,6 @@ export default function EditorCanvas({
     handleEdgeDoubleClick,
     handleNodeClick,
     handlePaneClick,
-    handleNodeMouseEnter,
-    handleNodeMouseLeave,
-    handleEdgeMouseEnter,
-    handleEdgeMouseLeave,
     handleContextMenuOpen,
     handleOpenSubMachine,
     handleNodeDragStart,
@@ -105,6 +141,200 @@ export default function EditorCanvas({
 }) {
     const runtimeLogInputRef = useRef(null);
     const [codeString, setCodeString] = useState("");
+    // React Flow's visibility culling performs geometry checks and can mount /
+    // unmount elements on every viewport frame. Counting edges here made fairly
+    // ordinary workflows with many transitions enter that expensive path. Keep
+    // the DOM stable unless the *node* count itself is genuinely very large;
+    // transition-heavy graphs are handled by the interaction edge fast paths.
+    const useViewportCulling = visibleNodes.length >= 600;
+
+    // Canvas hover must not travel through App state. A React-state hover used
+    // to rebuild the display graph and rerender unrelated panels every time the
+    // pointer crossed a node or edge. Keep the semantic graph unchanged and
+    // paint hover directly onto the already-mounted React Flow elements.
+    const hoverDomMutationsRef = useRef([]);
+
+    const hoverEdgeIndex = useMemo(() => {
+        const edgeById = new Map();
+        const edgeIdsByNodeId = new Map();
+
+        visibleEdges.forEach((edge) => {
+            edgeById.set(edge.id, edge);
+            getHoverEdgeNodeIds(edge).forEach((nodeId) => {
+                if (!edgeIdsByNodeId.has(nodeId)) {
+                    edgeIdsByNodeId.set(nodeId, []);
+                }
+                edgeIdsByNodeId.get(nodeId).push(edge.id);
+            });
+        });
+
+        return { edgeById, edgeIdsByNodeId };
+    }, [visibleEdges]);
+
+    const recordHoverClass = useCallback((element, className) => {
+        if (!element || element.classList.contains(className)) return;
+        element.classList.add(className);
+        hoverDomMutationsRef.current.push(() =>
+            element.classList.remove(className)
+        );
+    }, []);
+
+    const recordHoverStyle = useCallback((element, property, value) => {
+        if (!element) return;
+        const previousValue = element.style.getPropertyValue(property);
+        const previousPriority = element.style.getPropertyPriority(property);
+        element.style.setProperty(property, value);
+        hoverDomMutationsRef.current.push(() => {
+            if (previousValue) {
+                element.style.setProperty(
+                    property,
+                    previousValue,
+                    previousPriority
+                );
+            } else {
+                element.style.removeProperty(property);
+            }
+        });
+    }, []);
+
+    const clearFastHover = useCallback(() => {
+        const mutations = hoverDomMutationsRef.current;
+        hoverDomMutationsRef.current = [];
+        for (let index = mutations.length - 1; index >= 0; index -= 1) {
+            mutations[index]();
+        }
+    }, []);
+
+    const getFlowElement = useCallback((event) =>
+        event?.target?.closest?.(".react-flow") ||
+        document.querySelector(".react-flow"), []);
+
+    const getFlowNodeElement = useCallback((flowElement, nodeId) => {
+        if (!flowElement || !nodeId) return null;
+        return flowElement.querySelector(
+            `.react-flow__node[data-id="${escapeDataId(nodeId)}"]`
+        );
+    }, []);
+
+    const getFlowEdgeElement = useCallback((flowElement, edgeId) => {
+        if (!flowElement || !edgeId) return null;
+        return flowElement.querySelector(
+            `.react-flow__edge[data-id="${escapeDataId(edgeId)}"]`
+        );
+    }, []);
+
+    const markFastHoverNode = useCallback((flowElement, nodeId, highlighted) => {
+        const nodeElement = getFlowNodeElement(flowElement, nodeId);
+        if (!nodeElement) return;
+        recordHoverClass(nodeElement, "editor-node-context-visible");
+        if (highlighted) {
+            recordHoverClass(nodeElement, "editor-hover-highlight");
+        }
+    }, [getFlowNodeElement, recordHoverClass]);
+
+    const markFastHoverEdge = useCallback((flowElement, edge) => {
+        const edgeElement = getFlowEdgeElement(flowElement, edge?.id);
+        if (!edgeElement) return;
+
+        recordHoverClass(edgeElement, "editor-edge-context-visible");
+        recordHoverClass(edgeElement, "editor-edge-focus-active");
+
+        // Preserve the moving-dash hover effect, but enable it directly on the
+        // one/few connected SVG groups instead of rebuilding React edge data.
+        if (edgeElement.classList.contains("editor-user-transition-edge")) {
+            recordHoverClass(edgeElement, "animated");
+            const path = edgeElement.querySelector(".react-flow__edge-path");
+            if (path) {
+                recordHoverStyle(
+                    path,
+                    "stroke",
+                    getHoverTransitionColor(edge)
+                );
+            }
+        }
+    }, [getFlowEdgeElement, recordHoverClass, recordHoverStyle]);
+
+    const applyFastNodeHover = useCallback((event, node) => {
+        clearFastHover();
+        const flowElement = getFlowElement(event);
+        if (!flowElement || !node?.id) return;
+
+        recordHoverClass(flowElement, "editor-edge-focus-mode");
+        recordHoverClass(flowElement, "editor-node-focus-mode");
+        markFastHoverNode(flowElement, node.id, true);
+
+        const connectedEdgeIds =
+            hoverEdgeIndex.edgeIdsByNodeId.get(node.id) || [];
+        connectedEdgeIds.forEach((edgeId) => {
+            const edge = hoverEdgeIndex.edgeById.get(edgeId);
+            if (!edge) return;
+            markFastHoverEdge(flowElement, edge);
+            getHoverEdgeNodeIds(edge).forEach((nodeId) =>
+                markFastHoverNode(flowElement, nodeId, nodeId === node.id)
+            );
+        });
+    }, [
+        clearFastHover,
+        getFlowElement,
+        hoverEdgeIndex,
+        markFastHoverEdge,
+        markFastHoverNode,
+        recordHoverClass,
+    ]);
+
+    const applyFastEdgeHover = useCallback((event, edge) => {
+        clearFastHover();
+        const flowElement = getFlowElement(event);
+        if (!flowElement || !edge?.id) return;
+
+        recordHoverClass(flowElement, "editor-edge-focus-mode");
+        recordHoverClass(flowElement, "editor-node-focus-mode");
+
+        const renderedEdge = hoverEdgeIndex.edgeById.get(edge.id) || edge;
+        markFastHoverEdge(flowElement, renderedEdge);
+        getHoverEdgeNodeIds(renderedEdge).forEach((nodeId) =>
+            markFastHoverNode(flowElement, nodeId, true)
+        );
+    }, [
+        clearFastHover,
+        getFlowElement,
+        hoverEdgeIndex,
+        markFastHoverEdge,
+        markFastHoverNode,
+        recordHoverClass,
+    ]);
+
+    useEffect(() => clearFastHover, [clearFastHover]);
+
+    // Viewport movement must not feed back into React state. A previous attempt
+    // used state in onMoveStart/onMoveEnd and could recurse through React Flow's
+    // lifecycle. Toggle a paint-only class directly on the mounted flow element
+    // instead. This lets CSS temporarily disable expensive SVG/node effects
+    // during pan/zoom without causing a React render.
+    const movingFlowElementRef = useRef(null);
+    const handleViewportMoveStart = useCallback((event) => {
+        const flowElement =
+            event?.target?.closest?.(".react-flow") ||
+            document.querySelector(".react-flow");
+        if (!flowElement) return;
+
+        movingFlowElementRef.current = flowElement;
+        flowElement.classList.add("editor-viewport-moving");
+    }, []);
+
+    const handleViewportMoveEnd = useCallback(() => {
+        movingFlowElementRef.current?.classList.remove("editor-viewport-moving");
+        movingFlowElementRef.current = null;
+    }, []);
+
+    useEffect(
+        () => () => {
+            movingFlowElementRef.current?.classList.remove(
+                "editor-viewport-moving"
+            );
+        },
+        []
+    );
 
     useEffect(() => {
         if (activeMode !== "code") return undefined;
@@ -683,6 +913,7 @@ export default function EditorCanvas({
                             edgeFocusMode && "editor-edge-focus-mode",
                             nodeFocusMode && "editor-node-focus-mode",
                             runtimePlayback?.loaded && "runtime-log-focus-mode",
+                            isDraggingNode && "editor-node-dragging",
                         ]
                             .filter(Boolean)
                             .join(" ") || undefined
@@ -693,7 +924,7 @@ export default function EditorCanvas({
                     // React Flow elements that are actually inside the viewport.
                     // This significantly reduces DOM/SVG work on large state
                     // machines without changing the semantic graph in memory.
-                    onlyRenderVisibleElements
+                    onlyRenderVisibleElements={useViewportCulling}
                     onNodesChange={handleNodesChange}
                     onEdgesChange={handleVisibleEdgesChange}
                     onSelectionChange={onSelectionChange}
@@ -714,10 +945,10 @@ export default function EditorCanvas({
                     nodeTypes={nodeTypes}
                     edgeTypes={edgeTypes}
                     onNodeClick={handleNodeClick}
-                    onNodeMouseEnter={handleNodeMouseEnter}
-                    onNodeMouseLeave={handleNodeMouseLeave}
-                    onEdgeMouseEnter={handleEdgeMouseEnter}
-                    onEdgeMouseLeave={handleEdgeMouseLeave}
+                    onNodeMouseEnter={applyFastNodeHover}
+                    onNodeMouseLeave={clearFastHover}
+                    onEdgeMouseEnter={applyFastEdgeHover}
+                    onEdgeMouseLeave={clearFastHover}
                     onPaneClick={handlePaneClick}
                     onPaneContextMenu={(event) => handleContextMenuOpen(event)}
                     onNodeContextMenu={(event, node) =>
@@ -744,6 +975,8 @@ export default function EditorCanvas({
                     onNodeDragStart={handleNodeDragStart}
                     onNodeDrag={handleNodeDrag}
                     onNodeDragStop={handleNodeDragStop}
+                    onMoveStart={handleViewportMoveStart}
+                    onMoveEnd={handleViewportMoveEnd}
                 >
                     <Background />
                     <Controls />

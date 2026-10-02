@@ -61,7 +61,14 @@ export function useNodeDrag({
         }
     }, []);
 
-    const dragContainerIndexRef = useRef({ lanes: [], compounds: [] });
+    const dragContainerIndexRef = useRef({
+        lanes: [],
+        compounds: [],
+        allTargets: [],
+        compoundTargets: [],
+        byId: new Map(),
+    });
+    const dragTrashBoundsRef = useRef(null);
     const dragOriginContainerRef = useRef(null);
     const dragOriginParentIdRef = useRef(null);
 
@@ -106,7 +113,26 @@ export function useNodeDrag({
         });
 
         compounds.sort((a, b) => b.depth - a.depth);
-        return { lanes, compounds };
+        lanes.sort((a, b) => b.depth - a.depth);
+
+        // Candidate ordering is static for the duration of a drag. Build it
+        // once instead of allocating/filtering/sorting all containers on each
+        // pointer frame. Deepest containers come first so the first hit is the
+        // correct nested drop target.
+        const allTargets = [...compounds, ...lanes].sort(
+            (a, b) => b.depth - a.depth
+        );
+        const byId = new Map(
+            [...compounds, ...lanes].map((entry) => [entry.id, entry])
+        );
+
+        return {
+            lanes,
+            compounds,
+            allTargets,
+            compoundTargets: compounds,
+            byId,
+        };
     }, []);
 
     const handleNodeDragStart = useCallback((event, node) => {
@@ -122,6 +148,20 @@ export function useNodeDrag({
         const currentNodes = getNodes();
         const graphIndex = createEditorNodeIndex(currentNodes);
         dragContainerIndexRef.current = buildDragContainerIndex(currentNodes);
+
+        // DOM hit-testing (elementFromPoint) can force browser style/layout
+        // work. The trash zone does not move during a node drag, so snapshot
+        // its viewport bounds once and use a numeric point-in-rect test later.
+        const trashElement = document.querySelector(".trash-bin-dropzone");
+        const trashRect = trashElement?.getBoundingClientRect?.();
+        dragTrashBoundsRef.current = trashRect
+            ? {
+                  left: trashRect.left,
+                  right: trashRect.right,
+                  top: trashRect.top,
+                  bottom: trashRect.bottom,
+              }
+            : null;
 
         // Prefer the immediate Compound boundary when a skill is nested in a
         // Compound that itself lives inside a Parallel lane. If there is no
@@ -195,11 +235,22 @@ export function useNodeDrag({
         const pending = pendingNodeDragRef.current;
         if (!pending) return;
 
-        const { clientX, clientY, nodeId, nodeType, isEditorClone } = pending;
+        const {
+            clientX,
+            clientY,
+            flowX,
+            flowY,
+            nodeId,
+            nodeType,
+            isEditorClone,
+        } = pending;
+        const trashBounds = dragTrashBoundsRef.current;
         const isOverTrash = Boolean(
-            document
-                .elementFromPoint(clientX, clientY)
-                ?.closest(".trash-bin-dropzone")
+            trashBounds &&
+            clientX >= trashBounds.left &&
+            clientX <= trashBounds.right &&
+            clientY >= trashBounds.top &&
+            clientY <= trashBounds.bottom
         );
 
         setIsOverTrash(isOverTrash);
@@ -213,25 +264,28 @@ export function useNodeDrag({
             return;
         }
 
-        const pointerPosition = screenToFlowPosition({
-            x: clientX,
-            y: clientY,
-        });
+        const pointerPosition = { x: flowX, y: flowY };
         const containsPointer = (entry) =>
-            pointerPosition.x >= entry.x &&
-            pointerPosition.x <= entry.x + entry.width &&
-            pointerPosition.y >= entry.y &&
-            pointerPosition.y <= entry.y + entry.height;
+            flowX >= entry.x &&
+            flowX <= entry.x + entry.width &&
+            flowY >= entry.y &&
+            flowY <= entry.y + entry.height;
         const canUseTarget = (entry) =>
             entry.id !== nodeId && !entry.ancestorIds.has(nodeId);
 
         const dragContainerIndex = dragContainerIndexRef.current;
-        const hoveredContainer = [
-            ...dragContainerIndex.compounds,
-            ...(nodeType !== "parallel" ? dragContainerIndex.lanes : []),
-        ]
-            .filter((entry) => canUseTarget(entry) && containsPointer(entry))
-            .sort((a, b) => b.depth - a.depth)[0] || null;
+        const candidates =
+            nodeType === "parallel"
+                ? dragContainerIndex.compoundTargets
+                : dragContainerIndex.allTargets;
+        let hoveredContainer = null;
+        for (let index = 0; index < candidates.length; index += 1) {
+            const entry = candidates[index];
+            if (canUseTarget(entry) && containsPointer(entry)) {
+                hoveredContainer = entry;
+                break;
+            }
+        }
 
         let hoveredLane =
             hoveredContainer?.type === "parallelLane"
@@ -253,24 +307,32 @@ export function useNodeDrag({
             pointInsideBounds(pointerPosition, origin, CONTAINER_EXIT_RESISTANCE)
         ) {
             if (origin.kind === "compound") {
-                effectiveCompound = dragContainerIndex.compounds.find(
-                    (entry) => entry.id === origin.id
-                ) || origin;
+                effectiveCompound =
+                    dragContainerIndex.byId.get(origin.id) || origin;
             } else if (origin.kind === "parallelLane" && nodeType !== "parallel") {
-                hoveredLane = dragContainerIndex.lanes.find(
-                    (entry) => entry.id === origin.id
-                ) || origin;
+                hoveredLane =
+                    dragContainerIndex.byId.get(origin.id) || origin;
             }
         }
 
         setCompoundDropTargetId(effectiveCompound?.id || null);
         setParallelDropTargetId(hoveredLane?.id || null);
-    }, [screenToFlowPosition]);
+    }, []);
 
     const handleNodeDrag = useCallback((event, draggedNode) => {
+        // Convert coordinates once per pointer event. The previous path did
+        // this here for sticky-container clamping and again in the RAF drop
+        // target pass.
+        const pointerPosition = screenToFlowPosition({
+            x: event.clientX,
+            y: event.clientY,
+        });
+
         pendingNodeDragRef.current = {
             clientX: event.clientX,
             clientY: event.clientY,
+            flowX: pointerPosition.x,
+            flowY: pointerPosition.y,
             nodeId: draggedNode.id,
             nodeType: draggedNode.type,
             isEditorClone: Boolean(
@@ -290,10 +352,6 @@ export function useNodeDrag({
             draggedNode.type === "custom" &&
             !(draggedNode.data?.isSkillClone || draggedNode.data?.isStateClone)
         ) {
-            const pointerPosition = screenToFlowPosition({
-                x: event.clientX,
-                y: event.clientY,
-            });
             const isOutsideContainer = !pointInsideBounds(
                 pointerPosition,
                 origin,
@@ -356,7 +414,14 @@ export function useNodeDrag({
         pendingNodeDragRef.current = null;
         const dragOriginContainer = dragOriginContainerRef.current;
         const dragOriginParentId = dragOriginParentIdRef.current;
-        dragContainerIndexRef.current = { lanes: [], compounds: [] };
+        dragContainerIndexRef.current = {
+            lanes: [],
+            compounds: [],
+            allTargets: [],
+            compoundTargets: [],
+            byId: new Map(),
+        };
+        dragTrashBoundsRef.current = null;
         dragOriginContainerRef.current = null;
         dragOriginParentIdRef.current = null;
 

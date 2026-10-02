@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
     FiActivity,
     FiArrowDown,
@@ -2688,4 +2688,28 @@ function DetailsPanel({
     );
 }
 
-export default DetailsPanel;
+const areDetailsPanelPropsEqual = (previous, next) => {
+    const stableDataProps = [
+        "selectedNode",
+        "hasInitialNode",
+        "activeTab",
+        "packages",
+        "availableTargetNodes",
+        "availableSlotPaths",
+        "globalDataModel",
+        "actionValueVariables",
+        "slotDetails",
+        "parameterFocusRequest",
+        "slotFocusRequest",
+        "transitionFocusRequest",
+        "cloneSourceNode",
+        "cloneNodes",
+        "containerOutgoingTransitions",
+        "skillOutgoingTransitions",
+        "parallelLanes",
+    ];
+
+    return stableDataProps.every((key) => previous[key] === next[key]);
+};
+
+export default memo(DetailsPanel, areDetailsPanelPropsEqual);

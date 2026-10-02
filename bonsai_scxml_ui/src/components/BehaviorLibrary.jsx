@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import {
     FiChevronDown,
     FiChevronRight,
@@ -304,7 +304,7 @@ function BehaviorRoot({
     );
 }
 
-export default function BehaviorLibrary({
+function BehaviorLibrary({
     directories,
     onDirectoriesChange,
     onOpenBehavior,
@@ -528,3 +528,8 @@ export default function BehaviorLibrary({
         </aside>
     );
 }
+
+export default memo(BehaviorLibrary, (previous, next) =>
+    previous.directories === next.directories &&
+    previous.activeLibraryTab === next.activeLibraryTab
+);
