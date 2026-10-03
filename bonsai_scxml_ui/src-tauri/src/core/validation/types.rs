@@ -189,4 +189,6 @@ pub(crate) struct EditorProblemDto {
     pub mode: Option<String>,
     #[serde(default)]
     pub focus_node_ids: Vec<String>,
+    #[serde(default)]
+    pub slot_path: Option<String>,
 }

@@ -30,6 +30,7 @@ import {
 } from "../utils/transitionSemantics";
 import { rebuildBoundaryTransitionsIncremental } from "../utils/boundaryTransitions";
 import { isWildcardTransitionEvent } from "../utils/transitionEvents";
+import { slotDebug, summarizeSkillSlots } from "../utils/slotDebug";
 
 const getBoundarySourceEvent = (sourceNode, sourceHandle, allNodes = []) => {
     if (!sourceNode || !["compound", "parallelLane"].includes(sourceNode.type)) {
@@ -146,6 +147,9 @@ export function useTransitionGraph({
     updateNodeInternals,
     selectTransitionEdge,
     syncTransitionsForSource,
+    checkSlotConnection,
+    syncSlotsAfterCommit,
+    onSkillSlotConnectionApplied,
 }) {
     const [slotConnectionDrag, setSlotConnectionDrag] = useState(null);
     const reconnectingEdgeRef = useRef(null);
@@ -720,6 +724,255 @@ export function useTransitionGraph({
         setSlotConnectionDrag(null);
     }, []);
 
+    const applySkillSlotConnection = useCallback(
+        ({
+            skillNodeId,
+            slotNodeId,
+            access,
+            slotIndex,
+            preferredEdgeId = null,
+        }) => {
+            if (
+                !skillNodeId ||
+                !slotNodeId ||
+                !["read", "write"].includes(access) ||
+                !Number.isInteger(Number(slotIndex))
+            ) {
+                slotDebug("slot-edge: connection rejected invalid arguments", {
+                    skillNodeId,
+                    slotNodeId,
+                    access,
+                    slotIndex,
+                });
+                return false;
+            }
+
+            const normalizedSlotIndex = Number(slotIndex);
+            const skillNode = nodes.find((node) => node.id === skillNodeId);
+            const slotNode = slotNodes.find((node) => node.id === slotNodeId);
+            const path = getSlotPathFromNode(slotNode);
+
+            if (!skillNode || !slotNode || !path) {
+                slotDebug("slot-edge: connection rejected missing node/path", {
+                    skillNodeId,
+                    slotNodeId,
+                    hasSkillNode: Boolean(skillNode),
+                    hasSlotNode: Boolean(slotNode),
+                    resolvedPath: path || "",
+                });
+                return false;
+            }
+
+            const skillSlot =
+                access === "read"
+                    ? skillNode.data?.inSlots?.[normalizedSlotIndex]
+                    : skillNode.data?.outSlots?.[normalizedSlotIndex];
+            if (!skillSlot) {
+                slotDebug("slot-edge: connection rejected missing skill slot", {
+                    skillNodeId,
+                    access,
+                    slotIndex: normalizedSlotIndex,
+                    skillSlots: summarizeSkillSlots(nodes, skillNodeId),
+                });
+                return false;
+            }
+
+            const skillType = normalizeSlotType(skillSlot.type);
+            const slotType = normalizeSlotType(slotNode.data?.slotType);
+            if (!skillType || !slotType || skillType !== slotType) {
+                slotDebug("slot-edge: connection rejected type mismatch", {
+                    skillNodeId,
+                    slotNodeId,
+                    access,
+                    slotIndex: normalizedSlotIndex,
+                    skillType,
+                    slotType,
+                });
+                return false;
+            }
+
+            const normalizedPath = `/${path}`;
+            slotDebug("slot-edge: connection accepted", {
+                skillNodeId,
+                slotNodeId,
+                access,
+                slotIndex: normalizedSlotIndex,
+                rawPath: path,
+                normalizedPath,
+                previousSkillSlots: summarizeSkillSlots(nodes, skillNodeId),
+            });
+
+            const nextNodes = nodes.map((node) => {
+                if (node.id !== skillNodeId) return node;
+
+                const slotKey = access === "read" ? "inSlots" : "outSlots";
+                return {
+                    ...node,
+                    data: {
+                        ...node.data,
+                        [slotKey]: (node.data?.[slotKey] || []).map(
+                            (slot, index) =>
+                                index === normalizedSlotIndex
+                                    ? {
+                                          ...slot,
+                                          path: normalizedPath,
+                                          inherited: slotNode.data?.inherited
+                                              ? {
+                                                    state:
+                                                        slotNode.data
+                                                            ?.inheritedFrom ||
+                                                        "",
+                                                    xpath: normalizedPath,
+                                                }
+                                              : null,
+                                      }
+                                    : slot
+                        ),
+                    },
+                };
+            });
+
+            slotDebug("slot-edge: local skill slot path updated", {
+                skillNodeId,
+                access,
+                slotIndex: normalizedSlotIndex,
+                normalizedPath,
+                nextSkillSlots: summarizeSkillSlots(nextNodes, skillNodeId),
+            });
+
+            setNodes(nextNodes);
+
+            // Keep the connected skill as the active detail-panel context.
+            // The explicit refresh below runs after React has committed the
+            // updated node data, so the controlled slot-path field cannot stay
+            // on the pre-connection value.
+            setSelectedNodeId?.(skillNodeId);
+
+            setSlotEdges((currentEdges) => {
+                const existingEdge =
+                    currentEdges.find(
+                        (edge) =>
+                            preferredEdgeId && edge.id === preferredEdgeId
+                    ) ||
+                    currentEdges.find(
+                        (edge) =>
+                            edge.data?.edgeKind === "slot" &&
+                            edge.data?.subMachineInherited !== true &&
+                            edge.data?.access === access &&
+                            (edge.data?.skillNodeId || edge.source) ===
+                                skillNodeId &&
+                            Number(edge.data?.slotIndex) ===
+                                normalizedSlotIndex
+                    );
+
+                const remainingEdges = currentEdges.filter((edge) => {
+                    if (edge.data?.edgeKind !== "slot") return true;
+                    if (edge.data?.subMachineInherited === true) return true;
+                    if (edge.data?.access !== access) return true;
+
+                    const storedSkillNodeId =
+                        edge.data?.skillNodeId || edge.source;
+                    return !(
+                        storedSkillNodeId === skillNodeId &&
+                        Number(edge.data?.slotIndex) === normalizedSlotIndex
+                    );
+                });
+
+                const skillHandleId =
+                    access === "read"
+                        ? `slot-skill-read-${normalizedSlotIndex}`
+                        : `slot-skill-write-${normalizedSlotIndex}`;
+                const slotHandleId =
+                    access === "read" ? "slot-node-read" : "slot-node-write";
+
+                return [
+                    ...remainingEdges,
+                    {
+                        id:
+                            existingEdge?.id ||
+                            `edge-slot-${access}-${skillNodeId}-${normalizedSlotIndex}-${crypto.randomUUID()}`,
+                        source: skillNodeId,
+                        target: slotNodeId,
+                        sourceHandle: skillHandleId,
+                        targetHandle: slotHandleId,
+                        type: "smartTransition",
+                        selected: Boolean(existingEdge?.selected),
+                        style: {
+                            stroke: SLOT_CONNECTION_COLORS[access],
+                            strokeWidth: 1.7,
+                            strokeDasharray: "5 5",
+                        },
+                        markerEnd: {
+                            type: MarkerType.ArrowClosed,
+                            color: SLOT_CONNECTION_COLORS[access],
+                        },
+                        data: {
+                            ...(existingEdge?.data || {}),
+                            edgeKind: "slot",
+                            access,
+                            slotIndex: normalizedSlotIndex,
+                            path,
+                            skillNodeId,
+                            slotNodeId,
+                            canonicalSlotNodeId:
+                                slotNode.data?.isSlotClone &&
+                                slotNode.data?.cloneOfNodeId
+                                    ? slotNode.data.cloneOfNodeId
+                                    : slotNodeId,
+                            // A manual route to the previous slot target is no
+                            // longer meaningful after reconnecting the edge.
+                            controlPoints:
+                                existingEdge?.target === slotNodeId
+                                    ? existingEdge?.data?.controlPoints || []
+                                    : [],
+                        },
+                    },
+                ];
+            });
+
+            // Rebuild the slot projection from the already-updated skill data.
+            // This removes an old now-unused slot node and keeps clones /
+            // inherited metadata canonical. The Rust snapshot itself only needs
+            // the skill slot path, so it can be queued immediately afterwards.
+            requestAnimationFrame(() => {
+                checkSlotConnection?.(nextNodes);
+                onSkillSlotConnectionApplied?.(skillNodeId);
+            });
+            // Persist exactly the slot-path state produced by this connection.
+            // Do not wait for editorStateRef to catch up: manual handle dragging
+            // can otherwise send the previous (empty) path to Rust, which leaves
+            // the stale "slot path missing" problem in the Problems panel.
+            slotDebug("slot-edge: queue Rust slot snapshot", {
+                skillNodeId,
+                access,
+                slotIndex: normalizedSlotIndex,
+                normalizedPath,
+            });
+            void syncSlotsAfterCommit?.(
+                { nodes: nextNodes },
+                {
+                    source: "manual-slot-edge",
+                    skillNodeId,
+                    slotNodeId,
+                    access,
+                    slotIndex: normalizedSlotIndex,
+                    normalizedPath,
+                }
+            );
+            return true;
+        },
+        [
+            nodes,
+            slotNodes,
+            setNodes,
+            setSlotEdges,
+            setSelectedNodeId,
+            checkSlotConnection,
+            syncSlotsAfterCommit,
+            onSkillSlotConnectionApplied,
+        ]
+    );
+
     const handleReconnectStart = useCallback((_, edge) => {
         // Only target-end transition reconnects are exposed. React Flow reports
         // the fixed opposite handle here, so keep the edge itself regardless
@@ -735,6 +988,65 @@ export function useTransitionGraph({
     const onReconnect = useCallback(
         (oldEdge, connection) => {
             reconnectingEdgeRef.current = null;
+
+            if (oldEdge?.data?.edgeKind === "slot") {
+                const access =
+                    oldEdge.data?.access === "write" ? "write" : "read";
+                const slotIndex = Number(oldEdge.data?.slotIndex);
+                const skillNodeId =
+                    oldEdge.data?.skillNodeId || oldEdge.source;
+
+                const sourceHandle = parseSlotConnectionHandle(
+                    connection?.sourceHandle
+                );
+                const targetHandle = parseSlotConnectionHandle(
+                    connection?.targetHandle
+                );
+                const slotHandle =
+                    sourceHandle?.origin === "slot"
+                        ? sourceHandle
+                        : targetHandle?.origin === "slot"
+                          ? targetHandle
+                          : null;
+                const skillHandle =
+                    sourceHandle?.origin === "skill"
+                        ? sourceHandle
+                        : targetHandle?.origin === "skill"
+                          ? targetHandle
+                          : null;
+                const slotNodeId =
+                    sourceHandle?.origin === "slot"
+                        ? connection.source
+                        : targetHandle?.origin === "slot"
+                          ? connection.target
+                          : slotNodes.some(
+                                  (node) => node.id === connection?.target
+                              )
+                            ? connection.target
+                            : slotNodes.some(
+                                    (node) => node.id === connection?.source
+                                )
+                              ? connection.source
+                              : null;
+
+                if (
+                    (slotHandle && slotHandle.access !== access) ||
+                    (skillHandle &&
+                        (skillHandle.access !== access ||
+                            Number(skillHandle.slotIndex) !== slotIndex))
+                ) {
+                    return;
+                }
+
+                applySkillSlotConnection({
+                    skillNodeId,
+                    slotNodeId,
+                    access,
+                    slotIndex,
+                    preferredEdgeId: oldEdge.id,
+                });
+                return;
+            }
 
             const existingEdge = edges.find((edge) => edge.id === oldEdge?.id);
             if (
@@ -863,6 +1175,8 @@ export function useTransitionGraph({
             setNodes,
             updateNodeInternals,
             syncTransitionsForSource,
+            slotNodes,
+            applySkillSlotConnection,
         ]
     );
 
@@ -944,12 +1258,24 @@ export function useTransitionGraph({
             );
 
             if (sourceSlotHandle || targetSlotHandle) {
+                slotDebug("slot-edge: React Flow onConnect", {
+                    source: params.source,
+                    target: params.target,
+                    sourceHandle: params.sourceHandle,
+                    targetHandle: params.targetHandle,
+                    sourceSlotHandle,
+                    targetSlotHandle,
+                });
                 if (
                     !sourceSlotHandle ||
                     !targetSlotHandle ||
                     sourceSlotHandle.access !== targetSlotHandle.access ||
                     sourceSlotHandle.origin === targetSlotHandle.origin
                 ) {
+                    slotDebug("slot-edge: onConnect rejected handle pairing", {
+                        sourceSlotHandle,
+                        targetSlotHandle,
+                    });
                     return;
                 }
 
@@ -964,158 +1290,11 @@ export function useTransitionGraph({
                     ? params.target
                     : params.source;
 
-                const skillNode = nodes.find(
-                    (node) => node.id === skillNodeId
-                );
-                const slotNode = slotNodes.find(
-                    (node) => node.id === slotNodeId
-                );
-                const slotIndex = skillHandle.slotIndex;
-                const access = skillHandle.access;
-                const path = getSlotPathFromNode(slotNode);
-
-                if (!skillNode || !slotNode || !path) {
-                    return;
-                }
-
-                const skillSlot =
-                    access === "read"
-                        ? skillNode.data?.inSlots?.[slotIndex]
-                        : skillNode.data?.outSlots?.[slotIndex];
-
-                if (!skillSlot) {
-                    return;
-                }
-
-                const skillType = normalizeSlotType(skillSlot.type);
-                const slotType = normalizeSlotType(slotNode.data?.slotType);
-
-                // Never allow a Read/Write endpoint to be connected to a slot
-                // node of another datatype, even if onConnect is called
-                // programmatically or React Flow's loose mode accepts a drag.
-                if (
-                    !skillType ||
-                    !slotType ||
-                    skillType !== slotType
-                ) {
-                    return;
-                }
-
-                setNodes((currentNodes) =>
-                    currentNodes.map((node) => {
-                        if (node.id !== skillNodeId) return node;
-
-                        if (access === "read") {
-                            return {
-                                ...node,
-                                data: {
-                                    ...node.data,
-                                    inSlots: (node.data.inSlots || []).map(
-                                        (slot, index) =>
-                                            index === slotIndex
-                                                ? {
-                                                    ...slot,
-                                                    path: `/${path}`,
-                                                    inherited: slotNode.data?.inherited
-                                                        ? {
-                                                            state:
-                                                                slotNode.data?.inheritedFrom ||
-                                                                "",
-                                                            xpath: `/${path}`,
-                                                        }
-                                                        : null,
-                                                }
-                                                : slot
-                                    ),
-                                },
-                            };
-                        }
-
-                        return {
-                            ...node,
-                            data: {
-                                ...node.data,
-                                outSlots: (node.data.outSlots || []).map(
-                                    (slot, index) =>
-                                        index === slotIndex
-                                            ? {
-                                                ...slot,
-                                                path: `/${path}`,
-                                                inherited: slotNode.data?.inherited
-                                                    ? {
-                                                        state:
-                                                            slotNode.data?.inheritedFrom ||
-                                                            "",
-                                                        xpath: `/${path}`,
-                                                    }
-                                                    : null,
-                                            }
-                                            : slot
-                                ),
-                            },
-                        };
-                    })
-                );
-
-                setSlotEdges((currentEdges) => {
-                    // Every skill slot has exactly one slot edge. Reconnecting
-                    // the handle replaces its previous slot connection.
-                    const remainingEdges = currentEdges.filter((edge) => {
-                        if (edge.data?.edgeKind !== "slot") return true;
-                        if (edge.data?.access !== access) return true;
-
-                        const storedSkillNodeId =
-                            edge.data?.skillNodeId || edge.source;
-
-                        return !(
-                            storedSkillNodeId === skillNodeId &&
-                            Number(edge.data?.slotIndex) === slotIndex
-                        );
-                    });
-
-                    const skillHandleId =
-                        access === "read"
-                            ? `slot-skill-read-${slotIndex}`
-                            : `slot-skill-write-${slotIndex}`;
-                    const slotHandleId =
-                        access === "read"
-                            ? "slot-node-read"
-                            : "slot-node-write";
-
-                    // Slot connections are always drawn from the skill slot
-                    // handle to the corresponding endpoint on the slot node.
-                    const normalizedEdge = {
-                        source: skillNodeId,
-                        target: slotNodeId,
-                        sourceHandle: skillHandleId,
-                        targetHandle: slotHandleId,
-                    };
-
-                    return [
-                        ...remainingEdges,
-                        {
-                            id: `edge-slot-${access}-${skillNodeId}-${slotIndex}-${crypto.randomUUID()}`,
-                            ...normalizedEdge,
-                            type: "smartTransition",
-                            style: {
-                                stroke: SLOT_CONNECTION_COLORS[access],
-                                strokeWidth: 1.7,
-                                strokeDasharray: "5 5",
-                            },
-                            markerEnd: {
-                                type: MarkerType.ArrowClosed,
-                                color: SLOT_CONNECTION_COLORS[access],
-                            },
-                            data: {
-                                edgeKind: "slot",
-                                access,
-                                slotIndex,
-                                path,
-                                skillNodeId,
-                                slotNodeId,
-                            },
-                        },
-                    ];
+                applySkillSlotConnection({
+                    skillNodeId,
+                    slotNodeId,
+                    access: skillHandle.access,
+                    slotIndex: skillHandle.slotIndex,
                 });
 
                 return;
@@ -2010,6 +2189,7 @@ export function useTransitionGraph({
             setSlotEdges,
             updateNodeInternals,
             syncTransitionsForSource,
+            applySkillSlotConnection,
         ]
     );
 

@@ -476,6 +476,18 @@ function AppContent() {
     const [newParamId, setNewParamId] = useState("");
     const [newParamExpr, setNewParamExpr] = useState("");
 
+    const [skillSlotDetailRevision, setSkillSlotDetailRevision] = useState(0);
+
+    const handleSkillSlotConnectionApplied = useCallback(() => {
+        // Slot-edge creation updates the live React Flow node first. The
+        // details panel intentionally reads from the semantic projection so
+        // dragging does not rerender it every frame. Refresh that projection
+        // once the connection update has committed.
+        requestAnimationFrame(() => {
+            setSkillSlotDetailRevision((revision) => revision + 1);
+        });
+    }, []);
+
     const {
         drawerData,
         setDrawerData,
@@ -506,6 +518,9 @@ function AppContent() {
         selectTransitionEdge,
         syncTransitionsForSource:
             rustWorkflowDocument.syncTransitionsForSource,
+        checkSlotConnection,
+        syncSlotsAfterCommit: rustWorkflowDocument.syncSlotsAfterCommit,
+        onSkillSlotConnectionApplied: handleSkillSlotConnectionApplied,
     });
 
     const {
@@ -889,13 +904,36 @@ function AppContent() {
         handleToggleContainerCollapse,
     });
 
-    const selectedRawNode = useMemo(
-        () =>
+    const selectedRawNode = useMemo(() => {
+        const semanticNode =
             [...semanticNodes, ...semanticSlotNodes].find(
                 (node) => node.id === selectedNodeId
-            ) || null,
-        [semanticNodes, semanticSlotNodes, selectedNodeId]
-    );
+            ) || null;
+
+        if (!semanticNode || semanticNode.type === "slot") {
+            return semanticNode;
+        }
+
+        // Slot-edge connections can update node.data one render before the
+        // drag-stable semantic projection catches up. On the explicit slot
+        // refresh, reconcile only the selected node's semantic data from the
+        // live React Flow node. `nodes` is intentionally not a dependency:
+        // position-only drag frames must not make the DetailsPanel rerender.
+        const liveNode = nodes.find((node) => node.id === selectedNodeId);
+        if (liveNode?.data && liveNode.data !== semanticNode.data) {
+            return {
+                ...semanticNode,
+                data: liveNode.data,
+            };
+        }
+
+        return semanticNode;
+    }, [
+        semanticNodes,
+        semanticSlotNodes,
+        selectedNodeId,
+        skillSlotDetailRevision,
+    ]);
 
     const selectedParallelLanes = useMemo(() => {
         if (!selectedRawNode || selectedRawNode.type !== "parallel") {
@@ -962,6 +1000,7 @@ function AppContent() {
         availableDataModel: availableDataModelParameters,
         behaviorDirectories,
         runRustReadQuery: rustWorkflowDocument.runReadQuery,
+        validationRevision: rustWorkflowDocument.validationRevision,
     });
 
     const {
@@ -1015,6 +1054,7 @@ function AppContent() {
         setCenter,
         fitView,
         updateNodeInternals,
+        selectEditorNode,
     });
 
     const {

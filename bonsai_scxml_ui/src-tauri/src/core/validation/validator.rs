@@ -82,6 +82,59 @@ mod tests {
             .any(|problem| problem.id.starts_with("transition-missing-a-")));
     }
 
+
+    #[test]
+    fn reports_missing_slot_writer_once_per_path() {
+        let request = ValidationRequestDto {
+            nodes: vec![
+                ValidationNodeDto {
+                    id: "reader-a".into(),
+                    node_type: "custom".into(),
+                    is_initial: true,
+                    input_slots: vec![
+                        ValidationSlotDto {
+                            key: "one".into(),
+                            type_name: "String".into(),
+                            path: "/shared".into(),
+                        },
+                        ValidationSlotDto {
+                            key: "two".into(),
+                            type_name: "String".into(),
+                            path: "/shared".into(),
+                        },
+                    ],
+                    ..ValidationNodeDto::default()
+                },
+                ValidationNodeDto {
+                    id: "reader-b".into(),
+                    node_type: "custom".into(),
+                    input_slots: vec![ValidationSlotDto {
+                        key: "three".into(),
+                        type_name: "String".into(),
+                        path: "/shared".into(),
+                    }],
+                    ..ValidationNodeDto::default()
+                },
+            ],
+            ..ValidationRequestDto::default()
+        };
+
+        let problems = validate_editor_graph(&request);
+        let missing_writer = problems
+            .iter()
+            .filter(|problem| problem.id == "slot-no-writer-shared")
+            .collect::<Vec<_>>();
+
+        assert_eq!(missing_writer.len(), 1);
+        assert_eq!(missing_writer[0].slot_path.as_deref(), Some("/shared"));
+        assert!(missing_writer[0].node_id.is_none());
+        assert!(missing_writer[0].focus_node_ids.is_empty());
+        assert_eq!(
+            missing_writer[0].message,
+            "/shared is being read but has no writer."
+        );
+    }
+
     #[test]
     fn inherited_slot_with_ancestor_writer_is_valid() {
         let request = ValidationRequestDto {

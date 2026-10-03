@@ -122,22 +122,19 @@ pub(super) fn validate_slots(request: &ValidationRequestDto, problems: &mut Vec<
                 continue;
             }
 
-            for reader in path_readers {
-                let mut item = problem(
-                    format!("slot-no-writer-{path}-{}-{}", reader.node.id, reader.index),
-                    "warning",
-                    "Slots",
-                    "Slot has no writer",
-                    format!(
-                        "/{path} is read by {}, but no skill writes to it.",
-                        node_label(reader.node)
-                    ),
-                );
-                focus_node(&mut item, reader.node.id.clone());
-                item.detail_tab = Some("slots".into());
-                item.mode = Some("overview".into());
-                problems.push(item);
-            }
+            // A missing writer is a property of the slot path, not of any
+            // individual reader. Report it once per path and target the slot
+            // itself so Problems navigation can focus the canonical slot node.
+            let mut item = problem(
+                format!("slot-no-writer-{path}"),
+                "warning",
+                "Slots",
+                "Slot has no writer",
+                format!("/{path} is being read but has no writer."),
+            );
+            item.slot_path = Some(format!("/{path}"));
+            item.mode = Some("overview".into());
+            problems.push(item);
         }
     }
 }

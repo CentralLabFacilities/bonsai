@@ -6,6 +6,7 @@ import {
 } from "../utils/editorGraph";
 import { buildActiveValidationRequest } from "../utils/editorValidation";
 import { measureEditorAsync, measureEditorTask } from "../utils/editorPerf";
+import { slotDebug, summarizeProblems } from "../utils/slotDebug";
 import {
     buildActiveSlotAncestryRequest,
     slotAncestryResponseToMap,
@@ -31,6 +32,7 @@ export function useEditorAnalysis({
     availableDataModel = globalDataModel,
     behaviorDirectories,
     runRustReadQuery = null,
+    validationRevision = 0,
 }) {
     const [ancestorSlotSourcesByPath, setAncestorSlotSourcesByPath] = useState(
         () => new Map()
@@ -541,9 +543,39 @@ export function useEditorAnalysis({
         const revision = ++validationRevisionRef.current;
         let cancelled = false;
 
+        slotDebug("validation: effect scheduled", {
+            effectRevision: revision,
+            validationRevision,
+            overlays: validationRequest?.nodeOverlays?.length || 0,
+            semanticNodes: semanticNodes?.length || 0,
+            edges: edges?.length || 0,
+            manualSlots: manualSlots?.length || 0,
+        });
+
         const commitProblems = (next) => {
-            if (cancelled || revision !== validationRevisionRef.current) return;
-            setEditorProblems(next);
+            if (cancelled || revision !== validationRevisionRef.current) {
+                slotDebug("validation: result discarded", {
+                    effectRevision: revision,
+                    currentEffectRevision: validationRevisionRef.current,
+                    cancelled,
+                });
+                return;
+            }
+            // Always commit a fresh array with fresh problem objects.  The
+            // Problems panel is intentionally small, so correctness is more
+            // important here than preserving object identity across validation
+            // runs.  This also protects the UI if the Tauri bridge ever reuses
+            // a result array/object reference.
+            const normalized = Array.isArray(next)
+                ? next.map((problem) => ({ ...problem }))
+                : [];
+            slotDebug("validation: Problems panel committed", {
+                effectRevision: revision,
+                validationRevision,
+                problemCount: normalized.length,
+                problems: summarizeProblems(normalized),
+            });
+            setEditorProblems(normalized);
         };
 
         if (!isTauri()) {
@@ -559,6 +591,11 @@ export function useEditorAnalysis({
         // state into a container updates several pieces of semantic state).
         const timer = window.setTimeout(async () => {
             try {
+                slotDebug("validation: Rust query begin", {
+                    effectRevision: revision,
+                    validationRevision,
+                    overlays: validationRequest?.nodeOverlays?.length || 0,
+                });
                 const next = await measureEditorAsync(
                     "IPC validate editor workflow",
                     () => {
@@ -572,9 +609,27 @@ export function useEditorAnalysis({
                     }
                 );
                 if (next !== null && next !== undefined) {
+                    slotDebug("validation: Rust query returned", {
+                        effectRevision: revision,
+                        validationRevision,
+                        problemCount: Array.isArray(next) ? next.length : 0,
+                        problems: summarizeProblems(
+                            Array.isArray(next) ? next : []
+                        ),
+                    });
                     commitProblems(Array.isArray(next) ? next : []);
+                } else {
+                    slotDebug("validation: Rust query returned no result", {
+                        effectRevision: revision,
+                        validationRevision,
+                    });
                 }
             } catch (error) {
+                slotDebug("validation: Rust query failed", {
+                    effectRevision: revision,
+                    validationRevision,
+                    error: String(error?.message || error || "Unknown error"),
+                });
                 console.error("Rust editor validation failed:", error);
                 const message = String(
                     error?.message || error || "Unknown Rust validation error"
@@ -608,6 +663,7 @@ export function useEditorAnalysis({
         ancestorSlotSourcesByPath,
         semanticSlotNodes,
         runRustReadQuery,
+        validationRevision,
     ]);
 
     const errorProblemCount = useMemo(

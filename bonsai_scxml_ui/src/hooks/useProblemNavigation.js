@@ -6,6 +6,18 @@ import {
     getAbsoluteNodePosition,
 } from "../utils/editorGeometry";
 
+
+const getSlotProblemNodeId = (problem, nodeById) => {
+    const rawPath = String(problem?.slotPath || "").trim();
+    if (!rawPath) return null;
+
+    const cleanPath = rawPath.replace(/^\/+/, "");
+    if (!cleanPath) return null;
+
+    const slotNodeId = `slot-${cleanPath}`;
+    return nodeById.has(slotNodeId) ? slotNodeId : null;
+};
+
 const getTransitionProblemSourceId = (problem, problemEdge) => {
     if (problem?.category !== "Transitions" || !problemEdge) return null;
 
@@ -200,6 +212,7 @@ export const useProblemNavigation = ({
     setCenter,
     fitView,
     updateNodeInternals,
+    selectEditorNode,
 }) =>
     useCallback(
         (problem) => {
@@ -220,12 +233,18 @@ export const useProblemNavigation = ({
                 problem,
                 problemEdge
             );
+            const slotProblemNodeId = getSlotProblemNodeId(
+                problem,
+                liveNodeById
+            );
             const selectedProblemNodeId =
                 transitionSourceId && liveNodeById.has(transitionSourceId)
                     ? transitionSourceId
-                    : problem.nodeId && liveNodeById.has(problem.nodeId)
-                        ? problem.nodeId
-                        : null;
+                    : slotProblemNodeId
+                        ? slotProblemNodeId
+                        : problem.nodeId && liveNodeById.has(problem.nodeId)
+                            ? problem.nodeId
+                            : null;
 
             const requestedFocusIds = problem.focusNodeIds?.length
                 ? [...problem.focusNodeIds]
@@ -272,15 +291,22 @@ export const useProblemNavigation = ({
             );
 
             if (selectedProblemNodeId) {
-                setNodes((currentNodes) =>
-                    currentNodes.map((node) => ({
-                        ...node,
-                        selected: node.id === selectedProblemNodeId,
-                    }))
-                );
-                setSelectedNodeId(selectedProblemNodeId);
-                setActiveTab(problem.detailTab || "allgemein");
-                setRightPanelTab("details");
+                if (slotProblemNodeId === selectedProblemNodeId) {
+                    selectEditorNode?.(selectedProblemNodeId, {
+                        kind: "slot",
+                        tab: "slots",
+                    });
+                } else {
+                    setNodes((currentNodes) =>
+                        currentNodes.map((node) => ({
+                            ...node,
+                            selected: node.id === selectedProblemNodeId,
+                        }))
+                    );
+                    setSelectedNodeId(selectedProblemNodeId);
+                    setActiveTab(problem.detailTab || "allgemein");
+                    setRightPanelTab("details");
+                }
             } else if (problem.category === "Datamodel") {
                 setSelectedNodeId(null);
                 setRightPanelTab("datamodel");
@@ -309,5 +335,6 @@ export const useProblemNavigation = ({
             setSelectedNodeId,
             setShowTransitionEdges,
             updateNodeInternals,
+            selectEditorNode,
         ]
     );

@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
     applyWorkflowCommand as applyWorkflowCommandTauri,
     isTauri,
@@ -26,11 +26,28 @@ import {
     applyRustWorkflowStatePatch,
     applyRustWorkflowTransitionPatch,
 } from "../utils/rustWorkflowPatch";
+import {
+    slotDebug,
+    summarizeRustSlotSnapshot,
+    summarizeSkillSlots,
+} from "../utils/slotDebug";
 
 const isRevisionConflict = (error) =>
     String(error?.message || error || "")
         .toLowerCase()
         .includes("revision conflict");
+
+
+const commandAffectsValidation = (command) => {
+    switch (command?.type) {
+        // Pure editor geometry/view metadata does not change workflow validity.
+        case "updateStateEditorPosition":
+        case "replaceStateEditorPositions":
+            return false;
+        default:
+            return true;
+    }
+};
 
 const waitForEditorCommit = () =>
     new Promise((resolve) => {
@@ -108,6 +125,7 @@ export function useRustWorkflowDocument({
     setGlobalDataModel,
 }) {
     const revisionRef = useRef(null);
+    const [validationRevision, setValidationRevision] = useState(0);
     const readyRef = useRef(false);
     const queueRef = useRef(Promise.resolve());
     const documentGenerationRef = useRef(0);
@@ -295,6 +313,9 @@ export function useRustWorkflowDocument({
         );
         revisionRef.current = snapshot?.revision ?? null;
         readyRef.current = true;
+        // A document replacement changes the semantic validation source even
+        // when the React graph happens to preserve object identities.
+        setValidationRevision((current) => current + 1);
         return snapshot;
     }, []);
 
@@ -329,6 +350,13 @@ export function useRustWorkflowDocument({
 
             try {
                 const commandType = String(command?.type || "unknown");
+                if (commandType === "replaceSlotsSnapshot") {
+                    slotDebug("rust-command: replaceSlotsSnapshot begin", {
+                        expectedRevision: revisionRef.current,
+                        queueDepth: queueDepthRef.current,
+                        snapshot: summarizeRustSlotSnapshot(command),
+                    });
+                }
                 const result = await measureEditorAsync(
                     `IPC Rust command: ${commandType}`,
                     () =>
@@ -341,11 +369,27 @@ export function useRustWorkflowDocument({
                         queueDepth: queueDepthRef.current,
                     }
                 );
+                const previousRevision = revisionRef.current;
                 revisionRef.current = result?.revision ?? revisionRef.current;
-                if (
+                if (commandType === "replaceSlotsSnapshot") {
+                    slotDebug("rust-command: replaceSlotsSnapshot returned", {
+                        previousRevision,
+                        resultRevision: revisionRef.current,
+                        patchStates: result?.patch?.states?.length || 0,
+                        patchTransitions: result?.patch?.transitions?.length || 0,
+                    });
+                }
+                const belongsToActiveDocument =
                     activeQueueGenerationRef.current ===
-                    documentGenerationRef.current
-                ) {
+                    documentGenerationRef.current;
+                if (commandType === "replaceSlotsSnapshot") {
+                    slotDebug("rust-command: active document check", {
+                        belongsToActiveDocument,
+                        activeQueueGeneration: activeQueueGenerationRef.current,
+                        documentGeneration: documentGenerationRef.current,
+                    });
+                }
+                if (belongsToActiveDocument) {
                     measureEditorTask(
                         `Apply Rust canonical patch: ${commandType}`,
                         () => applyCanonicalPatch(result, command),
@@ -354,9 +398,28 @@ export function useRustWorkflowDocument({
                             transitions: result?.patch?.transitions?.length || 0,
                         }
                     );
+                    if (commandAffectsValidation(command)) {
+                        if (commandType === "replaceSlotsSnapshot") {
+                            slotDebug("validation: revision bump requested after slot commit", {
+                                rustRevision: revisionRef.current,
+                            });
+                        }
+                        // Validation reads the Rust-owned document. React can
+                        // render the optimistic edit before this command has
+                        // actually committed, so graph dependencies alone are
+                        // not sufficient to refresh the Problems panel. Bump a
+                        // dedicated signal after the semantic command lands.
+                        setValidationRevision((current) => current + 1);
+                    }
                 }
                 return result;
             } catch (error) {
+                if (String(command?.type || "") === "replaceSlotsSnapshot") {
+                    slotDebug("rust-command: replaceSlotsSnapshot failed", {
+                        revision: revisionRef.current,
+                        error: String(error?.message || error || "Unknown error"),
+                    });
+                }
                 return resyncFromEditor(error);
             }
         },
@@ -736,15 +799,55 @@ export function useRustWorkflowDocument({
     );
 
     const syncSlotsAfterCommit = useCallback(
-        () =>
+        (editorStateOverride = null, debugContext = null) =>
             enqueue(async () => {
                 if (!isTauri()) return null;
-                await waitForEditorCommit();
-                const editorState = editorStateRef.current || {};
-                return applyCommandNow({
-                    type: "replaceSlotsSnapshot",
-                    ...buildRustSlotsSnapshot(editorState),
+
+                slotDebug("slot-sync: queued operation started", {
+                    debugContext,
+                    overrideProvided: Boolean(editorStateOverride),
+                    currentRevision: revisionRef.current,
+                    queueDepth: queueDepthRef.current,
                 });
+
+                // Most callers can wait for React to commit and then read the
+                // latest editor ref. Slot-edge creation is different: it already
+                // has the exact next node snapshot in hand, and relying on a
+                // later render here can race with validation and persist the old
+                // (missing) slot path. Allow that caller to provide the semantic
+                // snapshot directly while inheriting unrelated editor state.
+                if (!editorStateOverride) {
+                    await waitForEditorCommit();
+                }
+
+                const currentEditorState = editorStateRef.current || {};
+                const editorState = editorStateOverride
+                    ? { ...currentEditorState, ...editorStateOverride }
+                    : currentEditorState;
+                const slotSnapshot = buildRustSlotsSnapshot(editorState);
+
+                slotDebug("slot-sync: Rust snapshot built", {
+                    debugContext,
+                    currentRevision: revisionRef.current,
+                    editorSkillSlots: summarizeSkillSlots(
+                        editorState?.nodes || [],
+                        debugContext?.skillNodeId || null
+                    ),
+                    snapshot: summarizeRustSlotSnapshot(slotSnapshot),
+                });
+
+                const result = await applyCommandNow({
+                    type: "replaceSlotsSnapshot",
+                    ...slotSnapshot,
+                });
+
+                slotDebug("slot-sync: Rust snapshot committed", {
+                    debugContext,
+                    resultRevision: result?.revision ?? revisionRef.current,
+                    hasPatch: Boolean(result?.patch),
+                    patchedStates: result?.patch?.states?.length || 0,
+                });
+                return result;
             }),
         [applyCommandNow, enqueue]
     );
@@ -988,6 +1091,7 @@ export function useRustWorkflowDocument({
         syncTransitionSources,
         runReadQuery,
         invalidate,
+        validationRevision,
         getRevision: () => revisionRef.current,
     };
 }

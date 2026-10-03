@@ -392,7 +392,19 @@ fn escape_attr(value: &str) -> String {
         .replace('<', "&lt;")
         .replace('>', "&gt;")
         .replace('"', "&quot;")
-        .replace('\'', "&apos;")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::escape_attr;
+
+    #[test]
+    fn keeps_apostrophes_in_double_quoted_attributes() {
+        assert_eq!(
+            escape_attr("'de.unibi.citec.clf.bonsai.skills.'"),
+            "'de.unibi.citec.clf.bonsai.skills.'"
+        );
+    }
 }
 
 fn format_number(value: f64) -> String {
