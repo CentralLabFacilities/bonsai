@@ -10,7 +10,12 @@
     "tauri:build": "vite build && tauri build",
     "build:binary": "mkdir -p target/dist && bun run build --outDir target/dist && bun run src/embed-assets.js target/dist target/embedded-assets.js && bun build src/server.js --compile --target=bun-linux-x64 --outfile target/bonsai-ui && rm -rf target/dist",
     "lint": "eslint .",
+    "test": "node --test tests/*.test.js",
+    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml --lib --no-default-features --locked",
     "preview": "vite preview"
+  },
+  "engines": {
+    "node": "^20.19.0 || ^22.13.0 || >=24"
   },
   "dependencies": {
     "@dagrejs/dagre": "^3.1.1",

@@ -1,11 +1,14 @@
 use std::collections::{HashMap, HashSet};
 
-use super::{helpers::state_name, types::{EditorExportNodeDto, EditorExportRequestDto}};
+use super::{
+    helpers::state_name,
+    types::{EditorExportNodeDto, EditorExportRequestDto},
+};
 
 pub(super) struct ExportIndex<'a> {
-    nodes: &'a [EditorExportNodeDto],
     pub(super) nodes_by_id: HashMap<&'a str, &'a EditorExportNodeDto>,
     flattened_lanes: HashMap<&'a str, &'a str>,
+    effective_children_by_parent: HashMap<String, Vec<&'a EditorExportNodeDto>>,
 }
 
 impl<'a> ExportIndex<'a> {
@@ -43,11 +46,24 @@ impl<'a> ExportIndex<'a> {
             }
         }
 
-        Self {
-            nodes: &request.nodes,
+        let mut index = Self {
             nodes_by_id,
             flattened_lanes,
+            effective_children_by_parent: HashMap::new(),
+        };
+        for node in &request.nodes {
+            if index.is_flattened_lane(&node.id) {
+                continue;
+            }
+            if let Some(parent_id) = index.effective_parent_id(node) {
+                index
+                    .effective_children_by_parent
+                    .entry(parent_id)
+                    .or_default()
+                    .push(node);
+            }
         }
+        index
     }
 
     pub(super) fn is_flattened_lane(&self, node_id: &str) -> bool {
@@ -78,14 +94,11 @@ impl<'a> ExportIndex<'a> {
         Some(parent_id.to_string())
     }
 
-    pub(super) fn effective_children(&self, parent_id: &str) -> Vec<&'a EditorExportNodeDto> {
-        self.nodes
-            .iter()
-            .filter(|node| {
-                !self.is_flattened_lane(&node.id)
-                    && self.effective_parent_id(node).as_deref() == Some(parent_id)
-            })
-            .collect()
+    pub(super) fn effective_children(&self, parent_id: &str) -> &[&'a EditorExportNodeDto] {
+        self.effective_children_by_parent
+            .get(parent_id)
+            .map(Vec::as_slice)
+            .unwrap_or(&[])
     }
 
     pub(super) fn is_inside_container(&self, node_id: &str, container_id: &str) -> bool {
@@ -117,11 +130,7 @@ impl<'a> ExportIndex<'a> {
     /// every container independently, which meant the same editor edge could
     /// be emitted once for each exited ancestor and therefore reuse the same
     /// transition id multiple times.
-    pub(super) fn transition_owner_id(
-        &self,
-        source_id: &str,
-        target_id: &str,
-    ) -> Option<&'a str> {
+    pub(super) fn transition_owner_id(&self, source_id: &str, target_id: &str) -> Option<&'a str> {
         let source = self.nodes_by_id.get(source_id).copied()?;
         let mut owner = source.id.as_str();
         let mut parent_id = source.parent_id.as_deref();
@@ -142,5 +151,72 @@ impl<'a> ExportIndex<'a> {
         }
 
         Some(owner)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn node(id: &str, parent: Option<&str>, node_type: &str, name: &str) -> EditorExportNodeDto {
+        EditorExportNodeDto {
+            id: id.into(),
+            parent_id: parent.map(str::to_string),
+            node_type: node_type.into(),
+            full_skill_name: name.into(),
+            label: name.into(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn effective_children_keep_request_order_across_nested_flattened_lanes() {
+        let request = EditorExportRequestDto {
+            nodes: vec![
+                node("leaf", Some("inner"), "custom", "Shared"),
+                node("root", None, "parallel", "Root"),
+                node("regular", Some("root"), "custom", "Regular"),
+                node("outer", Some("root"), "parallelLane", "Shared"),
+                node("inner", Some("outer"), "parallelLane", "Shared"),
+                node("dangling", Some("missing"), "custom", "Dangling"),
+                node("cycle-a", Some("cycle-b"), "parallelLane", "Cycle"),
+                node("cycle-b", Some("cycle-a"), "parallelLane", "Cycle"),
+            ],
+            ..Default::default()
+        };
+        let index = ExportIndex::new(&request);
+        assert_eq!(index.semantic_state_id("outer"), "leaf");
+        assert_eq!(
+            index.effective_parent_id(&request.nodes[0]).as_deref(),
+            Some("root")
+        );
+        assert_eq!(
+            index
+                .effective_children("root")
+                .iter()
+                .map(|node| node.id.as_str())
+                .collect::<Vec<_>>(),
+            ["leaf", "regular"]
+        );
+        assert_eq!(index.effective_children("missing")[0].id, "dangling");
+        assert!(index.effective_children("inner").is_empty());
+        assert!(index.effective_children("unknown").is_empty());
+        assert_eq!(index.effective_parent_id(&request.nodes[6]), None);
+        assert!(index.effective_children("cycle-a").is_empty());
+    }
+
+    #[test]
+    fn effective_children_preserve_duplicate_instances_and_last_wins_id_lookup() {
+        let request = EditorExportRequestDto {
+            nodes: vec![
+                node("duplicate", Some("root"), "custom", "First"),
+                node("duplicate", Some("other"), "custom", "Last"),
+            ],
+            ..Default::default()
+        };
+        let index = ExportIndex::new(&request);
+        assert_eq!(index.effective_children("root")[0].label, "First");
+        assert_eq!(index.effective_children("other")[0].label, "Last");
+        assert_eq!(index.nodes_by_id["duplicate"].label, "Last");
     }
 }

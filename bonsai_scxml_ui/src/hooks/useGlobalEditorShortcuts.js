@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 const isTypingTarget = (target) => {
     if (!(target instanceof Element)) return false;
@@ -37,32 +37,40 @@ export function useGlobalEditorShortcuts({
     const [isShortcutHelpOpen, setIsShortcutHelpOpen] = useState(false);
     const liveStateRef = useRef(null);
 
-    liveStateRef.current = {
-        activeMode,
-        setActiveMode,
-        activeTabId,
-        contextMenu,
-        setContextMenu,
-        isDrawerOpen,
-        setDrawerData,
-        isCreateSlotModalOpen,
-        setIsCreateSlotModalOpen,
-        isFindOpen,
-        setIsFindOpen,
-        isShortcutHelpOpen,
-        setIsShortcutHelpOpen,
-        nodes,
-        slotNodes,
-        fitView,
-        clearAllEdgeSelection,
-        clearEditorNodeSelection,
-        handleAddNewTab,
-        handleCloseTab,
-        canGoFocusBack,
-        canGoFocusForward,
-        goFocusBack,
-        goFocusForward,
-    };
+    useLayoutEffect(() => {
+        liveStateRef.current = {
+            activeMode,
+            setActiveMode,
+            activeTabId,
+            contextMenu,
+            setContextMenu,
+            isDrawerOpen,
+            setDrawerData,
+            isCreateSlotModalOpen,
+            setIsCreateSlotModalOpen,
+            isFindOpen,
+            setIsFindOpen,
+            isShortcutHelpOpen,
+            setIsShortcutHelpOpen,
+            nodes,
+            slotNodes,
+            fitView,
+            clearAllEdgeSelection,
+            clearEditorNodeSelection,
+            handleAddNewTab,
+            handleCloseTab,
+            canGoFocusBack,
+            canGoFocusForward,
+            goFocusBack,
+            goFocusForward,
+        };
+    }, [
+        activeMode, setActiveMode, activeTabId, contextMenu, setContextMenu,
+        isDrawerOpen, setDrawerData, isCreateSlotModalOpen, setIsCreateSlotModalOpen,
+        isFindOpen, setIsFindOpen, isShortcutHelpOpen, nodes, slotNodes, fitView,
+        clearAllEdgeSelection, clearEditorNodeSelection, handleAddNewTab, handleCloseTab,
+        canGoFocusBack, canGoFocusForward, goFocusBack, goFocusForward,
+    ]);
 
     useEffect(() => {
         const handleGlobalShortcut = (event) => {

@@ -8,31 +8,31 @@ const normalizeFileName = (value) => {
     return /\.(xml|scxml)$/i.test(trimmed) ? trimmed : `${trimmed}.xml`;
 };
 
-export default function CreateSubMachineModal({
-    isOpen,
+function CreateSubMachineForm({
     defaultDirectory = "",
     defaultFileName = "SubMachine.xml",
     onCancel,
     onConfirm,
 }) {
-    const [directory, setDirectory] = useState(defaultDirectory);
-    const [fileName, setFileName] = useState(defaultFileName);
+    const [directory, setDirectory] = useState(defaultDirectory || "");
+    const [fileName, setFileName] = useState(defaultFileName || "SubMachine.xml");
     const [isSubmitting, setIsSubmitting] = useState(false);
     const nameInputRef = useRef(null);
+    const mountedRef = useRef(false);
 
     useEffect(() => {
-        if (!isOpen) return;
-        setDirectory(defaultDirectory || "");
-        setFileName(defaultFileName || "SubMachine.xml");
-        setIsSubmitting(false);
-        window.setTimeout(() => {
+        mountedRef.current = true;
+        const timer = window.setTimeout(() => {
             nameInputRef.current?.focus();
             nameInputRef.current?.select();
         }, 0);
-    }, [isOpen, defaultDirectory, defaultFileName]);
+        return () => {
+            mountedRef.current = false;
+            window.clearTimeout(timer);
+        };
+    }, []);
 
     useEffect(() => {
-        if (!isOpen) return undefined;
         const handleKeyDown = (event) => {
             if (event.key === "Escape" && !isSubmitting) {
                 event.preventDefault();
@@ -41,12 +41,11 @@ export default function CreateSubMachineModal({
         };
         window.addEventListener("keydown", handleKeyDown, true);
         return () => window.removeEventListener("keydown", handleKeyDown, true);
-    }, [isOpen, isSubmitting, onCancel]);
-
-    if (!isOpen) return null;
+    }, [isSubmitting, onCancel]);
 
     const submit = async (event) => {
         event?.preventDefault?.();
+        if (isSubmitting) return;
         const normalizedName = normalizeFileName(fileName);
         if (!directory.trim()) {
             alert("Please choose a directory for the state-machine file.");
@@ -63,18 +62,18 @@ export default function CreateSubMachineModal({
                 directory: directory.trim(),
                 fileName: normalizedName,
             });
-            if (accepted !== false) {
+            if (mountedRef.current && accepted !== false) {
                 onCancel?.();
             }
         } finally {
-            setIsSubmitting(false);
+            if (mountedRef.current) setIsSubmitting(false);
         }
     };
 
     const browseDirectory = async () => {
         if (!isTauri()) return;
         const selected = await selectDirectory("Choose state-machine directory");
-        if (selected) setDirectory(selected);
+        if (mountedRef.current && selected) setDirectory(selected);
     };
 
     return (
@@ -132,4 +131,20 @@ export default function CreateSubMachineModal({
             </form>
         </div>
     );
+}
+
+export default function CreateSubMachineModal({
+    isOpen,
+    defaultDirectory = "",
+    defaultFileName = "SubMachine.xml",
+    ...props
+}) {
+    return isOpen ? (
+        <CreateSubMachineForm
+            key={JSON.stringify([defaultDirectory, defaultFileName])}
+            defaultDirectory={defaultDirectory}
+            defaultFileName={defaultFileName}
+            {...props}
+        />
+    ) : null;
 }

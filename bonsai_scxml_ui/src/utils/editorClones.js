@@ -1,4 +1,4 @@
-import { getNodeId } from "./editorGeometry";
+import { getNodeId } from "./editorGeometry.js";
 
 export const isEditorCloneNode = (node) => Boolean(
     node?.data?.cloneOfNodeId &&

@@ -7,10 +7,10 @@ use super::context::{
 };
 use super::expressions::evaluate_runtime_expression;
 use super::types::{
-    ResolvedRuntimeDataSampleDto, ResolvedRuntimeParameterSampleDto,
-    ResolvedRuntimeSlotSampleDto, RuntimeChangesStepDto, RuntimeChangesTimelineDto,
-    RuntimeParameterTimelineDto, RuntimeReplayRequestDto, RuntimeReplaySlotEdgeDto,
-    RuntimeSlotBindingDto, RuntimeSlotTimelineDto, RuntimeValueDto,
+    ResolvedRuntimeDataSampleDto, ResolvedRuntimeParameterSampleDto, ResolvedRuntimeSlotSampleDto,
+    RuntimeChangesStepDto, RuntimeChangesTimelineDto, RuntimeParameterTimelineDto,
+    RuntimeReplayRequestDto, RuntimeReplaySlotEdgeDto, RuntimeSlotBindingDto,
+    RuntimeSlotTimelineDto, RuntimeValueDto,
 };
 
 fn resolve_slot_sample_bindings(
@@ -40,7 +40,11 @@ fn resolve_slot_sample_bindings(
         }
     }
 
-    let preferred_access = if sample.kind == "write" { "write" } else { "read" };
+    let preferred_access = if sample.kind == "write" {
+        "write"
+    } else {
+        "read"
+    };
     let preferred: Vec<_> = candidates
         .iter()
         .copied()
@@ -247,9 +251,11 @@ fn resolve_runtime_data_samples(
             let mut best: Option<(usize, String, bool, Option<StateResolution>, i32)> = None;
             for (context_index, context) in contexts.iter().enumerate() {
                 let local_key = strip_data_suffix_for_context(&sample.key, context.source);
-                let known_variable = context.source.global_data_model.iter().any(|entry| {
-                    normalize(&entry.id) == normalize(&local_key)
-                });
+                let known_variable = context
+                    .source
+                    .global_data_model
+                    .iter()
+                    .any(|entry| normalize(&entry.id) == normalize(&local_key));
                 let state_resolution = resolve_runtime_state_in_context(&sample.state, context);
                 let suffix = if context.source.suffix_parts.is_empty() {
                     String::new()
@@ -270,7 +276,10 @@ fn resolve_runtime_data_samples(
                 if known_variable {
                     score += 100;
                 }
-                if state_resolution.as_ref().is_some_and(|resolved| resolved.exact) {
+                if state_resolution
+                    .as_ref()
+                    .is_some_and(|resolved| resolved.exact)
+                {
                     score += 20;
                 } else if state_resolution
                     .as_ref()
@@ -415,10 +424,7 @@ fn evaluate_runtime_data_samples(
             if sample.runtime_key.is_empty() {
                 sample.runtime_key = context_index
                     .map(|index| {
-                        runtime_data_key_for_context(
-                            &sample.local_key,
-                            contexts[index].source,
-                        )
+                        runtime_data_key_for_context(&sample.local_key, contexts[index].source)
                     })
                     .unwrap_or_else(|| sample.local_key.clone());
             }
@@ -448,15 +454,32 @@ fn evaluate_runtime_data_samples(
         .collect()
 }
 
-fn sample_step_index(steps: &[super::types::RuntimeStepDto], line: usize) -> Option<usize> {
-    let mut previous_line = 0usize;
-    for (index, step) in steps.iter().enumerate() {
-        if line > previous_line && line <= step.line {
-            return Some(index);
+struct StepLineIndex {
+    endpoints: Vec<(usize, usize)>,
+}
+
+impl StepLineIndex {
+    fn new(steps: &[super::types::RuntimeStepDto]) -> Self {
+        let mut endpoints = Vec::new();
+        let mut max_line = 0;
+        for (index, step) in steps.iter().enumerate() {
+            // Only record highs can be the first covering interval. This also
+            // preserves first-match behavior for duplicate or unsorted steps.
+            if step.line > max_line {
+                endpoints.push((step.line, index));
+                max_line = step.line;
+            }
         }
-        previous_line = step.line;
+        Self { endpoints }
     }
-    None
+
+    fn step_for_line(&self, line: usize) -> Option<usize> {
+        if line == 0 {
+            return None;
+        }
+        let position = self.endpoints.partition_point(|(end, _)| *end < line);
+        self.endpoints.get(position).map(|(_, index)| *index)
+    }
 }
 
 pub(super) fn build_runtime_changes_timeline(
@@ -470,14 +493,28 @@ pub(super) fn build_runtime_changes_timeline(
         contexts,
     );
 
+    let mut parameter_lines: HashMap<(&str, &str), Vec<usize>> = HashMap::new();
+    for parameter in &parameter_timeline.samples {
+        parameter_lines
+            .entry((parameter.state.trim(), parameter.key.trim()))
+            .or_default()
+            .push(parameter.line);
+    }
+    for lines in parameter_lines.values_mut() {
+        lines.sort_unstable();
+    }
     let mirrored_parameter_data_lines: HashSet<usize> = resolved_data_samples
         .iter()
         .filter(|data_sample| {
-            parameter_timeline.samples.iter().any(|parameter| {
-                normalize(&parameter.state) == normalize(&data_sample.state)
-                    && normalize(&parameter.key) == normalize(&data_sample.key)
-                    && parameter.line.abs_diff(data_sample.line) <= 2
-            })
+            parameter_lines
+                .get(&(data_sample.state.trim(), data_sample.key.trim()))
+                .is_some_and(|lines| {
+                    let position =
+                        lines.partition_point(|line| *line < data_sample.line.saturating_sub(2));
+                    lines
+                        .get(position)
+                        .is_some_and(|line| *line <= data_sample.line.saturating_add(2))
+                })
         })
         .map(|sample| sample.line)
         .collect();
@@ -494,8 +531,9 @@ pub(super) fn build_runtime_changes_timeline(
         })
         .collect();
 
+    let step_index = StepLineIndex::new(&request.runtime_log.steps);
     for sample in &slot_timeline.samples {
-        if let Some(index) = sample_step_index(&request.runtime_log.steps, sample.line) {
+        if let Some(index) = step_index.step_for_line(sample.line) {
             steps[index].slot_accesses.push(sample.clone());
             if sample.kind == "write" {
                 steps[index].slot_writes.push(sample.clone());
@@ -505,15 +543,17 @@ pub(super) fn build_runtime_changes_timeline(
         }
     }
     for sample in &parameter_timeline.samples {
-        if let Some(index) = sample_step_index(&request.runtime_log.steps, sample.line) {
+        if let Some(index) = step_index.step_for_line(sample.line) {
             steps[index].parameters.push(sample.clone());
         }
     }
     for sample in &resolved_data_samples {
-        if sample.key.trim().starts_with('#') || mirrored_parameter_data_lines.contains(&sample.line) {
+        if sample.key.trim().starts_with('#')
+            || mirrored_parameter_data_lines.contains(&sample.line)
+        {
             continue;
         }
-        if let Some(index) = sample_step_index(&request.runtime_log.steps, sample.line) {
+        if let Some(index) = step_index.step_for_line(sample.line) {
             steps[index].variables.push(sample.clone());
         }
     }
@@ -521,5 +561,289 @@ pub(super) fn build_runtime_changes_timeline(
     RuntimeChangesTimelineDto {
         steps,
         data_samples: resolved_data_samples,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::runtime::types::{RuntimeDataSampleDto, RuntimeLogDto, RuntimeStepDto};
+
+    #[test]
+    fn step_intervals_match_linear_scan_for_zero_duplicates_and_unsorted_lines() {
+        for encoded in 0..625usize {
+            let mut encoded = encoded;
+            let steps = (0..4)
+                .map(|_| {
+                    let line = encoded % 5;
+                    encoded /= 5;
+                    RuntimeStepDto {
+                        line,
+                        ..Default::default()
+                    }
+                })
+                .collect::<Vec<_>>();
+            let index = StepLineIndex::new(&steps);
+            for line in [0, 1, 2, 3, 4, 5, usize::MAX] {
+                let mut previous_line = 0;
+                let expected = steps.iter().position(|step| {
+                    let contains = line > previous_line && line <= step.line;
+                    previous_line = step.line;
+                    contains
+                });
+                assert_eq!(
+                    index.step_for_line(line),
+                    expected,
+                    "steps={steps:?}, line={line}"
+                );
+            }
+        }
+        assert_eq!(StepLineIndex::new(&[]).step_for_line(1), None);
+    }
+
+    #[test]
+    fn changes_keep_exact_boundaries_sample_order_and_duplicates() {
+        let request = RuntimeReplayRequestDto {
+            runtime_log: RuntimeLogDto {
+                steps: [0, 10, 10, 20]
+                    .into_iter()
+                    .map(|line| RuntimeStepDto {
+                        line,
+                        timestamp: line.to_string(),
+                        ..Default::default()
+                    })
+                    .collect(),
+                data_samples: [0, 10, 10, 11, 20, 21]
+                    .into_iter()
+                    .map(|line| RuntimeDataSampleDto {
+                        line,
+                        key: "variable".into(),
+                        expr: line.to_string(),
+                        ..Default::default()
+                    })
+                    .collect(),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let slots = RuntimeSlotTimelineDto {
+            samples: [
+                (21, "write"),
+                (0, "read"),
+                (11, "write"),
+                (10, "read"),
+                (1, "other"),
+                (11, "write"),
+                (20, "read"),
+            ]
+            .into_iter()
+            .map(|(line, kind)| ResolvedRuntimeSlotSampleDto {
+                line,
+                kind: kind.into(),
+                ..Default::default()
+            })
+            .collect(),
+            ..Default::default()
+        };
+        let parameters = RuntimeParameterTimelineDto {
+            samples: [20, 10, 10, 21, 0]
+                .into_iter()
+                .map(|line| ResolvedRuntimeParameterSampleDto {
+                    line,
+                    key: "parameter".into(),
+                    ..Default::default()
+                })
+                .collect(),
+            ..Default::default()
+        };
+        let changes = build_runtime_changes_timeline(&request, &[], &slots, &parameters);
+        assert_eq!(
+            changes
+                .steps
+                .iter()
+                .map(|step| step.step_index)
+                .collect::<Vec<_>>(),
+            [0, 1, 2, 3]
+        );
+        assert_eq!(
+            changes
+                .steps
+                .iter()
+                .map(|step| step.timestamp.as_str())
+                .collect::<Vec<_>>(),
+            ["0", "10", "10", "20"]
+        );
+        for index in [0, 2] {
+            assert!(changes.steps[index].slot_accesses.is_empty());
+            assert!(changes.steps[index].parameters.is_empty());
+            assert!(changes.steps[index].variables.is_empty());
+        }
+        assert_eq!(
+            changes.steps[1]
+                .slot_accesses
+                .iter()
+                .map(|sample| sample.line)
+                .collect::<Vec<_>>(),
+            [10, 1]
+        );
+        assert_eq!(
+            changes.steps[1]
+                .slot_reads
+                .iter()
+                .map(|sample| sample.line)
+                .collect::<Vec<_>>(),
+            [10]
+        );
+        assert!(changes.steps[1].slot_writes.is_empty());
+        assert_eq!(
+            changes.steps[3]
+                .slot_accesses
+                .iter()
+                .map(|sample| sample.line)
+                .collect::<Vec<_>>(),
+            [11, 11, 20]
+        );
+        assert_eq!(
+            changes.steps[3]
+                .slot_writes
+                .iter()
+                .map(|sample| sample.line)
+                .collect::<Vec<_>>(),
+            [11, 11]
+        );
+        assert_eq!(
+            changes.steps[3]
+                .slot_reads
+                .iter()
+                .map(|sample| sample.line)
+                .collect::<Vec<_>>(),
+            [20]
+        );
+        assert_eq!(
+            changes.steps[1]
+                .parameters
+                .iter()
+                .map(|sample| sample.line)
+                .collect::<Vec<_>>(),
+            [10, 10]
+        );
+        assert_eq!(
+            changes.steps[3]
+                .parameters
+                .iter()
+                .map(|sample| sample.line)
+                .collect::<Vec<_>>(),
+            [20]
+        );
+        assert_eq!(
+            changes.steps[1]
+                .variables
+                .iter()
+                .map(|sample| sample.line)
+                .collect::<Vec<_>>(),
+            [10, 10]
+        );
+        assert_eq!(
+            changes.steps[3]
+                .variables
+                .iter()
+                .map(|sample| sample.line)
+                .collect::<Vec<_>>(),
+            [11, 20]
+        );
+        assert_eq!(
+            changes
+                .data_samples
+                .iter()
+                .map(|sample| sample.line)
+                .collect::<Vec<_>>(),
+            [0, 10, 10, 11, 20, 21]
+        );
+        assert!(changes.data_samples.iter().all(|sample| sample.evaluated));
+        assert_eq!(
+            changes.data_samples[2].previous_value,
+            Some(RuntimeValueDto::Number(10.0))
+        );
+    }
+
+    #[test]
+    fn mirrored_variables_keep_trimmed_keys_two_line_window_and_line_wide_suppression() {
+        let data = |line, state: &str, key: &str, name: &str| RuntimeDataSampleDto {
+            line,
+            state: state.into(),
+            key: key.into(),
+            timestamp: name.into(),
+            expr: "1".into(),
+            ..Default::default()
+        };
+        let request = RuntimeReplayRequestDto {
+            runtime_log: RuntimeLogDto {
+                steps: vec![RuntimeStepDto {
+                    line: usize::MAX,
+                    ..Default::default()
+                }],
+                data_samples: vec![
+                    data(13, "S", "counter", "after-window"),
+                    data(8, "S", "counter", "lower-bound"),
+                    data(8, "Other", "unrelated", "same-line-other-state"),
+                    data(12, " S ", " counter ", "upper-bound"),
+                    data(12, "S", "unrelated", "same-line-other-key"),
+                    data(7, "S", "counter", "before-window"),
+                    data(10, "S", "counter", "exact"),
+                    data(14, "s", "Counter", "case-sensitive"),
+                    data(2, "S", "low", "low-bound"),
+                    data(3, "S", "low", "outside-low"),
+                    data(5, "S", " #internal ", "internal"),
+                    data(usize::MAX - 2, "S", "high", "high-bound"),
+                    data(usize::MAX - 3, "S", "high", "outside-high"),
+                    data(usize::MAX, "S", "high", "high-exact"),
+                ],
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let parameters = RuntimeParameterTimelineDto {
+            samples: [
+                (10, " counter "),
+                (usize::MAX, "high"),
+                (0, "low"),
+                (10, "counter"),
+            ]
+            .into_iter()
+            .map(|(line, key)| ResolvedRuntimeParameterSampleDto {
+                line,
+                state: " S ".into(),
+                key: key.into(),
+                ..Default::default()
+            })
+            .collect(),
+            ..Default::default()
+        };
+        let changes = build_runtime_changes_timeline(
+            &request,
+            &[],
+            &RuntimeSlotTimelineDto::default(),
+            &parameters,
+        );
+        assert_eq!(
+            changes.steps[0]
+                .variables
+                .iter()
+                .map(|sample| sample.timestamp.as_str())
+                .collect::<Vec<_>>(),
+            [
+                "outside-low",
+                "before-window",
+                "after-window",
+                "case-sensitive",
+                "outside-high"
+            ]
+        );
+        assert_eq!(changes.steps[0].parameters.len(), 3);
+        assert_eq!(
+            changes.data_samples.len(),
+            request.runtime_log.data_samples.len()
+        );
+        assert!(changes.data_samples.iter().all(|sample| sample.evaluated));
     }
 }

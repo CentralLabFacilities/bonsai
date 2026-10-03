@@ -17,45 +17,12 @@ import {
     normalizeTypedValue,
 } from "../utils/valueTypes";
 import { validateAssignmentExpression } from "../utils/assignmentExpressions";
-
-const getVariableReferenceContext = (value, caretPosition) => {
-    const text = String(value || "");
-    const caret = Number.isInteger(caretPosition)
-        ? caretPosition
-        : text.length;
-    const beforeCaret = text.slice(0, caret);
-    const match = beforeCaret.match(/@([A-Za-z0-9_:#.\-]*)$/);
-
-    if (!match) return null;
-
-    return {
-        start: match.index,
-        end: caret,
-        query: match[1] || "",
-    };
-};
-
-const getMatchingExpressionVariables = (value, caretPosition, variables) => {
-    const context = getVariableReferenceContext(value, caretPosition);
-    if (!context) return { context: null, matches: [] };
-
-    const query = context.query.toLowerCase();
-    const options = (Array.isArray(variables) ? variables : [])
-        .filter((variable) => variable?.id)
-        .filter((variable) =>
-            String(variable.id).toLowerCase().includes(query)
-        )
-        .sort((a, b) => {
-            const aId = String(a.id).toLowerCase();
-            const bId = String(b.id).toLowerCase();
-            const aStarts = aId.startsWith(query) ? 0 : 1;
-            const bStarts = bId.startsWith(query) ? 0 : 1;
-            return aStarts - bStarts || aId.localeCompare(bId);
-        })
-        .slice(0, 8);
-
-    return { context, matches: options };
-};
+import ExpressionVariableSuggestions from "./ExpressionVariableSuggestions.jsx";
+import {
+    getExpressionAutocompleteAction,
+    getMatchingExpressionVariables,
+    insertExpressionVariable,
+} from "./expressionAutocomplete.js";
 
 const CONDITION_PATTERN = /^([^\s]+)\s*(==|!=|>=|<=|>|<)\s*(.+)$/;
 
@@ -233,6 +200,8 @@ function ConditionModal({
             hydrateTransition(transition, index, usableVars, sourceEventName)
         );
 
+        // Reopening or replacing the transition candidates starts a fresh modal draft.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setTransitionsState(hydrated);
         setErrorMessage("");
         setAssignmentExpressionErrors({});
@@ -321,22 +290,27 @@ function ConditionModal({
 
     const conditionVariableType = getVariableType(selectedConditionVariable);
     const conditionIsBoolean = conditionVariableType === VALUE_TYPES.BOOLEAN;
+    const hasSelectedTransition = Boolean(selectedTransition);
+    const selectedTransitionTarget = selectedTransition?.target;
+    const selectedAvailableTargetIds = selectedTransition?.availableTargetIds;
 
     useEffect(() => {
-        if (!selectedTransition) {
+        if (!hasSelectedTransition) {
+            // Clear the target draft when there is no selected transition.
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setTargetQuery("");
             return;
         }
 
         setTargetQuery(
-            getTargetDisplayName(selectedTransition.target, availableTargets)
+            getTargetDisplayName(selectedTransitionTarget, availableTargets)
         );
         setTargetAutocompleteOpen(false);
         setActiveTargetSuggestionIndex(-1);
         setOpenAssignmentExpressionId(null);
         setActiveAssignmentExpressionSuggestionIndex(-1);
         setAssignmentExpressionErrors({});
-    }, [selectedTransitionId, selectedTransition?.target, availableTargets]);
+    }, [selectedTransitionId, hasSelectedTransition, selectedTransitionTarget, availableTargets]);
 
     useEffect(() => {
         if (!selectedTransition || !conditionIsBoolean) return;
@@ -344,6 +318,8 @@ function ConditionModal({
             selectedTransition.conditionOperator !== "==" &&
             selectedTransition.conditionOperator !== "!="
         ) {
+            // A variable type change can invalidate an existing comparison operator.
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setTransitionsState((current) =>
                 current.map((transition) =>
                     transition.transitionId === selectedTransitionId
@@ -358,14 +334,16 @@ function ConditionModal({
         selectedTransitionId,
     ]);
 
+    // Reordering copies the transition array; the allowed-target IDs are never mutated.
+    // eslint-disable-next-line react-hooks/preserve-manual-memoization
     const matchingTargets = useMemo(() => {
         const query = String(targetQuery || "").trim().toLowerCase();
         if (!query) return [];
 
         const allowedTargetIds =
             targetOnlyMode &&
-            Array.isArray(selectedTransition?.availableTargetIds)
-                ? new Set(selectedTransition.availableTargetIds)
+            Array.isArray(selectedAvailableTargetIds)
+                ? new Set(selectedAvailableTargetIds)
                 : null;
 
         return (availableTargets || [])
@@ -396,11 +374,15 @@ function ConditionModal({
         targetQuery,
         availableTargets,
         targetOnlyMode,
-        selectedTransition?.availableTargetIds,
+        // Unrelated assignment edits must not invalidate this existing target-options memo.
+        // eslint-disable-next-line react-hooks/preserve-manual-memoization
+        selectedAvailableTargetIds,
     ]);
 
     useEffect(() => {
         if (activeTargetSuggestionIndex >= matchingTargets.length) {
+            // Keep keyboard selection valid when externally supplied target options change.
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setActiveTargetSuggestionIndex(matchingTargets.length > 0 ? 0 : -1);
         }
     }, [matchingTargets, activeTargetSuggestionIndex]);
@@ -527,22 +509,15 @@ function ConditionModal({
         if (!assignment?.assignmentId || !variable?.id) return;
 
         const value = String(assignment.expr || "");
-        const { context } = getMatchingExpressionVariables(
+        const insertion = insertExpressionVariable(
             value,
             assignmentExpressionCaretPosition,
-            editorVariables
+            variable.id
         );
 
-        if (!context) return;
+        if (!insertion) return;
 
-        const replacement = `@${variable.id}`;
-        const nextValue =
-            value.slice(0, context.start) +
-            replacement +
-            value.slice(context.end);
-        const nextCaret = context.start + replacement.length;
-
-        updateAssignment(assignment.assignmentId, { expr: nextValue });
+        updateAssignment(assignment.assignmentId, { expr: insertion.value });
         setOpenAssignmentExpressionId(null);
         setActiveAssignmentExpressionSuggestionIndex(-1);
 
@@ -551,8 +526,8 @@ function ConditionModal({
                 assignment.assignmentId
                 ];
             input?.focus();
-            input?.setSelectionRange?.(nextCaret, nextCaret);
-            setAssignmentExpressionCaretPosition(nextCaret);
+            input?.setSelectionRange?.(insertion.caretPosition, insertion.caretPosition);
+            setAssignmentExpressionCaretPosition(insertion.caretPosition);
         });
     };
 
@@ -565,40 +540,26 @@ function ConditionModal({
             openAssignmentExpressionId === assignment.assignmentId &&
             matchingVariables.length > 0;
 
-        if (autocompleteOpen && event.key === "ArrowDown") {
-            event.preventDefault();
-            setActiveAssignmentExpressionSuggestionIndex((current) =>
-                current < matchingVariables.length - 1 ? current + 1 : 0
-            );
-            return;
-        }
+        const action = getExpressionAutocompleteAction(
+            event.key,
+            autocompleteOpen,
+            matchingVariables.length,
+            activeAssignmentExpressionSuggestionIndex
+        );
 
-        if (autocompleteOpen && event.key === "ArrowUp") {
+        if (action) {
             event.preventDefault();
-            setActiveAssignmentExpressionSuggestionIndex((current) =>
-                current > 0 ? current - 1 : matchingVariables.length - 1
-            );
-            return;
-        }
-
-        if (autocompleteOpen && (event.key === "Enter" || event.key === "Tab")) {
-            event.preventDefault();
-            const suggestionIndex =
-                activeAssignmentExpressionSuggestionIndex >= 0 &&
-                activeAssignmentExpressionSuggestionIndex < matchingVariables.length
-                    ? activeAssignmentExpressionSuggestionIndex
-                    : 0;
-            selectAssignmentExpressionSuggestion(
-                assignment,
-                matchingVariables[suggestionIndex]
-            );
-            return;
-        }
-
-        if (autocompleteOpen && event.key === "Escape") {
-            event.preventDefault();
-            setOpenAssignmentExpressionId(null);
-            setActiveAssignmentExpressionSuggestionIndex(-1);
+            if (action.type === "navigate") {
+                const key = event.key;
+                setActiveAssignmentExpressionSuggestionIndex((current) =>
+                    getExpressionAutocompleteAction(key, true, matchingVariables.length, current).index
+                );
+            } else if (action.type === "select") {
+                selectAssignmentExpressionSuggestion(assignment, matchingVariables[action.index]);
+            } else {
+                setOpenAssignmentExpressionId(null);
+                setActiveAssignmentExpressionSuggestionIndex(-1);
+            }
             return;
         }
 
@@ -1144,7 +1105,7 @@ function ConditionModal({
                         className={`step-card ${
                             targetOnlyMode ? "transition-step-locked" : ""
                         }`}
-                        inert={targetOnlyMode ? "" : undefined}
+                        inert={targetOnlyMode}
                     >
                         <div className="step-card-header">
                             <span className="step-number">2</span>
@@ -1362,7 +1323,7 @@ function ConditionModal({
                         className={`step-card ${
                             targetOnlyMode ? "transition-step-locked" : ""
                         }`}
-                        inert={targetOnlyMode ? "" : undefined}
+                        inert={targetOnlyMode}
                     >
                         <div className="step-card-header transition-assignment-header">
                             <span className="step-number">3</span>
@@ -1405,16 +1366,14 @@ function ConditionModal({
                                                         );
                                                     const assignmentVariableType =
                                                         getVariableType(assignmentVariable);
-                                                    const assignmentExpressionMatch =
-                                                        getMatchingExpressionVariables(
-                                                            assignment.expr || "",
-                                                            assignmentExpressionCaretPosition,
-                                                            editorVariables
-                                                        );
                                                     const matchingAssignmentExpressionVariables =
                                                         openAssignmentExpressionId ===
                                                         assignment.assignmentId
-                                                            ? assignmentExpressionMatch.matches
+                                                            ? getMatchingExpressionVariables(
+                                                                assignment.expr || "",
+                                                                assignmentExpressionCaretPosition,
+                                                                editorVariables
+                                                            ).matches
                                                             : [];
                                                     const isAssignmentExpressionAutocompleteOpen =
                                                         openAssignmentExpressionId ===
@@ -1548,45 +1507,12 @@ function ConditionModal({
                                                                 />
 
                                                                 {isAssignmentExpressionAutocompleteOpen && (
-                                                                    <div
-                                                                        className="typed-value-autocomplete"
-                                                                        role="listbox"
-                                                                    >
-                                                                        {matchingAssignmentExpressionVariables.map(
-                                                                            (variable, suggestionIndex) => (
-                                                                                <button
-                                                                                    type="button"
-                                                                                    className={`typed-value-autocomplete-option ${
-                                                                                        suggestionIndex ===
-                                                                                        activeAssignmentExpressionSuggestionIndex
-                                                                                            ? "active"
-                                                                                            : ""
-                                                                                    }`}
-                                                                                    key={variable.id}
-                                                                                    onMouseDown={(event) => {
-                                                                                        event.preventDefault();
-                                                                                        selectAssignmentExpressionSuggestion(
-                                                                                            assignment,
-                                                                                            variable
-                                                                                        );
-                                                                                    }}
-                                                                                >
-                                                                                    <span className="typed-value-autocomplete-value">
-                                                                                        @{variable.id}
-                                                                                    </span>
-                                                                                    {getVariableType(variable) && (
-                                                                                        <span
-                                                                                            className={`datamodel-value-type-badge datamodel-value-type-${getVariableType(
-                                                                                                variable
-                                                                                            ).toLowerCase()}`}
-                                                                                        >
-                                                                                            {getVariableType(variable)}
-                                                                                        </span>
-                                                                                    )}
-                                                                                </button>
-                                                                            )
-                                                                        )}
-                                                                    </div>
+                                                                    <ExpressionVariableSuggestions
+                                                                        variables={matchingAssignmentExpressionVariables}
+                                                                        activeIndex={activeAssignmentExpressionSuggestionIndex}
+                                                                        onSelect={(variable) => selectAssignmentExpressionSuggestion(assignment, variable)}
+                                                                        showTypes
+                                                                    />
                                                                 )}
                                                             </div>
 

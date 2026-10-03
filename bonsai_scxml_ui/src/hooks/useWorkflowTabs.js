@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 const createInitialTab = () => ({
     id: "tab-1",
@@ -48,17 +48,15 @@ export function useWorkflowTabs({
 }) {
     const [tabs, setTabsState] = useState([createInitialTab()]);
     const tabsRef = useRef(tabs);
-    tabsRef.current = tabs;
 
     const setTabs = useCallback((nextTabsOrUpdater) => {
-        setTabsState((currentTabs) => {
-            const nextTabs =
-                typeof nextTabsOrUpdater === "function"
-                    ? nextTabsOrUpdater(currentTabs)
-                    : nextTabsOrUpdater;
-            tabsRef.current = nextTabs;
-            return nextTabs;
-        });
+        // Tab operations can be batched before a commit. Advance their event
+        // snapshot here, not inside a React updater that may be replayed.
+        const nextTabs = typeof nextTabsOrUpdater === "function"
+            ? nextTabsOrUpdater(tabsRef.current)
+            : nextTabsOrUpdater;
+        tabsRef.current = nextTabs;
+        setTabsState(nextTabs);
     }, []);
 
     const [activeTabId, setActiveTabId] = useState("tab-1");
@@ -66,6 +64,24 @@ export function useWorkflowTabs({
     const [draggedTabId, setDraggedTabId] = useState(null);
 
     const activeTab = tabs.find((tab) => tab.id === activeTabId) || null;
+
+    // Keep tab actions stable while nodes move. The active editor state is read
+    // from a ref so tab operations do not get recreated on every drag frame.
+    const activeEditorStateRef = useRef(null);
+    useLayoutEffect(() => {
+        activeEditorStateRef.current = {
+            activeTabId,
+            nodes,
+            edges,
+            slotNodes,
+            slotEdges,
+            manualSlots,
+            globalDataModel,
+            inheritedGlobalDataModel,
+            selectedNodeId,
+        };
+    }, [activeTabId, nodes, edges, slotNodes, slotEdges, manualSlots,
+        globalDataModel, inheritedGlobalDataModel, selectedNodeId]);
 
     // File/document controllers should update tab metadata through one stable
     // operation rather than reaching into setTabs themselves. The updater can
@@ -85,21 +101,6 @@ export function useWorkflowTabs({
             })
         );
     }, [setTabs]);
-
-    // Keep tab actions stable while nodes move. The active editor state is read
-    // from a ref so tab operations do not get recreated on every drag frame.
-    const activeEditorStateRef = useRef(null);
-    activeEditorStateRef.current = {
-        activeTabId,
-        nodes,
-        edges,
-        slotNodes,
-        slotEdges,
-        manualSlots,
-        globalDataModel,
-        inheritedGlobalDataModel,
-        selectedNodeId,
-    };
 
     const persistActiveTab = useCallback((currentTabs, currentTabPatch = null) => {
         const current = activeEditorStateRef.current;
@@ -330,7 +331,7 @@ export function useWorkflowTabs({
                 return reorderedTabs;
             });
         },
-        [draggedTabId]
+        [draggedTabId, setTabs]
     );
 
     const handleTabDragEnd = useCallback(() => setDraggedTabId(null), []);

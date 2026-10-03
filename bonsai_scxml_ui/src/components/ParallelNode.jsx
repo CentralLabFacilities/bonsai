@@ -124,7 +124,7 @@ export default function ParallelNode({ id, data, selected = false }) {
                 });
             });
         },
-        [id, setNodes]
+        [id, setNodes, defaultBottomReserve, defaultHeaderHeight]
     );
 
     return (

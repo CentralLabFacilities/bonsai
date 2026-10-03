@@ -13,7 +13,7 @@ const normalizeSkillApiParamValue = (value) => {
     }
 
     const inner = trimmed.slice(1, -1);
-    return inner.replace(/\\([\\'\"])/g, "$1");
+    return inner.replace(/\\([\\'"])/g, "$1");
 };
 
 const normalizeSkillApiParams = (params) => {
@@ -32,10 +32,12 @@ export function useSkillDefinitions({ pollIntervalMs = 10000 } = {}) {
     const [skillLibraryRefreshVersion, setSkillLibraryRefreshVersion] = useState(0);
     const skillLibrarySignatureRef = useRef("");
     const skillDataCacheRef = useRef(new Map());
+    const skillLibraryRequestRef = useRef(0);
+    const skillDataGenerationRef = useRef(0);
+    const manualReloadCountRef = useRef(0);
 
-    const fetchSkills = useCallback(async ({ manual = false } = {}) => {
-        if (manual) setIsReloadingSkills(true);
-
+    const loadSkills = useCallback(async () => {
+        const requestId = ++skillLibraryRequestRef.current;
         try {
             const response = await fetch("/api/skills", { cache: "no-store" });
             if (!response.ok) {
@@ -43,6 +45,7 @@ export function useSkillDefinitions({ pollIntervalMs = 10000 } = {}) {
             }
 
             const data = await response.json();
+            if (requestId !== skillLibraryRequestRef.current) return false;
             const normalizedSkills = Array.isArray(data?.skills)
                 ? [...data.skills].sort()
                 : [];
@@ -52,6 +55,7 @@ export function useSkillDefinitions({ pollIntervalMs = 10000 } = {}) {
             // An individual skill definition may change without changing the
             // library's list of names. Refreshing the library therefore also
             // invalidates parameterized/base definition cache entries.
+            skillDataGenerationRef.current += 1;
             skillDataCacheRef.current.clear();
 
             if (changed) {
@@ -64,38 +68,50 @@ export function useSkillDefinitions({ pollIntervalMs = 10000 } = {}) {
         } catch (error) {
             console.error("Error loading skills:", error);
             return false;
-        } finally {
-            if (manual) setIsReloadingSkills(false);
         }
     }, []);
 
+    const fetchSkills = useCallback(async ({ manual = false } = {}) => {
+        if (!manual) return loadSkills();
+
+        manualReloadCountRef.current += 1;
+        setIsReloadingSkills(true);
+        try {
+            return await loadSkills();
+        } finally {
+            manualReloadCountRef.current -= 1;
+            if (manualReloadCountRef.current === 0) setIsReloadingSkills(false);
+        }
+    }, [loadSkills]);
+
     useEffect(() => {
-        fetchSkills();
+        void loadSkills();
 
         const intervalId = window.setInterval(() => {
             if (document.visibilityState === "visible") {
-                fetchSkills();
+                void loadSkills();
             }
         }, pollIntervalMs);
 
         const handleVisibilityChange = () => {
             if (document.visibilityState === "visible") {
-                fetchSkills();
+                void loadSkills();
             }
         };
-        const handleWindowFocus = () => fetchSkills();
+        const handleWindowFocus = () => void loadSkills();
 
         document.addEventListener("visibilitychange", handleVisibilityChange);
         window.addEventListener("focus", handleWindowFocus);
 
         return () => {
             window.clearInterval(intervalId);
+            skillLibraryRequestRef.current += 1;
             document.removeEventListener("visibilitychange", handleVisibilityChange);
             window.removeEventListener("focus", handleWindowFocus);
         };
-    }, [fetchSkills, pollIntervalMs]);
+    }, [loadSkills, pollIntervalMs]);
 
-    const fetchSkillData = useCallback(async (fullSkillName, params = null) => {
+    const fetchSkillData = useCallback(async function fetchDefinition(fullSkillName, params = null) {
         const apiParams = normalizeSkillApiParams(params);
         const hasParams = Object.keys(apiParams).length > 0;
         const normalizedParamEntries = Object.entries(apiParams).sort(
@@ -107,64 +123,54 @@ export function useSkillDefinitions({ pollIntervalMs = 10000 } = {}) {
             return skillDataCacheRef.current.get(cacheKey);
         }
 
-        try {
-            const response = await fetch(`/api/skill/${fullSkillName}`, {
-                ...(hasParams
-                    ? {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ params: apiParams }),
-                    }
-                    : { cache: "no-store" }),
-            });
-
-            if (response.ok) {
-                const data = await response.json();
+        const generation = skillDataGenerationRef.current;
+        const cacheData = (data) => {
+            // A library refresh invalidates both resolved and pending entries.
+            // Old replies may satisfy their callers, but cannot refill the cache.
+            if (data && generation === skillDataGenerationRef.current) {
                 skillDataCacheRef.current.set(cacheKey, data);
-                return data;
+            }
+            return data;
+        };
+        const request = (async () => {
+            try {
+                const response = await fetch(`/api/skill/${fullSkillName}`, {
+                    ...(hasParams
+                        ? {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ params: apiParams }),
+                        }
+                        : { cache: "no-store" }),
+                });
+
+                if (response.ok) return cacheData(await response.json());
+                if (!hasParams) throw new Error(`Server returned ${response.status}`);
+                console.warn(
+                    `Parameterized skill configuration failed for ${fullSkillName} (${response.status}); falling back to the base skill definition.`
+                );
+            } catch (error) {
+                if (!hasParams) {
+                    console.error(`Error loading skill ${fullSkillName}:`, error);
+                    return null;
+                }
+                console.warn(
+                    `Parameterized skill configuration failed for ${fullSkillName}; falling back to the base skill definition.`,
+                    error
+                );
             }
 
-            if (!hasParams) {
-                throw new Error(`Server returned ${response.status}`);
-            }
-
-            console.warn(
-                `Parameterized skill configuration failed for ${fullSkillName} (${response.status}); falling back to the base skill definition.`
-            );
-        } catch (error) {
-            if (!hasParams) {
-                console.error(`Error loading skill ${fullSkillName}:`, error);
-                return null;
-            }
-
-            console.warn(
-                `Parameterized skill configuration failed for ${fullSkillName}; falling back to the base skill definition.`,
-                error
-            );
-        }
-
-        const baseCacheKey = `${fullSkillName}\u0001[]`;
-        if (skillDataCacheRef.current.has(baseCacheKey)) {
-            const fallbackData = skillDataCacheRef.current.get(baseCacheKey);
-            skillDataCacheRef.current.set(cacheKey, fallbackData);
-            return fallbackData;
-        }
-
+            return cacheData(await fetchDefinition(fullSkillName));
+        })();
+        // Store the promise before another same-key request can start. The
+        // successful response replaces it with data; failed requests are retryable.
+        skillDataCacheRef.current.set(cacheKey, request);
         try {
-            const fallbackResponse = await fetch(`/api/skill/${fullSkillName}`, {
-                cache: "no-store",
-            });
-            if (!fallbackResponse.ok) {
-                throw new Error(`Server returned ${fallbackResponse.status}`);
+            return await request;
+        } finally {
+            if (skillDataCacheRef.current.get(cacheKey) === request) {
+                skillDataCacheRef.current.delete(cacheKey);
             }
-
-            const fallbackData = await fallbackResponse.json();
-            skillDataCacheRef.current.set(baseCacheKey, fallbackData);
-            skillDataCacheRef.current.set(cacheKey, fallbackData);
-            return fallbackData;
-        } catch (fallbackError) {
-            console.error(`Error loading skill ${fullSkillName}:`, fallbackError);
-            return null;
         }
     }, []);
 

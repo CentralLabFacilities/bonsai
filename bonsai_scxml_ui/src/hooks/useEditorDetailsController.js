@@ -1,12 +1,52 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef } from "react";
 import {
     COLLAPSED_CONTAINER_HEIGHT,
     COLLAPSED_CONTAINER_WIDTH,
     getAbsoluteNodePosition,
     layoutStateContainerForExpansion,
-} from "../utils/editorGeometry";
-import { getLocalDataModelEntries } from "../utils/editorScxml";
-import { isEditorCloneNode } from "../utils/editorClones";
+} from "../utils/editorGeometry.js";
+import { getLocalDataModelEntries } from "../utils/editorScxml.js";
+import { isEditorCloneNode } from "../utils/editorClones.js";
+
+// The inspector has a fixed event API. Stable forwarders retain drag-time memo
+// gating while publishing the current selected-node handlers after each commit.
+export function useEditorDetailsCallbacks(callbacks) {
+    const latest = useRef(callbacks);
+    useLayoutEffect(() => {
+        latest.current = callbacks;
+    });
+    return useMemo(() => ({
+        onNavigateCloneSource: (...args) => latest.current.onNavigateCloneSource?.(...args),
+        onNavigateClone: (...args) => latest.current.onNavigateClone?.(...args),
+        onMoveContainerTransition: (...args) => latest.current.onMoveContainerTransition?.(...args),
+        onNavigateTransitionNode: (...args) => latest.current.onNavigateTransitionNode?.(...args),
+        onHoverTransitionNode: (...args) => latest.current.onHoverTransitionNode?.(...args),
+        onOpenTransitionPanel: (...args) => latest.current.onOpenTransitionPanel?.(...args),
+        onAddParallelLane: (...args) => latest.current.onAddParallelLane?.(...args),
+        onRenameParallelLane: (...args) => latest.current.onRenameParallelLane?.(...args),
+        onMoveParallelLane: (...args) => latest.current.onMoveParallelLane?.(...args),
+        onDeleteParallelLane: (...args) => latest.current.onDeleteParallelLane?.(...args),
+        onSetInitial: (...args) => latest.current.onSetInitial?.(...args),
+        onUpdateName: (...args) => latest.current.onUpdateName?.(...args),
+        onUpdateNameCommit: (...args) => latest.current.onUpdateNameCommit?.(...args),
+        onUpdateSrc: (...args) => latest.current.onUpdateSrc?.(...args),
+        onUpdateEvent: (...args) => latest.current.onUpdateEvent?.(...args),
+        onSetEventTarget: (...args) => latest.current.onSetEventTarget?.(...args),
+        onUpdateParameter: (...args) => latest.current.onUpdateParameter?.(...args),
+        onUpdateParameterBlur: (...args) => latest.current.onUpdateParameterBlur?.(...args),
+        onUpdateStateActions: (...args) => latest.current.onUpdateStateActions?.(...args),
+        onUpdateSendEvents: (...args) => latest.current.onUpdateSendEvents?.(...args),
+        onUpdateInSlotPath: (...args) => latest.current.onUpdateInSlotPath?.(...args),
+        onUpdateOutSlotPath: (...args) => latest.current.onUpdateOutSlotPath?.(...args),
+        onCheckSlots: (...args) => latest.current.onCheckSlots?.(...args),
+        onUpdateSlotPath: (...args) => latest.current.onUpdateSlotPath?.(...args),
+        onUpdateSlotInherited: (...args) => latest.current.onUpdateSlotInherited?.(...args),
+        onHoverSlotAccessSkill: (...args) => latest.current.onHoverSlotAccessSkill?.(...args),
+        onSelectSlotAccessSkill: (...args) => latest.current.onSelectSlotAccessSkill?.(...args),
+        onNavigateDescendantSlotSkill: (...args) => latest.current.onNavigateDescendantSlotSkill?.(...args),
+        onNavigateAncestorSlot: (...args) => latest.current.onNavigateAncestorSlot?.(...args),
+    }), []);
+}
 
 const nextEditorFrame = () =>
     new Promise((resolve) => {

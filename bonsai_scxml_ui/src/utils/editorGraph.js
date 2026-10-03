@@ -1,12 +1,12 @@
-
-
 export const createEditorNodeIndex = (nodes = []) => {
     const nodeList = Array.isArray(nodes) ? nodes : [];
     const byId = new Map();
     const childrenByParent = new Map();
+    let hasDuplicateIds = false;
 
     nodeList.forEach((node) => {
         if (!node?.id) return;
+        if (byId.has(node.id)) hasDuplicateIds = true;
         byId.set(node.id, node);
 
         if (node.parentId) {
@@ -19,6 +19,7 @@ export const createEditorNodeIndex = (nodes = []) => {
 
     const ancestorIdsByNode = new Map();
     const absolutePositionByNode = new Map();
+    const nestingDepthByNode = new Map();
 
     const resolveNode = (nodeOrId) =>
         typeof nodeOrId === "string" ? byId.get(nodeOrId) : nodeOrId;
@@ -67,6 +68,27 @@ export const createEditorNodeIndex = (nodes = []) => {
         return null;
     };
 
+    const getNestingDepth = (nodeOrId) => {
+        const node = resolveNode(nodeOrId);
+        if (!node) return 0;
+        if (nestingDepthByNode.has(node)) return nestingDepthByNode.get(node);
+
+        let depth = 0;
+        let parentId = node.parentId;
+        const visited = new Set();
+
+        while (parentId && !visited.has(parentId)) {
+            visited.add(parentId);
+            const parent = byId.get(parentId);
+            if (!parent) break;
+            depth += 1;
+            parentId = parent.parentId;
+        }
+
+        nestingDepthByNode.set(node, depth);
+        return depth;
+    };
+
     const getAbsolutePosition = (nodeOrId) => {
         const node = resolveNode(nodeOrId);
         if (!node?.id) return { x: 0, y: 0 };
@@ -96,9 +118,11 @@ export const createEditorNodeIndex = (nodes = []) => {
     return {
         nodes: nodeList,
         byId,
+        hasDuplicateIds,
         getChildren,
         getAncestorIds,
         findAncestor,
+        getNestingDepth,
         getAbsolutePosition,
     };
 };

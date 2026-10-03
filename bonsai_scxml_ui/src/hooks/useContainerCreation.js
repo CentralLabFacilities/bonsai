@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
     COMPOUND_PADDING_X,
     COMPOUND_HEADER_HEIGHT,
@@ -218,14 +218,11 @@ export function useContainerCreation({
     syncWrappedContainerAfterCommit,
     syncEditorStateAfterCommit,
 }) {
-    const selectedNodesCacheRef = useRef([]);
-    const selectionNodesDependency = isDraggingNode ? null : nodes;
+    const [selectedNodesSnapshot, setSelectedNodesSnapshot] = useState([]);
     const selectedNodes = useMemo(() => {
-        if (!selectionNodesDependency) {
-            return selectedNodesCacheRef.current;
-        }
+        if (isDraggingNode) return selectedNodesSnapshot;
 
-        const candidates = selectionNodesDependency.filter(
+        const candidates = nodes.filter(
             (node) =>
                 node.selected &&
                 node.type !== "parallelLane" &&
@@ -242,9 +239,15 @@ export function useContainerCreation({
             groups.get(key).push(node);
         });
         const next = [...groups.values()].sort((a, b) => b.length - a.length)[0] || [];
-        selectedNodesCacheRef.current = next;
+        if (
+            next.length === selectedNodesSnapshot.length &&
+            next.every((node, index) => node === selectedNodesSnapshot[index])
+        ) {
+            return selectedNodesSnapshot;
+        }
         return next;
-    }, [selectionNodesDependency]);
+    }, [nodes, isDraggingNode, selectedNodesSnapshot]);
+    if (selectedNodes !== selectedNodesSnapshot) setSelectedNodesSnapshot(selectedNodes);
 
     const handleAddLaneToParallel = useCallback((parallelId) => {
         const newLaneId = getNodeId();

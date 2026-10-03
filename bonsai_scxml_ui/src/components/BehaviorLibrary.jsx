@@ -14,6 +14,7 @@ import {
     listBehaviorDirectory,
     selectDirectory,
 } from "../tauri-client.js";
+import { areBehaviorLibraryPropsEqual } from "./canvasLibraryProps.js";
 
 const normalizeKey = (value) =>
     String(value || "")
@@ -148,49 +149,69 @@ function BehaviorRoot({
     onOpenBehavior,
     searchText,
 }) {
-    const [entries, setEntries] = useState([]);
+    const source = useMemo(
+        () => ({ key: directory.key, path: directory.path }),
+        [directory.key, directory.path]
+    );
+    const [listing, setListing] = useState(() => ({
+        source,
+        revision: 0,
+        entries: [],
+        loading: Boolean(source.path),
+        error: source.path ? "" : "No directory selected.",
+    }));
     const [expanded, setExpanded] = useState(new Set());
     const [rootExpanded, setRootExpanded] = useState(true);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState("");
 
-    const loadEntries = async () => {
-        if (!directory.path) {
-            setEntries([]);
-            setError("No directory selected.");
-            return;
-        }
+    if (listing.source !== source) {
+        setListing({
+            source,
+            revision: 0,
+            entries: [],
+            loading: Boolean(source.path),
+            error: source.path ? "" : "No directory selected.",
+        });
+    }
 
-        setLoading(true);
-        setError("");
-
-        try {
-            const result = await listBehaviorDirectory(
-                directory.key,
-                directory.path
-            );
-            setEntries(result || []);
-        } catch (loadError) {
-            console.error(
-                `Could not load ${directory.key}:`,
-                loadError
-            );
-            setEntries([]);
-            setError(
-                loadError?.message ||
-                    String(loadError) ||
-                    "Could not read directory."
-            );
-        } finally {
-            setLoading(false);
-        }
+    const loadEntries = () => {
+        setListing((current) => ({
+            ...current,
+            revision: current.revision + 1,
+            loading: Boolean(source.path),
+            error: source.path ? "" : "No directory selected.",
+        }));
     };
 
+    const { entries, loading, error, revision } = listing;
+
     useEffect(() => {
-        loadEntries();
-        // Reload whenever the key or path changes.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [directory.key, directory.path]);
+        if (!source.path) return undefined;
+        let cancelled = false;
+
+        const readDirectory = async () => {
+            let nextEntries = [];
+            let nextError = "";
+            try {
+                nextEntries = await listBehaviorDirectory(source.key, source.path) || [];
+            } catch (loadError) {
+                if (cancelled) return;
+                console.error(`Could not load ${source.key}:`, loadError);
+                nextError = loadError?.message || String(loadError) || "Could not read directory.";
+            }
+
+            if (!cancelled) {
+                setListing((current) => {
+                    if (current.source !== source || current.revision !== revision) return current;
+                    return { ...current, entries: nextEntries, error: nextError, loading: false };
+                });
+            }
+        };
+
+        void readDirectory();
+        return () => {
+            cancelled = true;
+        };
+    }, [source, revision]);
 
     const visibleEntries = useMemo(
         () => filterEntries(entries, searchText),
@@ -529,7 +550,4 @@ function BehaviorLibrary({
     );
 }
 
-export default memo(BehaviorLibrary, (previous, next) =>
-    previous.directories === next.directories &&
-    previous.activeLibraryTab === next.activeLibraryTab
-);
+export default memo(BehaviorLibrary, areBehaviorLibraryPropsEqual);

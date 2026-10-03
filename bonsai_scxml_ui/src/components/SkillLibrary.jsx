@@ -1,4 +1,4 @@
-import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
     FiSearch,
@@ -11,11 +11,12 @@ import {
 import { MdAssistantNavigation } from "react-icons/md";
 import { FaHandPaper } from "react-icons/fa";
 import { GoPackage } from "react-icons/go";
+import { areSkillLibraryPropsEqual } from "./canvasLibraryProps.js";
 
 
 const SkillDescriptionTooltip = React.memo(
     forwardRef(function SkillDescriptionTooltip(
-        { fetchSkillData, refreshVersion },
+        { fetchSkillData },
         ref
     ) {
         const [tooltip, setTooltip] = useState(null);
@@ -23,14 +24,13 @@ const SkillDescriptionTooltip = React.memo(
         const pendingRequestsRef = useRef(new Map());
         const generationRef = useRef(0);
 
-        useEffect(() => {
+        useEffect(() => () => {
             generationRef.current += 1;
             descriptionCacheRef.current.clear();
             pendingRequestsRef.current.clear();
-            setTooltip(null);
-        }, [refreshVersion]);
+        }, []);
 
-        const requestDescription = (skill) => {
+        const requestDescription = useCallback((skill) => {
             if (descriptionCacheRef.current.has(skill)) {
                 return Promise.resolve(descriptionCacheRef.current.get(skill));
             }
@@ -82,7 +82,7 @@ const SkillDescriptionTooltip = React.memo(
 
             pendingRequestsRef.current.set(skill, request);
             return request;
-        };
+        }, [fetchSkillData]);
 
         useImperativeHandle(
             ref,
@@ -130,7 +130,7 @@ const SkillDescriptionTooltip = React.memo(
                     });
                 },
             }),
-            [fetchSkillData]
+            [requestDescription]
         );
 
         if (!tooltip) return null;
@@ -604,33 +604,12 @@ function SkillLibrary({
             </aside>
 
             <SkillDescriptionTooltip
+                key={refreshVersion}
                 ref={skillTooltipRef}
                 fetchSkillData={fetchSkillData}
-                refreshVersion={refreshVersion}
             />
         </>
     );
 }
-
-const areSkillLibraryPropsEqual = (previous, next) => {
-    const stableDataProps = [
-        "searchText",
-        "activeFilter",
-        "packages",
-        "selectedPackage",
-        "searchedSkills",
-        "packageSkills",
-        "filteredSkills",
-        "subPackages",
-        "selectedSubPackage",
-        "directSkills",
-        "activeLibraryTab",
-        "isReloadingSkills",
-        "refreshVersion",
-        "fetchSkillData",
-    ];
-
-    return stableDataProps.every((key) => previous[key] === next[key]);
-};
 
 export default React.memo(SkillLibrary, areSkillLibraryPropsEqual);

@@ -79,7 +79,7 @@ export function normalizeAssignmentExpressionInput(
         targetType === TYPE.STRING &&
         !value.startsWith("@") &&
         !isQuotedString(value) &&
-        !/(==|!=|>=|<=|>|<|\+|\-|\*|\/)/.test(value)
+        !/(==|!=|>=|<=|>|<|\+|-|\*|\/)/.test(value)
     ) {
         return quoteStringLiteral(value);
     }
@@ -423,7 +423,6 @@ function inferExpressionType(expression, variables = []) {
     if (!result.valid) return result;
 
     if (position !== tokens.length) {
-        const token = tokens[position];
         return {
             valid: false,
             error: "Invalid value",

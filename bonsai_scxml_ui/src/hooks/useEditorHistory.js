@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 
 const cloneGraphValue = (value) => {
     if (Array.isArray(value)) return value.map(cloneGraphValue);
@@ -134,14 +134,16 @@ export function useEditorHistory({
     const dataModelHistoryCacheRef = useRef({ source: null, snapshot: [] });
     const lastCreatedSnapshotRef = useRef(null);
 
-    liveHistoryStateRef.current = {
-        nodes,
-        edges,
-        slotNodes,
-        slotEdges,
-        manualSlots,
-        globalDataModel,
-    };
+    useLayoutEffect(() => {
+        liveHistoryStateRef.current = {
+            nodes,
+            edges,
+            slotNodes,
+            slotEdges,
+            manualSlots,
+            globalDataModel,
+        };
+    }, [nodes, edges, slotNodes, slotEdges, manualSlots, globalDataModel]);
 
     const resetSnapshotCaches = useCallback(() => {
         nodeHistoryCacheRef.current = new Map();

@@ -125,29 +125,41 @@ export function useEditorAnalysis({
         runRustReadQuery,
     ]);
 
-    const transitionAnalysisRequest = useMemo(
-        () =>
-            buildTransitionAnalysisRequest({
-                selectedNode: selectedRawNode,
+    const selectedIsContainer = selectedRawNode?.type === "compound" ||
+        selectedRawNode?.type === "parallel";
+    const selectedContainerId = selectedIsContainer ? selectedRawNode.id : null;
+    const selectedContainerType = selectedIsContainer ? selectedRawNode.type : null;
+    const transitionRequestCandidate = useMemo(() => {
+        const request = buildTransitionAnalysisRequest({
+                selectedNode: selectedContainerId
+                    ? { id: selectedContainerId, type: selectedContainerType }
+                    : null,
                 nodes: semanticNodes,
                 edges,
-            }),
-        [selectedRawNode, semanticNodes, edges]
-    );
+            });
+        return { request, signature: JSON.stringify(request) };
+    }, [selectedContainerId, selectedContainerType, semanticNodes, edges]);
+    const [transitionRequestSnapshot, setTransitionRequestSnapshot] = useState(transitionRequestCandidate);
+    const requestChanged = transitionRequestCandidate.signature !== transitionRequestSnapshot.signature;
+    const transitionAnalysisRequest = requestChanged
+        ? transitionRequestCandidate.request
+        : transitionRequestSnapshot.request;
+    // Only backend-consumed metadata invalidates analysis. Selection and manual
+    // control points are omitted by the request builder and should not issue IPC.
+    if (requestChanged) setTransitionRequestSnapshot(transitionRequestCandidate);
 
     const [selectedContainerOutgoingTransitions, setSelectedContainerOutgoingTransitions] =
         useState([]);
     const transitionAnalysisRevisionRef = useRef(0);
+    if (!selectedIsContainer && selectedContainerOutgoingTransitions.length > 0) {
+        setSelectedContainerOutgoingTransitions([]);
+    }
 
     useEffect(() => {
         const revision = ++transitionAnalysisRevisionRef.current;
         let cancelled = false;
 
-        const selectedIsContainer =
-            selectedRawNode?.type === "compound" ||
-            selectedRawNode?.type === "parallel";
         if (!selectedIsContainer) {
-            setSelectedContainerOutgoingTransitions([]);
             return () => {
                 cancelled = true;
             };
@@ -173,7 +185,6 @@ export function useEditorAnalysis({
         if (!isTauri()) {
             // Browser/Vite mode is UI-only. Container transition semantics are
             // resolved exclusively by the Rust backend.
-            commit([]);
             return () => {
                 cancelled = true;
             };
@@ -183,8 +194,8 @@ export function useEditorAnalysis({
             "IPC analyze container transitions",
             () => analyzeEditorTransitions(transitionAnalysisRequest),
             {
-                nodes: semanticNodes?.length || 0,
-                edges: edges?.length || 0,
+                nodes: transitionAnalysisRequest.nodes.length,
+                edges: transitionAnalysisRequest.edges.length,
             }
         )
             .then(commit)
@@ -201,9 +212,7 @@ export function useEditorAnalysis({
     }, [
         isDraggingNode,
         transitionAnalysisRequest,
-        selectedRawNode,
-        semanticNodes,
-        edges,
+        selectedIsContainer,
     ]);
 
     const selectedSlotDetails = useMemo(() => {
@@ -533,6 +542,9 @@ export function useEditorAnalysis({
 
     const [editorProblems, setEditorProblems] = useState([]);
     const validationRevisionRef = useRef(0);
+    const semanticNodeCount = semanticNodes?.length || 0;
+    const edgeCount = edges?.length || 0;
+    const manualSlotCount = manualSlots?.length || 0;
 
     useEffect(() => {
         // Validation is deliberately frozen while a node is being dragged.
@@ -547,9 +559,9 @@ export function useEditorAnalysis({
             effectRevision: revision,
             validationRevision,
             overlays: validationRequest?.nodeOverlays?.length || 0,
-            semanticNodes: semanticNodes?.length || 0,
-            edges: edges?.length || 0,
-            manualSlots: manualSlots?.length || 0,
+            semanticNodes: semanticNodeCount,
+            edges: edgeCount,
+            manualSlots: manualSlotCount,
         });
 
         const commitProblems = (next) => {
@@ -653,15 +665,9 @@ export function useEditorAnalysis({
     }, [
         isDraggingNode,
         validationRequest,
-        semanticNodes,
-        edges,
-        globalDataModel,
-        availableDataModel,
-        behaviorDirectories,
-        isBehaviorWorkflow,
-        manualSlots,
-        ancestorSlotSourcesByPath,
-        semanticSlotNodes,
+        semanticNodeCount,
+        edgeCount,
+        manualSlotCount,
         runRustReadQuery,
         validationRevision,
     ]);

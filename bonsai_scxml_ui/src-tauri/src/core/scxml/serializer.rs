@@ -1,30 +1,57 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::core::model::{AssignmentDto, StateDto, StateKindDto, Workflow, WorkflowDto};
+use crate::core::model::{Assignment, State, StateKind, Transition, Workflow};
 
-pub(crate) fn serialize_scxml(workflow: &Workflow) -> Result<String, String> {
-    let dto = workflow.to_dto();
-    serialize_scxml_dto(&dto)
+struct SerializationIndex<'a> {
+    states_by_id: HashMap<&'a str, &'a State>,
+    children_by_parent: HashMap<&'a str, Vec<&'a State>>,
+    transitions_by_source: HashMap<&'a str, Vec<&'a Transition>>,
 }
 
-fn serialize_scxml_dto(workflow: &WorkflowDto) -> Result<String, String> {
-    let states_by_id: HashMap<&str, &StateDto> = workflow
-        .states
-        .iter()
-        .map(|state| (state.id.as_str(), state))
-        .collect();
+impl<'a> SerializationIndex<'a> {
+    fn new(workflow: &'a Workflow) -> Self {
+        let mut index = Self {
+            states_by_id: HashMap::new(),
+            children_by_parent: HashMap::new(),
+            transitions_by_source: HashMap::new(),
+        };
+        // Buckets retain vector order and original instances, even for duplicate ids.
+        for state in &workflow.states {
+            index.states_by_id.insert(state.id.as_str(), state);
+            if let Some(parent_id) = state.parent_id.as_deref() {
+                index
+                    .children_by_parent
+                    .entry(parent_id)
+                    .or_default()
+                    .push(state);
+            }
+        }
+        for transition in &workflow.transitions {
+            index
+                .transitions_by_source
+                .entry(transition.source_state_id.as_str())
+                .or_default()
+                .push(transition);
+        }
+        index
+    }
+}
 
-    validate_parent_links(workflow, &states_by_id)?;
+pub(crate) fn serialize_scxml(workflow: &Workflow) -> Result<String, String> {
+    let index = SerializationIndex::new(workflow);
+    validate_parent_links(workflow, &index.states_by_id)?;
 
     let initial_scxml_id = workflow
         .initial_scxml_state_id
         .as_deref()
         .filter(|value| !value.trim().is_empty())
         .or_else(|| {
-            workflow
-                .initial_state_id
-                .as_deref()
-                .and_then(|id| states_by_id.get(id).map(|state| state.scxml_id.as_str()))
+            workflow.initial_state_id.as_deref().and_then(|id| {
+                index
+                    .states_by_id
+                    .get(id)
+                    .map(|state| state.scxml_id.as_str())
+            })
         })
         .or_else(|| {
             workflow
@@ -48,9 +75,16 @@ fn serialize_scxml_dto(workflow: &WorkflowDto) -> Result<String, String> {
     output.push_str("       xmlns:editor=\"http://bonsai.cit-ec.uni-bielefeld.de/editor\"\n");
     output.push_str("       version=\"1.0\"");
     if !initial_scxml_id.is_empty() {
-        output.push_str(&format!("\n       initial=\"{}\"", escape_attr(initial_scxml_id)));
+        output.push_str(&format!(
+            "\n       initial=\"{}\"",
+            escape_attr(initial_scxml_id)
+        ));
     }
-    if let Some(name) = workflow.name.as_deref().filter(|value| !value.trim().is_empty()) {
+    if let Some(name) = workflow
+        .name
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+    {
         output.push_str(&format!("\n       name=\"{}\"", escape_attr(name)));
     }
     output.push_str(">\n\n");
@@ -58,9 +92,13 @@ fn serialize_scxml_dto(workflow: &WorkflowDto) -> Result<String, String> {
     render_root_datamodel(workflow, &mut output);
 
     let mut visiting = HashSet::new();
-    for state in workflow.states.iter().filter(|state| state.parent_id.is_none()) {
+    for state in workflow
+        .states
+        .iter()
+        .filter(|state| state.parent_id.is_none())
+    {
         output.push('\n');
-        render_state(workflow, state, 1, &states_by_id, &mut visiting, &mut output)?;
+        render_state(state, 1, &index, &mut visiting, &mut output)?;
         output.push('\n');
     }
 
@@ -69,8 +107,8 @@ fn serialize_scxml_dto(workflow: &WorkflowDto) -> Result<String, String> {
 }
 
 fn validate_parent_links(
-    workflow: &WorkflowDto,
-    states_by_id: &HashMap<&str, &StateDto>,
+    workflow: &Workflow,
+    states_by_id: &HashMap<&str, &State>,
 ) -> Result<(), String> {
     for state in &workflow.states {
         if let Some(parent_id) = state.parent_id.as_deref() {
@@ -85,7 +123,7 @@ fn validate_parent_links(
     Ok(())
 }
 
-fn render_root_datamodel(workflow: &WorkflowDto, output: &mut String) {
+fn render_root_datamodel(workflow: &Workflow, output: &mut String) {
     // The editor has historically emitted a root <datamodel> even when it is
     // empty. Keep that stable for desktop Rust serialization so a save does not
     // introduce an avoidable structural diff in otherwise unchanged files.
@@ -98,7 +136,11 @@ fn render_root_datamodel(workflow: &WorkflowDto, output: &mut String) {
         output.push_str("        <data id=\"#_SLOTS\">\n");
         output.push_str("            <slots>\n");
         for slot in &workflow.slot_declarations {
-            let tag = if slot.inherited { "inheritSlot" } else { "slot" };
+            let tag = if slot.inherited {
+                "inheritSlot"
+            } else {
+                "slot"
+            };
             output.push_str(&format!(
                 "                <{} key=\"{}\" state=\"{}\" xpath=\"{}\"/>\n",
                 tag,
@@ -138,22 +180,24 @@ fn render_root_datamodel(workflow: &WorkflowDto, output: &mut String) {
     output.push_str("    </datamodel>\n");
 }
 
-fn render_state(
-    workflow: &WorkflowDto,
-    state: &StateDto,
+fn render_state<'a>(
+    state: &'a State,
     depth: usize,
-    states_by_id: &HashMap<&str, &StateDto>,
-    visiting: &mut HashSet<String>,
+    index: &SerializationIndex<'a>,
+    visiting: &mut HashSet<&'a str>,
     output: &mut String,
 ) -> Result<(), String> {
-    if !visiting.insert(state.id.clone()) {
-        return Err(format!("Cycle detected in state parent graph at '{}'.", state.id));
+    if !visiting.insert(state.id.as_str()) {
+        return Err(format!(
+            "Cycle detected in state parent graph at '{}'.",
+            state.id
+        ));
     }
 
     let indent = "    ".repeat(depth);
     let tag = match state.kind {
-        StateKindDto::Parallel => "parallel",
-        StateKindDto::Final => "final",
+        StateKind::Parallel => "parallel",
+        StateKind::Final => "final",
         _ => "state",
     };
 
@@ -164,8 +208,12 @@ fn render_state(
         escape_attr(&state.scxml_id)
     ));
 
-    if matches!(state.kind, StateKindDto::Submachine) {
-        if let Some(source) = state.source.as_deref().filter(|value| !value.trim().is_empty()) {
+    if matches!(state.kind, StateKind::Submachine) {
+        if let Some(source) = state
+            .source
+            .as_deref()
+            .filter(|value| !value.trim().is_empty())
+        {
             output.push_str(&format!(" src=\"{}\"", escape_attr(source)));
         }
     }
@@ -175,25 +223,27 @@ fn render_state(
         .as_deref()
         .filter(|value| !value.trim().is_empty())
         .or_else(|| {
-            state
-                .initial_child_id
-                .as_deref()
-                .and_then(|id| states_by_id.get(id).map(|child| child.scxml_id.as_str()))
+            state.initial_child_id.as_deref().and_then(|id| {
+                index
+                    .states_by_id
+                    .get(id)
+                    .map(|child| child.scxml_id.as_str())
+            })
         });
     if let Some(initial) = initial_scxml_id {
         output.push_str(&format!(" initial=\"{}\"", escape_attr(initial)));
     }
 
-    let children: Vec<&StateDto> = workflow
-        .states
-        .iter()
-        .filter(|candidate| candidate.parent_id.as_deref() == Some(state.id.as_str()))
-        .collect();
-    let transitions: Vec<_> = workflow
-        .transitions
-        .iter()
-        .filter(|transition| transition.source_state_id == state.id)
-        .collect();
+    let children = index
+        .children_by_parent
+        .get(state.id.as_str())
+        .map(Vec::as_slice)
+        .unwrap_or(&[]);
+    let transitions = index
+        .transitions_by_source
+        .get(state.id.as_str())
+        .map(Vec::as_slice)
+        .unwrap_or(&[]);
 
     let has_body = !state.parameters.is_empty()
         || !state.on_entry.is_empty()
@@ -210,7 +260,7 @@ fn render_state(
 
     if !has_body {
         output.push_str("/>");
-        visiting.remove(&state.id);
+        visiting.remove(state.id.as_str());
         return Ok(());
     }
 
@@ -221,20 +271,20 @@ fn render_state(
     render_action("onexit", &state.on_exit, depth + 1, output);
 
     for transition in transitions {
-        render_transition(transition, depth + 1, states_by_id, output);
+        render_transition(transition, depth + 1, &index.states_by_id, output);
     }
 
     for child in children {
-        render_state(workflow, child, depth + 1, states_by_id, visiting, output)?;
+        render_state(child, depth + 1, index, visiting, output)?;
         output.push('\n');
     }
 
     output.push_str(&format!("{}</{}>", indent, tag));
-    visiting.remove(&state.id);
+    visiting.remove(state.id.as_str());
     Ok(())
 }
 
-fn render_editor_metadata(state: &StateDto, depth: usize, output: &mut String) {
+fn render_editor_metadata(state: &State, depth: usize, output: &mut String) {
     let has_metadata = !state.editor.positions.is_empty()
         || !state.editor.edge_targets.is_empty()
         || state.editor.x != 0.0
@@ -287,7 +337,7 @@ fn render_editor_metadata(state: &StateDto, depth: usize, output: &mut String) {
     output.push_str(&format!("{}</metadata>\n", indent));
 }
 
-fn render_local_datamodel(state: &StateDto, depth: usize, output: &mut String) {
+fn render_local_datamodel(state: &State, depth: usize, output: &mut String) {
     if state.parameters.is_empty() {
         return;
     }
@@ -315,7 +365,7 @@ fn render_local_datamodel(state: &StateDto, depth: usize, output: &mut String) {
     output.push_str(&format!("{}</datamodel>\n", indent));
 }
 
-fn render_action(name: &str, assignments: &[AssignmentDto], depth: usize, output: &mut String) {
+fn render_action(name: &str, assignments: &[Assignment], depth: usize, output: &mut String) {
     if assignments.is_empty() {
         return;
     }
@@ -334,9 +384,9 @@ fn render_action(name: &str, assignments: &[AssignmentDto], depth: usize, output
 }
 
 fn render_transition(
-    transition: &crate::core::model::TransitionDto,
+    transition: &Transition,
     depth: usize,
-    states_by_id: &HashMap<&str, &StateDto>,
+    states_by_id: &HashMap<&str, &State>,
     output: &mut String,
 ) {
     let indent = "    ".repeat(depth);
@@ -383,7 +433,6 @@ fn render_transition(
         ));
     }
     output.push_str(&format!("{}</transition>\n", indent));
-
 }
 
 fn escape_attr(value: &str) -> String {
@@ -396,13 +445,133 @@ fn escape_attr(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::escape_attr;
+    use super::{escape_attr, serialize_scxml};
+    use crate::core::model::{StateId, Workflow};
+    use crate::core::scxml::parse_scxml;
 
     #[test]
     fn keeps_apostrophes_in_double_quoted_attributes() {
         assert_eq!(
             escape_attr("'de.unibi.citec.clf.bonsai.skills.'"),
             "'de.unibi.citec.clf.bonsai.skills.'"
+        );
+    }
+
+    #[test]
+    fn preserves_exact_xml_order_conditions_actions_and_duplicate_scxml_names() {
+        let workflow = Workflow::from_dto(serde_json::from_value(serde_json::json!({
+            "name": "Flow & 'name'",
+            "initialStateId": "root",
+            "states": [
+                {"id": "b", "scxmlId": "Repeated", "kind": "skill", "parentId": "root",
+                 "parameters": [{"key": "text", "defaultValue": "'fallback'", "typeName": "String"}]},
+                {"id": "end", "scxmlId": "End", "kind": "final"},
+                {"id": "root", "scxmlId": "Root", "kind": "compound", "initialChildId": "a",
+                 "editor": {"positions": [
+                     {"x": 1.5, "y": 2},
+                     {"x": -3, "y": 4.25, "instanceId": "copy", "cloneType": "reference"}
+                 ], "edgeTargets": [{"event": "done", "targetScxmlId": "End", "occurrence": 2,
+                                      "targetInstanceId": "end-copy"}]},
+                 "onEntry": [{"location": "@@count", "expression": "1"},
+                             {"location": "@text", "expression": "'a&b'"}],
+                 "onExit": [{"location": "@count", "expression": "count + 1"}]},
+                {"id": "leaf", "scxmlId": "Leaf", "kind": "submachine", "parentId": "a",
+                 "source": "${BEH}/a&b.xml"},
+                {"id": "a", "scxmlId": "Repeated", "kind": "parallel", "parentId": "root"}
+            ],
+            "transitions": [
+                {"id": "ta", "sourceStateId": "a", "targetStateId": "b", "targetScxmlId": "",
+                 "event": "go", "condition": "count < 2 && text == \"yes\"",
+                 "assignments": [{"location": "@@count", "expression": "count + 1"}],
+                 "sentEvents": ["first", "second"]},
+                {"id": "tr1", "sourceStateId": "root", "targetStateId": "end", "targetScxmlId": "",
+                 "event": "Repeated.success", "condition": "ready"},
+                {"id": "tb", "sourceStateId": "b", "targetScxmlId": "",
+                 "sentEvents": ["behavior.success"]},
+                {"id": "tr2", "sourceStateId": "root", "targetScxmlId": " external ",
+                 "condition": "count > 0"}
+            ],
+            "dataModel": [{"id": "#_STATE_PREFIX", "expression": "'pkg.'"},
+                          {"id": "count", "expression": "0", "typeName": "integer"}],
+            "slotDeclarations": [{"key": "Model", "state": "Repeated", "xpath": "/model"},
+                                 {"key": "Other", "state": "Root", "xpath": "/other", "inherited": true}]
+        })).unwrap()).unwrap();
+
+        assert_eq!(
+            serialize_scxml(&workflow).unwrap(),
+            r##"<?xml version="1.0" encoding="UTF-8"?>
+<scxml xmlns="http://www.w3.org/2005/07/scxml"
+       xmlns:editor="http://bonsai.cit-ec.uni-bielefeld.de/editor"
+       version="1.0"
+       initial="Root"
+       name="Flow &amp; 'name'">
+
+    <datamodel>
+        <data id="#_STATE_PREFIX" expr="'pkg.'" />
+        <data id="#_SLOTS">
+            <slots>
+                <slot key="Model" state="Repeated" xpath="/model"/>
+                <inheritSlot key="Other" state="Root" xpath="/other"/>
+            </slots>
+        </data>
+        <data id="count" expr="0" type="integer" />
+    </datamodel>
+
+    <final id="End"/>
+
+    <state id="Root" initial="Repeated">
+        <metadata>
+            <editor:position x="1.5" y="2"/>
+            <editor:position instance="copy" clone="reference" x="-3" y="4.25"/>
+            <editor:edgeTarget event="done" target="End" occurrence="2" instance="end-copy"/>
+        </metadata>
+        <onentry>
+            <assign location="count" expr="1"/>
+            <assign location="text" expr="'a&amp;b'"/>
+        </onentry>
+        <onexit>
+            <assign location="count" expr="count + 1"/>
+        </onexit>
+        <transition event="Repeated.success" target="End" cond="ready"/>
+        <transition target=" external " cond="count &gt; 0"/>
+        <state id="Repeated">
+            <datamodel>
+                <data id="text" expr="'fallback'" type="String" />
+            </datamodel>
+            <transition>
+                <send event="behavior.success"/>
+            </transition>
+        </state>
+        <parallel id="Repeated">
+            <transition event="go" target="Repeated" cond="count &lt; 2 &amp;&amp; text == &quot;yes&quot;">
+                <assign location="count" expr="count + 1"/>
+                <send event="first"/>
+                <send event="second"/>
+            </transition>
+            <state id="Leaf" src="${BEH}/a&amp;b.xml"/>
+        </parallel>
+    </state>
+
+</scxml>
+"##
+        );
+    }
+
+    #[test]
+    fn preserves_missing_parent_error_and_rootless_cycle_omission() {
+        let mut workflow =
+            parse_scxml("<scxml><state id=\"A\"/><state id=\"B\"/></scxml>").unwrap();
+        workflow.states[0].parent_id = Some(StateId::from("missing"));
+        assert_eq!(
+            serialize_scxml(&workflow).unwrap_err(),
+            "State 'state-1' references missing parent 'missing'."
+        );
+
+        workflow.states[0].parent_id = Some(workflow.states[1].id.clone());
+        workflow.states[1].parent_id = Some(workflow.states[0].id.clone());
+        assert_eq!(
+            serialize_scxml(&workflow).unwrap(),
+            serialize_scxml(&Workflow::default()).unwrap()
         );
     }
 }

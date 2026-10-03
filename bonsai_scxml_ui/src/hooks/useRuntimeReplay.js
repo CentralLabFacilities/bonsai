@@ -10,6 +10,8 @@ import {
 } from "../utils/runtimeRust";
 
 const EMPTY_RUNTIME_SET = new Set();
+const EMPTY_RUNTIME_STEPS = [];
+const EMPTY_RUNTIME_VALUES = {};
 
 const yieldRuntimePreparationFrame = () =>
     new Promise((resolve) => {
@@ -294,7 +296,7 @@ export function useRuntimeReplay({
     // Runtime resolution is intentionally prepared once when the log is
     // loaded. Playback, timeline scrubbing and value rendering read from this
     // cache rather than re-resolving the full trace on every render.
-    const resolvedRuntimeSteps = runtimeReplayCache?.resolvedSteps || [];
+    const resolvedRuntimeSteps = runtimeReplayCache?.resolvedSteps || EMPTY_RUNTIME_STEPS;
     const runtimeSlotTimeline = runtimeReplayCache?.slotTimeline || {
         snapshots: [],
         samples: [],
@@ -321,7 +323,7 @@ export function useRuntimeReplay({
             : {};
 
     const activeRuntimeSlotValues =
-        activeRuntimeSlotSnapshot[activeTabId] || {};
+        activeRuntimeSlotSnapshot[activeTabId] || EMPTY_RUNTIME_VALUES;
 
     const activeRuntimeParameterSnapshot =
         runtimeStarted && runtimeParameterTimeline.snapshots.length > 0
@@ -334,7 +336,7 @@ export function useRuntimeReplay({
             : {};
 
     const activeRuntimeParameterValues =
-        activeRuntimeParameterSnapshot[activeTabId] || {};
+        activeRuntimeParameterSnapshot[activeTabId] || EMPTY_RUNTIME_VALUES;
 
     const activeRuntimeChanges =
         runtimeStarted && runtimeChangesTimeline.steps.length > 0

@@ -1,6 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { createPortal } from "react-dom";
-import { FiChevronLeft, FiChevronRight, FiPlus, FiX } from "react-icons/fi";
+import { lazy, Suspense, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
     ReactFlowProvider,
     useReactFlow,
@@ -11,29 +9,19 @@ import "@xyflow/react/dist/style.css";
 import Header from "./components/Header";
 import SkillLibrary from "./components/SkillLibrary";
 import BehaviorLibrary from "./components/BehaviorLibrary";
-import DetailsPanel from "./components/DetailsPanel";
 import WorkflowPanel from "./components/WorkflowPanel";
-import ConditionModal from "./components/ConditionModal";
 import ProblemsPanel from "./components/ProblemsPanel";
-import CreateSlotModal from "./components/CreateSlotModal";
-import CreateSubMachineModal from "./components/CreateSubMachineModal";
 import EditorCanvas from "./components/EditorCanvas";
+import EditorOverlays from "./components/EditorOverlays.jsx";
+import RuntimeChangesPanel from "./components/RuntimeChangesPanel.jsx";
 import WorkflowTabBar from "./components/WorkflowTabBar";
 import EditorFindOverlay from "./components/EditorFindOverlay";
-import EditorShortcutHelp from "./components/EditorShortcutHelp";
-import HintPage from "./components/HintPage";
 
 import {
     isTauri,
     initApiProxy,
 } from "./tauri-client.js";
-import {
-    COLLAPSED_CONTAINER_WIDTH,
-    COLLAPSED_CONTAINER_HEIGHT,
-    fitCompoundAndAncestorCompounds,
-    growParallelToLaneContents,
-    layoutStateContainerForExpansion,
-} from "./utils/editorGeometry";
+import { getParallelLaneSummaries, toggleContainerCollapse } from "./utils/containerState.js";
 import { collectDescendantGlobals } from "./utils/editorScxml";
 import { useEditorHistory } from "./hooks/useEditorHistory";
 import { useNodeInteraction } from "./hooks/useNodeInteraction";
@@ -65,7 +53,8 @@ import { useGlobalEditorShortcuts } from "./hooks/useGlobalEditorShortcuts";
 import { useEditorLibraryDrop } from "./hooks/useEditorLibraryDrop";
 import { useEditorFlowChanges } from "./hooks/useEditorFlowChanges";
 import { useEditorLibraryItems } from "./hooks/useEditorLibraryItems";
-import { useEditorDetailsController } from "./hooks/useEditorDetailsController";
+import { useEditorDetailsCallbacks, useEditorDetailsController } from "./hooks/useEditorDetailsController.js";
+import { useEditorPreferences } from "./hooks/useEditorPreferences.js";
 import "./App.css";
 
 // Initialize API proxy for Tauri desktop mode (intercepts /api/* fetch calls)
@@ -74,62 +63,7 @@ initApiProxy();
 
 // Detect if running in Tauri desktop app
 const IS_DESKTOP = isTauri();
-
-const DEFAULT_BEHAVIOR_DIRECTORIES = [
-    {
-        key: "ROBOCUP",
-        path: "/robocup_ws/robocup",
-        isDefault: true,
-    },
-];
-
-const loadBehaviorDirectories = () => {
-    try {
-        const raw = window.localStorage.getItem(
-            "bonsai.behaviorDirectories"
-        );
-
-        if (!raw) {
-            return DEFAULT_BEHAVIOR_DIRECTORIES;
-        }
-
-        const parsed = JSON.parse(raw);
-
-        if (!Array.isArray(parsed)) {
-            return DEFAULT_BEHAVIOR_DIRECTORIES;
-        }
-
-        return parsed
-            .filter(
-                (entry) =>
-                    entry &&
-                    typeof entry.key === "string" &&
-                    typeof entry.path === "string"
-            )
-            .map((entry) => ({
-                ...entry,
-                key: entry.key.trim().toUpperCase(),
-            }))
-            // Remove only the old built-in defaults. If the user added an
-            // EXERCISE or CHALLENGE mapping themselves, keep it.
-            .filter(
-                (entry) =>
-                    !(
-                        entry.isDefault === true &&
-                        (entry.key === "EXERCISE" ||
-                            entry.key === "CHALLENGE")
-                    )
-            );
-    } catch (error) {
-        console.warn(
-            "Could not load behavior directories:",
-            error
-        );
-        return DEFAULT_BEHAVIOR_DIRECTORIES;
-    }
-};
-
-
+const DetailsPanel = lazy(() => import("./components/DetailsPanel.jsx"));
 
 function AppContent() {
     const {
@@ -147,16 +81,14 @@ function AppContent() {
     const [controlPointInsertRequest, setControlPointInsertRequest] = useState(null);
     const updateNodeInternals = useUpdateNodeInternals();
     const [leftLibraryTab, setLeftLibraryTab] = useState("skills");
-    const [behaviorDirectories, setBehaviorDirectories] = useState(
-        loadBehaviorDirectories
-    );
-
-    useEffect(() => {
-        window.localStorage.setItem(
-            "bonsai.behaviorDirectories",
-            JSON.stringify(behaviorDirectories)
-        );
-    }, [behaviorDirectories]);
+    const {
+        behaviorDirectories,
+        setBehaviorDirectories,
+        showTransitionEdges,
+        setShowTransitionEdges,
+        showSlotEdges,
+        setShowSlotEdges,
+    } = useEditorPreferences();
 
     //---- TAB / GRAPH MANAGEMENT ----
     const {
@@ -177,50 +109,12 @@ function AppContent() {
         globalDataModel,
         setGlobalDataModel,
         inheritedGlobalDataModel,
-        setInheritedGlobalDataModel,
         replaceDocument,
     } = useEditorGraphState();
 
     const [isHintPageOpen, setIsHintPageOpen] = useState(false);
 
     const [activeMode, setActiveMode] = useState("overview");
-    const [showTransitionEdges, setShowTransitionEdges] = useState(() => {
-        try {
-            return window.localStorage.getItem("bonsai.showTransitionEdges") !== "false";
-        } catch {
-            return true;
-        }
-    });
-    const [showSlotEdges, setShowSlotEdges] = useState(() => {
-        try {
-            return window.localStorage.getItem("bonsai.showSlotEdges") !== "false";
-        } catch {
-            return true;
-        }
-    });
-
-    useEffect(() => {
-        try {
-            window.localStorage.setItem(
-                "bonsai.showTransitionEdges",
-                String(showTransitionEdges)
-            );
-        } catch {
-            // Local storage is optional; the in-memory toggle still works.
-        }
-    }, [showTransitionEdges]);
-
-    useEffect(() => {
-        try {
-            window.localStorage.setItem(
-                "bonsai.showSlotEdges",
-                String(showSlotEdges)
-            );
-        } catch {
-            // Local storage is optional; the in-memory toggle still works.
-        }
-    }, [showSlotEdges]);
-
 
     const [isCreateSlotModalOpen, setIsCreateSlotModalOpen] = useState(false);
     const [pendingSubMachineCreation, setPendingSubMachineCreation] = useState(null);
@@ -235,11 +129,9 @@ function AppContent() {
     }, []);
     // Slot creation belongs to the slot-centric views only. If the user switches
     // to Event or Code mode while the dialog is open, close it immediately.
-    useEffect(() => {
-        if (activeMode !== "slots" && activeMode !== "overview") {
-            setIsCreateSlotModalOpen(false);
-        }
-    }, [activeMode]);
+    if (isCreateSlotModalOpen && activeMode !== "slots" && activeMode !== "overview") {
+        setIsCreateSlotModalOpen(false);
+    }
     const [activeTab, setActiveTab] = useState("allgemein");
     const [rightPanelTab, setRightPanelTab] = useState("datamodel");
 
@@ -476,18 +368,6 @@ function AppContent() {
     const [newParamId, setNewParamId] = useState("");
     const [newParamExpr, setNewParamExpr] = useState("");
 
-    const [skillSlotDetailRevision, setSkillSlotDetailRevision] = useState(0);
-
-    const handleSkillSlotConnectionApplied = useCallback(() => {
-        // Slot-edge creation updates the live React Flow node first. The
-        // details panel intentionally reads from the semantic projection so
-        // dragging does not rerender it every frame. Refresh that projection
-        // once the connection update has committed.
-        requestAnimationFrame(() => {
-            setSkillSlotDetailRevision((revision) => revision + 1);
-        });
-    }, []);
-
     const {
         drawerData,
         setDrawerData,
@@ -520,7 +400,6 @@ function AppContent() {
             rustWorkflowDocument.syncTransitionsForSource,
         checkSlotConnection,
         syncSlotsAfterCommit: rustWorkflowDocument.syncSlotsAfterCommit,
-        onSkillSlotConnectionApplied: handleSkillSlotConnectionApplied,
     });
 
     const {
@@ -575,7 +454,6 @@ function AppContent() {
 
     const {
         tabs,
-        setTabs,
         activeTabId,
         activeTab: activeWorkflowTab,
         updateActiveTab,
@@ -732,127 +610,9 @@ function AppContent() {
 
 
 
-    // Hilfsfunktion: Bounding Box um alle ausgewählten Nodes berechnen
-
-
-    // 1. Compound State erstellen
-
-
-    // 2. Parallel State erstellen
-
-
-    // 3. Sub-State-Machine erstellen & direkt in neuem Tab öffnen
-
-
     const handleToggleContainerCollapse = useCallback(
         (containerId) => {
-            setNodes((currentNodes) => {
-                const container = currentNodes.find(
-                    (node) => node.id === containerId
-                );
-
-                if (
-                    !container ||
-                    (container.type !== "compound" &&
-                        container.type !== "parallel")
-                ) {
-                    return currentNodes;
-                }
-
-                const isCollapsed = Boolean(container.data?.isCollapsed);
-
-                if (!isCollapsed) {
-                    const expandedWidth =
-                        Number(container.width) ||
-                        Number(container.measured?.width) ||
-                        Number(container.style?.width) ||
-                        (container.type === "compound" ? 320 : 420);
-                    const expandedHeight =
-                        Number(container.height) ||
-                        Number(container.measured?.height) ||
-                        Number(container.style?.height) ||
-                        (container.type === "compound" ? 220 : 295);
-
-                    return currentNodes.map((node) => {
-                        if (node.id !== containerId) return node;
-
-                        return {
-                            ...node,
-                            width: COLLAPSED_CONTAINER_WIDTH,
-                            height: COLLAPSED_CONTAINER_HEIGHT,
-                            style: {
-                                ...(node.style || {}),
-                                width: COLLAPSED_CONTAINER_WIDTH,
-                                height: COLLAPSED_CONTAINER_HEIGHT,
-                                minHeight: COLLAPSED_CONTAINER_HEIGHT,
-                            },
-                            data: {
-                                ...(node.data || {}),
-                                isCollapsed: true,
-                                expandedContainerSize: {
-                                    width: expandedWidth,
-                                    height: expandedHeight,
-                                    minHeight: node.style?.minHeight ?? null,
-                                },
-                            },
-                        };
-                    });
-                }
-
-                const savedSize = container.data?.expandedContainerSize || {};
-                const restoredStyle = {
-                    ...(container.style || {}),
-                    width:
-                        Number(savedSize.width) ||
-                        Number(container.style?.width) ||
-                        (container.type === "compound" ? 320 : 420),
-                    height:
-                        Number(savedSize.height) ||
-                        (container.type === "compound" ? 220 : 295),
-                };
-
-                if (savedSize.minHeight == null) {
-                    delete restoredStyle.minHeight;
-                } else {
-                    restoredStyle.minHeight = savedSize.minHeight;
-                }
-
-                const restoredWidth =
-                    Number(savedSize.width) ||
-                    Number(container.width) ||
-                    Number(restoredStyle.width) ||
-                    (container.type === "compound" ? 320 : 420);
-                const restoredHeight =
-                    Number(savedSize.height) ||
-                    (container.type === "compound" ? 220 : 295);
-
-                restoredStyle.width = restoredWidth;
-                restoredStyle.height = restoredHeight;
-
-                const expandedNodes = currentNodes.map((node) => {
-                    if (node.id !== containerId) return node;
-
-                    return {
-                        ...node,
-                        width: restoredWidth,
-                        height: restoredHeight,
-                        style: restoredStyle,
-                        data: {
-                            ...(node.data || {}),
-                            isCollapsed: false,
-                        },
-                    };
-                });
-
-                // First settle the descendants (nested states and sibling
-                // collisions), then compute the exact frame around the final
-                // child positions. Unlike the normal grow-only helpers this is
-                // allowed to shrink an outdated expanded size as well.
-                return layoutStateContainerForExpansion(
-                    expandedNodes,
-                    containerId
-                );
-            });
+            setNodes((currentNodes) => toggleContainerCollapse(currentNodes, containerId));
 
             requestAnimationFrame(() => {
                 const containerIds = getNodes()
@@ -863,16 +623,12 @@ function AppContent() {
                     )
                     .map((node) => node.id);
 
-                if (containerIds.length === 0) {
-                    updateNodeInternals(containerId);
-                } else {
-                    containerIds.forEach((id) => updateNodeInternals(id));
-                }
+                updateNodeInternals(containerIds.length === 0 ? containerId : containerIds);
             });
 
             setSelectedNodeId(containerId);
         },
-        [getNodes, setNodes, updateNodeInternals]
+        [getNodes, setNodes, setSelectedNodeId, updateNodeInternals]
     );
 
 
@@ -914,11 +670,8 @@ function AppContent() {
             return semanticNode;
         }
 
-        // Slot-edge connections can update node.data one render before the
-        // drag-stable semantic projection catches up. On the explicit slot
-        // refresh, reconcile only the selected node's semantic data from the
-        // live React Flow node. `nodes` is intentionally not a dependency:
-        // position-only drag frames must not make the DetailsPanel rerender.
+        // Reconcile pending slot edits from the live node while retaining the
+        // semantic projection's drag-stable geometry and identity.
         const liveNode = nodes.find((node) => node.id === selectedNodeId);
         if (liveNode?.data && liveNode.data !== semanticNode.data) {
             return {
@@ -931,54 +684,14 @@ function AppContent() {
     }, [
         semanticNodes,
         semanticSlotNodes,
+        nodes,
         selectedNodeId,
-        skillSlotDetailRevision,
     ]);
 
-    const selectedParallelLanes = useMemo(() => {
-        if (!selectedRawNode || selectedRawNode.type !== "parallel") {
-            return [];
-        }
-
-        const directLanes = semanticNodes.filter(
-            (node) =>
-                node.type === "parallelLane" &&
-                node.parentId === selectedRawNode.id
-        );
-
-        const childrenByParent = new Map();
-        semanticNodes.forEach((node) => {
-            if (!node.parentId) return;
-            if (!childrenByParent.has(node.parentId)) {
-                childrenByParent.set(node.parentId, []);
-            }
-            childrenByParent.get(node.parentId).push(node);
-        });
-
-        const countSemanticDescendants = (parentId) => {
-            let count = 0;
-            const stack = [...(childrenByParent.get(parentId) || [])];
-            while (stack.length > 0) {
-                const child = stack.pop();
-                if (!child) continue;
-                if (
-                    child.type !== "parallelLane" &&
-                    !child.data?.autoParallelLaneCompound &&
-                    !child.data?.isSkillClone &&
-                    !child.data?.isStateClone
-                ) {
-                    count += 1;
-                }
-                stack.push(...(childrenByParent.get(child.id) || []));
-            }
-            return count;
-        };
-
-        return directLanes.map((lane) => ({
-            ...lane,
-            childCount: countSemanticDescendants(lane.id),
-        }));
-    }, [selectedRawNode, semanticNodes]);
+    const selectedParallelLanes = useMemo(
+        () => getParallelLaneSummaries(selectedRawNode, semanticChildrenByParent),
+        [selectedRawNode, semanticChildrenByParent],
+    );
 
     const {
         selectedSlotDetails,
@@ -1271,8 +984,6 @@ function AppContent() {
         setCenter,
     });
 
-    const handleCreateManualSlot = createManualSlot;
-
     const {
         isFindOpen,
         setIsFindOpen,
@@ -1372,6 +1083,57 @@ function AppContent() {
         goFocusForward,
     });
 
+    const selectLibraryPackage = useCallback((pkg) => {
+        setSelectedPackage(pkg);
+        setSelectedSubPackage(null);
+    }, []);
+    const reloadSkills = useCallback(() => fetchSkills({ manual: true }), [fetchSkills]);
+
+    const detailsCallbacks = useEditorDetailsCallbacks({
+        onNavigateCloneSource: handleNavigateCloneSource,
+        onNavigateClone: handleNavigateCloneSource,
+        onMoveContainerTransition: handleMoveContainerTransition,
+        onNavigateTransitionNode: handleNavigateCloneSource,
+        onHoverTransitionNode: (nodeId) => setHoveredEditorNodeId(nodeId || null),
+        onOpenTransitionPanel: (sourceNodeId, eventId, targetNodeId = null, options = null) => {
+            if (!sourceNodeId || (!options?.containerMode && !eventId)) return;
+            openConditionDrawer(sourceNodeId, eventId, targetNodeId || null, null, options);
+        },
+        onAddParallelLane: () => handleAddLaneToParallel(selectedNode.id),
+        onRenameParallelLane: (laneId, name) => handleRenameParallelLane(selectedNode.id, laneId, name),
+        onMoveParallelLane: (laneId, direction) => handleMoveParallelLane(selectedNode.id, laneId, direction),
+        onDeleteParallelLane: (laneId) => handleDeleteParallelLane(selectedNode.id, laneId),
+        onSetInitial: () => setNodeAsInitial(selectedNode.id),
+        onUpdateName: (name) => updateNodeName(selectedNode.id, name, false),
+        onUpdateNameCommit: (name) => updateNodeName(selectedNode.id, name, true),
+        onUpdateSrc: updateNodeSource,
+        onUpdateEvent: updateNodeEvent,
+        onSetEventTarget: setExistingTargetForEvent,
+        onUpdateParameter: (index, value) => {
+            const nextParams = updateNodeParameter(selectedNode.id, index, value);
+            // Empty values configure the skill too; send the new parameters,
+            // not the still-pending React snapshot.
+            if (nextParams && String(value ?? "").trim() === "") {
+                updateEventsFromParameters(selectedNode.id, nextParams);
+            }
+        },
+        onUpdateParameterBlur: (nodeId) => {
+            commitNodeParameters(nodeId);
+            updateEventsFromParameters(nodeId);
+        },
+        onUpdateStateActions: updateStateActions,
+        onUpdateSendEvents: updateSendEvents,
+        onUpdateInSlotPath: (index, value, commit = false) => updateSkillSlotPath(selectedNode.id, "read", index, value, commit),
+        onUpdateOutSlotPath: (index, value, commit = false) => updateSkillSlotPath(selectedNode.id, "write", index, value, commit),
+        onCheckSlots: checkSlotConnection,
+        onUpdateSlotPath: handleUpdateSelectedSlotPath,
+        onUpdateSlotInherited: handleUpdateSelectedSlotInherited,
+        onHoverSlotAccessSkill: (nodeId) => setHoveredSlotAccessNodeId(nodeId || null),
+        onSelectSlotAccessSkill: handleSelectSlotAccessSkill,
+        onNavigateDescendantSlotSkill: handleNavigateDescendantSlotSkill,
+        onNavigateAncestorSlot: handleNavigateAncestorSlot,
+    });
+
     return (
         <div className="container">
             <Header
@@ -1382,137 +1144,6 @@ function AppContent() {
                 isSaving={isWorkflowSaving}
             />
 
-            {stateMachineLoading && (
-                <div
-                    className="state-machine-loading-overlay"
-                    role="status"
-                    aria-live="polite"
-                    aria-label={`Loading ${stateMachineLoading.label}`}
-                >
-                    <div className="state-machine-loading-card">
-                        <div className="state-machine-loading-spinner" aria-hidden="true" />
-                        <div className="state-machine-loading-title">
-                            Loading state machine
-                        </div>
-                        <div className="state-machine-loading-label">
-                            {stateMachineLoading.label}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {runtimePreparation && (
-                <div
-                    className="runtime-replay-loading-overlay"
-                    role="status"
-                    aria-live="polite"
-                    aria-label={`Preparing runtime replay ${runtimePreparation.fileName || ""}`}
-                >
-                    <div className="runtime-replay-loading-card">
-                        <div className="runtime-replay-loading-spinner" aria-hidden="true" />
-                        <div className="runtime-replay-loading-title">
-                            Preparing runtime replay
-                        </div>
-                        <div className="runtime-replay-loading-file">
-                            {runtimePreparation.fileName}
-                        </div>
-                        <div className="runtime-replay-loading-phase">
-                            {runtimePreparation.phase}
-                        </div>
-                        <div
-                            className="runtime-replay-loading-progress"
-                            aria-hidden="true"
-                        >
-                            <span
-                                style={{
-                                    width: `${Math.max(0, Math.min(1, runtimePreparation.progress || 0)) * 100}%`,
-                                }}
-                            />
-                        </div>
-                        <div className="runtime-replay-loading-percent">
-                            {Math.round(
-                                Math.max(0, Math.min(1, runtimePreparation.progress || 0)) * 100
-                            )}%
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {isHintPageOpen && (
-                <HintPage onClose={() => setIsHintPageOpen(false)} />
-            )}
-
-            <CreateSubMachineModal
-                isOpen={Boolean(pendingSubMachineCreation)}
-                defaultDirectory={pendingSubMachineCreation?.defaultDirectory || ""}
-                defaultFileName={pendingSubMachineCreation?.defaultFileName || "SubMachine.xml"}
-                onCancel={() => setPendingSubMachineCreation(null)}
-                onConfirm={async (fileConfig) => {
-                    if (!pendingSubMachineCreation) return false;
-                    if (pendingSubMachineCreation.fromSelection) {
-                        return await handleCreateSubMachineFromSelected(fileConfig);
-                    }
-                    return await handleCreateEmptySubMachine(
-                        pendingSubMachineCreation.flowPosition,
-                        fileConfig
-                    );
-                }}
-            />
-
-            {pendingSkillPaste && (
-                <div
-                    className="skill-paste-choice-overlay"
-                    onMouseDown={(event) => {
-                        if (event.target === event.currentTarget) {
-                            cancelPendingSkillPaste();
-                        }
-                    }}
-                >
-                    <div
-                        className="skill-paste-choice-dialog"
-                        role="dialog"
-                        aria-modal="true"
-                        aria-labelledby="skill-paste-choice-title"
-                    >
-                        <h3 id="skill-paste-choice-title">
-                            Paste {pendingSkillPaste.sourceTypeLabel || "State"}
-                        </h3>
-                        <p>
-                            How should <strong>{pendingSkillPaste.label}</strong> be pasted?
-                        </p>
-                        <div className="skill-paste-choice-options">
-                            <button
-                                type="button"
-                                className="skill-paste-choice-option"
-                                onClick={() => resolvePendingSkillPaste("clone")}
-                            >
-                                <span className="skill-paste-choice-option-title">Reference</span>
-                                <span className="skill-paste-choice-option-description">
-                                    Inbound-only reference to the original state.
-                                </span>
-                            </button>
-                            <button
-                                type="button"
-                                className="skill-paste-choice-option"
-                                onClick={() => resolvePendingSkillPaste("copy")}
-                            >
-                                <span className="skill-paste-choice-option-title">Copy</span>
-                                <span className="skill-paste-choice-option-description">
-                                    Create an independent copy of the selected state.
-                                </span>
-                            </button>
-                        </div>
-                        <button
-                            type="button"
-                            className="skill-paste-choice-cancel"
-                            onClick={cancelPendingSkillPaste}
-                        >
-                            Cancel
-                        </button>
-                    </div>
-                </div>
-            )}
-
             <div className="app">
                 {leftLibraryTab === "skills" ? (
                     <SkillLibrary
@@ -1522,10 +1153,7 @@ function AppContent() {
                         setActiveFilter={setActiveFilter}
                         packages={packages}
                         selectedPackage={selectedPackage}
-                        setSelectedPackage={(pkg) => {
-                            setSelectedPackage(pkg);
-                            setSelectedSubPackage(null);
-                        }}
+                        setSelectedPackage={selectLibraryPackage}
                         searchedSkills={searchedSkills}
                         packageSkills={packageSkills}
                         filteredSkills={filteredSkills}
@@ -1535,7 +1163,7 @@ function AppContent() {
                         directSkills={directSkills}
                         activeLibraryTab={leftLibraryTab}
                         onLibraryTabChange={setLeftLibraryTab}
-                        onReloadSkills={() => fetchSkills({ manual: true })}
+                        onReloadSkills={reloadSkills}
                         isReloadingSkills={isReloadingSkills}
                         refreshVersion={skillLibraryRefreshVersion}
                     />
@@ -1702,156 +1330,12 @@ function AppContent() {
                         </button>
                     </div>
                     {runtimeLog && (
-                        <aside
-                            className={`runtime-changes-drawer ${
-                                runtimeChangesPanelOpen ? "open" : "closed"
-                            }`}
-                            aria-label="Runtime changes"
-                        >
-                            <button
-                                type="button"
-                                className="runtime-changes-drawer-ledge"
-                                onClick={() =>
-                                    setRuntimeChangesPanelOpen((value) => !value)
-                                }
-                                title={
-                                    runtimeChangesPanelOpen
-                                        ? "Close runtime changes"
-                                        : "Open runtime changes"
-                                }
-                                aria-expanded={runtimeChangesPanelOpen}
-                            >
-                                {runtimeChangesPanelOpen ? (
-                                    <FiChevronRight />
-                                ) : (
-                                    <FiChevronLeft />
-                                )}
-                            </button>
-
-                            {runtimeChangesPanelOpen && (
-                                <div className="runtime-changes-drawer-content">
-                                    <div className="runtime-changes-drawer-header">
-                                        <div>
-                                            <strong>Runtime changes</strong>
-                                            <span>
-                                                {runtimePlayback.currentStep
-                                                    ? `Step ${runtimePlayback.stepIndex + 1} · ${runtimePlayback.currentStep.timestamp}`
-                                                    : "No timestep selected"}
-                                            </span>
-                                        </div>
-                                        {runtimePlayback.currentStep?.tabTitle && (
-                                            <span
-                                                className="runtime-changes-context"
-                                                title="State-machine tab used for this runtime step"
-                                            >
-                                                {runtimePlayback.currentStep.tabTitle}
-                                            </span>
-                                        )}
-                                    </div>
-
-                                    {!activeRuntimeChanges ? (
-                                        <div className="runtime-changes-empty">
-                                            Start playback or click the timeline to inspect writes and assignments.
-                                        </div>
-                                    ) : (
-                                        <div className="runtime-changes-groups">
-                                            {activeRuntimeChanges.slotWrites.length > 0 && (
-                                                <section className="runtime-changes-group">
-                                                    <h4>Slot writes</h4>
-                                                    {activeRuntimeChanges.slotWrites.map((change) => (
-                                                        <div
-                                                            key={`slot-${change.line}-${change.state}-${change.value}`}
-                                                            className="runtime-change-row"
-                                                        >
-                                                            <div className="runtime-change-main">
-                                                                <code>
-                                                                    {change.paths?.length > 0
-                                                                        ? change.paths.join(", ")
-                                                                        : change.slotKey || change.localState || change.state}
-                                                                </code>
-                                                                <span className="runtime-change-arrow">→</span>
-                                                                <strong>{String(change.value)}</strong>
-                                                            </div>
-                                                            <span className="runtime-change-meta">
-                                                                {change.localState || change.state}
-                                                            </span>
-                                                        </div>
-                                                    ))}
-                                                </section>
-                                            )}
-
-                                            {activeRuntimeChanges.variables.length > 0 && (
-                                                <section className="runtime-changes-group">
-                                                    <h4>Variables</h4>
-                                                    {activeRuntimeChanges.variables.map((change) => (
-                                                        <div
-                                                            key={`data-${change.line}-${change.key}`}
-                                                            className="runtime-change-row"
-                                                        >
-                                                            <div className="runtime-change-main">
-                                                                <code>{change.localKey || change.key}</code>
-                                                                <span className="runtime-change-arrow">→</span>
-                                                                <strong>
-                                                                    {String(
-                                                                        change.evaluated
-                                                                            ? change.evaluatedValue
-                                                                            : change.value
-                                                                    )}
-                                                                </strong>
-                                                            </div>
-                                                            <span className="runtime-change-meta">
-                                                                {change.localState || change.state}
-                                                                {change.evaluated && change.previousValue !== undefined
-                                                                    ? ` · previous: ${String(change.previousValue)}`
-                                                                    : ""}
-                                                                {change.expr
-                                                                    ? ` · expr: ${change.expr}`
-                                                                    : ""}
-                                                                {change.localKey && change.localKey !== change.key
-                                                                    ? ` · runtime: ${change.key}`
-                                                                    : ""}
-                                                                {!change.evaluated && change.evaluationError
-                                                                    ? ` · could not evaluate: ${change.evaluationError}`
-                                                                    : ""}
-                                                            </span>
-                                                        </div>
-                                                    ))}
-                                                </section>
-                                            )}
-
-                                            {activeRuntimeChanges.parameters.length > 0 && (
-                                                <section className="runtime-changes-group">
-                                                    <h4>Parameters</h4>
-                                                    {activeRuntimeChanges.parameters.map((change) => (
-                                                        <div
-                                                            key={`parameter-${change.line}-${change.state}-${change.key}`}
-                                                            className="runtime-change-row"
-                                                        >
-                                                            <div className="runtime-change-main">
-                                                                <code>{change.key}</code>
-                                                                <span className="runtime-change-arrow">→</span>
-                                                                <strong>{String(change.value)}</strong>
-                                                            </div>
-                                                            <span className="runtime-change-meta">
-                                                                {change.localState || change.state}
-                                                            </span>
-                                                        </div>
-                                                    ))}
-                                                </section>
-                                            )}
-
-                                            {activeRuntimeChanges.slotWrites.length === 0 &&
-                                                activeRuntimeChanges.variables.length === 0 &&
-                                                activeRuntimeChanges.parameters.length === 0 && (
-                                                    <div className="runtime-changes-empty">
-                                                        No slot writes, variable changes, or parameter assignments in this step.
-                                                    </div>
-                                                )}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </aside>
+                        <RuntimeChangesPanel
+                            isOpen={runtimeChangesPanelOpen}
+                            onToggle={() => setRuntimeChangesPanelOpen((value) => !value)}
+                            playback={runtimePlayback}
+                            changes={activeRuntimeChanges}
+                        />
                     )}
 
                     <div className="right-panel-content">
@@ -1883,140 +1367,29 @@ function AppContent() {
                         )}
 
                         {rightPanelTab === "details" && selectedNode && (
-                            <DetailsPanel
-                                selectedNode={selectedNode}
-                                cloneSourceNode={selectedCloneSourceNode}
-                                onNavigateCloneSource={handleNavigateCloneSource}
-                                cloneNodes={selectedNodeClones}
-                                onNavigateClone={handleNavigateCloneSource}
-                                containerOutgoingTransitions={selectedContainerOutgoingTransitions}
-                                onMoveContainerTransition={handleMoveContainerTransition}
-                                onNavigateTransitionNode={handleNavigateCloneSource}
-                                onHoverTransitionNode={(nodeId) =>
-                                    setHoveredEditorNodeId(nodeId || null)
-                                }
-                                onOpenTransitionPanel={(
-                                    sourceNodeId,
-                                    eventId,
-                                    targetNodeId = null,
-                                    options = null
-                                ) => {
-                                    if (!sourceNodeId) return;
-                                    if (!options?.containerMode && !eventId) return;
-
-                                    openConditionDrawer(
-                                        sourceNodeId,
-                                        eventId,
-                                        targetNodeId || null,
-                                        null,
-                                        options
-                                    );
-                                }}
-                                parallelLanes={selectedParallelLanes}
-                                onAddParallelLane={() =>
-                                    handleAddLaneToParallel(selectedNode.id)
-                                }
-                                onRenameParallelLane={(laneId, name) =>
-                                    handleRenameParallelLane(
-                                        selectedNode.id,
-                                        laneId,
-                                        name
-                                    )
-                                }
-                                onMoveParallelLane={(laneId, direction) =>
-                                    handleMoveParallelLane(
-                                        selectedNode.id,
-                                        laneId,
-                                        direction
-                                    )
-                                }
-                                onDeleteParallelLane={(laneId) =>
-                                    handleDeleteParallelLane(
-                                        selectedNode.id,
-                                        laneId
-                                    )
-                                }
-                                hasInitialNode={hasInitialNode}
-                                activeTab={activeTab}
-                                setActiveTab={setActiveTab}
-                                packages={packages}
-                                getPackageSkillEvent={getPackageSkillEvent}
-                                onSetInitial={() =>
-                                    setNodeAsInitial(selectedNode.id)
-                                }
-                                onUpdateName={(name) =>
-                                    updateNodeName(selectedNode.id, name, false)
-                                }
-                                onUpdateNameCommit={(name) =>
-                                    updateNodeName(selectedNode.id, name, true)
-                                }
-                                onUpdateSrc={updateNodeSource}
-                                onUpdateEvent={updateNodeEvent}
-                                availableTargetNodes={nodes}
-                                onSetEventTarget={setExistingTargetForEvent}
-                                onUpdateParameter={(idx, val) => {
-                                    const nextParams = updateNodeParameter(
-                                        selectedNode.id,
-                                        idx,
-                                        val
-                                    );
-
-                                    // Clearing a parameter changes the configured
-                                    // skill just as adding one does. Refresh right
-                                    // away and pass the new parameter list explicitly
-                                    // so the request cannot see stale React state.
-                                    if (
-                                        nextParams &&
-                                        String(val ?? "").trim() === ""
-                                    ) {
-                                        updateEventsFromParameters(
-                                            selectedNode.id,
-                                            nextParams
-                                        );
-                                    }
-                                }}
-
-                                onUpdateParameterBlur={(nodeId) => {
-                                    commitNodeParameters(nodeId);
-                                    updateEventsFromParameters(nodeId);
-                                }}
-                                globalDataModel={selectedActionDataModel}
-                                actionValueVariables={selectedActionExpressionVariables}
-                                onUpdateStateActions={updateStateActions}
-                                onUpdateSendEvents={updateSendEvents}
-                                onUpdateInSlotPath={(idx, val, commit = false) =>
-                                    updateSkillSlotPath(
-                                        selectedNode.id,
-                                        "read",
-                                        idx,
-                                        val,
-                                        commit
-                                    )
-                                }
-                                onUpdateOutSlotPath={(idx, val, commit = false) =>
-                                    updateSkillSlotPath(
-                                        selectedNode.id,
-                                        "write",
-                                        idx,
-                                        val,
-                                        commit
-                                    )
-                                }
-                                onCheckSlots={checkSlotConnection}
-                                availableSlotPaths={canvasSlotPathOptions}
-                                slotDetails={selectedSlotDetails}
-                                onUpdateSlotPath={handleUpdateSelectedSlotPath}
-                                onUpdateSlotInherited={handleUpdateSelectedSlotInherited}
-                                onHoverSlotAccessSkill={(nodeId) =>
-                                    setHoveredSlotAccessNodeId(nodeId || null)
-                                }
-                                onSelectSlotAccessSkill={handleSelectSlotAccessSkill}
-                                onNavigateDescendantSlotSkill={handleNavigateDescendantSlotSkill}
-                                onNavigateAncestorSlot={handleNavigateAncestorSlot}
-                                parameterFocusRequest={parameterFocusRequest}
-                                slotFocusRequest={slotFocusRequest}
-                                transitionFocusRequest={transitionFocusRequest}
-                            />
+                            <Suspense fallback={null}>
+                                <DetailsPanel
+                                    {...detailsCallbacks}
+                                    selectedNode={selectedNode}
+                                    cloneSourceNode={selectedCloneSourceNode}
+                                    cloneNodes={selectedNodeClones}
+                                    containerOutgoingTransitions={selectedContainerOutgoingTransitions}
+                                    parallelLanes={selectedParallelLanes}
+                                    hasInitialNode={hasInitialNode}
+                                    activeTab={activeTab}
+                                    setActiveTab={setActiveTab}
+                                    packages={packages}
+                                    getPackageSkillEvent={getPackageSkillEvent}
+                                    availableTargetNodes={semanticNodes}
+                                    globalDataModel={selectedActionDataModel}
+                                    actionValueVariables={selectedActionExpressionVariables}
+                                    availableSlotPaths={canvasSlotPathOptions}
+                                    slotDetails={selectedSlotDetails}
+                                    parameterFocusRequest={parameterFocusRequest}
+                                    slotFocusRequest={slotFocusRequest}
+                                    transitionFocusRequest={transitionFocusRequest}
+                                />
+                            </Suspense>
                         )}
                     </div>
                 </div>
@@ -2032,48 +1405,38 @@ function AppContent() {
                 ?
             </button>
 
-            <EditorShortcutHelp
-                isOpen={isShortcutHelpOpen}
-                setIsOpen={setIsShortcutHelpOpen}
-            />
-
-            {tabPathTooltip &&
-                createPortal(
-                    <div
-                        className="workflow-tab-path-tooltip"
-                        style={{
-                            left: tabPathTooltip.left,
-                            top: tabPathTooltip.top,
-                        }}
-                    >
-                        {tabPathTooltip.path}
-                    </div>,
-                    document.body
-                )}
-
-            <ConditionModal
-                isOpen={drawerData.isOpen}
-                onClose={() => {
-                    setDrawerData((prev) => ({ ...prev, isOpen: false }));
-                    clearTransitionSelection();
+            <EditorOverlays
+                loading={stateMachineLoading}
+                runtimePreparation={runtimePreparation}
+                hint={{ isOpen: isHintPageOpen, onClose: () => setIsHintPageOpen(false) }}
+                subMachine={{
+                    pending: pendingSubMachineCreation,
+                    onCancel: () => setPendingSubMachineCreation(null),
+                    onConfirm: (fileConfig) => {
+                        if (!pendingSubMachineCreation) return false;
+                        return pendingSubMachineCreation.fromSelection
+                            ? handleCreateSubMachineFromSelected(fileConfig)
+                            : handleCreateEmptySubMachine(pendingSubMachineCreation.flowPosition, fileConfig);
+                    },
                 }}
-                onConfirm={handleConfirmDrawer}
-                globalVariables={availableDataModelParameters}
-                sourceNodeName={drawerData.sourceNodeName}
-                sourceEventName={drawerData.sourceEventName}
-                candidateTransitions={drawerData.candidateTransitions}
-                availableEvents={drawerData.availableEvents}
-                availableTargets={drawerData.availableTargets}
-                initialTransitionId={drawerData.initialTransitionId}
-                initialTargetId={drawerData.initialTargetId}
-                targetOnlyMode={drawerData.targetOnlyMode}
-            />
-
-            <CreateSlotModal
-                isOpen={isCreateSlotModalOpen}
-                onClose={() => setIsCreateSlotModalOpen(false)}
-                onCreate={handleCreateManualSlot}
-                skillSlotOptions={canvasSkillSlotOptions}
+                paste={{ pending: pendingSkillPaste, onCancel: cancelPendingSkillPaste, onResolve: resolvePendingSkillPaste }}
+                shortcuts={{ isOpen: isShortcutHelpOpen, setIsOpen: setIsShortcutHelpOpen }}
+                tabPathTooltip={tabPathTooltip}
+                condition={{
+                    drawer: drawerData,
+                    variables: availableDataModelParameters,
+                    onConfirm: handleConfirmDrawer,
+                    onClose: () => {
+                        setDrawerData((prev) => ({ ...prev, isOpen: false }));
+                        clearTransitionSelection();
+                    },
+                }}
+                slots={{
+                    isOpen: isCreateSlotModalOpen,
+                    onClose: () => setIsCreateSlotModalOpen(false),
+                    onCreate: createManualSlot,
+                    options: canvasSkillSlotOptions,
+                }}
             />
         </div>
     );
@@ -2086,4 +1449,3 @@ export default function App() {
         </ReactFlowProvider>
     );
 }
-

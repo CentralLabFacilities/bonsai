@@ -1,5 +1,6 @@
 import { measureContainerTask } from "./containerPerf.js";
-import { resolveCollisionScope, resolveCollisions } from "./nodeCollisions";
+import { resolveCollisionScope, resolveCollisions } from "./nodeCollisions.js";
+import { createEditorNodeIndex } from "./editorGraph.js";
 
 export const getNodeId = () => `skill-node-${crypto.randomUUID()}`;
 
@@ -270,7 +271,7 @@ const fitCompoundAndAncestorCompoundsImpl = (allNodes, compoundId) => {
     return context.nodes;
 };
 
-export const getAbsoluteNodePosition = (node, allNodes) => {
+export const getAbsoluteNodePosition = (node, allNodes, graphIndex = null) => {
     let x = node?.position?.x || 0;
     let y = node?.position?.y || 0;
     let parentId = node?.parentId;
@@ -279,9 +280,10 @@ export const getAbsoluteNodePosition = (node, allNodes) => {
     while (parentId && !visited.has(parentId)) {
         visited.add(parentId);
 
-        const parent = allNodes.find(
-            (candidate) => candidate.id === parentId
-        );
+        // Legacy geometry uses the first duplicate id, unlike hierarchy Maps.
+        const parent = graphIndex && !graphIndex.hasDuplicateIds
+            ? graphIndex.byId.get(parentId)
+            : allNodes.find((candidate) => candidate.id === parentId);
 
         if (!parent) break;
 
@@ -313,10 +315,12 @@ export const getLaneForNode = (node, allNodes) => {
     return null;
 };
 
-export const getEnclosingStateContainers = (node, allNodes = []) => {
-    const byId = new Map(
-        (allNodes || []).map((candidate) => [candidate.id, candidate])
-    );
+export const getEnclosingStateContainers = (
+    node,
+    allNodes = [],
+    graphIndex = createEditorNodeIndex(allNodes)
+) => {
+    const { byId } = graphIndex;
     const containers = [];
     const visited = new Set();
     let parentId = node?.parentId;
@@ -336,12 +340,20 @@ export const getEnclosingStateContainers = (node, allNodes = []) => {
     return containers;
 };
 
-export const isNodeInsideContainer = (node, containerId, allNodes = []) => {
+export const isNodeInsideContainer = (
+    node,
+    containerId,
+    allNodes = [],
+    graphIndex = null
+) => {
     if (!node || !containerId) return false;
 
-    const byId = new Map(
-        (allNodes || []).map((candidate) => [candidate.id, candidate])
-    );
+    const index = graphIndex || createEditorNodeIndex(allNodes);
+    if (node.id && !index.hasDuplicateIds) {
+        return index.getAncestorIds(node).has(containerId);
+    }
+
+    const { byId } = index;
     const visited = new Set();
     let parentId = node.parentId;
 
@@ -357,24 +369,11 @@ export const isNodeInsideContainer = (node, containerId, allNodes = []) => {
     return false;
 };
 
-export const getNodeNestingDepth = (node, allNodes = []) => {
-    const byId = new Map(
-        (allNodes || []).map((candidate) => [candidate.id, candidate])
-    );
-    const visited = new Set();
-    let depth = 0;
-    let parentId = node?.parentId;
-
-    while (parentId && !visited.has(parentId)) {
-        visited.add(parentId);
-        const parent = byId.get(parentId);
-        if (!parent) break;
-        depth += 1;
-        parentId = parent.parentId;
-    }
-
-    return depth;
-};
+export const getNodeNestingDepth = (
+    node,
+    allNodes = [],
+    graphIndex = createEditorNodeIndex(allNodes)
+) => graphIndex.getNestingDepth(node);
 
 // Resolve the actual editor container under a flow-space pointer. This is used
 // for both library drops and existing-node drags so all parallel lanes (not
@@ -389,10 +388,12 @@ export const findDropContainerAtPoint = (
         excludeNodeId = null,
         allowCompounds = true,
         allowParallelLanes = true,
+        graphIndex = null,
     } = {}
 ) => {
     if (!point) return null;
 
+    const nodeIndex = graphIndex || createEditorNodeIndex(allNodes);
     const candidates = [];
 
     (allNodes || []).forEach((node, index) => {
@@ -409,10 +410,10 @@ export const findDropContainerAtPoint = (
 
         if (excludeNodeId) {
             if (node.id === excludeNodeId) return;
-            if (isNodeInsideContainer(node, excludeNodeId, allNodes)) return;
+            if (isNodeInsideContainer(node, excludeNodeId, allNodes, nodeIndex)) return;
         }
 
-        const position = getAbsoluteNodePosition(node, allNodes);
+        const position = getAbsoluteNodePosition(node, allNodes, nodeIndex);
         const size = isLane
             ? {
                   width: Number(node.style?.width) || Number(node.width) || 420,
@@ -431,7 +432,7 @@ export const findDropContainerAtPoint = (
 
         candidates.push({
             node,
-            depth: getNodeNestingDepth(node, allNodes),
+            depth: getNodeNestingDepth(node, allNodes, nodeIndex),
             index,
         });
     });
@@ -453,42 +454,27 @@ export const findDropContainerAtPoint = (
 // already inside every compound/parallel boundary surrounding that target.
 // This prevents transitions from jumping across a state boundary directly to
 // one of its children; external transitions must target the container itself.
-export const canTargetAcrossStateBoundaries = (sourceNode, targetNode, allNodes = []) =>
-    getEnclosingStateContainers(targetNode, allNodes).every((container) =>
-        isNodeInsideContainer(sourceNode, container.id, allNodes)
+export const canTargetAcrossStateBoundaries = (
+    sourceNode,
+    targetNode,
+    allNodes = [],
+    graphIndex = createEditorNodeIndex(allNodes)
+) =>
+    getEnclosingStateContainers(targetNode, allNodes, graphIndex).every((container) =>
+        isNodeInsideContainer(sourceNode, container.id, allNodes, graphIndex)
     );
 
 export const getTransitionTargetHandleForNode = (node) =>
     node?.type === "parallel" ? "target" : "transition-target";
 
 export const orderNodesParentsFirst = (allNodes) => {
-    const byId = new Map(
-        allNodes.map((node) => [node.id, node])
-    );
-
-    const getDepth = (node) => {
-        let depth = 0;
-        let parentId = node.parentId;
-        const visited = new Set();
-
-        while (
-            parentId &&
-            byId.has(parentId) &&
-            !visited.has(parentId)
-            ) {
-            visited.add(parentId);
-            depth += 1;
-            parentId = byId.get(parentId).parentId;
-        }
-
-        return depth;
-    };
+    const graphIndex = createEditorNodeIndex(allNodes);
 
     return allNodes
         .map((node, index) => ({
             node,
             index,
-            depth: getDepth(node),
+            depth: graphIndex.getNestingDepth(node),
         }))
         .sort((a, b) => a.depth - b.depth || a.index - b.index)
         .map(({ node }) => node);
@@ -1331,4 +1317,3 @@ export const growAllStateContainersToContents = (allNodes) =>
         () => growAllStateContainersToContentsImpl(allNodes),
         { nodes: allNodes?.length || 0 }
     );
-

@@ -1,10 +1,15 @@
-import { prepareGraphForScxml } from "./editorScxml";
-import { getConfiguredAssignments } from "./stateActions";
+import {
+    prepareGraphForScxml,
+    prepareNodesForScxml,
+    prepareStateEditorPositionsForScxml,
+} from "./editorScxml.js";
+import { createEditorNodeIndex } from "./editorGraph.js";
+import { getConfiguredAssignments } from "./stateActions.js";
 import {
     serializeEditorConditionForScxml,
     serializeEditorValueForScxml,
-} from "./valueTypes";
-import { serializeEditorWorkflow } from "../tauri-client";
+} from "./valueTypes.js";
+import { serializeEditorWorkflow } from "../tauri-client.js";
 
 const normalizeAssignment = (assignment) => ({
     location: String(assignment?.location || "").trim().replace(/^@/, ""),
@@ -66,6 +71,19 @@ const normalizeParameter = (parameter) => {
     };
 };
 
+const normalizeEditorPosition = (position) => ({
+    x: Number(position?.x || 0),
+    y: Number(position?.y || 0),
+    instanceId: position?.instanceId
+        ? String(position.instanceId)
+        : null,
+    cloneType: position?.cloneType
+        ? String(position.cloneType)
+        : position?.isSkillClone
+            ? "skill"
+            : null,
+});
+
 const normalizeNode = (node) => {
     const legacyOnEntry = (node?.data?.params || []).filter(
         (parameter) => parameter?.location && parameter?.expr
@@ -111,18 +129,7 @@ const normalizeNode = (node) => {
         containerTransitionOrder: (node?.data?.containerTransitionOrder || []).map(String),
         x: Number(node?.position?.x || 0),
         y: Number(node?.position?.y || 0),
-        editorPositions: (node?.data?.editorClonePositions || []).map((position) => ({
-            x: Number(position?.x || 0),
-            y: Number(position?.y || 0),
-            instanceId: position?.instanceId
-                ? String(position.instanceId)
-                : null,
-            cloneType: position?.cloneType
-                ? String(position.cloneType)
-                : position?.isSkillClone
-                    ? "skill"
-                    : null,
-        })),
+        editorPositions: (node?.data?.editorClonePositions || []).map(normalizeEditorPosition),
     };
 };
 
@@ -177,45 +184,28 @@ const normalizeEdge = (edge) => ({
     editorTargetInstanceId: String(edge?.data?.editorTargetInstanceId || ""),
     logicalSources: normalizeLogicalTransitionSources(edge),
 });
-
-
+// Reuse preparedGraph only for the same immutable node/edge snapshot.
 export const buildRustStateEditorPositions = ({
     nodes = [],
-    edges = [],
     stateId,
+    preparedGraph = null,
 } = {}) => {
     const canonicalId = String(stateId || "").trim();
     if (!canonicalId) return null;
 
-    const exportGraph = prepareGraphForScxml(nodes || [], edges || []);
-    const state = exportGraph.nodes.find((node) => node.id === canonicalId);
-    if (!state) return null;
+    let positions;
+    if (preparedGraph) {
+        const state = preparedGraph.nodes.find((node) => node.id === canonicalId);
+        if (!state) return null;
+        const clonePositions = state.data?.editorClonePositions;
+        positions = Array.isArray(clonePositions) && clonePositions.length > 0
+            ? clonePositions
+            : [{ x: state.position?.x, y: state.position?.y }];
+    } else {
+        positions = prepareStateEditorPositionsForScxml(nodes || [], canonicalId);
+    }
 
-    const clonePositions = Array.isArray(state.data?.editorClonePositions)
-        ? state.data.editorClonePositions
-        : [];
-
-    const positions = clonePositions.length > 0
-        ? clonePositions
-        : [{
-            x: Number(state.position?.x || 0),
-            y: Number(state.position?.y || 0),
-            instanceId: null,
-            cloneType: null,
-        }];
-
-    return positions.map((position) => ({
-        x: Number(position?.x || 0),
-        y: Number(position?.y || 0),
-        instanceId: position?.instanceId
-            ? String(position.instanceId)
-            : null,
-        cloneType: position?.cloneType
-            ? String(position.cloneType)
-            : position?.isSkillClone
-                ? "skill"
-                : null,
-    }));
+    return positions ? positions.map(normalizeEditorPosition) : null;
 };
 
 export const buildRustDataModelEntries = (globalDataModel = []) =>
@@ -235,18 +225,19 @@ export const buildRustStateParameters = (parameters = []) =>
 
 export const buildRustSlotsSnapshot = ({
     nodes = [],
-    edges = [],
     manualSlots = [],
+    preparedGraph = null,
 } = {}) => {
-    const exportGraph = prepareGraphForScxml(nodes || [], edges || []);
-    const states = exportGraph.nodes.map((node) => {
-        const normalized = normalizeNode(node);
+    const exportNodes = preparedGraph?.nodes || prepareNodesForScxml(nodes || []);
+    const states = exportNodes.map((node) => {
+        const stateId = String(node?.id || "");
+        const fullSkillName = String(node?.data?.fullSkillName || "");
+        const label = String(node?.data?.label || "");
         return {
-            stateId: normalized.id,
-            stateName:
-                normalized.fullSkillName || normalized.label || normalized.id,
-            inputSlots: normalized.inputSlots,
-            outputSlots: normalized.outputSlots,
+            stateId,
+            stateName: fullSkillName || label || stateId,
+            inputSlots: (node?.data?.inSlots || []).map(normalizeSlot),
+            outputSlots: (node?.data?.outSlots || []).map(normalizeSlot),
         };
     });
 
@@ -307,16 +298,16 @@ export const buildRustParallelLaneMoveContext = ({
 
 export const buildRustEditorNodeSnapshots = ({
     nodes = [],
-    edges = [],
     stateIds = [],
+    preparedGraph = null,
 } = {}) => {
     const requestedIds = (Array.isArray(stateIds) ? stateIds : [stateIds])
         .map((id) => String(id || "").trim())
         .filter(Boolean);
     if (requestedIds.length === 0) return [];
 
-    const exportGraph = prepareGraphForScxml(nodes || [], edges || []);
-    const byId = new Map(exportGraph.nodes.map((node) => [node.id, node]));
+    const exportNodes = preparedGraph?.nodes || prepareNodesForScxml(nodes || [], requestedIds);
+    const { byId } = createEditorNodeIndex(exportNodes);
 
     return requestedIds
         .map((stateId) => byId.get(stateId))
@@ -327,8 +318,9 @@ export const buildRustEditorNodeSnapshots = ({
 export const buildRustEditorStructureSnapshot = ({
     nodes = [],
     edges = [],
+    preparedGraph = null,
 } = {}) => {
-    const exportGraph = prepareGraphForScxml(nodes || [], edges || []);
+    const exportGraph = preparedGraph || prepareGraphForScxml(nodes || [], edges || []);
     return {
         nodes: exportGraph.nodes.map(normalizeNode),
         edges: exportGraph.edges.map(normalizeEdge),

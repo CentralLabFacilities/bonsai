@@ -1,49 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FiPlus, FiTrash2 } from "react-icons/fi";
 import { normalizeAssignmentExpressionInput, validateAssignmentExpression } from "../utils/assignmentExpressions";
-
-const getVariableReferenceContext = (value, caretPosition) => {
-    const text = String(value || "");
-    const caret = Number.isInteger(caretPosition)
-        ? caretPosition
-        : text.length;
-    const beforeCaret = text.slice(0, caret);
-    const match = beforeCaret.match(/@([A-Za-z0-9_:#.\-]*)$/);
-
-    if (!match) return null;
-
-    return {
-        start: match.index,
-        end: caret,
-        query: match[1] || "",
-    };
-};
-
-const getMatchingExpressionVariables = (value, caretPosition, variables) => {
-    const context = getVariableReferenceContext(value, caretPosition);
-    if (!context) return { context: null, matches: [] };
-
-    const query = context.query.toLowerCase();
-    const options = (Array.isArray(variables) ? variables : [])
-        .filter(
-            (variable) =>
-                variable?.id &&
-                String(variable.id).trim() !== "#_STATE_PREFIX"
-        )
-        .filter((variable) =>
-            String(variable.id).toLowerCase().includes(query)
-        )
-        .sort((a, b) => {
-            const aId = String(a.id).toLowerCase();
-            const bId = String(b.id).toLowerCase();
-            const aStarts = aId.startsWith(query) ? 0 : 1;
-            const bStarts = bId.startsWith(query) ? 0 : 1;
-            return aStarts - bStarts || aId.localeCompare(bId);
-        })
-        .slice(0, 8);
-
-    return { context, matches: options };
-};
+import ExpressionVariableSuggestions from "./ExpressionVariableSuggestions.jsx";
+import {
+    getExpressionAutocompleteAction,
+    getMatchingExpressionVariables,
+    insertExpressionVariable,
+} from "./expressionAutocomplete.js";
 
 function StateActionsEditor({
                                 actionName,
@@ -69,10 +32,14 @@ function StateActionsEditor({
         .join("\u0001");
 
     useEffect(() => {
+        // Synchronize external commits without discarding drafts on location-only edits.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setExpressionDrafts(
             assignments.map((assignment) => String(assignment?.expr || ""))
         );
         setExpressionErrors({});
+        // The signature and count, not assignment identity, define a committed-expression reset.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [assignments.length, committedExpressionSignature]);
 
     const locationOptions = useMemo(
@@ -325,7 +292,8 @@ function StateActionsEditor({
         const { context, matches } = getMatchingExpressionVariables(
             value,
             caretPosition,
-            valueVariables
+            valueVariables,
+            { excludeStatePrefix: true }
         );
 
         setExpressionCaretPosition(caretPosition);
@@ -347,33 +315,23 @@ function StateActionsEditor({
             expressionDrafts[index] ??
             assignments[index]?.expr ??
             "";
-        const { context } = getMatchingExpressionVariables(
+        const insertion = insertExpressionVariable(
             value,
             expressionCaretPosition,
-            valueVariables
+            variable.id
         );
 
-        if (!context) return;
+        if (!insertion) return;
 
-        const replacement = `@${variable.id}`;
-        const nextValue =
-            value.slice(0, context.start) +
-            replacement +
-            value.slice(context.end);
-        const nextCaret = context.start + replacement.length;
-        const targetLocation = locationOptions.find(
-            (location) => location.id === assignments[index]?.location
-        );
-
-        updateExpressionDraft(index, nextValue);
+        updateExpressionDraft(index, insertion.value);
         setOpenExpressionIndex(null);
         setActiveExpressionSuggestionIndex(-1);
 
         requestAnimationFrame(() => {
             const input = expressionInputRefs.current[index];
             input?.focus();
-            input?.setSelectionRange?.(nextCaret, nextCaret);
-            setExpressionCaretPosition(nextCaret);
+            input?.setSelectionRange?.(insertion.caretPosition, insertion.caretPosition);
+            setExpressionCaretPosition(insertion.caretPosition);
         });
     };
 
@@ -387,37 +345,26 @@ function StateActionsEditor({
             openExpressionIndex === index &&
             matchingVariables.length > 0;
 
-        if (autocompleteOpen && event.key === "ArrowDown") {
-            event.preventDefault();
-            setActiveExpressionSuggestionIndex((current) =>
-                current < matchingVariables.length - 1 ? current + 1 : 0
-            );
-            return;
-        }
+        const action = getExpressionAutocompleteAction(
+            event.key,
+            autocompleteOpen,
+            matchingVariables.length,
+            activeExpressionSuggestionIndex
+        );
 
-        if (autocompleteOpen && event.key === "ArrowUp") {
+        if (action) {
             event.preventDefault();
-            setActiveExpressionSuggestionIndex((current) =>
-                current > 0 ? current - 1 : matchingVariables.length - 1
-            );
-            return;
-        }
-
-        if (autocompleteOpen && (event.key === "Enter" || event.key === "Tab")) {
-            event.preventDefault();
-            const suggestionIndex =
-                activeExpressionSuggestionIndex >= 0 &&
-                activeExpressionSuggestionIndex < matchingVariables.length
-                    ? activeExpressionSuggestionIndex
-                    : 0;
-            selectExpressionSuggestion(index, matchingVariables[suggestionIndex]);
-            return;
-        }
-
-        if (event.key === "Escape" && autocompleteOpen) {
-            event.preventDefault();
-            setOpenExpressionIndex(null);
-            setActiveExpressionSuggestionIndex(-1);
+            if (action.type === "navigate") {
+                const key = event.key;
+                setActiveExpressionSuggestionIndex((current) =>
+                    getExpressionAutocompleteAction(key, true, matchingVariables.length, current).index
+                );
+            } else if (action.type === "select") {
+                selectExpressionSuggestion(index, matchingVariables[action.index]);
+            } else {
+                setOpenExpressionIndex(null);
+                setActiveExpressionSuggestionIndex(-1);
+            }
             return;
         }
 
@@ -499,15 +446,14 @@ function StateActionsEditor({
                             expressionDrafts[index] ??
                             assignment.expr ??
                             "";
-                        const expressionMatch =
-                            getMatchingExpressionVariables(
-                                expressionValue,
-                                expressionCaretPosition,
-                                valueVariables
-                            );
                         const matchingExpressionVariables =
                             openExpressionIndex === index
-                                ? expressionMatch.matches
+                                ? getMatchingExpressionVariables(
+                                    expressionValue,
+                                    expressionCaretPosition,
+                                    valueVariables,
+                                    { excludeStatePrefix: true }
+                                ).matches
                                 : [];
                         const isExpressionAutocompleteOpen =
                             openExpressionIndex === index &&
@@ -711,36 +657,11 @@ function StateActionsEditor({
                                             />
 
                                             {isExpressionAutocompleteOpen && (
-                                                <div
-                                                    className="typed-value-autocomplete"
-                                                    role="listbox"
-                                                >
-                                                    {matchingExpressionVariables.map(
-                                                        (variable, suggestionIndex) => (
-                                                            <button
-                                                                type="button"
-                                                                className={`typed-value-autocomplete-option ${
-                                                                    suggestionIndex ===
-                                                                    activeExpressionSuggestionIndex
-                                                                        ? "active"
-                                                                        : ""
-                                                                }`}
-                                                                key={variable.id}
-                                                                onMouseDown={(event) => {
-                                                                    event.preventDefault();
-                                                                    selectExpressionSuggestion(
-                                                                        index,
-                                                                        variable
-                                                                    );
-                                                                }}
-                                                            >
-                                                                <span className="typed-value-autocomplete-value">
-                                                                    @{variable.id}
-                                                                </span>
-                                                            </button>
-                                                        )
-                                                    )}
-                                                </div>
+                                                <ExpressionVariableSuggestions
+                                                    variables={matchingExpressionVariables}
+                                                    activeIndex={activeExpressionSuggestionIndex}
+                                                    onSelect={(variable) => selectExpressionSuggestion(index, variable)}
+                                                />
                                             )}
                                         </div>
 

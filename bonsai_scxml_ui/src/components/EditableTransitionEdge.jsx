@@ -40,6 +40,7 @@ const ForcedSmartTransitionEdge = createSmartEdge(
 
 const CONTROL_POINT_SIZE = 14;
 const ADD_POINT_SIZE = 18;
+const EMPTY_ARRAY = Object.freeze([]);
 
 const distanceSquared = (a, b) => {
     const dx = a.x - b.x;
@@ -240,7 +241,7 @@ function ManualEditableTransitionEdge(
     // selection/hover-only node updates would otherwise wake every manual edge.
     const routingNodes = Array.isArray(data?.routingNodes)
         ? data.routingNodes
-        : [];
+        : EMPTY_ARRAY;
 
     const {
         setEdges,
@@ -248,6 +249,11 @@ function ManualEditableTransitionEdge(
     } = useReactFlow();
 
     const activeDragRef = useRef(null);
+    const dragCleanupRef = useRef(null);
+
+    useEffect(() => () => {
+        dragCleanupRef.current?.();
+    }, []);
 
     const sourcePoint = useMemo(
         () => ({
@@ -268,7 +274,7 @@ function ManualEditableTransitionEdge(
     const storedControlPoints =
         Array.isArray(data?.controlPoints)
             ? data.controlPoints
-            : [];
+            : EMPTY_ARRAY;
 
     /*
      * Keep a synchronous reference to the latest points.
@@ -414,10 +420,10 @@ function ManualEditableTransitionEdge(
                 event.preventDefault();
                 event.stopPropagation();
 
-                event.currentTarget
-                    .setPointerCapture?.(
-                    event.pointerId
-                );
+                dragCleanupRef.current?.();
+                const pointerId = event.pointerId;
+                const captureTarget = event.currentTarget;
+                captureTarget.setPointerCapture?.(pointerId);
 
                 activeDragRef.current =
                     pointId;
@@ -426,6 +432,7 @@ function ManualEditableTransitionEdge(
                     moveEvent
                 ) => {
                     if (
+                        moveEvent.pointerId !== pointerId ||
                         activeDragRef.current !==
                         pointId
                     ) {
@@ -460,10 +467,12 @@ function ManualEditableTransitionEdge(
                     );
                 };
 
-                const handlePointerUp =
-                    () => {
+                const finishDrag =
+                    (endEvent) => {
+                        if (endEvent && endEvent.pointerId !== pointerId) return;
                         activeDragRef.current =
                             null;
+                        dragCleanupRef.current = null;
 
                         window.removeEventListener(
                             "pointermove",
@@ -472,9 +481,16 @@ function ManualEditableTransitionEdge(
 
                         window.removeEventListener(
                             "pointerup",
-                            handlePointerUp
+                            finishDrag
                         );
+                        window.removeEventListener("pointercancel", finishDrag);
+                        captureTarget.removeEventListener("lostpointercapture", finishDrag);
+                        if (captureTarget.hasPointerCapture?.(pointerId)) {
+                            captureTarget.releasePointerCapture?.(pointerId);
+                        }
                     };
+
+                dragCleanupRef.current = finishDrag;
 
                 window.addEventListener(
                     "pointermove",
@@ -483,11 +499,10 @@ function ManualEditableTransitionEdge(
 
                 window.addEventListener(
                     "pointerup",
-                    handlePointerUp,
-                    {
-                        once: true,
-                    }
+                    finishDrag
                 );
+                window.addEventListener("pointercancel", finishDrag);
+                captureTarget.addEventListener("lostpointercapture", finishDrag);
             },
             [
                 screenToFlowPosition,
@@ -1001,4 +1016,3 @@ function EditableTransitionEdge(props) {
 // Keep routed transition components stable when their actual edge props did not
 // change so toggling visibility remains a paint-only operation.
 export default memo(EditableTransitionEdge);
-

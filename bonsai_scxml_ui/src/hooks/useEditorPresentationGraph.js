@@ -1,7 +1,53 @@
-import { useMemo, useRef } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import { getCollapsedTransitionSource } from "../utils/editorGraph";
-import { getLocalDataModelEntries } from "../utils/editorScxml";
+import { getCollapsedTransitionSource } from "../utils/editorGraph.js";
+import { getLocalDataModelEntries } from "../utils/editorScxml.js";
+import { useSemanticNodeSnapshot } from "./useEditorGraphMaintenance.js";
+
+export function projectOutgoingTransitionHandles(previous, edges) {
+    const handlesByNodeId = new Map();
+    edges.forEach((edge) => {
+        if (!edge?.source || edge.sourceHandle == null) return;
+        if (!handlesByNodeId.has(edge.source)) {
+            handlesByNodeId.set(edge.source, new Set());
+        }
+        handlesByNodeId.get(edge.source).add(String(edge.sourceHandle));
+    });
+
+    let changed = previous.size !== handlesByNodeId.size;
+    const result = new Map();
+    handlesByNodeId.forEach((handles, nodeId) => {
+        const sortedHandles = [...handles].sort();
+        const signature = sortedHandles.join("\u001f");
+        const previousEntry = previous.get(nodeId);
+        if (previousEntry?.signature === signature) {
+            result.set(nodeId, previousEntry);
+        } else {
+            changed = true;
+            result.set(nodeId, { handles: signature ? sortedHandles : [], signature });
+        }
+    });
+    return changed ? result : previous;
+}
+
+function useNodeActionForwarders(handlers) {
+    const handlersRef = useRef(handlers);
+    useLayoutEffect(() => {
+        handlersRef.current = handlers;
+    });
+
+    // These refs belong only to event handlers. Keeping callback publication
+    // separate prevents fresh caller functions from invalidating graph caches.
+    const onAddLane = useCallback((...args) => handlersRef.current.handleAddLaneToParallel?.(...args), []);
+    const onOpenStateActions = useCallback((...args) => handlersRef.current.handleOpenStateActions?.(...args), []);
+    const onOpenParameter = useCallback((...args) => handlersRef.current.handleOpenParameter?.(...args), []);
+    const onOpenSlot = useCallback((...args) => handlersRef.current.handleOpenSlot?.(...args), []);
+    const onOpenTransition = useCallback((...args) => handlersRef.current.handleOpenTransition?.(...args), []);
+    const onOpenSubMachine = useCallback((...args) => handlersRef.current.handleOpenSubMachine?.(...args), []);
+    const onToggleCollapse = useCallback((...args) => handlersRef.current.handleToggleContainerCollapse?.(...args), []);
+    return { onAddLane, onOpenStateActions, onOpenParameter, onOpenSlot,
+        onOpenTransition, onOpenSubMachine, onToggleCollapse };
+}
 
 /**
  * Owns the presentation-only graph indexes and injected React Flow node props.
@@ -26,34 +72,12 @@ export function useEditorPresentationGraph({
     handleOpenSubMachine,
     handleToggleContainerCollapse,
 }) {
-    const semanticSlotNodesRef = useRef([]);
-    const semanticSlotNodesDependency = isDraggingNode ? null : slotNodes;
-    const semanticSlotNodes = useMemo(() => {
-        const previous = semanticSlotNodesRef.current;
-        if (!semanticSlotNodesDependency) return previous;
-
-        const unchanged =
-            previous.length === semanticSlotNodesDependency.length &&
-            semanticSlotNodesDependency.every((node, index) => {
-                const oldNode = previous[index];
-                return (
-                    oldNode?.id === node.id &&
-                    oldNode?.type === node.type &&
-                    oldNode?.data === node.data
-                );
-            });
-
-        if (unchanged) return previous;
-
-        const next = semanticSlotNodesDependency.map((node) => ({
-            id: node.id,
-            type: node.type,
-            parentId: node.parentId,
-            data: node.data,
-        }));
-        semanticSlotNodesRef.current = next;
-        return next;
-    }, [semanticSlotNodesDependency]);
+    const semanticSlotNodes = useSemanticNodeSnapshot(slotNodes, isDraggingNode);
+    const { onAddLane, onOpenStateActions, onOpenParameter, onOpenSlot,
+        onOpenTransition, onOpenSubMachine, onToggleCollapse } = useNodeActionForwarders({
+        handleAddLaneToParallel, handleOpenStateActions, handleOpenParameter,
+        handleOpenSlot, handleOpenTransition, handleOpenSubMachine, handleToggleContainerCollapse,
+    });
 
     // Build the semantic hierarchy once per real topology/data change. Compound
     // and Parallel operations used to construct several independent maps and
@@ -158,64 +182,16 @@ export function useEditorPresentationGraph({
     // showing/highlighting one transition could therefore wake up every skill.
     // Keep the full transition graph loaded, but expose only this tiny derived
     // per-skill dependency to the node renderer.
-    const outgoingTransitionHandlesCacheRef = useRef({
-        byNodeId: new Map(),
-        signaturesByNodeId: new Map(),
-    });
-
-    const outgoingTransitionHandlesByNodeId = useMemo(() => {
-        const handlesByNodeId = new Map();
-
-        edges.forEach((edge) => {
-            if (!edge?.source) return;
-            const handle = edge.sourceHandle;
-            if (handle === undefined || handle === null) return;
-
-            if (!handlesByNodeId.has(edge.source)) {
-                handlesByNodeId.set(edge.source, new Set());
-            }
-            handlesByNodeId.get(edge.source).add(String(handle));
-        });
-
-        const previous = outgoingTransitionHandlesCacheRef.current;
-        const nextSignatures = new Map();
-        handlesByNodeId.forEach((handles, nodeId) => {
-            nextSignatures.set(nodeId, [...handles].sort().join("\u001f"));
-        });
-
-        // React Flow changes edge object identity for selection and other
-        // presentation-only updates. Those changes must not invalidate every
-        // skill node. Keep this derived map referentially stable unless the
-        // semantic set of source handles actually changed.
-        const topologyUnchanged =
-            previous.signaturesByNodeId.size === nextSignatures.size &&
-            [...nextSignatures].every(
-                ([nodeId, signature]) =>
-                    previous.signaturesByNodeId.get(nodeId) === signature
-            );
-
-        if (topologyUnchanged) return previous.byNodeId;
-
-        const result = new Map();
-        nextSignatures.forEach((signature, nodeId) => {
-            const previousEntry = previous.byNodeId.get(nodeId);
-            if (previousEntry?.signature === signature) {
-                result.set(nodeId, previousEntry);
-                return;
-            }
-
-            result.set(nodeId, {
-                handles: signature ? signature.split("\u001f") : [],
-                signature,
-            });
-        });
-
-        outgoingTransitionHandlesCacheRef.current = {
-            byNodeId: result,
-            signaturesByNodeId: nextSignatures,
-        };
-        return result;
-    }, [edges]);
+    const [outgoingHandlesSnapshot, setOutgoingHandlesSnapshot] = useState(() =>
+        projectOutgoingTransitionHandles(new Map(), edges)
+    );
+    const outgoingTransitionHandlesByNodeId = useMemo(
+        () => projectOutgoingTransitionHandles(outgoingHandlesSnapshot, edges),
+        [outgoingHandlesSnapshot, edges]
+    );
+    if (outgoingTransitionHandlesByNodeId !== outgoingHandlesSnapshot) {
+        setOutgoingHandlesSnapshot(outgoingTransitionHandlesByNodeId);
+    }
 
     // Expose the single semantic incoming transition to the target node so the
     // visible entry handle can hand the drag off to React Flow's native edge
@@ -387,11 +363,17 @@ export function useEditorPresentationGraph({
     // node itself did not change. During a drag React Flow normally replaces
     // only the moved node; recreating wrappers for every other node forces
     // unnecessary custom-node renders.
-    const injectedNodeCacheRef = useRef(new Map());
-    const injectedSlotNodeCacheRef = useRef(new Map());
+    const [injectedNodeSnapshot, setInjectedNodeSnapshot] = useState(() => ({
+        cache: new Map(),
+        nodes: [],
+    }));
+    const [injectedSlotNodeSnapshot, setInjectedSlotNodeSnapshot] = useState(() => ({
+        cache: new Map(),
+        nodes: [],
+    }));
 
-    const injectedNodes = useMemo(() => {
-        const previousCache = injectedNodeCacheRef.current;
+    const injectedGraph = useMemo(() => {
+        const previousCache = injectedNodeSnapshot.cache;
         const nextCache = new Map();
 
         const result = nodes.map((n) => {
@@ -411,7 +393,7 @@ export function useEditorPresentationGraph({
                     ? reconnectableIncomingEdgeByNodeId.get(n.id) || null
                     : null;
             const collapsedTransitionSignature = collapsedTransitionHandles
-                .map((event) => `${event.id}:${event.sourceNodeId}:${event.transitionHandleId}`)
+                .map((event) => `${event.id}:${event.name}:${event.sourceNodeId}:${event.transitionHandleId}`)
                 .join("\u001f");
             const childTab =
                 n.type === "submachine"
@@ -433,16 +415,7 @@ export function useEditorPresentationGraph({
                 cached.reconnectIncomingEdgeId === reconnectIncomingEdgeId &&
                 cached.activeMode === activeMode &&
                 cached.slotConnectionDrag === slotConnectionDrag &&
-                cached.childGlobalDataModel === childGlobalDataModel &&
-                cached.handleOpenStateActions === handleOpenStateActions &&
-                cached.handleOpenParameter === handleOpenParameter &&
-                cached.handleOpenSlot === handleOpenSlot &&
-                cached.handleOpenTransition === handleOpenTransition &&
-                cached.handleToggleContainerCollapse === handleToggleContainerCollapse &&
-                (n.type !== "submachine" ||
-                    cached.handleOpenSubMachine === handleOpenSubMachine) &&
-                (n.type !== "parallel" ||
-                    cached.handleAddLaneToParallel === handleAddLaneToParallel)
+                cached.childGlobalDataModel === childGlobalDataModel
             );
 
             if (canReuse) {
@@ -458,16 +431,16 @@ export function useEditorPresentationGraph({
                 unexposedTransitionHandles,
                 collapsedTransitionHandles,
                 reconnectIncomingEdgeId,
-                onOpenStateActions: handleOpenStateActions,
-                onOpenParameter: handleOpenParameter,
-                onOpenSlot: handleOpenSlot,
-                onOpenTransition: handleOpenTransition,
+                onOpenStateActions,
+                onOpenParameter,
+                onOpenSlot,
+                onOpenTransition,
                 slotConnectionDrag,
-                onToggleCollapse: handleToggleContainerCollapse,
+                onToggleCollapse,
             };
 
             if (n.type === "submachine") {
-                injectedData.onOpenSubMachine = handleOpenSubMachine;
+                injectedData.onOpenSubMachine = onOpenSubMachine;
 
                 if (childTab) {
                     injectedData.localDataModel = getLocalDataModelEntries(
@@ -477,7 +450,7 @@ export function useEditorPresentationGraph({
             }
 
             if (n.type === "parallel") {
-                injectedData.onAddLane = handleAddLaneToParallel;
+                injectedData.onAddLane = onAddLane;
             }
 
             const value = {
@@ -496,22 +469,21 @@ export function useEditorPresentationGraph({
                 activeMode,
                 slotConnectionDrag,
                 childGlobalDataModel,
-                handleOpenStateActions,
-                handleOpenParameter,
-                handleOpenSlot,
-                handleOpenTransition,
-                handleToggleContainerCollapse,
-                handleOpenSubMachine: handleOpenSubMachine,
-                handleAddLaneToParallel,
                 value,
             });
 
             return value;
         });
 
-        injectedNodeCacheRef.current = nextCache;
-        return result;
+        if (
+            result.length === injectedNodeSnapshot.nodes.length &&
+            result.every((node, index) => node === injectedNodeSnapshot.nodes[index])
+        ) {
+            return injectedNodeSnapshot;
+        }
+        return { cache: nextCache, nodes: result };
     }, [
+        injectedNodeSnapshot,
         nodes,
         outgoingTransitionHandlesByNodeId,
         unexposedTransitionHandlesByNodeId,
@@ -519,19 +491,21 @@ export function useEditorPresentationGraph({
         reconnectableIncomingEdgeByNodeId,
         childTabBySubmachineNodeId,
         activeMode,
-        handleAddLaneToParallel,
-        handleOpenStateActions,
-        handleOpenParameter,
-        handleOpenSlot,
-        handleOpenTransition,
-        handleOpenSubMachine,
-        handleToggleContainerCollapse,
+        onAddLane,
+        onOpenStateActions,
+        onOpenParameter,
+        onOpenSlot,
+        onOpenTransition,
+        onOpenSubMachine,
+        onToggleCollapse,
         hiddenNodeIds,
         slotConnectionDrag,
     ]);
+    if (injectedGraph !== injectedNodeSnapshot) setInjectedNodeSnapshot(injectedGraph);
+    const injectedNodes = injectedGraph.nodes;
 
-    const injectedSlotNodes = useMemo(() => {
-        const previousCache = injectedSlotNodeCacheRef.current;
+    const injectedSlotGraph = useMemo(() => {
+        const previousCache = injectedSlotNodeSnapshot.cache;
         const nextCache = new Map();
 
         const result = slotNodes.map((node) => {
@@ -561,9 +535,18 @@ export function useEditorPresentationGraph({
             return value;
         });
 
-        injectedSlotNodeCacheRef.current = nextCache;
-        return result;
-    }, [slotNodes, slotConnectionDrag]);
+        if (
+            result.length === injectedSlotNodeSnapshot.nodes.length &&
+            result.every((node, index) => node === injectedSlotNodeSnapshot.nodes[index])
+        ) {
+            return injectedSlotNodeSnapshot;
+        }
+        return { cache: nextCache, nodes: result };
+    }, [injectedSlotNodeSnapshot, slotNodes, slotConnectionDrag]);
+    if (injectedSlotGraph !== injectedSlotNodeSnapshot) {
+        setInjectedSlotNodeSnapshot(injectedSlotGraph);
+    }
+    const injectedSlotNodes = injectedSlotGraph.nodes;
 
 
     return {

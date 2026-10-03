@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { FiX } from "react-icons/fi";
 
-function CreateSlotModal({
-                             isOpen,
+function CreateSlotForm({
                              onClose,
                              onCreate,
                              skillSlotOptions = [],
@@ -53,16 +52,6 @@ function CreateSlotModal({
             ) || null,
         [skillSlotOptions, linkedSkillSlotId]
     );
-
-    useEffect(() => {
-        if (!isOpen) return;
-        setPath("");
-        setIsInherited(false);
-        setSelectedSkillNodeId("");
-        setLinkedSkillSlotId("");
-    }, [isOpen]);
-
-    if (!isOpen) return null;
 
     const resetAndClose = () => {
         setPath("");
@@ -220,4 +209,6 @@ function CreateSlotModal({
     );
 }
 
-export default CreateSlotModal;
+export default function CreateSlotModal({ isOpen, ...props }) {
+    return isOpen ? <CreateSlotForm {...props} /> : null;
+}

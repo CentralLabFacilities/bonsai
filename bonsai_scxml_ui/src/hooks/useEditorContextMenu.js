@@ -587,6 +587,7 @@ export function useEditorContextMenu({
             createEditorReference,
             edges,
             editorCloneSelection,
+            selectedNodes.length,
             getNodes,
             handleAddLaneToParallel,
             handleCreateCompoundFromSelected,

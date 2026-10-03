@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import {
     VALUE_TYPES,
     getCompatibleVariables,
     getVariableType,
     normalizeTypedValue,
     normalizeValueType,
-} from "../utils/valueTypes";
+} from "../utils/valueTypes.js";
 
 function TypedValueEditor({
                               value,
@@ -19,33 +19,31 @@ function TypedValueEditor({
                               allowEmpty = true,
                               excludeVariableId = null,
                           }) {
-    const [draft, setDraft] = useState(value ?? "");
+    const [draft, setDraft] = useState(String(value ?? ""));
     const [error, setError] = useState("");
     const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false);
     const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
     const inputRef = useRef(null);
-    const lastEmittedValueRef = useRef(null);
+    const [lastEmittedValue, setLastEmittedValue] = useState(null);
+    const [source, setSource] = useState({ value, expectedType });
+    const suggestionsId = useId();
 
-    useEffect(() => {
-        const nextValue = String(value ?? "");
-
-        // Parent components mirror drafts back through `value`. Do not treat
-        // that echo as an external reset, otherwise the autocomplete closes
-        // after every keystroke and appears to flicker.
-        if (lastEmittedValueRef.current === nextValue) {
-            lastEmittedValueRef.current = null;
-            return;
+    if (!Object.is(source.value, value) || !Object.is(source.expectedType, expectedType)) {
+        setSource({ value, expectedType });
+        if (!Object.is(source.expectedType, expectedType)) setError("");
+        if (!Object.is(source.value, value)) {
+            const nextValue = String(value ?? "");
+            // A parent draft echo is not an external reset of autocomplete.
+            if (lastEmittedValue === nextValue) {
+                setLastEmittedValue(null);
+            } else {
+                setDraft(nextValue);
+                setError("");
+                setIsAutocompleteOpen(false);
+                setActiveSuggestionIndex(-1);
+            }
         }
-
-        setDraft(nextValue);
-        setError("");
-        setIsAutocompleteOpen(false);
-        setActiveSuggestionIndex(-1);
-    }, [value]);
-
-    useEffect(() => {
-        setError("");
-    }, [expectedType]);
+    }
 
     const normalizedType = normalizeValueType(expectedType) || expectedType || null;
 
@@ -108,11 +106,9 @@ function TypedValueEditor({
             .slice(0, 8);
     }, [draft, suggestions]);
 
-    useEffect(() => {
-        if (activeSuggestionIndex >= matchingSuggestions.length) {
-            setActiveSuggestionIndex(matchingSuggestions.length > 0 ? 0 : -1);
-        }
-    }, [matchingSuggestions, activeSuggestionIndex]);
+    if (activeSuggestionIndex >= matchingSuggestions.length) {
+        setActiveSuggestionIndex(matchingSuggestions.length > 0 ? 0 : -1);
+    }
 
     const commitValue = (nextValue = draft) => {
         const result = normalizeTypedValue(
@@ -131,7 +127,7 @@ function TypedValueEditor({
         setError("");
         setIsAutocompleteOpen(false);
         setActiveSuggestionIndex(-1);
-        lastEmittedValueRef.current = result.value;
+        setLastEmittedValue(result.value);
         onDraftChange?.(result.value);
         onCommit?.(result.value);
         return true;
@@ -144,7 +140,7 @@ function TypedValueEditor({
         setError("");
         setIsAutocompleteOpen(false);
         setActiveSuggestionIndex(-1);
-        lastEmittedValueRef.current = suggestion.value;
+        setLastEmittedValue(suggestion.value);
         onDraftChange?.(suggestion.value);
         onCommit?.(suggestion.value);
 
@@ -213,6 +209,12 @@ function TypedValueEditor({
                     placeholder={placeholder}
                     disabled={disabled}
                     aria-invalid={Boolean(error)}
+                    role="combobox"
+                    aria-autocomplete="list"
+                    aria-expanded={isAutocompleteOpen && matchingSuggestions.length > 0}
+                    aria-controls={isAutocompleteOpen && matchingSuggestions.length > 0 ? suggestionsId : undefined}
+                    aria-activedescendant={isAutocompleteOpen && activeSuggestionIndex >= 0 && matchingSuggestions.length > 0
+                        ? `${suggestionsId}-${activeSuggestionIndex}` : undefined}
                     autoComplete="off"
                     onFocus={() => {
                         if (String(draft || "").trim() && matchingSuggestions.length > 0) {
@@ -224,7 +226,7 @@ function TypedValueEditor({
                         const nextValue = event.target.value;
                         setDraft(nextValue);
                         setError("");
-                        lastEmittedValueRef.current = nextValue;
+                        setLastEmittedValue(nextValue);
                         onDraftChange?.(nextValue);
 
                         const hasText = nextValue.trim().length > 0;
@@ -242,7 +244,7 @@ function TypedValueEditor({
                 />
 
                 {isAutocompleteOpen && matchingSuggestions.length > 0 && (
-                    <div className="typed-value-autocomplete" role="listbox">
+                    <div className="typed-value-autocomplete" role="listbox" id={suggestionsId}>
                         {matchingSuggestions.map((suggestion, index) => (
                             <button
                                 type="button"
@@ -250,10 +252,11 @@ function TypedValueEditor({
                                     index === activeSuggestionIndex ? "active" : ""
                                 }`}
                                 key={`${suggestion.kind}:${suggestion.value}`}
-                                onMouseDown={(event) => {
-                                    event.preventDefault();
-                                    selectSuggestion(suggestion);
-                                }}
+                                id={`${suggestionsId}-${index}`}
+                                role="option"
+                                aria-selected={index === activeSuggestionIndex}
+                                onMouseDown={(event) => event.preventDefault()}
+                                onClick={() => selectSuggestion(suggestion)}
                             >
                                 <span className="typed-value-autocomplete-value">
                                     {suggestion.value}

@@ -3,8 +3,8 @@ import {
     COMPOUND_PADDING_X,
     getCompoundExitGutterWidth,
     getNodeSize,
-} from "./editorGeometry";
-import { createEditorNodeIndex } from "./editorGraph";
+} from "./editorGeometry.js";
+import { createEditorNodeIndex } from "./editorGraph.js";
 
 const sourceIdOf = (edge) =>
     edge?.data?.boundaryOriginalSource ||
@@ -135,6 +135,22 @@ const rebuildBoundaryTransitionsImpl = (sourceNodes = [], sourceEdges = []) => {
     }));
     const graphIndex = createEditorNodeIndex(nodes);
     const { byId } = graphIndex;
+    // Event handles share the same boundary path within this fixed hierarchy.
+    const exitedBoundariesBySource = new Map();
+    const getSourceSteps = (sourceId, targetNode) => {
+        let byTarget = exitedBoundariesBySource.get(sourceId);
+        if (!byTarget) {
+            byTarget = new Map();
+            exitedBoundariesBySource.set(sourceId, byTarget);
+        }
+        if (!byTarget.has(targetNode.id)) {
+            byTarget.set(
+                targetNode.id,
+                getExitedBoundaries(byId.get(sourceId), targetNode, graphIndex)
+            );
+        }
+        return byTarget.get(targetNode.id);
+    };
 
     // Remove only managed boundary events. API-defined normal skill events and
     // genuine container-level events remain untouched.
@@ -195,14 +211,8 @@ const rebuildBoundaryTransitionsImpl = (sourceNodes = [], sourceEdges = []) => {
             const cleanData = stripSourceBoundaryData(edge.data || {});
             const sourcePaths = validSources.map((entry) => ({
                 ...entry,
-                sourceNode: byId.get(entry.sourceId),
-                steps: getExitedBoundaries(
-                    byId.get(entry.sourceId),
-                    semanticTargetNode,
-                    graphIndex
-                ),
+                steps: getSourceSteps(entry.sourceId, semanticTargetNode),
             }));
-            const primaryPath = sourcePaths[0];
             const hasBoundaryStep = sourcePaths.some((path) => path.steps.length > 0);
 
             if (!hasBoundaryStep) {

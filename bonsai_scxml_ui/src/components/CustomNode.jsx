@@ -357,7 +357,6 @@ function CustomNode({ id, data, selected }) {
         };
     }, [
         data,
-        id,
         showEvents,
         showSlots,
         isFinalState,

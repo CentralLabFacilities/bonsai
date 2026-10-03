@@ -8,6 +8,15 @@ const sameFocus = (a, b) =>
         (a.nodeId || null) === (b.nodeId || null)
     );
 
+function findNavigableFocusIndex(entries, availableTabIds, startIndex, direction) {
+    let index = startIndex;
+    while (index >= 0 && index < entries.length) {
+        if (availableTabIds.has(entries[index]?.tabId)) return index;
+        index += direction;
+    }
+    return -1;
+}
+
 export function useFocusHistory({
     activeTabId,
     selectedNodeId,
@@ -125,19 +134,8 @@ export function useFocusHistory({
     );
 
     const findNavigableIndex = useCallback(
-        (startIndex, direction) => {
-            const entries = historyRef.current;
-            let index = startIndex;
-
-            while (index >= 0 && index < entries.length) {
-                if (availableTabIds.has(entries[index]?.tabId)) {
-                    return index;
-                }
-                index += direction;
-            }
-
-            return -1;
-        },
+        (startIndex, direction) =>
+            findNavigableFocusIndex(historyRef.current, availableTabIds, startIndex, direction),
         [availableTabIds]
     );
 
@@ -236,9 +234,9 @@ export function useFocusHistory({
     }, [findNavigableIndex, restoreFocus]);
 
     const canGoBack =
-        findNavigableIndex(historyIndex - 1, -1) >= 0;
+        findNavigableFocusIndex(history, availableTabIds, historyIndex - 1, -1) >= 0;
     const canGoForward =
-        findNavigableIndex(historyIndex + 1, 1) >= 0;
+        findNavigableFocusIndex(history, availableTabIds, historyIndex + 1, 1) >= 0;
 
     return {
         canGoBack,

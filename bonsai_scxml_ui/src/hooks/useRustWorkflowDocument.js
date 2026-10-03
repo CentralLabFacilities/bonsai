@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import {
     applyWorkflowCommand as applyWorkflowCommandTauri,
     isTauri,
@@ -135,12 +135,9 @@ export function useRustWorkflowDocument({
     const readQuerySequenceRef = useRef(new Map());
     const editorStateRef = useRef(null);
 
-    editorStateRef.current = {
-        nodes,
-        edges,
-        globalDataModel,
-        manualSlots,
-    };
+    useLayoutEffect(() => {
+        editorStateRef.current = { nodes, edges, globalDataModel, manualSlots };
+    }, [nodes, edges, globalDataModel, manualSlots]);
 
     const enqueue = useCallback((operation, generation = documentGenerationRef.current) => {
         const enqueuedAt = editorPerfNow();
@@ -866,16 +863,15 @@ export function useRustWorkflowDocument({
                     return replaceNow(editorState, null);
                 }
 
-                let result = await applyCommandNow({
+                await applyCommandNow({
                     type: "replaceStateParameters",
                     stateId,
                     parameters: buildRustStateParameters(node.data?.params || []),
                 });
-                result = await applyCommandNow({
+                return applyCommandNow({
                     type: "replaceSlotsSnapshot",
                     ...buildRustSlotsSnapshot(editorState),
                 });
-                return result;
             }),
         [applyCommandNow, enqueue, replaceNow]
     );

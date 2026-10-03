@@ -14,6 +14,14 @@ import {
     FiX,
 } from "react-icons/fi";
 import StateActionsEditor from "./StateActionsEditor";
+import {
+    areDetailsPanelPropsEqual,
+    createDetailsTargetIndex,
+    getAvailableActionLocations,
+    getMatchingTargetNodeOptions,
+    getSemanticTargetNodeIds as selectSemanticTargetNodeIds,
+    getSkillPackageName,
+} from "./detailsPanelSelectors.js";
 
 
 const normalizeSlotPath = (value) =>
@@ -159,6 +167,53 @@ function SlotPathEditor({
             </div>
         </div>
     );
+}
+
+function SkillSlotSection({
+                             nodeId,
+                             slots,
+                             access,
+                             availableSlotPaths,
+                             onChange,
+                             onCommit,
+                         }) {
+    const prefix = access === "read" ? "in" : "out";
+
+    return slots.map((slot, index) => (
+        <div
+            className={`slot-text-field compact-slot-card compact-slot-${access}`}
+            key={`${prefix}-${slot.key}`}
+        >
+            <div className="compact-slot-header">
+                <div className="compact-slot-name">{slot.key}</div>
+                <div className="compact-slot-badges">
+                    <span
+                        className={`parameter-type-badge parameter-type-${String(slot.type || "other")
+                            .toLowerCase()
+                            .replace(/[^a-z0-9]+/g, "-")}`}
+                    >
+                        {slot.type || "Unknown"}
+                    </span>
+                    <span className={`slot-access-badge slot-access-${access}`}>
+                        {access === "read" ? "Read" : "Write"}
+                    </span>
+                </div>
+            </div>
+
+            {slot.description && (
+                <div className="parameter-description">{slot.description}</div>
+            )}
+
+            <SlotPathEditor
+                id={`${prefix}-slot-${nodeId}-${index}`}
+                value={slot.path || ""}
+                slotType={slot.type}
+                availableSlotPaths={availableSlotPaths}
+                onChange={(value, commit) => onChange(index, value, commit)}
+                onCommit={onCommit}
+            />
+        </div>
+    ));
 }
 
 function SlotDetailsPanel({
@@ -790,28 +845,6 @@ function formatResourceKeys(items) {
 }
 
 
-function getSkillPackageName(fullSkillName) {
-    let baseName = String(fullSkillName || "").split("#")[0];
-
-    const skillsMarker = ".skills.";
-    const skillsIndex = baseName.indexOf(skillsMarker);
-
-    if (skillsIndex !== -1) {
-        baseName = baseName.slice(
-            skillsIndex + skillsMarker.length
-        );
-    }
-
-    const parts = baseName.split(".").filter(Boolean);
-
-    if (parts.length <= 1) {
-        return "";
-    }
-
-    return parts.slice(0, -1).join(".");
-}
-
-
 const NOP_SEND_EVENT_SUGGESTIONS = ["success", "fatal", "error"];
 
 function NopSendEditor({ nodeId, events = [], onChange }) {
@@ -1025,6 +1058,8 @@ function ParallelLaneRow({
     const [nameDraft, setNameDraft] = useState(laneLabel);
 
     useEffect(() => {
+        // External lane renames reset the draft; typing alone must not reset it.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setNameDraft(laneLabel);
     }, [lane.id, laneLabel]);
 
@@ -1164,12 +1199,9 @@ function DetailsPanel({
                           hasInitialNode,
                           activeTab,
                           setActiveTab,
-                          packages,
-                          getPackageSkillEvent,
                           onSetInitial,
                           onUpdateName,
                           onUpdateNameCommit,
-                          onUpdateEvent,
                           availableTargetNodes = [],
                           onSetEventTarget,
                           onUpdateParameter,
@@ -1199,7 +1231,6 @@ function DetailsPanel({
                           onNavigateClone,
                           containerOutgoingTransitions = [],
                           skillOutgoingTransitions = [],
-                          onMoveContainerTransition,
                           onNavigateTransitionNode,
                           onHoverTransitionNode,
                           onOpenTransitionPanel,
@@ -1237,9 +1268,9 @@ function DetailsPanel({
         isNopSkill &&
         Array.isArray(selectedNode.data?.behaviorExitEvents) &&
         String(selectedNode.data.behaviorExitEvents[0] || "").trim().length > 0;
-    const editableExitTokens = getEditableExitTokens(
-        selectedNode.data?.events || [],
-        exposesImplicitFatal
+    const editableExitTokens = useMemo(
+        () => getEditableExitTokens(selectedNode.data.events || [], exposesImplicitFatal),
+        [selectedNode.data.events, exposesImplicitFatal]
     );
     const firstEditableExitToken = editableExitTokens[0] || null;
     const transitionButtonSourceId = selectedNode.id;
@@ -1399,11 +1430,7 @@ function DetailsPanel({
             return;
         }
 
-        const sortedEvents = getEditableExitTokens(
-            selectedNode.data?.events || [],
-            exposesImplicitFatal
-        );
-        const eventIndex = sortedEvents.findIndex(
+        const eventIndex = editableExitTokens.findIndex(
             (event) =>
                 String(event?.id || "") ===
                 String(transitionFocusRequest.eventId || "")
@@ -1442,12 +1469,12 @@ function DetailsPanel({
         activeTab,
         transitionFocusRequest,
         selectedNode.id,
-        selectedNode.data?.events,
+        editableExitTokens,
     ]);
 
     useEffect(() => {
         const hiddenStandardTab =
-            (hidesParameterAndSlots || isEditorClone) &&
+            (hidesParameterAndSlots || isEditorClone || isSubMachine) &&
             (activeTab === "parameter" || activeTab === "slots");
         const invalidSendTab =
             activeTab === "send" && (!isNopSkill || isEditorClone);
@@ -1470,9 +1497,25 @@ function DetailsPanel({
         hidesEntryExit,
         isNopSkill,
         isEditorClone,
+        isSubMachine,
         selectedNode.id,
         setActiveTab,
     ]);
+
+    const hasStateDetails = selectedNode.type !== "slot" && !isEditorClone;
+    const targetNodeIndex = useMemo(
+        () => hasStateDetails
+            ? createDetailsTargetIndex(availableTargetNodes, skillOutgoingTransitions, selectedNode.id)
+            : null,
+        [hasStateDetails, availableTargetNodes, skillOutgoingTransitions, selectedNode.id]
+    );
+    // Child datamodel entries are writable in a sub-machine; parent values remain read-only.
+    const availableActionLocations = useMemo(
+        () => hasStateDetails
+            ? getAvailableActionLocations(globalDataModel, selectedNode.data.params, isSubMachine)
+            : [],
+        [hasStateDetails, globalDataModel, selectedNode.data.params, isSubMachine]
+    );
 
     if (selectedNode.type === "slot") {
         return (
@@ -1550,77 +1593,7 @@ function DetailsPanel({
         );
     }
 
-    const targetNodeOptions = (availableTargetNodes || []).map((node) => {
-        const fullSkillName = node.data?.fullSkillName || "";
-        const editorInstanceId = String(
-            node.data?.editorInstanceId || ""
-        ).trim();
-        const isReference = Boolean(
-            node.data?.isSkillClone || node.data?.isStateClone
-        );
-        const referenceId = isReference
-            ? editorInstanceId || String(node.id || "")
-            : "";
-        const stateName = editorInstanceId && !isReference
-            ? `#${editorInstanceId}`
-            : fullSkillName.includes("#")
-                ? fullSkillName.split("#").pop()
-                : "";
-
-        const skillName =
-            node.data?.label ||
-            fullSkillName.split(".").pop().split("#")[0] ||
-            node.id;
-
-        const displayName = isReference
-            ? `${skillName} [${referenceId}]`
-            : editorInstanceId
-                ? `${skillName}#${editorInstanceId}`
-                : stateName && stateName !== skillName
-                    ? `${skillName}${stateName.startsWith("#") ? "" : "#"}${stateName}`
-                    : skillName;
-
-        return {
-            id: node.id,
-            displayName,
-            skillName,
-            stateName,
-            fullSkillName,
-            editorInstanceId,
-            isReference,
-            referenceId,
-            packageName: getSkillPackageName(fullSkillName),
-        };
-    });
-
-    const getSemanticTargetNodeIds = (event) => {
-        const targetIds = [];
-        const addTarget = (targetId) => {
-            if (!targetId || targetIds.includes(targetId)) return;
-            targetIds.push(targetId);
-        };
-
-        if (event?.target) {
-            const option = targetNodeOptions.find(
-                (candidate) =>
-                    candidate.id === event.target ||
-                    candidate.fullSkillName === event.target ||
-                    candidate.displayName === event.target
-            );
-            addTarget(option?.id || event.target);
-        }
-
-        (skillOutgoingTransitions || [])
-            .filter(
-                (transition) =>
-                    transition?.sourceNodeId === selectedNode.id &&
-                    String(transition?.eventId || "") ===
-                    String(event?.id || "")
-            )
-            .forEach((transition) => addTarget(transition.targetNodeId));
-
-        return targetIds;
-    };
+    const getSemanticTargetNodeIds = (event) => selectSemanticTargetNodeIds(event, targetNodeIndex);
 
     const resolveEventTargetNodeId = (event) =>
         getSemanticTargetNodeIds(event)[0] || null;
@@ -1637,9 +1610,7 @@ function DetailsPanel({
         const targetNodeId = resolveEventTargetNodeId(event);
         if (!targetNodeId) return "";
 
-        const option = targetNodeOptions.find(
-            (candidate) => candidate.id === targetNodeId
-        );
+        const option = targetNodeIndex.byId.get(targetNodeId);
 
         return option?.displayName || targetNodeId;
     };
@@ -1659,29 +1630,7 @@ function DetailsPanel({
         return getCurrentTargetDisplayName(event);
     };
 
-    const getMatchingTargetNodes = (query) => {
-        const normalizedQuery = query.trim().toLowerCase();
-
-        if (!normalizedQuery) {
-            return targetNodeOptions;
-        }
-
-        return targetNodeOptions.filter((option) =>
-            [
-                option.displayName,
-                option.skillName,
-                option.stateName,
-                option.fullSkillName,
-                option.packageName,
-                option.id,
-                option.referenceId,
-            ].some((value) =>
-                String(value || "")
-                    .toLowerCase()
-                    .includes(normalizedQuery)
-            )
-        );
-    };
+    const getMatchingTargetNodes = (query) => getMatchingTargetNodeOptions(query, targetNodeIndex);
 
     const selectExistingTarget = (event, index, option) => {
         const key = getTargetSelectorKey(event, index);
@@ -1716,21 +1665,7 @@ function DetailsPanel({
 
         if (!query) return;
 
-        const exactMatch = targetNodeOptions.find((option) =>
-            [
-                option.displayName,
-                option.skillName,
-                option.stateName,
-                option.fullSkillName,
-                option.packageName,
-                option.id,
-                option.referenceId,
-            ].some(
-                (value) =>
-                    String(value || "").toLowerCase() ===
-                    query.toLowerCase()
-            )
-        );
+        const exactMatch = targetNodeIndex.byExactQuery.get(query.toLowerCase());
 
         if (exactMatch) {
             selectExistingTarget(event, index, exactMatch);
@@ -1743,34 +1678,6 @@ function DetailsPanel({
             selectExistingTarget(event, index, matches[0]);
         }
     };
-
-    // Assignment scopes are intentionally separate:
-    // - location: variables writable in the selected state. For a sub-state
-    //   machine these are ONLY the child machine's local datamodel entries.
-    // - valueVariables: variables readable by the assignment expression. For
-    //   a sub-state machine App.jsx supplies the parent workflow datamodel.
-    const availableActionLocations = [
-        ...(globalDataModel || []).filter(
-            (parameter) =>
-                parameter?.id &&
-                String(parameter.id).trim() !== "#_STATE_PREFIX"
-        ),
-        ...(!isSubMachine
-            ? (selectedNode.data.params || [])
-                .filter((parameter) => parameter?.key)
-                .map((parameter) => ({
-                    ...parameter,
-                    id: parameter.key,
-                    source: "Parameter",
-                }))
-            : []),
-    ].filter(
-        (location, index, locations) =>
-            location?.id &&
-            locations.findIndex(
-                (candidate) => candidate?.id === location.id
-            ) === index
-    );
 
     return (
         <aside className="details-panel">
@@ -2199,10 +2106,7 @@ function DetailsPanel({
                                                         <div className="exit-token-node-references">
                                                             {targetNodeIds.map((targetNodeId) => {
                                                                 const targetOption =
-                                                                    targetNodeOptions.find(
-                                                                        (option) =>
-                                                                            option.id === targetNodeId
-                                                                    );
+                                                                    targetNodeIndex.byId.get(targetNodeId);
 
                                                                 return (
                                                                     <NodeReferenceCard
@@ -2245,14 +2149,12 @@ function DetailsPanel({
                                                                 index
                                                             );
 
-                                                        const matches =
-                                                            getMatchingTargetNodes(
-                                                                query
-                                                            );
-
                                                         const isOpen =
                                                             openTargetSelector ===
                                                             selectorKey;
+                                                        const matches = isOpen
+                                                            ? getMatchingTargetNodes(query)
+                                                            : [];
 
                                                         return (
                                                             <div className="exit-target-selector">
@@ -2527,115 +2429,22 @@ function DetailsPanel({
                         <h3>Slots</h3>
 
                         <div className="slot-list">
-                            {(selectedNode.data.inSlots || []).map(
-                                (slot, index) => (
-                                    <div
-                                        className="slot-text-field compact-slot-card compact-slot-read"
-                                        key={`in-${slot.key}`}
-                                    >
-                                        <div className="compact-slot-header">
-                                            <div className="compact-slot-name">
-                                                {slot.key}
-                                            </div>
-
-                                            <div className="compact-slot-badges">
-                                                <span
-                                                    className={`parameter-type-badge parameter-type-${String(
-                                                        slot.type || "other"
-                                                    )
-                                                        .toLowerCase()
-                                                        .replace(
-                                                            /[^a-z0-9]+/g,
-                                                            "-"
-                                                        )}`}
-                                                >
-                                                    {slot.type || "Unknown"}
-                                                </span>
-
-                                                <span className="slot-access-badge slot-access-read">
-                                                    Read
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        {slot.description && (
-                                            <div className="parameter-description">
-                                                {slot.description}
-                                            </div>
-                                        )}
-
-                                        <SlotPathEditor
-                                            id={`in-slot-${selectedNode.id}-${index}`}
-                                            value={slot.path || ""}
-                                            slotType={slot.type}
-                                            availableSlotPaths={availableSlotPaths}
-                                            onChange={(value, commit) =>
-                                                onUpdateInSlotPath(
-                                                    index,
-                                                    value,
-                                                    commit
-                                                )
-                                            }
-                                            onCommit={onCheckSlots}
-                                        />
-                                    </div>
-                                )
-                            )}
-
-                            {(selectedNode.data.outSlots || []).map(
-                                (slot, index) => (
-                                    <div
-                                        className="slot-text-field compact-slot-card compact-slot-write"
-                                        key={`out-${slot.key}`}
-                                    >
-                                        <div className="compact-slot-header">
-                                            <div className="compact-slot-name">
-                                                {slot.key}
-                                            </div>
-
-                                            <div className="compact-slot-badges">
-                                                <span
-                                                    className={`parameter-type-badge parameter-type-${String(
-                                                        slot.type || "other"
-                                                    )
-                                                        .toLowerCase()
-                                                        .replace(
-                                                            /[^a-z0-9]+/g,
-                                                            "-"
-                                                        )}`}
-                                                >
-                                                    {slot.type || "Unknown"}
-                                                </span>
-
-                                                <span className="slot-access-badge slot-access-write">
-                                                    Write
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        {slot.description && (
-                                            <div className="parameter-description">
-                                                {slot.description}
-                                            </div>
-                                        )}
-
-                                        <SlotPathEditor
-                                            id={`out-slot-${selectedNode.id}-${index}`}
-                                            value={slot.path || ""}
-                                            slotType={slot.type}
-                                            availableSlotPaths={availableSlotPaths}
-                                            onChange={(value, commit) =>
-                                                onUpdateOutSlotPath(
-                                                    index,
-                                                    value,
-                                                    commit
-                                                )
-                                            }
-                                            onCommit={onCheckSlots}
-                                        />
-                                    </div>
-                                )
-                            )}
+                            <SkillSlotSection
+                                nodeId={selectedNode.id}
+                                slots={selectedNode.data.inSlots || []}
+                                access="read"
+                                availableSlotPaths={availableSlotPaths}
+                                onChange={onUpdateInSlotPath}
+                                onCommit={onCheckSlots}
+                            />
+                            <SkillSlotSection
+                                nodeId={selectedNode.id}
+                                slots={selectedNode.data.outSlots || []}
+                                access="write"
+                                availableSlotPaths={availableSlotPaths}
+                                onChange={onUpdateOutSlotPath}
+                                onCommit={onCheckSlots}
+                            />
                         </div>
                     </div>
                 )}
@@ -2687,29 +2496,5 @@ function DetailsPanel({
         </aside>
     );
 }
-
-const areDetailsPanelPropsEqual = (previous, next) => {
-    const stableDataProps = [
-        "selectedNode",
-        "hasInitialNode",
-        "activeTab",
-        "packages",
-        "availableTargetNodes",
-        "availableSlotPaths",
-        "globalDataModel",
-        "actionValueVariables",
-        "slotDetails",
-        "parameterFocusRequest",
-        "slotFocusRequest",
-        "transitionFocusRequest",
-        "cloneSourceNode",
-        "cloneNodes",
-        "containerOutgoingTransitions",
-        "skillOutgoingTransitions",
-        "parallelLanes",
-    ];
-
-    return stableDataProps.every((key) => previous[key] === next[key]);
-};
 
 export default memo(DetailsPanel, areDetailsPanelPropsEqual);

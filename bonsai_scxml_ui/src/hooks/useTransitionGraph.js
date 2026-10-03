@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { addEdge, MarkerType } from "@xyflow/react";
+import { MarkerType } from "@xyflow/react";
 import {
     SLOT_CONNECTION_COLORS,
     clearTransientTransitionHighlight,
@@ -137,10 +137,8 @@ export function useTransitionGraph({
     edges,
     slotNodes,
     slotEdges,
-    selectedNodeId,
     setNodes,
     setEdges,
-    setSlotNodes,
     setSlotEdges,
     setGlobalDataModel,
     setSelectedNodeId,
@@ -165,7 +163,7 @@ export function useTransitionGraph({
         availableTargets: [],
     });
 
-    const openConditionDrawer = (
+    const openConditionDrawer = useCallback((
         sourceId,
         sourceHandle = "",
         initialTargetId = null,
@@ -534,7 +532,7 @@ export function useTransitionGraph({
             targetOnlyMode,
             containerNodeId: null,
         });
-    };
+    }, [nodes, edges]);
 
     const isValidConnection = useCallback((connection) => {
         const possibleInitialCompound = nodes.find(
@@ -681,7 +679,7 @@ export function useTransitionGraph({
             !normalTransitionTargetHandles.has(connection.sourceHandle) &&
             normalTransitionTargetHandles.has(connection.targetHandle)
         );
-    }, [nodes, slotNodes, edges]);
+    }, [nodes, slotNodes]);
 
     const handleConnectStart = useCallback((_, params) => {
         const slotHandle = parseSlotConnectionHandle(params?.handleId);
@@ -691,7 +689,7 @@ export function useTransitionGraph({
             return;
         }
 
-        let slotType = "";
+        let slotType;
 
         if (slotHandle.origin === "skill") {
             const skillNode = nodes.find(
@@ -2230,13 +2228,12 @@ export function useTransitionGraph({
         [
             edges,
             nodes,
-            slotNodes,
             setEdges,
             setNodes,
-            setSlotEdges,
             updateNodeInternals,
             syncTransitionsForSource,
             applySkillSlotConnection,
+            openConditionDrawer,
         ]
     );
 
@@ -2249,7 +2246,7 @@ export function useTransitionGraph({
                 edge.target
             );
         },
-        [edges, nodes, selectTransitionEdge]
+        [openConditionDrawer, selectTransitionEdge]
     );
 
     const handleConfirmDrawer = ({ updatedTransitions, newGlobalVars = [], newGlobalVar = null }) => {

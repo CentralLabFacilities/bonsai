@@ -29,7 +29,8 @@ pub(crate) async fn api_request(
 ) -> Result<ApiResult, String> {
     let clean_path = strip_api_prefix(&path);
     let url = format!("{}{}", get_api_target(), clean_path);
-    let client = reqwest::Client::new();
+    static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
+    let client = CLIENT.get_or_init(reqwest::Client::new);
 
     let request_builder = match method.to_uppercase().as_str() {
         "GET" => client.get(&url),

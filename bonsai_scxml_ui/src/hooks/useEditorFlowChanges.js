@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useLayoutEffect, useRef } from "react";
 import { applyEdgeChanges } from "@xyflow/react";
 
 import { rebuildBoundaryTransitionsIncremental } from "../utils/boundaryTransitions";
@@ -43,8 +43,10 @@ export function useEditorFlowChanges({
     // callbacks on every drag frame.
     const nodesRef = useRef(nodes);
     const slotNodesRef = useRef(slotNodes);
-    nodesRef.current = nodes;
-    slotNodesRef.current = slotNodes;
+    useLayoutEffect(() => {
+        nodesRef.current = nodes;
+        slotNodesRef.current = slotNodes;
+    }, [nodes, slotNodes]);
 
     const handleNodesChange = useCallback(
         (changes) => {

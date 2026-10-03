@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { MarkerType } from "@xyflow/react";
 import {
     SLOT_CONNECTION_COLORS,
@@ -6,14 +6,112 @@ import {
     getCollapsedTransitionSource,
     getTransitionHighlightColor,
     withSmartTransitionRouting,
-} from "../utils/editorGraph";
+} from "../utils/editorGraph.js";
 import {
     getNodeSize,
     isAutoParallelLaneCompound,
-} from "../utils/editorGeometry";
+} from "../utils/editorGeometry.js";
 
 const SLOT_EDGE_INACTIVE_COLOR = "#64748b";
 const COMPOUND_ROUTING_GRID_CELL_SIZE = 640;
+const EMPTY_NODES = [];
+
+export function projectStructureEdges(previous, edges) {
+    const unchanged =
+        previous.length === edges.length &&
+        edges.every((edge, index) => {
+            const oldEdge = previous[index];
+            return (
+                oldEdge?.id === edge.id &&
+                oldEdge?.source === edge.source &&
+                oldEdge?.target === edge.target &&
+                oldEdge?.sourceHandle === edge.sourceHandle &&
+                oldEdge?.targetHandle === edge.targetHandle &&
+                oldEdge?.label === edge.label &&
+                oldEdge?.type === edge.type &&
+                oldEdge?.data === edge.data &&
+                oldEdge?.style === edge.style &&
+                oldEdge?.markerEnd === edge.markerEnd
+            );
+        });
+    return unchanged
+        ? previous
+        : edges.map((edge) => edge.selected ? { ...edge, selected: false } : edge);
+}
+
+function useStructureEdges(edges) {
+    const [snapshot, setSnapshot] = useState(() => projectStructureEdges([], edges));
+    const structureEdges = useMemo(
+        () => projectStructureEdges(snapshot, edges),
+        [snapshot, edges]
+    );
+    if (structureEdges !== snapshot) setSnapshot(structureEdges);
+    return structureEdges;
+}
+
+export function projectRoutingNodes(previous, nodes, isDraggingNode = false) {
+    if (isDraggingNode && previous.length > 0) return previous;
+
+    const unchanged =
+        previous.length === nodes.length &&
+        nodes.every((node, index) => {
+            const oldNode = previous[index];
+            return (
+                oldNode?.id === node.id &&
+                oldNode?.type === node.type &&
+                oldNode?.parentId === node.parentId &&
+                oldNode?.hidden === node.hidden &&
+                oldNode?.position?.x === node.position?.x &&
+                oldNode?.position?.y === node.position?.y &&
+                oldNode?.style?.width === node.style?.width &&
+                oldNode?.style?.height === node.style?.height &&
+                Boolean(oldNode?.data?.isCollapsed) === Boolean(node.data?.isCollapsed)
+            );
+        });
+    return unchanged ? previous : nodes;
+}
+
+function useRoutingNodeSnapshot(nodes, isDraggingNode) {
+    const [snapshot, setSnapshot] = useState(nodes);
+    const routingNodes = useMemo(
+        () => projectRoutingNodes(snapshot, nodes, isDraggingNode),
+        [snapshot, nodes, isDraggingNode]
+    );
+    if (routingNodes !== snapshot) setSnapshot(routingNodes);
+    return routingNodes;
+}
+
+function withSlotEdgeEmphasis(edge, hovered) {
+    const color = hovered
+        ? SLOT_CONNECTION_COLORS[edge.data?.access === "write" ? "write" : "read"]
+        : SLOT_EDGE_INACTIVE_COLOR;
+    return {
+        ...edge,
+        style: {
+            ...(edge.style || {}),
+            stroke: color,
+            strokeWidth: hovered ? 3 : 1.35,
+            strokeDasharray: edge.style?.strokeDasharray || "5 5",
+            opacity: hovered ? 1 : 0.3,
+        },
+        markerEnd: {
+            ...(edge.markerEnd || {}),
+            type: edge.markerEnd?.type || MarkerType.ArrowClosed,
+            color,
+        },
+    };
+}
+
+function withNodeFocusClass(node, highlighted) {
+    const classNames = String(node.className || "").split(/\s+/).filter(Boolean);
+    if (!classNames.includes("editor-node-context-visible")) {
+        classNames.push("editor-node-context-visible");
+    }
+    if (highlighted && !classNames.includes("editor-hover-highlight")) {
+        classNames.push("editor-hover-highlight");
+    }
+    return { ...node, className: classNames.join(" ") };
+}
 
 const pointInsideRect = (point, rect) =>
     point.x >= rect.left &&
@@ -127,7 +225,6 @@ export function useEditorDisplay({
     nodes,
     childIdsByParent,
     activeMode,
-    showTransitionEdges,
     showSlotEdges,
     injectedNodes,
     injectedSlotNodes,
@@ -138,6 +235,15 @@ export function useEditorDisplay({
     compoundDropTargetId,
     problemNodeIds,
 }) {
+    const routingHandlersRef = useRef({ updatePersistentEdgeControlPoints, onControlPointContextMenu });
+    useLayoutEffect(() => {
+        routingHandlersRef.current = { updatePersistentEdgeControlPoints, onControlPointContextMenu };
+    });
+    const routingHandlers = useMemo(() => ({
+        updateControlPoints: (...args) => routingHandlersRef.current.updatePersistentEdgeControlPoints(...args),
+        openControlPointContextMenu: (...args) => routingHandlersRef.current.onControlPointContextMenu?.(...args),
+    }), []);
+
     // Dragging should stay on the cheapest possible render path. Hover/focus
     // dimming is useful while inspecting the graph, but forcing every node and
     // edge through that styling pass on each drag frame is unnecessary.
@@ -254,45 +360,10 @@ export function useEditorDisplay({
         cloneGroupByNodeId,
     ]);
 
-    const transitionEdgeMatchesFocus = (edge) => {
-        if (edgeFocusNodeIds.size === 0) return false;
-        return getTransitionEdgeNodeIds(edge).some((id) =>
-            edgeFocusNodeIds.has(id)
-        );
-    };
-
     // React Flow stores selection on the edge object itself. Ignore that
     // display-only flag for routing-cache invalidation: clicking an edge must
     // not make the whole workflow normalize/re-route again.
-    const transitionStructureEdgesRef = useRef([]);
-    const transitionStructureEdges = useMemo(() => {
-        const previous = transitionStructureEdgesRef.current;
-        const structurallyUnchanged =
-            previous.length === edges.length &&
-            edges.every((edge, index) => {
-                const oldEdge = previous[index];
-                return (
-                    oldEdge?.id === edge.id &&
-                    oldEdge?.source === edge.source &&
-                    oldEdge?.target === edge.target &&
-                    oldEdge?.sourceHandle === edge.sourceHandle &&
-                    oldEdge?.targetHandle === edge.targetHandle &&
-                    oldEdge?.label === edge.label &&
-                    oldEdge?.type === edge.type &&
-                    oldEdge?.data === edge.data &&
-                    oldEdge?.style === edge.style &&
-                    oldEdge?.markerEnd === edge.markerEnd
-                );
-            });
-
-        if (structurallyUnchanged) return previous;
-
-        const next = edges.map((edge) =>
-            edge.selected ? { ...edge, selected: false } : edge
-        );
-        transitionStructureEdgesRef.current = next;
-        return next;
-    }, [edges]);
+    const transitionStructureEdges = useStructureEdges(edges);
 
     const selectedTransitionEdgeIds = useMemo(
         () =>
@@ -304,19 +375,8 @@ export function useEditorDisplay({
         [edges]
     );
 
-    // Node positions change on every React Flow drag frame. Transition
-    // normalization only needs structural node metadata (type/collapse/parent),
-    // so keep the last pre-drag node index until the drop completes. Otherwise
-    // every pointer move invalidates the complete transition/slot render cache.
-    const transitionNodeByIdRef = useRef(nodeById);
-    const transitionNodeById = useMemo(() => {
-        if (isDraggingNode && transitionNodeByIdRef.current) {
-            return transitionNodeByIdRef.current;
-        }
-
-        transitionNodeByIdRef.current = nodeById;
-        return nodeById;
-    }, [nodeById, isDraggingNode]);
+    // The presentation hook already owns the drag-stable semantic hierarchy.
+    const transitionNodeById = nodeById;
 
     // Build the complete transition render model once for the loaded graph.
     // Visibility/hover changes must never force normalization or routing to run
@@ -394,78 +454,30 @@ export function useEditorDisplay({
         [transitionStructureEdges, transitionNodeById]
     );
 
-    const routingGeometryNodesRef = useRef([]);
-    const routingGeometryNodes = useMemo(() => {
-        if (isDraggingNode && routingGeometryNodesRef.current.length > 0) {
-            return routingGeometryNodesRef.current;
-        }
-
-        const previous = routingGeometryNodesRef.current;
-        const geometryUnchanged =
-            previous.length === nodes.length &&
-            nodes.every((node, index) => {
-                const oldNode = previous[index];
-                return (
-                    oldNode?.id === node.id &&
-                    oldNode?.type === node.type &&
-                    oldNode?.parentId === node.parentId &&
-                    oldNode?.hidden === node.hidden &&
-                    oldNode?.position?.x === node.position?.x &&
-                    oldNode?.position?.y === node.position?.y &&
-                    oldNode?.style?.width === node.style?.width &&
-                    oldNode?.style?.height === node.style?.height &&
-                    Boolean(oldNode?.data?.isCollapsed) ===
-                        Boolean(node.data?.isCollapsed)
-                );
-            });
-
-        if (geometryUnchanged) return previous;
-
-        routingGeometryNodesRef.current = nodes;
-        return nodes;
-    }, [nodes, isDraggingNode]);
+    const routingGeometryNodes = useRoutingNodeSnapshot(nodes, isDraggingNode);
 
     // Smart/manual edge routing only depends on node geometry, not display-only
     // node data such as selection/hover highlighting. Keep one stable obstacle
     // array so those UI interactions do not invalidate every routed edge.
     // Slot nodes are included only in modes where they are actually rendered.
-    const manualRoutingNodesRef = useRef([]);
+    const [manualRoutingSnapshot, setManualRoutingSnapshot] = useState(EMPTY_NODES);
     const manualRoutingNodes = useMemo(() => {
         // The provider snapshot is intentionally static while dragging. Return
         // it before even constructing/comparing injected node arrays; the live
         // dragged endpoint is handled by React Flow itself.
-        if (isDraggingNode && manualRoutingNodesRef.current.length > 0) {
-            return manualRoutingNodesRef.current;
+        if (isDraggingNode && manualRoutingSnapshot.length > 0) {
+            return manualRoutingSnapshot;
         }
 
         const requestedNodes =
             activeMode === "slots" || activeMode === "overview"
                 ? [...injectedNodes, ...injectedSlotNodes]
                 : injectedNodes;
-        const previous = manualRoutingNodesRef.current;
-        const geometryUnchanged =
-            previous.length === requestedNodes.length &&
-            requestedNodes.every((node, index) => {
-                const oldNode = previous[index];
-                return (
-                    oldNode?.id === node.id &&
-                    oldNode?.type === node.type &&
-                    oldNode?.parentId === node.parentId &&
-                    oldNode?.hidden === node.hidden &&
-                    oldNode?.position?.x === node.position?.x &&
-                    oldNode?.position?.y === node.position?.y &&
-                    oldNode?.style?.width === node.style?.width &&
-                    oldNode?.style?.height === node.style?.height &&
-                    Boolean(oldNode?.data?.isCollapsed) ===
-                        Boolean(node.data?.isCollapsed)
-                );
-            });
-
-        if (geometryUnchanged) return previous;
-
-        manualRoutingNodesRef.current = requestedNodes;
-        return requestedNodes;
-    }, [activeMode, injectedNodes, injectedSlotNodes, isDraggingNode]);
+        return projectRoutingNodes(manualRoutingSnapshot, requestedNodes);
+    }, [manualRoutingSnapshot, activeMode, injectedNodes, injectedSlotNodes, isDraggingNode]);
+    if (manualRoutingNodes !== manualRoutingSnapshot) {
+        setManualRoutingSnapshot(manualRoutingNodes);
+    }
 
     // Build the expensive routing geometry once per real geometry change.
     // Previously the compound-avoidance pass repeatedly walked parent chains
@@ -533,6 +545,7 @@ export function useEditorDisplay({
             ancestorIdsByNodeId.set(node.id, ancestors);
             return ancestors;
         };
+        routingGeometryNodes.forEach((node) => getAncestorIds(node));
 
         const compoundEntries = routingGeometryNodes
             .filter((node) => node.type === "compound" && !node.hidden)
@@ -584,7 +597,6 @@ export function useEditorDisplay({
             ancestorIdsByNodeId,
             compoundEntries,
             compoundGrid,
-            getAncestorIds,
         };
     }, [routingGeometryNodes]);
 
@@ -594,7 +606,7 @@ export function useEditorDisplay({
             absolutePositionByNodeId,
             compoundEntries,
             compoundGrid,
-            getAncestorIds,
+            ancestorIdsByNodeId,
         } = routingGeometryIndex;
         const next = new Map();
 
@@ -627,8 +639,8 @@ export function useEditorDisplay({
                 y: targetPosition.y + targetSize.height / 2,
             };
 
-            const sourceAncestorIds = getAncestorIds(sourceNode);
-            const targetAncestorIds = getAncestorIds(targetNode);
+            const sourceAncestorIds = ancestorIdsByNodeId.get(sourceNode.id);
+            const targetAncestorIds = ancestorIdsByNodeId.get(targetNode.id);
 
             let candidates = compoundEntries;
             if (compoundEntries.length > 8) {
@@ -738,7 +750,7 @@ export function useEditorDisplay({
                         // geometry cache instead of subscribing to useNodes().
                         routingNodes: manualRoutingNodes,
                         onControlPointsChange: (controlPoints) =>
-                            updatePersistentEdgeControlPoints(
+                            routingHandlers.updateControlPoints(
                                 edge.id,
                                 controlPoints,
                                 "transition"
@@ -749,7 +761,7 @@ export function useEditorDisplay({
                                 ? controlPointInsertRequest
                                 : null,
                         onControlPointContextMenu: (event, pointId) =>
-                            onControlPointContextMenu?.(
+                            routingHandlers.openControlPointContextMenu(
                                 event,
                                 edge.id,
                                 pointId,
@@ -763,9 +775,8 @@ export function useEditorDisplay({
             reconnectableTransitionEdgeIds,
             compoundAvoidanceByEdgeId,
             manualRoutingNodes,
-            updatePersistentEdgeControlPoints,
+            routingHandlers,
             controlPointInsertRequest,
-            onControlPointContextMenu,
         ]
     );
 
@@ -956,10 +967,12 @@ export function useEditorDisplay({
     const highlightedTransitionEdges = transitionEdgesForDisplay;
 
     const selectedSlotContextId = activeCanvasFocusNodeId || selectedNodeId;
-    const selectedSlotContextNodeIds = selectedSlotContextId
-        ? cloneGroupByNodeId.get(selectedSlotContextId) ||
-          new Set([selectedSlotContextId])
-        : new Set();
+    const selectedSlotContextNodeIds = useMemo(
+        () => selectedSlotContextId
+            ? cloneGroupByNodeId.get(selectedSlotContextId) || new Set([selectedSlotContextId])
+            : new Set(),
+        [selectedSlotContextId, cloneGroupByNodeId]
+    );
     const hasSelectedSlotContext = Boolean(
         selectedSlotContextId &&
             (nodeById.has(selectedSlotContextId) ||
@@ -971,38 +984,9 @@ export function useEditorDisplay({
             slotNodeIdSet.has(selectedNodeId)
     );
 
-    const inactiveSlotEdgeCacheRef = useRef(new WeakMap());
-    const hoveredSlotEdgeCacheRef = useRef(new WeakMap());
-
     // Slot-edge selection is display-only too. Keep it out of the structural
     // cache so selecting a slot connection does not rebuild every routed edge.
-    const slotStructureEdgesRef = useRef([]);
-    const slotStructureEdges = useMemo(() => {
-        const previous = slotStructureEdgesRef.current;
-        const structurallyUnchanged =
-            previous.length === slotEdges.length &&
-            slotEdges.every((edge, index) => {
-                const oldEdge = previous[index];
-                return (
-                    oldEdge?.id === edge.id &&
-                    oldEdge?.source === edge.source &&
-                    oldEdge?.target === edge.target &&
-                    oldEdge?.sourceHandle === edge.sourceHandle &&
-                    oldEdge?.targetHandle === edge.targetHandle &&
-                    oldEdge?.data === edge.data &&
-                    oldEdge?.style === edge.style &&
-                    oldEdge?.markerEnd === edge.markerEnd
-                );
-            });
-
-        if (structurallyUnchanged) return previous;
-
-        const next = slotEdges.map((edge) =>
-            edge.selected ? { ...edge, selected: false } : edge
-        );
-        slotStructureEdgesRef.current = next;
-        return next;
-    }, [slotEdges]);
+    const slotStructureEdges = useStructureEdges(slotEdges);
 
     const selectedSlotEdgeIds = useMemo(
         () =>
@@ -1073,7 +1057,7 @@ export function useEditorDisplay({
                         // in Slot/Overview mode it already includes slot nodes.
                         routingNodes: manualRoutingNodes,
                         onControlPointsChange: (controlPoints) =>
-                            updatePersistentEdgeControlPoints(
+                            routingHandlers.updateControlPoints(
                                 edge.id,
                                 controlPoints,
                                 "slot"
@@ -1084,7 +1068,7 @@ export function useEditorDisplay({
                                 ? controlPointInsertRequest
                                 : null,
                         onControlPointContextMenu: (event, pointId) =>
-                            onControlPointContextMenu?.(
+                            routingHandlers.openControlPointContextMenu(
                                 event,
                                 edge.id,
                                 pointId,
@@ -1099,9 +1083,8 @@ export function useEditorDisplay({
             transitionNodeById,
             manualRoutingNodes,
             isDraggingNode,
-            updatePersistentEdgeControlPoints,
+            routingHandlers,
             controlPointInsertRequest,
-            onControlPointContextMenu,
         ]
     );
 
@@ -1206,12 +1189,19 @@ export function useEditorDisplay({
         selectedSlotEdgeIds,
     ]);
 
-    const editableSlotEdges = useMemo(() => {
+    const [slotVariantSnapshot, setSlotVariantSnapshot] = useState(() => ({
+        source: slotRenderCache,
+        byEdge: new Map(),
+    }));
+    const slotPresentation = useMemo(() => {
+        let nextCache = slotVariantSnapshot.source === slotRenderCache
+            ? slotVariantSnapshot.byEdge
+            : new Map();
         if (!hasSelectedSlotContext && !isSlotDetailsConnectionPreview) {
-            return routedSlotEdges;
+            return { edges: routedSlotEdges, cache: nextCache };
         }
 
-        return routedSlotEdges.map((edge) => {
+        const displayed = routedSlotEdges.map((edge) => {
             const isContextVisibleSlotEdge = String(edge.className || "")
                 .split(/\s+/)
                 .includes("editor-edge-context-visible");
@@ -1223,9 +1213,6 @@ export function useEditorDisplay({
             if (!showSlotEdges && !isContextVisibleSlotEdge && !edge.selected) {
                 return edge;
             }
-
-            const access = edge.data?.access === "write" ? "write" : "read";
-            const semanticColor = SLOT_CONNECTION_COLORS[access];
 
             const skillNodeId = edge.data?.skillNodeId || edge.source;
             const slotNodeId = edge.data?.slotNodeId || edge.target;
@@ -1249,60 +1236,33 @@ export function useEditorDisplay({
                 return edge;
             }
 
-            if (isHoveredSlotDetailsConnection) {
-                const cachedHovered = hoveredSlotEdgeCacheRef.current.get(edge);
-                if (cachedHovered) return cachedHovered;
+            const emphasis = isHoveredSlotDetailsConnection ? "hovered" : "inactive";
+            const cached = nextCache.get(edge);
+            if (cached?.[emphasis]) return cached[emphasis];
 
-                const hoveredEdge = {
-                    ...edge,
-                    style: {
-                        ...(edge.style || {}),
-                        stroke: semanticColor,
-                        strokeWidth: 3,
-                        strokeDasharray: edge.style?.strokeDasharray || "5 5",
-                        opacity: 1,
-                    },
-                    markerEnd: {
-                        ...(edge.markerEnd || {}),
-                        type: edge.markerEnd?.type || MarkerType.ArrowClosed,
-                        color: semanticColor,
-                    },
-                };
-                hoveredSlotEdgeCacheRef.current.set(edge, hoveredEdge);
-                return hoveredEdge;
-            }
-
-            const cachedInactive = inactiveSlotEdgeCacheRef.current.get(edge);
-            if (cachedInactive) return cachedInactive;
-
-            const inactiveEdge = {
-                ...edge,
-                style: {
-                    ...(edge.style || {}),
-                    stroke: SLOT_EDGE_INACTIVE_COLOR,
-                    strokeWidth: 1.35,
-                    strokeDasharray: edge.style?.strokeDasharray || "5 5",
-                    opacity: 0.3,
-                },
-                markerEnd: {
-                    ...(edge.markerEnd || {}),
-                    type: edge.markerEnd?.type || MarkerType.ArrowClosed,
-                    color: SLOT_EDGE_INACTIVE_COLOR,
-                },
-            };
-            inactiveSlotEdgeCacheRef.current.set(edge, inactiveEdge);
-            return inactiveEdge;
+            const value = withSlotEdgeEmphasis(edge, isHoveredSlotDetailsConnection);
+            if (nextCache === slotVariantSnapshot.byEdge) nextCache = new Map(nextCache);
+            nextCache.set(edge, { ...cached, [emphasis]: value });
+            return value;
         });
+        return { edges: displayed, cache: nextCache };
     }, [
+        slotVariantSnapshot,
+        slotRenderCache,
         routedSlotEdges,
         isSlotDetailsConnectionPreview,
         hoveredSlotAccessNodeId,
-        selectedNodeId,
         hasSelectedSlotContext,
-        selectedSlotContextId,
-        cloneGroupByNodeId,
+        selectedSlotContextNodeIds,
         showSlotEdges,
     ]);
+    if (
+        slotVariantSnapshot.source !== slotRenderCache ||
+        slotVariantSnapshot.byEdge !== slotPresentation.cache
+    ) {
+        setSlotVariantSnapshot({ source: slotRenderCache, byEdge: slotPresentation.cache });
+    }
+    const editableSlotEdges = slotPresentation.edges;
 
     const compoundInitialEdges = useMemo(
         () =>
@@ -1359,30 +1319,22 @@ export function useEditorDisplay({
         [semanticNodes, semanticChildrenByParent]
     );
 
-    const parallelEntryEdgesCacheRef = useRef([]);
-    const parallelEntryNodesDependency = isDraggingNode ? null : nodes;
     const parallelEntryEdges = useMemo(() => {
-        if (!parallelEntryNodesDependency) {
-            return parallelEntryEdgesCacheRef.current;
-        }
-
-        const liveNodeById = new Map(
-            parallelEntryNodesDependency.map((node) => [node.id, node])
-        );
-        const next = parallelEntryNodesDependency
+        const liveNodeById = routingGeometryIndex.liveNodeById;
+        return semanticNodes
             .filter(
                 (node) =>
                     node.type === "parallel" && !node.data?.isCollapsed
             )
             .flatMap((parallel) => {
                 const lanes = (childIdsByParent.get(parallel.id) || [])
-                    .map((id) => liveNodeById.get(id))
+                    .map((id) => nodeById.get(id))
                     .filter((node) => node?.type === "parallelLane");
 
                 return lanes
                     .map((lane) => {
                         const directChildren = (childIdsByParent.get(lane.id) || [])
-                            .map((id) => liveNodeById.get(id))
+                            .map((id) => nodeById.get(id))
                             .filter(Boolean);
 
                         const candidates = directChildren.filter(
@@ -1394,12 +1346,14 @@ export function useEditorDisplay({
                         if (candidates.length === 0) return null;
 
                         const sortedCandidates = [...candidates].sort((a, b) => {
-                            const ax = Number(a.position?.x || 0);
-                            const bx = Number(b.position?.x || 0);
+                            const aPosition = liveNodeById.get(a.id)?.position;
+                            const bPosition = liveNodeById.get(b.id)?.position;
+                            const ax = Number(aPosition?.x || 0);
+                            const bx = Number(bPosition?.x || 0);
                             if (ax !== bx) return ax - bx;
 
-                            const ay = Number(a.position?.y || 0);
-                            const by = Number(b.position?.y || 0);
+                            const ay = Number(aPosition?.y || 0);
+                            const by = Number(bPosition?.y || 0);
                             return ay - by;
                         });
 
@@ -1444,9 +1398,7 @@ export function useEditorDisplay({
                     .filter(Boolean);
             });
 
-        parallelEntryEdgesCacheRef.current = next;
-        return next;
-    }, [parallelEntryNodesDependency, childIdsByParent]);
+    }, [semanticNodes, nodeById, routingGeometryIndex, childIdsByParent]);
 
     const baseVisibleNodes = useMemo(
         () =>
@@ -1458,30 +1410,9 @@ export function useEditorDisplay({
 
     const hasSmartRoutedEdges =
         highlightedTransitionEdges.length > 0 || editableSlotEdges.length > 0;
-    const requestedSmartRoutingNodes = hasSmartRoutedEdges
+    const smartRoutingNodes = hasSmartRoutedEdges
         ? manualRoutingNodes
-        : [];
-    const [smartRoutingNodes, setSmartRoutingNodes] = useState(
-        requestedSmartRoutingNodes
-    );
-    const smartRoutingNodesDependency = isDraggingNode
-        ? null
-        : requestedSmartRoutingNodes;
-
-    useEffect(() => {
-        // Smart-edge obstacle routing is one of the most expensive parts of a
-        // large graph. Keep the provider snapshot fixed while the pointer is
-        // moving and refresh it once the drag finishes. Connected edge
-        // endpoints still follow React Flow's live node position; only the
-        // obstacle map waits until drop.
-        if (!smartRoutingNodesDependency) return;
-
-        setSmartRoutingNodes((current) =>
-            current === smartRoutingNodesDependency
-                ? current
-                : smartRoutingNodesDependency
-        );
-    }, [smartRoutingNodesDependency]);
+        : EMPTY_NODES;
 
     const isSlotDetailsFocus = Boolean(
         hoveredSlotAccessNodeId &&
@@ -1505,7 +1436,7 @@ export function useEditorDisplay({
                 "editor-transition-edge"
             );
             const isFocused =
-                transitionEdgeMatchesFocus(edge) ||
+                getTransitionEdgeNodeIds(edge).some((id) => edgeFocusNodeIds.has(id)) ||
                 edge.id === activeHoveredEditorEdgeId;
 
             if (isFocused) {
@@ -1761,33 +1692,31 @@ export function useEditorDisplay({
         [problemVisibleNodes]
     );
 
-    const contextVisibleNodeCacheRef = useRef(new WeakMap());
-    const highlightedContextNodeCacheRef = useRef(new WeakMap());
+    const [nodeFocusSnapshot, setNodeFocusSnapshot] = useState(() => new Map());
+    const nodeFocusVariants = useMemo(() => {
+        if (!hasHoverFocus || !hoverFocusNodeIds?.size) return nodeFocusSnapshot;
 
-    const withNodeFocusClass = (node, highlighted) => {
-        const cache = highlighted
-            ? highlightedContextNodeCacheRef.current
-            : contextVisibleNodeCacheRef.current;
-        const cached = cache.get(node);
-        if (cached) return cached;
-
-        const classNames = String(node.className || "")
-            .split(/\s+/)
-            .filter(Boolean);
-        if (!classNames.includes("editor-node-context-visible")) {
-            classNames.push("editor-node-context-visible");
-        }
-        if (highlighted && !classNames.includes("editor-hover-highlight")) {
-            classNames.push("editor-hover-highlight");
-        }
-
-        const nextNode = {
-            ...node,
-            className: classNames.join(" "),
-        };
-        cache.set(node, nextNode);
-        return nextNode;
-    };
+        const next = new Map();
+        let changed = false;
+        hoverFocusNodeIds.forEach((nodeId) => {
+            const index = nodeIndexById.get(nodeId);
+            if (index === undefined) return;
+            const node = problemVisibleNodes[index];
+            const cached = nodeFocusSnapshot.get(nodeId);
+            if (cached?.sourceNode === node) {
+                next.set(nodeId, cached);
+            } else {
+                changed = true;
+                next.set(nodeId, {
+                    sourceNode: node,
+                    context: withNodeFocusClass(node, false),
+                    highlighted: withNodeFocusClass(node, true),
+                });
+            }
+        });
+        return changed || next.size !== nodeFocusSnapshot.size ? next : nodeFocusSnapshot;
+    }, [nodeFocusSnapshot, hasHoverFocus, hoverFocusNodeIds, nodeIndexById, problemVisibleNodes]);
+    if (nodeFocusVariants !== nodeFocusSnapshot) setNodeFocusSnapshot(nodeFocusVariants);
 
     const visibleNodes = useMemo(() => {
         const needsFocusPresentation = Boolean(
@@ -1811,11 +1740,10 @@ export function useEditorDisplay({
             hoverFocusNodeIds.forEach((nodeId) => {
                 const index = nodeIndexById.get(nodeId);
                 if (index === undefined) return;
-                const node = displayed[index];
-                displayed[index] = withNodeFocusClass(
-                    node,
-                    Boolean(hoverHighlightNodeIds?.has(nodeId))
-                );
+                const variants = nodeFocusVariants.get(nodeId);
+                displayed[index] = hoverHighlightNodeIds?.has(nodeId)
+                    ? variants.highlighted
+                    : variants.context;
             });
         }
 
@@ -1887,6 +1815,7 @@ export function useEditorDisplay({
         hoverFocusNodeIds,
         hoverHighlightNodeIds,
         nodeIndexById,
+        nodeFocusVariants,
         parallelDropTargetId,
         compoundDropTargetId,
     ]);

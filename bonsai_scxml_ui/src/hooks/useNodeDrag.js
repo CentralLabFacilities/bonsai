@@ -683,6 +683,7 @@ export function useNodeDrag({
                 {
                     excludeNodeId: draggedNode.id,
                     allowParallelLanes: draggedNode.type !== "parallel",
+                    graphIndex,
                 }
             );
 
@@ -1347,6 +1348,7 @@ export function useNodeDrag({
         syncStatePosition,
         syncStateEditorPositions,
         syncRemovedStates,
+        setSelectedNodeId,
         ]);
 
     return {

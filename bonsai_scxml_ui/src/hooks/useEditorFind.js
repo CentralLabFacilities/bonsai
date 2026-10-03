@@ -14,8 +14,25 @@ export function useEditorFind({
     fitView,
 }) {
     const [isFindOpen, setIsFindOpen] = useState(false);
-    const [findQuery, setFindQuery] = useState("");
-    const [findResultIndex, setFindResultIndex] = useState(0);
+    const [findState, setFindState] = useState({ query: "", index: 0 });
+    const findQuery = findState.query;
+    const findResultIndex = findState.index;
+    const setFindQuery = useCallback((valueOrUpdater) => {
+        setFindState((current) => {
+            const query = typeof valueOrUpdater === "function"
+                ? valueOrUpdater(current.query)
+                : valueOrUpdater;
+            return query === current.query ? current : { query, index: 0 };
+        });
+    }, []);
+    const setFindResultIndex = useCallback((valueOrUpdater) => {
+        setFindState((current) => {
+            const index = typeof valueOrUpdater === "function"
+                ? valueOrUpdater(current.index)
+                : valueOrUpdater;
+            return index === current.index ? current : { ...current, index };
+        });
+    }, []);
     const findInputRef = useRef(null);
     const findPanelRef = useRef(null);
 
@@ -144,10 +161,6 @@ export function useEditorFind({
 
         return results.slice(0, 50);
     }, [findQuery, semanticNodes, slotNodes, manualSlots]);
-
-    useEffect(() => {
-        setFindResultIndex(0);
-    }, [findQuery]);
 
     const focusFindResult = useCallback(
         (result) => {

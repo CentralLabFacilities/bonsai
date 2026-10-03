@@ -1,10 +1,31 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
   base: './',
+  build: {
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          // Keep vendor dependencies together instead of importing the app chunk.
+          includeDependenciesRecursively: true,
+          groups: [
+            {
+              name: 'react-vendor',
+              test: /node_modules[\\/](?:react(?:-dom)?|scheduler)[\\/]/,
+              priority: 20,
+            },
+            {
+              name: 'graph-vendor',
+              test: /node_modules[\\/](?:@xyflow|@dagrejs|@tisoap)[\\/]/,
+              priority: 10,
+            },
+          ],
+        },
+      },
+    },
+  },
   server: {
     port: 1420,
     strictPort: true,

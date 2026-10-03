@@ -668,7 +668,8 @@ export const parseScxmlFile = async (
     } catch (error) {
         throw new Error(
             "Fehler in der XML-Struktur:\n" +
-                String(error?.message || error || "Unknown SCXML parse error")
+                String(error?.message || error || "Unknown SCXML parse error"),
+            { cause: error }
         );
     }
 

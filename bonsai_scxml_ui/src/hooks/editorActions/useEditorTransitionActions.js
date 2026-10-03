@@ -19,7 +19,6 @@ import {
 export function useEditorTransitionActions({
     nodes,
     edges,
-    slotNodes,
     selectedNodeId,
     setNodes,
     setEdges,

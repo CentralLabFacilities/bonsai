@@ -1,60 +1,12 @@
 import { invoke } from '@tauri-apps/api/core';
-
-const API_TARGET = 'http://localhost:8080';
+import { installApiProxy } from './utils/apiProxy.js';
 
 /**
  * Polyfill fetch for /api/* paths when running in Tauri desktop mode.
  * Routes API calls through Rust IPC.
  */
 export function initApiProxy() {
-  if (!isTauri()) return;
-
-  const originalFetch = window.fetch;
-
-  window.fetch = async function (input, init = {}) {
-    let url = '';
-    let method = init?.method || 'GET';
-    let body = init?.body ?? null;
-
-    if (typeof input === 'string') {
-      url = input;
-    } else if (input instanceof Request) {
-      url = input.url;
-      method = init?.method || input.method || 'GET';
-
-      if (init?.body == null && input.body) {
-        // Clone the request so reading its body for IPC does not consume the
-        // original Request object.
-        body = await input.clone().text();
-      }
-    }
-
-    if (body != null && typeof body !== 'string') {
-      body = String(body);
-    }
-
-    console.info("Tauri fetch")
-
-    // Only intercept /api/* paths
-    if (!url.startsWith('/api/')) {
-      return originalFetch.apply(this, [input, init]);
-    }
-
-    try {
-      const result = await invoke('api_request', {
-        method: method.toUpperCase(),
-        path: url,
-        body: body || null,
-      });
-      return new Response(result.body, {
-        status: result.status,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    } catch (err) {
-      console.error(`fetch proxy failed (${method} ${url}):`, err);
-      throw err;
-    }
-  };
+  if (isTauri()) installApiProxy(window, invoke);
 }
 
 /**

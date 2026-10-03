@@ -1,4 +1,3 @@
-import React from "react";
 import { Handle, Position } from "@xyflow/react";
 
 export default function ParallelLaneNode({ id, data = {}, selected = false }) {

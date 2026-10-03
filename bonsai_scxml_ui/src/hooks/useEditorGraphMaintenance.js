@@ -1,6 +1,44 @@
-import { useEffect, useMemo, useRef } from "react";
-import { normalizeContainerAutoExpansion } from "../utils/editorGeometry";
-import { isEditorCloneNode } from "../utils/editorClones";
+import { useEffect, useMemo, useState } from "react";
+import { normalizeContainerAutoExpansion } from "../utils/editorGeometry.js";
+import { isEditorCloneNode } from "../utils/editorClones.js";
+
+export function projectSemanticNodes(previous, nodes, isDraggingNode = false) {
+    if (isDraggingNode) return previous;
+
+    const unchanged =
+        previous.length === nodes.length &&
+        nodes.every((node, index) => {
+            const oldNode = previous[index];
+            return (
+                oldNode?.id === node.id &&
+                oldNode?.type === node.type &&
+                oldNode?.parentId === node.parentId &&
+                oldNode?.data === node.data
+            );
+        });
+
+    return unchanged
+        ? previous
+        : nodes.map((node) => ({
+              id: node.id,
+              type: node.type,
+              parentId: node.parentId,
+              data: node.data,
+          }));
+}
+
+export function useSemanticNodeSnapshot(nodes, isDraggingNode) {
+    const [snapshot, setSnapshot] = useState(() => projectSemanticNodes([], nodes));
+    const semanticNodes = useMemo(
+        () => projectSemanticNodes(snapshot, nodes, isDraggingNode),
+        [snapshot, nodes, isDraggingNode]
+    );
+
+    // A render-local state adjustment is replayable if React abandons a render;
+    // mutating a shared ref here would expose an uncommitted graph to handlers.
+    if (semanticNodes !== snapshot) setSnapshot(semanticNodes);
+    return semanticNodes;
+}
 
 /**
  * Maintains graph invariants that are independent from rendering/interaction.
@@ -15,36 +53,7 @@ export function useEditorGraphMaintenance({
     setEdges,
     setSelectedNodeId,
 }) {
-    const semanticNodesRef = useRef([]);
-    const semanticNodesDependency = isDraggingNode ? null : nodes;
-
-    const semanticNodes = useMemo(() => {
-        const previous = semanticNodesRef.current;
-        if (!semanticNodesDependency) return previous;
-
-        const unchanged =
-            previous.length === semanticNodesDependency.length &&
-            semanticNodesDependency.every((node, index) => {
-                const oldNode = previous[index];
-                return (
-                    oldNode?.id === node.id &&
-                    oldNode?.type === node.type &&
-                    oldNode?.parentId === node.parentId &&
-                    oldNode?.data === node.data
-                );
-            });
-
-        if (unchanged) return previous;
-
-        const next = semanticNodesDependency.map((node) => ({
-            id: node.id,
-            type: node.type,
-            parentId: node.parentId,
-            data: node.data,
-        }));
-        semanticNodesRef.current = next;
-        return next;
-    }, [semanticNodesDependency]);
+    const semanticNodes = useSemanticNodeSnapshot(nodes, isDraggingNode);
 
     useEffect(() => {
         if (isDraggingNode) return;

@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useLayoutEffect, useRef } from "react";
 import { isTauri, saveFile } from "../tauri-client.js";
 import { collectInheritedSlotUsages } from "../utils/editorGraph";
 import { getNodeId } from "../utils/editorGeometry";
@@ -148,7 +148,6 @@ export function useSubStateMachines({
     inheritedGlobalDataModel,
     behaviorDirectories,
     fetchSkillData,
-    setActiveTab,
     setContextMenu,
     checkSlotConnection,
     onStateMachineLoadStart,
@@ -260,8 +259,6 @@ export function useSubStateMachines({
         );
 
         let tabId = `tab-sub-${baseName}`;
-        let resolvedFilePath = null;
-
         try {
             // Inspect first so an already-open tab can be selected without
             // rebuilding its React Flow projection or refetching skill data.
@@ -270,7 +267,7 @@ export function useSubStateMachines({
                 directories: behaviorDirectories,
                 currentFilePath: currentTab?.filePath || null,
             });
-            resolvedFilePath = inspection.path;
+            const resolvedFilePath = inspection.path;
             if (resolvedFilePath) {
                 tabId = `tab-sub-${resolvedFilePath}`;
             }
@@ -428,7 +425,9 @@ export function useSubStateMachines({
         }
     };
     const handleOpenSubMachineRef = useRef(handleOpenSubMachineImpl);
-    handleOpenSubMachineRef.current = handleOpenSubMachineImpl;
+    useLayoutEffect(() => {
+        handleOpenSubMachineRef.current = handleOpenSubMachineImpl;
+    });
     const handleOpenSubMachine = useCallback(
         (...args) => handleOpenSubMachineRef.current?.(...args),
         []
