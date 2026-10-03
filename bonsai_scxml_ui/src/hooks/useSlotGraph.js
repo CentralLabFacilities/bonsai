@@ -20,7 +20,8 @@ export function useSlotGraph({
     const checkSlotConnection = useCallback((
         customNodes = null,
         customManualSlots = null,
-        customSlotNodes = null
+        customSlotNodes = null,
+        customSlotEdges = null
     ) => {
         const targetNodes = Array.isArray(customNodes) ? customNodes : nodes;
         const activeManualSlots =
@@ -28,6 +29,9 @@ export function useSlotGraph({
         const activeSlotNodes = Array.isArray(customSlotNodes)
             ? customSlotNodes
             : slotNodes;
+        const activeSlotEdges = Array.isArray(customSlotEdges)
+            ? customSlotEdges
+            : slotEdges;
         if (!targetNodes || targetNodes.length === 0) {
             setSlotNodes([]);
             setSlotEdges([]);
@@ -198,7 +202,7 @@ export function useSlotGraph({
             (activeSlotNodes || []).map((node) => [node.id, node])
         );
         const existingSlotEdgeByKey = new Map();
-        (slotEdges || []).forEach((edge) => {
+        (activeSlotEdges || []).forEach((edge) => {
             if (edge.data?.edgeKind !== "slot") return;
 
             if (edge.data?.subMachineInherited === true) {

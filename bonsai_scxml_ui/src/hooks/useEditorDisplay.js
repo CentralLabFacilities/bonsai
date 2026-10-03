@@ -1052,6 +1052,11 @@ export function useEditorDisplay({
                         ? "collapsed-slot-source"
                         : edge.sourceHandle,
                     type: "smartTransition",
+                    // Slot connections are semantically owned by the skill
+                    // handle. Reconnecting them may only move the slot end;
+                    // allowing the source end to be re-dragged would leave the
+                    // edge metadata pointing at the old skill.
+                    reconnectable: "target",
                     data: {
                         ...(edge.data || {}),
                         ...(collapsedSourceId

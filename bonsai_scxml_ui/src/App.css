@@ -7499,38 +7499,34 @@
  * transition SVG groups directly in CSS.
  */
 .react-flow.editor-edge-focus-mode
-.react-flow__edge.editor-transition-edge:not(.editor-edge-focus-active):not(.selected) {
+.react-flow__edge.editor-transition-edge:not(.editor-edge-focus-active):not(.selected),
+.react-flow.editor-edge-focus-mode
+.react-flow__edge.editor-slot-edge:not(.editor-edge-focus-active):not(.selected) {
     opacity: 0.22;
 }
 
 .react-flow.editor-edge-focus-mode
 .react-flow__edge.editor-transition-edge.editor-edge-focus-active,
 .react-flow.editor-edge-focus-mode
-.react-flow__edge.editor-transition-edge.selected {
+.react-flow__edge.editor-transition-edge.selected,
+.react-flow.editor-edge-focus-mode
+.react-flow__edge.editor-slot-edge.editor-edge-focus-active,
+.react-flow.editor-edge-focus-mode
+.react-flow__edge.editor-slot-edge.selected {
     opacity: 1;
 }
 
-/* Focused user transitions keep the familiar moving-dash animation. Canvas
-   hover now adds the animated class directly to only the connected mounted
-   edges, avoiding a React graph update just to start/stop this effect. */
-.react-flow.editor-edge-focus-mode
-.react-flow__edge.editor-user-transition-edge.editor-edge-focus-active.animated
-.react-flow__edge-path {
-    stroke-dasharray: 5 !important;
-}
 
 /*
- * Hover focus must stay extremely cheap because this selector can affect every
- * mounted node at once. CSS filters (especially animated grayscale) force a
- * separate compositing/paint pass for many node layers and were the dominant
- * cost when moving the pointer between states. Use opacity only and change it
- * immediately; the hovered/context nodes still receive their explicit outline.
+ * Node focus is paint-only for large graphs. The display hook marks only the
+ * handful of context nodes; CSS dims the rest. This avoids mapping and cloning
+ * every node whenever the pointer moves across a large state machine.
  */
 .react-flow.editor-node-focus-mode
 .react-flow__node:not(.editor-node-context-visible):not(.selected) {
-    opacity: 0.48;
-    filter: none !important;
-    transition: none !important;
+    opacity: 0.42;
+    filter: grayscale(0.72);
+    transition: opacity 120ms ease, filter 120ms ease;
 }
 
 .react-flow.editor-node-focus-mode
@@ -7538,8 +7534,7 @@
 .react-flow.editor-node-focus-mode
 .react-flow__node.selected {
     opacity: 1;
-    filter: none !important;
-    transition: none !important;
+    filter: none;
 }
 
 .context-menu-divider {
@@ -8767,57 +8762,4 @@
 
 .slot-hierarchy-machine-count {
     margin-left: auto;
-}
-
-/* Interaction fast path --------------------------------------------------
- * Pan/zoom is a compositor-heavy operation on large SVG/HTML canvases. Keep
- * React out of the viewport lifecycle and temporarily skip expensive labels
- * and decorative effects while the viewport is moving. Transition paths stay
- * visible so zooming never makes the graph topology disappear. */
-.react-flow.editor-viewport-moving .react-flow__edgelabel-renderer {
-    visibility: hidden !important;
-}
-
-/* Keep edges visible while zooming, but pause their dashed flow animation
- * until the viewport settles. This avoids paying for SVG dash animation and
- * viewport transforms at the same time without hiding the transitions. */
-.react-flow.editor-viewport-moving
-    .react-flow__edge.animated
-    .react-flow__edge-path {
-    animation-play-state: paused !important;
-}
-
-.react-flow.editor-viewport-moving .react-flow__node {
-    transition: none !important;
-}
-
-.react-flow.editor-viewport-moving :is(
-    .costum-node,
-    .submachine-node,
-    .compound-frame-node,
-    .parallel-group-container,
-    .parallel-lane-node,
-    .slot-node,
-    .state-clone-node
-) {
-    box-shadow: none !important;
-    filter: none !important;
-    transition: none !important;
-    animation: none !important;
-}
-
-/* The semantic graph keeps every edge in memory, but useEditorDisplay now
- * supplies only drag-relevant edges to React Flow while a node is moving. Keep
- * the remaining node chrome cheap as well. */
-.react-flow.editor-node-dragging :is(
-    .costum-node,
-    .submachine-node,
-    .compound-frame-node,
-    .parallel-group-container,
-    .parallel-lane-node,
-    .slot-node,
-    .state-clone-node
-) {
-    transition: none !important;
-    animation: none !important;
 }
