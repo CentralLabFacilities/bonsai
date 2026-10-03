@@ -1,37 +1,6 @@
 import { Handle, Position } from "@xyflow/react";
 import { FiDatabase } from "react-icons/fi";
-import { getSlotTypeStyle } from "../utils/slotVisuals";
-
-const normalizeSlotType = (type) =>
-    String(type || "").trim().toLowerCase();
-
-const getSlotHandleDragClass = ({
-                                    drag,
-                                    nodeId,
-                                    handleId,
-                                    access,
-                                    slotType,
-                                }) => {
-    if (!drag?.active) return "";
-
-    const isActiveHandle =
-        drag.nodeId === nodeId && drag.handleId === handleId;
-
-    if (isActiveHandle) {
-        return "slot-handle-compatible slot-handle-active";
-    }
-
-    // Only matching access + datatype endpoints stay available.
-    const isCompatible =
-        drag.origin === "skill" &&
-        drag.access === access &&
-        Boolean(drag.slotType) &&
-        normalizeSlotType(slotType) === drag.slotType;
-
-    return isCompatible
-        ? "slot-handle-compatible"
-        : "slot-handle-incompatible";
-};
+import { getSlotHandleDragClass, getSlotTypeStyle } from "../utils/slotVisuals";
 
 function SlotNode({ id, data, selected = false }) {
     const displayPath = data.path || data.label || "Undefined slot";
@@ -118,6 +87,7 @@ function SlotNode({ id, data, selected = false }) {
                     nodeId: id,
                     handleId: writeHandleId,
                     access: "write",
+                    origin: "slot",
                     slotType,
                 })}`}
                 title="Write"
@@ -135,6 +105,7 @@ function SlotNode({ id, data, selected = false }) {
                     nodeId: id,
                     handleId: readHandleId,
                     access: "read",
+                    origin: "slot",
                     slotType,
                 })}`}
                 title="Read"

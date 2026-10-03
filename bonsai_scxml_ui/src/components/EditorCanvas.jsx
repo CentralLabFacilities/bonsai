@@ -12,13 +12,9 @@ import {
     ReactFlow,
 } from "@xyflow/react";
 import { SmartEdgeProvider } from "@tisoap/react-flow-smart-edge";
-import CustomNode from "./CustomNode";
+import { SkillNode, SubMachineNode, StateReferenceNode } from "./StateNodes.jsx";
 import SlotNode from "./SlotNode";
-import ParallelNode from "./ParallelNode";
-import SubMachineNode from "./SubMachineNode";
-import CompoundNode from "./CompoundNode";
-import StateCloneNode from "./StateCloneNode";
-import ParallelLaneNode from "./ParallelLaneNode";
+import { CompoundNode, ParallelNode, ParallelLaneNode } from "./ContainerNodes.jsx";
 import EditableTransitionEdge from "./EditableTransitionEdge";
 import CodeView from "./CodeView";
 import ModeSwitcher from "./ModeSwitcher.jsx";
@@ -27,12 +23,12 @@ import CanvasContextMenu from "./CanvasContextMenu.jsx";
 import { getTransitionHighlightColor } from "../utils/editorGraph";
 
 const nodeTypes = {
-    custom: memo(CustomNode),
+    custom: memo(SkillNode),
     slot: memo(SlotNode),
     submachine: memo(SubMachineNode),
     parallel: memo(ParallelNode),
     compound: memo(CompoundNode),
-    stateClone: memo(StateCloneNode),
+    stateClone: memo(StateReferenceNode),
     parallelLane: memo(ParallelLaneNode),
 };
 

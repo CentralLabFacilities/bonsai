@@ -1,38 +1,11 @@
 import dagre from "@dagrejs/dagre";
+import { getStateSlotEntries } from "./slotVisuals.js";
 
 const DEFAULT_NODE_WIDTH = 210;
 const DEFAULT_NODE_HEIGHT = 80;
 const MAX_OVERVIEW_WIDTH = 520;
 
-const getSkillSlotEntries = (data = {}, nodeType = "custom") => {
-    const regularSlots = [
-        ...(data.inSlots || []).map((slot) => ({
-            key: slot?.key,
-            path: slot?.path,
-        })),
-        ...(data.outSlots || []).map((slot) => ({
-            key: slot?.key,
-            path: slot?.path,
-        })),
-    ];
-
-    if (nodeType !== "submachine") {
-        return regularSlots.filter((slot) => String(slot.key || "").trim());
-    }
-
-    const inheritedSlots = (data.inheritedSlots || [])
-        .filter((slot) => slot?.access === "read" || slot?.access === "write")
-        .map((slot) => ({
-            key: slot?.key,
-            path: slot?.path,
-        }));
-
-    return [...regularSlots, ...inheritedSlots].filter((slot) =>
-        String(slot.key || slot.path || "").trim()
-    );
-};
-
-const estimateSlotDockWidth = (slotEntries) => {
+export const estimateSlotDockWidth = (slotEntries) => {
     if (!slotEntries.length) return 0;
 
     const slotGutters = 16 + 24;
@@ -54,6 +27,13 @@ const estimateSlotDockWidth = (slotEntries) => {
     return Math.min(MAX_OVERVIEW_WIDTH, Math.max(180, requiredSlotWidth));
 };
 
+export const estimateSummaryWidth = (label, rows) => {
+    if (!rows.length) return 0;
+    const longestRow = rows.reduce((longest, text) =>
+        Math.max(longest, text.length), String(label || "").length);
+    return Math.min(MAX_OVERVIEW_WIDTH, Math.max(190, 55 + longestRow * 7));
+};
+
 const estimateOverviewWidth = (node) => {
     const data = node?.data || {};
     const nodeType = node?.type || "custom";
@@ -65,18 +45,18 @@ const estimateOverviewWidth = (node) => {
             String(parameter?.key || "").trim()
         );
         if (parameters.length > 0) {
-            const longestRow = parameters.reduce((longest, parameter) => {
+            const rows = parameters.map((parameter) => {
                 const value = String(
                     parameter?.expr ?? parameter?.default ?? ""
                 ).trim();
                 const text = value
                     ? `${parameter.key} = ${value}`
                     : String(parameter.key || "");
-                return Math.max(longest, text.length);
-            }, labelLength);
+                return text;
+            });
             requiredWidth = Math.max(
                 requiredWidth,
-                Math.min(MAX_OVERVIEW_WIDTH, Math.max(190, 55 + longestRow * 7))
+                estimateSummaryWidth(data.label || data.fullSkillName, rows)
             );
         }
     }
@@ -87,21 +67,21 @@ const estimateOverviewWidth = (node) => {
             return id && id !== "#_STATE_PREFIX";
         });
         if (entries.length > 0) {
-            const longestRow = entries.reduce((longest, entry) => {
+            const rows = entries.map((entry) => {
                 const value = String(entry?.expr ?? "").trim();
                 const text = value ? `${entry.id} = ${value}` : String(entry.id);
-                return Math.max(longest, text.length);
-            }, labelLength);
+                return text;
+            });
             requiredWidth = Math.max(
                 requiredWidth,
-                Math.min(MAX_OVERVIEW_WIDTH, Math.max(190, 55 + longestRow * 7))
+                estimateSummaryWidth(data.label || data.fullSkillName, rows)
             );
         }
     }
 
     requiredWidth = Math.max(
         requiredWidth,
-        estimateSlotDockWidth(getSkillSlotEntries(data, nodeType))
+        estimateSlotDockWidth(getStateSlotEntries(data, nodeType))
     );
 
     return Math.min(MAX_OVERVIEW_WIDTH, requiredWidth);
@@ -117,7 +97,7 @@ const estimateOverviewHeight = (node) => {
     const eventCount = new Set(
         (data.events || []).map((event) => String(event?.id || "").trim()).filter(Boolean)
     ).size;
-    const slotCount = getSkillSlotEntries(data, nodeType).length;
+    const slotCount = getStateSlotEntries(data, nodeType).length;
 
     if (nodeType === "submachine") {
         const localDataCount = (data.localDataModel || []).filter((entry) => {
