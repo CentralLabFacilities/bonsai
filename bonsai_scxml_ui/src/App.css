@@ -761,9 +761,6 @@
     color: #fecaca;
 }
 
-.library-state-button {
-    margin-top: 8px;
-}
 
 /* ==========================================================================
    3. CENTER: EDITOR AREA & HORIZONTAL TABS
@@ -1330,10 +1327,6 @@
     font-size: 12px;
 }
 
-.event-list-hidden {
-    height: 0;
-    overflow: hidden;
-}
 
 .slot-node {
     color: black;
@@ -1384,40 +1377,7 @@
 }
 
 /* Gruppentitel "Inherited Slots" / "Own Slots" */
-.slot-group {
-    margin-bottom: 10px;
-}
 
-.slot-group-title {
-    margin: 4px 0 6px;
-    color: #94a3b8;
-    font-size: 10.5px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-}
-
-.slot-group-title-inherited {
-    color: #d99a53;
-}
-
-.slot-write-handle,
-.slot-read-handle {
-    width: 9px;
-    height: 9px;
-    border: 2px solid #ffffff;
-    border-radius: 50%;
-    box-sizing: border-box;
-    opacity: 1;
-}
-
-.slot-write-handle {
-    background: #22c55e;
-}
-
-.slot-read-handle {
-    background: #38bdf8;
-}
 
 .slot-node {
     position: relative;
@@ -1447,14 +1407,6 @@
     overflow-wrap: anywhere;
 }
 
-.detail-card-header {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    margin-bottom: 6px;
-}
 
 .detail-card-title {
     min-width: 0;
@@ -1484,12 +1436,6 @@
     overflow-wrap: anywhere;
 }
 
-.metadata-container {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    margin: 8px 0 12px;
-}
 
 .metadata-row {
     display: grid;
@@ -1707,11 +1653,6 @@
     background: var(--secondary-color);
 }
 
-.event-text-field {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
 
 .skill-select {
     width: 100%;
@@ -1810,9 +1751,6 @@
     cursor: pointer;
 }
 
-.state-action-add-button:hover {
-    background: #2f72c9;
-}
 
 .state-action-empty {
     padding: 12px;
@@ -1836,14 +1774,6 @@
     background: var(--secondary-color);
 }
 
-.state-action-row-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 8px;
-    font-size: 12px;
-    font-weight: 700;
-}
 
 .state-action-remove-button {
     display: inline-flex;
@@ -1857,11 +1787,6 @@
     cursor: pointer;
 }
 
-.state-action-remove-button:hover {
-    border-color: #ef4444;
-    background: rgba(239, 68, 68, 0.14);
-    color: #ffffff;
-}
 
 .state-action-field {
     display: flex;
@@ -1941,19 +1866,6 @@
     font-weight: 500;
 }
 
-.drawer-warning-box {
-    margin: 12px 24px 0 24px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    background-color: rgba(234, 179, 8, 0.15);
-    border: 1px solid #eab308;
-    color: #fde047;
-    padding: 10px 16px;
-    border-radius: 6px;
-    font-size: 13px;
-    font-weight: 500;
-}
 
 .order-btn {
     background-color: #334155;
@@ -2035,43 +1947,6 @@
     flex: 1;
 }
 
-.target-list-vertical {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.target-card-full {
-    background-color: #0f172a;
-    border: 1px solid #334155;
-    border-radius: 6px;
-    padding: 8px 12px;
-    cursor: pointer;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    transition: all 0.15s ease;
-}
-
-.target-card-full:hover {
-    border-color: #38bdf8;
-    background-color: #1e293b;
-}
-
-.target-card-full.selected {
-    border: 2px solid #38bdf8;
-    background-color: #0284c725;
-}
-
-.target-card-status {
-    font-size: 11px;
-    color: #94a3b8;
-}
-
-.target-card-full.selected .target-card-status {
-    color: #38bdf8;
-    font-weight: bold;
-}
 
 .bottom-drawer-footer {
     padding: 12px 24px;
@@ -2229,22 +2104,6 @@
     color: #0f172a;
 }
 
-.parallel-group-lanes {
-    display: flex;
-    flex-direction: column;
-    height: calc(100% - 38px);
-}
-
-.parallel-group-lane-row {
-    flex: 1;
-    border-bottom: 1.5px solid #0284c7;
-    position: relative;
-    pointer-events: none;
-}
-
-.parallel-group-lane-row:last-child {
-    border-bottom: none;
-}
 
 .parallel-lane-node {
     width: 100%;
@@ -2331,10 +2190,7 @@
 }
 
 /* Interner Target Handle ist nur für React Flow */
-.compound-frame-internal-target-handle {
-    opacity: 0;
-    pointer-events: none;
-}
+
 
 /* Normaler Target Handle links */
 .compound-frame-node > .target-handle {
@@ -2524,78 +2380,6 @@
     background-color: #1c7fcf;
 }
 
-.multi-selection-toolbar {
-    position: absolute;
-    top: 15px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 30;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    background-color: #0f172a;
-    border: 1.5px solid #38bdf8;
-    padding: 8px 16px;
-    border-radius: 8px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
-    animation: fadeInDown 0.2s ease-out;
-}
-
-@keyframes fadeInDown {
-    from {
-        opacity: 0;
-        transform: translate(-50%, -10px);
-    }
-    to {
-        opacity: 1;
-        transform: translate(-50%, 0);
-    }
-}
-
-.selection-count {
-    font-size: 13px;
-    font-weight: bold;
-    color: #94a3b8;
-    border-right: 1px solid #334155;
-    padding-right: 12px;
-}
-
-.selection-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.group-btn {
-    background-color: #1e293b;
-    color: #ffffff;
-    border: 1px solid #475569;
-    border-radius: 6px;
-    padding: 6px 12px;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.15s ease;
-}
-
-.group-btn:hover {
-    transform: translateY(-1px);
-}
-
-.compound-btn:hover {
-    background-color: #334155;
-    border-color: #94a3b8;
-}
-
-.parallel-btn:hover {
-    background-color: #0369a1;
-    border-color: #38bdf8;
-}
-
-.submachine-btn:hover {
-    background-color: #7e22ce;
-    border-color: #c084fc;
-}
 
 .parallel-group-container {
     transition:
@@ -2910,9 +2694,6 @@
     overflow-wrap: anywhere;
 }
 
-.datamodel-overwritten-parameter {
-    border-color: #ef4444;
-}
 
 .datamodel-overwrite-error {
     margin: 2px 0 8px;
@@ -3061,30 +2842,11 @@
     border-color: #4d87e6;
 }
 
-.datamodel-compact-readonly-value {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    padding: 5px 7px;
-    border: 1px solid rgba(255, 255, 255, 0.16);
-    border-radius: 5px;
-    background-color: var(--background);
-    color: #b8c0c8;
-    font-size: 12px;
-}
 
 .datamodel-sourced-section {
     margin-top: 0;
 }
 
-.datamodel-sourced-row {
-    grid-template-columns:
-    minmax(80px, 0.8fr)
-    minmax(0, 1.25fr)
-    minmax(70px, auto);
-    border-style: dashed;
-}
 
 .datamodel-sourced-row .datamodel-parent-badge,
 .datamodel-sourced-row .datamodel-child-badge {
@@ -3852,14 +3614,6 @@
 }
 
 
-.transition-typed-assignment {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    margin-top: 8px;
-}
-
-
 .condition-expression-row {
     display: grid;
     grid-template-columns: auto minmax(72px, 0.8fr) 74px minmax(120px, 1.4fr);
@@ -3990,21 +3744,6 @@
     align-items: center;
 }
 
-.parameter-identity {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    min-width: 0;
-    flex: 1;
-}
-
-.parameter-identity .parameter-name {
-    min-width: 0;
-}
-
-.parameter-identity .parameter-type-badge {
-    flex-shrink: 0;
-}
 
 /* ==========================================================================
    PARAMETER / SLOT HEADER ALIGNMENT
@@ -4646,12 +4385,6 @@
    CUSTOM NODE: SLOT KEY CHIPS BELOW TRANSITIONS
    ========================================================================== */
 
-.node-slot-divider {
-    width: calc(100% - 20px);
-    height: 1px;
-    margin: 8px auto 6px;
-    background-color: #d1d5db;
-}
 
 .node-slot-summary {
     display: flex;
@@ -4662,49 +4395,19 @@
     padding: 0 10px 6px;
 }
 
-.node-slot-chip {
-    position: static;
-    display: inline-flex;
-    align-items: center;
-    padding: 1px 6px;
-    border-radius: 999px;
-    font-size: 9px;
-    font-weight: 700;
-    line-height: 1.4;
-    white-space: nowrap;
-    border: 1px solid rgba(100, 116, 139, 0.35);
-    background: rgba(100, 116, 139, 0.08);
-    color: #64748b;
-}
-
-.node-slot-chip-inherited {
-    border-color: rgba(180, 83, 9, 0.55);
-    background: rgba(180, 83, 9, 0.08);
-    color: #b45309;
-}
 
 /* ==========================================================================
    NODE DISPLAY MODES (EVENT / SLOT / BOTH)
    ========================================================================== */
 
 /* EVENT MODE*/
-.mode-event .node-slot-divider,
-.mode-event .node-slot-summary {
-    display: none !important;
-}
+
 
 /* SLOT MODE */
-.mode-slots .event-list {
-    display: none !important;
-}
+
 
 /* BOTH MODE */
-.mode-both .event-list {
-    display: block;
-}
-.mode-both .node-slot-summary {
-    display: flex;
-}
+
 
 /* ==========================================================================
    RIGHT PANEL: THREE TOP-LEVEL TABS + PROBLEMS
@@ -5378,21 +5081,6 @@
     color: #111827;
 }
 
-.node-slot-access {
-    font-size: 9px;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: #64748b;
-}
-
-.node-slot-access-read {
-    color: #0284c7;
-}
-
-.node-slot-access-write {
-    color: #16a34a;
-}
 
 .node-slot-key {
     overflow: hidden;
@@ -5515,15 +5203,7 @@
 }
 
 /* Skill-node slot rows */
-.node-slot-row-read .node-slot-access,
-.node-slot-access-read {
-    color: #4f46e5;
-}
 
-.node-slot-row-write .node-slot-access,
-.node-slot-access-write {
-    color: #c026d3;
-}
 
 /* Skill-side slot connection points. Keep the same circular geometry as
    transitions, but give Read/Write their semantic slot colours. */
@@ -5538,15 +5218,7 @@
 }
 
 /* Slot-node endpoints use the same semantic colours. */
-.slot-node-handle.slot-node-read-handle {
-    background-color: #6366f1 !important;
-    border-color: #eef2ff;
-}
 
-.slot-node-handle.slot-node-write-handle {
-    background-color: #d946ef !important;
-    border-color: #fdf4ff;
-}
 
 /* Semantic drag affordances instead of the previous neutral grey glow. */
 .slot-skill-read-handle.slot-handle-compatible,
@@ -5588,9 +5260,6 @@
     box-shadow: inset 0 0 0 1px rgba(6, 182, 212, 0.42);
 }
 
-.slot-node.slot-node-inherited.slot-node-child-required {
-    border-style: solid;
-}
 
 .slot-node-provenance {
     display: flex;
@@ -5612,11 +5281,6 @@
     text-overflow: ellipsis;
 }
 
-.slot-node-provenance-parent {
-    color: #92400e;
-    background: rgba(245, 158, 11, 0.14);
-    border: 1px solid rgba(245, 158, 11, 0.38);
-}
 
 .slot-node-provenance-child {
     color: #0e7490;
@@ -5624,35 +5288,6 @@
     border: 1px solid rgba(6, 182, 212, 0.4);
 }
 
-.slot-node-provenance-access {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto auto;
-    align-items: center;
-    gap: 5px;
-    width: 100%;
-    max-width: 190px;
-    color: #cbd5e1;
-    font-size: 8.5px;
-    line-height: 1.25;
-}
-
-.slot-node-provenance-access > span:first-child {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.slot-node-provenance-access strong {
-    color: #e2e8f0;
-    font-weight: 800;
-}
-
-.slot-node-provenance-access > span:last-child {
-    color: #94a3b8;
-    text-transform: uppercase;
-    font-size: 7.5px;
-    letter-spacing: 0.35px;
-}
 
 /* ==========================================================================
    "NEW SLOT" TOOLBAR BUTTON
@@ -6346,11 +5981,6 @@ dialog.editor-creation-dialog::backdrop {
     text-overflow: ellipsis;
 }
 
-.slot-node-provenance-parent {
-    color: #fcd9a8;
-    background: rgba(245, 158, 11, 0.10);
-    border-color: rgba(245, 158, 11, 0.32);
-}
 
 .slot-node-provenance-child {
     color: #a5f3fc;
@@ -7228,34 +6858,6 @@ dialog.editor-creation-dialog::backdrop {
     background: rgba(127, 127, 127, 0.10);
 }
 
-.nop-send-preview {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    min-width: 0;
-    padding: 9px 11px;
-    border-radius: 9px;
-    background: rgba(127, 127, 127, 0.055);
-    border: 1px solid rgba(127, 127, 127, 0.11);
-}
-
-.nop-send-preview > span {
-    flex: 0 0 auto;
-    font-size: 9px;
-    font-weight: 800;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    opacity: 0.46;
-}
-
-.nop-send-preview code {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 11px;
-    opacity: 0.8;
-}
 
 /* Browser-style focus navigation for node/sub-machine jumps. */
 .focus-history-controls {
@@ -7313,18 +6915,6 @@ dialog.editor-creation-dialog::backdrop {
     border-bottom-color: #506c71;
 }
 
-.skill-clone-badge {
-    flex: 0 0 auto;
-    padding: 2px 5px;
-    border: 1px solid #739096;
-    border-radius: 9px;
-    background: #344f54;
-    color: #d9eef0 !important;
-    font-size: 8px;
-    font-weight: 800 !important;
-    line-height: 1.15;
-    letter-spacing: 0.45px;
-}
 
 .skill-clone-detail-card {
     display: flex;
@@ -7882,66 +7472,7 @@ dialog.editor-creation-dialog::backdrop {
 
 
 /* Container outgoing transition summary in the Details panel. */
-.container-transition-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
 
-.container-transition-card {
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 9px 10px;
-    background: rgba(2, 132, 199, 0.04);
-}
-
-.container-transition-event {
-    margin-bottom: 7px;
-    font-size: 12px;
-    font-weight: 700;
-    color: #0369a1;
-    overflow-wrap: anywhere;
-}
-
-.container-transition-route {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    min-width: 0;
-}
-
-.container-transition-node-link {
-    min-width: 0;
-    max-width: calc(50% - 16px);
-    padding: 3px 6px;
-    border: 0;
-    border-radius: 5px;
-    background: transparent;
-    color: inherit;
-    font: inherit;
-    font-size: 12px;
-    font-weight: 600;
-    text-decoration: underline;
-    text-decoration-color: transparent;
-    text-underline-offset: 2px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    cursor: pointer;
-}
-
-.container-transition-node-link:hover,
-.container-transition-node-link:focus-visible {
-    background: rgba(2, 132, 199, 0.1);
-    color: #0369a1;
-    text-decoration-color: currentColor;
-    outline: none;
-}
-
-.container-transition-arrow {
-    flex: 0 0 auto;
-    color: #64748b;
-}
 
 /* Exit-token node references use the same compact, clickable treatment as the
    Slot Details "Accessed by" cards. */
@@ -8064,10 +7595,6 @@ dialog.editor-creation-dialog::backdrop {
     letter-spacing: 0.65px;
     line-height: 1;
     pointer-events: none;
-}
-
-.initial-state-badge-container {
-    left: 14px;
 }
 
 
@@ -8257,38 +7784,6 @@ dialog.editor-creation-dialog::backdrop {
     color: #dbeafe;
 }
 
-.exit-token-order-controls {
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
-}
-
-.exit-token-order-button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    padding: 0;
-    border: 1px solid rgba(148, 163, 184, 0.28);
-    border-radius: 4px;
-    background: rgba(15, 23, 42, 0.32);
-    color: #cbd5e1;
-    cursor: pointer;
-}
-
-.exit-token-order-button:hover:not(:disabled) {
-    border-color: rgba(96, 165, 250, 0.58);
-    background: rgba(59, 130, 246, 0.14);
-    color: #dbeafe;
-}
-
-.exit-token-order-button:disabled {
-    opacity: 0.28;
-    cursor: default;
-}
-
-
 
 /* Compact collapsed state containers ------------------------------------ */
 .compound-frame-node.collapsed-container .compound-collapsed-source-handle {
@@ -8397,7 +7892,6 @@ dialog.editor-creation-dialog::backdrop {
     margin: 2px 6px;
     background-color: #1e293b;
 }
-
 
 
 /*
