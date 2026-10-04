@@ -9,7 +9,7 @@ export function useEditorUiState({ showPanel }) {
     const [controlPointInsertRequest, setControlPointInsertRequest] = useState(null);
     const [leftLibraryTab, setLeftLibraryTab] = useState("skills");
     const [isHintPageOpen, setIsHintPageOpen] = useState(false);
-    const [activeMode, setActiveMode] = useState("overview");
+    const [activeMode, setActiveModeState] = useState("overview");
     const [isCreateSlotModalOpen, setIsCreateSlotModalOpen] = useState(false);
     const [pendingSubMachineCreation, setPendingSubMachineCreation] = useState(null);
     const [stateMachineLoading, setStateMachineLoading] = useState(null);
@@ -32,15 +32,12 @@ export function useEditorUiState({ showPanel }) {
         [showPanel],
     );
 
-    useEffect(() => {
-        if (
-            isCreateSlotModalOpen &&
-            activeMode !== "slots" &&
-            activeMode !== "overview"
-        ) {
+    const setActiveMode = useCallback((nextMode) => {
+        setActiveModeState(nextMode);
+        if (nextMode !== "slots" && nextMode !== "overview") {
             setIsCreateSlotModalOpen(false);
         }
-    }, [activeMode, isCreateSlotModalOpen]);
+    }, []);
 
     return {
         selectedPackage,

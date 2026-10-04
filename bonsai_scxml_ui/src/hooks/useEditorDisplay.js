@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef } from "react";
 import { MarkerType } from "@xyflow/react";
 import {
     SLOT_CONNECTION_COLORS,
@@ -40,13 +40,12 @@ export function projectStructureEdges(previous, edges) {
 }
 
 function useStructureEdges(edges) {
-    const [snapshot, setSnapshot] = useState(() => projectStructureEdges([], edges));
-    const structureEdges = useMemo(
-        () => projectStructureEdges(snapshot, edges),
-        [snapshot, edges]
-    );
-    if (structureEdges !== snapshot) setSnapshot(structureEdges);
-    return structureEdges;
+    const snapshotRef = useRef([]);
+    return useMemo(() => {
+        const next = projectStructureEdges(snapshotRef.current, edges);
+        snapshotRef.current = next;
+        return next;
+    }, [edges]);
 }
 
 export function projectRoutingNodes(previous, nodes, isDraggingNode = false) {
@@ -72,13 +71,12 @@ export function projectRoutingNodes(previous, nodes, isDraggingNode = false) {
 }
 
 function useRoutingNodeSnapshot(nodes, isDraggingNode) {
-    const [snapshot, setSnapshot] = useState(nodes);
-    const routingNodes = useMemo(
-        () => projectRoutingNodes(snapshot, nodes, isDraggingNode),
-        [snapshot, nodes, isDraggingNode]
-    );
-    if (routingNodes !== snapshot) setSnapshot(routingNodes);
-    return routingNodes;
+    const snapshotRef = useRef(nodes);
+    return useMemo(() => {
+        const next = projectRoutingNodes(snapshotRef.current, nodes, isDraggingNode);
+        snapshotRef.current = next;
+        return next;
+    }, [nodes, isDraggingNode]);
 }
 
 function withSlotEdgeEmphasis(edge, hovered) {
@@ -460,24 +458,24 @@ export function useEditorDisplay({
     // node data such as selection/hover highlighting. Keep one stable obstacle
     // array so those UI interactions do not invalidate every routed edge.
     // Slot nodes are included only in modes where they are actually rendered.
-    const [manualRoutingSnapshot, setManualRoutingSnapshot] = useState(EMPTY_NODES);
+    const manualRoutingSnapshotRef = useRef(EMPTY_NODES);
     const manualRoutingNodes = useMemo(() => {
+        const snapshot = manualRoutingSnapshotRef.current;
         // The provider snapshot is intentionally static while dragging. Return
         // it before even constructing/comparing injected node arrays; the live
         // dragged endpoint is handled by React Flow itself.
-        if (isDraggingNode && manualRoutingSnapshot.length > 0) {
-            return manualRoutingSnapshot;
+        if (isDraggingNode && snapshot.length > 0) {
+            return snapshot;
         }
 
         const requestedNodes =
             activeMode === "slots" || activeMode === "overview"
                 ? [...injectedNodes, ...injectedSlotNodes]
                 : injectedNodes;
-        return projectRoutingNodes(manualRoutingSnapshot, requestedNodes);
-    }, [manualRoutingSnapshot, activeMode, injectedNodes, injectedSlotNodes, isDraggingNode]);
-    if (manualRoutingNodes !== manualRoutingSnapshot) {
-        setManualRoutingSnapshot(manualRoutingNodes);
-    }
+        const next = projectRoutingNodes(snapshot, requestedNodes);
+        manualRoutingSnapshotRef.current = next;
+        return next;
+    }, [activeMode, injectedNodes, injectedSlotNodes, isDraggingNode]);
 
     // Build the expensive routing geometry once per real geometry change.
     // Previously the compound-avoidance pass repeatedly walked parent chains
@@ -1290,16 +1288,21 @@ export function useEditorDisplay({
         selectedSlotEdgeIds,
     ]);
 
-    const [slotVariantSnapshot, setSlotVariantSnapshot] = useState(() => ({
+    const slotVariantSnapshotRef = useRef({
         source: slotRenderCache,
         byEdge: new Map(),
-    }));
+    });
     const slotPresentation = useMemo(() => {
-        let nextCache = slotVariantSnapshot.source === slotRenderCache
-            ? slotVariantSnapshot.byEdge
+        const snapshot = slotVariantSnapshotRef.current;
+        let nextCache = snapshot.source === slotRenderCache
+            ? snapshot.byEdge
             : new Map();
         if (!isSlotDetailsConnectionPreview) {
-            return { edges: routedSlotEdges, cache: nextCache };
+            slotVariantSnapshotRef.current = {
+                source: slotRenderCache,
+                byEdge: nextCache,
+            };
+            return routedSlotEdges;
         }
 
         const displayed = routedSlotEdges.map((edge) => {
@@ -1351,13 +1354,16 @@ export function useEditorDisplay({
             if (cached?.[emphasis]) return cached[emphasis];
 
             const value = withSlotEdgeEmphasis(edge, isHoveredSlotDetailsConnection);
-            if (nextCache === slotVariantSnapshot.byEdge) nextCache = new Map(nextCache);
+            if (nextCache === snapshot.byEdge) nextCache = new Map(nextCache);
             nextCache.set(edge, { ...cached, [emphasis]: value });
             return value;
         });
-        return { edges: displayed, cache: nextCache };
+        slotVariantSnapshotRef.current = {
+            source: slotRenderCache,
+            byEdge: nextCache,
+        };
+        return displayed;
     }, [
-        slotVariantSnapshot,
         slotRenderCache,
         routedSlotEdges,
         isSlotDetailsConnectionPreview,
@@ -1365,13 +1371,7 @@ export function useEditorDisplay({
         selectedSlotContextNodeIds,
         showSlotEdges,
     ]);
-    if (
-        slotVariantSnapshot.source !== slotRenderCache ||
-        slotVariantSnapshot.byEdge !== slotPresentation.cache
-    ) {
-        setSlotVariantSnapshot({ source: slotRenderCache, byEdge: slotPresentation.cache });
-    }
-    const editableSlotEdges = slotPresentation.edges;
+    const editableSlotEdges = slotPresentation;
 
     const compoundInitialEdges = useMemo(
         () =>
@@ -1832,9 +1832,10 @@ export function useEditorDisplay({
         [problemVisibleNodes]
     );
 
-    const [nodeFocusSnapshot, setNodeFocusSnapshot] = useState(() => new Map());
+    const nodeFocusSnapshotRef = useRef(new Map());
     const nodeFocusVariants = useMemo(() => {
-        if (!hasHoverFocus || !hoverFocusNodeIds?.size) return nodeFocusSnapshot;
+        const snapshot = nodeFocusSnapshotRef.current;
+        if (!hasHoverFocus || !hoverFocusNodeIds?.size) return snapshot;
 
         const next = new Map();
         let changed = false;
@@ -1842,7 +1843,7 @@ export function useEditorDisplay({
             const index = nodeIndexById.get(nodeId);
             if (index === undefined) return;
             const node = problemVisibleNodes[index];
-            const cached = nodeFocusSnapshot.get(nodeId);
+            const cached = snapshot.get(nodeId);
             if (cached?.sourceNode === node) {
                 next.set(nodeId, cached);
             } else {
@@ -1854,9 +1855,10 @@ export function useEditorDisplay({
                 });
             }
         });
-        return changed || next.size !== nodeFocusSnapshot.size ? next : nodeFocusSnapshot;
-    }, [nodeFocusSnapshot, hasHoverFocus, hoverFocusNodeIds, nodeIndexById, problemVisibleNodes]);
-    if (nodeFocusVariants !== nodeFocusSnapshot) setNodeFocusSnapshot(nodeFocusVariants);
+        const result = changed || next.size !== snapshot.size ? next : snapshot;
+        nodeFocusSnapshotRef.current = result;
+        return result;
+    }, [hasHoverFocus, hoverFocusNodeIds, nodeIndexById, problemVisibleNodes]);
 
     const visibleNodes = useMemo(() => {
         const needsFocusPresentation = Boolean(

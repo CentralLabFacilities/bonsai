@@ -166,40 +166,77 @@ function DetailsPanel({
         setActiveTab(inspectorTabs[nextIndex].id);
     };
 
-    const handledParameterFocusRequestRef = useRef(null);
+    const handledFocusRequestsRef = useRef({
+        parameter: null,
+        slots: null,
+        transition: null,
+    });
 
     useEffect(() => {
-        if (!parameterFocusRequest) return;
-        if (activeTab !== "parameter") return;
-        if (selectedNode.id !== parameterFocusRequest.nodeId) return;
-        if (
-            handledParameterFocusRequestRef.current ===
-            parameterFocusRequest.requestId
-        ) {
-            return;
+        let kind = null;
+        let request = null;
+        let inputId = null;
+
+        if (activeTab === "parameter" && parameterFocusRequest) {
+            kind = "parameter";
+            request = parameterFocusRequest;
+            const parameterIndex = (selectedNode.data?.params || []).findIndex(
+                (parameter) =>
+                    String(parameter?.key || "") ===
+                    String(request.parameterKey || "")
+            );
+            if (parameterIndex >= 0) {
+                inputId = `param-${selectedNode.id}-${parameterIndex}`;
+            }
+        } else if (activeTab === "slots" && slotFocusRequest) {
+            kind = "slots";
+            request = slotFocusRequest;
+            const slots =
+                request.access === "write"
+                    ? selectedNode.data?.outSlots || []
+                    : selectedNode.data?.inSlots || [];
+            const slotIndex = slots.findIndex(
+                (slot) =>
+                    String(slot?.key || "") ===
+                    String(request.slotKey || "")
+            );
+            if (slotIndex >= 0) {
+                inputId = `${
+                    request.access === "write" ? "out" : "in"
+                }-slot-${selectedNode.id}-${slotIndex}`;
+            }
+        } else if (activeTab === "allgemein" && transitionFocusRequest) {
+            kind = "transition";
+            request = transitionFocusRequest;
+            const eventIndex = editableExitTokens.findIndex(
+                (event) =>
+                    String(event?.id || "") ===
+                    String(request.eventId || "")
+            );
+            if (eventIndex >= 0) {
+                inputId = `transition-target-${selectedNode.id}-${eventIndex}`;
+            }
         }
 
-        const parameterIndex = (selectedNode.data?.params || []).findIndex(
-            (parameter) =>
-                String(parameter?.key || "") ===
-                String(parameterFocusRequest.parameterKey || "")
-        );
-
-        if (parameterIndex < 0) return;
+        if (
+            !kind ||
+            !request ||
+            !inputId ||
+            selectedNode.id !== request.nodeId ||
+            handledFocusRequestsRef.current[kind] === request.requestId
+        ) {
+            return undefined;
+        }
 
         let frameA = null;
         let frameB = null;
 
         frameA = requestAnimationFrame(() => {
             frameB = requestAnimationFrame(() => {
-                const input = document.getElementById(
-                    `param-${selectedNode.id}-${parameterIndex}`
-                );
-
+                const input = document.getElementById(inputId);
                 if (!input) return;
 
-                handledParameterFocusRequestRef.current =
-                    parameterFocusRequest.requestId;
+                handledFocusRequestsRef.current[kind] = request.requestId;
                 input.focus();
 
                 const cursorPosition = String(input.value || "").length;
@@ -218,124 +255,12 @@ function DetailsPanel({
     }, [
         activeTab,
         parameterFocusRequest,
-        selectedNode.id,
-        selectedNode.data?.params,
-    ]);
-
-    const handledSlotFocusRequestRef = useRef(null);
-
-    useEffect(() => {
-        if (!slotFocusRequest) return;
-        if (activeTab !== "slots") return;
-        if (selectedNode.id !== slotFocusRequest.nodeId) return;
-        if (
-            handledSlotFocusRequestRef.current ===
-            slotFocusRequest.requestId
-        ) {
-            return;
-        }
-
-        const slots =
-            slotFocusRequest.access === "write"
-                ? selectedNode.data?.outSlots || []
-                : selectedNode.data?.inSlots || [];
-        const slotIndex = slots.findIndex(
-            (slot) =>
-                String(slot?.key || "") ===
-                String(slotFocusRequest.slotKey || "")
-        );
-
-        if (slotIndex < 0) return;
-
-        const inputId = `${
-            slotFocusRequest.access === "write" ? "out" : "in"
-        }-slot-${selectedNode.id}-${slotIndex}`;
-
-        let frameA = null;
-        let frameB = null;
-
-        frameA = requestAnimationFrame(() => {
-            frameB = requestAnimationFrame(() => {
-                const input = document.getElementById(inputId);
-                if (!input) return;
-
-                handledSlotFocusRequestRef.current =
-                    slotFocusRequest.requestId;
-                input.focus();
-
-                const cursorPosition = String(input.value || "").length;
-                if (typeof input.setSelectionRange === "function") {
-                    input.setSelectionRange(cursorPosition, cursorPosition);
-                }
-
-                input.scrollIntoView({ block: "nearest", behavior: "smooth" });
-            });
-        });
-
-        return () => {
-            if (frameA !== null) cancelAnimationFrame(frameA);
-            if (frameB !== null) cancelAnimationFrame(frameB);
-        };
-    }, [
-        activeTab,
         slotFocusRequest,
-        selectedNode.id,
-        selectedNode.data?.inSlots,
-        selectedNode.data?.outSlots,
-    ]);
-
-    const handledTransitionFocusRequestRef = useRef(null);
-
-    useEffect(() => {
-        if (!transitionFocusRequest) return;
-        if (activeTab !== "allgemein") return;
-        if (selectedNode.id !== transitionFocusRequest.nodeId) return;
-        if (
-            handledTransitionFocusRequestRef.current ===
-            transitionFocusRequest.requestId
-        ) {
-            return;
-        }
-
-        const eventIndex = editableExitTokens.findIndex(
-            (event) =>
-                String(event?.id || "") ===
-                String(transitionFocusRequest.eventId || "")
-        );
-
-        if (eventIndex < 0) return;
-
-        let frameA = null;
-        let frameB = null;
-
-        frameA = requestAnimationFrame(() => {
-            frameB = requestAnimationFrame(() => {
-                const input = document.getElementById(
-                    `transition-target-${selectedNode.id}-${eventIndex}`
-                );
-                if (!input) return;
-
-                handledTransitionFocusRequestRef.current =
-                    transitionFocusRequest.requestId;
-                input.focus();
-
-                const cursorPosition = String(input.value || "").length;
-                if (typeof input.setSelectionRange === "function") {
-                    input.setSelectionRange(cursorPosition, cursorPosition);
-                }
-
-                input.scrollIntoView({ block: "nearest", behavior: "smooth" });
-            });
-        });
-
-        return () => {
-            if (frameA !== null) cancelAnimationFrame(frameA);
-            if (frameB !== null) cancelAnimationFrame(frameB);
-        };
-    }, [
-        activeTab,
         transitionFocusRequest,
         selectedNode.id,
+        selectedNode.data?.params,
+        selectedNode.data?.inSlots,
+        selectedNode.data?.outSlots,
         editableExitTokens,
     ]);
 
