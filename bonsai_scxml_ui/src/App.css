@@ -8350,18 +8350,22 @@ dialog.editor-creation-dialog::backdrop {
  * transition SVG groups directly in CSS.
  */
 .react-flow.editor-edge-focus-mode
-.react-flow__edge.editor-transition-edge:not(.editor-edge-focus-active):not(.selected),
+.react-flow__edge.editor-transition-edge:not(.editor-edge-focus-active):not(.editor-edge-selection-related):not(.selected),
 .react-flow.editor-edge-focus-mode
-.react-flow__edge.editor-slot-edge:not(.editor-edge-focus-active):not(.selected) {
+.react-flow__edge.editor-slot-edge:not(.editor-edge-focus-active):not(.editor-edge-selection-related):not(.selected) {
     opacity: 0.22;
 }
 
 .react-flow.editor-edge-focus-mode
 .react-flow__edge.editor-transition-edge.editor-edge-focus-active,
 .react-flow.editor-edge-focus-mode
+.react-flow__edge.editor-transition-edge.editor-edge-selection-related,
+.react-flow.editor-edge-focus-mode
 .react-flow__edge.editor-transition-edge.selected,
 .react-flow.editor-edge-focus-mode
 .react-flow__edge.editor-slot-edge.editor-edge-focus-active,
+.react-flow.editor-edge-focus-mode
+.react-flow__edge.editor-slot-edge.editor-edge-selection-related,
 .react-flow.editor-edge-focus-mode
 .react-flow__edge.editor-slot-edge.selected {
     opacity: 1;

@@ -796,6 +796,7 @@ export function useEditorDisplay({
     const transitionRenderCache = useMemo(() => {
         const baseEdges = [];
         const focusedEdges = [];
+        const selectionRelatedEdges = [];
         const selectedEdges = [];
         const selectedFocusedEdges = [];
 
@@ -873,6 +874,23 @@ export function useEditorDisplay({
                     ? { ...fullDetailEdge.markerEnd, color }
                     : fullDetailEdge.markerEnd,
             };
+            const selectionRelatedEdge = {
+                ...withEdgeClassName(
+                    fullDetailEdge,
+                    "editor-edge-selection-related"
+                ),
+                // Selection context is persistent and independent from hover.
+                // Keep the semantic transition colour on the React-owned edge
+                // so mouse-leave can never fall back to the inactive grey.
+                animated: false,
+                style: {
+                    ...(fullDetailEdge.style || {}),
+                    stroke: color,
+                },
+                markerEnd: fullDetailEdge.markerEnd
+                    ? { ...fullDetailEdge.markerEnd, color }
+                    : fullDetailEdge.markerEnd,
+            };
             const selectedFocusedEdge = {
                 ...withEdgeClassName(
                     withEdgeClassName(
@@ -886,6 +904,7 @@ export function useEditorDisplay({
 
             baseEdges.push(edge);
             focusedEdges.push(focusedEdge);
+            selectionRelatedEdges.push(selectionRelatedEdge);
             selectedEdges.push(selectedEdge);
             selectedFocusedEdges.push(selectedFocusedEdge);
         });
@@ -893,6 +912,7 @@ export function useEditorDisplay({
         return {
             baseEdges,
             focusedEdges,
+            selectionRelatedEdges,
             selectedEdges,
             selectedFocusedEdges,
             indexByNodeId: buildEdgeIndexByNodeId(
@@ -911,11 +931,27 @@ export function useEditorDisplay({
         const {
             baseEdges,
             focusedEdges,
+            selectionRelatedEdges,
             selectedEdges,
             selectedFocusedEdges,
             indexByNodeId,
             indexByEdgeId,
         } = transitionRenderCache;
+
+        // Node selection is semantic context, not edge selection. Give all
+        // connected transitions their own persistent related state without
+        // setting edge.selected (which would change delete/multi-select
+        // semantics). During node dragging we intentionally stay on the cheap
+        // drag-only focus path.
+        const selectionRelatedIndexes = new Set();
+        if (!isDraggingNode) {
+            selectedVisualNodeIdSet.forEach((nodeId) => {
+                (indexByNodeId.get(nodeId) || []).forEach((edgeIndex) =>
+                    selectionRelatedIndexes.add(edgeIndex)
+                );
+            });
+        }
+
         const focusedIndexes = new Set();
         edgeFocusNodeIds.forEach((nodeId) => {
             (indexByNodeId.get(nodeId) || []).forEach((edgeIndex) =>
@@ -934,6 +970,7 @@ export function useEditorDisplay({
         // variants instead of rebuilding the complete edge cache.
         if (
             focusedIndexes.size === 0 &&
+            selectionRelatedIndexes.size === 0 &&
             selectedTransitionEdgeIds.size === 0
         ) {
             return baseEdges;
@@ -955,6 +992,15 @@ export function useEditorDisplay({
                     : focusedEdges[edgeIndex];
         });
 
+        selectionRelatedIndexes.forEach((edgeIndex) => {
+            const edgeId = baseEdges[edgeIndex]?.id;
+            // A directly selected edge is always stronger than contextual
+            // highlighting from a selected skill.
+            if (edgeId && selectedTransitionEdgeIds.has(edgeId)) return;
+
+            displayed[edgeIndex] = selectionRelatedEdges[edgeIndex];
+        });
+
         return displayed;
     }, [
         activeMode,
@@ -962,21 +1008,21 @@ export function useEditorDisplay({
         selectedTransitionEdgeIds,
         edgeFocusNodeIds,
         activeHoveredEditorEdgeId,
+        selectedVisualNodeIdSet,
+        isDraggingNode,
     ]);
 
     const highlightedTransitionEdges = transitionEdgesForDisplay;
 
-    const selectedSlotContextId = activeCanvasFocusNodeId || selectedNodeId;
+    // Selection and hover are intentionally separate for slot connections.
+    // A hovered skill must be able to preview its slot edges without replacing
+    // the persistent context of the skill the user explicitly selected.
+    const selectedSlotContextId = selectedNodeId;
     const selectedSlotContextNodeIds = useMemo(
         () => selectedSlotContextId
             ? cloneGroupByNodeId.get(selectedSlotContextId) || new Set([selectedSlotContextId])
             : new Set(),
         [selectedSlotContextId, cloneGroupByNodeId]
-    );
-    const hasSelectedSlotContext = Boolean(
-        selectedSlotContextId &&
-            (nodeById.has(selectedSlotContextId) ||
-                slotNodeIdSet.has(selectedSlotContextId))
     );
     const isSlotDetailsConnectionPreview = Boolean(
         hoveredSlotAccessNodeId &&
@@ -1097,9 +1143,10 @@ export function useEditorDisplay({
     // swaps references at the indexed connected positions below.
     const slotRenderCache = useMemo(() => {
         const baseEdges = [];
-        const contextEdges = [];
+        const hoveredEdges = [];
+        const selectionRelatedEdges = [];
         const selectedEdges = [];
-        const selectedContextEdges = [];
+        const selectedHoveredEdges = [];
 
         routedSlotEdgeCache.forEach((rawEdge) => {
             const edge = withEdgeClassName(rawEdge, "editor-slot-edge");
@@ -1107,23 +1154,33 @@ export function useEditorDisplay({
                 edge,
                 "editor-edge-context-visible"
             );
+            const hoveredEdge = withEdgeClassName(
+                contextEdge,
+                "editor-edge-focus-active"
+            );
+            const selectionRelatedEdge = withEdgeClassName(
+                contextEdge,
+                "editor-edge-selection-related"
+            );
             const selectedEdge = { ...edge, selected: true };
-            const selectedContextEdge = {
-                ...contextEdge,
+            const selectedHoveredEdge = {
+                ...hoveredEdge,
                 selected: true,
             };
 
             baseEdges.push(edge);
-            contextEdges.push(contextEdge);
+            hoveredEdges.push(hoveredEdge);
+            selectionRelatedEdges.push(selectionRelatedEdge);
             selectedEdges.push(selectedEdge);
-            selectedContextEdges.push(selectedContextEdge);
+            selectedHoveredEdges.push(selectedHoveredEdge);
         });
 
         return {
             baseEdges,
-            contextEdges,
+            hoveredEdges,
+            selectionRelatedEdges,
             selectedEdges,
-            selectedContextEdges,
+            selectedHoveredEdges,
             indexByNodeId: buildEdgeIndexByNodeId(
                 baseEdges,
                 getSlotEdgeNodeIds
@@ -1134,15 +1191,44 @@ export function useEditorDisplay({
         };
     }, [routedSlotEdgeCache]);
 
-    const slotFocusedIndexes = useMemo(() => {
+    const slotSelectionRelatedIndexes = useMemo(() => {
         const indexes = new Set();
-        edgeFocusNodeIds.forEach((nodeId) => {
+        selectedVisualNodeIdSet.forEach((nodeId) => {
             (slotRenderCache.indexByNodeId.get(nodeId) || []).forEach(
                 (edgeIndex) => indexes.add(edgeIndex)
             );
         });
         return indexes;
-    }, [slotRenderCache, edgeFocusNodeIds]);
+    }, [slotRenderCache, selectedVisualNodeIdSet]);
+
+    const slotHoveredIndexes = useMemo(() => {
+        const indexes = new Set();
+        const hoveredNodeIds = new Set();
+
+        const addCloneGroup = (nodeId) => {
+            if (!nodeId) return;
+            hoveredNodeIds.add(nodeId);
+            cloneGroupByNodeId
+                .get(nodeId)
+                ?.forEach((linkedId) => hoveredNodeIds.add(linkedId));
+        };
+
+        addCloneGroup(activeCanvasFocusNodeId);
+        addCloneGroup(hoveredSlotAccessNodeId);
+
+        hoveredNodeIds.forEach((nodeId) => {
+            (slotRenderCache.indexByNodeId.get(nodeId) || []).forEach(
+                (edgeIndex) => indexes.add(edgeIndex)
+            );
+        });
+
+        return indexes;
+    }, [
+        slotRenderCache,
+        activeCanvasFocusNodeId,
+        hoveredSlotAccessNodeId,
+        cloneGroupByNodeId,
+    ]);
 
     const routedSlotEdges = useMemo(() => {
         if (activeMode !== "slots" && activeMode !== "overview") {
@@ -1151,21 +1237,24 @@ export function useEditorDisplay({
 
         const {
             baseEdges,
-            contextEdges,
+            hoveredEdges,
+            selectionRelatedEdges,
             selectedEdges,
-            selectedContextEdges,
+            selectedHoveredEdges,
             indexByEdgeId,
         } = slotRenderCache;
         if (
-            slotFocusedIndexes.size === 0 &&
+            slotHoveredIndexes.size === 0 &&
+            slotSelectionRelatedIndexes.size === 0 &&
             selectedSlotEdgeIds.size === 0
         ) {
             return baseEdges;
         }
 
-        // Keep the complete edge set mounted and swap only cached entries that
-        // are selected or contextual. Selecting one slot edge therefore no
-        // longer rebuilds render objects for every slot connection.
+        // Keep the complete edge set mounted and swap only cached presentation
+        // variants. Hover and selection are different semantic states here:
+        // hover is temporary, while a selected skill keeps its slot edges
+        // highlighted until selection changes.
         const displayed = baseEdges.slice();
 
         selectedSlotEdgeIds.forEach((edgeId) => {
@@ -1174,18 +1263,30 @@ export function useEditorDisplay({
             displayed[edgeIndex] = selectedEdges[edgeIndex];
         });
 
-        slotFocusedIndexes.forEach((edgeIndex) => {
+        slotHoveredIndexes.forEach((edgeIndex) => {
             const edgeId = baseEdges[edgeIndex]?.id;
             displayed[edgeIndex] =
                 edgeId && selectedSlotEdgeIds.has(edgeId)
-                    ? selectedContextEdges[edgeIndex]
-                    : contextEdges[edgeIndex];
+                    ? selectedHoveredEdges[edgeIndex]
+                    : hoveredEdges[edgeIndex];
         });
+
+        // Persistent selection context wins over hover context. This gives the
+        // selected skill a slightly stronger slot-edge weight even while a
+        // different skill is being hovered. Directly selected edges remain
+        // strongest and are never converted into contextual selection.
+        slotSelectionRelatedIndexes.forEach((edgeIndex) => {
+            const edgeId = baseEdges[edgeIndex]?.id;
+            if (edgeId && selectedSlotEdgeIds.has(edgeId)) return;
+            displayed[edgeIndex] = selectionRelatedEdges[edgeIndex];
+        });
+
         return displayed;
     }, [
         activeMode,
         slotRenderCache,
-        slotFocusedIndexes,
+        slotHoveredIndexes,
+        slotSelectionRelatedIndexes,
         selectedSlotEdgeIds,
     ]);
 
@@ -1197,14 +1298,20 @@ export function useEditorDisplay({
         let nextCache = slotVariantSnapshot.source === slotRenderCache
             ? slotVariantSnapshot.byEdge
             : new Map();
-        if (!hasSelectedSlotContext && !isSlotDetailsConnectionPreview) {
+        if (!isSlotDetailsConnectionPreview) {
             return { edges: routedSlotEdges, cache: nextCache };
         }
 
         const displayed = routedSlotEdges.map((edge) => {
-            const isContextVisibleSlotEdge = String(edge.className || "")
+            const edgeClassNames = String(edge.className || "")
                 .split(/\s+/)
-                .includes("editor-edge-context-visible");
+                .filter(Boolean);
+            const isContextVisibleSlotEdge = edgeClassNames.includes(
+                "editor-edge-context-visible"
+            );
+            const isGraphInteractionEdge =
+                edgeClassNames.includes("editor-edge-focus-active") ||
+                edgeClassNames.includes("editor-edge-selection-related");
 
             // With slot edges globally hidden, unrelated edges are already
             // invisible through CSS. Preserve their cached object identity
@@ -1232,7 +1339,10 @@ export function useEditorDisplay({
                   selectedSlotContextNodeIds.has(edge.source) ||
                   selectedSlotContextNodeIds.has(edge.target);
 
-            if (isConnectedToSelection && !isHoveredSlotDetailsConnection) {
+            if (
+                isGraphInteractionEdge ||
+                (isConnectedToSelection && !isHoveredSlotDetailsConnection)
+            ) {
                 return edge;
             }
 
@@ -1252,7 +1362,6 @@ export function useEditorDisplay({
         routedSlotEdges,
         isSlotDetailsConnectionPreview,
         hoveredSlotAccessNodeId,
-        hasSelectedSlotContext,
         selectedSlotContextNodeIds,
         showSlotEdges,
     ]);
@@ -1420,9 +1529,29 @@ export function useEditorDisplay({
             slotNodeIdSet.has(selectedNodeId)
     );
 
+    const hasSelectedTransitionContext = useMemo(
+        () =>
+            !isDraggingNode &&
+            [...selectedVisualNodeIdSet].some(
+                (nodeId) => nodeById.has(nodeId) && !slotNodeIdSet.has(nodeId)
+            ),
+        [
+            isDraggingNode,
+            selectedVisualNodeIdSet,
+            nodeById,
+            slotNodeIdSet,
+        ]
+    );
+
+    const hasSelectedSlotEdgeContext = Boolean(
+        !isDraggingNode && slotSelectionRelatedIndexes.size > 0
+    );
+
     const edgeFocusMode = Boolean(
         activeCanvasFocusNodeId ||
             activeHoveredEditorEdgeId ||
+            hasSelectedTransitionContext ||
+            hasSelectedSlotEdgeContext ||
             isSlotDetailsFocus
     );
 
@@ -1435,8 +1564,12 @@ export function useEditorDisplay({
                 edge,
                 "editor-transition-edge"
             );
+            const edgeNodeIds = getTransitionEdgeNodeIds(edge);
+            const isSelectionRelated =
+                !isDraggingNode &&
+                edgeNodeIds.some((id) => selectedVisualNodeIdSet.has(id));
             const isFocused =
-                getTransitionEdgeNodeIds(edge).some((id) => edgeFocusNodeIds.has(id)) ||
+                edgeNodeIds.some((id) => edgeFocusNodeIds.has(id)) ||
                 edge.id === activeHoveredEditorEdgeId;
 
             if (isFocused) {
@@ -1447,6 +1580,12 @@ export function useEditorDisplay({
                 transitionEdge = withEdgeClassName(
                     transitionEdge,
                     "editor-edge-focus-active"
+                );
+            }
+            if (isSelectionRelated) {
+                transitionEdge = withEdgeClassName(
+                    transitionEdge,
+                    "editor-edge-selection-related"
                 );
             }
 
@@ -1510,6 +1649,7 @@ export function useEditorDisplay({
         isDraggingNode,
         hiddenNodeIds,
         activeHoveredEditorEdgeId,
+        selectedVisualNodeIdSet,
     ]);
 
     const structuralEdgeById = useMemo(() => {

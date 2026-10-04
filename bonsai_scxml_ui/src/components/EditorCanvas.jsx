@@ -164,12 +164,23 @@ export default function EditorCanvas({
         );
     }, []);
 
-    const recordHoverStyle = useCallback((element, property, value) => {
+    const recordHoverStyle = useCallback((
+        element,
+        property,
+        value,
+        getPersistentValue = null
+    ) => {
         if (!element) return;
         const previousValue = element.style.getPropertyValue(property);
         const previousPriority = element.style.getPropertyPriority(property);
         element.style.setProperty(property, value);
         hoverDomMutationsRef.current.push(() => {
+            const persistentValue = getPersistentValue?.();
+            if (persistentValue != null) {
+                element.style.setProperty(property, persistentValue);
+                return;
+            }
+
             if (previousValue) {
                 element.style.setProperty(
                     property,
@@ -230,10 +241,17 @@ export default function EditorCanvas({
             recordHoverClass(edgeElement, "animated");
             const path = edgeElement.querySelector(".react-flow__edge-path");
             if (path) {
+                const hoverColor = getHoverTransitionColor(edge);
                 recordHoverStyle(
                     path,
                     "stroke",
-                    getHoverTransitionColor(edge)
+                    hoverColor,
+                    () =>
+                        edgeElement.classList.contains(
+                            "editor-edge-selection-related"
+                        ) || edgeElement.classList.contains("selected")
+                            ? hoverColor
+                            : null
                 );
             }
         }
@@ -250,7 +268,15 @@ export default function EditorCanvas({
 
         const originalNodeId = node.data?.cloneOfNodeId;
         if (originalNodeId) {
-            markFastHoverNode(flowElement, originalNodeId, true);
+            // A reference hover has two different meanings: the reference itself
+            // is hovered, while the source is only the related target. Keep
+            // those states separate so their visual feedback can coexist with
+            // selection/problem styling without pretending both nodes are hovered.
+            markFastHoverNode(flowElement, originalNodeId, false);
+            recordHoverClass(
+                getFlowNodeElement(flowElement, originalNodeId),
+                "editor-reference-target-highlight"
+            );
         }
 
         const connectedEdgeIds =
@@ -266,6 +292,7 @@ export default function EditorCanvas({
     }, [
         clearFastHover,
         getFlowElement,
+        getFlowNodeElement,
         hoverEdgeIndex,
         markFastHoverEdge,
         markFastHoverNode,

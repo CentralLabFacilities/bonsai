@@ -59,6 +59,22 @@
     --ui-warning: #f59e0b;
     --ui-success: #22c55e;
 
+    /* Shared interaction-state palette. Keep these semantic rather than
+       tying hover/selection/problem feedback to individual components. */
+    --ui-state-hover: #93c5fd;
+    --ui-state-selected: #38bdf8;
+    --ui-state-focus: #e0f2fe;
+    --ui-state-invalid: #ef4444;
+    --ui-state-warning: #f59e0b;
+    --ui-state-reference: #a78bfa;
+    --ui-state-reference-target: #22d3ee;
+    --ui-state-disabled-opacity: 0.48;
+    --ui-state-dimmed-opacity: 0.42;
+    --ui-state-hover-ring: 0 0 0 2px rgba(147, 197, 253, 0.42);
+    --ui-state-selected-ring: 0 0 0 3px rgba(56, 189, 248, 0.72);
+    --ui-state-focus-ring: 0 0 0 2px rgba(224, 242, 254, 0.96), 0 0 0 5px rgba(56, 189, 248, 0.32);
+    --ui-state-invalid-ring: 0 0 0 3px rgba(239, 68, 68, 0.78);
+
     --ui-shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.24);
     --ui-shadow-md: 0 10px 28px rgba(0, 0, 0, 0.34);
     --ui-shadow-lg: 0 22px 55px rgba(0, 0, 0, 0.5);
