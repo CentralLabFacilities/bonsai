@@ -7,7 +7,6 @@ import {
     FiPlus,
     FiTrash2,
     FiX,
-    FiAlertTriangle,
 } from "react-icons/fi";
 import TypedValueEditor from "./TypedValueEditor";
 import {
@@ -18,6 +17,7 @@ import {
 } from "../utils/valueTypes";
 import { validateAssignmentExpression } from "../utils/assignmentExpressions";
 import ExpressionVariableSuggestions from "./ExpressionVariableSuggestions.jsx";
+import { InlineFeedback } from "./ui/index.js";
 import {
     getExpressionAutocompleteAction,
     getMatchingExpressionVariables,
@@ -945,10 +945,9 @@ function ConditionModal({
                 </div>
 
                 {errorMessage && (
-                    <div className="drawer-error-box">
-                        <FiAlertTriangle style={{ fontSize: "18px", flexShrink: 0 }} />
-                        <span>{errorMessage}</span>
-                    </div>
+                    <InlineFeedback tone="danger" className="drawer-error-box">
+                        {errorMessage}
+                    </InlineFeedback>
                 )}
 
                 <div

@@ -2,7 +2,7 @@ import { useId, useLayoutEffect, useRef, useState } from "react";
 import { FiFolder } from "react-icons/fi";
 import { isTauri, selectDirectory } from "../tauri-client.js";
 import { CreationDialog } from "./EditorOverlays.jsx";
-import { Button, IconButton, TextInput } from "./ui/index.js";
+import { Button, IconButton, InlineFeedback, TextInput } from "./ui/index.js";
 
 const normalizeFileName = (value) => {
     const trimmed = String(value || "").trim();
@@ -21,6 +21,7 @@ function CreateSubMachineForm({
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isBrowsing, setIsBrowsing] = useState(false);
     const [error, setError] = useState("");
+    const [invalidField, setInvalidField] = useState(null);
     const nameInputRef = useRef(null);
     const mountedRef = useRef(false);
     const submittingRef = useRef(false);
@@ -46,16 +47,19 @@ function CreateSubMachineForm({
         if (submittingRef.current || browseRequestRef.current) return;
         const normalizedName = normalizeFileName(fileName);
         if (!directory.trim()) {
-            alert("Please choose a directory for the state-machine file.");
+            setInvalidField("directory");
+            setError("Choose a directory for the state-machine file.");
             return;
         }
         if (!normalizedName) {
-            alert("Please enter a state-machine file name.");
+            setInvalidField("fileName");
+            setError("Enter a state-machine file name.");
             return;
         }
 
         submittingRef.current = true;
         setIsSubmitting(true);
+        setInvalidField(null);
         setError("");
         try {
             const accepted = await onConfirm?.({
@@ -68,6 +72,7 @@ function CreateSubMachineForm({
         } catch (submitError) {
             if (mountedRef.current) {
                 const message = String(submitError?.message || submitError || "").trim() || "Unknown error.";
+                setInvalidField(null);
                 setError(`Could not create state machine. ${message} Retry with Create.`);
             }
         } finally {
@@ -85,10 +90,12 @@ function CreateSubMachineForm({
             const selected = await selectDirectory("Choose state-machine directory");
             if (!mountedRef.current || browseRequestRef.current !== request || request.cancelled || !selected) return;
             setDirectory(selected);
+            setInvalidField(null);
             setError("");
         } catch (pickError) {
             if (!mountedRef.current || browseRequestRef.current !== request || request.cancelled) return;
             const message = String(pickError?.message || pickError || "").trim() || "Unknown error.";
+            setInvalidField(null);
             setError(`Could not choose directory. ${message} Retry with Choose directory or enter a path.`);
         } finally {
             if (browseRequestRef.current === request) {
@@ -120,10 +127,13 @@ function CreateSubMachineForm({
                             onChange={(event) => {
                                 if (browseRequestRef.current) browseRequestRef.current.cancelled = true;
                                 setDirectory(event.target.value);
+                                if (invalidField === "directory") setInvalidField(null);
                                 setError("");
                             }}
                             placeholder="/path/to/behaviors"
                             spellCheck={false}
+                            aria-invalid={invalidField === "directory"}
+                            aria-describedby={error ? `${labelId}-error` : undefined}
                         />
                         {isTauri() && (
                             <IconButton
@@ -144,13 +154,27 @@ function CreateSubMachineForm({
                     <TextInput
                         ref={nameInputRef}
                         value={fileName}
-                        onChange={(event) => setFileName(event.target.value)}
+                        onChange={(event) => {
+                            setFileName(event.target.value);
+                            if (invalidField === "fileName") setInvalidField(null);
+                            setError("");
+                        }}
                         placeholder="MyBehavior.xml"
                         spellCheck={false}
+                        aria-invalid={invalidField === "fileName"}
+                        aria-describedby={error ? `${labelId}-error` : undefined}
                     />
                 </label>
 
-                {error && <div className="submachine-create-error" role="alert">{error}</div>}
+                {error && (
+                    <InlineFeedback
+                        id={`${labelId}-error`}
+                        tone="danger"
+                        className="submachine-create-error"
+                    >
+                        {error}
+                    </InlineFeedback>
+                )}
 
                 <div className="submachine-create-actions">
                     <Button onClick={cancel} disabled={isSubmitting}>

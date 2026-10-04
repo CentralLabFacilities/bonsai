@@ -13,7 +13,7 @@ import { MdAssistantNavigation } from "react-icons/md";
 import { FaHandPaper } from "react-icons/fa";
 import { GoPackage } from "react-icons/go";
 import { areSkillLibraryPropsEqual } from "./canvasLibraryProps.js";
-import { IconButton, SegmentedButton, SegmentedControl, TextInput } from "./ui/index.js";
+import { Button, IconButton, InlineFeedback, SegmentedButton, SegmentedControl, TextInput } from "./ui/index.js";
 
 
 const SkillDescriptionTooltip = React.memo(
@@ -465,26 +465,35 @@ function SkillLibrary({
                 </div>
 
                 {addFeedback && (
-                    <p className={`skill-add-feedback${addFeedback.error ? " error" : ""}`} role={addFeedback.error ? "alert" : "status"}>
+                    <InlineFeedback
+                        compact
+                        tone={addFeedback.error ? "danger" : "success"}
+                        className="skill-add-feedback"
+                    >
                         {addFeedback.message}
-                    </p>
+                    </InlineFeedback>
                 )}
 
                 {skillLibraryStatus === "loading" && (
                     <div className="library-state" role="status">Loading skill library...</div>
                 )}
                 {skillLibraryStatus === "error" && (
-                    <div className="library-state library-state-error">
-                        <div role="alert" aria-atomic="true">
-                            <strong>{hasLoadedSkills ? "Skill library refresh failed" : "Skill library unavailable"}</strong>
+                    <div className="library-state-error-actions">
+                        <InlineFeedback
+                            tone="danger"
+                            title={hasLoadedSkills ? "Skill library refresh failed" : "Skill library unavailable"}
+                        >
                             <p>{skillLibraryError}</p>
                             <p>Check that the Bonsai backend is reachable, then reload.</p>
                             {hasLoadedSkills && <p>Showing the last successfully loaded skill list.</p>}
-                        </div>
-                        <button className="library-state-button" type="button" disabled={isReloadingSkills}
-                            onClick={() => void onReloadSkills?.()}>
+                        </InlineFeedback>
+                        <Button
+                            size="sm"
+                            disabled={isReloadingSkills}
+                            onClick={() => void onReloadSkills?.()}
+                        >
                             {isReloadingSkills ? "Retrying..." : "Retry loading skills"}
-                        </button>
+                        </Button>
                     </div>
                 )}
                 {skillLibraryStatus === "ready" && visibleItemCount === 0 && (
@@ -499,12 +508,17 @@ function SkillLibrary({
                                 <strong>No matching skills</strong>
                                 <p>Try a different search, filter, or package.</p>
                                 {hasActiveFilters && (
-                                    <button className="library-state-button" type="button" onClick={() => {
-                                        setSearchText("");
-                                        setActiveFilter("Everything");
-                                        setSelectedPackage(null);
-                                        setSelectedSubPackage(null);
-                                    }}>Clear filters</button>
+                                    <Button
+                                        size="sm"
+                                        onClick={() => {
+                                            setSearchText("");
+                                            setActiveFilter("Everything");
+                                            setSelectedPackage(null);
+                                            setSelectedSubPackage(null);
+                                        }}
+                                    >
+                                        Clear filters
+                                    </Button>
                                 )}
                             </>
                         )}

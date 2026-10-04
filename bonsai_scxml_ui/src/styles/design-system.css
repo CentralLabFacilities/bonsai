@@ -89,6 +89,7 @@
     --ui-z-dialog: 4000;
     --ui-z-popover: 5000;
     --ui-z-critical: 6200;
+    --ui-z-toast: 7000;
 
     /* Compatibility aliases for the legacy editor stylesheet. */
     --background: var(--ui-canvas);
@@ -407,6 +408,200 @@ body {
     padding: var(--ui-space-4) var(--ui-space-5);
     border: 0;
     text-align: left;
+}
+
+/* Inline and transient feedback ------------------------------------------- */
+.ui-inline-feedback {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--ui-space-3);
+    padding: var(--ui-space-4) var(--ui-space-5);
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius-md);
+    background: var(--ui-surface-2);
+    color: var(--ui-text-secondary);
+    font-size: var(--ui-font-size-sm);
+    line-height: 1.45;
+}
+
+.ui-inline-feedback--compact {
+    padding: var(--ui-space-3) var(--ui-space-4);
+}
+
+.ui-feedback__icon {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 auto;
+    margin-top: 1px;
+}
+
+.ui-inline-feedback__content,
+.ui-toast__content {
+    min-width: 0;
+    flex: 1;
+}
+
+.ui-inline-feedback__title,
+.ui-toast__title {
+    display: block;
+    color: var(--ui-text);
+    font-weight: var(--ui-font-weight-semibold);
+}
+
+.ui-inline-feedback__message,
+.ui-toast__message {
+    overflow-wrap: anywhere;
+}
+
+.ui-inline-feedback__title + .ui-inline-feedback__message,
+.ui-toast__title + .ui-toast__message {
+    margin-top: 2px;
+}
+
+.ui-inline-feedback__message > :first-child {
+    margin-top: 0;
+}
+
+.ui-inline-feedback__message > :last-child {
+    margin-bottom: 0;
+}
+
+.ui-inline-feedback__message p {
+    margin-block: var(--ui-space-1);
+}
+
+
+.ui-inline-feedback--info {
+    border-color: rgba(56, 189, 248, 0.42);
+    background: rgba(2, 132, 199, 0.1);
+}
+
+.ui-inline-feedback--info .ui-feedback__icon {
+    color: var(--ui-primary-border);
+}
+
+.ui-inline-feedback--success {
+    border-color: rgba(34, 197, 94, 0.42);
+    background: rgba(34, 197, 94, 0.09);
+}
+
+.ui-inline-feedback--success .ui-feedback__icon {
+    color: var(--ui-success);
+}
+
+.ui-inline-feedback--warning {
+    border-color: rgba(245, 158, 11, 0.48);
+    background: rgba(245, 158, 11, 0.09);
+}
+
+.ui-inline-feedback--warning .ui-feedback__icon {
+    color: var(--ui-warning);
+}
+
+.ui-inline-feedback--danger {
+    border-color: rgba(239, 68, 68, 0.48);
+    background: rgba(220, 38, 38, 0.1);
+}
+
+.ui-inline-feedback--danger .ui-feedback__icon {
+    color: var(--ui-state-invalid);
+}
+
+.ui-toast-viewport {
+    position: fixed;
+    left: 50%;
+    bottom: var(--ui-space-7);
+    z-index: var(--ui-z-toast);
+    display: flex;
+    width: min(440px, calc(100vw - 32px));
+    flex-direction: column;
+    gap: var(--ui-space-3);
+    transform: translateX(-50%);
+    pointer-events: none;
+}
+
+.ui-toast {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--ui-space-3);
+    padding: var(--ui-space-4);
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius-lg);
+    background: var(--ui-surface-1);
+    color: var(--ui-text-secondary);
+    box-shadow: var(--ui-shadow-lg);
+    font-size: var(--ui-font-size-sm);
+    line-height: 1.4;
+    pointer-events: auto;
+    backdrop-filter: blur(10px);
+    animation: ui-toast-enter 150ms ease-out;
+}
+
+.ui-toast--info {
+    border-color: rgba(56, 189, 248, 0.48);
+}
+
+.ui-toast--info .ui-feedback__icon {
+    color: var(--ui-primary-border);
+}
+
+.ui-toast--success {
+    border-color: rgba(34, 197, 94, 0.52);
+}
+
+.ui-toast--success .ui-feedback__icon {
+    color: var(--ui-success);
+}
+
+.ui-toast--warning {
+    border-color: rgba(245, 158, 11, 0.58);
+}
+
+.ui-toast--warning .ui-feedback__icon {
+    color: var(--ui-warning);
+}
+
+.ui-toast--danger {
+    border-color: rgba(239, 68, 68, 0.58);
+}
+
+.ui-toast--danger .ui-feedback__icon {
+    color: var(--ui-state-invalid);
+}
+
+.ui-toast__dismiss {
+    flex: 0 0 auto;
+    margin: -3px -3px -3px 0;
+}
+
+.ui-toast__action {
+    margin-top: var(--ui-space-3);
+}
+
+.library-state-error-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--ui-space-3);
+    margin-bottom: var(--ui-space-5);
+}
+
+
+@keyframes ui-toast-enter {
+    from {
+        opacity: 0;
+        transform: translateY(8px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ui-toast {
+        animation: none;
+    }
 }
 
 /* Shared popover shell used by lightweight editor utilities. */

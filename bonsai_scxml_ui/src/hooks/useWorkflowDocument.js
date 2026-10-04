@@ -13,44 +13,7 @@ import {
     normalizeSharedScxmlStateIdentity,
 } from "../utils/editorScxml";
 import { isEditorModalOpen } from "./useGlobalEditorShortcuts.js";
-
-const showSavedToast = (fileName, newerChanges) => {
-    if (typeof document === "undefined") return;
-    document.querySelectorAll(".bonsai-save-toast").forEach((element) => element.remove());
-    const toast = document.createElement("div");
-    toast.className = "bonsai-save-toast";
-    toast.setAttribute("role", "status");
-    toast.setAttribute("aria-live", "polite");
-    toast.textContent = `Saved ${fileName}${newerChanges ? "; newer changes remain unsaved" : ""}`;
-    Object.assign(toast.style, {
-        position: "fixed",
-        left: "50%",
-        bottom: "28px",
-        zIndex: "10000",
-        transform: "translate(-50%, 8px)",
-        padding: "7px 14px",
-        border: "1px solid rgba(34, 197, 94, 0.45)",
-        borderRadius: "7px",
-        background: "#0f172a",
-        color: "#86efac",
-        boxShadow: "0 6px 18px rgba(0, 0, 0, 0.28)",
-        fontSize: "12px",
-        fontWeight: "700",
-        opacity: "0",
-        pointerEvents: "none",
-        transition: "opacity 140ms ease, transform 140ms ease",
-    });
-    document.body.appendChild(toast);
-    window.requestAnimationFrame(() => {
-        toast.style.opacity = "1";
-        toast.style.transform = "translate(-50%, 0)";
-    });
-    window.setTimeout(() => {
-        toast.style.opacity = "0";
-        toast.style.transform = "translate(-50%, 8px)";
-        window.setTimeout(() => toast.remove(), 160);
-    }, 1200);
-};
+import { useFeedback } from "../components/ui/index.js";
 
 const checkpoint = (snapshot) =>
     snapshot
@@ -84,6 +47,7 @@ export function useWorkflowDocument({
     onStateMachineLoadStart,
     onStateMachineLoadEnd,
 }) {
+    const { notify } = useFeedback();
     const [saveStatus, setSaveStatus] = useState("idle");
     const [lastSavedAt, setLastSavedAt] = useState(null);
     const [isOpening, setIsOpening] = useState(false);
@@ -177,11 +141,18 @@ export function useWorkflowDocument({
                         setLastSavedAt(Date.now());
                         setSaveStatus("saved");
                         clearOperationNotice("save", snapshot);
-                        showSavedToast(
-                            result.fileName,
+                        const newerChangesRemain =
                             current?.documentGeneration === snapshot.documentGeneration &&
-                                current.isModified,
-                        );
+                            current.isModified;
+                        notify({
+                            id: "workflow-save",
+                            tone: "success",
+                            title: "Workflow saved",
+                            message: newerChangesRemain
+                                ? `${result.fileName} was saved, but newer changes remain unsaved.`
+                                : `${result.fileName} saved successfully.`,
+                            duration: newerChangesRemain ? 5200 : 2600,
+                        });
                         return result;
                     } catch (error) {
                         console.error("Save error:", error);
@@ -214,7 +185,7 @@ export function useWorkflowDocument({
             saveQueueRef.current = operation.catch(() => null);
             return operation;
         },
-        [isDesktop, getTabSnapshot, updateTab, clearOperationNotice],
+        [isDesktop, getTabSnapshot, updateTab, clearOperationNotice, notify],
     );
 
     const finishGuard = useCallback((ticket) => {
@@ -416,12 +387,14 @@ export function useWorkflowDocument({
                         checkSlotConnection(imported.document.nodes, [], imported.editorSlotNodes);
                     }
                     if (imported.parameterErrors.length > 0) {
-                        const lines = imported.parameterErrors
-                            .slice(0, 10)
-                            .map((error) => `${error.state}.${error.parameter}: ${error.message}`);
-                        alert(
-                            `Imported with ${imported.parameterErrors.length} parameter type errors:\n\n${lines.join("\n")}\n\nThese are also listed under Problems / Parameters.`,
-                        );
+                        const count = imported.parameterErrors.length;
+                        notify({
+                            id: "workflow-open-parameter-errors",
+                            tone: "warning",
+                            title: "Opened with parameter type errors",
+                            message: `${count} parameter ${count === 1 ? "value has" : "values have"} an invalid type. Review Problems > Parameters before saving.`,
+                            duration: 8000,
+                        });
                     }
                     return filePath;
                 } catch (error) {
@@ -453,6 +426,7 @@ export function useWorkflowDocument({
         replaceTabDocument,
         checkSlotConnection,
         clearOperationNotice,
+        notify,
     ]);
 
     const dismissDocumentNotice = useCallback(() => setDocumentNotice(null), []);

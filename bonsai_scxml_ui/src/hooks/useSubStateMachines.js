@@ -1,5 +1,6 @@
 import { useCallback, useLayoutEffect, useRef } from "react";
 import { isTauri, saveFile } from "../tauri-client.js";
+import { useFeedback } from "../components/ui/index.js";
 import { collectInheritedSlotUsages } from "../utils/editorGraph";
 import { getNodeId } from "../utils/editorGeometry";
 import {
@@ -151,6 +152,7 @@ export function useSubStateMachines({
     onStateMachineLoadStart,
     onStateMachineLoadEnd,
 }) {
+    const { notify } = useFeedback();
 
     const hydrateSubMachineInheritedSlots = async (
         targetNodes,
@@ -428,9 +430,12 @@ export function useSubStateMachines({
                 fitOptions: { duration: 300 },
             });
             if (!opened) {
-                alert(
-                    "The sub-state machine was not opened because the original workflow is no longer available for this operation. No workflow was changed by this operation."
-                );
+                notify({
+                    id: "submachine-open",
+                    tone: "warning",
+                    title: "Sub-state machine not opened",
+                    message: "The original workflow is no longer available for this operation. No workflow was changed.",
+                });
                 return false;
             }
             checkSlotConnection(
@@ -441,9 +446,12 @@ export function useSubStateMachines({
 
         } catch (err) {
             console.error("Sub-Machine loading error:", err);
-            alert(
-                `Error loading the sub-state machine:\n${err.message}\n\nSource: ${srcPath}`
-            );
+            notify({
+                id: "submachine-open",
+                tone: "danger",
+                title: "Could not open sub-state machine",
+                message: `${String(err?.message || err || "Unknown error.")} Source: ${srcPath}`,
+            });
         } finally {
             onStateMachineLoadEnd?.();
         }
@@ -537,18 +545,16 @@ export function useSubStateMachines({
                 fitOptions: { duration: 300 },
             });
             if (!opened) {
-                alert(
-                    "The new sub-state machine could not be added to the original workflow. No workflow was changed by this operation." +
-                        (IS_DESKTOP ? `\nThe new child file was kept at: ${resolvedFilePath}` : "")
+                throw new Error(
+                    "The original workflow changed or is no longer available. No workflow was changed." +
+                        (IS_DESKTOP ? ` The new child file was kept at ${resolvedFilePath}.` : "")
                 );
-                return false;
             }
             setContextMenu(null);
             return true;
         } catch (error) {
             console.error("Could not create sub-state-machine:", error);
-            alert(`Could not create the sub-state-machine file:\n${error.message}`);
-            return false;
+            throw error;
         }
     };
 
@@ -706,11 +712,10 @@ export function useSubStateMachines({
                 fitOptions: { duration: 300 },
             });
             if (!opened) {
-                alert(
-                    "The extraction was not applied because the original workflow changed or is no longer available. The original workflow was retained; no states were removed by this operation." +
-                        (IS_DESKTOP ? `\nThe new child file was kept at: ${resolvedFilePath}` : "")
+                throw new Error(
+                    "The original workflow changed or is no longer available. It was retained and no states were removed." +
+                        (IS_DESKTOP ? ` The new child file was kept at ${resolvedFilePath}.` : "")
                 );
-                return false;
             }
             const openedChild = getTabsSnapshot().find((tab) =>
                 getWorkflowFileKey(tab.filePath) === getWorkflowFileKey(resolvedFilePath)
@@ -721,8 +726,7 @@ export function useSubStateMachines({
             return true;
         } catch (error) {
             console.error("Could not create sub-state-machine:", error);
-            alert(`Could not create the sub-state-machine file:\n${error.message}`);
-            return false;
+            throw error;
         }
     };
 

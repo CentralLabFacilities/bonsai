@@ -15,7 +15,7 @@ import {
     selectDirectory,
 } from "../tauri-client.js";
 import { areBehaviorLibraryPropsEqual } from "./canvasLibraryProps.js";
-import { Button, SegmentedButton, SegmentedControl, TextInput } from "./ui/index.js";
+import { Button, InlineFeedback, SegmentedButton, SegmentedControl, TextInput } from "./ui/index.js";
 
 const normalizeKey = (value) =>
     String(value || "")
@@ -351,15 +351,15 @@ function BehaviorRoot({
             </div>
 
             {picker.error && (
-                <div className="behavior-library-error" role="alert">
+                <InlineFeedback compact tone="danger" className="behavior-library-error">
                     {picker.error}
-                </div>
+                </InlineFeedback>
             )}
 
             {openError && (
-                <div className="behavior-library-error" role="alert">
+                <InlineFeedback compact tone="danger" className="behavior-library-error">
                     {openError}
-                </div>
+                </InlineFeedback>
             )}
 
             {rootExpanded && (
@@ -377,9 +377,9 @@ function BehaviorRoot({
                     )}
 
                     {error && (
-                        <div className="behavior-library-error" role="alert">
+                        <InlineFeedback compact tone="danger" className="behavior-library-error">
                             Could not read directory. {error} Retry with Refresh or Choose directory.
-                        </div>
+                        </InlineFeedback>
                     )}
 
                     {hasLoaded && (loading || error) && (
@@ -606,11 +606,11 @@ function BehaviorLibrary({
                     </div>
 
                     {(newPathPicker.error || addError) && (
-                        <div className="behavior-add-error" role="alert">
+                        <InlineFeedback compact tone="danger" className="behavior-add-error">
                             {newPathPicker.error}
                             {newPathPicker.error && addError && " "}
                             {addError}
-                        </div>
+                        </InlineFeedback>
                     )}
 
                     <div className="behavior-add-actions">

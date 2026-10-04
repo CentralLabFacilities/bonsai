@@ -16,6 +16,7 @@ import EditorOverlays from "./components/EditorOverlays.jsx";
 import RuntimeChangesPanel from "./components/RuntimeChangesPanel.jsx";
 import WorkflowTabBar from "./components/WorkflowTabBar";
 import EditorFindOverlay from "./components/EditorFindOverlay";
+import { FeedbackProvider } from "./components/ui/index.js";
 
 import {
     isTauri,
@@ -1557,8 +1558,10 @@ function AppContent() {
 
 export default function App() {
     return (
-        <ReactFlowProvider>
-            <AppContent />
-        </ReactFlowProvider>
+        <FeedbackProvider>
+            <ReactFlowProvider>
+                <AppContent />
+            </ReactFlowProvider>
+        </FeedbackProvider>
     );
 }

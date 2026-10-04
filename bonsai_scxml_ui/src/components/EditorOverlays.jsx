@@ -1,6 +1,6 @@
 import { lazy, Suspense, useId, useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Button } from "./ui/index.js";
+import { Button, InlineFeedback } from "./ui/index.js";
 
 const ConditionModal = lazy(() => import("./ConditionModal.jsx"));
 const CreateSlotModal = lazy(() => import("./CreateSlotModal.jsx"));
@@ -168,7 +168,11 @@ function UnsavedWorkflowDialog({ title, action, busy, error, status, onResolve }
             </p>
             {busy && <p role="status">Saving changes...</p>}
             {!busy && status && <p role="status">{status}</p>}
-            {error && <p className="workflow-unsaved-dialog-error" role="alert">{error}</p>}
+            {error && (
+                <InlineFeedback tone="danger" className="workflow-unsaved-dialog-error">
+                    {error}
+                </InlineFeedback>
+            )}
             <div className="workflow-unsaved-dialog-actions">
                 <Button ref={cancelButtonRef} disabled={busy} onClick={() => resolveChoice("cancel")}>Cancel</Button>
                 <Button variant="danger" className="workflow-unsaved-dialog-discard" disabled={busy} onClick={() => resolveChoice("discard")}>Discard</Button>
