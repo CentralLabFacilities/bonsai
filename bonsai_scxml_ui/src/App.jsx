@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useCallback, useMemo } from "react";
 import {
     ReactFlowProvider,
     useReactFlow,
@@ -9,13 +9,11 @@ import "@xyflow/react/dist/style.css";
 import Header, { EditorNotice, EditorPanel, EditorPanelLedge, EditorPanelResizer } from "./components/EditorChrome.jsx";
 import SkillLibrary from "./components/SkillLibrary";
 import BehaviorLibrary from "./components/BehaviorLibrary";
-import WorkflowPanel from "./components/WorkflowPanel";
-import ProblemsPanel from "./components/ProblemsPanel";
 import EditorCanvas from "./components/EditorCanvas";
 import EditorOverlays from "./components/EditorOverlays.jsx";
-import RuntimeChangesPanel from "./components/RuntimeChangesPanel.jsx";
 import WorkflowTabBar from "./components/WorkflowTabBar";
 import EditorFindOverlay from "./components/EditorFindOverlay";
+import EditorInspectorPanel from "./components/EditorInspectorPanel.jsx";
 import { FeedbackProvider } from "./components/ui/index.js";
 
 import {
@@ -56,6 +54,7 @@ import { useEditorFlowChanges } from "./hooks/useEditorFlowChanges";
 import { useEditorLibraryItems } from "./hooks/useEditorLibraryItems";
 import { useEditorDetailsCallbacks, useEditorDetailsController } from "./hooks/useEditorDetailsController.js";
 import { useEditorPanelLayout, useEditorPreferences } from "./hooks/useEditorPreferences.js";
+import { useEditorUiState, useRestoreCanvasViewportOnModeChange } from "./hooks/useEditorUiState.js";
 import "./App.css";
 import "./styles/design-system.css";
 import "./styles/interaction-states.css";
@@ -66,8 +65,6 @@ initApiProxy();
 
 // Detect if running in Tauri desktop app
 const IS_DESKTOP = isTauri();
-const DetailsPanel = lazy(() => import("./components/DetailsPanel.jsx"));
-
 function AppContent() {
     const {
         skills,
@@ -79,14 +76,7 @@ function AppContent() {
         fetchSkills,
         fetchSkillData,
     } = useSkillDefinitions();
-    const [selectedPackage, setSelectedPackage] = useState(null);
-    const [selectedSubPackage, setSelectedSubPackage] = useState(null);
-    const [activeFilter, setActiveFilter] = useState("Everything");
-    const [searchText, setSearchText] = useState("");
-    const [contextMenu, setContextMenu] = useState(null);
-    const [controlPointInsertRequest, setControlPointInsertRequest] = useState(null);
     const updateNodeInternals = useUpdateNodeInternals();
-    const [leftLibraryTab, setLeftLibraryTab] = useState("skills");
     const {
         behaviorDirectories,
         setBehaviorDirectories,
@@ -136,32 +126,37 @@ function AppContent() {
         return parameters;
     }, [inheritedGlobalDataModel, globalDataModel]);
 
-    const [isHintPageOpen, setIsHintPageOpen] = useState(false);
-
-    const [activeMode, setActiveMode] = useState("overview");
-
-    const [isCreateSlotModalOpen, setIsCreateSlotModalOpen] = useState(false);
-    const [pendingSubMachineCreation, setPendingSubMachineCreation] = useState(null);
-    const [stateMachineLoading, setStateMachineLoading] = useState(null);
-
-    const beginStateMachineLoad = useCallback((label = "State machine") => {
-        setStateMachineLoading({ label });
-    }, []);
-
-    const endStateMachineLoad = useCallback(() => {
-        setStateMachineLoading(null);
-    }, []);
-    // Slot creation belongs to the slot-centric views only. If the user switches
-    // to Event or Code mode while the dialog is open, close it immediately.
-    if (isCreateSlotModalOpen && activeMode !== "slots" && activeMode !== "overview") {
-        setIsCreateSlotModalOpen(false);
-    }
-    const [activeTab, setActiveTab] = useState("allgemein");
-    const [rightPanelTab, setRightPanelTabState] = useState("datamodel");
-    const setRightPanelTab = useCallback((tab) => {
-        setRightPanelTabState(tab);
-        if (tab === "details") showPanel("inspector");
-    }, [showPanel]);
+    const {
+        selectedPackage,
+        setSelectedPackage,
+        selectedSubPackage,
+        setSelectedSubPackage,
+        activeFilter,
+        setActiveFilter,
+        searchText,
+        setSearchText,
+        contextMenu,
+        setContextMenu,
+        controlPointInsertRequest,
+        setControlPointInsertRequest,
+        leftLibraryTab,
+        setLeftLibraryTab,
+        isHintPageOpen,
+        setIsHintPageOpen,
+        activeMode,
+        setActiveMode,
+        isCreateSlotModalOpen,
+        setIsCreateSlotModalOpen,
+        pendingSubMachineCreation,
+        setPendingSubMachineCreation,
+        stateMachineLoading,
+        beginStateMachineLoad,
+        endStateMachineLoad,
+        activeTab,
+        setActiveTab,
+        rightPanelTab,
+        setRightPanelTab,
+    } = useEditorUiState({ showPanel });
 
     const {
         selectedNodeId,
@@ -314,51 +309,7 @@ function AppContent() {
         syncStateEditorPositions:
             rustWorkflowDocument.syncStateEditorPositions,
     });
-    const previousActiveModeRef = useRef(activeMode);
-
-    useEffect(() => {
-        const previousMode = previousActiveModeRef.current;
-        previousActiveModeRef.current = activeMode;
-
-        if (previousMode !== "code" || activeMode === "code") return;
-
-        // Code View unmounts React Flow. Wait until the canvas has mounted and
-        // measured its nodes again, then restore a useful workflow viewport.
-        let frameA = null;
-        let frameB = null;
-        frameA = requestAnimationFrame(() => {
-            frameB = requestAnimationFrame(() => {
-                const currentNodes = getNodes();
-                const skillNodes = currentNodes.filter(
-                    (node) =>
-                        !node.hidden &&
-                        (node.type === "custom" || node.type === "submachine")
-                );
-                const focusNodes =
-                    skillNodes.length > 0
-                        ? skillNodes
-                        : currentNodes.filter(
-                            (node) =>
-                                !node.hidden &&
-                                node.type !== "slot" &&
-                                node.type !== "parallelLane"
-                        );
-
-                if (focusNodes.length === 0) return;
-                fitView({
-                    nodes: focusNodes.map((node) => ({ id: node.id })),
-                    padding: 0.22,
-                    maxZoom: 1.15,
-                    duration: 260,
-                });
-            });
-        });
-
-        return () => {
-            if (frameA !== null) cancelAnimationFrame(frameA);
-            if (frameB !== null) cancelAnimationFrame(frameB);
-        };
-    }, [activeMode, fitView, getNodes]);
+    useRestoreCanvasViewportOnModeChange({ activeMode, fitView, getNodes });
 
     const {
         parallelDropTargetId,
@@ -396,9 +347,6 @@ function AppContent() {
         setEdges,
         setSelectedNodeId,
     });
-
-    const [newParamId, setNewParamId] = useState("");
-    const [newParamExpr, setNewParamExpr] = useState("");
 
     const {
         drawerData,
@@ -1107,8 +1055,6 @@ function AppContent() {
         onNavigateAncestorSlot: handleNavigateAncestorSlot,
     });
 
-    const inspectorTab = rightPanelTab === "details" && !selectedNode ? "datamodel" : rightPanelTab;
-
     return (
         <div className="container">
             <Header
@@ -1296,141 +1242,53 @@ function AppContent() {
 
                 <EditorPanelResizer side="inspector" panels={panels} />
                 <EditorPanel side="inspector" panels={panels}>
-                <div className="right-panel-shell">
-                    <div className="right-panel-tabs" role="tablist" aria-label="Inspector"
-                        onKeyDown={(event) => {
-                            if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
-                            const buttons = [...event.currentTarget.querySelectorAll('[role="tab"]')];
-                            const index = buttons.indexOf(event.target);
-                            if (index < 0) return;
-                            let next;
-                            if (event.key === "Home") next = 0;
-                            else if (event.key === "End") next = buttons.length - 1;
-                            else if (event.key === "ArrowLeft") next = (index - 1 + buttons.length) % buttons.length;
-                            else if (event.key === "ArrowRight") next = (index + 1) % buttons.length;
-                            else return;
-                            event.preventDefault();
-                            event.stopPropagation();
-                            buttons[next].focus();
-                            buttons[next].click();
-                        }}>
-                        <button
-                            type="button"
-                            id="inspector-tab-datamodel"
-                            role="tab"
-                            aria-selected={inspectorTab === "datamodel"}
-                            aria-controls="inspector-tab-panel"
-                            tabIndex={inspectorTab === "datamodel" ? 0 : -1}
-                            className={`right-panel-tab ${inspectorTab === "datamodel" ? "active" : ""}`}
-                            onClick={() => setRightPanelTab("datamodel")}
-                        >
-                            Data
-                        </button>
-
-                        {selectedNode && (
-                            <button
-                                type="button"
-                                id="inspector-tab-details"
-                                role="tab"
-                                aria-selected={inspectorTab === "details"}
-                                aria-controls="inspector-tab-panel"
-                                tabIndex={inspectorTab === "details" ? 0 : -1}
-                                className={`right-panel-tab ${inspectorTab === "details" ? "active" : ""}`}
-                                onClick={() => setRightPanelTab("details")}
-                            >
-                                {selectedNode.type === "slot" ? "Slot Details" : "Skill Detail"}
-                            </button>
-                        )}
-
-                        <button
-                            type="button"
-                            id="inspector-tab-problems"
-                            role="tab"
-                            aria-selected={inspectorTab === "problems"}
-                            aria-controls="inspector-tab-panel"
-                            tabIndex={inspectorTab === "problems" ? 0 : -1}
-                            className={`right-panel-tab ${inspectorTab === "problems" ? "active" : ""}`}
-                            onClick={() => setRightPanelTab("problems")}
-                        >
-                            <span>Problems</span>
-                            {editorProblems.length > 0 && (
-                                <span
-                                    className={`right-panel-problem-count ${
-                                        errorProblemCount > 0
-                                            ? "has-errors"
-                                            : "warnings-only"
-                                    }`}
-                                >
-                                    {editorProblems.length}
-                                </span>
-                            )}
-                        </button>
-                    </div>
-                    {runtimeLog && (
-                        <RuntimeChangesPanel
-                            isOpen={runtimeChangesPanelOpen}
-                            onToggle={() => setRuntimeChangesPanelOpen((value) => !value)}
-                            playback={runtimePlayback}
-                            changes={activeRuntimeChanges}
-                        />
-                    )}
-
-                    <div className="right-panel-content" id="inspector-tab-panel" role="tabpanel"
-                        aria-labelledby={`inspector-tab-${inspectorTab}`} tabIndex={0}>
-                        {inspectorTab === "datamodel" && (
-                            <WorkflowPanel
-                                globalDataModel={globalDataModel}
-                                inheritedGlobalDataModel={inheritedGlobalDataModel}
-                                descendantGlobalDataModel={descendantGlobalDataModel}
-                                newParamId={newParamId}
-                                setNewParamId={setNewParamId}
-                                newParamExpr={newParamExpr}
-                                setNewParamExpr={setNewParamExpr}
-                                onUpdateGlobalParam={updateGlobalParameter}
-                                onAddParameter={(parameterId, parameterExpr) => {
-                                    if (!String(parameterId || "").trim()) return;
-                                    addGlobalParameter(parameterId, parameterExpr);
-                                    setNewParamId("");
-                                    setNewParamExpr("");
-                                }}
-                                onDeleteParameter={deleteGlobalParameter}
-                            />
-                        )}
-
-                        {inspectorTab === "problems" && (
-                            <ProblemsPanel
-                                problems={editorProblems}
-                                onProblemClick={handleProblemClick}
-                            />
-                        )}
-
-                        {inspectorTab === "details" && selectedNode && (
-                            <Suspense fallback={null}>
-                                <DetailsPanel
-                                    {...detailsCallbacks}
-                                    selectedNode={selectedNode}
-                                    cloneSourceNode={selectedCloneSourceNode}
-                                    cloneNodes={selectedNodeClones}
-                                    containerOutgoingTransitions={selectedContainerOutgoingTransitions}
-                                    parallelLanes={selectedParallelLanes}
-                                    hasInitialNode={hasInitialNode}
-                                    activeTab={activeTab}
-                                    setActiveTab={setActiveTab}
-                                    packages={packages}
-                                    getPackageSkillEvent={getPackageSkillEvent}
-                                    availableTargetNodes={semanticNodes}
-                                    globalDataModel={selectedActionDataModel}
-                                    actionValueVariables={selectedActionExpressionVariables}
-                                    availableSlotPaths={canvasSlotPathOptions}
-                                    slotDetails={selectedSlotDetails}
-                                    parameterFocusRequest={parameterFocusRequest}
-                                    slotFocusRequest={slotFocusRequest}
-                                    transitionFocusRequest={transitionFocusRequest}
-                                />
-                            </Suspense>
-                        )}
-                    </div>
-                </div>
+                    <EditorInspectorPanel
+                        rightPanelTab={rightPanelTab}
+                        setRightPanelTab={setRightPanelTab}
+                        selection={{
+                            selectedNode,
+                            cloneSourceNode: selectedCloneSourceNode,
+                            cloneNodes: selectedNodeClones,
+                            containerOutgoingTransitions: selectedContainerOutgoingTransitions,
+                            parallelLanes: selectedParallelLanes,
+                            hasInitialNode,
+                            actionDataModel: selectedActionDataModel,
+                            actionExpressionVariables: selectedActionExpressionVariables,
+                            slotDetails: selectedSlotDetails,
+                        }}
+                        dataModel={{
+                            global: globalDataModel,
+                            inherited: inheritedGlobalDataModel,
+                            descendant: descendantGlobalDataModel,
+                            onUpdateParameter: updateGlobalParameter,
+                            onAddParameter: addGlobalParameter,
+                            onDeleteParameter: deleteGlobalParameter,
+                        }}
+                        problems={{
+                            items: editorProblems,
+                            errorCount: errorProblemCount,
+                            onClick: handleProblemClick,
+                        }}
+                        runtime={{
+                            log: runtimeLog,
+                            panelOpen: runtimeChangesPanelOpen,
+                            setPanelOpen: setRuntimeChangesPanelOpen,
+                            playback: runtimePlayback,
+                            changes: activeRuntimeChanges,
+                        }}
+                        details={{
+                            callbacks: detailsCallbacks,
+                            activeTab,
+                            setActiveTab,
+                            packages,
+                            getPackageSkillEvent,
+                            availableTargetNodes: semanticNodes,
+                            availableSlotPaths: canvasSlotPathOptions,
+                            parameterFocusRequest,
+                            slotFocusRequest,
+                            transitionFocusRequest,
+                        }}
+                    />
                 </EditorPanel>
                 <EditorPanelLedge side="library" panels={panels} />
                 <EditorPanelLedge side="inspector" panels={panels} />

@@ -48,13 +48,15 @@ export function useEditorPanelLayout() {
         ? { ...draft.base, [`${draft.side}Width`]: draft.width }
         : preferences;
     const layout = getEditorPanelLayout(width, effectivePreferences, drawer);
-    const [previousMode, setPreviousMode] = useState(layout.isDocked);
-    if (previousMode !== layout.isDocked) {
-        setPreviousMode(layout.isDocked);
+    const previousDockedModeRef = useRef(layout.isDocked);
+
+    useEffect(() => {
+        if (previousDockedModeRef.current === layout.isDocked) return;
+        previousDockedModeRef.current = layout.isDocked;
         setDrawer(null);
         setDraft(null);
         setLibraryDragging(false);
-    }
+    }, [layout.isDocked]);
 
     useEffect(() => {
         savePanelPreferences(preferences);
