@@ -1,68 +1,92 @@
-import { useCallback, useState } from "react";
-import { useEdgesState, useNodesState } from "@xyflow/react";
+import { useCallback, useRef, useState } from "react";
+import { applyEdgeChanges, applyNodeChanges } from "@xyflow/react";
 
-const createInitialDataModel = () => [
+const createStatePrefixDeclaration = () => [
     { id: "#_STATE_PREFIX", expr: "'de.unibi.citec.clf.bonsai.skills.'" },
 ];
 
-/**
- * Owns the editable workflow document state.
- *
- * Keep transient UI state (selection panels, hover, drag state, dialogs, etc.)
- * outside this hook. These values describe the document that is eventually
- * serialized to SCXML and therefore form one coherent state boundary.
- */
 export function useEditorGraphState() {
-    const [nodes, setNodes, onNodesChange] = useNodesState([]);
-    const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-    const [slotNodes, setSlotNodes, onSlotNodesChange] = useNodesState([]);
-    const [slotEdges, setSlotEdges, onSlotEdgesChange] = useEdgesState([]);
-    const [manualSlots, setManualSlots] = useState([]);
-    const [globalDataModel, setGlobalDataModel] = useState(createInitialDataModel);
-    const [inheritedGlobalDataModel, setInheritedGlobalDataModel] = useState([]);
+    const [document, setDocument] = useState(() => ({
+        nodes: [],
+        edges: [],
+        slotNodes: [],
+        slotEdges: [],
+        manualSlots: [],
+        globalDataModel: createStatePrefixDeclaration(),
+        inheritedGlobalDataModel: [],
+    }));
+    const documentRef = useRef(document);
 
-    // Replacing a loaded workflow is one document-level operation. Keeping it
-    // here prevents import/open paths from coordinating seven independent
-    // setters and gives us a single seam for a future reducer/Rust document
-    // store without changing callers again.
+    const setField = useCallback((field, valueOrUpdater) => {
+        const current = documentRef.current;
+        const value =
+            typeof valueOrUpdater === "function" ? valueOrUpdater(current[field]) : valueOrUpdater;
+        if (value === current[field]) return;
+        const next = { ...current, [field]: value };
+        // Publish edits before React paints them so async document actions
+        // cannot approve a stale checkpoint from the previous render.
+        documentRef.current = next;
+        setDocument(next);
+    }, []);
+    const setNodes = useCallback((value) => setField("nodes", value), [setField]);
+    const setEdges = useCallback((value) => setField("edges", value), [setField]);
+    const setSlotNodes = useCallback((value) => setField("slotNodes", value), [setField]);
+    const setSlotEdges = useCallback((value) => setField("slotEdges", value), [setField]);
+    const setManualSlots = useCallback((value) => setField("manualSlots", value), [setField]);
+    const setGlobalDataModel = useCallback(
+        (value) => setField("globalDataModel", value),
+        [setField],
+    );
+    const setInheritedGlobalDataModel = useCallback(
+        (value) => setField("inheritedGlobalDataModel", value),
+        [setField],
+    );
+    const onNodesChange = useCallback(
+        (changes) => setNodes((nodes) => applyNodeChanges(changes, nodes)),
+        [setNodes],
+    );
+    const onEdgesChange = useCallback(
+        (changes) => setEdges((edges) => applyEdgeChanges(changes, edges)),
+        [setEdges],
+    );
+    const onSlotNodesChange = useCallback(
+        (changes) => setSlotNodes((nodes) => applyNodeChanges(changes, nodes)),
+        [setSlotNodes],
+    );
+    const onSlotEdgesChange = useCallback(
+        (changes) => setSlotEdges((edges) => applyEdgeChanges(changes, edges)),
+        [setSlotEdges],
+    );
+    const getDocumentSnapshot = useCallback(() => documentRef.current, []);
+
     const replaceDocument = useCallback((nextDocument = {}) => {
-        setNodes(nextDocument.nodes || []);
-        setEdges(nextDocument.edges || []);
-        setSlotNodes(nextDocument.slotNodes || []);
-        setSlotEdges(nextDocument.slotEdges || []);
-        setManualSlots(nextDocument.manualSlots || []);
-        setGlobalDataModel(
-            nextDocument.globalDataModel || createInitialDataModel()
-        );
-        setInheritedGlobalDataModel(
-            nextDocument.inheritedGlobalDataModel || []
-        );
-    }, [
-        setNodes,
-        setEdges,
-        setSlotNodes,
-        setSlotEdges,
-    ]);
+        const next = {
+            nodes: nextDocument.nodes || [],
+            edges: nextDocument.edges || [],
+            slotNodes: nextDocument.slotNodes || [],
+            slotEdges: nextDocument.slotEdges || [],
+            manualSlots: nextDocument.manualSlots || [],
+            globalDataModel: nextDocument.globalDataModel || createStatePrefixDeclaration(),
+            inheritedGlobalDataModel: nextDocument.inheritedGlobalDataModel || [],
+        };
+        documentRef.current = next;
+        setDocument(next);
+    }, []);
 
     return {
-        nodes,
+        ...document,
         setNodes,
         onNodesChange,
-        edges,
         setEdges,
         onEdgesChange,
-        slotNodes,
         setSlotNodes,
         onSlotNodesChange,
-        slotEdges,
         setSlotEdges,
         onSlotEdgesChange,
-        manualSlots,
         setManualSlots,
-        globalDataModel,
         setGlobalDataModel,
-        inheritedGlobalDataModel,
         setInheritedGlobalDataModel,
+        getDocumentSnapshot,
         replaceDocument,
     };
 }

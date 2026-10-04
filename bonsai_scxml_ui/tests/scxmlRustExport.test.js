@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { prepareGraphForScxml, prepareNodesForScxml } from "../src/utils/editorScxml.js";
+import { rebuildBoundaryTransitions } from "../src/utils/boundaryTransitions.js";
 import {
     buildRustEditorExportRequest,
     buildRustEditorNodeSnapshots,
@@ -8,6 +9,7 @@ import {
     buildRustParallelLaneMoveContext,
     buildRustSlotsSnapshot,
     buildRustStateEditorPositions,
+    getWorkflowDocumentFingerprint,
 } from "../src/utils/scxmlRustExport.js";
 
 const makeFixture = () => {
@@ -223,4 +225,200 @@ test("single-state/position payloads skip unrelated actions, clone geometry and 
     assert.equal(parameterReads, 0);
     assert.equal(visitedEdges.size, 0);
     t.diagnostic("400 nodes/800 edges: selected action reads 400 -> 2; clone x reads 400 -> 2; edge visits 800 -> 0");
+});
+
+test("document fingerprints are deterministic across equivalent decorated and selected snapshots", () => {
+    const document = { ...makeFixture(), globalDataModel: [{ id: "ready", expr: "TRUE" }],
+        manualSlots: [{ key: "extra", state: "outer", path: "/extra" }] };
+    const decorated = structuredClone(document);
+    const callback = () => { throw new Error("Fingerprint must not execute UI callbacks"); };
+    decorated.nodes = decorated.nodes.map((node) => ({
+        selected: true, dragging: true, hidden: true, measured: { width: 900, height: 700 },
+        width: 900, height: 700, style: { color: "red", width: 900, height: 700 },
+        className: "runtime-active", positionAbsolute: { x: 999, y: 999 },
+        ...node,
+        data: { ...(node.data || {}), onSelect: callback, onUpdate: callback,
+            runtimeState: "active", runtimeParams: { ready: false }, mode: "runtime",
+            localDataModel: [{ id: "derived", expr: "changed" }],
+            isCollapsed: true, expandedContainerSize: { width: 1200, height: 800 } },
+    }));
+    decorated.edges = decorated.edges.map((edge) => ({
+        ...edge, selected: true, animated: true, type: "smartTransition", targetHandle: "ui-port",
+        style: { stroke: "red" }, markerEnd: { type: "arrow" },
+        data: { ...(edge.data || {}), onDelete: callback, runtimeState: "active",
+            controlPoints: [{ id: "random-route-id", anchor: "source", dx: 100, dy: 200 }] },
+    }));
+    Object.assign(decorated, { viewport: { x: 300, y: 400, zoom: 2 }, title: "Other title",
+        filePath: "/different/path", inheritedGlobalDataModel: [{ id: "derived", expr: "4" }],
+        slotNodes: [{ id: "derived-slot", position: { x: 80, y: 90 }, data: { path: "/other" } }],
+        slotEdges: [{ id: "derived-edge", source: "derived-slot", target: "work" }] });
+    decorated.nodes[0].data.runtimeSnapshot = decorated;
+    const fingerprint = getWorkflowDocumentFingerprint(document);
+    assert.equal(typeof fingerprint, "string");
+    assert.deepEqual(getWorkflowDocumentFingerprint(), getWorkflowDocumentFingerprint({
+        nodes: [], edges: [], globalDataModel: [], manualSlots: [],
+    }));
+    assert.equal(fingerprint, getWorkflowDocumentFingerprint(document));
+    assert.equal(fingerprint, getWorkflowDocumentFingerprint(decorated));
+    assert.deepEqual(JSON.parse(fingerprint).dataModel, [{ id: "ready", expression: "true" }]);
+});
+
+test("document fingerprints detect saveable content, node/reference geometry and logical/visual edge edits", () => {
+    const document = { ...makeFixture(), globalDataModel: [{ id: "ready", expr: "true" }],
+        manualSlots: [{ key: "extra", state: "outer", path: "/extra" }] };
+    const fingerprint = getWorkflowDocumentFingerprint(document);
+    const changes = [
+        ["state label", (d) => { d.nodes[0].data.label = "Renamed outer"; }],
+        ["skill identity", (d) => { d.nodes[5].data.fullSkillName = "pkg.skills.Other#1"; }],
+        ["submachine source", (d) => { d.nodes[5].data.src = "other.scxml"; }],
+        ["initial state", (d) => { d.nodes[5].data.isInitial = false; }],
+        ["final state", (d) => { d.nodes[5].data.isFinal = true; }],
+        ["initial child", (d) => { d.nodes[4].data = { initialChildId: "work" }; }],
+        ["initial substate", (d) => { d.nodes[5].data.initialSubState = "Other"; }],
+        ["parameter expression", (d) => { d.nodes[5].data.params[0].expr = "42"; }],
+        ["parameter default", (d) => { d.nodes[5].data.params[1].default = "5"; }],
+        ["entry assignment", (d) => { d.nodes[5].data.onEntry[0].expr = "2"; }],
+        ["exit assignment", (d) => { d.nodes[5].data.onExit[0].location = "other"; }],
+        ["bound event", (d) => { d.nodes[5].data.events = [{ id: "retry", target: "outer" }]; }],
+        ["output slot binding", (d) => { d.nodes[5].data.outSlots[0].path = "/changed"; }],
+        ["input slot key", (d) => { d.nodes[5].data.inSlots[0].key = "other"; }],
+        ["inherited slot state", (d) => { d.nodes[5].data.inSlots[0].inherited.state = "other"; }],
+        ["inherited slot xpath", (d) => { d.nodes[5].data.inSlots[0].inherited.xpath = "/other"; }],
+        ["slot inheritance", (d) => { delete d.nodes[5].data.inSlots[0].inherited; }],
+        ["global expression", (d) => { d.globalDataModel[0].expr = "false"; }],
+        ["manual slot", (d) => { d.manualSlots[0].path = "/changed"; }],
+        ["behavior exit", (d) => { d.nodes[13].data.behaviorExitEvents = ["changed"]; }],
+        ["state position", (d) => { d.nodes[5].position.x += 1; }],
+        ["ancestor position", (d) => { d.nodes[0].position.y += 1; }],
+        ["lane ancestor position", (d) => { d.nodes[2].position.y += 1; }],
+        ["skill reference position", (d) => { d.nodes[6].position.x += 1; }],
+        ["state reference position", (d) => { d.nodes[7].position.y += 1; }],
+        ["reference identity", (d) => { d.nodes[6].data.cloneOfNodeId = "end-root"; }],
+        ["visual instance identity", (d) => { d.nodes[6].data.editorInstanceId = "reference-2"; }],
+        ["reference kind", (d) => { d.nodes[7].data.sourceNodeType = "parallel"; }],
+        ["state containment", (d) => { d.nodes[5].parentId = "outer"; }],
+        ["edge source", (d) => { d.edges[0].source = "work"; }],
+        ["edge semantic target", (d) => { d.edges[0].target = "outer"; }],
+        ["edge visual target", (d) => { d.edges[0].target = "work"; }],
+        ["edge event", (d) => { d.edges[0].sourceHandle = "retry"; }],
+        ["edge condition", (d) => { d.edges[4].data.cond = "@count > 1"; }],
+        ["edge assignment", (d) => { d.edges[4].data.assignments[0].expr = "3"; }],
+        ["logical edge source", (d) => { d.edges[4].data.boundaryOriginalSources[1].sourceId = "outer"; }],
+        ["logical edge handle", (d) => { d.edges[4].data.boundaryOriginalSources[1].sourceHandle = "retry"; }],
+        ["imported boundary event", (d) => { d.edges[4].data.boundaryImportedRawEvent = "Work.retry"; }],
+        ["state insertion", (d) => { d.nodes.push({ id: "new", type: "custom" }); }],
+        ["edge removal", (d) => { d.edges.splice(0, 1); }],
+    ];
+    for (const [label, change] of changes) {
+        const edited = structuredClone(document);
+        change(edited);
+        assert.notEqual(getWorkflowDocumentFingerprint(edited), fingerprint, label);
+    }
+});
+
+test("document fingerprints retain persisted state, transition, parameter and declaration ordering", () => {
+    const document = { ...makeFixture(),
+        globalDataModel: [{ id: "first", expr: "1" }, { id: "second", expr: "2" }],
+        manualSlots: [{ key: "first", state: "work", path: "/first" },
+            { key: "second", state: "work", path: "/second" }] };
+    document.edges.push({ id: "retry", source: "work", target: "end-root", sourceHandle: "retry" });
+    document.nodes[0].data.containerTransitionOrder = ["boundary", "retry"];
+    const fingerprint = getWorkflowDocumentFingerprint(document);
+    const changes = [
+        ["states", (d) => { [d.nodes[9], d.nodes[13]] = [d.nodes[13], d.nodes[9]]; }],
+        ["transitions", (d) => { d.edges.reverse(); }],
+        ["parameters", (d) => { d.nodes[5].data.params.reverse(); }],
+        ["container transitions", (d) => { d.nodes[0].data.containerTransitionOrder.reverse(); }],
+        ["datamodel", (d) => { d.globalDataModel.reverse(); }],
+        ["manual declarations", (d) => { d.manualSlots.reverse(); }],
+    ];
+    for (const [label, change] of changes) {
+        const reordered = structuredClone(document);
+        change(reordered);
+        assert.notEqual(getWorkflowDocumentFingerprint(reordered), fingerprint, label);
+    }
+});
+
+test("document fingerprints normalize API-only declarations, defaults and actual inherited slot bindings", () => {
+    const document = { nodes: [{ id: "work", type: "custom", data: {
+        fullSkillName: "pkg.skills.Work", params: [{ key: "rate", default: "4" }],
+        events: [{ id: "api", name: "unused", cond: "@ready", assignments: [] }],
+        inSlots: [{ key: "unbound", type: "Number", description: "API slot" },
+            { key: "read", path: " value ", inherited: {} }],
+        outSlots: [{ key: "write", path: " output ", type: "Number", description: "output" }],
+    } }], edges: [], globalDataModel: [{ id: "ready", expr: " TRUE " }],
+    manualSlots: [{ key: " extra ", state: " parent ", path: " extra " }] };
+    const hydrated = structuredClone(document);
+    hydrated.nodes[0].data.params = [{ key: "rate", expr: "4", default: "9", type: "Number" },
+        { key: "empty", expr: "", description: "API parameter" }];
+    hydrated.nodes[0].data.events = [{ id: "different-api", name: "other", target: "  " }];
+    hydrated.nodes[0].data.inSlots = [
+        { key: "read", path: "/ignored-binding", type: "String", description: "Updated API",
+            inherited: { state: "pkg.skills.Work", xpath: " /value " } },
+        { key: "another-unbound", path: " ", inherited: { state: "parent", xpath: "/unused" } },
+    ];
+    hydrated.nodes[0].data.outSlots[0] = { key: " write ", path: "/output", type: "String" };
+    hydrated.globalDataModel[0].expr = "true";
+    hydrated.manualSlots = [{ key: "extra", state: "parent", path: "/extra", type: "String" },
+        { key: "unbound", state: "parent", path: " " }];
+    const fingerprint = getWorkflowDocumentFingerprint(document);
+    assert.equal(getWorkflowDocumentFingerprint(hydrated), fingerprint);
+    assert.deepEqual(JSON.parse(fingerprint).nodes[0].inputSlots, [{
+        key: "read", state: "pkg.skills.Work", xpath: "/value", inherited: true,
+    }]);
+    assert.deepEqual(JSON.parse(fingerprint).nodes[0].events, []);
+    const bound = structuredClone(document);
+    bound.nodes[0].data.events[0].target = "work";
+    const boundFingerprint = getWorkflowDocumentFingerprint(bound);
+    assert.notEqual(boundFingerprint, fingerprint);
+    for (const [key, value] of [["name", "changed"], ["cond", "@ready == false"],
+        ["assignments", [{ location: "ready", expr: "false" }]], ["target", "other"]]) {
+        const changed = structuredClone(bound);
+        changed.nodes[0].data.events[0][key] = value;
+        assert.notEqual(getWorkflowDocumentFingerprint(changed), boundFingerprint, key);
+    }
+    const inherited = structuredClone(document);
+    inherited.manualSlots[0] = { key: "extra", slotKind: "inheritSlot",
+        inherited: { state: "parent", xpath: "/extra" } };
+    assert.notEqual(getWorkflowDocumentFingerprint(inherited), fingerprint);
+});
+
+test("document fingerprints ignore regenerated boundary helpers and managed border events", () => {
+    const nodes = [
+        { id: "outer", type: "compound", position: { x: 10, y: 20 }, data: { events: [] } },
+        { id: "work", type: "custom", parentId: "outer", position: { x: 5, y: 6 } },
+        { id: "outside", type: "custom", position: { x: 500, y: 600 } },
+    ];
+    const edges = [{ id: "leave", source: "work", target: "outside", sourceHandle: "success" }];
+    const first = rebuildBoundaryTransitions(nodes, edges);
+    const second = rebuildBoundaryTransitions(first.nodes, first.edges);
+    assert.notEqual(first.edges[0].id, second.edges[0].id);
+    assert.equal(first.edges[0].data.boundaryInternalEdge, true);
+    assert.equal(getWorkflowDocumentFingerprint(first), getWorkflowDocumentFingerprint(second));
+    const decorated = structuredClone(second);
+    decorated.edges[0].data.cond = "changed-helper";
+    decorated.nodes[0].data.events[0].id = "regenerated-border-handle";
+    decorated.nodes[0].data.events[0].name = "derived-label";
+    assert.equal(getWorkflowDocumentFingerprint(first), getWorkflowDocumentFingerprint(decorated));
+});
+
+test("document fingerprint checkpoints are pure, immutable and detached from subsequent document edits", () => {
+    const document = { ...makeFixture(), globalDataModel: [{ id: "ready", expr: "TRUE" }],
+        manualSlots: [{ key: "extra", state: "outer", path: "/extra" }] };
+    const before = structuredClone(document);
+    const freeze = (value) => {
+        if (!value || typeof value !== "object") return;
+        Object.values(value).forEach(freeze);
+        Object.freeze(value);
+    };
+    freeze(document);
+    const checkpoint = getWorkflowDocumentFingerprint(document);
+    assert.deepEqual(document, before);
+    assert.equal(checkpoint, getWorkflowDocumentFingerprint(before));
+    before.nodes[5].data.params[0].expr = "99";
+    const newer = getWorkflowDocumentFingerprint(before);
+    assert.notEqual(newer, checkpoint);
+    assert.equal(checkpoint, getWorkflowDocumentFingerprint(document));
+    before.nodes[5].data.params[0].expr = "@rate";
+    assert.equal(getWorkflowDocumentFingerprint(before), checkpoint);
 });

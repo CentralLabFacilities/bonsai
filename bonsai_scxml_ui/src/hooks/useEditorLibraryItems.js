@@ -13,18 +13,19 @@ import {
     inspectWorkflowForEditorSource,
     loadWorkflowForEditor,
     projectWorkflowInspectionForEditor,
+    getWorkflowFileKey,
 } from "../utils/workflowLoader";
 
 export function useEditorLibraryItems({
     skills,
     nodes,
-    tabs,
     behaviorDirectories,
     fetchSkillData,
     hydrateSubMachineInheritedSlots,
     handleOpenSubMachine,
     switchTab,
     openTab,
+    getTabsSnapshot,
     checkSlotConnection,
     beginStateMachineLoad,
     endStateMachineLoad,
@@ -52,10 +53,12 @@ export function useEditorLibraryItems({
                 });
 
                 const tabId = `tab-behavior-${loaded.path || behavior.source}`;
-                const existingTab = tabs.find((tab) => tab.id === tabId);
+                const fileKey = getWorkflowFileKey(loaded.path);
+                const existingTab = fileKey ? getTabsSnapshot().find((tab) =>
+                    getWorkflowFileKey(tab.filePath) === fileKey) : null;
 
                 if (existingTab) {
-                    switchTab(tabId);
+                    switchTab(existingTab.id);
                     return;
                 }
 
@@ -109,7 +112,7 @@ export function useEditorLibraryItems({
         },
         [
             behaviorDirectories,
-            tabs,
+            getTabsSnapshot,
             beginStateMachineLoad,
             endStateMachineLoad,
             fetchSkillData,

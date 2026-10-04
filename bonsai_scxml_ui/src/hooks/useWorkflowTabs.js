@@ -1,33 +1,76 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { getWorkflowDocumentFingerprint } from "../utils/scxmlRustExport.js";
+import { isDocumentGuardOpen } from "./useGlobalEditorShortcuts.js";
+import { getWorkflowFileKey } from "../utils/workflowLoader.js";
 
-const createInitialTab = () => ({
-    id: "tab-1",
-    title: "Workflow 1",
-    fileName: "Workflow_1.xml",
-    fileHandle: null,
-    filePath: null,
-    nodes: [],
-    edges: [],
-    slotNodes: [],
-    slotEdges: [],
-    manualSlots: [],
-    parentTabId: null,
-    selectedNodeId: null,
-    viewport: { x: 0, y: 0, zoom: 1 },
-    globalDataModel: [
-        { id: "#_STATE_PREFIX", expr: "'de.unibi.citec.clf.bonsai.skills.'" },
-    ],
+const checkpointTab = (tab) => ({
+    ...tab,
+    documentGeneration: tab.documentGeneration ?? 0,
+    savedFingerprint: tab.savedFingerprint ?? getWorkflowDocumentFingerprint(tab),
+    isModified: false,
 });
+
+const sameDocumentInputs = (previous, next) => {
+    if (
+        !previous ||
+        previous.manualSlots !== next.manualSlots ||
+        previous.globalDataModel !== next.globalDataModel
+    )
+        return false;
+    if (previous.nodes.length !== next.nodes.length || previous.edges.length !== next.edges.length)
+        return false;
+    return (
+        previous.nodes.every((node, index) => {
+            const other = next.nodes[index];
+            return (
+                node === other ||
+                (node.id === other.id &&
+                    node.type === other.type &&
+                    node.parentId === other.parentId &&
+                    node.data === other.data &&
+                    node.position?.x === other.position?.x &&
+                    node.position?.y === other.position?.y)
+            );
+        }) &&
+        previous.edges.every((edge, index) => {
+            const other = next.edges[index];
+            return (
+                edge === other ||
+                (edge.id === other.id &&
+                    edge.type === other.type &&
+                    edge.source === other.source &&
+                    edge.target === other.target &&
+                    edge.sourceHandle === other.sourceHandle &&
+                    edge.targetHandle === other.targetHandle &&
+                    edge.label === other.label &&
+                    edge.data === other.data)
+            );
+        })
+    );
+};
+
+const createInitialTab = () =>
+    checkpointTab({
+        id: "tab-1",
+        title: "Workflow 1",
+        fileName: "Workflow_1.xml",
+        fileHandle: null,
+        filePath: null,
+        nodes: [],
+        edges: [],
+        slotNodes: [],
+        slotEdges: [],
+        manualSlots: [],
+        parentTabId: null,
+        selectedNodeId: null,
+        viewport: { x: 0, y: 0, zoom: 1 },
+        globalDataModel: [{ id: "#_STATE_PREFIX", expr: "'de.unibi.citec.clf.bonsai.skills.'" }],
+    });
 
 const getTabDisplayPath = (tab) => {
     if (!tab) return "";
 
-    return (
-        tab.filePath ||
-        tab.sourcePath ||
-        tab.fileName ||
-        "Unsaved workflow"
-    );
+    return tab.filePath || tab.sourcePath || tab.fileName || "Unsaved workflow";
 };
 
 export function useWorkflowTabs({
@@ -39,22 +82,26 @@ export function useWorkflowTabs({
     globalDataModel,
     inheritedGlobalDataModel,
     replaceDocument,
+    getDocumentSnapshot,
     selectedNodeId,
     setSelectedNodeId,
     fitView,
     getViewport,
     setViewport,
     syncRustDocument,
+    isDraggingNode = false,
 }) {
-    const [tabs, setTabsState] = useState([createInitialTab()]);
-    const tabsRef = useRef(tabs);
+    const [storedTabs, setTabsState] = useState(() => [createInitialTab()]);
+    const tabsRef = useRef(storedTabs);
+    const documentSequenceRef = useRef(0);
 
     const setTabs = useCallback((nextTabsOrUpdater) => {
         // Tab operations can be batched before a commit. Advance their event
         // snapshot here, not inside a React updater that may be replayed.
-        const nextTabs = typeof nextTabsOrUpdater === "function"
-            ? nextTabsOrUpdater(tabsRef.current)
-            : nextTabsOrUpdater;
+        const nextTabs =
+            typeof nextTabsOrUpdater === "function"
+                ? nextTabsOrUpdater(tabsRef.current)
+                : nextTabsOrUpdater;
         tabsRef.current = nextTabs;
         setTabsState(nextTabs);
     }, []);
@@ -63,6 +110,44 @@ export function useWorkflowTabs({
     const [tabPathTooltip, setTabPathTooltip] = useState(null);
     const [draggedTabId, setDraggedTabId] = useState(null);
 
+    const [lastFingerprint, setLastFingerprint] = useState(() => ({
+        tabId: "tab-1",
+        value: storedTabs[0].savedFingerprint,
+        inputs: null,
+    }));
+    const projection = useMemo(() => {
+        if (isDraggingNode) return null;
+        const inputs = { nodes, edges, manualSlots, globalDataModel };
+        // Selection and measurements replace objects without changing the file.
+        return sameDocumentInputs(lastFingerprint.inputs, inputs)
+            ? { value: lastFingerprint.value, inputs: lastFingerprint.inputs }
+            : { value: getWorkflowDocumentFingerprint(inputs), inputs };
+    }, [isDraggingNode, nodes, edges, manualSlots, globalDataModel, lastFingerprint]);
+    const fingerprint = projection?.value ?? null;
+    if (
+        fingerprint !== null &&
+        (lastFingerprint.tabId !== activeTabId ||
+            lastFingerprint.value !== fingerprint ||
+            lastFingerprint.inputs !== projection.inputs)
+    ) {
+        setLastFingerprint({ tabId: activeTabId, ...projection });
+    }
+    const activeStoredTab = storedTabs.find((tab) => tab.id === activeTabId);
+    const activeFingerprint =
+        fingerprint ??
+        (lastFingerprint.tabId === activeTabId
+            ? lastFingerprint.value
+            : activeStoredTab?.savedFingerprint);
+    const activeIsModified = activeFingerprint !== activeStoredTab?.savedFingerprint;
+    const tabs = useMemo(
+        () =>
+            storedTabs.map((tab) =>
+                tab.id === activeTabId && tab.isModified !== activeIsModified
+                    ? { ...tab, isModified: activeIsModified }
+                    : tab,
+            ),
+        [storedTabs, activeTabId, activeIsModified],
+    );
     const activeTab = tabs.find((tab) => tab.id === activeTabId) || null;
 
     // Keep tab actions stable while nodes move. The active editor state is read
@@ -80,58 +165,111 @@ export function useWorkflowTabs({
             inheritedGlobalDataModel,
             selectedNodeId,
         };
-    }, [activeTabId, nodes, edges, slotNodes, slotEdges, manualSlots,
-        globalDataModel, inheritedGlobalDataModel, selectedNodeId]);
+    }, [
+        activeTabId,
+        nodes,
+        edges,
+        slotNodes,
+        slotEdges,
+        manualSlots,
+        globalDataModel,
+        inheritedGlobalDataModel,
+        selectedNodeId,
+    ]);
 
-    // File/document controllers should update tab metadata through one stable
-    // operation rather than reaching into setTabs themselves. The updater can
-    // be either a partial object or a function of the current active tab.
-    const updateActiveTab = useCallback((patchOrUpdater) => {
-        const currentActiveTabId = activeEditorStateRef.current?.activeTabId;
-        if (!currentActiveTabId) return;
+    const getTabSnapshot = useCallback(
+        (tabId = activeEditorStateRef.current?.activeTabId) => {
+            const tab = tabsRef.current.find((candidate) => candidate.id === tabId);
+            if (!tab) return null;
+            const current = activeEditorStateRef.current;
+            const liveDocument = getDocumentSnapshot();
+            const snapshot =
+                current?.activeTabId === tabId
+                    ? {
+                          ...tab,
+                          ...liveDocument,
+                          selectedNodeId: current.selectedNodeId,
+                      }
+                    : tab;
+            const currentFingerprint = getWorkflowDocumentFingerprint(snapshot);
+            return {
+                ...snapshot,
+                fingerprint: currentFingerprint,
+                isModified: currentFingerprint !== tab.savedFingerprint,
+            };
+        },
+        [getDocumentSnapshot],
+    );
 
-        setTabs((currentTabs) =>
-            currentTabs.map((tab) => {
-                if (tab.id !== currentActiveTabId) return tab;
-                const patch =
-                    typeof patchOrUpdater === "function"
-                        ? patchOrUpdater(tab)
-                        : patchOrUpdater;
-                return patch ? { ...tab, ...patch } : tab;
-            })
-        );
-    }, [setTabs]);
+    const getTabsSnapshot = useCallback(
+        () => tabsRef.current.map((tab) => getTabSnapshot(tab.id)),
+        [getTabSnapshot],
+    );
 
-    const persistActiveTab = useCallback((currentTabs, currentTabPatch = null) => {
-        const current = activeEditorStateRef.current;
-        if (!current) return currentTabs;
+    // Always address the originating tab. Read its live content, not the stale
+    // arrays captured by an asynchronous save, before applying metadata.
+    const updateTab = useCallback(
+        (tabId, patchOrUpdater) => {
+            let updated = false;
+            setTabs((currentTabs) =>
+                currentTabs.map((tab) => {
+                    if (tab.id !== tabId) return tab;
+                    const current = getTabSnapshot(tabId);
+                    const patch =
+                        typeof patchOrUpdater === "function"
+                            ? patchOrUpdater(current)
+                            : patchOrUpdater;
+                    if (!patch) return tab;
+                    const next = { ...current, ...patch };
+                    next.fingerprint = getWorkflowDocumentFingerprint(next);
+                    next.isModified = next.fingerprint !== next.savedFingerprint;
+                    if (
+                        tabId === activeEditorStateRef.current?.activeTabId &&
+                        next.inheritedGlobalDataModel !== current.inheritedGlobalDataModel
+                    ) {
+                        activeEditorStateRef.current = {
+                            ...activeEditorStateRef.current,
+                            inheritedGlobalDataModel: next.inheritedGlobalDataModel,
+                        };
+                        replaceDocument(next);
+                    }
+                    updated = true;
+                    return next;
+                }),
+            );
+            return updated;
+        },
+        [setTabs, getTabSnapshot, replaceDocument],
+    );
 
-        let viewport = null;
-        try {
-            viewport = getViewport?.() || null;
-        } catch {
-            // React Flow can be temporarily unmounted (for example in Code
-            // view). Keep the last tab viewport in that case.
-        }
+    const persistActiveTab = useCallback(
+        (currentTabs, currentTabPatch = null) => {
+            const current = activeEditorStateRef.current;
+            if (!current) return currentTabs;
 
-        return currentTabs.map((tab) =>
-            tab.id === current.activeTabId
-                ? {
-                    ...tab,
-                    nodes: current.nodes,
-                    edges: current.edges,
-                    slotNodes: current.slotNodes,
-                    slotEdges: current.slotEdges,
-                    manualSlots: current.manualSlots,
-                    globalDataModel: current.globalDataModel,
-                    inheritedGlobalDataModel: current.inheritedGlobalDataModel,
+            let viewport = null;
+            try {
+                viewport = getViewport?.() || null;
+            } catch {
+                // React Flow can be temporarily unmounted (for example in Code
+                // view). Keep the last tab viewport in that case.
+            }
+
+            return currentTabs.map((tab) => {
+                if (tab.id !== current.activeTabId) return tab;
+                const next = {
+                    ...getTabSnapshot(tab.id),
                     selectedNodeId: current.selectedNodeId || null,
                     viewport: viewport || tab.viewport || null,
                     ...(currentTabPatch || {}),
-                }
-                : tab
-        );
-    }, [getViewport]);
+                };
+                next.fingerprint = getWorkflowDocumentFingerprint(next);
+                next.isModified = next.fingerprint !== next.savedFingerprint;
+                return next;
+            });
+        },
+        [getViewport, getTabSnapshot],
+    );
 
     const loadTabState = useCallback(
         (tab, { fit = false, fitOptions = null } = {}) => {
@@ -145,11 +283,16 @@ export function useWorkflowTabs({
                 globalDataModel: tab.globalDataModel || [],
                 inheritedGlobalDataModel: tab.inheritedGlobalDataModel || [],
             };
+            activeEditorStateRef.current = {
+                ...nextDocument,
+                activeTabId: tab.id,
+                selectedNodeId: tab.selectedNodeId || null,
+            };
             replaceDocument(nextDocument);
             void syncRustDocument?.(nextDocument).catch((error) => {
                 console.warn(
                     "Could not synchronize Rust workflow document after tab switch.",
-                    error
+                    error,
                 );
             });
 
@@ -160,10 +303,8 @@ export function useWorkflowTabs({
             const restoredSelectedNodeId =
                 tab.selectedNodeId && selectableIds.has(tab.selectedNodeId)
                     ? tab.selectedNodeId
-                    : [
-                        ...(tab.nodes || []),
-                        ...(tab.slotNodes || []),
-                    ].find((node) => node.selected)?.id || null;
+                    : [...(tab.nodes || []), ...(tab.slotNodes || [])].find((node) => node.selected)
+                          ?.id || null;
             setSelectedNodeId(restoredSelectedNodeId);
 
             // React Flow applies node changes asynchronously. Restore the
@@ -171,6 +312,7 @@ export function useWorkflowTabs({
             // state-machine tabs returns to exactly the previous view.
             window.requestAnimationFrame(() => {
                 window.requestAnimationFrame(() => {
+                    if (activeEditorStateRef.current?.activeTabId !== tab.id) return;
                     if (tab.viewport && setViewport) {
                         setViewport(tab.viewport, { duration: 0 });
                         return;
@@ -186,13 +328,26 @@ export function useWorkflowTabs({
                 });
             });
         },
-        [
-            replaceDocument,
-            setSelectedNodeId,
-            fitView,
-            setViewport,
-            syncRustDocument,
-        ]
+        [replaceDocument, setSelectedNodeId, fitView, setViewport, syncRustDocument],
+    );
+
+    const replaceTabDocument = useCallback(
+        (tabId, nextDocument, metadata = {}) => {
+            const current = getTabSnapshot(tabId);
+            if (!current) return false;
+            const next = checkpointTab({
+                ...current,
+                ...nextDocument,
+                ...metadata,
+                documentGeneration: ++documentSequenceRef.current,
+                savedFingerprint: getWorkflowDocumentFingerprint(nextDocument),
+            });
+            updateTab(tabId, next);
+            if (activeEditorStateRef.current?.activeTabId === tabId)
+                loadTabState(next, { fit: true });
+            return true;
+        },
+        [getTabSnapshot, updateTab, loadTabState],
     );
 
     const switchTab = useCallback(
@@ -207,7 +362,7 @@ export function useWorkflowTabs({
             setActiveTabId(targetTabId);
             loadTabState(targetTab, { fit: !targetTab.viewport });
         },
-        [persistActiveTab, loadTabState, setTabs]
+        [persistActiveTab, loadTabState, setTabs],
     );
 
     // Central entry point for opening a newly loaded/created workflow. The
@@ -219,24 +374,57 @@ export function useWorkflowTabs({
             tab,
             {
                 currentTabPatch = null,
+                originTabId = null,
+                originGeneration,
+                expectedFingerprint,
                 fit = true,
                 fitOptions = { duration: 300 },
-            } = {}
+            } = {},
         ) => {
             if (!tab?.id) return false;
 
-            const updatedTabs = persistActiveTab(
-                tabsRef.current,
-                currentTabPatch
-            );
-            const existingIndex = updatedTabs.findIndex(
-                (candidate) => candidate.id === tab.id
+            let updatedTabs = persistActiveTab(tabsRef.current);
+            if (currentTabPatch) {
+                const origin = getTabSnapshot(
+                    originTabId || activeEditorStateRef.current?.activeTabId,
+                );
+                if (
+                    !origin ||
+                    (originGeneration !== undefined &&
+                        origin.documentGeneration !== originGeneration) ||
+                    (expectedFingerprint !== undefined &&
+                        origin.fingerprint !== expectedFingerprint)
+                )
+                    return false;
+                const patch =
+                    typeof currentTabPatch === "function"
+                        ? currentTabPatch(origin)
+                        : currentTabPatch;
+                if (!patch) return false;
+                const next = { ...origin, ...patch };
+                next.fingerprint = getWorkflowDocumentFingerprint(next);
+                next.isModified = next.fingerprint !== next.savedFingerprint;
+                updatedTabs = updatedTabs.map((candidate) =>
+                    candidate.id === origin.id ? next : candidate,
+                );
+            }
+            const fileKey = getWorkflowFileKey(tab.filePath);
+            const existingIndex = updatedTabs.findIndex((candidate) =>
+                fileKey
+                    ? getWorkflowFileKey(candidate.filePath) === fileKey
+                    : candidate.id === tab.id,
             );
             const nextTabs = [...updatedTabs];
 
             if (existingIndex >= 0) {
-                nextTabs[existingIndex] = tab;
+                // An asynchronous library load must not replace an already-open
+                // workflow, especially one edited while that load was pending.
+                tab = nextTabs[existingIndex];
             } else {
+                if (nextTabs.some((candidate) => candidate.id === tab.id)) {
+                    tab = { ...tab, id: `${tab.id}-${crypto.randomUUID().slice(0, 6)}` };
+                }
+                tab = checkpointTab({ ...tab, documentGeneration: ++documentSequenceRef.current });
                 nextTabs.push(tab);
             }
 
@@ -245,7 +433,7 @@ export function useWorkflowTabs({
             loadTabState(tab, { fit, fitOptions });
             return true;
         },
-        [persistActiveTab, loadTabState, setTabs]
+        [persistActiveTab, getTabSnapshot, loadTabState, setTabs],
     );
 
     const handleAddNewTab = useCallback(() => {
@@ -274,17 +462,13 @@ export function useWorkflowTabs({
         openTab(newTabObj, { fit: false });
     }, [openTab]);
 
-    const handleCloseTab = useCallback(
-        (tabIdToClose, event = null) => {
-            event?.preventDefault?.();
-            event?.stopPropagation?.();
+    const closeTab = useCallback(
+        (tabIdToClose) => {
+            const currentTabs = persistActiveTab(tabsRef.current);
+            if (currentTabs.length === 1 || !currentTabs.some((tab) => tab.id === tabIdToClose))
+                return false;
 
-            const currentTabs = tabsRef.current;
-            if (currentTabs.length === 1) return;
-
-            const remainingTabs = currentTabs.filter(
-                (tab) => tab.id !== tabIdToClose
-            );
+            const remainingTabs = currentTabs.filter((tab) => tab.id !== tabIdToClose);
             setTabs(remainingTabs);
 
             const currentActiveTabId = activeEditorStateRef.current?.activeTabId;
@@ -293,8 +477,9 @@ export function useWorkflowTabs({
                 setActiveTabId(fallbackTab.id);
                 loadTabState(fallbackTab);
             }
+            return true;
         },
-        [loadTabState, setTabs]
+        [persistActiveTab, loadTabState, setTabs],
     );
 
     const handleTabDragStart = useCallback((event, tabId) => {
@@ -315,12 +500,8 @@ export function useWorkflowTabs({
             }
 
             setTabs((currentTabs) => {
-                const sourceIndex = currentTabs.findIndex(
-                    (tab) => tab.id === draggedTabId
-                );
-                const targetIndex = currentTabs.findIndex(
-                    (tab) => tab.id === targetTabId
-                );
+                const sourceIndex = currentTabs.findIndex((tab) => tab.id === draggedTabId);
+                const targetIndex = currentTabs.findIndex((tab) => tab.id === targetTabId);
                 if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) {
                     return currentTabs;
                 }
@@ -331,20 +512,10 @@ export function useWorkflowTabs({
                 return reorderedTabs;
             });
         },
-        [draggedTabId, setTabs]
+        [draggedTabId, setTabs],
     );
 
     const handleTabDragEnd = useCallback(() => setDraggedTabId(null), []);
-
-    const handleTabMiddleMouseDown = useCallback(
-        (event, tabId) => {
-            if (event.button !== 1) return;
-            event.preventDefault();
-            event.stopPropagation();
-            handleCloseTab(tabId, event);
-        },
-        [handleCloseTab]
-    );
 
     const handleTabMouseEnter = useCallback((event, tab) => {
         const rect = event.currentTarget.getBoundingClientRect();
@@ -354,10 +525,7 @@ export function useWorkflowTabs({
 
         let left = rect.left;
         if (left + tooltipWidth > window.innerWidth - viewportPadding) {
-            left = Math.max(
-                viewportPadding,
-                window.innerWidth - tooltipWidth - viewportPadding
-            );
+            left = Math.max(viewportPadding, window.innerWidth - tooltipWidth - viewportPadding);
         }
 
         setTabPathTooltip({
@@ -376,6 +544,7 @@ export function useWorkflowTabs({
     // responsibility instead of leaking tab internals back into App.jsx.
     useEffect(() => {
         const handleTabShortcut = (event) => {
+            if (isDocumentGuardOpen()) return;
             if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
 
             const isTabShortcut =
@@ -393,11 +562,10 @@ export function useWorkflowTabs({
             const currentTabId = activeEditorStateRef.current?.activeTabId;
             const currentIndex = Math.max(
                 0,
-                currentTabs.findIndex((tab) => tab.id === currentTabId)
+                currentTabs.findIndex((tab) => tab.id === currentTabId),
             );
             const direction = event.shiftKey ? -1 : 1;
-            const nextIndex =
-                (currentIndex + direction + currentTabs.length) % currentTabs.length;
+            const nextIndex = (currentIndex + direction + currentTabs.length) % currentTabs.length;
 
             switchTab(currentTabs[nextIndex].id);
         };
@@ -408,20 +576,21 @@ export function useWorkflowTabs({
 
     return {
         tabs,
-        setTabs,
         activeTabId,
         activeTab,
-        updateActiveTab,
+        getTabSnapshot,
+        getTabsSnapshot,
+        updateTab,
+        replaceTabDocument,
         tabPathTooltip,
         draggedTabId,
         switchTab,
         openTab,
         handleAddNewTab,
-        handleCloseTab,
+        closeTab,
         handleTabDragStart,
         handleTabDragOver,
         handleTabDragEnd,
-        handleTabMiddleMouseDown,
         handleTabMouseEnter,
         handleTabMouseLeave,
     };

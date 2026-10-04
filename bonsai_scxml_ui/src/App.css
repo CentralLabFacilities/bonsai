@@ -368,6 +368,14 @@
     box-shadow: 0 2px 8px rgba(56, 189, 248, 0.8);
 }
 
+.workflow-tab-modified-indicator {
+    width: 6px;
+    height: 6px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: #fbbf24;
+}
+
 .intellij-tab-close {
     display: flex;
     align-items: center;
@@ -6686,6 +6694,87 @@
 .skill-paste-choice-cancel:hover {
     background: #1e293b;
     color: #f8fafc;
+}
+
+/* ================= UNSAVED WORKFLOW GUARD ================= */
+.workflow-unsaved-dialog {
+    box-sizing: border-box;
+    width: min(480px, calc(100vw - 32px));
+    max-height: calc(100dvh - 32px);
+    overflow: auto;
+    margin: auto;
+    padding: 22px;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    background: #0f172a;
+    color: #e2e8f0;
+    box-shadow: 0 22px 55px rgba(0, 0, 0, 0.55);
+}
+
+.workflow-unsaved-dialog::backdrop {
+    background: rgba(2, 6, 23, 0.72);
+    backdrop-filter: blur(2px);
+}
+
+.workflow-unsaved-dialog h2 {
+    margin: 0 0 8px;
+    color: #f8fafc;
+    font-size: 17px;
+}
+
+.workflow-unsaved-dialog p {
+    margin: 0 0 16px;
+    color: #cbd5e1;
+    font-size: 13px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+.workflow-unsaved-dialog .workflow-unsaved-dialog-error {
+    color: #fca5a5;
+}
+
+.workflow-unsaved-dialog-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 20px;
+}
+
+.workflow-unsaved-dialog-actions button {
+    padding: 8px 14px;
+    border: 1px solid #475569;
+    border-radius: 7px;
+    background: #1e293b;
+    color: #e2e8f0;
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.workflow-unsaved-dialog-actions .workflow-unsaved-dialog-discard {
+    color: #fca5a5;
+}
+
+.workflow-unsaved-dialog-actions .workflow-unsaved-dialog-save {
+    border-color: #0284c7;
+    background: #0369a1;
+    color: #f8fafc;
+}
+
+.workflow-unsaved-dialog-actions button:hover:not(:disabled) {
+    border-color: #94a3b8;
+}
+
+.workflow-unsaved-dialog-actions button:focus-visible {
+    outline: 2px solid #38bdf8;
+    outline-offset: 3px;
+}
+
+.workflow-unsaved-dialog-actions button:disabled {
+    cursor: wait;
+    opacity: 0.55;
 }
 
 /* ================= STATE MACHINE LOADING ================= */

@@ -351,6 +351,49 @@ export const buildRustEditorExportRequest = ({
     };
 };
 
+// Compare saveable content, not presentation state or XML/IPC output. The export
+// request already excludes routes, collapse/dimensions and the derived slot graph.
+export const getWorkflowDocumentFingerprint = ({
+    nodes = [],
+    edges = [],
+    globalDataModel = [],
+    manualSlots = [],
+} = {}) => {
+    const request = buildRustEditorExportRequest({ nodes, edges, globalDataModel, manualSlots });
+    const normalizeBindings = (slots) => slots
+        .map(({ key, state, xpath, inherited }) => {
+            const path = xpath.trim();
+            return {
+                key: key.trim(),
+                state: state.trim(),
+                xpath: path && !path.startsWith("/") ? `/${path}` : path,
+                inherited,
+            };
+        })
+        .filter((slot) => slot.key && slot.state && slot.xpath);
+    const boundNodeSlots = (slots, node) => normalizeBindings(slots
+        // Rust only declares slots with a binding; API type/description are not saved.
+        .filter((slot) => slot.path.trim())
+        .map((slot) => ({
+            key: slot.key,
+            state: (slot.inherited && slot.inheritedState.trim()) ||
+                node.fullSkillName.trim() || node.label.trim() || node.id,
+            xpath: (slot.inherited && slot.inheritedXpath.trim()) || slot.path,
+            inherited: slot.inherited,
+        })));
+
+    return JSON.stringify({
+        ...request,
+        nodes: request.nodes.map((node) => ({
+            ...node,
+            events: node.events.filter((event) => event.target.trim()),
+            inputSlots: boundNodeSlots(node.inputSlots, node),
+            outputSlots: boundNodeSlots(node.outputSlots, node),
+        })),
+        extraSlotDeclarations: normalizeBindings(request.extraSlotDeclarations),
+    });
+};
+
 export const serializeEditorGraphWithRust = async (editorState) =>
     serializeEditorWorkflow(buildRustEditorExportRequest(editorState));
 

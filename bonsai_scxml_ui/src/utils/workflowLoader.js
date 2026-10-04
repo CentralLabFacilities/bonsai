@@ -1,6 +1,8 @@
 import { inspectWorkflowSource } from "../tauri-client.js";
 import { parseScxmlFile } from "./scxmlImport";
 
+export const getWorkflowFileKey = (path) => String(path || "").replace(/\\/g, "/").replace(/\/+$/, "");
+
 /**
  * Resolve/read one workflow and inspect its semantic interface.
  *

@@ -110,6 +110,7 @@ function AppContent() {
         setGlobalDataModel,
         inheritedGlobalDataModel,
         replaceDocument,
+        getDocumentSnapshot,
     } = useEditorGraphState();
 
     const [isHintPageOpen, setIsHintPageOpen] = useState(false);
@@ -456,17 +457,19 @@ function AppContent() {
         tabs,
         activeTabId,
         activeTab: activeWorkflowTab,
-        updateActiveTab,
+        getTabSnapshot,
+        getTabsSnapshot,
+        updateTab,
+        replaceTabDocument,
         tabPathTooltip,
         draggedTabId,
         switchTab,
         openTab,
         handleAddNewTab,
-        handleCloseTab,
+        closeTab,
         handleTabDragStart,
         handleTabDragOver,
         handleTabDragEnd,
-        handleTabMiddleMouseDown,
         handleTabMouseEnter,
         handleTabMouseLeave,
     } = useWorkflowTabs({
@@ -478,12 +481,14 @@ function AppContent() {
         globalDataModel,
         inheritedGlobalDataModel,
         replaceDocument,
+        getDocumentSnapshot,
         selectedNodeId,
         setSelectedNodeId,
         fitView,
         getViewport,
         setViewport,
         syncRustDocument: rustWorkflowDocument.syncEditorState,
+        isDraggingNode,
     });
 
     const {
@@ -509,18 +514,14 @@ function AppContent() {
         handleOpenSubMachine,
         handleCreateSubMachineFromSelected,
     } = useSubStateMachines({
-        nodes,
-        edges,
         selectedNodes,
-        tabs,
         activeTabId,
+        getTabSnapshot,
+        getTabsSnapshot,
         switchTab,
         openTab,
-        globalDataModel,
-        inheritedGlobalDataModel,
         behaviorDirectories,
         fetchSkillData,
-        setActiveTab,
         setContextMenu,
         checkSlotConnection,
         onStateMachineLoadStart: beginStateMachineLoad,
@@ -535,13 +536,13 @@ function AppContent() {
     } = useEditorLibraryItems({
         skills,
         nodes,
-        tabs,
         behaviorDirectories,
         fetchSkillData,
         hydrateSubMachineInheritedSlots,
         handleOpenSubMachine,
         switchTab,
         openTab,
+        getTabsSnapshot,
         checkSlotConnection,
         beginStateMachineLoad,
         endStateMachineLoad,
@@ -1012,25 +1013,24 @@ function AppContent() {
         handleOpenDocument,
         handleSaveCurrentTab,
         handleSaveAsCurrentTab,
+        handleCloseTab,
+        handleTabMiddleMouseDown,
+        documentGuard,
         hasFilePath: activeWorkflowHasFilePath,
         isSaving: isWorkflowSaving,
     } = useWorkflowDocument({
         isDesktop: IS_DESKTOP,
-        nodes,
-        edges,
-        manualSlots,
-        globalDataModel,
         activeTab: activeWorkflowTab,
-        updateActiveTab,
-        replaceDocument,
-        setSelectedNodeId,
+        getTabSnapshot,
+        getTabsSnapshot,
+        updateTab,
+        replaceTabDocument,
+        closeTab,
         fetchSkillData,
         hydrateSubMachineInheritedSlots,
         checkSlotConnection,
-        fitView,
         onStateMachineLoadStart: beginStateMachineLoad,
         onStateMachineLoadEnd: endStateMachineLoad,
-        syncRustDocument: rustWorkflowDocument.syncEditorState,
     });
 
     const {
@@ -1406,6 +1406,7 @@ function AppContent() {
             </button>
 
             <EditorOverlays
+                documentGuard={documentGuard}
                 loading={stateMachineLoading}
                 runtimePreparation={runtimePreparation}
                 hint={{ isOpen: isHintPageOpen, onClose: () => setIsHintPageOpen(false) }}

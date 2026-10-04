@@ -74,6 +74,9 @@ export default function WorkflowTabBar({
                         }}
                     >
                         <span>{tab.title}</span>
+                        {tab.isModified && (
+                            <span className="workflow-tab-modified-indicator" role="img" aria-label="Unsaved changes" title="Unsaved changes" />
+                        )}
                         {tabs.length > 1 && (
                             <span
                                 className="intellij-tab-close"

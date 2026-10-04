@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { isDocumentGuardOpen } from "./useGlobalEditorShortcuts";
 
 import {
     buildEditorCloneNode,
@@ -570,6 +571,7 @@ export const useEditorClipboard = ({
         requestGraphPasteRef.current = requestPasteClipboard;
 
         const handleGraphClipboardShortcut = (event) => {
+            if (isDocumentGuardOpen()) return;
             if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
             if (activeMode === "code" || isTypingTarget(event.target)) return;
 
@@ -677,6 +679,7 @@ export const useEditorClipboard = ({
         if (!pendingSkillPaste) return undefined;
 
         const handlePendingPasteKey = (event) => {
+            if (isDocumentGuardOpen()) return;
             if (event.key !== "Escape") return;
             event.preventDefault();
             event.stopPropagation();

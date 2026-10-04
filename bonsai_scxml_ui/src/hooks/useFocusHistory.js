@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { isDocumentGuardOpen } from "./useGlobalEditorShortcuts";
 
 const sameFocus = (a, b) =>
     Boolean(
@@ -141,6 +142,7 @@ export function useFocusHistory({
 
     const restoreFocus = useCallback(
         (targetIndex) => {
+            if (isDocumentGuardOpen()) return false;
             const entries = historyRef.current;
             const target = entries[targetIndex];
             if (!target || !availableTabIds.has(target.tabId)) return false;

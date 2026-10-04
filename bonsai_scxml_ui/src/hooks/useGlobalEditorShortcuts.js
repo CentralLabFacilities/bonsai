@@ -1,5 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
+export function isDocumentGuardOpen() {
+    return typeof document !== "undefined" && Boolean(document.querySelector("[data-workflow-document-guard]"));
+}
+
 const isTypingTarget = (target) => {
     if (!(target instanceof Element)) return false;
 
@@ -74,6 +78,7 @@ export function useGlobalEditorShortcuts({
 
     useEffect(() => {
         const handleGlobalShortcut = (event) => {
+            if (isDocumentGuardOpen()) return;
             const live = liveStateRef.current;
             if (!live) return;
 

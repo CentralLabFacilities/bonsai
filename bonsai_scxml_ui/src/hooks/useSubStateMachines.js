@@ -10,6 +10,7 @@ import {
 } from "../utils/editorScxml";
 import { serializeEditorGraphWithRust } from "../utils/scxmlRustExport";
 import {
+    getWorkflowFileKey,
     inspectWorkflowForEditorSource,
     loadWorkflowForEditor,
     projectWorkflowInspectionForEditor,
@@ -137,15 +138,12 @@ const buildInheritedGlobalsForChild = (
 };
 
 export function useSubStateMachines({
-    nodes,
-    edges,
     selectedNodes,
-    tabs,
     activeTabId,
+    getTabSnapshot,
+    getTabsSnapshot,
     switchTab,
     openTab,
-    globalDataModel,
-    inheritedGlobalDataModel,
     behaviorDirectories,
     fetchSkillData,
     setContextMenu,
@@ -247,9 +245,11 @@ export function useSubStateMachines({
     const handleOpenSubMachineImpl = async (srcPath, label) => {
         if (!srcPath) return;
 
+        const originTab = getTabSnapshot(activeTabId);
+        if (!originTab) return false;
+
         const fileName = srcPath.split(/[\\/]/).pop();
         const baseName = fileName.replace(/\.(xml|scxml)$/i, "");
-        const currentTab = tabs.find((tab) => tab.id === activeTabId);
 
         onStateMachineLoadStart?.(label || baseName || "State machine");
         await new Promise((resolve) =>
@@ -265,16 +265,22 @@ export function useSubStateMachines({
             const inspection = await inspectWorkflowForEditorSource({
                 src: srcPath,
                 directories: behaviorDirectories,
-                currentFilePath: currentTab?.filePath || null,
+                currentFilePath: originTab.filePath || null,
             });
             const resolvedFilePath = inspection.path;
             if (resolvedFilePath) {
                 tabId = `tab-sub-${resolvedFilePath}`;
             }
 
-            const existingTab = tabs.find((tab) => tab.id === tabId);
+            const resolvedFileKey = getWorkflowFileKey(resolvedFilePath);
+            const getExistingChild = () => getTabsSnapshot().find((tab) =>
+                resolvedFileKey
+                    ? getWorkflowFileKey(tab.filePath) === resolvedFileKey
+                    : tab.id === tabId
+            );
+            const existingTab = getExistingChild();
             if (existingTab) {
-                switchTab(tabId);
+                switchTab(existingTab.id);
                 return;
             }
 
@@ -298,75 +304,77 @@ export function useSubStateMachines({
                     declaredInheritedSlots
                 );
 
-            const syncedParentNodes = nodes.map((node) => {
-                if (
-                    node.type !== "submachine" ||
-                    String(node.data?.src || "") !== String(srcPath)
-                ) {
-                    return node;
-                }
+            const currentTabPatch = (liveOriginSnapshot) => ({
+                nodes: liveOriginSnapshot.nodes.map((node) => {
+                    if (
+                        node.type !== "submachine" ||
+                        String(node.data?.src || "") !== String(srcPath)
+                    ) {
+                        return node;
+                    }
 
-                const existingEventsById = new Map(
-                    (node.data?.events || []).map((event) => [
-                        event.id,
-                        event,
-                    ])
-                );
+                    const existingEventsById = new Map(
+                        (node.data?.events || []).map((event) => [
+                            String(event?.id || ""),
+                            event,
+                        ])
+                    );
 
-                return {
-                    ...node,
-                    data: {
-                        ...node.data,
-                        events:
-                            discoveredBehaviorExitEvents.length > 0
-                                ? (() => {
-                                    const confirmedEventIds = new Set(
-                                        discoveredBehaviorExitEvents.map(
-                                            (eventId) => String(eventId)
-                                        )
-                                    );
-                                    const confirmedEvents =
-                                        discoveredBehaviorExitEvents.map(
-                                            (eventId) => ({
-                                                ...(existingEventsById.get(eventId) || {}),
-                                                id: eventId,
-                                                // Opening the child machine confirms
-                                                // that this exit is genuinely exposed
-                                                // by a forwarding Nop. Do not retain a
-                                                // provisional imported-handle marker.
-                                                editorImportedSynthetic: false,
-                                                editorBoundarySynthetic: false,
-                                            })
+                    return {
+                        ...node,
+                        data: {
+                            ...node.data,
+                            events:
+                                discoveredBehaviorExitEvents.length > 0
+                                    ? (() => {
+                                        const confirmedEventIds = new Set(
+                                            discoveredBehaviorExitEvents.map(
+                                                (eventId) => String(eventId)
+                                            )
                                         );
-                                    const unresolvedImportedEvents = (
-                                        node.data?.events || []
-                                    ).filter((event) => {
-                                        const eventId = String(event?.id || "");
-                                        if (
-                                            !eventId ||
-                                            confirmedEventIds.has(eventId)
-                                        ) {
-                                            return false;
-                                        }
+                                        const confirmedEvents =
+                                            discoveredBehaviorExitEvents.map(
+                                                (eventId) => ({
+                                                    ...(existingEventsById.get(String(eventId)) || {}),
+                                                    id: eventId,
+                                                    // Opening the child machine confirms
+                                                    // that this exit is genuinely exposed
+                                                    // by a forwarding Nop. Do not retain a
+                                                    // provisional imported-handle marker.
+                                                    editorImportedSynthetic: false,
+                                                    editorBoundarySynthetic: false,
+                                                })
+                                            );
+                                        const unresolvedImportedEvents = (
+                                            node.data?.events || []
+                                        ).filter((event) => {
+                                            const eventId = String(event?.id || "");
+                                            if (
+                                                !eventId ||
+                                                confirmedEventIds.has(eventId)
+                                            ) {
+                                                return false;
+                                            }
 
-                                        return Boolean(
-                                            event?.editorImportedSynthetic ||
-                                            event?.editorBoundarySynthetic
-                                        );
-                                    });
+                                            return Boolean(
+                                                event?.editorImportedSynthetic ||
+                                                event?.editorBoundarySynthetic
+                                            );
+                                        });
 
-                                    return [
-                                        ...confirmedEvents,
-                                        ...unresolvedImportedEvents,
-                                    ];
-                                })()
-                                : node.data?.events || [],
-                        inheritedSlots: discoveredInheritedSlots,
-                        localDataModel: getLocalDataModelEntries(
-                            parsed.globalDataModel
-                        ),
-                    },
-                };
+                                        return [
+                                            ...confirmedEvents,
+                                            ...unresolvedImportedEvents,
+                                        ];
+                                    })()
+                                    : node.data?.events || [],
+                            inheritedSlots: discoveredInheritedSlots,
+                            localDataModel: getLocalDataModelEntries(
+                                parsed.globalDataModel
+                            ),
+                        },
+                    };
+                }),
             });
             const parsedNodes = ensureSharedEditorInstanceIds(
                 (await hydrateSubMachineInheritedSlots(
@@ -375,11 +383,19 @@ export function useSubStateMachines({
                 )).map(normalizeSharedScxmlStateIdentity)
             );
 
+            // Another load may have opened this child during hydration. Keep
+            // its live graph and slot metadata instead of applying this load.
+            const existingAfterHydration = getExistingChild();
+            if (existingAfterHydration) {
+                switchTab(existingAfterHydration.id);
+                return;
+            }
+
             const inheritedForChild = buildInheritedGlobalsForChild(
-                inheritedGlobalDataModel,
-                globalDataModel,
-                currentTab?.title ||
-                currentTab?.fileName ||
+                originTab.inheritedGlobalDataModel,
+                originTab.globalDataModel,
+                originTab.title ||
+                originTab.fileName ||
                 "Parent"
             );
 
@@ -397,18 +413,26 @@ export function useSubStateMachines({
                 slotNodes: [],
                 slotEdges: [],
                 manualSlots: [],
-                parentTabId: activeTabId,
+                parentTabId: originTab.id,
                 selectedNodeId: null,
                 viewport: null,
                 inheritedGlobalDataModel: inheritedForChild,
                 globalDataModel: parsed.globalDataModel,
             };
 
-            openTab(newTabObj, {
-                currentTabPatch: { nodes: syncedParentNodes },
+            const opened = openTab(newTabObj, {
+                originTabId: originTab.id,
+                originGeneration: originTab.documentGeneration,
+                currentTabPatch,
                 fit: true,
                 fitOptions: { duration: 300 },
             });
+            if (!opened) {
+                alert(
+                    "The sub-state machine was not opened because the original workflow is no longer available for this operation. No workflow was changed by this operation."
+                );
+                return false;
+            }
             checkSlotConnection(
                 parsedNodes,
                 [],
@@ -434,7 +458,10 @@ export function useSubStateMachines({
     );
 
     const handleCreateEmptySubMachine = async (pos, fileConfig = {}) => {
-        const fallbackLabel = `SubMachine_${nodes.filter((n) => n.type === "submachine").length + 1}`;
+        const originTab = getTabSnapshot(activeTabId);
+        if (!originTab) return false;
+
+        const fallbackLabel = `SubMachine_${originTab.nodes.filter((n) => n.type === "submachine").length + 1}`;
         const fileName = String(fileConfig.fileName || `${fallbackLabel}.xml`).trim();
         const subMachineLabel = fileName.replace(/\.(xml|scxml)$/i, "") || fallbackLabel;
         const requestedFilePath = joinFsPath(fileConfig.directory, fileName);
@@ -459,18 +486,16 @@ export function useSubStateMachines({
                     fullSkillName: subMachineLabel,
                     src: sourcePath,
                     localDataModel: [],
-                    isInitial: nodes.length === 0,
                     events: [{ id: "success" }, { id: "failure" }],
                     onOpenSubMachine: handleOpenSubMachine,
                 },
             };
 
-            const parentNodes = [...nodes, subMachineNode];
             const newTabId = `tab-sub-${resolvedFilePath || crypto.randomUUID().slice(0, 6)}`;
             const inheritedForChild = buildInheritedGlobalsForChild(
-                inheritedGlobalDataModel,
-                globalDataModel,
-                tabs.find((tab) => tab.id === activeTabId)?.title || "Parent"
+                originTab.inheritedGlobalDataModel,
+                originTab.globalDataModel,
+                originTab.title || originTab.fileName || "Parent"
             );
             const newTabObj = {
                 id: newTabId,
@@ -484,21 +509,40 @@ export function useSubStateMachines({
                 slotNodes: [],
                 slotEdges: [],
                 manualSlots: [],
-                parentTabId: activeTabId,
+                parentTabId: originTab.id,
                 selectedNodeId: null,
                 viewport: null,
                 inheritedGlobalDataModel: inheritedForChild,
                 globalDataModel: DEFAULT_CHILD_DATA_MODEL,
             };
 
-            // Save the new Sub-SM node in the parent tab before switching to
-            // the child. Otherwise returning to the parent can restore the old
-            // snapshot without the freshly created node.
-            openTab(newTabObj, {
-                currentTabPatch: { nodes: parentNodes },
+            // Append to the live origin so edits made during the file write
+            // survive even if another tab is now active.
+            const opened = openTab(newTabObj, {
+                originTabId: originTab.id,
+                originGeneration: originTab.documentGeneration,
+                currentTabPatch: (liveOriginSnapshot) => ({
+                    nodes: [
+                        ...liveOriginSnapshot.nodes,
+                        {
+                            ...subMachineNode,
+                            data: {
+                                ...subMachineNode.data,
+                                isInitial: liveOriginSnapshot.nodes.length === 0,
+                            },
+                        },
+                    ],
+                }),
                 fit: true,
                 fitOptions: { duration: 300 },
             });
+            if (!opened) {
+                alert(
+                    "The new sub-state machine could not be added to the original workflow. No workflow was changed by this operation." +
+                        (IS_DESKTOP ? `\nThe new child file was kept at: ${resolvedFilePath}` : "")
+                );
+                return false;
+            }
             setContextMenu(null);
             return true;
         } catch (error) {
@@ -511,14 +555,25 @@ export function useSubStateMachines({
     const handleCreateSubMachineFromSelected = async (fileConfig = {}) => {
         if (selectedNodes.length < 1) return false;
 
-        const { minX, minY } = getSelectionBoundingBox(selectedNodes);
-        const fallbackLabel = `SubMachine_${nodes.filter((n) => n.type === "submachine").length + 1}`;
+        const originTab = getTabSnapshot(activeTabId);
+        if (!originTab) return false;
+
+        const selectedIds = new Set(selectedNodes.map((n) => n.id));
+        const selectedParentNodes = originTab.nodes.filter((node) =>
+            selectedIds.has(node.id)
+        );
+        if (selectedParentNodes.length !== selectedIds.size) return false;
+
+        const { minX, minY } = getSelectionBoundingBox(selectedParentNodes);
+        const fallbackLabel = `SubMachine_${originTab.nodes.filter((n) => n.type === "submachine").length + 1}`;
         const fileName = String(fileConfig.fileName || `${fallbackLabel}.xml`).trim();
         const subMachineLabel = fileName.replace(/\.(xml|scxml)$/i, "") || fallbackLabel;
         const requestedFilePath = joinFsPath(fileConfig.directory, fileName);
         const subMachineId = getNodeId();
-        const selectedIds = new Set(selectedNodes.map((n) => n.id));
-        const semanticParentGraph = prepareGraphForScxml(nodes, edges);
+        const semanticParentGraph = prepareGraphForScxml(
+            originTab.nodes,
+            originTab.edges
+        );
         const semanticParentEdges = semanticParentGraph.edges || [];
 
         const externalEvents = [];
@@ -547,7 +602,7 @@ export function useSubStateMachines({
             }
         });
 
-        const subTabNodes = selectedNodes.map((node) => ({
+        const subTabNodes = selectedParentNodes.map((node) => ({
             ...node,
             position: {
                 x: node.position.x - minX + 50,
@@ -580,7 +635,7 @@ export function useSubStateMachines({
                     fullSkillName: subMachineLabel,
                     localDataModel: [],
                     src: sourcePath,
-                    isInitial: selectedNodes.some((node) => node.data?.isInitial),
+                    isInitial: selectedParentNodes.some((node) => node.data?.isInitial),
                     events: externalEvents.length > 0
                         ? externalEvents
                         : [{ id: "success" }, { id: "failure" }],
@@ -590,31 +645,10 @@ export function useSubStateMachines({
                 },
             };
 
-            const updatedParentEdges = semanticParentEdges
-                .map((edge) => {
-                    if (selectedIds.has(edge.source) && !selectedIds.has(edge.target)) {
-                        return { ...edge, source: subMachineId };
-                    }
-                    if (!selectedIds.has(edge.source) && selectedIds.has(edge.target)) {
-                        return { ...edge, target: subMachineId };
-                    }
-                    if (selectedIds.has(edge.source) && selectedIds.has(edge.target)) {
-                        return null;
-                    }
-                    return edge;
-                })
-                .filter(Boolean);
-
-            const remainingParentNodes = [
-                ...nodes.filter((node) => !selectedIds.has(node.id)),
-                subMachineNode,
-            ];
-
-            const parentTab = tabs.find((tab) => tab.id === activeTabId);
             const inheritedForChild = buildInheritedGlobalsForChild(
-                inheritedGlobalDataModel,
-                globalDataModel,
-                parentTab?.title || parentTab?.fileName || "Parent"
+                originTab.inheritedGlobalDataModel,
+                originTab.globalDataModel,
+                originTab.title || originTab.fileName || "Parent"
             );
             const newTabId = `tab-sub-${resolvedFilePath || crypto.randomUUID().slice(0, 6)}`;
             const newTabObj = {
@@ -629,22 +663,61 @@ export function useSubStateMachines({
                 slotNodes: [],
                 slotEdges: [],
                 manualSlots: [],
-                parentTabId: activeTabId,
+                parentTabId: originTab.id,
                 selectedNodeId: null,
                 viewport: null,
                 inheritedGlobalDataModel: inheritedForChild,
                 globalDataModel: DEFAULT_CHILD_DATA_MODEL,
             };
 
-            openTab(newTabObj, {
-                currentTabPatch: {
-                    nodes: remainingParentNodes,
-                    edges: updatedParentEdges,
+            const opened = openTab(newTabObj, {
+                originTabId: originTab.id,
+                originGeneration: originTab.documentGeneration,
+                expectedFingerprint: originTab.fingerprint,
+                currentTabPatch: (liveOriginSnapshot) => {
+                    const liveParentGraph = prepareGraphForScxml(
+                        liveOriginSnapshot.nodes,
+                        liveOriginSnapshot.edges
+                    );
+                    return {
+                        nodes: [
+                            ...liveOriginSnapshot.nodes.filter((node) =>
+                                !selectedIds.has(node.id)
+                            ),
+                            subMachineNode,
+                        ],
+                        edges: liveParentGraph.edges
+                            .map((edge) => {
+                                if (selectedIds.has(edge.source) && !selectedIds.has(edge.target)) {
+                                    return { ...edge, source: subMachineId };
+                                }
+                                if (!selectedIds.has(edge.source) && selectedIds.has(edge.target)) {
+                                    return { ...edge, target: subMachineId };
+                                }
+                                if (selectedIds.has(edge.source) && selectedIds.has(edge.target)) {
+                                    return null;
+                                }
+                                return edge;
+                            })
+                            .filter(Boolean),
+                    };
                 },
                 fit: true,
                 fitOptions: { duration: 300 },
             });
-            checkSlotConnection(subTabNodes);
+            if (!opened) {
+                alert(
+                    "The extraction was not applied because the original workflow changed or is no longer available. The original workflow was retained; no states were removed by this operation." +
+                        (IS_DESKTOP ? `\nThe new child file was kept at: ${resolvedFilePath}` : "")
+                );
+                return false;
+            }
+            const openedChild = getTabsSnapshot().find((tab) =>
+                getWorkflowFileKey(tab.filePath) === getWorkflowFileKey(resolvedFilePath)
+            );
+            if (openedChild?.nodes === subTabNodes) {
+                checkSlotConnection(subTabNodes);
+            }
             return true;
         } catch (error) {
             console.error("Could not create sub-state-machine:", error);

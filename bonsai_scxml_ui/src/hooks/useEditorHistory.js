@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
+import { isDocumentGuardOpen } from "./useGlobalEditorShortcuts";
 
 const cloneGraphValue = (value) => {
     if (Array.isArray(value)) return value.map(cloneGraphValue);
@@ -504,6 +505,7 @@ export function useEditorHistory({
 
     useEffect(() => {
         const handleUndoRedoShortcut = (event) => {
+            if (isDocumentGuardOpen()) return;
             if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
             if (activeMode === "code") return;
             if (isUndoRedoEditableTarget(event.target)) return;
