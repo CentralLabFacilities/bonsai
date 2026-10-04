@@ -23,6 +23,7 @@ export function useEditorNodeDataActions({
     syncStateEditorPositions,
     syncStateParameters,
     syncSlotsAfterCommit,
+    updateEventsFromParameters,
 }) {
     const updateNodeName = useCallback(
         (nodeId, name, commit = false) => {
@@ -173,7 +174,7 @@ export function useEditorNodeDataActions({
     );
 
     const updateNodeParameter = useCallback(
-        (nodeId, parameterIndex, expression) => {
+        (nodeId, parameterIndex, expression, commit = false) => {
             const sourceNode = nodes.find((node) => node.id === nodeId);
             if (!sourceNode) return null;
 
@@ -181,9 +182,10 @@ export function useEditorNodeDataActions({
             const parameter = parameters[parameterIndex];
             if (!parameter) return null;
 
-            // The graph mutation is a semantic write boundary. Revalidate here
-            // even when the UI already validated the field so programmatic
-            // callers cannot bypass the same type rules.
+            // This action is the write boundary for parameter values. UI
+            // editors may validate earlier for feedback, but every semantic
+            // write is checked again here before it can reach graph state or
+            // the Rust document.
             const validation = validateParameterValue(
                 parameter,
                 expression,
@@ -198,6 +200,14 @@ export function useEditorNodeDataActions({
                     : currentParameter
             );
 
+            const listValidation = validateParameterList(
+                nextParameters,
+                valueVariables,
+                { allowEmpty: true }
+            );
+            if (!listValidation.valid) return null;
+
+            const normalizedParameters = listValidation.parameters;
             setNodes((currentNodes) =>
                 currentNodes.map((node) =>
                     node.id === nodeId
@@ -205,39 +215,37 @@ export function useEditorNodeDataActions({
                               ...node,
                               data: {
                                   ...(node.data || {}),
-                                  params: nextParameters,
+                                  params: normalizedParameters,
                               },
                           }
                         : node
                 )
             );
 
-            return nextParameters;
+            if (commit) {
+                void syncStateParameters?.(nodeId, normalizedParameters);
+                void updateEventsFromParameters?.(
+                    nodeId,
+                    normalizedParameters
+                );
+            } else if (String(validation.value ?? "").trim() === "") {
+                // Optional parameters affect dynamic slot/event definitions as
+                // soon as they are cleared, matching the previous behavior.
+                void updateEventsFromParameters?.(
+                    nodeId,
+                    normalizedParameters
+                );
+            }
+
+            return normalizedParameters;
         },
-        [nodes, setNodes, valueVariables]
-    );
-
-    const commitNodeParameters = useCallback(
-        (nodeId, parameterOverride = null) => {
-            if (!nodeId) return false;
-            const node = nodes.find((candidate) => candidate.id === nodeId);
-            if (!node && !Array.isArray(parameterOverride)) return false;
-
-            const parameterList = Array.isArray(parameterOverride)
-                ? parameterOverride
-                : node?.data?.params || [];
-            const validation = validateParameterList(
-                parameterList,
-                valueVariables,
-                { allowEmpty: true }
-            );
-
-            if (!validation.valid) return false;
-
-            void syncStateParameters?.(nodeId, validation.parameters);
-            return true;
-        },
-        [nodes, syncStateParameters, valueVariables]
+        [
+            nodes,
+            setNodes,
+            valueVariables,
+            syncStateParameters,
+            updateEventsFromParameters,
+        ]
     );
 
     const updateStateActions = useCallback(
@@ -426,7 +434,6 @@ export function useEditorNodeDataActions({
         updateNodeName,
         updateNodeSource,
         updateNodeParameter,
-        commitNodeParameters,
         updateStateActions,
         updateSendEvents,
         updateSkillSlotPath,

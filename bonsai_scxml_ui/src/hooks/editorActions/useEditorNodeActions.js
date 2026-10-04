@@ -8,6 +8,7 @@ import {
     resolveNodeCollisionsAndRefit,
 } from "../../utils/editorGeometry";
 import { getOverviewLayoutNodeSize } from "../../utils/layoutUtils";
+import { toggleContainerCollapse as toggleContainerCollapseNodes } from "../../utils/containerState.js";
 import {
     buildEditorCloneNode,
     isCloneableEditorNode,
@@ -32,6 +33,7 @@ export function useEditorNodeActions({
     applyWorkflowCommand,
     syncInsertedParallelLaneStateAfterCommit,
     syncStateEditorPositions,
+    updateNodeInternals,
 }) {
     const selectEditorNode = useCallback(
         (nodeId, options = {}) => {
@@ -231,6 +233,35 @@ export function useEditorNodeActions({
         [nodes, setNodes, applyWorkflowCommand]
     );
 
+
+    const toggleContainerCollapse = useCallback(
+        (containerId) => {
+            if (!containerId) return false;
+
+            const containerIds = nodes
+                .filter((node) =>
+                    ["compound", "parallel", "parallelLane"].includes(
+                        node.type
+                    )
+                )
+                .map((node) => node.id);
+
+            setNodes((currentNodes) =>
+                toggleContainerCollapseNodes(currentNodes, containerId)
+            );
+
+            requestAnimationFrame(() => {
+                const idsToRefresh =
+                    containerIds.length > 0 ? containerIds : [containerId];
+                updateNodeInternals?.(idsToRefresh);
+            });
+
+            setSelectedNodeId(containerId);
+            return true;
+        },
+        [nodes, setNodes, setSelectedNodeId, updateNodeInternals]
+    );
+
     const addEmptyStateToContainer = useCallback(
         (parentId) => {
             if (!parentId) return null;
@@ -368,5 +399,6 @@ export function useEditorNodeActions({
         createEditorReference,
         setNodeAsInitial,
         addEmptyStateToContainer,
+        toggleContainerCollapse,
     };
 }

@@ -27,6 +27,7 @@ export function useEditorTransitionActions({
     setSelectedNodeId,
     updateNodeInternals,
     syncTransitionsForSource,
+    setControlPointInsertRequest,
 }) {
     const clearTransitionSelection = useCallback(() => {
         setEdges((currentEdges) =>
@@ -109,6 +110,34 @@ export function useEditorTransitionActions({
             );
         },
         [setSlotEdges, clearTransitionSelection]
+    );
+
+
+    const updateEdgeControlPoints = useCallback(
+        (edgeId, controlPoints, edgeKind = "transition") => {
+            if (!edgeId) return false;
+
+            const setter = edgeKind === "slot" ? setSlotEdges : setEdges;
+            setter((currentEdges) =>
+                currentEdges.map((edge) =>
+                    edge.id === edgeId
+                        ? {
+                              ...edge,
+                              data: {
+                                  ...(edge.data || {}),
+                                  controlPoints,
+                              },
+                          }
+                        : edge
+                )
+            );
+
+            setControlPointInsertRequest?.((current) =>
+                current?.edgeId === edgeId ? null : current
+            );
+            return true;
+        },
+        [setEdges, setSlotEdges, setControlPointInsertRequest]
     );
 
     const updateNodeEvent = useCallback(
@@ -327,5 +356,6 @@ export function useEditorTransitionActions({
         updateNodeEvent,
         setExistingTargetForEvent,
         moveContainerTransition,
+        updateEdgeControlPoints,
     };
 }

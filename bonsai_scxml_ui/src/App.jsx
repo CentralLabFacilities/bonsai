@@ -22,7 +22,7 @@ import {
     isTauri,
     initApiProxy,
 } from "./tauri-client.js";
-import { getParallelLaneSummaries, toggleContainerCollapse } from "./utils/containerState.js";
+import { getParallelLaneSummaries } from "./utils/containerState.js";
 import { collectDescendantGlobals } from "./utils/editorScxml";
 import { useEditorHistory } from "./hooks/useEditorHistory";
 import { useNodeInteraction } from "./hooks/useNodeInteraction";
@@ -232,7 +232,8 @@ function AppContent() {
         updateNodeName,
         updateNodeSource,
         updateNodeParameter,
-        commitNodeParameters,
+        toggleContainerCollapse,
+        updateEdgeControlPoints,
         updateStateActions,
         updateSendEvents,
         updateSkillSlotPath,
@@ -268,6 +269,8 @@ function AppContent() {
             rustWorkflowDocument.syncTransitionsForSource,
         syncStateParameters: rustWorkflowDocument.syncStateParameters,
         syncSlotsAfterCommit: rustWorkflowDocument.syncSlotsAfterCommit,
+        updateEventsFromParameters,
+        setControlPointInsertRequest,
     });
 
     const {
@@ -621,30 +624,6 @@ function AppContent() {
     });
 
 
-
-
-    const handleToggleContainerCollapse = useCallback(
-        (containerId) => {
-            setNodes((currentNodes) => toggleContainerCollapse(currentNodes, containerId));
-
-            requestAnimationFrame(() => {
-                const containerIds = getNodes()
-                    .filter((node) =>
-                        ["compound", "parallel", "parallelLane"].includes(
-                            node.type
-                        )
-                    )
-                    .map((node) => node.id);
-
-                updateNodeInternals(containerIds.length === 0 ? containerId : containerIds);
-            });
-
-            setSelectedNodeId(containerId);
-        },
-        [getNodes, setNodes, setSelectedNodeId, updateNodeInternals]
-    );
-
-
     const {
         semanticSlotNodes,
         nodeById,
@@ -670,7 +649,7 @@ function AppContent() {
         handleOpenSlot,
         handleOpenTransition,
         handleOpenSubMachine,
-        handleToggleContainerCollapse,
+        handleToggleContainerCollapse: toggleContainerCollapse,
     });
 
     const selectedRawNode = useMemo(() => {
@@ -754,7 +733,7 @@ function AppContent() {
         getNodes,
         setNodes,
         updateNodeInternals,
-        handleToggleContainerCollapse,
+        handleToggleContainerCollapse: toggleContainerCollapse,
         clearAllEdgeSelection,
         selectEditorNode,
         fitView,
@@ -797,32 +776,6 @@ function AppContent() {
         searchText,
         activeFilter,
     });
-
-    const updatePersistentEdgeControlPoints = useCallback(
-        (edgeId, controlPoints, edgeKind = "transition") => {
-            const setter =
-                edgeKind === "slot" ? setSlotEdges : setEdges;
-
-            setter((currentEdges) =>
-                currentEdges.map((edge) =>
-                    edge.id === edgeId
-                        ? {
-                            ...edge,
-                            data: {
-                                ...(edge.data || {}),
-                                controlPoints,
-                            },
-                        }
-                        : edge
-                )
-            );
-
-            setControlPointInsertRequest((current) =>
-                current?.edgeId === edgeId ? null : current
-            );
-        },
-        [setEdges, setSlotEdges]
-    );
 
     const handleControlPointContextMenu = useCallback(
         (event, edgeId, pointId, edgeKind = "transition") => {
@@ -874,7 +827,7 @@ function AppContent() {
         nodeById,
         slotNodeIdSet,
         slotEdges,
-        updatePersistentEdgeControlPoints,
+        updatePersistentEdgeControlPoints: updateEdgeControlPoints,
         controlPointInsertRequest,
         onControlPointContextMenu: handleControlPointContextMenu,
         hoveredSlotAccessNodeId,
@@ -989,7 +942,7 @@ function AppContent() {
         openConditionDrawer,
         handleNavigateCloneSource,
         setControlPointInsertRequest,
-        updatePersistentEdgeControlPoints,
+        updatePersistentEdgeControlPoints: updateEdgeControlPoints,
         handleVisibleEdgesChange,
         handleOpenSlot,
         clearAllEdgeSelection,
@@ -1139,32 +1092,8 @@ function AppContent() {
         onUpdateSrc: updateNodeSource,
         onUpdateEvent: updateNodeEvent,
         onSetEventTarget: setExistingTargetForEvent,
-        onUpdateParameter: (index, value, commit = false) => {
-            const nextParams = updateNodeParameter(selectedNode.id, index, value);
-            if (!nextParams) return null;
-
-            // Typed parameter values are only persisted once validation has
-            // succeeded. Use the freshly built parameter list so the Rust
-            // sync and dynamic skill request cannot observe a stale React
-            // snapshot from before this edit.
-            if (commit) {
-                const persisted = commitNodeParameters(selectedNode.id, nextParams);
-                if (persisted) {
-                    updateEventsFromParameters(selectedNode.id, nextParams);
-                }
-            } else if (String(value ?? "").trim() === "") {
-                // Preserve the previous behavior for callers that clear a
-                // parameter without explicitly committing it.
-                updateEventsFromParameters(selectedNode.id, nextParams);
-            }
-
-            return nextParams;
-        },
-        onUpdateParameterBlur: (nodeId) => {
-            if (commitNodeParameters(nodeId)) {
-                updateEventsFromParameters(nodeId);
-            }
-        },
+        onUpdateParameter: (index, value, commit = false) =>
+            updateNodeParameter(selectedNode.id, index, value, commit),
         onUpdateStateActions: updateStateActions,
         onUpdateSendEvents: updateSendEvents,
         onUpdateInSlotPath: (index, value, commit = false) => updateSkillSlotPath(selectedNode.id, "read", index, value, commit),

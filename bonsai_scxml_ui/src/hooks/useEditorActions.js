@@ -21,6 +21,7 @@ export function useEditorActions(options) {
         syncInsertedParallelLaneStateAfterCommit:
             options.syncInsertedParallelLaneStateAfterCommit,
         syncStateEditorPositions: options.syncStateEditorPositions,
+        updateNodeInternals: options.updateNodeInternals,
     });
 
     const slotActions = useEditorSlotActions({
@@ -45,6 +46,7 @@ export function useEditorActions(options) {
         syncStateEditorPositions: options.syncStateEditorPositions,
         syncStateParameters: options.syncStateParameters,
         syncSlotsAfterCommit: options.syncSlotsAfterCommit,
+        updateEventsFromParameters: options.updateEventsFromParameters,
     });
 
     const dataModelActions = useEditorDataModelActions({
@@ -65,6 +67,7 @@ export function useEditorActions(options) {
         setSelectedNodeId: options.setSelectedNodeId,
         updateNodeInternals: options.updateNodeInternals,
         syncTransitionsForSource: options.syncTransitionsForSource,
+        setControlPointInsertRequest: options.setControlPointInsertRequest,
     });
 
     return {
