@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { buildRustDataModelEntries } from "../../utils/scxmlRustExport";
+import { normalizeDataModelValueInput } from "../../utils/valueValidation.js";
 
 /** Workflow-level datamodel mutations used by WorkflowPanel. */
 export function useEditorDataModelActions({
@@ -19,9 +20,12 @@ export function useEditorDataModelActions({
 
     const updateGlobalParameter = useCallback(
         (index, expression, commit = false) => {
+            const nextExpression = commit
+                ? normalizeDataModelValueInput(expression)
+                : expression;
             const next = globalDataModel.map((parameter, parameterIndex) =>
                 parameterIndex === index
-                    ? { ...parameter, expr: expression }
+                    ? { ...parameter, expr: nextExpression }
                     : parameter
             );
             setGlobalDataModel(next);
@@ -46,7 +50,10 @@ export function useEditorDataModelActions({
 
             const next = [
                 ...globalDataModel,
-                { id: normalizedId, expr: expression },
+                {
+                    id: normalizedId,
+                    expr: normalizeDataModelValueInput(expression),
+                },
             ];
             setGlobalDataModel(next);
             syncDataModel(next);

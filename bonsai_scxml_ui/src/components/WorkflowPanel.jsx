@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { FaPlus } from "react-icons/fa6";
 import { FiX } from "react-icons/fi";
-import { inferLiteralValueType, normalizeDatamodelValue } from "../utils/valueTypes";
+import { inferLiteralValueType } from "../utils/valueTypes";
 
 function getDatamodelType(parameter) {
     return inferLiteralValueType(parameter?.expr).toLowerCase();
@@ -77,7 +77,7 @@ function WorkflowPanel({
             return;
         }
 
-        onAddParameter(normalizedParameterId, normalizeDatamodelValue(newParamExpr));
+        onAddParameter(normalizedParameterId, newParamExpr);
         setCreateGlobal(false);
     };
 
@@ -142,7 +142,7 @@ function WorkflowPanel({
                                 onBlur={(event) =>
                                     onUpdateGlobalParam(
                                         index,
-                                        normalizeDatamodelValue(event.target.value),
+                                        event.target.value,
                                         true
                                     )
                                 }

@@ -1,6 +1,10 @@
 import { useCallback } from "react";
 import { isSlotEdge } from "../../utils/editorGraph";
 import { getForwardingNopScxmlStateId } from "../../utils/editorScxml";
+import {
+    validateParameterList,
+    validateParameterValue,
+} from "../../utils/valueValidation.js";
 
 /**
  * Persistent state/skill property mutations used by DetailsPanel.
@@ -11,6 +15,7 @@ import { getForwardingNopScxmlStateId } from "../../utils/editorScxml";
  */
 export function useEditorNodeDataActions({
     nodes,
+    valueVariables = [],
     setNodes,
     setEdges,
     checkSlotConnection,
@@ -172,11 +177,25 @@ export function useEditorNodeDataActions({
             const sourceNode = nodes.find((node) => node.id === nodeId);
             if (!sourceNode) return null;
 
-            const nextParameters = (sourceNode.data?.params || []).map(
-                (parameter, index) =>
-                    index === parameterIndex
-                        ? { ...parameter, expr: expression }
-                        : parameter
+            const parameters = sourceNode.data?.params || [];
+            const parameter = parameters[parameterIndex];
+            if (!parameter) return null;
+
+            // The graph mutation is a semantic write boundary. Revalidate here
+            // even when the UI already validated the field so programmatic
+            // callers cannot bypass the same type rules.
+            const validation = validateParameterValue(
+                parameter,
+                expression,
+                valueVariables,
+                { allowEmpty: true }
+            );
+            if (!validation.valid) return null;
+
+            const nextParameters = parameters.map((currentParameter, index) =>
+                index === parameterIndex
+                    ? { ...currentParameter, expr: validation.value }
+                    : currentParameter
             );
 
             setNodes((currentNodes) =>
@@ -195,22 +214,30 @@ export function useEditorNodeDataActions({
 
             return nextParameters;
         },
-        [nodes, setNodes]
+        [nodes, setNodes, valueVariables]
     );
 
     const commitNodeParameters = useCallback(
         (nodeId, parameterOverride = null) => {
-            if (!nodeId) return;
+            if (!nodeId) return false;
             const node = nodes.find((candidate) => candidate.id === nodeId);
-            if (!node && !Array.isArray(parameterOverride)) return;
-            void syncStateParameters?.(
-                nodeId,
-                Array.isArray(parameterOverride)
-                    ? parameterOverride
-                    : node?.data?.params || []
+            if (!node && !Array.isArray(parameterOverride)) return false;
+
+            const parameterList = Array.isArray(parameterOverride)
+                ? parameterOverride
+                : node?.data?.params || [];
+            const validation = validateParameterList(
+                parameterList,
+                valueVariables,
+                { allowEmpty: true }
             );
+
+            if (!validation.valid) return false;
+
+            void syncStateParameters?.(nodeId, validation.parameters);
+            return true;
         },
-        [nodes, syncStateParameters]
+        [nodes, syncStateParameters, valueVariables]
     );
 
     const updateStateActions = useCallback(

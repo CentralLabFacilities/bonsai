@@ -8,9 +8,8 @@ import {
     deserializeScxmlConditionForEditor,
     deserializeScxmlValueForEditor,
     deserializeStateDatamodelValueForEditor,
-    normalizeTypedValue,
-    normalizeValueType,
 } from "./valueTypes.js";
+import { validateParameterValue } from "./valueValidation.js";
 import {
     COLLAPSED_CONTAINER_HEIGHT,
     COLLAPSED_CONTAINER_WIDTH,
@@ -979,11 +978,10 @@ export const parseScxmlFile = async (
             // of waiting for the user to edit the field. The graph still loads;
             // the caller receives a parameterErrors entry and the normal
             // Problems analysis keeps reporting it until the value is fixed.
-            const normalizedParameterType = normalizeValueType(param.type);
-            if (String(expr || "").trim() && normalizedParameterType) {
-                const validation = normalizeTypedValue(
+            if (String(expr || "").trim()) {
+                const validation = validateParameterValue(
+                    param,
                     expr,
-                    normalizedParameterType,
                     parameterValidationVariables,
                     { allowEmpty: true }
                 );

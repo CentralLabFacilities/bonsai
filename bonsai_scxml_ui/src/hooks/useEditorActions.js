@@ -37,6 +37,7 @@ export function useEditorActions(options) {
 
     const nodeDataActions = useEditorNodeDataActions({
         nodes: options.nodes,
+        valueVariables: options.valueVariables,
         setNodes: options.setNodes,
         setEdges: options.setEdges,
         checkSlotConnection: options.checkSlotConnection,

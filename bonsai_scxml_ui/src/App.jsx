@@ -121,6 +121,21 @@ function AppContent() {
         getDocumentSnapshot,
     } = useEditorGraphState();
 
+    const availableDataModelParameters = useMemo(() => {
+        const parameters = [];
+        const seen = new Set();
+
+        // Parent globals take precedence when a child defines the same global.
+        [...(inheritedGlobalDataModel || []), ...(globalDataModel || [])].forEach(
+            (parameter) => {
+                if (!parameter?.id || seen.has(parameter.id)) return;
+                seen.add(parameter.id);
+                parameters.push(parameter);
+            }
+        );
+        return parameters;
+    }, [inheritedGlobalDataModel, globalDataModel]);
+
     const [isHintPageOpen, setIsHintPageOpen] = useState(false);
 
     const [activeMode, setActiveMode] = useState("overview");
@@ -231,6 +246,7 @@ function AppContent() {
         slotEdges,
         manualSlots,
         globalDataModel,
+        valueVariables: availableDataModelParameters,
         selectedNodeId,
         setNodes,
         setEdges,
@@ -581,22 +597,6 @@ function AppContent() {
         globalDataModel,
         inheritedGlobalDataModel,
     ]);
-
-
-    const availableDataModelParameters = useMemo(() => {
-        const parameters = [];
-        const seen = new Set();
-
-        // Parent globals take precedence when a child defines the same global.
-        [...(inheritedGlobalDataModel || []), ...(globalDataModel || [])].forEach(
-            (parameter) => {
-                if (!parameter?.id || seen.has(parameter.id)) return;
-                seen.add(parameter.id);
-                parameters.push(parameter);
-            }
-        );
-        return parameters;
-    }, [inheritedGlobalDataModel, globalDataModel]);
 
     useEditorHistory({
         activeTabId,
@@ -1148,8 +1148,10 @@ function AppContent() {
             // sync and dynamic skill request cannot observe a stale React
             // snapshot from before this edit.
             if (commit) {
-                commitNodeParameters(selectedNode.id, nextParams);
-                updateEventsFromParameters(selectedNode.id, nextParams);
+                const persisted = commitNodeParameters(selectedNode.id, nextParams);
+                if (persisted) {
+                    updateEventsFromParameters(selectedNode.id, nextParams);
+                }
             } else if (String(value ?? "").trim() === "") {
                 // Preserve the previous behavior for callers that clear a
                 // parameter without explicitly committing it.
@@ -1159,8 +1161,9 @@ function AppContent() {
             return nextParams;
         },
         onUpdateParameterBlur: (nodeId) => {
-            commitNodeParameters(nodeId);
-            updateEventsFromParameters(nodeId);
+            if (commitNodeParameters(nodeId)) {
+                updateEventsFromParameters(nodeId);
+            }
         },
         onUpdateStateActions: updateStateActions,
         onUpdateSendEvents: updateSendEvents,

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FiPlus, FiTrash2 } from "react-icons/fi";
-import { normalizeAssignmentExpressionInput, validateAssignmentExpression } from "../utils/assignmentExpressions";
+import { validateAssignmentValue } from "../utils/valueValidation.js";
 import ExpressionVariableSuggestions from "./ExpressionVariableSuggestions.jsx";
 import {
     getExpressionAutocompleteAction,
@@ -136,7 +136,7 @@ function StateActionsEditor({
         allowEmpty = true,
         showError = false
     ) => {
-        const result = validateAssignmentExpression(
+        const result = validateAssignmentValue(
             expression,
             targetLocation,
             valueVariables,
@@ -176,29 +176,23 @@ function StateActionsEditor({
 
     const commitExpression = (index, targetLocation, showError = false) => {
         const draft = expressionDrafts[index] ?? assignments[index]?.expr ?? "";
-        const normalizedDraft = normalizeAssignmentExpressionInput(
-            draft,
-            targetLocation,
-            valueVariables
-        );
-
-        if (normalizedDraft !== draft) {
-            setExpressionDrafts((current) => {
-                const next = [...current];
-                next[index] = normalizedDraft;
-                return next;
-            });
-        }
-
         const result = validateExpression(
             index,
-            normalizedDraft,
+            draft,
             targetLocation,
             false,
             showError
         );
 
         if (!result.valid) return false;
+
+        if (result.value !== draft) {
+            setExpressionDrafts((current) => {
+                const next = [...current];
+                next[index] = result.value;
+                return next;
+            });
+        }
 
         updateAssignment(index, { expr: result.value });
         return true;

@@ -3,9 +3,9 @@ import {
     VALUE_TYPES,
     getCompatibleVariables,
     getVariableType,
-    normalizeTypedValue,
     normalizeValueType,
 } from "../utils/valueTypes.js";
+import { validateTypedValueInput } from "../utils/valueValidation.js";
 
 function TypedValueEditor({
                               id,
@@ -112,7 +112,7 @@ function TypedValueEditor({
     }
 
     const commitValue = (nextValue = draft) => {
-        const result = normalizeTypedValue(
+        const result = validateTypedValueInput(
             nextValue,
             normalizedType,
             variables,

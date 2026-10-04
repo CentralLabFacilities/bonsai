@@ -12,10 +12,12 @@ import TypedValueEditor from "./TypedValueEditor";
 import {
     VALUE_TYPES,
     getVariableType,
-    normalizeDatamodelValue,
-    normalizeTypedValue,
 } from "../utils/valueTypes";
-import { validateAssignmentExpression } from "../utils/assignmentExpressions";
+import {
+    normalizeDataModelValueInput,
+    validateAssignmentValue,
+    validateConditionValue,
+} from "../utils/valueValidation.js";
 import ExpressionVariableSuggestions from "./ExpressionVariableSuggestions.jsx";
 import { InlineFeedback } from "./ui/index.js";
 import {
@@ -569,7 +571,7 @@ function ConditionModal({
             const assignmentVariable = editorVariables.find(
                 (variable) => variable.id === assignment.location
             );
-            const result = validateAssignmentExpression(
+            const result = validateAssignmentValue(
                 assignment.expr,
                 assignmentVariable,
                 editorVariables,
@@ -781,7 +783,7 @@ function ConditionModal({
             if (!newVariablesById.has(variableId)) {
                 const variable = {
                     id: variableId,
-                    expr: normalizeDatamodelValue(initialValue),
+                    expr: normalizeDataModelValueInput(initialValue),
                 };
                 newVariablesById.set(variableId, variable);
                 allVariables.push(variable);
@@ -826,9 +828,9 @@ function ConditionModal({
                 }
 
                 const variableType = getVariableType(variable);
-                const conditionValue = normalizeTypedValue(
+                const conditionValue = validateConditionValue(
                     transition.conditionValue,
-                    variableType,
+                    variable,
                     allVariables,
                     { allowEmpty: false }
                 );
@@ -869,7 +871,7 @@ function ConditionModal({
                     return;
                 }
 
-                const assignmentResult = validateAssignmentExpression(
+                const assignmentResult = validateAssignmentValue(
                     assignment.expr,
                     assignmentVariable,
                     allVariables,
