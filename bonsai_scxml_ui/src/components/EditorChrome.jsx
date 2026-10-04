@@ -13,6 +13,7 @@ import {
 import { isTauri } from "../tauri-client.js";
 import { PANEL_LIMITS } from "../utils/editorPreferences.js";
 import { isDocumentGuardOpen } from "../hooks/useGlobalEditorShortcuts.js";
+import { Button, IconButton } from "./ui/index.js";
 
 function Header({ onOpenFile, onSaveFile, onSaveAsFile, hasFilePath, isSaving = false, isOpening = false, panels }) {
     const IS_DESKTOP = isTauri();
@@ -20,46 +21,53 @@ function Header({ onOpenFile, onSaveFile, onSaveAsFile, hasFilePath, isSaving = 
     return (
         <header className="header">
             <div className="header-left">
-                <button
+                <Button
+                    size="sm"
                     className="menu-button"
+                    leadingIcon={<FiFolder />}
                     onClick={() => void onOpenFile?.()}
                     disabled={isSaving || isOpening}
                 >
-                    <FiFolder />
-                    <span>{isOpening ? "Opening..." : "Open"}</span>
-                </button>
+                    {isOpening ? "Opening..." : "Open"}
+                </Button>
 
                 {/* Save button - direct save when a desktop path is known. */}
                 {IS_DESKTOP && hasFilePath ? (
-                    <button
+                    <Button
+                        variant="primary"
+                        size="sm"
                         className="menu-button highlight-save-button"
+                        leadingIcon={<FiSave />}
                         onClick={() => void onSaveFile?.()}
                         disabled={isSaving || isOpening}
                     >
-                        <FiSave />
-                        <span>{isSaving ? "Saving…" : "Save"}</span>
-                    </button>
+                        {isSaving ? "Saving…" : "Save"}
+                    </Button>
                 ) : null}
 
                 {/* SCXML file operations require the desktop Rust backend. */}
                 {IS_DESKTOP ? (
-                    <button
+                    <Button
+                        variant="primary"
+                        size="sm"
                         className="menu-button highlight-save-button"
+                        leadingIcon={<FiDownload />}
                         onClick={() => void onSaveAsFile?.()}
                         disabled={isSaving || isOpening}
                     >
-                        <FiDownload />
-                        <span>Save as..</span>
-                    </button>
+                        Save as..
+                    </Button>
                 ) : (
-                    <button
+                    <Button
+                        variant="primary"
+                        size="sm"
                         className="menu-button highlight-save-button"
+                        leadingIcon={<FiSave />}
                         onClick={() => void onSaveFile?.()}
                         disabled={isSaving || isOpening}
                     >
-                        <FiSave />
-                        <span>{isSaving ? "Saving…" : "Save"}</span>
-                    </button>
+                        {isSaving ? "Saving…" : "Save"}
+                    </Button>
                 )}
 
                 <h2>Bonsai UI</h2>
@@ -70,19 +78,19 @@ function Header({ onOpenFile, onSaveFile, onSaveAsFile, hasFilePath, isSaving = 
                         ["library", "Library", FiSidebar],
                         ["inspector", "Inspector", FiSliders],
                     ].map(([side, label, Icon]) => (
-                        <button
+                        <Button
                             key={side}
-                            type="button"
+                            size="sm"
                             className={`menu-button panel-toggle ${panels[`${side}Open`] ? "active" : ""}`}
+                            leadingIcon={<Icon />}
                             aria-controls={`editor-${side}-panel`}
                             aria-expanded={panels[`${side}Open`]}
                             aria-label={`Toggle ${label.toLowerCase()}`}
                             title={`${panels[`${side}Open`] ? "Hide" : "Show"} ${label.toLowerCase()}`}
                             onClick={() => panels.togglePanel(side)}
                         >
-                            <Icon aria-hidden="true" />
                             <span className="panel-toggle-text">{label}</span>
-                        </button>
+                        </Button>
                     ))}
                 </nav>
             )}
@@ -121,21 +129,21 @@ export function EditorNotice({ notice, onDismiss, onRetry, onSaveAs }) {
             </div>
             <div className="editor-notice-actions">
                 {notice.canRetry && (
-                    <button type="button" disabled={notice.busy} onClick={() => void onRetry?.()}>
+                    <Button size="sm" disabled={notice.busy} onClick={() => void onRetry?.()}>
                         Retry {notice.action === "save" ? "Save" : "Open"}
-                    </button>
+                    </Button>
                 )}
                 {notice.canRetry && notice.action === "save" && (
-                    <button type="button" disabled={notice.busy} onClick={() => void onSaveAs?.()}>Save As...</button>
+                    <Button size="sm" disabled={notice.busy} onClick={() => void onSaveAs?.()}>Save As...</Button>
                 )}
-                <button type="button" className="editor-notice-dismiss" aria-label="Dismiss operation feedback" onClick={() => {
+                <IconButton size="sm" className="editor-notice-dismiss" aria-label="Dismiss operation feedback" onClick={() => {
                     onDismiss?.();
                     const previous = previousFocusRef.current;
                     if (previous?.isConnected && !previous.matches(":disabled") && !previous.closest("[inert]")) previous.focus();
                     else document.querySelector('.intellij-tab-button[aria-selected="true"]')?.focus();
                 }}>
                     <FiX aria-hidden="true" />
-                </button>
+                </IconButton>
             </div>
         </section>
     );
@@ -217,14 +225,14 @@ export function EditorPanel({ side, panels, children }) {
         >
             <div className="editor-side-panel-heading">
                 <h2 id={`editor-${side}-heading`}>{title}</h2>
-                <button
-                    type="button"
+                <IconButton
+                    size="sm"
                     className="editor-side-panel-close"
                     aria-label={`Close ${title.toLowerCase()}`}
                     onClick={() => panels.closePanel(side)}
                 >
-                    <FiX />
-                </button>
+                    <FiX aria-hidden="true" />
+                </IconButton>
             </div>
             <div className="editor-side-panel-body">{children}</div>
         </aside>

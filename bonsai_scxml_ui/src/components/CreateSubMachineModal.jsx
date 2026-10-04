@@ -2,6 +2,7 @@ import { useId, useLayoutEffect, useRef, useState } from "react";
 import { FiFolder } from "react-icons/fi";
 import { isTauri, selectDirectory } from "../tauri-client.js";
 import { CreationDialog } from "./EditorOverlays.jsx";
+import { Button, IconButton, TextInput } from "./ui/index.js";
 
 const normalizeFileName = (value) => {
     const trimmed = String(value || "").trim();
@@ -114,7 +115,7 @@ function CreateSubMachineForm({
                 <label className="submachine-create-field">
                     <span>Directory</span>
                     <div className="submachine-create-directory-row">
-                        <input
+                        <TextInput
                             value={directory}
                             onChange={(event) => {
                                 if (browseRequestRef.current) browseRequestRef.current.cancelled = true;
@@ -125,8 +126,7 @@ function CreateSubMachineForm({
                             spellCheck={false}
                         />
                         {isTauri() && (
-                            <button
-                                type="button"
+                            <IconButton
                                 className="submachine-create-browse"
                                 onClick={browseDirectory}
                                 disabled={isBrowsing || isSubmitting}
@@ -134,14 +134,14 @@ function CreateSubMachineForm({
                                 title="Choose directory"
                             >
                                 <FiFolder aria-hidden="true" />
-                            </button>
+                            </IconButton>
                         )}
                     </div>
                 </label>
 
                 <label className="submachine-create-field">
                     <span>File name</span>
-                    <input
+                    <TextInput
                         ref={nameInputRef}
                         value={fileName}
                         onChange={(event) => setFileName(event.target.value)}
@@ -153,12 +153,12 @@ function CreateSubMachineForm({
                 {error && <div className="submachine-create-error" role="alert">{error}</div>}
 
                 <div className="submachine-create-actions">
-                    <button type="button" onClick={cancel} disabled={isSubmitting}>
+                    <Button onClick={cancel} disabled={isSubmitting}>
                         Cancel
-                    </button>
-                    <button type="submit" className="primary" disabled={isSubmitting || isBrowsing}>
+                    </Button>
+                    <Button type="submit" variant="primary" className="primary" disabled={isSubmitting || isBrowsing}>
                         {isSubmitting ? "Creating…" : "Create"}
-                    </button>
+                    </Button>
                 </div>
             </form>
         </CreationDialog>

@@ -1,4 +1,5 @@
 import { FiX } from "react-icons/fi";
+import { EmptyState, IconButton, TextInput } from "./ui/index.js";
 
 export default function EditorFindOverlay({
     isOpen,
@@ -15,39 +16,11 @@ export default function EditorFindOverlay({
     if (!isOpen) return null;
 
     return (
-        <div
-            ref={panelRef}
-            className="nodrag nopan"
-            style={{
-                position: "fixed",
-                top: 72,
-                right: 24,
-                width: 360,
-                maxWidth: "calc(100vw - 48px)",
-                maxHeight: "max(0px, calc(100dvh - 88px))",
-                boxSizing: "border-box",
-                display: "flex",
-                flexDirection: "column",
-                background: "#111827",
-                border: "1px solid #475569",
-                borderRadius: 8,
-                boxShadow: "0 14px 35px rgba(0, 0, 0, 0.35)",
-                zIndex: 5000,
-                overflow: "hidden",
-            }}
-        >
-            <div
-                style={{
-                    display: "flex",
-                    flexShrink: 0,
-                    alignItems: "center",
-                    gap: 8,
-                    padding: 8,
-                    borderBottom: "1px solid #334155",
-                }}
-            >
-                <input
+        <div ref={panelRef} className="editor-find-overlay ui-popover nodrag nopan">
+            <div className="editor-find-overlay__header">
+                <TextInput
                     ref={inputRef}
+                    className="editor-find-overlay__input"
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
                     onKeyDown={(event) => {
@@ -60,9 +33,7 @@ export default function EditorFindOverlay({
                         if (event.key === "ArrowDown") {
                             event.preventDefault();
                             if (results.length > 0) {
-                                setResultIndex((index) =>
-                                    (index + 1) % results.length
-                                );
+                                setResultIndex((index) => (index + 1) % results.length);
                             }
                             return;
                         }
@@ -70,9 +41,7 @@ export default function EditorFindOverlay({
                         if (event.key === "ArrowUp") {
                             event.preventDefault();
                             if (results.length > 0) {
-                                setResultIndex((index) =>
-                                    (index - 1 + results.length) % results.length
-                                );
+                                setResultIndex((index) => (index - 1 + results.length) % results.length);
                             }
                             return;
                         }
@@ -83,116 +52,35 @@ export default function EditorFindOverlay({
                         }
                     }}
                     placeholder="Find skill or slot…"
-                    style={{
-                        flex: 1,
-                        minWidth: 0,
-                        padding: "8px 10px",
-                        borderRadius: 6,
-                        border: "1px solid #475569",
-                        background: "#0f172a",
-                        color: "#e2e8f0",
-                        outline: "none",
-                    }}
                 />
-                <button
-                    type="button"
-                    onClick={onClose}
-                    title="Close (Esc)"
-                    style={{
-                        border: 0,
-                        background: "transparent",
-                        color: "#94a3b8",
-                        cursor: "pointer",
-                        padding: 4,
-                    }}
-                >
-                    <FiX size={16} />
-                </button>
+                <IconButton size="sm" onClick={onClose} title="Close (Esc)" aria-label="Close find">
+                    <FiX size={16} aria-hidden="true" />
+                </IconButton>
             </div>
 
             {query.trim() && (
-                <div
-                    style={{
-                        maxHeight: "min(320px, max(0px, calc(100dvh - 144px)))",
-                        minHeight: 0,
-                        overflowY: "auto",
-                        padding: 4,
-                    }}
-                >
-                {results.length === 0 ? (
-                    <div
-                        style={{
-                            padding: "10px 12px",
-                            color: "#94a3b8",
-                            fontSize: 12,
-                        }}
-                    >
-                        No matching skill or slot.
-                    </div>
-                ) : (
-                    results.map((result, index) => (
-                        <button
-                            key={`${result.kind}-${result.id}`}
-                            type="button"
-                            onMouseDown={(event) => event.preventDefault()}
-                            onClick={() => focusResult(result)}
-                            style={{
-                                display: "flex",
-                                boxSizing: "border-box",
-                                width: "100%",
-                                alignItems: "center",
-                                gap: 10,
-                                padding: "8px 10px",
-                                border: 0,
-                                borderRadius: 5,
-                                background:
-                                    index === resultIndex
-                                        ? "#1e293b"
-                                        : "transparent",
-                                color: "#e2e8f0",
-                                cursor: "pointer",
-                                textAlign: "left",
-                            }}
-                        >
-                            <span
-                                style={{
-                                    width: 58,
-                                    flex: "0 0 58px",
-                                    fontSize: 10,
-                                    textTransform: "uppercase",
-                                    color: "#94a3b8",
-                                }}
+                <div className="editor-find-overlay__results">
+                    {results.length === 0 ? (
+                        <EmptyState compact>No matching skill or slot.</EmptyState>
+                    ) : (
+                        results.map((result, index) => (
+                            <button
+                                key={`${result.kind}-${result.id}`}
+                                type="button"
+                                className={`editor-find-result ${index === resultIndex ? "is-active" : ""}`}
+                                onMouseDown={(event) => event.preventDefault()}
+                                onClick={() => focusResult(result)}
                             >
-                                {result.kind}
-                            </span>
-                            <span style={{ flex: 1, minWidth: 0 }}>
-                                <div
-                                    style={{
-                                        overflow: "hidden",
-                                        textOverflow: "ellipsis",
-                                        whiteSpace: "nowrap",
-                                        fontSize: 12,
-                                    }}
-                                >
-                                    {result.label}
-                                </div>
-                                {result.detail && result.detail !== result.label && (
-                                    <div
-                                        style={{
-                                            overflow: "hidden",
-                                            textOverflow: "ellipsis",
-                                            whiteSpace: "nowrap",
-                                            fontSize: 10,
-                                            color: "#94a3b8",
-                                        }}
-                                    >
-                                        {result.detail}
-                                    </div>
-                                )}
-                            </span>
-                        </button>
-                    ))
-                )}
+                                <span className="editor-find-result__kind">{result.kind}</span>
+                                <span className="editor-find-result__content">
+                                    <span className="editor-find-result__label">{result.label}</span>
+                                    {result.detail && result.detail !== result.label && (
+                                        <span className="editor-find-result__detail">{result.detail}</span>
+                                    )}
+                                </span>
+                            </button>
+                        ))
+                    )}
                 </div>
             )}
         </div>

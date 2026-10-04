@@ -1,5 +1,6 @@
 import { lazy, Suspense, useId, useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { Button } from "./ui/index.js";
 
 const ConditionModal = lazy(() => import("./ConditionModal.jsx"));
 const CreateSlotModal = lazy(() => import("./CreateSlotModal.jsx"));
@@ -51,7 +52,7 @@ export function CreationDialog({
     return createPortal(
         <dialog
             ref={dialogRef}
-            className={`editor-creation-dialog ${className}`}
+            className={`editor-creation-dialog${className ? ` ${className}` : ""}`}
             aria-modal="true"
             aria-labelledby={labelledBy}
             aria-describedby={describedBy}
@@ -169,9 +170,9 @@ function UnsavedWorkflowDialog({ title, action, busy, error, status, onResolve }
             {!busy && status && <p role="status">{status}</p>}
             {error && <p className="workflow-unsaved-dialog-error" role="alert">{error}</p>}
             <div className="workflow-unsaved-dialog-actions">
-                <button ref={cancelButtonRef} type="button" disabled={busy} onClick={() => resolveChoice("cancel")}>Cancel</button>
-                <button type="button" className="workflow-unsaved-dialog-discard" disabled={busy} onClick={() => resolveChoice("discard")}>Discard</button>
-                <button type="button" className="workflow-unsaved-dialog-save" disabled={busy} onClick={() => resolveChoice("save")}>Save</button>
+                <Button ref={cancelButtonRef} disabled={busy} onClick={() => resolveChoice("cancel")}>Cancel</Button>
+                <Button variant="danger" className="workflow-unsaved-dialog-discard" disabled={busy} onClick={() => resolveChoice("discard")}>Discard</Button>
+                <Button variant="primary" className="workflow-unsaved-dialog-save" disabled={busy} onClick={() => resolveChoice("save")}>Save</Button>
             </div>
         </dialog>,
         document.body,

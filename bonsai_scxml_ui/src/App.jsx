@@ -56,6 +56,7 @@ import { useEditorLibraryItems } from "./hooks/useEditorLibraryItems";
 import { useEditorDetailsCallbacks, useEditorDetailsController } from "./hooks/useEditorDetailsController.js";
 import { useEditorPanelLayout, useEditorPreferences } from "./hooks/useEditorPreferences.js";
 import "./App.css";
+import "./styles/design-system.css";
 
 // Initialize API proxy for Tauri desktop mode (intercepts /api/* fetch calls)
 initApiProxy();

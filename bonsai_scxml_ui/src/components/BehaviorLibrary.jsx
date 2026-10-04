@@ -15,6 +15,7 @@ import {
     selectDirectory,
 } from "../tauri-client.js";
 import { areBehaviorLibraryPropsEqual } from "./canvasLibraryProps.js";
+import { Button, SegmentedButton, SegmentedControl, TextInput } from "./ui/index.js";
 
 const normalizeKey = (value) =>
     String(value || "")
@@ -526,40 +527,29 @@ function BehaviorLibrary({
 
     return (
         <aside className="skill-library behavior-library">
-            <div className="library-mode-tabs">
-                <button
-                    type="button"
-                    className={`library-mode-tab ${
-                        activeLibraryTab === "skills"
-                            ? "active"
-                            : ""
-                    }`}
-                    onClick={() =>
-                        onLibraryTabChange?.("skills")
-                    }
+            <SegmentedControl className="library-mode-tabs" aria-label="Library type">
+                <SegmentedButton
+                    className="library-mode-tab"
+                    active={activeLibraryTab === "skills"}
+                    onClick={() => onLibraryTabChange?.("skills")}
                 >
                     Skills
-                </button>
-                <button
-                    type="button"
-                    className={`library-mode-tab ${
-                        activeLibraryTab === "behaviors"
-                            ? "active"
-                            : ""
-                    }`}
-                    onClick={() =>
-                        onLibraryTabChange?.("behaviors")
-                    }
+                </SegmentedButton>
+                <SegmentedButton
+                    className="library-mode-tab"
+                    active={activeLibraryTab === "behaviors"}
+                    onClick={() => onLibraryTabChange?.("behaviors")}
                 >
                     Behaviors
-                </button>
-            </div>
+                </SegmentedButton>
+            </SegmentedControl>
 
             <div className="behavior-library-title-row">
                 <h3>Behavior Library</h3>
-                <button
-                    type="button"
+                <Button
+                    size="sm"
                     className="behavior-add-root-button"
+                    leadingIcon={<FiPlus />}
                     onClick={() => {
                         resetNewPathPicker();
                         setAdding((value) => !value);
@@ -567,40 +557,36 @@ function BehaviorLibrary({
                     }}
                     title="Add behavior directory"
                 >
-                    <FiPlus />
                     Directory
-                </button>
+                </Button>
             </div>
 
             <div className="search-container">
-                <input
+                <TextInput
                     className="skill-search"
                     type="text"
                     placeholder="Search behaviors..."
+                    aria-label="Search behaviors"
                     value={searchText}
-                    onChange={(event) =>
-                        setSearchText(event.target.value)
-                    }
+                    onChange={(event) => setSearchText(event.target.value)}
                 />
                 <FiSearch className="search-icon" />
             </div>
 
             {adding && (
                 <div className="behavior-add-form">
-                    <input
+                    <TextInput
                         className="behavior-key-input"
                         value={newKey}
                         onChange={(event) => {
                             resetNewPathPicker();
-                            setNewKey(
-                                normalizeKey(event.target.value)
-                            );
+                            setNewKey(normalizeKey(event.target.value));
                         }}
                         placeholder="KEY"
                     />
 
                     <div className="behavior-path-picker">
-                        <input
+                        <TextInput
                             className="behavior-path-input"
                             value={newPath}
                             onChange={(event) => {
@@ -609,14 +595,14 @@ function BehaviorLibrary({
                             }}
                             placeholder="/path/to/behaviors"
                         />
-                        <button
-                            type="button"
+                        <Button
+                            size="sm"
                             className="behavior-browse-button"
                             onClick={browseForNewPath}
                             disabled={newPathPicker.pending}
                         >
                             Browse
-                        </button>
+                        </Button>
                     </div>
 
                     {(newPathPicker.error || addError) && (
@@ -628,15 +614,16 @@ function BehaviorLibrary({
                     )}
 
                     <div className="behavior-add-actions">
-                        <button
-                            type="button"
+                        <Button
+                            size="sm"
+                            variant="primary"
                             className="behavior-add-confirm"
                             onClick={addDirectory}
                         >
                             Add
-                        </button>
-                        <button
-                            type="button"
+                        </Button>
+                        <Button
+                            size="sm"
                             className="behavior-add-cancel"
                             onClick={() => {
                                 resetNewPathPicker();
@@ -645,7 +632,7 @@ function BehaviorLibrary({
                             }}
                         >
                             Cancel
-                        </button>
+                        </Button>
                     </div>
                 </div>
             )}

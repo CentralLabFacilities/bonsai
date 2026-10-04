@@ -13,6 +13,7 @@ import { MdAssistantNavigation } from "react-icons/md";
 import { FaHandPaper } from "react-icons/fa";
 import { GoPackage } from "react-icons/go";
 import { areSkillLibraryPropsEqual } from "./canvasLibraryProps.js";
+import { IconButton, SegmentedButton, SegmentedControl, TextInput } from "./ui/index.js";
 
 
 const SkillDescriptionTooltip = React.memo(
@@ -342,93 +343,45 @@ function SkillLibrary({
     return (
         <>
             <aside className="skill-library" aria-busy={addingSkill !== null || isReloadingSkills || skillLibraryStatus === "loading"}>
-                <div className="library-mode-tabs">
-                    <button
-                        type="button"
-                        className={`library-mode-tab ${
-                            activeLibraryTab === "skills"
-                                ? "active"
-                                : ""
-                        }`}
-                        onClick={() =>
-                            onLibraryTabChange?.("skills")
-                        }
+                <SegmentedControl className="library-mode-tabs" aria-label="Library type">
+                    <SegmentedButton
+                        className="library-mode-tab"
+                        active={activeLibraryTab === "skills"}
+                        onClick={() => onLibraryTabChange?.("skills")}
                     >
                         Skills
-                    </button>
-                    <button
-                        type="button"
-                        className={`library-mode-tab ${
-                            activeLibraryTab === "behaviors"
-                                ? "active"
-                                : ""
-                        }`}
-                        onClick={() =>
-                            onLibraryTabChange?.("behaviors")
-                        }
+                    </SegmentedButton>
+                    <SegmentedButton
+                        className="library-mode-tab"
+                        active={activeLibraryTab === "behaviors"}
+                        onClick={() => onLibraryTabChange?.("behaviors")}
                     >
                         Behaviors
-                    </button>
-                </div>
+                    </SegmentedButton>
+                </SegmentedControl>
 
-                <div
-                    style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: 8,
-                        marginBottom: 8,
-                    }}
-                >
-                    <h3 style={{ margin: 0 }}>Skill Library</h3>
-                    <button
-                        type="button"
+                <div className="skill-library-title-row">
+                    <h3>Skill Library</h3>
+                    <IconButton
+                        size="sm"
+                        className={`skill-library-refresh-button ${isReloadingSkills ? "is-spinning" : ""}`}
                         title="Reload skill library"
                         aria-label="Reload skill library"
                         onClick={() => onReloadSkills?.()}
                         disabled={isReloadingSkills}
-                        style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            width: 30,
-                            height: 30,
-                            padding: 0,
-                            border: "1px solid var(--border)",
-                            borderRadius: 7,
-                            background: "transparent",
-                            color: "inherit",
-                            cursor: isReloadingSkills ? "default" : "pointer",
-                            opacity: isReloadingSkills ? 0.6 : 1,
-                        }}
                     >
-                        <FiRefreshCw
-                            style={{
-                                animation: isReloadingSkills
-                                    ? "skill-library-refresh-spin 0.8s linear infinite"
-                                    : "none",
-                            }}
-                        />
-                    </button>
+                        <FiRefreshCw aria-hidden="true" />
+                    </IconButton>
                 </div>
 
-                <style>{`
-                    @keyframes skill-library-refresh-spin {
-                        from { transform: rotate(0deg); }
-                        to { transform: rotate(360deg); }
-                    }
-                `}</style>
-
                 <div className="search-container">
-                    <input
+                    <TextInput
                         className="skill-search"
                         type="text"
-                            placeholder="Search skills..."
-                            aria-label="Search skills"
+                        placeholder="Search skills..."
+                        aria-label="Search skills"
                         value={searchText}
-                        onChange={(e) =>
-                            setSearchText(e.target.value)
-                        }
+                        onChange={(e) => setSearchText(e.target.value)}
                     />
                     <FiSearch className="search-icon" />
                 </div>

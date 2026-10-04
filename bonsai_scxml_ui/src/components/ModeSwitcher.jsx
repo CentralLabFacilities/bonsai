@@ -1,3 +1,5 @@
+import { SegmentedButton, SegmentedControl } from "./ui/index.js";
+
 const MODES = [
     ["event", "Event Mode"],
     ["slots", "Slot Mode"],
@@ -7,17 +9,17 @@ const MODES = [
 
 export default function ModeSwitcher({ activeMode, setActiveMode }) {
     return (
-        <div className="mode-button-group-floating">
+        <SegmentedControl className="mode-button-group-floating" aria-label="Editor mode">
             {MODES.map(([mode, label]) => (
-                <button
+                <SegmentedButton
                     key={mode}
-                    type="button"
-                    className={`mode-button ${activeMode === mode ? "active" : ""}`}
+                    className="mode-button"
+                    active={activeMode === mode}
                     onClick={() => setActiveMode(mode)}
                 >
                     {label}
-                </button>
+                </SegmentedButton>
             ))}
-        </div>
+        </SegmentedControl>
     );
 }

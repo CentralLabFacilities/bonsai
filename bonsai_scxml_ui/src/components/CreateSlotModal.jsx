@@ -1,6 +1,7 @@
 import { useId, useMemo, useRef, useState } from "react";
 import { FiX } from "react-icons/fi";
 import { CreationDialog } from "./EditorOverlays.jsx";
+import { Button, IconButton, Select, TextInput } from "./ui/index.js";
 
 function CreateSlotForm({
                              onClose,
@@ -100,20 +101,21 @@ function CreateSlotForm({
             <div className="slot-create-modal">
                 <div className="slot-create-modal-header">
                     <h3 id={titleId}>Create New Slot</h3>
-                    <button
-                        type="button"
+                    <IconButton
+                        size="sm"
+                        variant="danger"
                         className="slot-create-modal-close"
                         aria-label="Cancel slot creation"
                         onClick={resetAndClose}
                     >
                         <FiX aria-hidden="true" />
-                    </button>
+                    </IconButton>
                 </div>
 
                 <form onSubmit={handleSubmit} className="slot-create-modal-form">
                     <label className="slot-create-modal-label">
                         Skill
-                        <select
+                        <Select
                             ref={skillInputRef}
                             className="skill-select"
                             value={selectedSkillNodeId}
@@ -133,12 +135,12 @@ function CreateSlotForm({
                                     {option.nodeLabel}
                                 </option>
                             ))}
-                        </select>
+                        </Select>
                     </label>
 
                     <label className="slot-create-modal-label">
                         Key
-                        <select
+                        <Select
                             className="skill-select"
                             value={linkedSkillSlotId}
                             onChange={(event) =>
@@ -156,7 +158,7 @@ function CreateSlotForm({
                                     {option.key} — {option.access === "read" ? "READ" : "WRITE"}
                                 </option>
                             ))}
-                        </select>
+                        </Select>
                         {linkedSkillSlot && (
                             <span className="slot-create-modal-hint">
                                 Type: {linkedSkillSlot.type}
@@ -166,7 +168,7 @@ function CreateSlotForm({
 
                     <label className="slot-create-modal-label">
                         Path
-                        <input
+                        <TextInput
                             className="text-field"
                             type="text"
                             value={path}
@@ -187,20 +189,20 @@ function CreateSlotForm({
                     </label>
 
                     <div className="slot-create-modal-footer">
-                        <button
-                            type="button"
+                        <Button
                             className="menu-button"
                             onClick={resetAndClose}
                         >
                             Cancel
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                             type="submit"
+                            variant="primary"
                             className="menu-button highlight-save-button"
                             disabled={!path.trim() || !linkedSkillSlot}
                         >
                             Create
-                        </button>
+                        </Button>
                     </div>
                 </form>
             </div>
