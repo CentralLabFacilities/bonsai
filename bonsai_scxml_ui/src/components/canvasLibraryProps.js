@@ -19,6 +19,12 @@ const SKILL_LIBRARY_PROPS = [
     "isReloadingSkills",
     "refreshVersion",
     "fetchSkillData",
+    "onAddSkill",
+    "canAddSkill",
+    "skillLibraryStatus",
+    "skillLibraryError",
+    "hasLoadedSkills",
+    "skillCount",
 ];
 
 export const areSkillLibraryPropsEqual = (previous, next) =>

@@ -8,6 +8,7 @@ import {
 } from "../utils/valueTypes.js";
 
 function TypedValueEditor({
+                              id,
                               value,
                               expectedType,
                               variables = [],
@@ -202,6 +203,7 @@ function TypedValueEditor({
         <div className={`typed-value-editor ${error ? "typed-value-editor-invalid" : ""}`}>
             <div className="typed-value-editor-row">
                 <input
+                    id={id}
                     ref={inputRef}
                     className={inputClassName}
                     type="text"

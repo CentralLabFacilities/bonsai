@@ -12,7 +12,7 @@ import {
     ensureSharedEditorInstanceIds,
     normalizeSharedScxmlStateIdentity,
 } from "../utils/editorScxml";
-import { isDocumentGuardOpen } from "./useGlobalEditorShortcuts.js";
+import { isEditorModalOpen } from "./useGlobalEditorShortcuts.js";
 
 const showSavedToast = (fileName, newerChanges) => {
     if (typeof document === "undefined") return;
@@ -86,6 +86,8 @@ export function useWorkflowDocument({
 }) {
     const [saveStatus, setSaveStatus] = useState("idle");
     const [lastSavedAt, setLastSavedAt] = useState(null);
+    const [isOpening, setIsOpening] = useState(false);
+    const [documentNotice, setDocumentNotice] = useState(null);
     const [pendingGuard, setPendingGuard] = useState(null);
     const guardRef = useRef(null);
     const savesRef = useRef(new Map());
@@ -95,6 +97,12 @@ export function useWorkflowDocument({
     const windowClosingRef = useRef(false);
     const windowCloseApprovedRef = useRef(false);
 
+    const clearOperationNotice = useCallback((action, snapshot) => {
+        setDocumentNotice((notice) => notice?.action === action &&
+            notice.tabId === snapshot.id && notice.generation === snapshot.documentGeneration
+            ? null : notice);
+    }, []);
+
     const saveDocument = useCallback(
         ({ tabId, forceSaveAs = false } = {}) => {
             const snapshot = getTabSnapshot(tabId);
@@ -102,6 +110,7 @@ export function useWorkflowDocument({
             const operationKey = `${snapshot.id}:${snapshot.documentGeneration}`;
             if (savesRef.current.has(operationKey)) return savesRef.current.get(operationKey);
 
+            clearOperationNotice("save", snapshot);
             setSaveStatus("saving");
             // Publish the promise before serialization or native I/O can finish.
             const operation = saveQueueRef.current
@@ -116,12 +125,7 @@ export function useWorkflowDocument({
                             getTabSnapshot(snapshot.id)?.documentGeneration !==
                             snapshot.documentGeneration
                         ) {
-                            setSaveStatus("idle");
-                            return {
-                                success: false,
-                                ...checkpoint(snapshot),
-                                error: "The original workflow was closed or replaced before saving completed.",
-                            };
+                            throw new Error("The original workflow was closed or replaced before saving completed. No file was written.");
                         }
                         const defaultName =
                             snapshot.fileName || `${snapshot.title || "workflow"}.xml`;
@@ -130,6 +134,12 @@ export function useWorkflowDocument({
                             forceSaveAs ? null : snapshot.filePath,
                             defaultName,
                         );
+                        if (saved?.success !== true && saved?.success !== false) {
+                            throw new Error("The desktop backend did not report a save result.");
+                        }
+                        if (saved.success && (typeof saved.path !== "string" || !saved.path)) {
+                            throw new Error("The desktop backend did not report the saved file path.");
+                        }
                         const result = {
                             success: Boolean(saved?.success),
                             fileName: saved?.file_name || defaultName,
@@ -138,7 +148,7 @@ export function useWorkflowDocument({
                         };
                         if (!result.success) {
                             setSaveStatus("idle");
-                            return result;
+                            return { ...result, cancelled: true };
                         }
 
                         // A tab can be edited, switched, closed or replaced during I/O.
@@ -166,6 +176,7 @@ export function useWorkflowDocument({
                         result.isCurrent = matchesCheckpoint(current, result);
                         setLastSavedAt(Date.now());
                         setSaveStatus("saved");
+                        clearOperationNotice("save", snapshot);
                         showSavedToast(
                             result.fileName,
                             current?.documentGeneration === snapshot.documentGeneration &&
@@ -175,10 +186,20 @@ export function useWorkflowDocument({
                     } catch (error) {
                         console.error("Save error:", error);
                         setSaveStatus("error");
-                        if (!guardRef.current) alert(`Save error:\n${error?.message || error}`);
+                        const message = String(error?.message || error || "The save did not complete.");
+                        if (!guardRef.current) {
+                            setDocumentNotice({
+                                action: "save",
+                                title: `Could not save ${snapshot.fileName || snapshot.title || "workflow"}`,
+                                message,
+                                tabId: snapshot.id,
+                                generation: snapshot.documentGeneration,
+                                forceSaveAs,
+                            });
+                        }
                         return {
                             success: false,
-                            error: error?.message || String(error),
+                            error: message,
                             ...checkpoint(snapshot),
                         };
                     }
@@ -193,7 +214,7 @@ export function useWorkflowDocument({
             saveQueueRef.current = operation.catch(() => null);
             return operation;
         },
-        [isDesktop, getTabSnapshot, updateTab],
+        [isDesktop, getTabSnapshot, updateTab, clearOperationNotice],
     );
 
     const finishGuard = useCallback((ticket) => {
@@ -216,7 +237,8 @@ export function useWorkflowDocument({
                     title: snapshot.title || snapshot.fileName || "Workflow",
                     generation: snapshot.documentGeneration,
                     busy: false,
-                    error: null,
+                     error: null,
+                     status: null,
                     resolve,
                 };
                 guardRef.current = guard;
@@ -246,7 +268,9 @@ export function useWorkflowDocument({
             if (choice !== "save") return;
 
             guard.busy = true;
-            setPendingGuard({ ...guard, error: null });
+            guard.error = null;
+            guard.status = null;
+            setPendingGuard({ ...guard });
             const result = await saveDocument({ tabId: guard.tabId });
             if (guardRef.current !== guard) return;
             const current = getTabSnapshot(guard.tabId);
@@ -254,10 +278,13 @@ export function useWorkflowDocument({
                 finishGuard(checkpoint(current));
             } else {
                 guard.busy = false;
-                guard.error = result?.success
+                guard.status = result?.cancelled
+                    ? "Save cancelled. Your unsaved workflow is still open."
+                    : null;
+                guard.error = result?.cancelled ? null : result?.success
                     ? "The workflow changed while saving. Save again to keep the newer changes, or cancel."
                     : result?.error ||
-                      "The save was cancelled or could not complete. Your workflow is still open.";
+                      "The save could not complete. Your workflow is still open.";
                 setPendingGuard({ ...guard });
             }
         },
@@ -337,16 +364,19 @@ export function useWorkflowDocument({
         ],
     );
 
-    const handleOpenDocument = useCallback(() => {
+    const handleOpenDocument = useCallback(({ tabId, filePath: requestedPath = null } = {}) => {
         if (openRef.current) return openRef.current;
-        const target = getTabSnapshot();
+        const target = getTabSnapshot(tabId);
         if (!target || guardRef.current) return Promise.resolve(null);
+        clearOperationNotice("open", target);
+        setIsOpening(true);
+        let filePath = requestedPath;
         const operation = Promise.resolve()
             .then(async () => {
                 try {
                     if (!isDesktop)
                         throw new Error("Opening SCXML requires the Rust/Tauri desktop backend.");
-                    const filePath = await openFile();
+                    filePath = requestedPath || await openFile();
                     if (!filePath) return null;
                     const fileName = filePath.split(/[\\/]/).pop() || "workflow.xml";
                     let imported;
@@ -397,13 +427,21 @@ export function useWorkflowDocument({
                 } catch (error) {
                     if (error?.name !== "AbortError") {
                         console.error("Import error:", error);
-                        alert(`Import error:\n${error?.message || error}`);
+                        setDocumentNotice({
+                            action: "open",
+                            title: `Could not finish opening ${filePath?.split(/[\\/]/).pop() || "workflow"}`,
+                            message: String(error?.message || error || "The file could not be opened."),
+                            tabId: target.id,
+                            generation: target.documentGeneration,
+                            filePath,
+                        });
                     }
                     return null;
                 }
             })
             .finally(() => {
                 openRef.current = null;
+                setIsOpening(false);
             });
         openRef.current = operation;
         return operation;
@@ -414,7 +452,21 @@ export function useWorkflowDocument({
         prepareImportedDocument,
         replaceTabDocument,
         checkSlotConnection,
+        clearOperationNotice,
     ]);
+
+    const dismissDocumentNotice = useCallback(() => setDocumentNotice(null), []);
+    const handleRetryDocumentAction = useCallback(({ forceSaveAs } = {}) => {
+        if (!documentNotice || guardRef.current || openRef.current || savesRef.current.size > 0)
+            return Promise.resolve(null);
+        const origin = getTabSnapshot(documentNotice.tabId);
+        if (!origin || origin.documentGeneration !== documentNotice.generation)
+            return Promise.resolve(null);
+        // Retry belongs to the failed operation's document, not the active tab.
+        return documentNotice.action === "save"
+            ? saveDocument({ tabId: origin.id, forceSaveAs: forceSaveAs ?? documentNotice.forceSaveAs })
+            : handleOpenDocument({ tabId: origin.id, filePath: documentNotice.filePath });
+    }, [documentNotice, getTabSnapshot, saveDocument, handleOpenDocument]);
 
     const handleSaveCurrentTab = useCallback(() => saveDocument(), [saveDocument]);
     const handleSaveAsCurrentTab = useCallback(
@@ -424,7 +476,7 @@ export function useWorkflowDocument({
 
     useEffect(() => {
         const handleSaveShortcut = (event) => {
-            if (isDocumentGuardOpen()) return;
+            if (event.defaultPrevented || isEditorModalOpen()) return;
             if (
                 !(event.ctrlKey || event.metaKey) ||
                 event.altKey ||
@@ -529,8 +581,19 @@ export function useWorkflowDocument({
         ],
     );
 
+    const noticeOrigin = documentNotice && getTabSnapshot(documentNotice.tabId);
+
     return {
         ...documentInfo,
+        isOpening,
+        documentNotice: documentNotice ? {
+            ...documentNotice,
+            canRetry: Boolean(isDesktop && noticeOrigin && noticeOrigin.documentGeneration === documentNotice.generation),
+            desktopRequired: !isDesktop,
+            busy: saveStatus === "saving" || isOpening || Boolean(pendingGuard),
+        } : null,
+        dismissDocumentNotice,
+        handleRetryDocumentAction,
         documentGuard: pendingGuard ? { ...pendingGuard, onResolve: resolveGuard } : null,
         handleOpenDocument,
         handleSaveCurrentTab,

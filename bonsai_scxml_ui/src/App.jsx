@@ -6,7 +6,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
-import Header from "./components/Header";
+import Header, { EditorNotice, EditorPanel, EditorPanelLedge, EditorPanelResizer } from "./components/EditorChrome.jsx";
 import SkillLibrary from "./components/SkillLibrary";
 import BehaviorLibrary from "./components/BehaviorLibrary";
 import WorkflowPanel from "./components/WorkflowPanel";
@@ -54,7 +54,7 @@ import { useEditorLibraryDrop } from "./hooks/useEditorLibraryDrop";
 import { useEditorFlowChanges } from "./hooks/useEditorFlowChanges";
 import { useEditorLibraryItems } from "./hooks/useEditorLibraryItems";
 import { useEditorDetailsCallbacks, useEditorDetailsController } from "./hooks/useEditorDetailsController.js";
-import { useEditorPreferences } from "./hooks/useEditorPreferences.js";
+import { useEditorPanelLayout, useEditorPreferences } from "./hooks/useEditorPreferences.js";
 import "./App.css";
 
 // Initialize API proxy for Tauri desktop mode (intercepts /api/* fetch calls)
@@ -70,6 +70,9 @@ function AppContent() {
         skills,
         isReloadingSkills,
         skillLibraryRefreshVersion,
+        skillLibraryStatus,
+        skillLibraryError,
+        hasLoadedSkills,
         fetchSkills,
         fetchSkillData,
     } = useSkillDefinitions();
@@ -89,6 +92,8 @@ function AppContent() {
         showSlotEdges,
         setShowSlotEdges,
     } = useEditorPreferences();
+    const panels = useEditorPanelLayout();
+    const { showPanel } = panels;
 
     //---- TAB / GRAPH MANAGEMENT ----
     const {
@@ -134,7 +139,11 @@ function AppContent() {
         setIsCreateSlotModalOpen(false);
     }
     const [activeTab, setActiveTab] = useState("allgemein");
-    const [rightPanelTab, setRightPanelTab] = useState("datamodel");
+    const [rightPanelTab, setRightPanelTabState] = useState("datamodel");
+    const setRightPanelTab = useCallback((tab) => {
+        setRightPanelTabState(tab);
+        if (tab === "details") showPanel("inspector");
+    }, [showPanel]);
 
     const {
         selectedNodeId,
@@ -1018,6 +1027,10 @@ function AppContent() {
         documentGuard,
         hasFilePath: activeWorkflowHasFilePath,
         isSaving: isWorkflowSaving,
+        isOpening: isWorkflowOpening,
+        documentNotice,
+        dismissDocumentNotice,
+        handleRetryDocumentAction,
     } = useWorkflowDocument({
         isDesktop: IS_DESKTOP,
         activeTab: activeWorkflowTab,
@@ -1037,9 +1050,14 @@ function AppContent() {
         handleLibraryDragOver,
         handleLibraryDragLeave,
         handleLibraryDrop,
+        handleAddLibrarySkill,
+        libraryDropError,
+        dismissLibraryDropError,
     } = useEditorLibraryDrop({
         activeMode,
         nodes,
+        flowContainerRef,
+        getTabSnapshot,
         screenToFlowPosition,
         setParallelDropTargetId,
         setCompoundDropTargetId,
@@ -1054,6 +1072,15 @@ function AppContent() {
         syncInsertedParallelLaneStateAfterCommit:
             rustWorkflowDocument.syncInsertedParallelLaneStateAfterCommit,
     });
+
+    const addLibrarySkill = useCallback(async (skill) => {
+        const added = await handleAddLibrarySkill(skill);
+        if (added) {
+            setRightPanelTab("details");
+            setActiveTab("allgemein");
+        }
+        return added;
+    }, [handleAddLibrarySkill, setRightPanelTab]);
 
     const {
         isShortcutHelpOpen,
@@ -1109,13 +1136,24 @@ function AppContent() {
         onUpdateSrc: updateNodeSource,
         onUpdateEvent: updateNodeEvent,
         onSetEventTarget: setExistingTargetForEvent,
-        onUpdateParameter: (index, value) => {
+        onUpdateParameter: (index, value, commit = false) => {
             const nextParams = updateNodeParameter(selectedNode.id, index, value);
-            // Empty values configure the skill too; send the new parameters,
-            // not the still-pending React snapshot.
-            if (nextParams && String(value ?? "").trim() === "") {
+            if (!nextParams) return null;
+
+            // Typed parameter values are only persisted once validation has
+            // succeeded. Use the freshly built parameter list so the Rust
+            // sync and dynamic skill request cannot observe a stale React
+            // snapshot from before this edit.
+            if (commit) {
+                commitNodeParameters(selectedNode.id, nextParams);
+                updateEventsFromParameters(selectedNode.id, nextParams);
+            } else if (String(value ?? "").trim() === "") {
+                // Preserve the previous behavior for callers that clear a
+                // parameter without explicitly committing it.
                 updateEventsFromParameters(selectedNode.id, nextParams);
             }
+
+            return nextParams;
         },
         onUpdateParameterBlur: (nodeId) => {
             commitNodeParameters(nodeId);
@@ -1134,6 +1172,8 @@ function AppContent() {
         onNavigateAncestorSlot: handleNavigateAncestorSlot,
     });
 
+    const inspectorTab = rightPanelTab === "details" && !selectedNode ? "datamodel" : rightPanelTab;
+
     return (
         <div className="container">
             <Header
@@ -1142,9 +1182,25 @@ function AppContent() {
                 onSaveAsFile={handleSaveAsCurrentTab}
                 hasFilePath={activeWorkflowHasFilePath}
                 isSaving={isWorkflowSaving}
+                isOpening={isWorkflowOpening}
+                panels={panels}
             />
+            <EditorNotice notice={documentNotice} onDismiss={dismissDocumentNotice}
+                onRetry={handleRetryDocumentAction}
+                onSaveAs={() => handleRetryDocumentAction({ forceSaveAs: true })} />
+            <EditorNotice notice={libraryDropError} onDismiss={dismissLibraryDropError} />
 
-            <div className="app">
+            <div className="app" data-panel-mode={panels.isDocked ? "docked" : "drawers"}
+                data-library-dragging={String(panels.libraryDragging)} data-panel-resizing={String(panels.resizing)}
+                style={{
+                    "--library-width": `${panels.libraryWidth}px`,
+                    "--inspector-width": `${panels.inspectorWidth}px`,
+                    "--library-drawer-width": `${Math.min(panels.preferences.libraryWidth, panels.libraryMaxWidth)}px`,
+                    "--inspector-drawer-width": `${Math.min(panels.preferences.inspectorWidth, panels.inspectorMaxWidth)}px`,
+                    "--library-resize-width": panels.isDocked && panels.libraryOpen ? "6px" : "0px",
+                    "--inspector-resize-width": panels.isDocked && panels.inspectorOpen ? "6px" : "0px",
+                }}>
+                <EditorPanel side="library" panels={panels}>
                 {leftLibraryTab === "skills" ? (
                     <SkillLibrary
                         searchText={searchText}
@@ -1166,6 +1222,13 @@ function AppContent() {
                         onReloadSkills={reloadSkills}
                         isReloadingSkills={isReloadingSkills}
                         refreshVersion={skillLibraryRefreshVersion}
+                        skillLibraryStatus={skillLibraryStatus}
+                        skillLibraryError={skillLibraryError}
+                        hasLoadedSkills={hasLoadedSkills}
+                        skillCount={skills.skills.length}
+                        fetchSkillData={fetchSkillData}
+                        onAddSkill={addLibrarySkill}
+                        canAddSkill={activeMode !== "code"}
                     />
                 ) : (
                     <BehaviorLibrary
@@ -1176,6 +1239,8 @@ function AppContent() {
                         onLibraryTabChange={setLeftLibraryTab}
                     />
                 )}
+                </EditorPanel>
+                <EditorPanelResizer side="library" panels={panels} />
 
                 <main className="editor-area">
                     <WorkflowTabBar
@@ -1212,6 +1277,10 @@ function AppContent() {
 
                     <div
                         ref={flowContainerRef}
+                        id="workflow-tab-panel"
+                        role="tabpanel"
+                        aria-labelledby={`workflow-tab-${activeTabId}`}
+                        tabIndex={0}
                         className="flow-container"
                         onPointerMove={(event) => {
                             editorPointerPositionRef.current = {
@@ -1290,11 +1359,34 @@ function AppContent() {
                     </div>
                 </main>
 
+                <EditorPanelResizer side="inspector" panels={panels} />
+                <EditorPanel side="inspector" panels={panels}>
                 <div className="right-panel-shell">
-                    <div className="right-panel-tabs">
+                    <div className="right-panel-tabs" role="tablist" aria-label="Inspector"
+                        onKeyDown={(event) => {
+                            if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+                            const buttons = [...event.currentTarget.querySelectorAll('[role="tab"]')];
+                            const index = buttons.indexOf(event.target);
+                            if (index < 0) return;
+                            let next;
+                            if (event.key === "Home") next = 0;
+                            else if (event.key === "End") next = buttons.length - 1;
+                            else if (event.key === "ArrowLeft") next = (index - 1 + buttons.length) % buttons.length;
+                            else if (event.key === "ArrowRight") next = (index + 1) % buttons.length;
+                            else return;
+                            event.preventDefault();
+                            event.stopPropagation();
+                            buttons[next].focus();
+                            buttons[next].click();
+                        }}>
                         <button
                             type="button"
-                            className={`right-panel-tab ${rightPanelTab === "datamodel" ? "active" : ""}`}
+                            id="inspector-tab-datamodel"
+                            role="tab"
+                            aria-selected={inspectorTab === "datamodel"}
+                            aria-controls="inspector-tab-panel"
+                            tabIndex={inspectorTab === "datamodel" ? 0 : -1}
+                            className={`right-panel-tab ${inspectorTab === "datamodel" ? "active" : ""}`}
                             onClick={() => setRightPanelTab("datamodel")}
                         >
                             Data
@@ -1303,7 +1395,12 @@ function AppContent() {
                         {selectedNode && (
                             <button
                                 type="button"
-                                className={`right-panel-tab ${rightPanelTab === "details" ? "active" : ""}`}
+                                id="inspector-tab-details"
+                                role="tab"
+                                aria-selected={inspectorTab === "details"}
+                                aria-controls="inspector-tab-panel"
+                                tabIndex={inspectorTab === "details" ? 0 : -1}
+                                className={`right-panel-tab ${inspectorTab === "details" ? "active" : ""}`}
                                 onClick={() => setRightPanelTab("details")}
                             >
                                 {selectedNode.type === "slot" ? "Slot Details" : "Skill Detail"}
@@ -1312,7 +1409,12 @@ function AppContent() {
 
                         <button
                             type="button"
-                            className={`right-panel-tab ${rightPanelTab === "problems" ? "active" : ""}`}
+                            id="inspector-tab-problems"
+                            role="tab"
+                            aria-selected={inspectorTab === "problems"}
+                            aria-controls="inspector-tab-panel"
+                            tabIndex={inspectorTab === "problems" ? 0 : -1}
+                            className={`right-panel-tab ${inspectorTab === "problems" ? "active" : ""}`}
                             onClick={() => setRightPanelTab("problems")}
                         >
                             <span>Problems</span>
@@ -1338,8 +1440,9 @@ function AppContent() {
                         />
                     )}
 
-                    <div className="right-panel-content">
-                        {rightPanelTab === "datamodel" && (
+                    <div className="right-panel-content" id="inspector-tab-panel" role="tabpanel"
+                        aria-labelledby={`inspector-tab-${inspectorTab}`} tabIndex={0}>
+                        {inspectorTab === "datamodel" && (
                             <WorkflowPanel
                                 globalDataModel={globalDataModel}
                                 inheritedGlobalDataModel={inheritedGlobalDataModel}
@@ -1359,14 +1462,14 @@ function AppContent() {
                             />
                         )}
 
-                        {rightPanelTab === "problems" && (
+                        {inspectorTab === "problems" && (
                             <ProblemsPanel
                                 problems={editorProblems}
                                 onProblemClick={handleProblemClick}
                             />
                         )}
 
-                        {rightPanelTab === "details" && selectedNode && (
+                        {inspectorTab === "details" && selectedNode && (
                             <Suspense fallback={null}>
                                 <DetailsPanel
                                     {...detailsCallbacks}
@@ -1393,6 +1496,13 @@ function AppContent() {
                         )}
                     </div>
                 </div>
+                </EditorPanel>
+                <EditorPanelLedge side="library" panels={panels} />
+                <EditorPanelLedge side="inspector" panels={panels} />
+                {!panels.isDocked && panels.drawer && !panels.libraryDragging && (
+                    <button type="button" className="editor-panel-backdrop" tabIndex={-1}
+                        aria-label="Close side panel" onClick={() => panels.closePanel(panels.drawer)} />
+                )}
             </div>
 
             <button

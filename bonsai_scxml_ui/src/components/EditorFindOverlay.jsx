@@ -24,6 +24,10 @@ export default function EditorFindOverlay({
                 right: 24,
                 width: 360,
                 maxWidth: "calc(100vw - 48px)",
+                maxHeight: "max(0px, calc(100dvh - 88px))",
+                boxSizing: "border-box",
+                display: "flex",
+                flexDirection: "column",
                 background: "#111827",
                 border: "1px solid #475569",
                 borderRadius: 8,
@@ -35,6 +39,7 @@ export default function EditorFindOverlay({
             <div
                 style={{
                     display: "flex",
+                    flexShrink: 0,
                     alignItems: "center",
                     gap: 8,
                     padding: 8,
@@ -108,7 +113,8 @@ export default function EditorFindOverlay({
             {query.trim() && (
                 <div
                     style={{
-                        maxHeight: 320,
+                        maxHeight: "min(320px, max(0px, calc(100dvh - 144px)))",
+                        minHeight: 0,
                         overflowY: "auto",
                         padding: 4,
                     }}
@@ -132,6 +138,7 @@ export default function EditorFindOverlay({
                             onClick={() => focusResult(result)}
                             style={{
                                 display: "flex",
+                                boxSizing: "border-box",
                                 width: "100%",
                                 alignItems: "center",
                                 gap: 10,
@@ -158,7 +165,7 @@ export default function EditorFindOverlay({
                             >
                                 {result.kind}
                             </span>
-                            <span style={{ minWidth: 0 }}>
+                            <span style={{ flex: 1, minWidth: 0 }}>
                                 <div
                                     style={{
                                         overflow: "hidden",

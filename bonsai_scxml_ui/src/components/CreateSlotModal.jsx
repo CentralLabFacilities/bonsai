@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import { FiX } from "react-icons/fi";
+import { CreationDialog } from "./EditorOverlays.jsx";
 
 function CreateSlotForm({
                              onClose,
@@ -10,6 +11,8 @@ function CreateSlotForm({
     const [isInherited, setIsInherited] = useState(false);
     const [selectedSkillNodeId, setSelectedSkillNodeId] = useState("");
     const [linkedSkillSlotId, setLinkedSkillSlotId] = useState("");
+    const skillInputRef = useRef(null);
+    const titleId = useId();
 
     const skillOptions = useMemo(() => {
         const byNode = new Map();
@@ -88,26 +91,22 @@ function CreateSlotForm({
     };
 
     return (
-        <div
+        <CreationDialog
             className="slot-create-modal-overlay"
-            onClick={(event) => {
-                if (event.target === event.currentTarget) {
-                    resetAndClose();
-                }
-            }}
+            labelledBy={titleId}
+            initialFocusRef={skillInputRef}
+            onCancel={resetAndClose}
         >
-            <div
-                className="slot-create-modal"
-                onClick={(event) => event.stopPropagation()}
-            >
+            <div className="slot-create-modal">
                 <div className="slot-create-modal-header">
-                    <h3>Create New Slot</h3>
+                    <h3 id={titleId}>Create New Slot</h3>
                     <button
                         type="button"
                         className="slot-create-modal-close"
+                        aria-label="Cancel slot creation"
                         onClick={resetAndClose}
                     >
-                        <FiX />
+                        <FiX aria-hidden="true" />
                     </button>
                 </div>
 
@@ -115,11 +114,11 @@ function CreateSlotForm({
                     <label className="slot-create-modal-label">
                         Skill
                         <select
+                            ref={skillInputRef}
                             className="skill-select"
                             value={selectedSkillNodeId}
                             onChange={handleSkillChange}
                             disabled={skillOptions.length === 0}
-                            autoFocus
                         >
                             <option value="" disabled>
                                 {skillOptions.length > 0
@@ -205,7 +204,7 @@ function CreateSlotForm({
                     </div>
                 </form>
             </div>
-        </div>
+        </CreationDialog>
     );
 }
 

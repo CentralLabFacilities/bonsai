@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useId, useLayoutEffect, useRef, useState } from "react";
 import { FiFolder } from "react-icons/fi";
 import { isTauri, selectDirectory } from "../tauri-client.js";
+import { CreationDialog } from "./EditorOverlays.jsx";
 
 const normalizeFileName = (value) => {
     const trimmed = String(value || "").trim();
@@ -17,35 +18,31 @@ function CreateSubMachineForm({
     const [directory, setDirectory] = useState(defaultDirectory || "");
     const [fileName, setFileName] = useState(defaultFileName || "SubMachine.xml");
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isBrowsing, setIsBrowsing] = useState(false);
+    const [error, setError] = useState("");
     const nameInputRef = useRef(null);
     const mountedRef = useRef(false);
+    const submittingRef = useRef(false);
+    const browseRequestRef = useRef(null);
+    const labelId = useId();
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         mountedRef.current = true;
-        const timer = window.setTimeout(() => {
-            nameInputRef.current?.focus();
-            nameInputRef.current?.select();
-        }, 0);
         return () => {
             mountedRef.current = false;
-            window.clearTimeout(timer);
+            browseRequestRef.current = null;
         };
     }, []);
 
-    useEffect(() => {
-        const handleKeyDown = (event) => {
-            if (event.key === "Escape" && !isSubmitting) {
-                event.preventDefault();
-                onCancel?.();
-            }
-        };
-        window.addEventListener("keydown", handleKeyDown, true);
-        return () => window.removeEventListener("keydown", handleKeyDown, true);
-    }, [isSubmitting, onCancel]);
+    const cancel = () => {
+        if (submittingRef.current) return;
+        if (browseRequestRef.current) browseRequestRef.current.cancelled = true;
+        onCancel?.();
+    };
 
     const submit = async (event) => {
         event?.preventDefault?.();
-        if (isSubmitting) return;
+        if (submittingRef.current || browseRequestRef.current) return;
         const normalizedName = normalizeFileName(fileName);
         if (!directory.trim()) {
             alert("Please choose a directory for the state-machine file.");
@@ -56,7 +53,9 @@ function CreateSubMachineForm({
             return;
         }
 
+        submittingRef.current = true;
         setIsSubmitting(true);
+        setError("");
         try {
             const accepted = await onConfirm?.({
                 directory: directory.trim(),
@@ -65,34 +64,63 @@ function CreateSubMachineForm({
             if (mountedRef.current && accepted !== false) {
                 onCancel?.();
             }
+        } catch (submitError) {
+            if (mountedRef.current) {
+                const message = String(submitError?.message || submitError || "").trim() || "Unknown error.";
+                setError(`Could not create state machine. ${message} Retry with Create.`);
+            }
         } finally {
+            submittingRef.current = false;
             if (mountedRef.current) setIsSubmitting(false);
         }
     };
 
     const browseDirectory = async () => {
-        if (!isTauri()) return;
-        const selected = await selectDirectory("Choose state-machine directory");
-        if (mountedRef.current && selected) setDirectory(selected);
+        if (!isTauri() || submittingRef.current || browseRequestRef.current) return;
+        const request = { cancelled: false };
+        browseRequestRef.current = request;
+        setIsBrowsing(true);
+        try {
+            const selected = await selectDirectory("Choose state-machine directory");
+            if (!mountedRef.current || browseRequestRef.current !== request || request.cancelled || !selected) return;
+            setDirectory(selected);
+            setError("");
+        } catch (pickError) {
+            if (!mountedRef.current || browseRequestRef.current !== request || request.cancelled) return;
+            const message = String(pickError?.message || pickError || "").trim() || "Unknown error.";
+            setError(`Could not choose directory. ${message} Retry with Choose directory or enter a path.`);
+        } finally {
+            if (browseRequestRef.current === request) {
+                browseRequestRef.current = null;
+                if (mountedRef.current) setIsBrowsing(false);
+            }
+        }
     };
 
     return (
-        <div
+        <CreationDialog
             className="submachine-create-overlay nodrag nopan"
-            onMouseDown={(event) => {
-                if (event.target === event.currentTarget && !isSubmitting) onCancel?.();
-            }}
+            labelledBy={`${labelId}-title`}
+            describedBy={`${labelId}-description`}
+            initialFocusRef={nameInputRef}
+            selectInitialFocus
+            busy={isSubmitting}
+            onCancel={cancel}
         >
             <form className="submachine-create-dialog" onSubmit={submit}>
-                <h3>Create Sub-State-Machine</h3>
-                <p>Choose where the new SCXML file should be created.</p>
+                <h3 id={`${labelId}-title`}>Create Sub-State-Machine</h3>
+                <p id={`${labelId}-description`}>Choose where the new SCXML file should be created.</p>
 
                 <label className="submachine-create-field">
                     <span>Directory</span>
                     <div className="submachine-create-directory-row">
                         <input
                             value={directory}
-                            onChange={(event) => setDirectory(event.target.value)}
+                            onChange={(event) => {
+                                if (browseRequestRef.current) browseRequestRef.current.cancelled = true;
+                                setDirectory(event.target.value);
+                                setError("");
+                            }}
                             placeholder="/path/to/behaviors"
                             spellCheck={false}
                         />
@@ -101,9 +129,11 @@ function CreateSubMachineForm({
                                 type="button"
                                 className="submachine-create-browse"
                                 onClick={browseDirectory}
+                                disabled={isBrowsing || isSubmitting}
+                                aria-label="Choose directory"
                                 title="Choose directory"
                             >
-                                <FiFolder />
+                                <FiFolder aria-hidden="true" />
                             </button>
                         )}
                     </div>
@@ -120,16 +150,18 @@ function CreateSubMachineForm({
                     />
                 </label>
 
+                {error && <div className="submachine-create-error" role="alert">{error}</div>}
+
                 <div className="submachine-create-actions">
-                    <button type="button" onClick={onCancel} disabled={isSubmitting}>
+                    <button type="button" onClick={cancel} disabled={isSubmitting}>
                         Cancel
                     </button>
-                    <button type="submit" className="primary" disabled={isSubmitting}>
+                    <button type="submit" className="primary" disabled={isSubmitting || isBrowsing}>
                         {isSubmitting ? "Creating…" : "Create"}
                     </button>
                 </div>
             </form>
-        </div>
+        </CreationDialog>
     );
 }
 

@@ -105,7 +105,7 @@ export function useEditorLibraryItems({
                 );
             } catch (error) {
                 console.error("Could not open behavior:", error);
-                alert(`Could not open behavior:\n${error.message}`);
+                throw error;
             } finally {
                 endStateMachineLoad();
             }
@@ -155,10 +155,7 @@ export function useEditorLibraryItems({
                     );
                 }
             } catch (error) {
-                console.warn(
-                    `Could not inspect behavior exits for ${behavior?.source || baseName}:`,
-                    error
-                );
+                throw new Error(`Could not inspect ${behavior?.source || baseName}: ${error?.message || error}`, { cause: error });
             }
 
             // A Sub-SM exposes exactly the events forwarded by Nop states
@@ -189,7 +186,10 @@ export function useEditorLibraryItems({
 
     const createNode = useCallback(
         async (selectedSkill, nodeid, position) => {
-            const data = (await fetchSkillData(selectedSkill)) || {};
+            const data = await fetchSkillData(selectedSkill);
+            if (!data) {
+                throw new Error(`Could not load ${selectedSkill}. Check the Bonsai backend and try again.`);
+            }
             const baseSkillLabel = selectedSkill.split(".").pop() || selectedSkill;
             const isFinalSkill =
                 baseSkillLabel.toLowerCase() === "end" ||

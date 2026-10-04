@@ -13,13 +13,8 @@ export function initApiProxy() {
  * Open a file picker dialog and return the selected file path.
  */
 export async function openFile(title = 'Open Workflow') {
-  try {
-    const result = await invoke('open_file', { title });
-    return result || null;
-  } catch (err) {
-    console.error('Failed to open file:', err);
-    return null;
-  }
+  const result = await invoke('open_file', { title });
+  return result || null;
 }
 
 /**
@@ -27,26 +22,14 @@ export async function openFile(title = 'Open Workflow') {
  * Otherwise shows a save-as dialog.
  */
 export async function saveFile(content, path = null, title = 'Save Workflow') {
-  try {
-    const result = await invoke('save_file', { content, path, title });
-    return result;
-  } catch (err) {
-    console.error('Failed to save file:', err);
-    return { success: false, path: '', file_name: '' };
-  }
+  return await invoke('save_file', { content, path, title });
 }
 
 /**
  * Read a file's contents.
  */
 export async function readFile(path) {
-  try {
-    const content = await invoke('read_file', { path });
-    return content;
-  } catch (err) {
-    console.error('Failed to read file:', err);
-    return null;
-  }
+  return await invoke('read_file', { path });
 }
 
 
@@ -55,13 +38,8 @@ export async function readFile(path) {
  * Pick a local directory and return its path.
  */
 export async function selectDirectory(title = 'Select Directory') {
-  try {
-    const result = await invoke('pick_directory', { title });
-    return result || null;
-  } catch (err) {
-    console.error('Failed to select directory:', err);
-    return null;
-  }
+  const result = await invoke('pick_directory', { title });
+  return result || null;
 }
 
 /**

@@ -7,7 +7,98 @@ const CreateSubMachineModal = lazy(() => import("./CreateSubMachineModal.jsx"));
 const EditorShortcutHelp = lazy(() => import("./EditorShortcutHelp.jsx"));
 const HintPage = lazy(() => import("./HintPage.jsx"));
 
-function UnsavedWorkflowDialog({ title, action, busy, error, onResolve }) {
+export function CreationDialog({
+    children,
+    className,
+    labelledBy,
+    describedBy,
+    onCancel,
+    busy = false,
+    initialFocusRef,
+    selectInitialFocus = false,
+}) {
+    const dialogRef = useRef(null);
+
+    useLayoutEffect(() => {
+        const dialog = dialogRef.current;
+        const previouslyFocused = document.activeElement;
+        if (!dialog.open) dialog.showModal();
+
+        const preferredFocus = initialFocusRef?.current;
+        const initialFocus = preferredFocus && !preferredFocus.matches(":disabled")
+            ? preferredFocus
+            : dialog.querySelector("input:not(:disabled):not([type=hidden]), select:not(:disabled), textarea:not(:disabled)")
+                || dialog.querySelector("button:not(:disabled)") || dialog;
+        initialFocus.focus();
+        if (selectInitialFocus) initialFocus.select?.();
+
+        return () => {
+            if (dialog.open) dialog.close();
+            if (previouslyFocused?.isConnected) previouslyFocused.focus();
+        };
+    }, [initialFocusRef, selectInitialFocus]);
+
+    useLayoutEffect(() => {
+        const dialog = dialogRef.current;
+        if (busy) dialog.focus();
+        else if (document.activeElement === dialog) initialFocusRef?.current?.focus();
+    }, [busy, initialFocusRef]);
+
+    const cancel = () => {
+        if (!busy) onCancel?.();
+    };
+
+    return createPortal(
+        <dialog
+            ref={dialogRef}
+            className={`editor-creation-dialog ${className}`}
+            aria-modal="true"
+            aria-labelledby={labelledBy}
+            aria-describedby={describedBy}
+            aria-busy={busy}
+            tabIndex={-1}
+            onCancel={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                cancel();
+            }}
+            onClick={(event) => {
+                event.stopPropagation();
+                if (event.target === event.currentTarget) cancel();
+            }}
+            onKeyDown={(event) => {
+                if (event.defaultPrevented) return;
+                if (event.key === "Escape") {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    cancel();
+                    return;
+                }
+                if (event.key !== "Tab" || event.altKey || event.ctrlKey || event.metaKey) return;
+
+                event.preventDefault();
+                event.stopPropagation();
+                const controls = [...event.currentTarget.querySelectorAll("button, input, select, textarea, a[href], [tabindex]")]
+                    .filter((element) => element.tabIndex >= 0 && !element.matches(":disabled")
+                        && !element.closest("[hidden], [inert]") && element.type !== "hidden");
+                if (controls.length === 0) {
+                    event.currentTarget.focus();
+                    return;
+                }
+                const currentIndex = controls.indexOf(document.activeElement);
+                const nextIndex = currentIndex < 0
+                    ? (event.shiftKey ? controls.length - 1 : 0)
+                    : (currentIndex + (event.shiftKey ? -1 : 1) + controls.length) % controls.length;
+                controls[nextIndex].focus();
+            }}
+        >
+            {children}
+        </dialog>,
+        document.body,
+    );
+}
+
+function UnsavedWorkflowDialog({ title, action, busy, error, status, onResolve }) {
     const dialogRef = useRef(null);
     const cancelButtonRef = useRef(null);
     const labelId = useId();
@@ -75,6 +166,7 @@ function UnsavedWorkflowDialog({ title, action, busy, error, onResolve }) {
                 {" "}Discarding will lose your unsaved changes.
             </p>
             {busy && <p role="status">Saving changes...</p>}
+            {!busy && status && <p role="status">{status}</p>}
             {error && <p className="workflow-unsaved-dialog-error" role="alert">{error}</p>}
             <div className="workflow-unsaved-dialog-actions">
                 <button ref={cancelButtonRef} type="button" disabled={busy} onClick={() => resolveChoice("cancel")}>Cancel</button>
@@ -99,6 +191,8 @@ export default function EditorOverlays({
     documentGuard = null,
 }) {
     const progressPercent = Math.round(Math.max(0, Math.min(1, runtimePreparation?.progress || 0)) * 100);
+    const shortcutHelpId = useId();
+    const shortcutHelpButtonRef = useRef(null);
 
     return (
         <>
@@ -142,7 +236,6 @@ export default function EditorOverlays({
                         onConfirm={subMachine.onConfirm}
                     />
                 )}
-                {shortcuts.isOpen && <EditorShortcutHelp isOpen setIsOpen={shortcuts.setIsOpen} />}
                 {condition.drawer.isOpen && (
                     <ConditionModal
                         isOpen
@@ -163,6 +256,52 @@ export default function EditorOverlays({
                     <CreateSlotModal isOpen onClose={slots.onClose} onCreate={slots.onCreate} skillSlotOptions={slots.options} />
                 )}
             </Suspense>
+
+            <div
+                className="nodrag nopan"
+                onBlurCapture={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget)) shortcuts.setIsOpen?.(false);
+                }}
+                onKeyDown={(event) => {
+                    if (event.key === "Escape" && shortcuts.isOpen) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        shortcutHelpButtonRef.current?.focus();
+                        shortcuts.setIsOpen?.(false);
+                    }
+                }}
+                style={{ position: "fixed", right: 18, bottom: 18, zIndex: 5200 }}
+            >
+                <button
+                    ref={shortcutHelpButtonRef}
+                    type="button"
+                    aria-label="Show keyboard shortcuts"
+                    aria-expanded={Boolean(shortcuts.isOpen)}
+                    aria-controls={shortcutHelpId}
+                    title="Keyboard shortcuts"
+                    onClick={() => shortcuts.setIsOpen?.(!shortcuts.isOpen)}
+                    style={{
+                        width: 34,
+                        height: 34,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        border: "1px solid #475569",
+                        borderRadius: 8,
+                        background: "#111827",
+                        color: "#cbd5e1",
+                        boxShadow: "0 6px 18px rgba(0, 0, 0, 0.28)",
+                        cursor: "help",
+                        fontSize: 18,
+                        lineHeight: 1,
+                    }}
+                >
+                    {"\u2328"}
+                </button>
+                <Suspense fallback={null}>
+                    {shortcuts.isOpen && <EditorShortcutHelp id={shortcutHelpId} />}
+                </Suspense>
+            </div>
 
             {documentGuard && (
                 <UnsavedWorkflowDialog key={`${documentGuard.tabId}:${documentGuard.action}`} {...documentGuard} />

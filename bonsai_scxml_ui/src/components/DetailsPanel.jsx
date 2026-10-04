@@ -14,6 +14,7 @@ import {
     FiX,
 } from "react-icons/fi";
 import StateActionsEditor from "./StateActionsEditor";
+import TypedValueEditor from "./TypedValueEditor";
 import {
     areDetailsPanelPropsEqual,
     createDetailsTargetIndex,
@@ -1210,7 +1211,6 @@ function DetailsPanel({
                           onCheckSlots,
                           availableSlotPaths = [],
                           onUpdateSrc,
-                          onUpdateParameterBlur,
                           globalDataModel,
                           actionValueVariables,
                           onUpdateStateActions,
@@ -1296,8 +1296,65 @@ function DetailsPanel({
             selectedSkillType === "end" ||
             (isNopSkill && hasNopSend));
 
+    const inspectorTabs = [{ id: "allgemein", label: "Overall" }];
+    if (!isEditorClone) {
+        if (hasClones) inspectorTabs.push({ id: "clones", label: "References" });
+        if (!isSubMachine && !hidesParameterAndSlots) {
+            inspectorTabs.push(
+                { id: "parameter", label: "Parameter" },
+                { id: "slots", label: "Slots" },
+            );
+        }
+        if (isNopSkill) inspectorTabs.push({ id: "send", label: "Send" });
+        if (!hidesEntryExit) inspectorTabs.push({ id: "actions", label: "Entry / Exit" });
+    }
+    const visibleActiveTab = inspectorTabs.some((tab) => tab.id === activeTab)
+        ? activeTab
+        : "allgemein";
+
     const [openTargetSelector, setOpenTargetSelector] = useState(null);
     const [targetQueries, setTargetQueries] = useState({});
+    const tabListRef = useRef(null);
+    const focusedTabRef = useRef(null);
+
+    useEffect(() => {
+        const focusedTab = focusedTabRef.current;
+        if (!focusedTab || focusedTab.isConnected) return;
+
+        focusedTabRef.current = null;
+        if (document.activeElement === document.body) {
+            tabListRef.current
+                ?.querySelector('[role="tab"][aria-selected="true"]')
+                ?.focus();
+        }
+    }, [selectedNode, cloneNodes, visibleActiveTab]);
+
+    const handleTabKeyDown = (event, index) => {
+        if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+
+        let nextIndex;
+        switch (event.key) {
+            case "ArrowLeft":
+                nextIndex = (index - 1 + inspectorTabs.length) % inspectorTabs.length;
+                break;
+            case "ArrowRight":
+                nextIndex = (index + 1) % inspectorTabs.length;
+                break;
+            case "Home":
+                nextIndex = 0;
+                break;
+            case "End":
+                nextIndex = inspectorTabs.length - 1;
+                break;
+            default:
+                return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        tabListRef.current.querySelectorAll('[role="tab"]')[nextIndex]?.focus();
+        setActiveTab(inspectorTabs[nextIndex].id);
+    };
 
     const handledParameterFocusRequestRef = useRef(null);
 
@@ -1473,32 +1530,13 @@ function DetailsPanel({
     ]);
 
     useEffect(() => {
-        const hiddenStandardTab =
-            (hidesParameterAndSlots || isEditorClone || isSubMachine) &&
-            (activeTab === "parameter" || activeTab === "slots");
-        const invalidSendTab =
-            activeTab === "send" && (!isNopSkill || isEditorClone);
-        const hiddenActionsTab =
-            activeTab === "actions" && (hidesEntryExit || isEditorClone);
-        const invalidClonesTab = activeTab === "clones" && !hasClones;
-
-        if (
-            hiddenStandardTab ||
-            invalidSendTab ||
-            hiddenActionsTab ||
-            invalidClonesTab
-        ) {
-            setActiveTab("allgemein");
+        if (selectedNode.type !== "slot" && activeTab !== visibleActiveTab) {
+            setActiveTab(visibleActiveTab);
         }
     }, [
         activeTab,
-        hasClones,
-        hidesParameterAndSlots,
-        hidesEntryExit,
-        isNopSkill,
-        isEditorClone,
-        isSubMachine,
-        selectedNode.id,
+        visibleActiveTab,
+        selectedNode.type,
         setActiveTab,
     ]);
 
@@ -1515,6 +1553,40 @@ function DetailsPanel({
             ? getAvailableActionLocations(globalDataModel, selectedNode.data.params, isSubMachine)
             : [],
         [hasStateDetails, globalDataModel, selectedNode.data.params, isSubMachine]
+    );
+
+    const tabBar = (
+        <div
+            ref={tabListRef}
+            className="tabs"
+            role="tablist"
+            aria-label="Node details"
+            onFocus={(event) => {
+                focusedTabRef.current = event.target;
+            }}
+            onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget)) {
+                    focusedTabRef.current = null;
+                }
+            }}
+        >
+            {inspectorTabs.map((tab, index) => (
+                <button
+                    key={tab.id}
+                    type="button"
+                    className={`tab ${visibleActiveTab === tab.id ? "active-tab" : ""}`}
+                    id={`details-tab-${tab.id}`}
+                    role="tab"
+                    aria-selected={visibleActiveTab === tab.id}
+                    aria-controls="details-tab-panel"
+                    tabIndex={visibleActiveTab === tab.id ? 0 : -1}
+                    onClick={() => setActiveTab(tab.id)}
+                    onKeyDown={(event) => handleTabKeyDown(event, index)}
+                >
+                    {tab.label}
+                </button>
+            ))}
+        </div>
     );
 
     if (selectedNode.type === "slot") {
@@ -1549,11 +1621,15 @@ function DetailsPanel({
             <aside className="details-panel">
                 <h3>Details: {selectedNode.data?.label || "State Reference"}</h3>
 
-                <div className="tabs">
-                    <div className="tab active-tab">Overall</div>
-                </div>
+                {tabBar}
 
-                <div className="tab-content">
+                <div
+                    className="tab-content"
+                    id="details-tab-panel"
+                    role="tabpanel"
+                    aria-labelledby="details-tab-allgemein"
+                    tabIndex={0}
+                >
                     <div className="allgemein-container">
                         <div className="description-header">
                             <h3>{isSkillClone ? "Skill Reference" : "State Reference"}</h3>
@@ -1683,74 +1759,16 @@ function DetailsPanel({
         <aside className="details-panel">
             <h3>Details: {selectedNode.data.label}</h3>
 
-            <div className="tabs">
-                <div
-                    className={`tab ${
-                        activeTab === "allgemein" ? "active-tab" : ""
-                    }`}
-                    onClick={() => setActiveTab("allgemein")}
-                >
-                    Overall
-                </div>
+            {tabBar}
 
-                {hasClones && (
-                    <div
-                        className={`tab ${
-                            activeTab === "clones" ? "active-tab" : ""
-                        }`}
-                        onClick={() => setActiveTab("clones")}
-                    >
-                        References
-                    </div>
-                )}
-
-                {!isSubMachine && !hidesParameterAndSlots && (
-                    <>
-                        <div
-                            className={`tab ${
-                                activeTab === "parameter" ? "active-tab" : ""
-                            }`}
-                            onClick={() => setActiveTab("parameter")}
-                        >
-                            Parameter
-                        </div>
-
-                        <div
-                            className={`tab ${
-                                activeTab === "slots" ? "active-tab" : ""
-                            }`}
-                            onClick={() => setActiveTab("slots")}
-                        >
-                            Slots
-                        </div>
-                    </>
-                )}
-
-                {isNopSkill && (
-                    <div
-                        className={`tab ${
-                            activeTab === "send" ? "active-tab" : ""
-                        }`}
-                        onClick={() => setActiveTab("send")}
-                    >
-                        Send
-                    </div>
-                )}
-
-                {!hidesEntryExit && (
-                    <div
-                        className={`tab ${
-                            activeTab === "actions" ? "active-tab" : ""
-                        }`}
-                        onClick={() => setActiveTab("actions")}
-                    >
-                        Entry / Exit
-                    </div>
-                )}
-            </div>
-
-            <div className="tab-content">
-                {activeTab === "allgemein" && (
+            <div
+                className="tab-content"
+                id="details-tab-panel"
+                role="tabpanel"
+                aria-labelledby={`details-tab-${visibleActiveTab}`}
+                tabIndex={0}
+            >
+                {visibleActiveTab === "allgemein" && (
                     <div className="allgemein-container">
                         {selectedNode.data.description && (
                             <div className="node-description">
@@ -2305,7 +2323,7 @@ function DetailsPanel({
                     </div>
                 )}
 
-                {activeTab === "clones" && hasClones && (
+                {visibleActiveTab === "clones" && hasClones && (
                     <div className="allgemein-container">
                         <div className="description-header">
                             <h3>References</h3>
@@ -2337,7 +2355,7 @@ function DetailsPanel({
                     </div>
                 )}
 
-                {activeTab === "parameter" && !isSubMachine && !hidesParameterAndSlots && (
+                {visibleActiveTab === "parameter" && !isSubMachine && !hidesParameterAndSlots && (
                     <div className="slots-container">
                         <h3>Parameters</h3>
 
@@ -2346,7 +2364,7 @@ function DetailsPanel({
                                 (param, index) => (
                                     <div
                                         className="slot-text-field parameter-card"
-                                        key={param.key}
+                                        key={`${selectedNode.id}:${param.key}`}
                                     >
                                         <div className="parameter-card-header">
                                             <div className="parameter-name">
@@ -2389,32 +2407,21 @@ function DetailsPanel({
                                             </div>
                                         )}
 
-                                        <input
+                                        <TypedValueEditor
                                             id={`param-${selectedNode.id}-${index}`}
-                                            className="parameter-value-input"
-                                            type="text"
                                             value={param.expr || ""}
+                                            expectedType={param.type}
+                                            variables={actionValueVariables || globalDataModel || []}
+                                            inputClassName="parameter-value-input"
                                             placeholder={
                                                 param.default != null
                                                     ? String(param.default)
-                                                    : "Enter value"
+                                                    : param.type
+                                                        ? `${param.type} value or @variable`
+                                                        : "Enter value"
                                             }
-                                            onChange={(e) =>
-                                                onUpdateParameter(
-                                                    index,
-                                                    e.target.value
-                                                )
-                                            }
-                                            onKeyDown={(e) => {
-                                                if (e.key === "Enter") {
-                                                    e.preventDefault();
-                                                    e.currentTarget.blur();
-                                                }
-                                            }}
-                                            onBlur={() =>
-                                                onUpdateParameterBlur?.(
-                                                    selectedNode.id
-                                                )
+                                            onCommit={(value) =>
+                                                onUpdateParameter(index, value, true)
                                             }
                                         />
                                     </div>
@@ -2424,7 +2431,7 @@ function DetailsPanel({
                     </div>
                 )}
 
-                {activeTab === "slots" && !isSubMachine && !hidesParameterAndSlots && (
+                {visibleActiveTab === "slots" && !isSubMachine && !hidesParameterAndSlots && (
                     <div className="slots-container">
                         <h3>Slots</h3>
 
@@ -2449,7 +2456,7 @@ function DetailsPanel({
                     </div>
                 )}
 
-                {activeTab === "send" && isNopSkill && (
+                {visibleActiveTab === "send" && isNopSkill && (
                     <NopSendEditor
                         nodeId={selectedNode.id}
                         events={selectedNode.data.behaviorExitEvents || []}
@@ -2459,7 +2466,7 @@ function DetailsPanel({
                     />
                 )}
 
-                {activeTab === "actions" && !hidesEntryExit && (
+                {visibleActiveTab === "actions" && !hidesEntryExit && (
                     <div className="state-actions-container">
                         <StateActionsEditor
                             actionName="OnEntry"

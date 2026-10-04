@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { installApiProxy } from "../src/utils/apiProxy.js";
+import { openFile, saveFile, readFile, selectDirectory } from "../src/tauri-client.js";
 
 function proxyEnvironment(result = { status: 200, body: "{}" }) {
     const calls = [];
@@ -86,4 +87,52 @@ test("IPC failures propagate to callers", async () => {
     const environment = { fetch: () => {}, location: { origin: "http://tauri.localhost" } };
     installApiProxy(environment, async () => { throw new Error("backend unavailable"); });
     await assert.rejects(environment.fetch("/api/skills"), /backend unavailable/);
+});
+
+test("file picker cancellation and successful file IO preserve native result contracts", async (context) => {
+    const original = Object.getOwnPropertyDescriptor(globalThis, "window");
+    const values = new Map([
+        ["open_file", null], ["save_file", { success: false, path: "", file_name: "" }],
+        ["read_file", ""], ["pick_directory", null],
+    ]);
+    Object.defineProperty(globalThis, "window", { configurable: true, value: {
+        __TAURI_INTERNALS__: { invoke: async (command) => values.get(command) },
+    } });
+    context.after(() => {
+        if (original) Object.defineProperty(globalThis, "window", original);
+        else delete globalThis.window;
+    });
+    assert.equal(await openFile(), null);
+    assert.deepEqual(await saveFile("<scxml/>"), { success: false, path: "", file_name: "" });
+    assert.equal(await readFile("/empty.xml"), "");
+    assert.equal(await selectDirectory(), null);
+    values.set("open_file", "/workflow.xml");
+    values.set("save_file", { success: true, path: "/workflow.xml", file_name: "workflow.xml" });
+    values.set("pick_directory", "/behaviors");
+    assert.equal(await openFile(), "/workflow.xml");
+    assert.deepEqual(await saveFile("<scxml/>", "/workflow.xml"), values.get("save_file"));
+    assert.equal(await selectDirectory(), "/behaviors");
+});
+
+test("file and directory IPC failures reject instead of masquerading as cancellation", async (context) => {
+    const original = Object.getOwnPropertyDescriptor(globalThis, "window");
+    const calls = [];
+    const reason = "Permission denied";
+    Object.defineProperty(globalThis, "window", { configurable: true, value: {
+        __TAURI_INTERNALS__: { invoke: async (command, args) => { calls.push({ command, args }); throw reason; } },
+    } });
+    context.after(() => {
+        if (original) Object.defineProperty(globalThis, "window", original);
+        else delete globalThis.window;
+    });
+    for (const request of [() => openFile("Open SCXML"), () => saveFile("<scxml/>", "/workflow.xml", "Workflow"),
+        () => readFile("/workflow.xml"), () => selectDirectory("Behaviors")]) {
+        await assert.rejects(request(), (error) => error === reason);
+    }
+    assert.deepEqual(calls, [
+        { command: "open_file", args: { title: "Open SCXML" } },
+        { command: "save_file", args: { content: "<scxml/>", path: "/workflow.xml", title: "Workflow" } },
+        { command: "read_file", args: { path: "/workflow.xml" } },
+        { command: "pick_directory", args: { title: "Behaviors" } },
+    ]);
 });

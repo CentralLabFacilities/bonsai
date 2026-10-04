@@ -248,6 +248,11 @@ export default function EditorCanvas({
         recordHoverClass(flowElement, "editor-node-focus-mode");
         markFastHoverNode(flowElement, node.id, true);
 
+        const originalNodeId = node.data?.cloneOfNodeId;
+        if (originalNodeId) {
+            markFastHoverNode(flowElement, originalNodeId, true);
+        }
+
         const connectedEdgeIds =
             hoverEdgeIndex.edgeIdsByNodeId.get(node.id) || [];
         connectedEdgeIds.forEach((edgeId) => {
@@ -336,42 +341,57 @@ export default function EditorCanvas({
 
     return (
         <>
-            <ModeSwitcher activeMode={activeMode} setActiveMode={setActiveMode} />
+            <div className="editor-canvas-toolbar">
+                <ModeSwitcher activeMode={activeMode} setActiveMode={setActiveMode} />
 
-            <div className="edge-visibility-toggle-group">
-                <button
-                    type="button"
-                    className={`edge-visibility-toggle ${showTransitionEdges ? "active" : ""}`}
-                    aria-pressed={showTransitionEdges}
-                    title={
-                        showTransitionEdges
-                            ? "Hide transitions except for hovered/selected nodes"
-                            : "Show all transitions"
-                    }
-                    onClick={() => setShowTransitionEdges((value) => !value)}
-                >
-                    {showTransitionEdges ? <FiEye /> : <FiEyeOff />}
-                    <span>Transitions</span>
-                </button>
+                <div className="editor-canvas-toolbar-actions">
+                    <div className="edge-visibility-toggle-group">
+                        <button
+                            type="button"
+                            className={`edge-visibility-toggle ${showTransitionEdges ? "active" : ""}`}
+                            aria-pressed={showTransitionEdges}
+                            title={
+                                showTransitionEdges
+                                    ? "Hide transitions except for hovered/selected nodes"
+                                    : "Show all transitions"
+                            }
+                            onClick={() => setShowTransitionEdges((value) => !value)}
+                        >
+                            {showTransitionEdges ? <FiEye /> : <FiEyeOff />}
+                            <span>Transitions</span>
+                        </button>
 
-                <button
-                    type="button"
-                    className={`edge-visibility-toggle ${showSlotEdges ? "active" : ""}`}
-                    aria-pressed={showSlotEdges}
-                    title={
-                        showSlotEdges
-                            ? "Hide slot edges except for hovered/selected skills or slots"
-                            : "Show all slot edges"
-                    }
-                    onClick={() => setShowSlotEdges((value) => !value)}
-                >
-                    {showSlotEdges ? <FiEye /> : <FiEyeOff />}
-                    <span>Slot edges</span>
-                </button>
+                        <button
+                            type="button"
+                            className={`edge-visibility-toggle ${showSlotEdges ? "active" : ""}`}
+                            aria-pressed={showSlotEdges}
+                            title={
+                                showSlotEdges
+                                    ? "Hide slot edges except for hovered/selected skills or slots"
+                                    : "Show all slot edges"
+                            }
+                            onClick={() => setShowSlotEdges((value) => !value)}
+                        >
+                            {showSlotEdges ? <FiEye /> : <FiEyeOff />}
+                            <span>Slot edges</span>
+                        </button>
+                    </div>
+
+                    {(activeMode === "slots" || activeMode === "overview") && (
+                        <button
+                            type="button"
+                            className="create-slot-button-floating"
+                            onClick={() => setIsCreateSlotModalOpen(true)}
+                        >
+                            <FiPlus /> New Slot
+                        </button>
+                    )}
+                </div>
             </div>
 
             <RuntimeLogPlayer
                 runtimePlayback={runtimePlayback}
+                isDraggingNode={isDraggingNode}
                 onLoadRuntimeLog={onLoadRuntimeLog}
                 onRuntimePlayPause={onRuntimePlayPause}
                 onRuntimeRestart={onRuntimeRestart}
@@ -381,16 +401,6 @@ export default function EditorCanvas({
                 onRuntimeClear={onRuntimeClear}
                 onRuntimeDelayChange={onRuntimeDelayChange}
             />
-
-            {(activeMode === "slots" || activeMode === "overview") && (
-                <button
-                    type="button"
-                    className="create-slot-button-floating"
-                    onClick={() => setIsCreateSlotModalOpen(true)}
-                >
-                    <FiPlus /> New Slot
-                </button>
-            )}
 
             {isDraggingNode && (
                 <div
@@ -485,7 +495,7 @@ export default function EditorCanvas({
                     onMoveEnd={handleViewportMoveEnd}
                 >
                     <Background />
-                    <Controls />
+                    <Controls position={runtimePlayback?.loaded ? "bottom-right" : "bottom-left"} />
                 </ReactFlow>
             </SmartEdgeProvider>
         </>

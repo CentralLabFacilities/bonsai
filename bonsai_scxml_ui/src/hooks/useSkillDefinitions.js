@@ -28,8 +28,12 @@ const normalizeSkillApiParams = (params) => {
 
 export function useSkillDefinitions({ pollIntervalMs = 10000 } = {}) {
     const [skills, setSkills] = useState({ skills: [] });
+    const [skillLibraryState, setSkillLibraryState] = useState({
+        status: "loading", error: null, hasLoadedSkills: false,
+    });
     const [isReloadingSkills, setIsReloadingSkills] = useState(false);
     const [skillLibraryRefreshVersion, setSkillLibraryRefreshVersion] = useState(0);
+    const skillLibraryStateRef = useRef(null);
     const skillLibrarySignatureRef = useRef("");
     const skillDataCacheRef = useRef(new Map());
     const skillLibraryRequestRef = useRef(0);
@@ -46,9 +50,13 @@ export function useSkillDefinitions({ pollIntervalMs = 10000 } = {}) {
 
             const data = await response.json();
             if (requestId !== skillLibraryRequestRef.current) return false;
-            const normalizedSkills = Array.isArray(data?.skills)
-                ? [...data.skills].sort()
-                : [];
+            if (!Array.isArray(data?.skills)) {
+                throw new Error("Invalid skill library response: expected a skills array.");
+            }
+            if (!data.skills.every((skill) => typeof skill === "string" && skill.trim())) {
+                throw new Error("Invalid skill library response: identifiers must be non-empty strings.");
+            }
+            const normalizedSkills = [...data.skills].sort();
             const signature = JSON.stringify(normalizedSkills);
             const changed = signature !== skillLibrarySignatureRef.current;
 
@@ -63,10 +71,30 @@ export function useSkillDefinitions({ pollIntervalMs = 10000 } = {}) {
                 setSkills(data);
                 setSkillLibraryRefreshVersion((version) => version + 1);
             }
+            if (skillLibraryStateRef.current?.status !== "ready") {
+                const nextState = { status: "ready", error: null, hasLoadedSkills: true };
+                skillLibraryStateRef.current = nextState;
+                setSkillLibraryState(nextState);
+            }
 
             return changed;
         } catch (error) {
+            if (requestId !== skillLibraryRequestRef.current) return false;
             console.error("Error loading skills:", error);
+            const message = (typeof error === "string" ? error : error?.message);
+            const conciseMessage = typeof message === "string" && message.trim()
+                ? message.trim().replace(/\s+/g, " ")
+                : "Unable to load skills.";
+            // Polling the same failure must not rerender or reannounce its alert.
+            if (skillLibraryStateRef.current?.error !== conciseMessage) {
+                const nextState = {
+                    status: "error",
+                    error: conciseMessage,
+                    hasLoadedSkills: skillLibraryStateRef.current?.hasLoadedSkills ?? false,
+                };
+                skillLibraryStateRef.current = nextState;
+                setSkillLibraryState(nextState);
+            }
             return false;
         }
     }, []);
@@ -176,6 +204,9 @@ export function useSkillDefinitions({ pollIntervalMs = 10000 } = {}) {
 
     return {
         skills,
+        skillLibraryStatus: skillLibraryState.status,
+        skillLibraryError: skillLibraryState.error,
+        hasLoadedSkills: skillLibraryState.hasLoadedSkills,
         isReloadingSkills,
         skillLibraryRefreshVersion,
         fetchSkills,

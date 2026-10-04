@@ -37,14 +37,15 @@ function CodeEditor({ code, activeMode, setActiveMode, onCodeChange }) {
 
     return (
         <div className="inline-code-view">
-            <ModeSwitcher activeMode={activeMode} setActiveMode={setActiveMode} />
-
-            <div className="code-view-toolbar">
-                <span>Generated SCXML / XML</span>
-                <button type="button" className="modal-copy-button" onClick={handleCopy}>
-                    {copied ? <FiCheck color="#2ecc71" /> : <FiCopy />}
-                    <span>{copied ? "Copy!" : "Copy"}</span>
-                </button>
+            <div className="editor-canvas-toolbar code-view-toolbar">
+                <ModeSwitcher activeMode={activeMode} setActiveMode={setActiveMode} />
+                <div className="code-view-actions">
+                    <span>Generated SCXML / XML</span>
+                    <button type="button" className="modal-copy-button" onClick={handleCopy}>
+                        {copied ? <FiCheck color="#2ecc71" /> : <FiCopy />}
+                        <span>{copied ? "Copy!" : "Copy"}</span>
+                    </button>
+                </div>
             </div>
             <textarea
                 className="code-view-body"

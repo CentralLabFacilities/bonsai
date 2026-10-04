@@ -7,6 +7,7 @@ import {
     FiTag,
     FiChevronRight,
     FiRefreshCw,
+    FiPlus,
 } from "react-icons/fi";
 import { MdAssistantNavigation } from "react-icons/md";
 import { FaHandPaper } from "react-icons/fa";
@@ -178,8 +179,49 @@ function SkillLibrary({
                           onReloadSkills,
                           isReloadingSkills = false,
                           refreshVersion = 0,
+                          onAddSkill,
+                          canAddSkill = true,
+                          skillLibraryStatus = "ready",
+                          skillLibraryError = null,
+                          hasLoadedSkills = false,
+                          skillCount = 0,
                       }) {
     const skillTooltipRef = useRef(null);
+    const pendingAddRef = useRef(false);
+    const mountedRef = useRef(false);
+    const [addingSkill, setAddingSkill] = useState(null);
+    const [addFeedback, setAddFeedback] = useState(null);
+
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => {
+            mountedRef.current = false;
+        };
+    }, []);
+
+    const addSkill = async (skill) => {
+        if (pendingAddRef.current || !canAddSkill || !onAddSkill) return;
+        pendingAddRef.current = true;
+        setAddingSkill(skill);
+        setAddFeedback(null);
+        handleSkillMouseLeave(skill);
+        try {
+            const added = await onAddSkill(skill);
+            if (mountedRef.current) {
+                setAddFeedback(added
+                    ? { message: `Added ${skill.split(".").pop()} to canvas.`, error: false }
+                    : { message: "The workflow changed before the skill could be added. Try again in the canvas view.", error: true });
+            }
+        } catch (error) {
+            console.error(`Could not add ${skill}:`, error);
+            if (mountedRef.current) {
+                setAddFeedback({ message: `Could not add skill: ${error?.message || "Please try again."}`, error: true });
+            }
+        } finally {
+            pendingAddRef.current = false;
+            if (mountedRef.current) setAddingSkill(null);
+        }
+    };
 
     const handleSkillMouseEnter = (event, skill) => {
         const rect = event.currentTarget.getBoundingClientRect();
@@ -229,6 +271,15 @@ function SkillLibrary({
         skillTooltipRef.current?.hide(skill);
     };
 
+    const visibleItemCount = activeFilter !== "Everything"
+        ? filteredSkills?.length || 0
+        : selectedPackage != null
+            ? (packageSkills?.length || 0) + (selectedSubPackage == null ? subPackages?.length || 0 : 0)
+            : searchText
+                ? searchedSkills?.length || 0
+                : (packages?.length || 0) + (directSkills?.length || 0);
+    const hasActiveFilters = Boolean(searchText) || activeFilter !== "Everything" || selectedPackage != null;
+
     const renderSkill = (skill, key = skill) => (
         <li
             key={key}
@@ -264,13 +315,33 @@ function SkillLibrary({
                 handleSkillMouseLeave(skill)
             }
         >
-            {skill.split(".").pop()}
+            <span className="skill-item-name">{skill.split(".").pop()}</span>
+            {onAddSkill && (
+                <button
+                    type="button"
+                    className="skill-add-button"
+                    draggable={false}
+                    aria-label={`Add ${skill} to canvas`}
+                    title={canAddSkill ? `Add ${skill} to canvas` : "Switch to a canvas view to add skills"}
+                    disabled={!canAddSkill || addingSkill !== null}
+                    onClick={() => void addSkill(skill)}
+                    onDragStart={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                    }}
+                    onFocus={(event) => handleSkillMouseEnter(event, skill)}
+                    onBlur={() => handleSkillMouseLeave(skill)}
+                >
+                    <FiPlus aria-hidden="true" />
+                    <span>{addingSkill === skill ? "Adding..." : "Add"}</span>
+                </button>
+            )}
         </li>
     );
 
     return (
         <>
-            <aside className="skill-library">
+            <aside className="skill-library" aria-busy={addingSkill !== null || isReloadingSkills || skillLibraryStatus === "loading"}>
                 <div className="library-mode-tabs">
                     <button
                         type="button"
@@ -352,7 +423,8 @@ function SkillLibrary({
                     <input
                         className="skill-search"
                         type="text"
-                        placeholder="Search skills..."
+                            placeholder="Search skills..."
+                            aria-label="Search skills"
                         value={searchText}
                         onChange={(e) =>
                             setSearchText(e.target.value)
@@ -438,6 +510,53 @@ function SkillLibrary({
                         Slots <FiTag />
                     </button>
                 </div>
+
+                {addFeedback && (
+                    <p className={`skill-add-feedback${addFeedback.error ? " error" : ""}`} role={addFeedback.error ? "alert" : "status"}>
+                        {addFeedback.message}
+                    </p>
+                )}
+
+                {skillLibraryStatus === "loading" && (
+                    <div className="library-state" role="status">Loading skill library...</div>
+                )}
+                {skillLibraryStatus === "error" && (
+                    <div className="library-state library-state-error">
+                        <div role="alert" aria-atomic="true">
+                            <strong>{hasLoadedSkills ? "Skill library refresh failed" : "Skill library unavailable"}</strong>
+                            <p>{skillLibraryError}</p>
+                            <p>Check that the Bonsai backend is reachable, then reload.</p>
+                            {hasLoadedSkills && <p>Showing the last successfully loaded skill list.</p>}
+                        </div>
+                        <button className="library-state-button" type="button" disabled={isReloadingSkills}
+                            onClick={() => void onReloadSkills?.()}>
+                            {isReloadingSkills ? "Retrying..." : "Retry loading skills"}
+                        </button>
+                    </div>
+                )}
+                {skillLibraryStatus === "ready" && visibleItemCount === 0 && (
+                    <div className="library-state" role="status">
+                        {skillCount === 0 ? (
+                            <>
+                                <strong>The skill library is empty</strong>
+                                <p>The backend returned no skills. Reload after skills become available.</p>
+                            </>
+                        ) : (
+                            <>
+                                <strong>No matching skills</strong>
+                                <p>Try a different search, filter, or package.</p>
+                                {hasActiveFilters && (
+                                    <button className="library-state-button" type="button" onClick={() => {
+                                        setSearchText("");
+                                        setActiveFilter("Everything");
+                                        setSelectedPackage(null);
+                                        setSelectedSubPackage(null);
+                                    }}>Clear filters</button>
+                                )}
+                            </>
+                        )}
+                    </div>
+                )}
 
                 <div className="list-container">
                     {activeFilter === "Everything" &&

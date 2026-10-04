@@ -1,8 +1,59 @@
-export default function CanvasContextMenu({ contextMenu, activeMode, hasGraphClipboard, handleSelectAction }) {
-    if (!contextMenu) return null;
+import { useLayoutEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 
-    return (
+export default function CanvasContextMenu({ contextMenu, activeMode, hasGraphClipboard, handleSelectAction }) {
+    const menuRef = useRef(null);
+
+    useLayoutEffect(() => {
+        const menu = menuRef.current;
+        if (!contextMenu || !menu || typeof window === "undefined") return undefined;
+
+        const viewport = window.visualViewport;
+        const placeMenu = () => {
+            if (!menu.isConnected) return;
+            const width = viewport?.width || window.innerWidth;
+            const height = viewport?.height || window.innerHeight;
+            if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return;
+
+            const padding = 8;
+            const viewportLeft = viewport?.offsetLeft || 0;
+            const viewportTop = viewport?.offsetTop || 0;
+            const availableWidth = Math.max(0, width - padding * 2);
+            menu.style.minWidth = `${Math.min(190, availableWidth)}px`;
+            menu.style.maxWidth = `${Math.min(340, availableWidth)}px`;
+            menu.style.maxHeight = `${Math.max(0, height - padding * 2)}px`;
+
+            const bounds = menu.getBoundingClientRect();
+            const menuWidth = Math.max(menu.offsetWidth, bounds.width);
+            const menuHeight = Math.max(menu.offsetHeight, bounds.height);
+            const minLeft = viewportLeft + padding;
+            const minTop = viewportTop + padding;
+            const maxLeft = Math.max(minLeft, viewportLeft + width - padding - menuWidth);
+            const maxTop = Math.max(minTop, viewportTop + height - padding - menuHeight);
+            const clickX = Number.isFinite(contextMenu.x) ? contextMenu.x : minLeft;
+            const clickY = Number.isFinite(contextMenu.y) ? contextMenu.y : minTop;
+
+            // Clamp only the visual menu; insertion actions retain the click coordinates.
+            menu.style.left = `${Math.max(minLeft, Math.min(clickX, maxLeft))}px`;
+            menu.style.top = `${Math.max(minTop, Math.min(clickY, maxTop))}px`;
+        };
+
+        placeMenu();
+        window.addEventListener("resize", placeMenu);
+        viewport?.addEventListener("resize", placeMenu);
+        viewport?.addEventListener("scroll", placeMenu);
+        return () => {
+            window.removeEventListener("resize", placeMenu);
+            viewport?.removeEventListener("resize", placeMenu);
+            viewport?.removeEventListener("scroll", placeMenu);
+        };
+    }, [contextMenu, activeMode, hasGraphClipboard]);
+
+    if (!contextMenu || typeof document === "undefined") return null;
+
+    return createPortal(
         <div
+            ref={menuRef}
             className="context-menu"
             style={{ top: contextMenu.y, left: contextMenu.x }}
             onClick={(event) => event.stopPropagation()}
@@ -240,6 +291,7 @@ export default function CanvasContextMenu({ contextMenu, activeMode, hasGraphCli
                     Remove control point
                 </button>
             )}
-        </div>
+        </div>,
+        document.body
     );
 }

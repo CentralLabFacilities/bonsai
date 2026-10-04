@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
     FiChevronDown,
     FiChevronRight,
@@ -21,6 +21,9 @@ const normalizeKey = (value) =>
         .trim()
         .toUpperCase()
         .replace(/[^A-Z0-9_]/g, "_");
+
+const errorMessage = (error) =>
+    String(error?.message || error || "").trim() || "Unknown error.";
 
 const filterEntries = (entries, searchText) => {
     const query = searchText.trim().toLowerCase();
@@ -157,20 +160,39 @@ function BehaviorRoot({
         source,
         revision: 0,
         entries: [],
+        hasLoaded: false,
         loading: Boolean(source.path),
-        error: source.path ? "" : "No directory selected.",
+        error: "",
     }));
+    const [picker, setPicker] = useState({ pending: false, error: "" });
+    const [openError, setOpenError] = useState("");
+    const pickerRequestRef = useRef(null);
+    const openRequestRef = useRef(null);
+    const changeRef = useRef({ directory, onChange });
     const [expanded, setExpanded] = useState(new Set());
     const [rootExpanded, setRootExpanded] = useState(true);
+
+    useLayoutEffect(() => {
+        // A picker completion must not restore roots removed while it was open.
+        changeRef.current = { directory, onChange };
+    });
+
+    useLayoutEffect(() => () => {
+        pickerRequestRef.current = null;
+        openRequestRef.current = null;
+    }, [source]);
 
     if (listing.source !== source) {
         setListing({
             source,
             revision: 0,
             entries: [],
+            hasLoaded: false,
             loading: Boolean(source.path),
-            error: source.path ? "" : "No directory selected.",
+            error: "",
         });
+        setPicker({ pending: false, error: "" });
+        setOpenError("");
     }
 
     const loadEntries = () => {
@@ -178,11 +200,10 @@ function BehaviorRoot({
             ...current,
             revision: current.revision + 1,
             loading: Boolean(source.path),
-            error: source.path ? "" : "No directory selected.",
         }));
     };
 
-    const { entries, loading, error, revision } = listing;
+    const { entries, hasLoaded, loading, error, revision } = listing;
 
     useEffect(() => {
         if (!source.path) return undefined;
@@ -192,17 +213,26 @@ function BehaviorRoot({
             let nextEntries = [];
             let nextError = "";
             try {
-                nextEntries = await listBehaviorDirectory(source.key, source.path) || [];
+                nextEntries = await listBehaviorDirectory(source.key, source.path);
+                if (!Array.isArray(nextEntries)) {
+                    throw new Error("Invalid directory listing.");
+                }
             } catch (loadError) {
                 if (cancelled) return;
                 console.error(`Could not load ${source.key}:`, loadError);
-                nextError = loadError?.message || String(loadError) || "Could not read directory.";
+                nextError = errorMessage(loadError);
             }
 
             if (!cancelled) {
                 setListing((current) => {
                     if (current.source !== source || current.revision !== revision) return current;
-                    return { ...current, entries: nextEntries, error: nextError, loading: false };
+                    return {
+                        ...current,
+                        entries: nextError ? current.entries : nextEntries,
+                        hasLoaded: current.hasLoaded || !nextError,
+                        error: nextError,
+                        loading: false,
+                    };
                 });
             }
         };
@@ -219,16 +249,47 @@ function BehaviorRoot({
     );
 
     const choosePath = async () => {
-        const selected = await selectDirectory(
-            `Select ${directory.key} Behavior Directory`
-        );
+        if (pickerRequestRef.current) return;
+        const request = {};
+        pickerRequestRef.current = request;
+        setPicker((current) => ({ ...current, pending: true }));
+        try {
+            const selected = await selectDirectory(
+                `Select ${directory.key} Behavior Directory`
+            );
+            if (pickerRequestRef.current !== request || !selected) return;
+            setPicker({ pending: true, error: "" });
+            changeRef.current.onChange({
+                ...changeRef.current.directory,
+                path: selected,
+            });
+        } catch (pickError) {
+            if (pickerRequestRef.current !== request) return;
+            setPicker({
+                pending: true,
+                error: `Could not choose directory. ${errorMessage(pickError)} Retry with Choose directory.`,
+            });
+        } finally {
+            if (pickerRequestRef.current === request) {
+                pickerRequestRef.current = null;
+                setPicker((current) => ({ ...current, pending: false }));
+            }
+        }
+    };
 
-        if (!selected) return;
-
-        onChange({
-            ...directory,
-            path: selected,
-        });
+    const openBehavior = async (entry) => {
+        const request = {};
+        openRequestRef.current = request;
+        try {
+            await onOpenBehavior?.(entry);
+            if (openRequestRef.current === request) setOpenError("");
+        } catch (behaviorError) {
+            if (openRequestRef.current === request) {
+                setOpenError(`Could not open ${entry.name}. ${errorMessage(behaviorError)} Double-click this behavior to retry.`);
+            }
+        } finally {
+            if (openRequestRef.current === request) openRequestRef.current = null;
+        }
     };
 
     return (
@@ -256,6 +317,7 @@ function BehaviorRoot({
                         type="button"
                         className="behavior-icon-button"
                         onClick={choosePath}
+                        disabled={picker.pending}
                         title="Choose directory"
                     >
                         <FiFolderPlus />
@@ -271,9 +333,11 @@ function BehaviorRoot({
                     <button
                         type="button"
                         className="behavior-icon-button behavior-delete-button"
-                        onClick={() =>
-                            onRemove(directory.key)
-                        }
+                        onClick={() => {
+                            pickerRequestRef.current = null;
+                            openRequestRef.current = null;
+                            onRemove(directory.key);
+                        }}
                         title="Remove directory"
                     >
                         <FiTrash2 />
@@ -285,30 +349,60 @@ function BehaviorRoot({
                 {directory.path}
             </div>
 
+            {picker.error && (
+                <div className="behavior-library-error" role="alert">
+                    {picker.error}
+                </div>
+            )}
+
+            {openError && (
+                <div className="behavior-library-error" role="alert">
+                    {openError}
+                </div>
+            )}
+
             {rootExpanded && (
                 <div className="behavior-root-content">
-                    {loading && (
+                    {!source.path && (
                         <div className="behavior-library-status">
-                            Loading…
+                            No directory selected. Use Choose directory.
                         </div>
                     )}
 
-                    {!loading && error && (
-                        <div className="behavior-library-error">
-                            {error}
+                    {loading && (
+                        <div className="behavior-library-status" role="status">
+                            {hasLoaded ? "Refreshing..." : "Loading..."}
                         </div>
                     )}
 
-                    {!loading &&
+                    {error && (
+                        <div className="behavior-library-error" role="alert">
+                            Could not read directory. {error} Retry with Refresh or Choose directory.
+                        </div>
+                    )}
+
+                    {hasLoaded && (loading || error) && (
+                        <div className="behavior-library-status behavior-library-cached" role="status">
+                            Showing cached directory listing.
+                        </div>
+                    )}
+
+                    {hasLoaded &&
+                        !loading &&
                         !error &&
-                        visibleEntries.length === 0 && (
+                        entries.length === 0 && (
                             <div className="behavior-library-status">
                                 No SCXML files found.
                             </div>
                         )}
 
-                    {!loading &&
-                        !error &&
+                    {hasLoaded && entries.length > 0 && visibleEntries.length === 0 && (
+                        <div className="behavior-library-status">
+                            No behaviors match your search.
+                        </div>
+                    )}
+
+                    {hasLoaded &&
                         visibleEntries.map((entry) => (
                             <BehaviorTreeEntry
                                 key={entry.path}
@@ -316,7 +410,7 @@ function BehaviorRoot({
                                 depth={0}
                                 expanded={expanded}
                                 setExpanded={setExpanded}
-                                onOpenBehavior={onOpenBehavior}
+                                onOpenBehavior={openBehavior}
                             />
                         ))}
                 </div>
@@ -337,6 +431,17 @@ function BehaviorLibrary({
     const [newKey, setNewKey] = useState("");
     const [newPath, setNewPath] = useState("");
     const [addError, setAddError] = useState("");
+    const [newPathPicker, setNewPathPicker] = useState({ pending: false, error: "" });
+    const newPathRequestRef = useRef(null);
+
+    useLayoutEffect(() => () => {
+        newPathRequestRef.current = null;
+    }, []);
+
+    const resetNewPathPicker = () => {
+        newPathRequestRef.current = null;
+        setNewPathPicker({ pending: false, error: "" });
+    };
 
     const updateDirectory = (updated) => {
         onDirectoriesChange(
@@ -357,12 +462,26 @@ function BehaviorLibrary({
     };
 
     const browseForNewPath = async () => {
-        const selected = await selectDirectory(
-            "Select Behavior Directory"
-        );
-
-        if (selected) {
+        if (newPathRequestRef.current) return;
+        const request = {};
+        newPathRequestRef.current = request;
+        setNewPathPicker((current) => ({ ...current, pending: true }));
+        try {
+            const selected = await selectDirectory("Select Behavior Directory");
+            if (newPathRequestRef.current !== request || !selected) return;
             setNewPath(selected);
+            setNewPathPicker({ pending: true, error: "" });
+        } catch (pickError) {
+            if (newPathRequestRef.current !== request) return;
+            setNewPathPicker({
+                pending: true,
+                error: `Could not choose directory. ${errorMessage(pickError)} Retry with Browse or enter a path.`,
+            });
+        } finally {
+            if (newPathRequestRef.current === request) {
+                newPathRequestRef.current = null;
+                setNewPathPicker((current) => ({ ...current, pending: false }));
+            }
         }
     };
 
@@ -401,6 +520,7 @@ function BehaviorLibrary({
         setNewKey("");
         setNewPath("");
         setAddError("");
+        resetNewPathPicker();
         setAdding(false);
     };
 
@@ -441,6 +561,7 @@ function BehaviorLibrary({
                     type="button"
                     className="behavior-add-root-button"
                     onClick={() => {
+                        resetNewPathPicker();
                         setAdding((value) => !value);
                         setAddError("");
                     }}
@@ -469,11 +590,12 @@ function BehaviorLibrary({
                     <input
                         className="behavior-key-input"
                         value={newKey}
-                        onChange={(event) =>
+                        onChange={(event) => {
+                            resetNewPathPicker();
                             setNewKey(
                                 normalizeKey(event.target.value)
-                            )
-                        }
+                            );
+                        }}
                         placeholder="KEY"
                     />
 
@@ -481,22 +603,26 @@ function BehaviorLibrary({
                         <input
                             className="behavior-path-input"
                             value={newPath}
-                            onChange={(event) =>
-                                setNewPath(event.target.value)
-                            }
+                            onChange={(event) => {
+                                resetNewPathPicker();
+                                setNewPath(event.target.value);
+                            }}
                             placeholder="/path/to/behaviors"
                         />
                         <button
                             type="button"
                             className="behavior-browse-button"
                             onClick={browseForNewPath}
+                            disabled={newPathPicker.pending}
                         >
                             Browse
                         </button>
                     </div>
 
-                    {addError && (
-                        <div className="behavior-add-error">
+                    {(newPathPicker.error || addError) && (
+                        <div className="behavior-add-error" role="alert">
+                            {newPathPicker.error}
+                            {newPathPicker.error && addError && " "}
                             {addError}
                         </div>
                     )}
@@ -513,6 +639,7 @@ function BehaviorLibrary({
                             type="button"
                             className="behavior-add-cancel"
                             onClick={() => {
+                                resetNewPathPicker();
                                 setAdding(false);
                                 setAddError("");
                             }}

@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import {
     COMPOUND_BOTTOM_PADDING,
     COMPOUND_HEADER_HEIGHT,
@@ -16,10 +16,13 @@ import {
     resolveNodeCollisionsAndRefit,
 } from "../utils/editorGeometry";
 import { getOverviewLayoutNodeSize } from "../utils/layoutUtils";
+import { isEditorModalOpen } from "./useGlobalEditorShortcuts.js";
 
 export function useEditorLibraryDrop({
     activeMode,
     nodes,
+    flowContainerRef,
+    getTabSnapshot,
     screenToFlowPosition,
     setParallelDropTargetId,
     setCompoundDropTargetId,
@@ -32,6 +35,13 @@ export function useEditorLibraryDrop({
     syncInsertedEditorStatesAfterCommit,
     syncInsertedParallelLaneStateAfterCommit,
 }) {
+    const activeModeRef = useRef(activeMode);
+    const [libraryDropError, setLibraryDropError] = useState(null);
+    const dismissLibraryDropError = useCallback(() => setLibraryDropError(null), []);
+    useLayoutEffect(() => {
+        activeModeRef.current = activeMode;
+    }, [activeMode]);
+
     const handleLibraryDragOver = useCallback(
         (event) => {
             event.preventDefault();
@@ -87,61 +97,52 @@ export function useEditorLibraryDrop({
         [setCompoundDropTargetId, setParallelDropTargetId]
     );
 
-    const handleLibraryDrop = useCallback(
-        async (event) => {
-            event.preventDefault();
-
+    const insertLibraryItem = useCallback(
+        async (mousePosition, skill, behaviorPayload = "", atRoot = false) => {
             setParallelDropTargetId(null);
             setCompoundDropTargetId(null);
 
-            if (activeMode === "code") return;
-
-            const mousePosition = screenToFlowPosition({
-                x: event.clientX,
-                y: event.clientY,
-            });
-
-            const targetContainer = findDropContainerAtPoint(
-                mousePosition,
-                nodes
-            );
-            const targetCompound =
-                targetContainer?.type === "compound" ? targetContainer : null;
-            const targetLane =
-                targetContainer?.type === "parallelLane"
-                    ? targetContainer
-                    : null;
-            const targetLaneCompound = targetLane
-                ? nodes.find(
-                    (candidate) =>
-                        candidate.parentId === targetLane.id &&
-                        isAutoParallelLaneCompound(candidate)
-                ) || null
-                : null;
-            const insertionCompound = targetCompound || targetLaneCompound;
-
-            const behaviorPayload = event.dataTransfer.getData("behavior");
-            const skill = event.dataTransfer.getData("skill");
+            if (activeModeRef.current === "code" || isEditorModalOpen()) return false;
+            const origin = getTabSnapshot();
+            if (!origin) return false;
             const isBehaviorDrop = Boolean(behaviorPayload);
 
             let newNode;
 
             if (behaviorPayload) {
+                let behavior;
                 try {
-                    const behavior = JSON.parse(behaviorPayload);
-                    newNode = await createBehaviorNode(behavior, { x: 0, y: 0 });
-                } catch (error) {
-                    console.error("Invalid behavior drag payload:", error);
-                    return;
+                    behavior = JSON.parse(behaviorPayload);
+                } catch {
+                    throw new Error("The dragged behavior data is invalid. Drag the behavior again from the library.");
                 }
+                if (!behavior?.source) throw new Error("The dragged behavior has no source file.");
+                newNode = await createBehaviorNode(behavior, { x: 0, y: 0 });
             } else {
-                if (!skill) return;
+                if (!skill) return false;
                 newNode = await createNode(
-                    skill.split("skills.")[1],
+                    skill.includes("skills.") ? skill.split("skills.")[1] : skill,
                     getNodeId(),
                     { x: 0, y: 0 }
                 );
             }
+
+            // Skill inspection is asynchronous. Never append its result to a
+            // different or replaced workflow, and rebase onto live node edits.
+            const current = getTabSnapshot();
+            if (
+                !newNode || !current || current.id !== origin.id ||
+                current.documentGeneration !== origin.documentGeneration ||
+                activeModeRef.current === "code" || isEditorModalOpen()
+            ) return false;
+            const nodes = current.nodes;
+            const targetContainer = atRoot ? null : findDropContainerAtPoint(mousePosition, nodes);
+            const targetCompound = targetContainer?.type === "compound" ? targetContainer : null;
+            const targetLane = targetContainer?.type === "parallelLane" ? targetContainer : null;
+            const targetLaneCompound = targetLane
+                ? nodes.find((candidate) => candidate.parentId === targetLane.id && isAutoParallelLaneCompound(candidate)) || null
+                : null;
+            const insertionCompound = targetCompound || targetLaneCompound;
 
             const refreshBehaviorSlots = () => {
                 if (!isBehaviorDrop) return;
@@ -214,7 +215,7 @@ export function useEditorLibraryDrop({
                 setSelectedNodeId(newNode.id);
                 refreshBehaviorSlots();
                 void syncInsertedEditorStatesAfterCommit?.(newNode.id);
-                return;
+                return true;
             }
 
             if (targetLane) {
@@ -371,7 +372,7 @@ export function useEditorLibraryDrop({
                     newNode.id,
                     targetLane.id
                 );
-                return;
+                return true;
             }
 
             newNode.position = {
@@ -388,15 +389,14 @@ export function useEditorLibraryDrop({
             setSelectedNodeId(newNode.id);
             refreshBehaviorSlots();
             void syncInsertedEditorStatesAfterCommit?.(newNode.id);
+            return true;
         },
         [
-            activeMode,
             checkSlotConnection,
             createBehaviorNode,
             createNode,
             getNodes,
-            nodes,
-            screenToFlowPosition,
+            getTabSnapshot,
             setCompoundDropTargetId,
             setNodes,
             setParallelDropTargetId,
@@ -406,9 +406,45 @@ export function useEditorLibraryDrop({
         ]
     );
 
+    const handleLibraryDrop = useCallback(async (event) => {
+        event.preventDefault();
+        const origin = getTabSnapshot();
+        setLibraryDropError(null);
+        try {
+            return await insertLibraryItem(
+                screenToFlowPosition({ x: event.clientX, y: event.clientY }),
+                event.dataTransfer.getData("skill"),
+                event.dataTransfer.getData("behavior"),
+            );
+        } catch (error) {
+            console.error("Could not insert library item:", error);
+            setLibraryDropError({
+                action: "insert",
+                title: `Could not add an item to ${origin?.title || "workflow"}`,
+                message: String(error?.message || error || "The library item could not be loaded."),
+                guidance: "Check the backend connection or behavior file, then add or drag the item again.",
+            });
+            return false;
+        }
+    }, [getTabSnapshot, insertLibraryItem, screenToFlowPosition]);
+
+    const handleAddLibrarySkill = useCallback((skill) => {
+        const rect = flowContainerRef.current?.getBoundingClientRect();
+        if (!rect || rect.width <= 0 || rect.height <= 0) return Promise.resolve(false);
+        return insertLibraryItem(
+            screenToFlowPosition({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }),
+            skill,
+            "",
+            true,
+        );
+    }, [flowContainerRef, insertLibraryItem, screenToFlowPosition]);
+
     return {
         handleLibraryDragOver,
         handleLibraryDragLeave,
         handleLibraryDrop,
+        handleAddLibrarySkill,
+        libraryDropError,
+        dismissLibraryDropError,
     };
 }

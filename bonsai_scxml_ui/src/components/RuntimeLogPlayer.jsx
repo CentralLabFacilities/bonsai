@@ -11,6 +11,7 @@ import {
 
 export default function RuntimeLogPlayer({
     runtimePlayback,
+    isDraggingNode = false,
     onLoadRuntimeLog,
     onRuntimePlayPause,
     onRuntimeRestart,
@@ -47,6 +48,7 @@ export default function RuntimeLogPlayer({
                 <button
                     type="button"
                     className="runtime-log-load-button"
+                    hidden={isDraggingNode}
                     onClick={() => runtimeLogInputRef.current?.click()}
                     title="Load a SkillStateMachine runtime log"
                 >
@@ -54,7 +56,7 @@ export default function RuntimeLogPlayer({
                     <span>Load log</span>
                 </button>
             ) : (
-                <div className="runtime-log-player" role="region" aria-label="Runtime log playback">
+                <div className="runtime-log-player" role="region" aria-label="Runtime log playback" hidden={isDraggingNode}>
                     <div className="runtime-log-player-header">
                         <button
                             type="button"

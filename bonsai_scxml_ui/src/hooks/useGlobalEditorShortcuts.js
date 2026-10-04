@@ -4,6 +4,12 @@ export function isDocumentGuardOpen() {
     return typeof document !== "undefined" && Boolean(document.querySelector("[data-workflow-document-guard]"));
 }
 
+export function isEditorModalOpen() {
+    return typeof document !== "undefined" && Boolean(document.querySelector(
+        '[data-workflow-document-guard], dialog[open], [aria-modal="true"]',
+    ));
+}
+
 const isTypingTarget = (target) => {
     if (!(target instanceof Element)) return false;
 
@@ -78,7 +84,7 @@ export function useGlobalEditorShortcuts({
 
     useEffect(() => {
         const handleGlobalShortcut = (event) => {
-            if (isDocumentGuardOpen()) return;
+            if (event.defaultPrevented || isEditorModalOpen()) return;
             const live = liveStateRef.current;
             if (!live) return;
 
