@@ -1,4 +1,6 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+
+use crate::atomic_file::write_atomic;
 
 use tauri_plugin_dialog::DialogExt;
 
@@ -36,11 +38,7 @@ pub(crate) async fn pick_directory(
 ) -> Result<Option<String>, String> {
     let title = title.unwrap_or_else(|| "Select Directory".to_string());
 
-    let folder = app
-        .dialog()
-        .file()
-        .set_title(&title)
-        .blocking_pick_folder();
+    let folder = app.dialog().file().set_title(&title).blocking_pick_folder();
 
     Ok(folder.and_then(|folder| {
         folder
@@ -59,7 +57,8 @@ pub(crate) async fn save_file(
     let title = title.unwrap_or_else(|| "Save Workflow".to_string());
 
     if let Some(save_path) = path {
-        std::fs::write(&save_path, content.as_bytes()).map_err(|error| error.to_string())?;
+        write_atomic(Path::new(&save_path), content.as_bytes())
+            .map_err(|error| error.to_string())?;
 
         return Ok(save_result(true, save_path));
     }
@@ -72,13 +71,13 @@ pub(crate) async fn save_file(
         .set_file_name("workflow.xml")
         .blocking_save_file();
 
-    match file.and_then(|file| {
-        file.as_path()
-            .map(|path| path.to_string_lossy().to_string())
-    }) {
-        Some(save_path) => {
-            std::fs::write(&save_path, content.as_bytes()).map_err(|error| error.to_string())?;
-            Ok(save_result(true, save_path))
+    match file {
+        Some(file) => {
+            let save_path = file.as_path().ok_or_else(|| {
+                "Selected save location does not have a local filesystem path.".to_string()
+            })?;
+            write_atomic(&save_path, content.as_bytes()).map_err(|error| error.to_string())?;
+            Ok(save_result(true, save_path.to_string_lossy().to_string()))
         }
         None => Ok(SaveResult {
             success: false,

@@ -94,6 +94,17 @@ export function useWorkflowTabs({
     const [storedTabs, setTabsState] = useState(() => [createInitialTab()]);
     const tabsRef = useRef(storedTabs);
     const documentSequenceRef = useRef(0);
+    const activeDocumentIdentityRef = useRef({
+        id: "tab-1",
+        documentGeneration: 0,
+        activationGeneration: 0,
+    });
+    // This token stays stable across edits, but not across leaving/reloading a
+    // document. Async guards can read it without serializing a tab snapshot.
+    const getActiveDocumentIdentity = useCallback(
+        () => activeDocumentIdentityRef.current,
+        [],
+    );
 
     const setTabs = useCallback((nextTabsOrUpdater) => {
         // Tab operations can be batched before a commit. Advance their event
@@ -267,6 +278,12 @@ export function useWorkflowTabs({
     const loadTabState = useCallback(
         (tab, { fit = false, fitOptions = null } = {}) => {
             if (!tab) return;
+            activeDocumentIdentityRef.current = {
+                id: tab.id,
+                documentGeneration: tab.documentGeneration ?? 0,
+                activationGeneration:
+                    activeDocumentIdentityRef.current.activationGeneration + 1,
+            };
             const nextDocument = {
                 nodes: tab.nodes || [],
                 edges: tab.edges || [],
@@ -571,6 +588,7 @@ export function useWorkflowTabs({
         tabs,
         activeTabId,
         activeTab,
+        getActiveDocumentIdentity,
         getTabSnapshot,
         getTabsSnapshot,
         updateTab,

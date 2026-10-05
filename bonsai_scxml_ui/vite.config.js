@@ -29,6 +29,9 @@ export default defineConfig({
   server: {
     port: 1420,
     strictPort: true,
+    watch: {
+      ignored: ['**/src-tauri/target/**', '**/target/**', '**/.pixi/**', '**/.container-home/**', '**/test-results/**', '**/playwright-report/**'],
+    },
     proxy: {
       "/api": {
         target: "http://localhost:8080",

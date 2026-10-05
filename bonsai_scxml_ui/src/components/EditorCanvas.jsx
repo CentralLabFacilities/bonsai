@@ -92,6 +92,7 @@ export default function EditorCanvas({
     edgeFocusMode,
     nodeFocusMode,
     contextMenu,
+    setContextMenu,
     handleSelectAction,
     hasGraphClipboard,
     setIsCreateSlotModalOpen,
@@ -443,6 +444,7 @@ export default function EditorCanvas({
                 activeMode={activeMode}
                 hasGraphClipboard={hasGraphClipboard}
                 handleSelectAction={handleSelectAction}
+                onClose={() => setContextMenu(null)}
             />
 
 

@@ -11,7 +11,10 @@
     "build:binary": "mkdir -p target/dist && bun run build --outDir target/dist && bun run src/embed-assets.js target/dist target/embedded-assets.js && bun build src/server.js --compile --target=bun-linux-x64 --outfile target/bonsai-ui && rm -rf target/dist",
     "lint": "eslint .",
     "test": "node --test tests/*.test.js",
-    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml --lib --no-default-features --locked",
+    "test:rust": "node scripts/verify.mjs rust",
+    "test:browser": "node scripts/verify.mjs browser",
+    "test:browser:update": "node scripts/verify.mjs browser --update-snapshots",
+    "verify": "node scripts/verify.mjs",
     "preview": "vite preview"
   },
   "engines": {
@@ -28,6 +31,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.63.0",
     "@tauri-apps/cli": "^2.11.4",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",

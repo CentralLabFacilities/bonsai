@@ -1,8 +1,19 @@
 import { useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 
-export default function CanvasContextMenu({ contextMenu, activeMode, hasGraphClipboard, handleSelectAction }) {
+export default function CanvasContextMenu({ contextMenu, activeMode, hasGraphClipboard, handleSelectAction, onClose }) {
     const menuRef = useRef(null);
+    const isOpen = Boolean(contextMenu);
+    useLayoutEffect(() => {
+        const menu = menuRef.current;
+        if (!isOpen || !menu) return;
+        const previous = document.activeElement;
+        menu.querySelector("button:not(:disabled)")?.focus();
+        return () => {
+            if ((document.activeElement === document.body || menu.contains(document.activeElement)) &&
+                previous?.isConnected && !previous.closest('[inert], [hidden], [aria-hidden="true"]')) previous.focus();
+        };
+    }, [isOpen]);
 
     useLayoutEffect(() => {
         const menu = menuRef.current;
@@ -55,8 +66,31 @@ export default function CanvasContextMenu({ contextMenu, activeMode, hasGraphCli
         <div
             ref={menuRef}
             className="context-menu"
+            role="group"
+            aria-label={contextMenu.title || "Editor actions"}
             style={{ top: contextMenu.y, left: contextMenu.x }}
             onClick={(event) => event.stopPropagation()}
+            onKeyDown={(event) => {
+                if (event.ctrlKey || event.metaKey || event.altKey) return;
+                if (event.key === "Escape") {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onClose?.();
+                    return;
+                }
+                const buttons = [...event.currentTarget.querySelectorAll("button:not(:disabled)")];
+                const index = buttons.indexOf(event.target);
+                if (index < 0) return;
+                let next;
+                if (event.key === "Home") next = 0;
+                else if (event.key === "End") next = buttons.length - 1;
+                else if (event.key === "ArrowUp") next = (index - 1 + buttons.length) % buttons.length;
+                else if (event.key === "ArrowDown") next = (index + 1) % buttons.length;
+                else return;
+                event.preventDefault();
+                event.stopPropagation();
+                buttons[next].focus();
+            }}
         >
             <div className="context-menu-header">
                 {contextMenu.title || "Editor"}

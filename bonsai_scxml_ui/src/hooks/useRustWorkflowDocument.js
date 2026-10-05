@@ -154,6 +154,7 @@ export function useRustWorkflowDocument({
                     currentDepth: queueDepthRef.current,
                 });
                 try {
+                    if (generation !== documentGenerationRef.current) return null;
                     return await operation();
                 } finally {
                     queueDepthRef.current = Math.max(0, queueDepthRef.current - 1);
@@ -341,11 +342,13 @@ export function useRustWorkflowDocument({
 
     const applyCommandNow = useCallback(
         async (command) => {
-            if (!isTauri() || !command) return null;
+            const generation = activeQueueGenerationRef.current;
+            if (!isTauri() || !command || generation !== documentGenerationRef.current) return null;
 
             if (!readyRef.current) {
                 await syncEditorStateNow(editorStateRef.current, null);
             }
+            if (generation !== documentGenerationRef.current) return null;
 
             try {
                 const commandType = String(command?.type || "unknown");
@@ -368,6 +371,7 @@ export function useRustWorkflowDocument({
                         queueDepth: queueDepthRef.current,
                     }
                 );
+                if (generation !== documentGenerationRef.current) return null;
                 const previousRevision = revisionRef.current;
                 revisionRef.current = result?.revision ?? revisionRef.current;
                 if (commandType === "replaceSlotsSnapshot") {
@@ -413,6 +417,7 @@ export function useRustWorkflowDocument({
                 }
                 return result;
             } catch (error) {
+                if (generation !== documentGenerationRef.current) return null;
                 if (String(command?.type || "") === "replaceSlotsSnapshot") {
                     slotDebug("rust-command: replaceSlotsSnapshot failed", {
                         revision: revisionRef.current,
@@ -872,10 +877,12 @@ export function useRustWorkflowDocument({
     );
 
     const syncStateConfigurationAfterCommit = useCallback(
-        (stateId) =>
-            enqueue(async () => {
+        (stateId) => {
+            const generation = documentGenerationRef.current;
+            return enqueue(async () => {
                 if (!isTauri() || !stateId) return null;
                 await waitForEditorCommit();
+                if (generation !== documentGenerationRef.current) return null;
 
                 const editorState = editorStateRef.current || {};
                 const node = (editorState.nodes || []).find(
@@ -890,11 +897,13 @@ export function useRustWorkflowDocument({
                     stateId,
                     parameters: buildRustStateParameters(node.data?.params || []),
                 });
+                if (generation !== documentGenerationRef.current) return null;
                 return applyCommandNow({
                     type: "replaceSlotsSnapshot",
                     ...buildRustSlotsSnapshot(editorState),
                 });
-            }),
+            }, generation);
+        },
         [applyCommandNow, enqueue, syncEditorStateNow]
     );
 

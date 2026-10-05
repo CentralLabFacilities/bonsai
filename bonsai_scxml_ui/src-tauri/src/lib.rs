@@ -1,5 +1,8 @@
 mod core;
 
+#[cfg(any(feature = "desktop", test))]
+mod atomic_file;
+
 #[cfg(feature = "desktop")]
 mod commands;
 // Workspace inspection has existing pure tests, but is not a core dependency.

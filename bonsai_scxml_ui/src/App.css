@@ -72,9 +72,9 @@
     box-sizing: border-box;
     overflow-y: auto;
     border-bottom: 1px solid #7f1d1d;
-    background: #241c28;
+    background: var(--ui-danger-surface);
     color: #fecaca;
-    font-size: 12px;
+    font-size: var(--ui-font-size-sm);
 }
 
 .editor-notice-icon {
@@ -94,37 +94,34 @@
 }
 
 .editor-notice-guidance {
-    color: #cbd5e1;
+    color: var(--ui-text-secondary);
 }
 
 .editor-notice-actions {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
+    gap: var(--ui-space-2);
     margin-left: auto;
 }
 
-.editor-notice-actions button,
-.library-state-button {
+.editor-notice-actions button {
     padding: 5px 9px;
-    border: 1px solid #64748b;
-    border-radius: 5px;
-    background: #1e293b;
+    border: 1px solid var(--ui-border-strong);
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-surface-3);
     color: #f1f5f9;
     font: inherit;
     cursor: pointer;
 }
 
-.editor-notice-actions button:disabled,
-.library-state-button:disabled {
+.editor-notice-actions button:disabled {
     opacity: 0.55;
     cursor: default;
 }
 
-.editor-notice-actions button:focus-visible,
-.library-state-button:focus-visible {
-    outline: 2px solid #38bdf8;
+.editor-notice-actions button:focus-visible {
+    outline: 2px solid var(--ui-focus);
     outline-offset: 2px;
 }
 
@@ -135,6 +132,14 @@
 }
 
 .app {
+    /* React overrides these defaults when panels resize or collapse. */
+    --library-width: 350px;
+    --library-resize-width: 6px;
+    --inspector-resize-width: 6px;
+    --inspector-width: 400px;
+    --library-drawer-width: 350px;
+    --inspector-drawer-width: 400px;
+
     position: relative;
     flex: 1;
     display: grid;
@@ -705,21 +710,21 @@
     display: inline-flex;
     flex-shrink: 0;
     align-items: center;
-    gap: 4px;
-    min-height: 28px;
+    gap: var(--ui-space-1);
+    min-height: var(--ui-control-height-sm);
     padding: 4px 7px;
-    border: 1px solid #475569;
-    border-radius: 5px;
-    background: #0f172a;
-    color: #cbd5e1;
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-surface-1);
+    color: var(--ui-text-secondary);
     font: inherit;
-    font-size: 11px;
+    font-size: var(--ui-font-size-xs);
     cursor: pointer;
 }
 
 .skill-add-button:hover:not(:disabled) {
-    border-color: #38bdf8;
-    color: #f8fafc;
+    border-color: var(--ui-primary-border);
+    color: var(--ui-text);
 }
 
 .skill-add-button:disabled {
@@ -730,24 +735,24 @@
 .skill-add-feedback {
     margin: 0 0 8px;
     padding: 8px;
-    border: 1px solid #334155;
-    border-radius: 5px;
-    color: #cbd5e1;
-    font-size: 12px;
+    border: 1px solid var(--ui-border-subtle);
+    border-radius: var(--ui-radius-sm);
+    color: var(--ui-text-secondary);
+    font-size: var(--ui-font-size-sm);
     overflow-wrap: anywhere;
 }
 
 .skill-add-feedback.error {
-    color: #fca5a5;
+    color: var(--ui-danger-text);
 }
 
 .library-state {
     margin-bottom: 10px;
     padding: 10px;
-    border: 1px solid #334155;
+    border: 1px solid var(--ui-border-subtle);
     border-radius: 6px;
-    color: #cbd5e1;
-    font-size: 12px;
+    color: var(--ui-text-secondary);
+    font-size: var(--ui-font-size-sm);
     line-height: 1.4;
     overflow-wrap: anywhere;
 }
@@ -838,8 +843,8 @@
     gap: 8px;
     padding: 0 16px;
     font-size: 12.5px;
-    color: #94a3b8;
-    background-color: #1e293b;
+    color: var(--ui-text-muted);
+    background-color: var(--ui-surface-3);
     border-right: 1px solid var(--secondary-color);
     cursor: pointer;
     white-space: nowrap;
@@ -879,7 +884,7 @@
 .right-panel-content:focus-visible,
 .details-panel [role="tabpanel"]:focus-visible,
 .editor-creation-dialog :is(button, input, select):focus-visible {
-    outline: 2px solid #38bdf8;
+    outline: 2px solid var(--ui-focus);
     outline-offset: -2px;
 }
 
@@ -897,12 +902,12 @@
 
 .intellij-tab:hover {
     background-color: #2b3947;
-    color: #f8fafc;
+    color: var(--ui-text);
 }
 
 /* AKTIVER TAB MIT KLAR SICHTBAREM HIGHLIGHTING */
 .intellij-tab.active {
-    background-color: #0f172a;
+    background-color: var(--ui-surface-1);
     color: #ffffff;
     font-weight: 700;
 }
@@ -5353,10 +5358,15 @@ dialog.editor-creation-dialog::backdrop {
 }
 
 .editor-creation-dialog > .slot-create-modal,
-.editor-creation-dialog > .submachine-create-dialog {
+.editor-creation-dialog > .submachine-create-dialog,
+.editor-creation-dialog > .skill-paste-choice-dialog {
     box-sizing: border-box;
     max-height: 100%;
     overflow-y: auto;
+}
+
+dialog.skill-paste-choice-overlay {
+    padding: 20px;
 }
 
 .slot-create-modal {

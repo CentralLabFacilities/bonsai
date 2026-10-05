@@ -35,7 +35,8 @@ export function CreationDialog({
 
         return () => {
             if (dialog.open) dialog.close();
-            if (previouslyFocused?.isConnected) previouslyFocused.focus();
+            if (previouslyFocused?.isConnected && !previouslyFocused.matches(":disabled")
+                && !previouslyFocused.closest('[hidden], [inert], [aria-hidden="true"]')) previouslyFocused.focus();
         };
     }, [initialFocusRef, selectInitialFocus]);
 
@@ -198,6 +199,7 @@ export default function EditorOverlays({
     const progressPercent = Math.round(Math.max(0, Math.min(1, runtimePreparation?.progress || 0)) * 100);
     const shortcutHelpId = useId();
     const shortcutHelpButtonRef = useRef(null);
+    const pasteCancelButtonRef = useRef(null);
 
     return (
         <>
@@ -313,13 +315,13 @@ export default function EditorOverlays({
             )}
 
             {paste.pending && (
-                <div
+                <CreationDialog
                     className="skill-paste-choice-overlay"
-                    onMouseDown={(event) => {
-                        if (event.target === event.currentTarget) paste.onCancel();
-                    }}
+                    labelledBy="skill-paste-choice-title"
+                    onCancel={paste.onCancel}
+                    initialFocusRef={pasteCancelButtonRef}
                 >
-                    <div className="skill-paste-choice-dialog" role="dialog" aria-modal="true" aria-labelledby="skill-paste-choice-title">
+                    <div className="skill-paste-choice-dialog">
                         <h3 id="skill-paste-choice-title">Paste {paste.pending.sourceTypeLabel || "State"}</h3>
                         <p>How should <strong>{paste.pending.label}</strong> be pasted?</p>
                         <div className="skill-paste-choice-options">
@@ -332,9 +334,9 @@ export default function EditorOverlays({
                                 <span className="skill-paste-choice-option-description">Create an independent copy of the selected state.</span>
                             </button>
                         </div>
-                        <button type="button" className="skill-paste-choice-cancel" onClick={paste.onCancel}>Cancel</button>
+                        <button ref={pasteCancelButtonRef} type="button" className="skill-paste-choice-cancel" onClick={paste.onCancel}>Cancel</button>
                     </div>
-                </div>
+                </CreationDialog>
             )}
 
             {tabPathTooltip && createPortal(

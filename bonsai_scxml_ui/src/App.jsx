@@ -199,15 +199,6 @@ function AppContent() {
         setGlobalDataModel,
     });
 
-    const { updateEventsFromParameters } = useDynamicSkillConfiguration({
-        nodes,
-        setNodes,
-        fetchSkillData,
-        checkSlotConnection,
-        syncStateConfigurationAfterCommit:
-            rustWorkflowDocument.syncStateConfigurationAfterCommit,
-    });
-
     const {
         selectEditorNode,
         clearEditorNodeSelection,
@@ -264,7 +255,8 @@ function AppContent() {
             rustWorkflowDocument.syncTransitionsForSource,
         syncStateParameters: rustWorkflowDocument.syncStateParameters,
         syncSlotsAfterCommit: rustWorkflowDocument.syncSlotsAfterCommit,
-        updateEventsFromParameters,
+        // Actions run after the tab-aware configuration hook below is initialized.
+        updateEventsFromParameters: (nodeId, params) => updateEventsFromParameters(nodeId, params),
         setControlPointInsertRequest,
     });
 
@@ -436,6 +428,7 @@ function AppContent() {
         tabs,
         activeTabId,
         activeTab: activeWorkflowTab,
+        getActiveDocumentIdentity,
         getTabSnapshot,
         getTabsSnapshot,
         updateTab,
@@ -468,6 +461,16 @@ function AppContent() {
         setViewport,
         syncRustDocument: rustWorkflowDocument.syncEditorState,
         isDraggingNode,
+    });
+
+    const { updateEventsFromParameters } = useDynamicSkillConfiguration({
+        getDocumentSnapshot,
+        getActiveDocumentIdentity,
+        setNodes,
+        fetchSkillData,
+        checkSlotConnection,
+        syncStateConfigurationAfterCommit:
+            rustWorkflowDocument.syncStateConfigurationAfterCommit,
     });
 
     const {
@@ -1195,6 +1198,7 @@ function AppContent() {
                             edgeFocusMode={edgeFocusMode}
                             nodeFocusMode={nodeFocusMode}
                             contextMenu={contextMenu}
+                            setContextMenu={setContextMenu}
                             handleSelectAction={handleSelectAction}
                             hasGraphClipboard={hasGraphClipboard}
                             setIsCreateSlotModalOpen={setIsCreateSlotModalOpen}
