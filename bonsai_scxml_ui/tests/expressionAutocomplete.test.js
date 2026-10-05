@@ -5,7 +5,7 @@ import {
     getMatchingExpressionVariables,
     getVariableReferenceContext,
     insertExpressionVariable,
-} from "../src/components/expressionAutocomplete.js";
+} from "../src/components/inputs/expressionAutocomplete.js";
 
 test("reference context follows the caret, not the end of the expression", () => {
     assert.deepEqual(getVariableReferenceContext("1 + @co + @other", 7), {

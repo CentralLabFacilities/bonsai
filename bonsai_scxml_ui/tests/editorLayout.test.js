@@ -48,12 +48,12 @@ test.before(async () => {
         optimizeDeps: { noDiscovery: true, include: [] },
     });
     ({ useEditorPanelLayout: useLayout } = await server.ssrLoadModule(
-        "/src/hooks/useEditorPreferences.js",
+        "/src/hooks/editor/useEditorPreferences.js",
     ));
     ({ useEditorGraphState: useGraph } = await server.ssrLoadModule(
-        "/src/hooks/useEditorGraphState.js",
+        "/src/hooks/graph/useEditorGraphState.js",
     ));
-    ({ useWorkflowTabs: useTabs } = await server.ssrLoadModule("/src/hooks/useWorkflowTabs.js"));
+    ({ useWorkflowTabs: useTabs } = await server.ssrLoadModule("/src/hooks/document/useWorkflowTabs.js"));
     ({
         default: Header,
         EditorPanel: Panel,
@@ -61,7 +61,7 @@ test.before(async () => {
         EditorPanelLedge: Ledge,
     } = await server.ssrLoadModule("/src/components/EditorChrome.jsx"));
     ({ default: ContextMenu } = await server.ssrLoadModule(
-        "/src/components/CanvasContextMenu.jsx",
+        "/src/components/canvas/CanvasContextMenu.jsx",
     ));
 });
 

@@ -9,7 +9,7 @@ import {
     getMatchingTargetNodeOptions,
     getSemanticTargetNodeIds,
     getSkillPackageName,
-} from "../src/components/detailsPanel/selectors.js";
+} from "../src/components/inspector/selectors.js";
 
 const node = (id, data = {}) => ({ id, data });
 
@@ -279,11 +279,11 @@ test("isolated inspector editors preserve draft, focus, commit and render contra
             optimizeDeps: { noDiscovery: true, include: [] },
         });
         const [lanes, slots, general, nop, details, inspector] = await Promise.all([
-            "/src/components/detailsPanel/ParallelLaneEditor.jsx",
-            "/src/components/detailsPanel/SlotDetailsPanel.jsx",
-            "/src/components/detailsPanel/GeneralDetailsSection.jsx",
-            "/src/components/detailsPanel/NopSendEditor.jsx",
-            "/src/components/DetailsPanel.jsx", "/src/components/EditorInspectorPanel.jsx",
+            "/src/components/inspector/ParallelLaneEditor.jsx",
+            "/src/components/inspector/SlotDetailsPanel.jsx",
+            "/src/components/inspector/GeneralDetailsSection.jsx",
+            "/src/components/inspector/NopSendEditor.jsx",
+            "/src/components/inspector/DetailsPanel.jsx", "/src/components/inspector/EditorInspectorPanel.jsx",
         ].map((path) => server.ssrLoadModule(path)));
 
         await t.test("lane Escape cancels synchronous blur while Enter commits once and external renames resync", async () => {

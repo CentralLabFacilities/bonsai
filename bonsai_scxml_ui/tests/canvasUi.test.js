@@ -7,11 +7,11 @@ import {
     applyGeneratedCode,
     createGeneratedCodeDraft,
     editGeneratedCodeDraft,
-} from "../src/components/canvasCodeDraft.js";
+} from "../src/components/canvas/canvasCodeDraft.js";
 import {
     areBehaviorLibraryPropsEqual,
     areSkillLibraryPropsEqual,
-} from "../src/components/canvasLibraryProps.js";
+} from "../src/components/library/canvasLibraryProps.js";
 
 test("generated drafts start pending for their exact graph snapshot", () => {
     const graph = { nodes: [], edges: [] };
@@ -199,16 +199,16 @@ test("keyboard controls, creation dialogs, and library insertion preserve editor
             optimizeDeps: { noDiscovery: true, include: [] },
         });
         const modules = await Promise.all([
-            "/src/components/DetailsPanel.jsx", "/src/components/CreateSlotModal.jsx",
-            "/src/components/CreateSubMachineModal.jsx", "/src/components/EditorOverlays.jsx",
-            "/src/components/SkillLibrary.jsx", "/src/hooks/useEditorLibraryDrop.js",
-            "/src/hooks/useEditorLibraryItems.js", "/src/hooks/useEditorGraphState.js",
-            "/src/hooks/useWorkflowTabs.js", "/src/hooks/useGlobalEditorShortcuts.js",
-            "/src/components/EditorChrome.jsx", "/src/components/BehaviorLibrary.jsx",
-            "/src/components/ui/index.js", "/src/components/CodeView.jsx",
-            "/src/hooks/useContainerCreation.js",
-            "/src/hooks/useEditorClipboard.js", "/src/hooks/useEditorFind.js",
-            "/src/hooks/useEditorHistory.js", "/src/hooks/useWorkflowDocument.js",
+            "/src/components/inspector/DetailsPanel.jsx", "/src/components/overlays/CreateSlotModal.jsx",
+            "/src/components/overlays/CreateSubMachineModal.jsx", "/src/components/overlays/EditorOverlays.jsx",
+            "/src/components/library/SkillLibrary.jsx", "/src/hooks/library/useEditorLibraryDrop.js",
+            "/src/hooks/library/useEditorLibraryItems.js", "/src/hooks/graph/useEditorGraphState.js",
+            "/src/hooks/document/useWorkflowTabs.js", "/src/hooks/interaction/useGlobalEditorShortcuts.js",
+            "/src/components/EditorChrome.jsx", "/src/components/library/BehaviorLibrary.jsx",
+            "/src/components/ui/index.js", "/src/components/canvas/CodeView.jsx",
+            "/src/hooks/graph/useContainerCreation.js",
+            "/src/hooks/interaction/useEditorClipboard.js", "/src/hooks/interaction/useEditorFind.js",
+            "/src/hooks/document/useEditorHistory.js", "/src/hooks/document/useWorkflowDocument.js",
         ].map((path) => server.ssrLoadModule(path)));
         const [details, slots, submachines, overlays, skills, drop, items, graphState, tabState, shortcuts, chrome, behaviors, feedback, codeView, containers, clipboard, find, history, workflowDocument] = modules;
 
@@ -672,7 +672,7 @@ test("keyboard controls, creation dialogs, and library insertion preserve editor
             assert.equal(document.getElementById(button.getAttribute("aria-controls")), null);
             button.focus();
             await click(button);
-            await React.act(async () => server.ssrLoadModule("/src/components/EditorShortcutHelp.jsx"));
+            await React.act(async () => server.ssrLoadModule("/src/components/overlays/EditorShortcutHelp.jsx"));
             const reference = document.getElementById(button.getAttribute("aria-controls"));
             assert.ok(reference);
             assert.equal(button.getAttribute("aria-expanded"), "true");

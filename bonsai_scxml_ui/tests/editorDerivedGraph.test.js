@@ -5,9 +5,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { ReactFlow, ReactFlowProvider } from "@xyflow/react";
 import { Window } from "happy-dom";
 
-import { projectSemanticNodes, useDerivedGraphSnapshot, useSemanticNodeSnapshot } from "../src/hooks/useEditorGraphMaintenance.js";
-import { projectOutgoingTransitionHandles, useEditorPresentationGraph } from "../src/hooks/useEditorPresentationGraph.js";
-import { projectRoutingNodes, projectStructureEdges, useEditorDisplay } from "../src/hooks/useEditorDisplay.js";
+import { projectSemanticNodes, useDerivedGraphSnapshot, useSemanticNodeSnapshot } from "../src/hooks/graph/useEditorGraphMaintenance.js";
+import { projectOutgoingTransitionHandles, useEditorPresentationGraph } from "../src/hooks/graph/useEditorPresentationGraph.js";
+import { projectRoutingNodes, projectStructureEdges, useEditorDisplay } from "../src/hooks/graph/useEditorDisplay.js";
 
 function node(id, extra = {}) {
     return { id, type: "custom", position: { x: 10, y: 20 }, data: { label: id }, ...extra };
@@ -452,9 +452,9 @@ test("consolidated node renderers preserve their public graph and presentation c
         appType: "custom",
     });
     try {
-        const states = await server.ssrLoadModule("/src/components/StateNodes.jsx");
-        const containers = await server.ssrLoadModule("/src/components/ContainerNodes.jsx");
-        const chrome = await server.ssrLoadModule("/src/components/NodeChrome.jsx");
+        const states = await server.ssrLoadModule("/src/components/graph/StateNodes.jsx");
+        const containers = await server.ssrLoadModule("/src/components/graph/ContainerNodes.jsx");
+        const chrome = await server.ssrLoadModule("/src/components/graph/NodeChrome.jsx");
         const render = (component, data = {}, selected = false) => {
             const node = { id: "node", type: "fixture", position: { x: 0, y: 0 }, width: 520, height: 320, data, selected };
             return renderToStaticMarkup(createElement(ReactFlowProvider, { initialNodes: [node] },

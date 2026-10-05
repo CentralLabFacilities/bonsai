@@ -4,7 +4,7 @@ import { setImmediate } from "node:timers/promises";
 import { act, createElement } from "react";
 import { renderToString } from "react-dom/server";
 import { Window } from "happy-dom";
-import { useSkillDefinitions } from "../src/hooks/useSkillDefinitions.js";
+import { useSkillDefinitions } from "../src/hooks/library/useSkillDefinitions.js";
 
 function mockSkillRequests(context) {
     const calls = [];

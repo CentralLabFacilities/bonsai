@@ -12,7 +12,7 @@ import {
 } from "react-icons/fi";
 import { isTauri } from "../tauri-client.js";
 import { PANEL_LIMITS } from "../utils/editorPreferences.js";
-import { isDocumentGuardOpen } from "../hooks/useGlobalEditorShortcuts.js";
+import { isDocumentGuardOpen } from "../hooks/interaction/useGlobalEditorShortcuts.js";
 import { Button, IconButton } from "./ui/index.js";
 
 function Header({ onOpenFile, onSaveFile, onSaveAsFile, hasFilePath, isSaving = false, isOpening = false, panels }) {

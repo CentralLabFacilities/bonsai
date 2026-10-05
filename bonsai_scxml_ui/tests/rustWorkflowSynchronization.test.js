@@ -66,8 +66,8 @@ test("real Rust workflow hooks preserve committed snapshots and native queue own
             optimizeDeps: { noDiscovery: true, include: [] },
         });
         const [workflowModule, graphModule, containerModule, client, exporter] = await Promise.all([
-            "/src/hooks/useRustWorkflowDocument.js", "/src/hooks/useEditorGraphState.js",
-            "/src/hooks/useContainerCreation.js", "/src/tauri-client.js", "/src/utils/scxmlRustExport.js",
+            "/src/hooks/document/useRustWorkflowDocument.js", "/src/hooks/graph/useEditorGraphState.js",
+            "/src/hooks/graph/useContainerCreation.js", "/src/tauri-client.js", "/src/utils/scxmlRustExport.js",
         ].map((path) => server.ssrLoadModule(path)));
         const suspended = new Promise(() => {});
         function Harness() {

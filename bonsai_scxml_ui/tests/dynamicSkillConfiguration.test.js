@@ -130,7 +130,7 @@ test.before(async () => {
         optimizeDeps: { noDiscovery: true, include: [] },
     });
     const modules = await Promise.all([
-        "useEditorGraphState", "useWorkflowTabs", "useDynamicSkillConfiguration", "useSlotGraph", "useEditorHistory",
+        "graph/useEditorGraphState", "document/useWorkflowTabs", "library/useDynamicSkillConfiguration", "graph/useSlotGraph", "document/useEditorHistory",
     ].map((name) => server.ssrLoadModule(`/src/hooks/${name}.js`)));
     hooks = Object.assign({}, ...modules);
 });

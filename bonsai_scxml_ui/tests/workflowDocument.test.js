@@ -111,13 +111,13 @@ test.before(async () => {
     // Sub-SM creation captures desktop mode when its module is evaluated.
     window.__TAURI_INTERNALS__ = {};
     const [graph, tabs, documents, submachines] = await Promise.all([
-        server.ssrLoadModule("/src/hooks/useEditorGraphState.js"),
-        server.ssrLoadModule("/src/hooks/useWorkflowTabs.js"),
-        server.ssrLoadModule("/src/hooks/useWorkflowDocument.js"),
-        server.ssrLoadModule("/src/hooks/useSubStateMachines.js"),
+        server.ssrLoadModule("/src/hooks/graph/useEditorGraphState.js"),
+        server.ssrLoadModule("/src/hooks/document/useWorkflowTabs.js"),
+        server.ssrLoadModule("/src/hooks/document/useWorkflowDocument.js"),
+        server.ssrLoadModule("/src/hooks/document/useSubStateMachines.js"),
     ]);
     hooks = { ...graph, ...tabs, ...documents, ...submachines };
-    overlays = (await server.ssrLoadModule("/src/components/EditorOverlays.jsx")).default;
+    overlays = (await server.ssrLoadModule("/src/components/overlays/EditorOverlays.jsx")).default;
     tabBar = (await server.ssrLoadModule("/src/components/WorkflowTabBar.jsx")).default;
     feedback = await server.ssrLoadModule("/src/components/ui/index.js");
 });
@@ -1225,7 +1225,7 @@ test("keyboard workflow close buttons preserve guard cancellation and restore su
 
 test("creation modality prevents workflow switching and saving beneath the dialog", async () => {
     await openTab("a");
-    const SlotModal = (await server.ssrLoadModule("/src/components/CreateSlotModal.jsx")).default;
+    const SlotModal = (await server.ssrLoadModule("/src/components/overlays/CreateSlotModal.jsx")).default;
     const holder = document.createElement("div");
     document.body.append(holder);
     const modalRoot = createRoot(holder);
