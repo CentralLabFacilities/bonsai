@@ -37,7 +37,6 @@ export function useEditorDetailsCallbacks(callbacks) {
         onUpdateSendEvents: (...args) => latest.current.onUpdateSendEvents?.(...args),
         onUpdateInSlotPath: (...args) => latest.current.onUpdateInSlotPath?.(...args),
         onUpdateOutSlotPath: (...args) => latest.current.onUpdateOutSlotPath?.(...args),
-        onCheckSlots: (...args) => latest.current.onCheckSlots?.(...args),
         onUpdateSlotPath: (...args) => latest.current.onUpdateSlotPath?.(...args),
         onUpdateSlotInherited: (...args) => latest.current.onUpdateSlotInherited?.(...args),
         onHoverSlotAccessSkill: (...args) => latest.current.onHoverSlotAccessSkill?.(...args),

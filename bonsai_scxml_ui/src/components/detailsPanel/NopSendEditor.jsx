@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { FiSend, FiX } from "react-icons/fi";
 
 const NOP_SEND_EVENT_SUGGESTIONS = ["success", "fatal", "error"];
@@ -8,6 +8,8 @@ function NopSendEditor({ nodeId, events = [], onChange }) {
         Array.isArray(events) && events.length > 0 ? events[0] ?? "" : ""
     );
     const [isFocused, setIsFocused] = useState(false);
+    const inputRef = useRef(null);
+    const suggestionsId = `nop-send-suggestions-${nodeId}`;
 
     const normalizedQuery = eventName.trim().toLowerCase();
     const matchingSuggestions = NOP_SEND_EVENT_SUGGESTIONS.filter((suggestion) =>
@@ -16,6 +18,7 @@ function NopSendEditor({ nodeId, events = [], onChange }) {
 
     const setEventName = (value) => {
         const nextValue = String(value ?? "");
+        if (nextValue === eventName) return;
         onChange?.(nextValue ? [nextValue] : []);
     };
 
@@ -69,19 +72,35 @@ function NopSendEditor({ nodeId, events = [], onChange }) {
                     Event
                 </label>
 
-                <div className="nop-send-input-wrap">
+                <div
+                    className="nop-send-input-wrap"
+                    onBlur={(event) => {
+                        if (!event.currentTarget.contains(event.relatedTarget)) {
+                            setIsFocused(false);
+                        }
+                    }}
+                    onKeyDown={(event) => {
+                        if (event.key !== "Escape") return;
+                        event.preventDefault();
+                        event.stopPropagation();
+                        inputRef.current?.focus();
+                        setIsFocused(false);
+                    }}
+                >
                     <input
                         id={`nop-send-event-${nodeId}`}
+                        ref={inputRef}
                         className="nop-send-input"
                         type="text"
                         autoComplete="off"
                         spellCheck="false"
                         value={eventName}
                         placeholder="e.g. success or my.custom.event"
+                        role="combobox"
+                        aria-autocomplete="list"
+                        aria-expanded={isFocused && matchingSuggestions.length > 0}
+                        aria-controls={isFocused && matchingSuggestions.length > 0 ? suggestionsId : undefined}
                         onFocus={() => setIsFocused(true)}
-                        onBlur={() => {
-                            window.setTimeout(() => setIsFocused(false), 100);
-                        }}
                         onChange={(event) => setEventName(event.target.value)}
                         onKeyDown={handleKeyDown}
                     />
@@ -100,7 +119,7 @@ function NopSendEditor({ nodeId, events = [], onChange }) {
                     )}
 
                     {isFocused && matchingSuggestions.length > 0 && (
-                        <div className="nop-send-suggestions">
+                        <div className="nop-send-suggestions" id={suggestionsId} role="listbox">
                             {matchingSuggestions.map((suggestion) => (
                                 <button
                                     type="button"
@@ -108,9 +127,12 @@ function NopSendEditor({ nodeId, events = [], onChange }) {
                                     className={`nop-send-suggestion ${
                                         suggestion === normalizedQuery ? "selected" : ""
                                     }`}
+                                    role="option"
+                                    aria-selected={suggestion === normalizedQuery}
                                     onMouseDown={(event) => event.preventDefault()}
                                     onClick={() => {
                                         setEventName(suggestion);
+                                        inputRef.current?.focus();
                                         setIsFocused(false);
                                     }}
                                 >

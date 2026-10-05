@@ -9,11 +9,11 @@ import {
     StateActionsSection,
 } from "./detailsPanel/DetailsTabSections.jsx";
 import { MetadataRow } from "./detailsPanel/DetailsPanelPrimitives.jsx";
-import { getEditableExitTokens } from "./detailsPanel/exitTokens.js";
 import {
     areDetailsPanelPropsEqual,
     getAvailableActionLocations,
-} from "./detailsPanelSelectors.js";
+    getEditableExitTokens,
+} from "./detailsPanel/selectors.js";
 
 function DetailsPanel({
                           selectedNode,
@@ -28,7 +28,6 @@ function DetailsPanel({
                           onUpdateParameter,
                           onUpdateInSlotPath,
                           onUpdateOutSlotPath,
-                          onCheckSlots,
                           availableSlotPaths = [],
                           onUpdateSrc,
                           globalDataModel,
@@ -462,7 +461,6 @@ function DetailsPanel({
                         availableSlotPaths={availableSlotPaths}
                         onUpdateInSlotPath={onUpdateInSlotPath}
                         onUpdateOutSlotPath={onUpdateOutSlotPath}
-                        onCheckSlots={onCheckSlots}
                     />
                 )}
 

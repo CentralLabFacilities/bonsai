@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useDerivedGraphSnapshot } from "./useEditorGraphMaintenance.js";
 import {
     getSlotPathFromNode,
     normalizeSlotPath,
@@ -139,21 +140,25 @@ export function useEditorAnalysis({
             });
         return { request, signature: JSON.stringify(request) };
     }, [selectedContainerId, selectedContainerType, semanticNodes, edges]);
-    const [transitionRequestSnapshot, setTransitionRequestSnapshot] = useState(transitionRequestCandidate);
-    const requestChanged = transitionRequestCandidate.signature !== transitionRequestSnapshot.signature;
-    const transitionAnalysisRequest = requestChanged
-        ? transitionRequestCandidate.request
-        : transitionRequestSnapshot.request;
     // Only backend-consumed metadata invalidates analysis. Selection and manual
-    // control points are omitted by the request builder and should not issue IPC.
-    if (requestChanged) setTransitionRequestSnapshot(transitionRequestCandidate);
+    // control points should not recreate requests or issue another IPC query.
+    const transitionRequestSnapshot = useDerivedGraphSnapshot(
+        [transitionRequestCandidate.signature],
+        () => transitionRequestCandidate,
+    );
+    const transitionAnalysisRequest = transitionRequestSnapshot.request;
+    const transitionAnalysisSignature = transitionRequestSnapshot.signature;
 
-    const [selectedContainerOutgoingTransitions, setSelectedContainerOutgoingTransitions] =
-        useState([]);
+    const [containerTransitionResult, setContainerTransitionResult] = useState(() => ({
+        signature: null,
+        transitions: [],
+    }));
+    const selectedContainerOutgoingTransitions =
+        selectedIsContainer &&
+        containerTransitionResult.signature === transitionAnalysisSignature
+            ? containerTransitionResult.transitions
+            : [];
     const transitionAnalysisRevisionRef = useRef(0);
-    if (!selectedIsContainer && selectedContainerOutgoingTransitions.length > 0) {
-        setSelectedContainerOutgoingTransitions([]);
-    }
 
     useEffect(() => {
         const revision = ++transitionAnalysisRevisionRef.current;
@@ -177,9 +182,10 @@ export function useEditorAnalysis({
             if (cancelled || revision !== transitionAnalysisRevisionRef.current) {
                 return;
             }
-            setSelectedContainerOutgoingTransitions(
-                Array.isArray(next) ? next : []
-            );
+            setContainerTransitionResult({
+                signature: transitionAnalysisSignature,
+                transitions: Array.isArray(next) ? next : [],
+            });
         };
 
         if (!isTauri()) {
@@ -212,6 +218,7 @@ export function useEditorAnalysis({
     }, [
         isDraggingNode,
         transitionAnalysisRequest,
+        transitionAnalysisSignature,
         selectedIsContainer,
     ]);
 

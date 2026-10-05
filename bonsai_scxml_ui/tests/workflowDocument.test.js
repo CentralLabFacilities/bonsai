@@ -11,6 +11,7 @@ let server;
 let hooks;
 let overlays;
 let tabBar;
+let feedback;
 let root;
 let container;
 let current;
@@ -118,6 +119,7 @@ test.before(async () => {
     hooks = { ...graph, ...tabs, ...documents, ...submachines };
     overlays = (await server.ssrLoadModule("/src/components/EditorOverlays.jsx")).default;
     tabBar = (await server.ssrLoadModule("/src/components/WorkflowTabBar.jsx")).default;
+    feedback = await server.ssrLoadModule("/src/components/ui/index.js");
 });
 
 test.beforeEach(async () => {
@@ -207,7 +209,7 @@ test.beforeEach(async () => {
             }),
         );
     }
-    await React.act(async () => root.render(React.createElement(Harness)));
+    await React.act(async () => root.render(React.createElement(feedback.FeedbackProvider, null, React.createElement(Harness))));
 });
 
 test.afterEach(async () => {
@@ -246,10 +248,18 @@ const begin = async (callback) => {
 };
 const settle = async (operation, callback) => {
     let result;
+    let failure;
+    let failed = false;
     await React.act(async () => {
         callback?.();
-        result = await operation.promise;
+        try {
+            result = await operation.promise;
+        } catch (error) {
+            failure = error;
+            failed = true;
+        }
     });
+    if (failed) throw failure;
     return result;
 };
 const dialog = () => document.querySelector("[data-workflow-document-guard]");
@@ -967,7 +977,8 @@ test("Sub-SM extraction retains edited, closed or replaced origins when a child 
             directory: "/behaviors", fileName: `extracted-${change}.xml`,
         }));
         await writing.promise;
-        const extracted = await settle(extracting, () => {
+        let failure;
+        await assert.rejects(() => settle(extracting, () => {
             if (change === "edited") {
                 current.graph.setNodes((nodes) => nodes.map((node) => ({
                     ...node, data: { ...node.data, params: [{ key: "rate", expr: "2" }] },
@@ -977,8 +988,10 @@ test("Sub-SM extraction retains edited, closed or replaced origins when a child 
             if (change === "closed") current.tabs.closeTab(parentId);
             if (change === "replaced") current.tabs.replaceTabDocument(parentId, loadedTab("replacement"), { id: parentId });
             write.resolve();
+        }), (error) => {
+            failure = error;
+            return error.message.includes("no states were removed");
         });
-        assert.equal(extracted, false, change);
         const parent = current.tabs.getTabSnapshot(parentId);
         if (change === "closed") {
             assert.equal(parent, null);
@@ -998,10 +1011,11 @@ test("Sub-SM extraction retains edited, closed or replaced origins when a child 
         assert.equal(written.nodes.length, 1);
         assert.equal(written.nodes[0].id, "selected");
         assert.equal(written.nodes[0].parameters[0].expression, "1");
-        const message = calls.filter((call) => call.command === "alert").at(-1).message;
-        assert.match(message, /original workflow was retained/);
+        const message = failure.message;
+        assert.match(message, /original workflow changed|no longer available/);
         assert.match(message, /no states were removed/);
-        assert.ok(message.includes(`The new child file was kept at: ${path}`));
+        assert.ok(message.includes(`The new child file was kept at ${path}`));
+        assert.equal(calls.some((call) => call.command === "alert"), false);
     }
     assert.equal(writtenFiles.size, 3);
     assert.equal(calls.filter((call) => call.command === "save_file").length, 3);

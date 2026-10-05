@@ -29,29 +29,27 @@ export function useFocusHistory({
     setRightPanelTab,
     fitView,
 }) {
-    const [history, setHistory] = useState([]);
-    const [historyIndex, setHistoryIndex] = useState(-1);
-
-    const historyRef = useRef(history);
-    const historyIndexRef = useRef(historyIndex);
+    const [historyState, setHistoryState] = useState(() => ({
+        entries: [],
+        index: -1,
+    }));
+    const historyStateRef = useRef(historyState);
     const restoringRef = useRef(null);
     const restoreTimeoutRef = useRef(null);
     const recordTimeoutRef = useRef(null);
     const lastObservedTabRef = useRef(activeTabId);
 
-    useEffect(() => {
-        historyRef.current = history;
-    }, [history]);
-
-    useEffect(() => {
-        historyIndexRef.current = historyIndex;
-    }, [historyIndex]);
+    const publishHistoryState = useCallback((nextState) => {
+        historyStateRef.current = nextState;
+        setHistoryState(nextState);
+    }, []);
 
     const commitFocus = useCallback((focus) => {
         if (!focus?.tabId) return;
 
-        const currentHistory = historyRef.current;
-        const currentIndex = historyIndexRef.current;
+        const currentState = historyStateRef.current;
+        const currentHistory = currentState.entries;
+        const currentIndex = currentState.index;
         const current = currentHistory[currentIndex] || null;
 
         if (sameFocus(current, focus)) return;
@@ -64,11 +62,8 @@ export function useFocusHistory({
         const boundedHistory = nextHistory.slice(-200);
         const nextIndex = boundedHistory.length - 1;
 
-        historyRef.current = boundedHistory;
-        historyIndexRef.current = nextIndex;
-        setHistory(boundedHistory);
-        setHistoryIndex(nextIndex);
-    }, []);
+        publishHistoryState({ entries: boundedHistory, index: nextIndex });
+    }, [publishHistoryState]);
 
     useEffect(() => {
         if (!activeTabId) return;
@@ -90,7 +85,7 @@ export function useFocusHistory({
 
         // Clearing a selection inside the same workflow is not a useful focus
         // destination. A tab change is useful even before a node is selected.
-        if (!selectedNodeId && !tabChanged && historyRef.current.length > 0) {
+        if (!selectedNodeId && !tabChanged && historyStateRef.current.entries.length > 0) {
             return;
         }
 
@@ -136,20 +131,20 @@ export function useFocusHistory({
 
     const findNavigableIndex = useCallback(
         (startIndex, direction) =>
-            findNavigableFocusIndex(historyRef.current, availableTabIds, startIndex, direction),
+            findNavigableFocusIndex(historyStateRef.current.entries, availableTabIds, startIndex, direction),
         [availableTabIds]
     );
 
     const restoreFocus = useCallback(
         (targetIndex) => {
             if (isEditorModalOpen()) return false;
-            const entries = historyRef.current;
+            const currentHistoryState = historyStateRef.current;
+            const entries = currentHistoryState.entries;
             const target = entries[targetIndex];
             if (!target || !availableTabIds.has(target.tabId)) return false;
 
             restoringRef.current = target;
-            historyIndexRef.current = targetIndex;
-            setHistoryIndex(targetIndex);
+            publishHistoryState({ ...currentHistoryState, index: targetIndex });
 
             const selectTarget = () => {
                 const nodeId = target.nodeId || null;
@@ -209,6 +204,7 @@ export function useFocusHistory({
             activeTabId,
             availableTabIds,
             fitView,
+            publishHistoryState,
             setNodes,
             setRightPanelTab,
             setSelectedNodeId,
@@ -219,7 +215,7 @@ export function useFocusHistory({
 
     const goBack = useCallback(() => {
         const targetIndex = findNavigableIndex(
-            historyIndexRef.current - 1,
+            historyStateRef.current.index - 1,
             -1
         );
         if (targetIndex < 0) return false;
@@ -228,7 +224,7 @@ export function useFocusHistory({
 
     const goForward = useCallback(() => {
         const targetIndex = findNavigableIndex(
-            historyIndexRef.current + 1,
+            historyStateRef.current.index + 1,
             1
         );
         if (targetIndex < 0) return false;
@@ -236,9 +232,19 @@ export function useFocusHistory({
     }, [findNavigableIndex, restoreFocus]);
 
     const canGoBack =
-        findNavigableFocusIndex(history, availableTabIds, historyIndex - 1, -1) >= 0;
+        findNavigableFocusIndex(
+            historyState.entries,
+            availableTabIds,
+            historyState.index - 1,
+            -1
+        ) >= 0;
     const canGoForward =
-        findNavigableFocusIndex(history, availableTabIds, historyIndex + 1, 1) >= 0;
+        findNavigableFocusIndex(
+            historyState.entries,
+            availableTabIds,
+            historyState.index + 1,
+            1
+        ) >= 0;
 
     return {
         canGoBack,

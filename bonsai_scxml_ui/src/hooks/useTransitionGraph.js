@@ -196,7 +196,7 @@ export function useTransitionGraph({
         // of that handleType value for validation during the drag.
         reconnectingEdgeRef.current = edge;
         setSlotConnectionDrag(null);
-    }, []);
+    }, [setSlotConnectionDrag]);
 
     const handleReconnectEnd = useCallback(() => {
         reconnectingEdgeRef.current = null;

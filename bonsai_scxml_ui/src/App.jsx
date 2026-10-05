@@ -511,9 +511,7 @@ function AppContent() {
         handleOpenBehaviorFile,
         createBehaviorNode,
         createNode,
-        getPackageSkillEvent,
     } = useEditorLibraryItems({
-        skills,
         nodes,
         behaviorDirectories,
         fetchSkillData,
@@ -740,7 +738,7 @@ function AppContent() {
                 title: "Control point",
             });
         },
-        []
+        [setContextMenu]
     );
 
     const variableProblemNodeIds = useMemo(
@@ -984,7 +982,7 @@ function AppContent() {
             setActiveTab("allgemein");
         }
         return added;
-    }, [handleAddLibrarySkill, setRightPanelTab]);
+    }, [handleAddLibrarySkill, setRightPanelTab, setActiveTab]);
 
     const {
         isShortcutHelpOpen,
@@ -1017,7 +1015,7 @@ function AppContent() {
     const selectLibraryPackage = useCallback((pkg) => {
         setSelectedPackage(pkg);
         setSelectedSubPackage(null);
-    }, []);
+    }, [setSelectedPackage, setSelectedSubPackage]);
     const reloadSkills = useCallback(() => fetchSkills({ manual: true }), [fetchSkills]);
 
     const detailsCallbacks = useEditorDetailsCallbacks({
@@ -1046,7 +1044,6 @@ function AppContent() {
         onUpdateSendEvents: updateSendEvents,
         onUpdateInSlotPath: (index, value, commit = false) => updateSkillSlotPath(selectedNode.id, "read", index, value, commit),
         onUpdateOutSlotPath: (index, value, commit = false) => updateSkillSlotPath(selectedNode.id, "write", index, value, commit),
-        onCheckSlots: checkSlotConnection,
         onUpdateSlotPath: handleUpdateSelectedSlotPath,
         onUpdateSlotInherited: handleUpdateSelectedSlotInherited,
         onHoverSlotAccessSkill: (nodeId) => setHoveredSlotAccessNodeId(nodeId || null),
@@ -1280,8 +1277,6 @@ function AppContent() {
                             callbacks: detailsCallbacks,
                             activeTab,
                             setActiveTab,
-                            packages,
-                            getPackageSkillEvent,
                             availableTargetNodes: semanticNodes,
                             availableSlotPaths: canvasSlotPathOptions,
                             parameterFocusRequest,

@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { memo, useRef, useState } from "react";
 import { FiArrowDown, FiArrowUp, FiPlus, FiTrash2 } from "react-icons/fi";
 
-function ParallelLaneRow({
+const ParallelLaneRow = memo(function ParallelLaneRow({
                              lane,
                              index,
                              laneCount,
@@ -10,16 +10,21 @@ function ParallelLaneRow({
                              onDelete,
                          }) {
     const laneLabel = String(lane?.data?.label || `Lane_${index + 1}`);
-    const [nameDraft, setNameDraft] = useState(laneLabel);
+    const [draft, setDraft] = useState({ source: laneLabel, value: laneLabel, committed: laneLabel });
+    const cancelBlurRef = useRef(false);
 
-    useEffect(() => {
-        // External lane renames reset the draft; typing alone must not reset it.
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setNameDraft(laneLabel);
-    }, [lane.id, laneLabel]);
+    if (draft.source !== laneLabel) {
+        setDraft({ source: laneLabel, value: laneLabel, committed: laneLabel });
+    }
 
     const commitName = () => {
-        const nextName = String(nameDraft || "").trim();
+        const nextName = String(draft.value || "").trim();
+        if (nextName === draft.committed) {
+            if (draft.value !== nextName) setDraft({ ...draft, value: nextName });
+            return;
+        }
+        const nextDraft = nextName || laneLabel;
+        setDraft({ ...draft, value: nextDraft, committed: nextDraft });
         onRename?.(lane.id, nextName);
     };
 
@@ -42,18 +47,26 @@ function ParallelLaneRow({
                 <input
                     className="parallel-lane-editor-input"
                     type="text"
-                    value={nameDraft}
+                    value={draft.value}
                     placeholder={`Lane_${index + 1}`}
                     spellCheck="false"
-                    onChange={(event) => setNameDraft(event.target.value)}
-                    onBlur={commitName}
+                    onChange={(event) => setDraft({ ...draft, value: event.target.value })}
+                    onBlur={() => {
+                        if (cancelBlurRef.current) {
+                            cancelBlurRef.current = false;
+                            return;
+                        }
+                        commitName();
+                    }}
                     onKeyDown={(event) => {
                         if (event.key === "Enter") {
                             event.preventDefault();
                             event.currentTarget.blur();
                         } else if (event.key === "Escape") {
                             event.preventDefault();
-                            setNameDraft(laneLabel);
+                            event.stopPropagation();
+                            cancelBlurRef.current = true;
+                            setDraft({ ...draft, value: draft.committed });
                             event.currentTarget.blur();
                         }
                     }}
@@ -94,7 +107,7 @@ function ParallelLaneRow({
             </div>
         </div>
     );
-}
+});
 
 function ParallelLaneEditor({
                                 lanes = [],

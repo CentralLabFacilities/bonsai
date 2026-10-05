@@ -1,6 +1,27 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { normalizeContainerAutoExpansion } from "../utils/editorGeometry.js";
 import { isEditorCloneNode } from "../utils/editorClones.js";
+
+// Publish immutable projections as render state, not shared ref mutations. The
+// input guard makes React's immediate retry cheap and isolates abandoned renders.
+// Project must be pure, with every changing dependency included in inputs.
+export function useDerivedGraphSnapshot(inputs, project, initialValue) {
+    const [snapshot, setSnapshot] = useState(() => ({
+        inputs,
+        value: project(initialValue),
+    }));
+
+    if (
+        inputs.length !== snapshot.inputs.length ||
+        inputs.some((input, index) => !Object.is(input, snapshot.inputs[index]))
+    ) {
+        const value = project(snapshot.value);
+        setSnapshot({ inputs, value });
+        return value;
+    }
+
+    return snapshot.value;
+}
 
 export function projectSemanticNodes(previous, nodes, isDraggingNode = false) {
     if (isDraggingNode) return previous;
@@ -28,16 +49,12 @@ export function projectSemanticNodes(previous, nodes, isDraggingNode = false) {
 }
 
 export function useSemanticNodeSnapshot(nodes, isDraggingNode) {
-    const [snapshot, setSnapshot] = useState(() => projectSemanticNodes([], nodes));
-    const semanticNodes = useMemo(
-        () => projectSemanticNodes(snapshot, nodes, isDraggingNode),
-        [snapshot, nodes, isDraggingNode]
+    return useDerivedGraphSnapshot(
+        [nodes, isDraggingNode],
+        (previous) => previous === undefined
+            ? projectSemanticNodes([], nodes)
+            : projectSemanticNodes(previous, nodes, isDraggingNode)
     );
-
-    // A render-local state adjustment is replayable if React abandons a render;
-    // mutating a shared ref here would expose an uncommitted graph to handlers.
-    if (semanticNodes !== snapshot) setSnapshot(semanticNodes);
-    return semanticNodes;
 }
 
 /**

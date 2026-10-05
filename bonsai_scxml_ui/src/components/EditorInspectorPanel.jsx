@@ -59,15 +59,21 @@ export default function EditorInspectorPanel({
     const selectedNode = selection.selectedNode;
     const inspectorTab =
         rightPanelTab === "details" && !selectedNode ? "datamodel" : rightPanelTab;
+    const addParameter = dataModel.onAddParameter;
+    const setRuntimePanelOpen = runtime.setPanelOpen;
 
     const handleAddParameter = useCallback(
         (parameterId, parameterExpr) => {
             if (!String(parameterId || "").trim()) return;
-            dataModel.onAddParameter(parameterId, parameterExpr);
+            addParameter(parameterId, parameterExpr);
             setNewParamId("");
             setNewParamExpr("");
         },
-        [dataModel],
+        [addParameter],
+    );
+    const handleToggleRuntimePanel = useCallback(
+        () => setRuntimePanelOpen((value) => !value),
+        [setRuntimePanelOpen],
     );
 
     return (
@@ -117,7 +123,7 @@ export default function EditorInspectorPanel({
             {runtime.log && (
                 <RuntimeChangesPanel
                     isOpen={runtime.panelOpen}
-                    onToggle={() => runtime.setPanelOpen((value) => !value)}
+                    onToggle={handleToggleRuntimePanel}
                     playback={runtime.playback}
                     changes={runtime.changes}
                 />
@@ -161,8 +167,6 @@ export default function EditorInspectorPanel({
                             hasInitialNode={selection.hasInitialNode}
                             activeTab={details.activeTab}
                             setActiveTab={details.setActiveTab}
-                            packages={details.packages}
-                            getPackageSkillEvent={details.getPackageSkillEvent}
                             availableTargetNodes={details.availableTargetNodes}
                             globalDataModel={selection.actionDataModel}
                             actionValueVariables={selection.actionExpressionVariables}

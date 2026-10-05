@@ -146,6 +146,20 @@ function BehaviorTreeEntry({
     );
 }
 
+
+const createBehaviorRootState = (source) => ({
+    source,
+    listing: {
+        revision: 0,
+        entries: [],
+        hasLoaded: false,
+        loading: Boolean(source.path),
+        error: "",
+    },
+    picker: { pending: false, error: "" },
+    openError: "",
+});
+
 function BehaviorRoot({
     directory,
     onChange,
@@ -157,16 +171,22 @@ function BehaviorRoot({
         () => ({ key: directory.key, path: directory.path }),
         [directory.key, directory.path]
     );
-    const [listing, setListing] = useState(() => ({
-        source,
-        revision: 0,
-        entries: [],
-        hasLoaded: false,
-        loading: Boolean(source.path),
-        error: "",
-    }));
-    const [picker, setPicker] = useState({ pending: false, error: "" });
-    const [openError, setOpenError] = useState("");
+    const [rootState, setRootState] = useState(() =>
+        createBehaviorRootState(source)
+    );
+    const currentRootState =
+        rootState.source === source ? rootState : createBehaviorRootState(source);
+    const { listing, picker, openError } = currentRootState;
+
+    const updateRootState = (updater) => {
+        setRootState((current) => {
+            const base =
+                current.source === source
+                    ? current
+                    : createBehaviorRootState(source);
+            return updater(base);
+        });
+    };
     const pickerRequestRef = useRef(null);
     const openRequestRef = useRef(null);
     const changeRef = useRef({ directory, onChange });
@@ -183,24 +203,14 @@ function BehaviorRoot({
         openRequestRef.current = null;
     }, [source]);
 
-    if (listing.source !== source) {
-        setListing({
-            source,
-            revision: 0,
-            entries: [],
-            hasLoaded: false,
-            loading: Boolean(source.path),
-            error: "",
-        });
-        setPicker({ pending: false, error: "" });
-        setOpenError("");
-    }
-
     const loadEntries = () => {
-        setListing((current) => ({
+        updateRootState((current) => ({
             ...current,
-            revision: current.revision + 1,
-            loading: Boolean(source.path),
+            listing: {
+                ...current.listing,
+                revision: current.listing.revision + 1,
+                loading: Boolean(source.path),
+            },
         }));
     };
 
@@ -225,14 +235,24 @@ function BehaviorRoot({
             }
 
             if (!cancelled) {
-                setListing((current) => {
-                    if (current.source !== source || current.revision !== revision) return current;
+                setRootState((current) => {
+                    const base =
+                        current.source === source
+                            ? current
+                            : createBehaviorRootState(source);
+                    if (base.listing.revision !== revision) return current;
+
                     return {
-                        ...current,
-                        entries: nextError ? current.entries : nextEntries,
-                        hasLoaded: current.hasLoaded || !nextError,
-                        error: nextError,
-                        loading: false,
+                        ...base,
+                        listing: {
+                            ...base.listing,
+                            entries: nextError
+                                ? base.listing.entries
+                                : nextEntries,
+                            hasLoaded: base.listing.hasLoaded || !nextError,
+                            error: nextError,
+                            loading: false,
+                        },
                     };
                 });
             }
@@ -253,27 +273,39 @@ function BehaviorRoot({
         if (pickerRequestRef.current) return;
         const request = {};
         pickerRequestRef.current = request;
-        setPicker((current) => ({ ...current, pending: true }));
+        updateRootState((current) => ({
+            ...current,
+            picker: { ...current.picker, pending: true },
+        }));
         try {
             const selected = await selectDirectory(
                 `Select ${directory.key} Behavior Directory`
             );
             if (pickerRequestRef.current !== request || !selected) return;
-            setPicker({ pending: true, error: "" });
+            updateRootState((current) => ({
+                ...current,
+                picker: { pending: true, error: "" },
+            }));
             changeRef.current.onChange({
                 ...changeRef.current.directory,
                 path: selected,
             });
         } catch (pickError) {
             if (pickerRequestRef.current !== request) return;
-            setPicker({
-                pending: true,
-                error: `Could not choose directory. ${errorMessage(pickError)} Retry with Choose directory.`,
-            });
+            updateRootState((current) => ({
+                ...current,
+                picker: {
+                    pending: true,
+                    error: `Could not choose directory. ${errorMessage(pickError)} Retry with Choose directory.`,
+                },
+            }));
         } finally {
             if (pickerRequestRef.current === request) {
                 pickerRequestRef.current = null;
-                setPicker((current) => ({ ...current, pending: false }));
+                updateRootState((current) => ({
+                    ...current,
+                    picker: { ...current.picker, pending: false },
+                }));
             }
         }
     };
@@ -283,10 +315,15 @@ function BehaviorRoot({
         openRequestRef.current = request;
         try {
             await onOpenBehavior?.(entry);
-            if (openRequestRef.current === request) setOpenError("");
+            if (openRequestRef.current === request) {
+                updateRootState((current) => ({ ...current, openError: "" }));
+            }
         } catch (behaviorError) {
             if (openRequestRef.current === request) {
-                setOpenError(`Could not open ${entry.name}. ${errorMessage(behaviorError)} Double-click this behavior to retry.`);
+                updateRootState((current) => ({
+                    ...current,
+                    openError: `Could not open ${entry.name}. ${errorMessage(behaviorError)} Double-click this behavior to retry.`,
+                }));
             }
         } finally {
             if (openRequestRef.current === request) openRequestRef.current = null;

@@ -132,6 +132,7 @@ export function useRustWorkflowDocument({
     const activeQueueGenerationRef = useRef(0);
     const queueDepthRef = useRef(0);
     const coalescedSequenceRef = useRef(new Map());
+    const editorStateSyncBatchRef = useRef({ generation: null, sequence: 0, tail: null });
     const readQuerySequenceRef = useRef(new Map());
     const editorStateRef = useRef(null);
 
@@ -167,9 +168,9 @@ export function useRustWorkflowDocument({
      * command bridge. Every call keeps its original place in the queue, but a
      * queued operation becomes a cheap no-op if a newer value for the same key
      * was requested before it started. This is intentionally used only for
-     * latest-value editor snapshots (positions/parameters). State drag keys
-     * include their source parent, so reparenting across different container or
-     * lane boundaries is never collapsed into the same queue entry.
+     * latest-value editor snapshots (positions/parameters/full state). State
+     * drag keys include their source parent, so reparenting across different
+     * container or lane boundaries is never collapsed into the same queue entry.
      *
      * Keeping the stale queue entries instead of physically removing/reordering
      * them preserves the relative order of unrelated/structural commands while
@@ -182,15 +183,14 @@ export function useRustWorkflowDocument({
                 (coalescedSequenceRef.current.get(generationKey) || 0) + 1;
             coalescedSequenceRef.current.set(generationKey, sequence);
 
-            return enqueue(async () => {
-                if (
-                    coalescedSequenceRef.current.get(generationKey) !== sequence
-                ) {
-                    return null;
-                }
+            const isCurrent = () =>
+                generation === documentGenerationRef.current &&
+                coalescedSequenceRef.current.get(generationKey) === sequence;
 
+            return enqueue(async () => {
                 try {
-                    return await operation();
+                    if (!isCurrent()) return null;
+                    return await operation(isCurrent);
                 } finally {
                     if (
                         coalescedSequenceRef.current.get(generationKey) ===
@@ -282,8 +282,9 @@ export function useRustWorkflowDocument({
         [setEdges, setGlobalDataModel, setNodes]
     );
 
-    const replaceNow = useCallback(async (editorState, expectedRevision = null) => {
-        if (!isTauri()) return null;
+    const syncEditorStateNow = useCallback(async (editorState, expectedRevision = null) => {
+        const generation = activeQueueGenerationRef.current;
+        if (!isTauri() || generation !== documentGenerationRef.current) return null;
 
         const request = measureEditorTask(
             "Build full Rust workflow snapshot",
@@ -308,6 +309,7 @@ export function useRustWorkflowDocument({
                 queueDepth: queueDepthRef.current,
             }
         );
+        if (generation !== documentGenerationRef.current) return null;
         revisionRef.current = snapshot?.revision ?? null;
         readyRef.current = true;
         // A document replacement changes the semantic validation source even
@@ -332,9 +334,9 @@ export function useRustWorkflowDocument({
             }
 
             await waitForEditorCommit();
-            return replaceNow(editorStateRef.current, null);
+            return syncEditorStateNow(editorStateRef.current, null);
         },
-        [replaceNow]
+        [syncEditorStateNow]
     );
 
     const applyCommandNow = useCallback(
@@ -342,7 +344,7 @@ export function useRustWorkflowDocument({
             if (!isTauri() || !command) return null;
 
             if (!readyRef.current) {
-                await replaceNow(editorStateRef.current, null);
+                await syncEditorStateNow(editorStateRef.current, null);
             }
 
             try {
@@ -420,7 +422,7 @@ export function useRustWorkflowDocument({
                 return resyncFromEditor(error);
             }
         },
-        [applyCanonicalPatch, replaceNow, resyncFromEditor]
+        [applyCanonicalPatch, resyncFromEditor, syncEditorStateNow]
     );
 
     const syncEditorTransitionsNow = useCallback(
@@ -451,11 +453,31 @@ export function useRustWorkflowDocument({
 
             return enqueue(async () => {
                 if (!isTauri()) return null;
-                return replaceNow(snapshot, null);
+                return syncEditorStateNow(snapshot, null);
             }, generation);
         },
-        [enqueue, replaceNow]
+        [enqueue, syncEditorStateNow]
     );
+
+    const syncEditorStateAfterCommit = useCallback(() => {
+        const generation = documentGenerationRef.current;
+        const batch = editorStateSyncBatchRef.current;
+        // A replacement can be a prerequisite for a later command/read. Only
+        // adjacent full snapshots may supersede one another across the commit wait.
+        if (batch.generation !== generation || batch.tail !== queueRef.current) {
+            batch.sequence += 1;
+        }
+
+        const result = enqueueLatest(`editor-state:${batch.sequence}`, async (isCurrent) => {
+            if (!isTauri()) return null;
+            await waitForEditorCommit();
+            if (!isCurrent()) return null;
+            return syncEditorStateNow(editorStateRef.current, revisionRef.current);
+        }, generation);
+        batch.generation = generation;
+        batch.tail = queueRef.current;
+        return result;
+    }, [enqueueLatest, syncEditorStateNow]);
 
     const syncInsertedEditorStatesAfterCommit = useCallback(
         (stateIds) =>
@@ -483,7 +505,7 @@ export function useRustWorkflowDocument({
                 // not an isolated semantic add. Fall back to the full structural
                 // exporter, which owns lane flattening/promotion semantics.
                 if (insertedNodes.length !== requestedIds.length) {
-                    return replaceNow(editorState, null);
+                    return syncEditorStateNow(editorState, null);
                 }
 
                 return applyCommandNow({
@@ -491,7 +513,7 @@ export function useRustWorkflowDocument({
                     nodes: insertedNodes,
                 });
             }),
-        [applyCommandNow, enqueue, replaceNow]
+        [applyCommandNow, enqueue, syncEditorStateNow]
     );
 
 
@@ -508,7 +530,7 @@ export function useRustWorkflowDocument({
                     laneId,
                 });
                 if (!context) {
-                    return replaceNow(editorState, null);
+                    return syncEditorStateNow(editorState, null);
                 }
 
                 const [insertedNode] = buildRustEditorNodeSnapshots({
@@ -516,7 +538,7 @@ export function useRustWorkflowDocument({
                     stateIds: [stateId],
                 });
                 if (!insertedNode) {
-                    return replaceNow(editorState, null);
+                    return syncEditorStateNow(editorState, null);
                 }
 
                 // A visual Parallel lane may be flattened in the semantic
@@ -535,7 +557,7 @@ export function useRustWorkflowDocument({
                     context,
                 });
             }),
-        [applyCommandNow, enqueue, replaceNow]
+        [applyCommandNow, enqueue, syncEditorStateNow]
     );
 
 
@@ -551,7 +573,7 @@ export function useRustWorkflowDocument({
                     (candidate) => candidate.id === containerId
                 );
                 if (!containerNode || !["compound", "parallel"].includes(containerNode.type)) {
-                    return replaceNow(editorState, null);
+                    return syncEditorStateNow(editorState, null);
                 }
 
                 const [container] = buildRustEditorNodeSnapshots({
@@ -559,7 +581,7 @@ export function useRustWorkflowDocument({
                     stateIds: [containerId],
                 });
                 if (!container) {
-                    return replaceNow(editorState, null);
+                    return syncEditorStateNow(editorState, null);
                 }
 
                 let groups;
@@ -602,7 +624,7 @@ export function useRustWorkflowDocument({
                 }
 
                 if (groups.length === 0 || groups.some((group) => group.stateIds.length === 0)) {
-                    return replaceNow(editorState, null);
+                    return syncEditorStateNow(editorState, null);
                 }
 
                 return applyCommandNow({
@@ -611,7 +633,7 @@ export function useRustWorkflowDocument({
                     groups,
                 });
             }),
-        [applyCommandNow, enqueue, replaceNow]
+        [applyCommandNow, enqueue, syncEditorStateNow]
     );
 
     const syncPastedEditorSubgraphAfterCommit = useCallback(
@@ -653,7 +675,7 @@ export function useRustWorkflowDocument({
                     stateId,
                 });
                 if (!positions) {
-                    return replaceNow(editorState, null);
+                    return syncEditorStateNow(editorState, null);
                 }
 
                 return applyCommandNow({
@@ -662,7 +684,7 @@ export function useRustWorkflowDocument({
                     positions,
                 });
             }),
-        [applyCommandNow, enqueueLatest, replaceNow]
+        [applyCommandNow, enqueueLatest, syncEditorStateNow]
     );
 
     const syncStatePosition = useCallback(
@@ -678,7 +700,7 @@ export function useRustWorkflowDocument({
                         (candidate) => candidate.id === stateId
                     );
                     if (!node) {
-                        return replaceNow(editorStateRef.current, null);
+                        return syncEditorStateNow(editorStateRef.current, null);
                     }
 
                     const currentParentId = node.parentId || null;
@@ -694,7 +716,7 @@ export function useRustWorkflowDocument({
                             stateId: sourceStateId,
                         });
                         if (!sourceStateId || !positions) {
-                            return replaceNow(editorStateRef.current, null);
+                            return syncEditorStateNow(editorStateRef.current, null);
                         }
                         return applyCommandNow({
                             type: "replaceStateEditorPositions",
@@ -767,7 +789,7 @@ export function useRustWorkflowDocument({
                     });
                 }
             ),
-        [applyCommandNow, enqueueLatest, replaceNow]
+        [applyCommandNow, enqueueLatest, syncEditorStateNow]
     );
 
     const syncStateParameters = useCallback(
@@ -781,7 +803,7 @@ export function useRustWorkflowDocument({
                         (candidate) => candidate.id === stateId
                     );
                     if (!node) {
-                        return replaceNow(editorStateRef.current, null);
+                        return syncEditorStateNow(editorStateRef.current, null);
                     }
                     parameterList = node.data?.params || [];
                 }
@@ -792,7 +814,7 @@ export function useRustWorkflowDocument({
                     parameters: buildRustStateParameters(parameterList),
                 });
             }),
-        [applyCommandNow, enqueueLatest, replaceNow]
+        [applyCommandNow, enqueueLatest, syncEditorStateNow]
     );
 
     const syncSlotsAfterCommit = useCallback(
@@ -860,7 +882,7 @@ export function useRustWorkflowDocument({
                     (candidate) => candidate.id === stateId
                 );
                 if (!node) {
-                    return replaceNow(editorState, null);
+                    return syncEditorStateNow(editorState, null);
                 }
 
                 await applyCommandNow({
@@ -873,7 +895,7 @@ export function useRustWorkflowDocument({
                     ...buildRustSlotsSnapshot(editorState),
                 });
             }),
-        [applyCommandNow, enqueue, replaceNow]
+        [applyCommandNow, enqueue, syncEditorStateNow]
     );
 
     const syncRemovedStates = useCallback(
@@ -1028,6 +1050,7 @@ export function useRustWorkflowDocument({
     // potentially expensive validation/analysis query block later UI edits.
     // Repeated queries with the same key are latest-value-wins.
     const runReadQuery = useCallback((key, operation) => {
+        editorStateSyncBatchRef.current.tail = null;
         const generation = documentGenerationRef.current;
         const generationKey = `${generation}:read:${String(key || "query")}`;
         const sequence =
@@ -1067,12 +1090,14 @@ export function useRustWorkflowDocument({
         readyRef.current = false;
         revisionRef.current = null;
         coalescedSequenceRef.current.clear();
+        editorStateSyncBatchRef.current.tail = null;
         readQuerySequenceRef.current.clear();
     }, []);
 
     return {
         applyWorkflowCommand,
         syncEditorState,
+        syncEditorStateAfterCommit,
         syncInsertedEditorStatesAfterCommit,
         syncInsertedParallelLaneStateAfterCommit,
         syncWrappedContainerAfterCommit,

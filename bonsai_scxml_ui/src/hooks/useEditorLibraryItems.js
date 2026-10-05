@@ -17,7 +17,6 @@ import {
 } from "../utils/workflowLoader";
 
 export function useEditorLibraryItems({
-    skills,
     nodes,
     behaviorDirectories,
     fetchSkillData,
@@ -316,20 +315,9 @@ export function useEditorLibraryItems({
         [fetchSkillData, nodes]
     );
 
-    const getPackageSkillEvent = useCallback(
-        (pkgName) => {
-            if (!pkgName) return [];
-            return (skills.skills || []).filter((skill) =>
-                skill.includes(`skills.${pkgName}`)
-            );
-        },
-        [skills.skills]
-    );
-
     return {
         handleOpenBehaviorFile,
         createBehaviorNode,
         createNode,
-        getPackageSkillEvent,
     };
 }

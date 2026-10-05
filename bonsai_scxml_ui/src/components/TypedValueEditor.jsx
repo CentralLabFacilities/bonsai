@@ -1,4 +1,4 @@
-import { useId, useMemo, useRef, useState } from "react";
+import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
     VALUE_TYPES,
     getCompatibleVariables,
@@ -25,26 +25,31 @@ function TypedValueEditor({
     const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false);
     const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
     const inputRef = useRef(null);
-    const [lastEmittedValue, setLastEmittedValue] = useState(null);
-    const [source, setSource] = useState({ value, expectedType });
+    const lastEmittedValueRef = useRef(null);
+    const sourceRef = useRef({ value, expectedType });
     const suggestionsId = useId();
 
-    if (!Object.is(source.value, value) || !Object.is(source.expectedType, expectedType)) {
-        setSource({ value, expectedType });
-        if (!Object.is(source.expectedType, expectedType)) setError("");
-        if (!Object.is(source.value, value)) {
-            const nextValue = String(value ?? "");
-            // A parent draft echo is not an external reset of autocomplete.
-            if (lastEmittedValue === nextValue) {
-                setLastEmittedValue(null);
-            } else {
-                setDraft(nextValue);
-                setError("");
-                setIsAutocompleteOpen(false);
-                setActiveSuggestionIndex(-1);
-            }
+    useLayoutEffect(() => {
+        const previousSource = sourceRef.current;
+        const typeChanged = !Object.is(previousSource.expectedType, expectedType);
+        const valueChanged = !Object.is(previousSource.value, value);
+        sourceRef.current = { value, expectedType };
+
+        if (typeChanged) setError("");
+        if (!valueChanged) return;
+
+        const nextValue = String(value ?? "");
+        // A parent draft echo is not an external reset of autocomplete.
+        if (lastEmittedValueRef.current === nextValue) {
+            lastEmittedValueRef.current = null;
+            return;
         }
-    }
+
+        setDraft(nextValue);
+        setError("");
+        setIsAutocompleteOpen(false);
+        setActiveSuggestionIndex(-1);
+    }, [value, expectedType]);
 
     const normalizedType = normalizeValueType(expectedType) || expectedType || null;
 
@@ -107,9 +112,12 @@ function TypedValueEditor({
             .slice(0, 8);
     }, [draft, suggestions]);
 
-    if (activeSuggestionIndex >= matchingSuggestions.length) {
-        setActiveSuggestionIndex(matchingSuggestions.length > 0 ? 0 : -1);
-    }
+    const visibleSuggestionIndex =
+        activeSuggestionIndex >= matchingSuggestions.length
+            ? matchingSuggestions.length > 0
+                ? 0
+                : -1
+            : activeSuggestionIndex;
 
     const commitValue = (nextValue = draft) => {
         const result = validateTypedValueInput(
@@ -128,7 +136,7 @@ function TypedValueEditor({
         setError("");
         setIsAutocompleteOpen(false);
         setActiveSuggestionIndex(-1);
-        setLastEmittedValue(result.value);
+        lastEmittedValueRef.current = result.value;
         onDraftChange?.(result.value);
         onCommit?.(result.value);
         return true;
@@ -141,7 +149,7 @@ function TypedValueEditor({
         setError("");
         setIsAutocompleteOpen(false);
         setActiveSuggestionIndex(-1);
-        setLastEmittedValue(suggestion.value);
+        lastEmittedValueRef.current = suggestion.value;
         onDraftChange?.(suggestion.value);
         onCommit?.(suggestion.value);
 
@@ -157,8 +165,10 @@ function TypedValueEditor({
             event.key === "ArrowDown"
         ) {
             event.preventDefault();
-            setActiveSuggestionIndex((current) =>
-                current < matchingSuggestions.length - 1 ? current + 1 : 0
+            setActiveSuggestionIndex(
+                visibleSuggestionIndex < matchingSuggestions.length - 1
+                    ? visibleSuggestionIndex + 1
+                    : 0
             );
             return;
         }
@@ -169,8 +179,10 @@ function TypedValueEditor({
             event.key === "ArrowUp"
         ) {
             event.preventDefault();
-            setActiveSuggestionIndex((current) =>
-                current > 0 ? current - 1 : matchingSuggestions.length - 1
+            setActiveSuggestionIndex(
+                visibleSuggestionIndex > 0
+                    ? visibleSuggestionIndex - 1
+                    : matchingSuggestions.length - 1
             );
             return;
         }
@@ -188,9 +200,9 @@ function TypedValueEditor({
         if (
             isAutocompleteOpen &&
             matchingSuggestions.length > 0 &&
-            activeSuggestionIndex >= 0
+            visibleSuggestionIndex >= 0
         ) {
-            selectSuggestion(matchingSuggestions[activeSuggestionIndex]);
+            selectSuggestion(matchingSuggestions[visibleSuggestionIndex]);
             return;
         }
 
@@ -215,8 +227,8 @@ function TypedValueEditor({
                     aria-autocomplete="list"
                     aria-expanded={isAutocompleteOpen && matchingSuggestions.length > 0}
                     aria-controls={isAutocompleteOpen && matchingSuggestions.length > 0 ? suggestionsId : undefined}
-                    aria-activedescendant={isAutocompleteOpen && activeSuggestionIndex >= 0 && matchingSuggestions.length > 0
-                        ? `${suggestionsId}-${activeSuggestionIndex}` : undefined}
+                    aria-activedescendant={isAutocompleteOpen && visibleSuggestionIndex >= 0 && matchingSuggestions.length > 0
+                        ? `${suggestionsId}-${visibleSuggestionIndex}` : undefined}
                     autoComplete="off"
                     onFocus={() => {
                         if (String(draft || "").trim() && matchingSuggestions.length > 0) {
@@ -228,7 +240,7 @@ function TypedValueEditor({
                         const nextValue = event.target.value;
                         setDraft(nextValue);
                         setError("");
-                        setLastEmittedValue(nextValue);
+                        lastEmittedValueRef.current = nextValue;
                         onDraftChange?.(nextValue);
 
                         const hasText = nextValue.trim().length > 0;
@@ -251,12 +263,12 @@ function TypedValueEditor({
                             <button
                                 type="button"
                                 className={`typed-value-autocomplete-option ${
-                                    index === activeSuggestionIndex ? "active" : ""
+                                    index === visibleSuggestionIndex ? "active" : ""
                                 }`}
                                 key={`${suggestion.kind}:${suggestion.value}`}
                                 id={`${suggestionsId}-${index}`}
                                 role="option"
-                                aria-selected={index === activeSuggestionIndex}
+                                aria-selected={index === visibleSuggestionIndex}
                                 onMouseDown={(event) => event.preventDefault()}
                                 onClick={() => selectSuggestion(suggestion)}
                             >

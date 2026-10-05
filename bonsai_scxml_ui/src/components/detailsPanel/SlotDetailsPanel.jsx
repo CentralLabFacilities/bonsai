@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { FiActivity, FiChevronDown, FiDatabase, FiExternalLink, FiLayers, FiLink2 } from "react-icons/fi";
 import { MetadataRow } from "./DetailsPanelPrimitives.jsx";
 import { normalizeSlotPath, normalizeSlotType } from "../../utils/editorGraph.js";
@@ -11,14 +11,22 @@ function SlotPathEditor({
                             value,
                             slotType,
                             availableSlotPaths = [],
-                            onChange,
                             onCommit,
                         }) {
+    const committedPath = String(value ?? "");
+    const [draft, setDraft] = useState({ source: committedPath, value: committedPath, committed: committedPath });
     const [isOpen, setIsOpen] = useState(false);
     const [activeIndex, setActiveIndex] = useState(-1);
+    const inputRef = useRef(null);
+
+    if (draft.source !== committedPath) {
+        setDraft({ source: committedPath, value: committedPath, committed: committedPath });
+        setIsOpen(false);
+        setActiveIndex(-1);
+    }
 
     const matches = useMemo(() => {
-        const query = normalizeSlotSearchPath(value);
+        const query = normalizeSlotSearchPath(draft.value);
         const type = normalizeSlotType(slotType);
 
         return (availableSlotPaths || [])
@@ -40,21 +48,47 @@ function SlotPathEditor({
                     String(a.path).localeCompare(String(b.path))
                 );
             });
-    }, [availableSlotPaths, slotType, value]);
+    }, [availableSlotPaths, slotType, draft.value]);
+
+    const visibleActiveIndex = Math.min(activeIndex, matches.length - 1);
+    const suggestionsId = `${id}-suggestions`;
+
+    const commitPath = (nextValue = draft.value) => {
+        if (nextValue === draft.committed) return;
+        const accepted = onCommit?.(nextValue);
+        setDraft({
+            ...draft,
+            value: accepted === false ? draft.committed : nextValue,
+            committed: accepted === false ? draft.committed : nextValue,
+        });
+    };
 
     const selectMatch = (path) => {
-        onChange(path, true);
+        commitPath(path);
+        inputRef.current?.focus();
         setIsOpen(false);
         setActiveIndex(-1);
     };
 
     const handleKeyDown = (event) => {
+        if (event.key === "Escape") {
+            event.preventDefault();
+            event.stopPropagation();
+            setDraft({ ...draft, value: draft.committed });
+            inputRef.current?.focus();
+            setIsOpen(false);
+            setActiveIndex(-1);
+            return;
+        }
+
+        if (event.target !== inputRef.current) return;
+
         if (event.key === "ArrowDown") {
             if (matches.length === 0) return;
             event.preventDefault();
             setIsOpen(true);
-            setActiveIndex((current) =>
-                current < matches.length - 1 ? current + 1 : 0
+            setActiveIndex(
+                visibleActiveIndex < matches.length - 1 ? visibleActiveIndex + 1 : 0
             );
             return;
         }
@@ -63,8 +97,8 @@ function SlotPathEditor({
             if (matches.length === 0) return;
             event.preventDefault();
             setIsOpen(true);
-            setActiveIndex((current) =>
-                current > 0 ? current - 1 : matches.length - 1
+            setActiveIndex(
+                visibleActiveIndex > 0 ? visibleActiveIndex - 1 : matches.length - 1
             );
             return;
         }
@@ -72,35 +106,47 @@ function SlotPathEditor({
         if (event.key === "Enter") {
             event.preventDefault();
 
-            if (isOpen && matches.length > 0 && activeIndex >= 0) {
-                selectMatch(matches[activeIndex].path);
+            if (isOpen && visibleActiveIndex >= 0) {
+                selectMatch(matches[visibleActiveIndex].path);
                 return;
             }
 
             // No matching existing path was selected. Keeping the typed path
             // makes it a new slot when the slot graph is rebuilt on blur.
-            event.currentTarget.blur();
+            inputRef.current?.blur();
             return;
-        }
-
-        if (event.key === "Escape") {
-            setIsOpen(false);
-            setActiveIndex(-1);
         }
     };
 
     return (
-        <div className="typed-value-editor">
+        <div
+            className="typed-value-editor"
+            onKeyDown={handleKeyDown}
+            onBlur={(event) => {
+                if (event.currentTarget.contains(event.relatedTarget)) return;
+                setIsOpen(false);
+                setActiveIndex(-1);
+                commitPath();
+            }}
+        >
             <div className="typed-value-editor-row">
                 <input
                     id={id}
+                    ref={inputRef}
                     className="parameter-value-input compact-slot-path-input"
                     type="text"
-                    value={value || ""}
+                    value={draft.value}
                     placeholder="Enter or select path"
                     autoComplete="off"
+                    aria-label="Slot path"
+                    role="combobox"
+                    aria-autocomplete="list"
+                    aria-expanded={isOpen && matches.length > 0}
+                    aria-controls={isOpen && matches.length > 0 ? suggestionsId : undefined}
+                    aria-activedescendant={isOpen && visibleActiveIndex >= 0
+                        ? `${suggestionsId}-${visibleActiveIndex}` : undefined}
                     onChange={(event) => {
-                        onChange(event.target.value, false);
+                        setDraft({ ...draft, value: event.target.value });
                         setIsOpen(true);
                         setActiveIndex(-1);
                     }}
@@ -108,27 +154,22 @@ function SlotPathEditor({
                         setIsOpen(true);
                         setActiveIndex(-1);
                     }}
-                    onBlur={() => {
-                        setIsOpen(false);
-                        setActiveIndex(-1);
-                        onCommit?.();
-                    }}
-                    onKeyDown={handleKeyDown}
                 />
 
                 {isOpen && matches.length > 0 && (
-                    <div className="typed-value-autocomplete">
+                    <div className="typed-value-autocomplete" id={suggestionsId} role="listbox">
                         {matches.map((option, index) => (
                             <button
                                 key={`${option.path}-${option.type || ""}`}
                                 type="button"
                                 className={`typed-value-autocomplete-option ${
-                                    index === activeIndex ? "active" : ""
+                                    index === visibleActiveIndex ? "active" : ""
                                 }`}
-                                onMouseDown={(event) => {
-                                    event.preventDefault();
-                                    selectMatch(option.path);
-                                }}
+                                id={`${suggestionsId}-${index}`}
+                                role="option"
+                                aria-selected={index === visibleActiveIndex}
+                                onMouseDown={(event) => event.preventDefault()}
+                                onClick={() => selectMatch(option.path)}
                             >
                                 <span className="typed-value-autocomplete-value">
                                     {option.path}
@@ -146,16 +187,15 @@ function SkillSlotSection({
                              nodeId,
                              slots,
                              access,
-                             availableSlotPaths,
-                             onChange,
-                             onCommit,
+                              availableSlotPaths,
+                              onChange,
                          }) {
     const prefix = access === "read" ? "in" : "out";
 
     return slots.map((slot, index) => (
         <div
             className={`slot-text-field compact-slot-card compact-slot-${access}`}
-            key={`${prefix}-${slot.key}`}
+            key={`${nodeId}:${prefix}:${slot.key}`}
         >
             <div className="compact-slot-header">
                 <div className="compact-slot-name">{slot.key}</div>
@@ -182,8 +222,7 @@ function SkillSlotSection({
                 value={slot.path || ""}
                 slotType={slot.type}
                 availableSlotPaths={availableSlotPaths}
-                onChange={(value, commit) => onChange(index, value, commit)}
-                onCommit={onCommit}
+                onCommit={(value) => onChange(index, value, true)}
             />
         </div>
     ));
@@ -200,11 +239,10 @@ function SlotDetailsPanel({
                               onNavigateAncestorSlot,
                               onNavigateDescendantSkill,
                           }) {
-    const initialPath =
+    const committedPath =
         selectedNode.data?.path ||
         selectedNode.data?.label ||
         "";
-    const [pathDraft, setPathDraft] = useState(initialPath);
     const [sourceHierarchyExpanded, setSourceHierarchyExpanded] = useState(true);
     const [accessedByExpanded, setAccessedByExpanded] = useState(true);
 
@@ -256,13 +294,10 @@ function SlotDetailsPanel({
         selectedNode.data?.currentMachineInherited
     );
 
-    const commitPath = (nextValue = pathDraft) => {
+    const commitPath = (nextValue) => {
         const cleanPath = String(nextValue || "").trim();
-        if (!cleanPath) {
-            setPathDraft(initialPath);
-            return;
-        }
-        onUpdateSlotPath?.(cleanPath);
+        if (!cleanPath || normalizeSlotPath(cleanPath) === normalizeSlotPath(committedPath)) return false;
+        return onUpdateSlotPath?.(cleanPath);
     };
 
     return (
@@ -308,16 +343,10 @@ function SlotDetailsPanel({
                     <div className="slot-path-editor-shell">
                         <SlotPathEditor
                             id={`slot-detail-path-${selectedNode.id}`}
-                            value={pathDraft}
+                            value={committedPath}
                             slotType={slotType}
                             availableSlotPaths={availableSlotPaths}
-                            onChange={(value, commit) => {
-                                setPathDraft(value);
-                                if (commit) {
-                                    commitPath(value);
-                                }
-                            }}
-                            onCommit={() => commitPath(pathDraft)}
+                            onCommit={commitPath}
                         />
                     </div>
 

@@ -174,6 +174,8 @@ test("keyboard controls, creation dialogs, and library insertion preserve editor
         assert.ok(target, "click target exists");
         await React.act(async () => target.click());
     };
+    const buttonByText = (scope, text) => [...scope.querySelectorAll("button")]
+        .find((button) => button.textContent.trim() === text);
     const setInput = async (input, value) => React.act(async () => {
         Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set.call(input, value);
         input.dispatchEvent(new window.Event("input", { bubbles: true }));
@@ -203,8 +205,164 @@ test("keyboard controls, creation dialogs, and library insertion preserve editor
             "/src/hooks/useEditorLibraryItems.js", "/src/hooks/useEditorGraphState.js",
             "/src/hooks/useWorkflowTabs.js", "/src/hooks/useGlobalEditorShortcuts.js",
             "/src/components/EditorChrome.jsx", "/src/components/BehaviorLibrary.jsx",
+            "/src/components/ui/index.js", "/src/components/CodeView.jsx",
+            "/src/hooks/useContainerCreation.js",
         ].map((path) => server.ssrLoadModule(path)));
-        const [details, slots, submachines, overlays, skills, drop, items, graphState, tabState, shortcuts, chrome, behaviors] = modules;
+        const [details, slots, submachines, overlays, skills, drop, items, graphState, tabState, shortcuts, chrome, behaviors, feedback, codeView, containers] = modules;
+
+        await t.test("container selection is linear, sibling-scoped, stable on ties and frozen during drag", async () => {
+            const a = { ...node("a"), selected: true, parentId: "first" };
+            const a2 = { ...node("a2"), selected: true, parentId: "first" };
+            const b = { ...node("b"), selected: true, parentId: "second" };
+            const b2 = { ...node("b2"), selected: true, parentId: "second" };
+            const excluded = [
+                { ...node("lane"), selected: true, type: "parallelLane", parentId: "second" },
+                { ...node("wrapper"), selected: true, data: { autoParallelLaneCompound: true } },
+                node("unselected"),
+            ];
+            const nodes = [a, b, b2, a2, ...excluded];
+            const selected = containers.projectContainerSelection([], nodes, false);
+            assert.deepEqual(selected, [a, a2]);
+            assert.equal(containers.projectContainerSelection(selected, [...nodes], false), selected);
+            assert.equal(containers.projectContainerSelection(selected, [b, b2], true), selected);
+            const updated = { ...a, data: { ...a.data, label: "Changed" } };
+            assert.deepEqual(containers.projectContainerSelection(selected, [updated, a2], false), [updated, a2]);
+            const empty = [];
+            assert.equal(containers.projectContainerSelection(empty, excluded, false), empty);
+            const root = { ...node("root"), selected: true };
+            const child = { ...node("child"), selected: true, parentId: "__root__" };
+            assert.deepEqual(containers.projectContainerSelection([], [child, root], false), [child]);
+        });
+
+        const setCode = async (value) => React.act(async () => {
+            const textarea = container.querySelector("textarea");
+            Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set.call(textarea, value);
+            textarea.dispatchEvent(new window.Event("input", { bubbles: true }));
+        });
+        await t.test("supplied Code View resets committed sources without reviving old drafts", async () => {
+            const props = { activeMode: "code", setActiveMode: noop, codeString: "<first/>" };
+            await mount(element(codeView.default, props));
+            await setCode("");
+            await React.act(async () => root.render(element(codeView.default, { ...props, activeMode: "overview" })));
+            assert.equal(container.querySelector("textarea").value, "");
+            await React.act(async () => root.render(element(codeView.default, { ...props, codeString: "<second/>" })));
+            assert.equal(container.querySelector("textarea").value, "<second/>");
+            await React.act(async () => root.render(element(codeView.default, props)));
+            assert.equal(container.querySelector("textarea").value, "<first/>");
+        });
+
+        await t.test("a suspended Code View source change cannot discard the committed user draft", async () => {
+            let setSource;
+            const pending = new Promise(() => {});
+            function Suspend({ source }) {
+                if (source === "<pending/>") throw pending;
+                return null;
+            }
+            function Harness() {
+                const [source, updateSource] = React.useState("<first/>");
+                React.useLayoutEffect(() => { setSource = updateSource; }, []);
+                return element(React.Fragment, null,
+                    element(codeView.default, { codeString: source, activeMode: "code", setActiveMode: noop }),
+                    element(Suspend, { source }));
+            }
+            await mount(element(React.Suspense, { fallback: element("span", null, "Pending") }, element(Harness)));
+            await setCode("<edited/>");
+            await React.act(async () => React.startTransition(() => setSource("<pending/>")));
+            assert.equal(container.querySelector("textarea").value, "<edited/>");
+            await React.act(async () => setSource("<first/>"));
+            assert.equal(container.querySelector("textarea").value, "<edited/>");
+        });
+
+        await t.test("browser Code View caches fallback generation once per graph snapshot", async () => {
+            let reads = 0;
+            const measured = { ...node("first"), get data() { reads += 1; return node("first").data; } };
+            const props = { nodes: [measured], edges: [], globalDataModel: [], manualSlots: [], activeMode: "code", setActiveMode: noop };
+            await mount(element(codeView.default, props));
+            assert.ok(reads > 0);
+            const next = { ...props, nodes: [measured, node("next")] };
+            await React.act(async () => root.render(element(codeView.default, next)));
+            const afterGeneration = reads;
+            await React.act(async () => root.render(element(codeView.default, { ...next, activeMode: "overview" })));
+            assert.equal(reads, afterGeneration);
+            await setCode("");
+            await React.act(async () => root.render(element(codeView.default, next)));
+            assert.equal(container.querySelector("textarea").value, "");
+            assert.equal(reads, afterGeneration);
+        });
+
+        await t.test("feedback caps committed timers, cancels eviction and preserves replacement and action semantics", async () => {
+            const originalSet = window.setTimeout;
+            const originalClear = window.clearTimeout;
+            const timers = new Map();
+            const cleared = [];
+            let sequence = 1000000;
+            let api;
+            let consumerRenders = 0;
+            window.setTimeout = (callback, duration) => {
+                const id = ++sequence;
+                timers.set(id, { callback, duration });
+                return id;
+            };
+            window.clearTimeout = (id) => { cleared.push(id); timers.delete(id); };
+            const titles = () => [...document.querySelectorAll(".ui-toast__title")].map((item) => item.textContent);
+            function Consumer() {
+                consumerRenders += 1;
+                const actions = feedback.useFeedback();
+                React.useLayoutEffect(() => { api = actions; }, [actions]);
+                return element("span", null, "Feedback consumer");
+            }
+            try {
+                await mount(element(React.StrictMode, null, element(feedback.FeedbackProvider, null, element(Consumer))));
+                const originalApi = api;
+                const renders = consumerRenders;
+                await React.act(async () => {
+                    for (let index = 0; index < 5; index += 1) api.notify({ id: String(index), title: String(index), message: "Message", duration: 100 });
+                });
+                assert.deepEqual(titles(), ["1", "2", "3", "4"]);
+                assert.equal(timers.size, 4);
+                assert.equal(api, originalApi);
+                assert.equal(consumerRenders, renders);
+                const [oldId, oldTimer] = timers.entries().next().value;
+                await React.act(async () => api.notify({ id: "5", title: "5", duration: 100 }));
+                assert.deepEqual(titles(), ["2", "3", "4", "5"]);
+                assert.ok(cleared.includes(oldId));
+                await React.act(async () => oldTimer.callback());
+                assert.deepEqual(titles(), ["2", "3", "4", "5"]);
+                const [replacedId, replacedTimer] = timers.entries().next().value;
+                await React.act(async () => api.notify({ id: "2", title: "Persistent", persistent: true }));
+                assert.deepEqual(titles(), ["3", "4", "5", "Persistent"]);
+                assert.ok(cleared.includes(replacedId));
+                assert.equal(timers.size, 3);
+                await React.act(async () => replacedTimer.callback());
+                assert.ok(titles().includes("Persistent"));
+                const articles = [...document.querySelectorAll(".ui-toast")];
+                const beforeTimers = [...timers.keys()];
+                await React.act(async () => api.dismiss("not-present"));
+                assert.deepEqual([...document.querySelectorAll(".ui-toast")], articles);
+                assert.deepEqual([...timers.keys()], beforeTimers);
+                let acted = 0;
+                await React.act(async () => api.notify({ id: "action", title: "Action", persistent: true,
+                    actionLabel: "Retry", onAction: () => { acted += 1; } }));
+                await click(document.querySelector(".ui-toast__action"));
+                assert.equal(acted, 1);
+                assert.equal(titles().includes("Action"), false);
+                const persistentToast = [...document.querySelectorAll(".ui-toast")].find((toast) => toast.textContent.includes("Persistent"));
+                await click(persistentToast.querySelector('button[aria-label="Dismiss notification"]'));
+                assert.equal(titles().includes("Persistent"), false);
+                assert.equal(api, originalApi);
+                assert.equal(consumerRenders, renders);
+                await mount(element("span", null, "Unmounted"));
+                assert.equal(timers.size, 0);
+                await React.act(async () => api.notify({ id: "late", title: "Late" }));
+                assert.equal(timers.size, 0);
+                assert.equal(document.querySelector(".ui-toast"), null);
+            } finally {
+                if (root) await React.act(async () => root.unmount());
+                root = null;
+                window.setTimeout = originalSet;
+                window.clearTimeout = originalClear;
+            }
+        });
 
         await t.test("inspector tabs are linked buttons with wrapping arrow, Home and End navigation", async () => {
             let controls;
@@ -413,17 +571,17 @@ test("keyboard controls, creation dialogs, and library insertion preserve editor
             assert.match(container.querySelector('[role="alert"]').textContent, /Skill library unavailable/);
             assert.match(container.querySelector('[role="alert"]').textContent, /502/);
             assert.equal(container.textContent.includes("The skill library is empty"), false);
-            await click(container.querySelector(".library-state-button"));
+            await click(buttonByText(container, "Retry loading skills"));
             assert.deepEqual(retries, ["retry"]);
             await React.act(async () => root.render(element(skills.default, { ...props, skillLibraryStatus: "error", skillLibraryError: "Server returned 502", isReloadingSkills: true })));
-            assert.equal(container.querySelector(".library-state-button").disabled, true);
+            assert.equal(buttonByText(container, "Retrying...").disabled, true);
             assert.match(container.querySelector('[role="alert"]').textContent, /502/);
             await React.act(async () => root.render(element(skills.default, { ...props, skillLibraryStatus: "ready", hasLoadedSkills: true })));
             assert.match(container.querySelector('[role="status"]').textContent, /skill library is empty/);
             assert.equal(container.querySelector('[role="alert"]'), null);
             await React.act(async () => root.render(element(skills.default, { ...props, searchText: "missing", skillCount: 1, skillLibraryStatus: "ready" })));
             assert.match(container.querySelector('[role="status"]').textContent, /No matching skills/);
-            await click(container.querySelector(".library-state-button"));
+            await click(buttonByText(container, "Clear filters"));
             assert.deepEqual(reset, [["search", ""], ["filter", "Everything"], ["package", null], ["subpackage", null]]);
             await React.act(async () => root.render(element(skills.default, { ...props, directSkills: ["pkg.skills.Work"],
                 skillCount: 1, skillLibraryStatus: "error", skillLibraryError: "Disconnected", hasLoadedSkills: true })));
@@ -691,10 +849,10 @@ test("keyboard controls, creation dialogs, and library insertion preserve editor
             window.HTMLElement.prototype.scrollIntoView = noop;
             const App = (await server.ssrLoadModule("/src/App.jsx")).default;
             await mount(element(App));
-            assert.match(container.querySelector('.library-state-error [role="alert"]').textContent, /503/);
+            assert.match(container.querySelector('.skill-library [role="alert"]').textContent, /503/);
             apiFailure = false;
-            await click(container.querySelector(".library-state-button"));
-            assert.equal(container.querySelector(".library-state-error"), null);
+            await click(buttonByText(container, "Retry loading skills"));
+            assert.equal(container.querySelector('.skill-library [role="alert"]'), null);
             assert.match(container.querySelector(".library-state").textContent, /skill library is empty/);
             const openButton = container.querySelector(".header .menu-button");
             openButton.focus();

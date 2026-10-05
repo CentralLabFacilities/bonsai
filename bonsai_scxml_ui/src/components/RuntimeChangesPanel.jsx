@@ -1,6 +1,7 @@
+import { memo } from "react";
 import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 
-export default function RuntimeChangesPanel({ isOpen, onToggle, playback, changes }) {
+function RuntimeChangesPanel({ isOpen, onToggle, playback, changes }) {
     return (
         <aside className={`runtime-changes-drawer ${isOpen ? "open" : "closed"}`} aria-label="Runtime changes">
             <button
@@ -50,6 +51,8 @@ export default function RuntimeChangesPanel({ isOpen, onToggle, playback, change
         </aside>
     );
 }
+
+export default memo(RuntimeChangesPanel);
 
 function ChangeGroup({ title, changes, kind }) {
     if (changes.length === 0) return null;

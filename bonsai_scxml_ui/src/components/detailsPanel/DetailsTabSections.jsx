@@ -119,7 +119,6 @@ function SlotsSection({
     availableSlotPaths = [],
     onUpdateInSlotPath,
     onUpdateOutSlotPath,
-    onCheckSlots,
 }) {
     return (
         <div className="slots-container">
@@ -132,7 +131,6 @@ function SlotsSection({
                     access="read"
                     availableSlotPaths={availableSlotPaths}
                     onChange={onUpdateInSlotPath}
-                    onCommit={onCheckSlots}
                 />
                 <SkillSlotSection
                     nodeId={selectedNode.id}
@@ -140,7 +138,6 @@ function SlotsSection({
                     access="write"
                     availableSlotPaths={availableSlotPaths}
                     onChange={onUpdateOutSlotPath}
-                    onCommit={onCheckSlots}
                 />
             </div>
         </div>

@@ -1,7 +1,5 @@
 import {
-    createContext,
     useCallback,
-    useContext,
     useEffect,
     useMemo,
     useRef,
@@ -16,9 +14,9 @@ import {
     FiX,
 } from "react-icons/fi";
 import { Button, IconButton } from "./Button.jsx";
+import { FeedbackContext } from "./feedbackContext.js";
 
 const classNames = (...values) => values.filter(Boolean).join(" ");
-const FeedbackContext = createContext(null);
 
 const DEFAULT_DURATION = {
     info: 4000,
@@ -152,12 +150,16 @@ export function FeedbackProvider({ children }) {
     const timersRef = useRef(new Map());
 
     const dismiss = useCallback((id) => {
-        const timer = timersRef.current.get(id);
-        if (timer) {
-            window.clearTimeout(timer);
+        const entry = timersRef.current.get(id);
+        if (entry) {
+            window.clearTimeout(entry.timer);
             timersRef.current.delete(id);
         }
-        setNotifications((current) => current.filter((item) => item.id !== id));
+        setNotifications((current) =>
+            current.some((item) => item.id === id)
+                ? current.filter((item) => item.id !== id)
+                : current,
+        );
     }, []);
 
     const notify = useCallback(
@@ -173,40 +175,57 @@ export function FeedbackProvider({ children }) {
             const notification = {
                 id,
                 tone,
+                duration,
                 title: String(input.title || "").trim(),
                 message: String(input.message || "").trim(),
                 actionLabel: input.actionLabel || "",
                 onAction: typeof input.onAction === "function" ? input.onAction : null,
             };
 
-            const previousTimer = timersRef.current.get(id);
-            if (previousTimer) window.clearTimeout(previousTimer);
-
             setNotifications((current) => [
                 ...current.filter((item) => item.id !== id),
                 notification,
             ].slice(-4));
-
-            if (duration > 0 && typeof window !== "undefined") {
-                const timer = window.setTimeout(() => {
-                    timersRef.current.delete(id);
-                    setNotifications((current) => current.filter((item) => item.id !== id));
-                }, duration);
-                timersRef.current.set(id, timer);
-            }
 
             return id;
         },
         [],
     );
 
-    useEffect(
-        () => () => {
-            timersRef.current.forEach((timer) => window.clearTimeout(timer));
-            timersRef.current.clear();
-        },
-        [],
-    );
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+
+        const timers = timersRef.current;
+        timers.forEach(({ notification, timer }, id) => {
+            if (!notifications.includes(notification)) {
+                window.clearTimeout(timer);
+                timers.delete(id);
+            }
+        });
+
+        notifications.forEach((notification) => {
+            if (notification.duration <= 0 || timers.has(notification.id)) return;
+
+            const timer = window.setTimeout(() => {
+                if (timers.get(notification.id)?.notification !== notification) return;
+                timers.delete(notification.id);
+                setNotifications((current) =>
+                    current.includes(notification)
+                        ? current.filter((item) => item !== notification)
+                        : current,
+                );
+            }, notification.duration);
+            timers.set(notification.id, { notification, timer });
+        });
+    }, [notifications]);
+
+    useEffect(() => {
+        const timers = timersRef.current;
+        return () => {
+            timers.forEach(({ timer }) => window.clearTimeout(timer));
+            timers.clear();
+        };
+    }, []);
 
     const value = useMemo(() => ({ notify, dismiss }), [notify, dismiss]);
 
@@ -216,12 +235,4 @@ export function FeedbackProvider({ children }) {
             <ToastViewport notifications={notifications} onDismiss={dismiss} />
         </FeedbackContext.Provider>
     );
-}
-
-export function useFeedback() {
-    const feedback = useContext(FeedbackContext);
-    if (!feedback) {
-        throw new Error("useFeedback must be used inside FeedbackProvider.");
-    }
-    return feedback;
 }

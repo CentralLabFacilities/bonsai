@@ -60,20 +60,17 @@ function CodeEditor({ code, activeMode, setActiveMode, onCodeChange }) {
 
 function SuppliedCodeView({ codeString, onCodeChange, ...props }) {
     const source = codeString || "";
-    const [draft, setDraft] = useState({ source, code: source });
-
-    // Replace external drafts before commit, not in an effect after painting.
-    if (draft.source !== source) {
-        setDraft({ source, code: source });
-    }
+    const [draft, setDraft] = useState(() => ({ source, code: source }));
+    if (draft.source !== source) setDraft({ source, code: source });
+    const code = draft.source === source ? draft.code : source;
 
     return (
         <CodeEditor
             {...props}
-            code={draft.code}
-            onCodeChange={(code) => {
-                setDraft({ source, code });
-                onCodeChange?.(code);
+            code={code}
+            onCodeChange={(nextCode) => {
+                setDraft({ source, code: nextCode });
+                onCodeChange?.(nextCode);
             }}
         />
     );
@@ -96,9 +93,10 @@ function GeneratedCodeView({ nodes, edges, globalDataModel, manualSlots, onCodeC
         [nodes, edges, globalDataModel, manualSlots]
     );
     const [draft, setDraft] = useState(() => createCodeViewDraft(graph));
-
+    let currentDraft = draft;
     if (draft.graph !== graph) {
-        setDraft(createCodeViewDraft(graph));
+        currentDraft = createCodeViewDraft(graph);
+        setDraft(currentDraft);
     }
 
     useEffect(() => {
@@ -117,7 +115,13 @@ function GeneratedCodeView({ nodes, edges, globalDataModel, manualSlots, onCodeC
             }
 
             if (!cancelled) {
-                setDraft((current) => applyGeneratedCode(current, graph, code));
+                setDraft((current) => {
+                    const base =
+                        current.graph === graph
+                            ? current
+                            : createGeneratedCodeDraft(graph);
+                    return applyGeneratedCode(base, graph, code);
+                });
             }
         };
 
@@ -130,9 +134,9 @@ function GeneratedCodeView({ nodes, edges, globalDataModel, manualSlots, onCodeC
     return (
         <CodeEditor
             {...props}
-            code={draft.code}
+            code={currentDraft.code}
             onCodeChange={(code) => {
-                setDraft((current) => editGeneratedCodeDraft(current, code));
+                setDraft(editGeneratedCodeDraft(currentDraft, code));
                 onCodeChange?.(code);
             }}
         />

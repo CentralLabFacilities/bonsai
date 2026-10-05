@@ -381,13 +381,12 @@ function ConditionModal({
         selectedAvailableTargetIds,
     ]);
 
-    useEffect(() => {
-        if (activeTargetSuggestionIndex >= matchingTargets.length) {
-            // Keep keyboard selection valid when externally supplied target options change.
-            // eslint-disable-next-line react-hooks/set-state-in-effect
-            setActiveTargetSuggestionIndex(matchingTargets.length > 0 ? 0 : -1);
-        }
-    }, [matchingTargets, activeTargetSuggestionIndex]);
+    const visibleTargetSuggestionIndex =
+        activeTargetSuggestionIndex >= matchingTargets.length
+            ? matchingTargets.length > 0
+                ? 0
+                : -1
+            : activeTargetSuggestionIndex;
 
     if (!isOpen) return null;
 
@@ -674,8 +673,10 @@ function ConditionModal({
             event.key === "ArrowDown"
         ) {
             event.preventDefault();
-            setActiveTargetSuggestionIndex((current) =>
-                current < matchingTargets.length - 1 ? current + 1 : 0
+            setActiveTargetSuggestionIndex(
+                visibleTargetSuggestionIndex < matchingTargets.length - 1
+                    ? visibleTargetSuggestionIndex + 1
+                    : 0
             );
             return;
         }
@@ -686,8 +687,10 @@ function ConditionModal({
             event.key === "ArrowUp"
         ) {
             event.preventDefault();
-            setActiveTargetSuggestionIndex((current) =>
-                current > 0 ? current - 1 : matchingTargets.length - 1
+            setActiveTargetSuggestionIndex(
+                visibleTargetSuggestionIndex > 0
+                    ? visibleTargetSuggestionIndex - 1
+                    : matchingTargets.length - 1
             );
             return;
         }
@@ -704,9 +707,9 @@ function ConditionModal({
         if (
             targetAutocompleteOpen &&
             matchingTargets.length > 0 &&
-            activeTargetSuggestionIndex >= 0
+            visibleTargetSuggestionIndex >= 0
         ) {
-            selectTarget(matchingTargets[activeTargetSuggestionIndex]);
+            selectTarget(matchingTargets[visibleTargetSuggestionIndex]);
         }
     };
 
@@ -1602,7 +1605,7 @@ function ConditionModal({
                                                                 key={target.id}
                                                                 className={`transition-target-suggestion ${
                                                                     index ===
-                                                                    activeTargetSuggestionIndex
+                                                                    visibleTargetSuggestionIndex
                                                                         ? "active"
                                                                         : ""
                                                                 }`}

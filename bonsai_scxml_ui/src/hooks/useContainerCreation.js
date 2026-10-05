@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback } from "react";
+import { useDerivedGraphSnapshot } from "./useEditorGraphMaintenance.js";
 import {
     COMPOUND_PADDING_X,
     COMPOUND_HEADER_HEIGHT,
@@ -204,6 +205,23 @@ const reorderParallelLaneSubtrees = (
     return orderNodesParentsFirst(remaining);
 };
 
+export function projectContainerSelection(previous, nodes, isDraggingNode) {
+    if (isDraggingNode) return previous;
+    const groups = new Map();
+    for (const node of nodes) {
+        if (!node.selected || node.type === "parallelLane" || node.data?.autoParallelLaneCompound) continue;
+        const key = node.parentId || null;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(node);
+    }
+    let next = [];
+    for (const group of groups.values()) {
+        if (group.length > next.length) next = group;
+    }
+    return next.length === previous.length && next.every((node, index) => node === previous[index])
+        ? previous : next;
+}
+
 export function useContainerCreation({
     nodes,
     edges,
@@ -218,36 +236,12 @@ export function useContainerCreation({
     syncWrappedContainerAfterCommit,
     syncEditorStateAfterCommit,
 }) {
-    const [selectedNodesSnapshot, setSelectedNodesSnapshot] = useState([]);
-    const selectedNodes = useMemo(() => {
-        if (isDraggingNode) return selectedNodesSnapshot;
-
-        const candidates = nodes.filter(
-            (node) =>
-                node.selected &&
-                node.type !== "parallelLane" &&
-                !node.data?.autoParallelLaneCompound
-        );
-
-        // Container creation is scoped to siblings. This allows recursive
-        // compounds/parallels while preventing one new container from trying
-        // to adopt nodes that currently belong to unrelated parents.
-        const groups = new Map();
-        candidates.forEach((node) => {
-            const key = node.parentId || "__root__";
-            if (!groups.has(key)) groups.set(key, []);
-            groups.get(key).push(node);
-        });
-        const next = [...groups.values()].sort((a, b) => b.length - a.length)[0] || [];
-        if (
-            next.length === selectedNodesSnapshot.length &&
-            next.every((node, index) => node === selectedNodesSnapshot[index])
-        ) {
-            return selectedNodesSnapshot;
-        }
-        return next;
-    }, [nodes, isDraggingNode, selectedNodesSnapshot]);
-    if (selectedNodes !== selectedNodesSnapshot) setSelectedNodesSnapshot(selectedNodes);
+    // Adopt only the largest sibling group; ties retain first-seen ordering.
+    const selectedNodes = useDerivedGraphSnapshot(
+        [nodes, isDraggingNode],
+        (previous) => projectContainerSelection(previous, nodes, isDraggingNode),
+        [],
+    );
 
     const handleAddLaneToParallel = useCallback((parallelId) => {
         const newLaneId = getNodeId();

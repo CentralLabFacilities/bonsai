@@ -1,8 +1,8 @@
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef } from "react";
 
 import { getCollapsedTransitionSource } from "../utils/editorGraph.js";
 import { getLocalDataModelEntries } from "../utils/editorScxml.js";
-import { useSemanticNodeSnapshot } from "./useEditorGraphMaintenance.js";
+import { useDerivedGraphSnapshot, useSemanticNodeSnapshot } from "./useEditorGraphMaintenance.js";
 
 export function projectOutgoingTransitionHandles(previous, edges) {
     const handlesByNodeId = new Map();
@@ -182,16 +182,10 @@ export function useEditorPresentationGraph({
     // showing/highlighting one transition could therefore wake up every skill.
     // Keep the full transition graph loaded, but expose only this tiny derived
     // per-skill dependency to the node renderer.
-    const [outgoingHandlesSnapshot, setOutgoingHandlesSnapshot] = useState(() =>
-        projectOutgoingTransitionHandles(new Map(), edges)
+    const outgoingTransitionHandlesByNodeId = useDerivedGraphSnapshot(
+        [edges],
+        (previous = new Map()) => projectOutgoingTransitionHandles(previous, edges)
     );
-    const outgoingTransitionHandlesByNodeId = useMemo(
-        () => projectOutgoingTransitionHandles(outgoingHandlesSnapshot, edges),
-        [outgoingHandlesSnapshot, edges]
-    );
-    if (outgoingTransitionHandlesByNodeId !== outgoingHandlesSnapshot) {
-        setOutgoingHandlesSnapshot(outgoingTransitionHandlesByNodeId);
-    }
 
     // Expose the single semantic incoming transition to the target node so the
     // visible entry handle can hand the drag off to React Flow's native edge
@@ -363,16 +357,24 @@ export function useEditorPresentationGraph({
     // node itself did not change. During a drag React Flow normally replaces
     // only the moved node; recreating wrappers for every other node forces
     // unnecessary custom-node renders.
-    const [injectedNodeSnapshot, setInjectedNodeSnapshot] = useState(() => ({
-        cache: new Map(),
-        nodes: [],
-    }));
-    const [injectedSlotNodeSnapshot, setInjectedSlotNodeSnapshot] = useState(() => ({
-        cache: new Map(),
-        nodes: [],
-    }));
-
-    const injectedGraph = useMemo(() => {
+    const injectedGraph = useDerivedGraphSnapshot([
+        nodes,
+        outgoingTransitionHandlesByNodeId,
+        unexposedTransitionHandlesByNodeId,
+        collapsedParallelTransitionHandlesByNodeId,
+        reconnectableIncomingEdgeByNodeId,
+        childTabBySubmachineNodeId,
+        activeMode,
+        onAddLane,
+        onOpenStateActions,
+        onOpenParameter,
+        onOpenSlot,
+        onOpenTransition,
+        onOpenSubMachine,
+        onToggleCollapse,
+        hiddenNodeIds,
+        slotConnectionDrag,
+    ], (injectedNodeSnapshot = { cache: new Map(), nodes: [] }) => {
         const previousCache = injectedNodeSnapshot.cache;
         const nextCache = new Map();
 
@@ -482,29 +484,13 @@ export function useEditorPresentationGraph({
             return injectedNodeSnapshot;
         }
         return { cache: nextCache, nodes: result };
-    }, [
-        injectedNodeSnapshot,
-        nodes,
-        outgoingTransitionHandlesByNodeId,
-        unexposedTransitionHandlesByNodeId,
-        collapsedParallelTransitionHandlesByNodeId,
-        reconnectableIncomingEdgeByNodeId,
-        childTabBySubmachineNodeId,
-        activeMode,
-        onAddLane,
-        onOpenStateActions,
-        onOpenParameter,
-        onOpenSlot,
-        onOpenTransition,
-        onOpenSubMachine,
-        onToggleCollapse,
-        hiddenNodeIds,
-        slotConnectionDrag,
-    ]);
-    if (injectedGraph !== injectedNodeSnapshot) setInjectedNodeSnapshot(injectedGraph);
+    });
     const injectedNodes = injectedGraph.nodes;
 
-    const injectedSlotGraph = useMemo(() => {
+    const injectedSlotGraph = useDerivedGraphSnapshot([
+        slotNodes,
+        slotConnectionDrag,
+    ], (injectedSlotNodeSnapshot = { cache: new Map(), nodes: [] }) => {
         const previousCache = injectedSlotNodeSnapshot.cache;
         const nextCache = new Map();
 
@@ -542,10 +528,7 @@ export function useEditorPresentationGraph({
             return injectedSlotNodeSnapshot;
         }
         return { cache: nextCache, nodes: result };
-    }, [injectedSlotNodeSnapshot, slotNodes, slotConnectionDrag]);
-    if (injectedSlotGraph !== injectedSlotNodeSnapshot) {
-        setInjectedSlotNodeSnapshot(injectedSlotGraph);
-    }
+    });
     const injectedSlotNodes = injectedSlotGraph.nodes;
 
 

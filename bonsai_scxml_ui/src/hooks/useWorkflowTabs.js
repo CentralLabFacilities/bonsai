@@ -119,19 +119,12 @@ export function useWorkflowTabs({
         if (isDraggingNode) return null;
         const inputs = { nodes, edges, manualSlots, globalDataModel };
         // Selection and measurements replace objects without changing the file.
-        return sameDocumentInputs(lastFingerprint.inputs, inputs)
-            ? { value: lastFingerprint.value, inputs: lastFingerprint.inputs }
-            : { value: getWorkflowDocumentFingerprint(inputs), inputs };
-    }, [isDraggingNode, nodes, edges, manualSlots, globalDataModel, lastFingerprint]);
+        return lastFingerprint.tabId === activeTabId && sameDocumentInputs(lastFingerprint.inputs, inputs)
+            ? lastFingerprint
+            : { tabId: activeTabId, value: getWorkflowDocumentFingerprint(inputs), inputs };
+    }, [isDraggingNode, activeTabId, nodes, edges, manualSlots, globalDataModel, lastFingerprint]);
     const fingerprint = projection?.value ?? null;
-    if (
-        fingerprint !== null &&
-        (lastFingerprint.tabId !== activeTabId ||
-            lastFingerprint.value !== fingerprint ||
-            lastFingerprint.inputs !== projection.inputs)
-    ) {
-        setLastFingerprint({ tabId: activeTabId, ...projection });
-    }
+    if (projection && projection !== lastFingerprint) setLastFingerprint(projection);
     const activeStoredTab = storedTabs.find((tab) => tab.id === activeTabId);
     const activeFingerprint =
         fingerprint ??
