@@ -73,11 +73,13 @@ open class WebController(val host: String, val port: Int) : SCXMLRemote {
     }
 
     override fun pause(): Boolean {
-        return false
+        val response = runBlocking { client.post("$bonsai/pause") }
+        return response.status.value in 200..299
     }
 
     override fun resume(): Boolean {
-        return false
+        val response = runBlocking { client.post("$bonsai/resume") }
+        return response.status.value in 200..299
     }
 
     override fun setParams(map: MutableMap<String, String>?): Boolean {
@@ -94,6 +96,7 @@ open class WebController(val host: String, val port: Int) : SCXMLRemote {
     override fun start(state: String): Boolean {
         runBlocking {
             client.post("$bonsai/start") {
+                contentType(ContentType.Text.Plain)
                 setBody(state)
             }
         }
