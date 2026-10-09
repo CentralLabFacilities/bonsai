@@ -1,0 +1,382 @@
+/*
+ * Shared interaction states
+ * -------------------------
+ * This file owns interaction feedback rather than component identity. Node
+ * families keep their own surfaces/accent colours; hover, selection, keyboard
+ * focus, validation and reference relationships use one visual language.
+ */
+
+/* Graph nodes ------------------------------------------------------------ */
+.react-flow__node {
+    --editor-state-radius: 10px;
+    border-radius: var(--editor-state-radius);
+    transition:
+        opacity var(--ui-transition-fast),
+        filter var(--ui-transition-fast),
+        box-shadow var(--ui-transition-fast),
+        outline-color var(--ui-transition-fast);
+}
+
+/* Hover is deliberately lighter than selection. EditorCanvas applies this
+   class imperatively so large graphs do not re-render on pointer movement. */
+.react-flow__node.editor-hover-highlight {
+    outline: none !important;
+    box-shadow: var(--ui-state-hover-ring);
+}
+
+/* React Flow's wrapper selected state is the authoritative outer selection
+   indicator for every node family (skill, slot, container and reference). */
+.react-flow__node.selected {
+    outline: none;
+    box-shadow: var(--ui-state-selected-ring);
+}
+
+.react-flow__node:focus-visible {
+    outline: none;
+    box-shadow: var(--ui-state-focus-ring);
+}
+
+/* Problem is persistent. When a problem node is selected/hovered, keep the
+   red problem ring and add the transient interaction ring outside it. */
+.react-flow__node.editor-node-problem {
+    outline: none !important;
+    box-shadow: var(--ui-state-invalid-ring) !important;
+}
+
+.react-flow__node.editor-node-problem.selected {
+    box-shadow:
+        var(--ui-state-invalid-ring),
+        0 0 0 6px rgba(56, 189, 248, 0.42) !important;
+}
+
+.react-flow__node.editor-node-problem.editor-hover-highlight:not(.selected) {
+    box-shadow:
+        var(--ui-state-invalid-ring),
+        0 0 0 6px rgba(147, 197, 253, 0.28) !important;
+}
+
+.react-flow__node.editor-node-problem:focus-visible {
+    box-shadow:
+        var(--ui-state-invalid-ring),
+        0 0 0 6px rgba(224, 242, 254, 0.72),
+        0 0 0 9px rgba(56, 189, 248, 0.24) !important;
+}
+
+/* A reference target is related, not hovered or selected. A dashed cyan ring
+   makes that relationship clear while allowing selection/problem rings to
+   remain visible at the same time. */
+.react-flow__node.editor-reference-target-highlight {
+    outline: 2px dashed var(--ui-state-reference-target) !important;
+    outline-offset: 5px;
+}
+
+.react-flow__node.editor-reference-target-highlight.selected {
+    outline-offset: 6px;
+}
+
+/* Hover/selection used to translate individual cards by different amounts.
+   Besides feeling inconsistent, that visually separates ports from React
+   Flow's node geometry. Keep interaction feedback paint-only. */
+.react-flow__node > :is(
+    .costum-node,
+    .submachine-node,
+    .slot-node,
+    .state-clone-node,
+    .compound-frame-node,
+    .parallel-group-container
+),
+.react-flow__node > :is(
+    .costum-node,
+    .submachine-node,
+    .slot-node,
+    .state-clone-node,
+    .compound-frame-node,
+    .parallel-group-container
+):hover,
+.react-flow__node.selected > :is(
+    .costum-node,
+    .submachine-node,
+    .slot-node,
+    .state-clone-node,
+    .compound-frame-node,
+    .parallel-group-container
+) {
+    transform: none !important;
+}
+
+/* Legacy component-specific selected glows remain as subtle internal accents;
+   remove only their extra outer rings so the wrapper indicator stays singular. */
+.react-flow__node.selected > .state-clone-node.selected-node {
+    outline: none;
+}
+
+/* Focus mode ------------------------------------------------------------- */
+.react-flow.editor-node-focus-mode
+.react-flow__node:not(.editor-node-context-visible):not(.selected) {
+    opacity: var(--ui-state-dimmed-opacity);
+}
+
+.react-flow.editor-node-focus-mode
+.react-flow__node.editor-reference-target-highlight {
+    opacity: 1;
+    filter: none;
+}
+
+/* Graph edges ------------------------------------------------------------ */
+.react-flow__edge .react-flow__edge-path {
+    transition:
+        stroke-width var(--ui-transition-fast),
+        opacity var(--ui-transition-fast),
+        filter var(--ui-transition-fast);
+}
+
+/* Hover/focus keeps the semantic edge colour but increases weight. */
+.react-flow__edge.editor-edge-focus-active .react-flow__edge-path {
+    stroke-width: 2.7px !important;
+    filter: drop-shadow(0 0 2px rgba(147, 197, 253, 0.48));
+}
+
+/* A selected node highlights connected edges without actually selecting them. */
+.react-flow__edge.editor-edge-selection-related {
+    /* A selected skill owns this relationship until the selection changes.
+       Hover must never be required to bring its connected edges back to full
+       visibility. */
+    opacity: 1 !important;
+}
+
+.react-flow__edge.editor-edge-selection-related .react-flow__edge-path {
+    stroke-width: 3px !important;
+    filter:
+        drop-shadow(0 0 2px rgba(125, 211, 252, 0.68))
+        drop-shadow(0 0 4px rgba(56, 189, 248, 0.28));
+}
+
+/* Selection is stronger than hover/relationship context and is shared by transition + slot edges. */
+.react-flow__edge.selected .react-flow__edge-path {
+    stroke-width: 3.2px !important;
+    filter: drop-shadow(0 0 3px rgba(56, 189, 248, 0.58));
+}
+
+.react-flow__edge:focus-visible {
+    outline: none;
+}
+
+.react-flow__edge:focus-visible .react-flow__edge-path {
+    stroke-width: 3.2px !important;
+    filter:
+        drop-shadow(0 0 2px rgba(224, 242, 254, 0.9))
+        drop-shadow(0 0 5px rgba(56, 189, 248, 0.42));
+}
+
+.react-flow.editor-edge-focus-mode
+.react-flow__edge.editor-transition-edge:not(.editor-edge-focus-active):not(.editor-edge-selection-related):not(.selected),
+.react-flow.editor-edge-focus-mode
+.react-flow__edge.editor-slot-edge:not(.editor-edge-focus-active):not(.editor-edge-selection-related):not(.selected) {
+    opacity: var(--ui-state-dimmed-opacity);
+}
+
+/* Connection handles ---------------------------------------------------- */
+.react-flow__handle {
+    transition:
+        box-shadow var(--ui-transition-fast),
+        filter var(--ui-transition-fast),
+        opacity var(--ui-transition-fast),
+        transform var(--ui-transition-fast);
+}
+
+.react-flow__handle:hover:not(.slot-handle-incompatible) {
+    filter: brightness(1.12);
+    box-shadow: 0 0 0 3px rgba(147, 197, 253, 0.28);
+}
+
+.react-flow__handle:focus-visible {
+    outline: none;
+    box-shadow:
+        0 0 0 2px rgba(224, 242, 254, 0.94),
+        0 0 0 5px rgba(56, 189, 248, 0.34);
+}
+
+/* Preserve Read/Write semantic colours while giving compatible targets the
+   same strength hierarchy as transition handles. */
+.react-flow__handle.slot-handle-compatible {
+    filter: brightness(1.12);
+}
+
+.react-flow__handle.slot-handle-active {
+    filter: brightness(1.2);
+}
+
+.react-flow__handle.slot-handle-incompatible {
+    opacity: 0 !important;
+}
+
+/* Clickable content inside nodes ---------------------------------------- */
+:is(
+    .event-name[role="button"],
+    .node-parameter-row[role="button"],
+    .node-slot-entry[role="button"]
+):focus:not(:focus-visible) {
+    box-shadow: none;
+}
+
+:is(
+    .event-name[role="button"],
+    .node-parameter-row[role="button"],
+    .node-slot-entry[role="button"]
+):focus-visible {
+    outline: 2px solid var(--ui-state-focus);
+    outline-offset: 2px;
+}
+
+/* Selectable rows / menus ------------------------------------------------ */
+:is(
+    .problem-item,
+    .transition-order-card,
+    .transition-target-suggestion,
+    .exit-target-suggestion,
+    .nop-send-suggestion,
+    .nop-send-preset,
+    .skill-paste-choice-option
+) {
+    transition:
+        background-color var(--ui-transition-fast),
+        border-color var(--ui-transition-fast),
+        color var(--ui-transition-fast),
+        box-shadow var(--ui-transition-fast),
+        opacity var(--ui-transition-fast),
+        transform var(--ui-transition-fast);
+}
+
+:is(
+    .problem-item,
+    .transition-order-card,
+    .transition-target-suggestion,
+    .exit-target-suggestion,
+    .nop-send-suggestion,
+    .nop-send-preset,
+    .skill-paste-choice-option
+):focus-visible {
+    outline: 2px solid var(--ui-state-focus);
+    outline-offset: 2px;
+}
+
+:is(
+    .transition-order-card.selected,
+    .transition-target-suggestion.active,
+    .exit-target-suggestion.active,
+    .exit-target-suggestion.selected,
+    .nop-send-suggestion.selected,
+    .nop-send-preset.active
+) {
+    border-color: var(--ui-state-selected);
+    box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.2);
+}
+
+:is(
+    .problem-item,
+    .transition-order-card,
+    .transition-target-suggestion,
+    .exit-target-suggestion,
+    .nop-send-suggestion,
+    .nop-send-preset,
+    .skill-paste-choice-option
+):disabled {
+    cursor: not-allowed;
+    opacity: var(--ui-state-disabled-opacity);
+}
+
+/* Library/tree navigation uses the same keyboard focus and disabled
+   treatment even though each surface keeps its own hover/active palette. */
+:is(
+    .package-button,
+    .filter-button,
+    .skill-add-button,
+    .behavior-tree-row,
+    .behavior-root-toggle,
+    .behavior-icon-button,
+    .behavior-browse-button,
+    .behavior-add-root-button,
+    .behavior-add-confirm,
+    .behavior-add-cancel
+) {
+    transition:
+        background-color var(--ui-transition-fast),
+        border-color var(--ui-transition-fast),
+        color var(--ui-transition-fast),
+        box-shadow var(--ui-transition-fast),
+        opacity var(--ui-transition-fast);
+}
+
+:is(
+    .package-button,
+    .filter-button,
+    .skill-add-button,
+    .behavior-tree-row,
+    .behavior-root-toggle,
+    .behavior-icon-button,
+    .behavior-browse-button,
+    .behavior-add-root-button,
+    .behavior-add-confirm,
+    .behavior-add-cancel
+):focus-visible {
+    outline: 2px solid var(--ui-state-focus);
+    outline-offset: 2px;
+}
+
+:is(
+    .package-button,
+    .filter-button,
+    .skill-add-button,
+    .behavior-tree-row,
+    .behavior-root-toggle,
+    .behavior-icon-button,
+    .behavior-browse-button,
+    .behavior-add-root-button,
+    .behavior-add-confirm,
+    .behavior-add-cancel
+):disabled {
+    cursor: not-allowed;
+    opacity: var(--ui-state-disabled-opacity);
+}
+
+/* Tabs and high-frequency navigation controls --------------------------- */
+:is(
+    .intellij-tab-button,
+    .intellij-tab-close,
+    .right-panel-tab,
+    .details-panel .tab,
+    .edge-visibility-toggle,
+    .panel-toggle,
+    .editor-panel-ledge
+):focus-visible {
+    outline: 2px solid var(--ui-state-focus);
+    outline-offset: 2px;
+}
+
+/* Reduced motion --------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+    .react-flow__node,
+    .react-flow__edge .react-flow__edge-path,
+    .react-flow__handle,
+    :is(
+        .problem-item,
+        .transition-order-card,
+        .transition-target-suggestion,
+        .exit-target-suggestion,
+        .nop-send-suggestion,
+        .nop-send-preset,
+        .skill-paste-choice-option,
+        .package-button,
+        .filter-button,
+        .skill-add-button,
+        .behavior-tree-row,
+        .behavior-root-toggle,
+        .behavior-icon-button,
+        .behavior-browse-button,
+        .behavior-add-root-button,
+        .behavior-add-confirm,
+        .behavior-add-cancel
+    ) {
+        transition: none;
+    }
+}

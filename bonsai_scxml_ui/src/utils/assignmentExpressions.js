@@ -1,40 +1,17 @@
-import { getVariableType } from "./valueTypes";
+import {
+    VALUE_TYPES,
+    getVariableType,
+    isValueTypeCompatible,
+    normalizeValueType,
+} from "./valueTypes";
 
-const TYPE = {
-    BOOLEAN: "Boolean",
-    STRING: "String",
-    INTEGER: "Integer",
-    DOUBLE: "Double",
-    UNKNOWN: "Unknown",
-};
-
-const canonicalType = (type) => {
-    const normalized = String(type || "").trim().toLowerCase();
-
-    if (["boolean", "bool"].includes(normalized)) return TYPE.BOOLEAN;
-    if (["string", "str"].includes(normalized)) return TYPE.STRING;
-    if (["integer", "int", "long", "short", "byte"].includes(normalized)) {
-        return TYPE.INTEGER;
-    }
-    if (["double", "float", "number", "decimal"].includes(normalized)) {
-        return TYPE.DOUBLE;
-    }
-
-    return type ? String(type) : TYPE.UNKNOWN;
-};
+const UNKNOWN_TYPE = "Unknown";
 
 const variableType = (variable) =>
-    canonicalType(getVariableType(variable) || variable?.type);
+    normalizeValueType(getVariableType(variable) || variable?.type) || UNKNOWN_TYPE;
 
 const isNumeric = (type) =>
-    type === TYPE.INTEGER || type === TYPE.DOUBLE;
-
-const typesCompatible = (targetType, resultType) => {
-    if (targetType === resultType) return true;
-
-    // Widening an Integer result into a Double location is safe.
-    return targetType === TYPE.DOUBLE && resultType === TYPE.INTEGER;
-};
+    type === VALUE_TYPES.INTEGER || type === VALUE_TYPES.DOUBLE;
 
 const quoteStringLiteral = (value) => {
     const escaped = String(value || "")
@@ -58,10 +35,10 @@ const findVariable = (name, variables = []) =>
 
 const getReferenceType = (reference, variables = []) => {
     const match = String(reference || "").trim().match(/^@([A-Za-z_][A-Za-z0-9_.:]*)$/);
-    if (!match) return TYPE.UNKNOWN;
+    if (!match) return UNKNOWN_TYPE;
 
     const variable = findVariable(match[1], variables);
-    return variable ? variableType(variable) : TYPE.UNKNOWN;
+    return variable ? variableType(variable) : UNKNOWN_TYPE;
 };
 
 export function normalizeAssignmentExpressionInput(
@@ -76,10 +53,10 @@ export function normalizeAssignmentExpressionInput(
 
     // Direct String assignment: hello -> 'hello'
     if (
-        targetType === TYPE.STRING &&
+        targetType === VALUE_TYPES.STRING &&
         !value.startsWith("@") &&
         !isQuotedString(value) &&
-        !/(==|!=|>=|<=|>|<|\+|\-|\*|\/)/.test(value)
+        !/(==|!=|>=|<=|>|<|\+|-|\*|\/)/.test(value)
     ) {
         return quoteStringLiteral(value);
     }
@@ -95,13 +72,13 @@ export function normalizeAssignmentExpressionInput(
         const rightType = getReferenceType(right, variables);
 
         if (
-            leftType === TYPE.STRING &&
+            leftType === VALUE_TYPES.STRING &&
             !right.startsWith("@") &&
             !isQuotedString(right)
         ) {
             right = quoteStringLiteral(right);
         } else if (
-            rightType === TYPE.STRING &&
+            rightType === VALUE_TYPES.STRING &&
             !left.startsWith("@") &&
             !isQuotedString(left)
         ) {
@@ -186,7 +163,7 @@ function tokenize(expression) {
             tokens.push({
                 kind: "literal",
                 value: text.slice(index, cursor + 1),
-                valueType: TYPE.STRING,
+                valueType: VALUE_TYPES.STRING,
             });
             index = cursor + 1;
             continue;
@@ -198,7 +175,7 @@ function tokenize(expression) {
             tokens.push({
                 kind: "literal",
                 value: booleanMatch[0],
-                valueType: TYPE.BOOLEAN,
+                valueType: VALUE_TYPES.BOOLEAN,
             });
             index += booleanMatch[0].length;
             continue;
@@ -212,8 +189,8 @@ function tokenize(expression) {
                 value: numberText,
                 valueType:
                     numberText.includes(".") || /[eE]/.test(numberText)
-                        ? TYPE.DOUBLE
-                        : TYPE.INTEGER,
+                        ? VALUE_TYPES.DOUBLE
+                        : VALUE_TYPES.INTEGER,
             });
             index += numberText.length;
             continue;
@@ -261,9 +238,9 @@ function inferExpressionType(expression, variables = []) {
             return {
                 valid: true,
                 type:
-                    leftType === TYPE.DOUBLE || rightType === TYPE.DOUBLE
-                        ? TYPE.DOUBLE
-                        : TYPE.INTEGER,
+                    leftType === VALUE_TYPES.DOUBLE || rightType === VALUE_TYPES.DOUBLE
+                        ? VALUE_TYPES.DOUBLE
+                        : VALUE_TYPES.INTEGER,
             };
         }
 
@@ -275,7 +252,7 @@ function inferExpressionType(expression, variables = []) {
                 return { valid: false, error: operatorError(operator, rightType) };
             }
 
-            return { valid: true, type: TYPE.BOOLEAN };
+            return { valid: true, type: VALUE_TYPES.BOOLEAN };
         }
 
         if (["==", "!="].includes(operator)) {
@@ -290,7 +267,7 @@ function inferExpressionType(expression, variables = []) {
                 };
             }
 
-            return { valid: true, type: TYPE.BOOLEAN };
+            return { valid: true, type: VALUE_TYPES.BOOLEAN };
         }
 
         return {
@@ -341,7 +318,7 @@ function inferExpressionType(expression, variables = []) {
             }
 
             const type = variableType(variable);
-            if (type === TYPE.UNKNOWN) {
+            if (type === UNKNOWN_TYPE) {
                 return {
                     valid: false,
                     error: "Wrong type",
@@ -423,7 +400,6 @@ function inferExpressionType(expression, variables = []) {
     if (!result.valid) return result;
 
     if (position !== tokens.length) {
-        const token = tokens[position];
         return {
             valid: false,
             error: "Invalid value",
@@ -455,7 +431,7 @@ export function validateAssignmentExpression(
     }
 
     const targetType = variableType(targetVariable);
-    if (targetType === TYPE.UNKNOWN) {
+    if (targetType === UNKNOWN_TYPE) {
         return {
             valid: false,
             error: "Wrong type",
@@ -465,7 +441,7 @@ export function validateAssignmentExpression(
     const inferred = inferExpressionType(value, variables);
     if (!inferred.valid) return inferred;
 
-    if (!typesCompatible(targetType, inferred.type)) {
+    if (!isValueTypeCompatible(inferred.type, targetType)) {
         return {
             valid: false,
             error: "Wrong type",

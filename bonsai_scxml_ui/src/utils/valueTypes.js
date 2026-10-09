@@ -310,7 +310,7 @@ export function deserializeScxmlValueForEditor(value) {
 
     // Outside a state's skill-parameter datamodel, a bare SCXML identifier
     // represents a variable reference. The UI adds @ purely as a visual marker.
-    if (/^[A-Za-z_#][A-Za-z0-9_:#.\-]*$/.test(trimmed)) {
+    if (/^[A-Za-z_#][A-Za-z0-9_:#.-]*$/.test(trimmed)) {
         return `@${trimmed}`;
     }
 
@@ -343,7 +343,7 @@ export function serializeEditorConditionForScxml(condition) {
     if (!match) {
         // Best effort for legacy/free-form conditions: remove only explicit
         // editor reference markers instead of quoting the whole expression.
-        return trimmed.replace(/@([A-Za-z_#][A-Za-z0-9_:#.\-]*)/g, "$1");
+        return trimmed.replace(/@([A-Za-z_#][A-Za-z0-9_:#.-]*)/g, "$1");
     }
 
     const [, rawLeft, operator, rawRight] = match;
@@ -364,7 +364,7 @@ export function deserializeScxmlConditionForEditor(condition) {
         // comparison-based, so represent that equivalent expression
         // explicitly instead of falling back to an uneditable free-form value.
         if (
-            /^@?[A-Za-z_#][A-Za-z0-9_:#.\-]*$/.test(trimmed) &&
+            /^@?[A-Za-z_#][A-Za-z0-9_:#.-]*$/.test(trimmed) &&
             !/^(true|false|null)$/i.test(trimmed)
         ) {
             return `${trimmed.replace(/^@/, "")} == true`;
@@ -378,4 +378,3 @@ export function deserializeScxmlConditionForEditor(condition) {
 
     return `${left} ${operator} ${right}`;
 }
-

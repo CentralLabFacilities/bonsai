@@ -1,5 +1,131 @@
-import { isCompoundInitialChildCandidate } from "./editorGeometry";
-import { normalizeTypedValue, normalizeValueType } from "./valueTypes";
+export const createEditorNodeIndex = (nodes = []) => {
+    const nodeList = Array.isArray(nodes) ? nodes : [];
+    const byId = new Map();
+    const childrenByParent = new Map();
+    let hasDuplicateIds = false;
+
+    nodeList.forEach((node) => {
+        if (!node?.id) return;
+        if (byId.has(node.id)) hasDuplicateIds = true;
+        byId.set(node.id, node);
+
+        if (node.parentId) {
+            if (!childrenByParent.has(node.parentId)) {
+                childrenByParent.set(node.parentId, []);
+            }
+            childrenByParent.get(node.parentId).push(node);
+        }
+    });
+
+    const ancestorIdsByNode = new Map();
+    const absolutePositionByNode = new Map();
+    const nestingDepthByNode = new Map();
+
+    const resolveNode = (nodeOrId) =>
+        typeof nodeOrId === "string" ? byId.get(nodeOrId) : nodeOrId;
+
+    const getChildren = (parentId) =>
+        childrenByParent.get(parentId) || [];
+
+    const getAncestorIds = (nodeOrId) => {
+        const node = resolveNode(nodeOrId);
+        if (!node?.id) return new Set();
+
+        const cached = ancestorIdsByNode.get(node.id);
+        if (cached) return cached;
+
+        const ancestorIds = new Set();
+        const visited = new Set();
+        let parentId = node.parentId;
+
+        while (parentId && !visited.has(parentId)) {
+            visited.add(parentId);
+            ancestorIds.add(parentId);
+            const parent = byId.get(parentId);
+            if (!parent) break;
+            parentId = parent.parentId;
+        }
+
+        ancestorIdsByNode.set(node.id, ancestorIds);
+        return ancestorIds;
+    };
+
+    const findAncestor = (nodeOrId, predicate) => {
+        const node = resolveNode(nodeOrId);
+        if (!node || typeof predicate !== "function") return null;
+
+        const visited = new Set();
+        let parentId = node.parentId;
+
+        while (parentId && !visited.has(parentId)) {
+            visited.add(parentId);
+            const parent = byId.get(parentId);
+            if (!parent) break;
+            if (predicate(parent)) return parent;
+            parentId = parent.parentId;
+        }
+
+        return null;
+    };
+
+    const getNestingDepth = (nodeOrId) => {
+        const node = resolveNode(nodeOrId);
+        if (!node) return 0;
+        if (nestingDepthByNode.has(node)) return nestingDepthByNode.get(node);
+
+        let depth = 0;
+        let parentId = node.parentId;
+        const visited = new Set();
+
+        while (parentId && !visited.has(parentId)) {
+            visited.add(parentId);
+            const parent = byId.get(parentId);
+            if (!parent) break;
+            depth += 1;
+            parentId = parent.parentId;
+        }
+
+        nestingDepthByNode.set(node, depth);
+        return depth;
+    };
+
+    const getAbsolutePosition = (nodeOrId) => {
+        const node = resolveNode(nodeOrId);
+        if (!node?.id) return { x: 0, y: 0 };
+
+        const cached = absolutePositionByNode.get(node.id);
+        if (cached) return cached;
+
+        let x = Number(node.position?.x || 0);
+        let y = Number(node.position?.y || 0);
+        const visited = new Set();
+        let parentId = node.parentId;
+
+        while (parentId && !visited.has(parentId)) {
+            visited.add(parentId);
+            const parent = byId.get(parentId);
+            if (!parent) break;
+            x += Number(parent.position?.x || 0);
+            y += Number(parent.position?.y || 0);
+            parentId = parent.parentId;
+        }
+
+        const absolute = { x, y };
+        absolutePositionByNode.set(node.id, absolute);
+        return absolute;
+    };
+
+    return {
+        nodes: nodeList,
+        byId,
+        hasDuplicateIds,
+        getChildren,
+        getAncestorIds,
+        findAncestor,
+        getNestingDepth,
+        getAbsolutePosition,
+    };
+};
 
 export const withSmartTransitionRouting = (transitionEdges) =>
     transitionEdges.map((edge) => ({
@@ -163,405 +289,91 @@ export const clearTransientTransitionHighlight = (edge) => {
     };
 };
 
-export const highlightSelectedTransitions = (transitionEdges, selectedNodeIds) =>
-    transitionEdges.map((rawEdge) => {
-        // Selection/highlight styling is display-only. Strip a previously
-        // persisted semantic highlight before deciding whether this edge is
-        // currently selected. This prevents edited edges from staying coloured
-        // after React Flow has deselected them.
-        const edge = clearTransientTransitionHighlight(rawEdge);
-
-        // Boundary transitions are displayed as container -> target edges, but
-        // semantically still belong to the skill inside the container. Use that
-        // semantic source for both selection and success/error/fatal colouring.
-        const semanticSource =
-            edge.data?.boundaryOriginalSource ||
-            edge.data?.compoundOriginalSource ||
-            edge.data?.parallelOriginalSource ||
-            edge.source;
-        const semanticTarget =
-            edge.data?.boundaryOriginalTarget ||
-            edge.data?.compoundOriginalTarget ||
-            edge.data?.parallelOriginalTarget ||
-            edge.target;
-        const semanticHandle =
-            edge.data?.boundaryOriginalSourceHandle ||
-            edge.data?.compoundOriginalSourceHandle ||
-            edge.data?.parallelOriginalSourceHandle ||
-            edge.sourceHandle ||
-            edge.label;
-
-        const isConnectedToSelection =
-            selectedNodeIds.has(edge.source) ||
-            selectedNodeIds.has(edge.target) ||
-            selectedNodeIds.has(semanticSource) ||
-            selectedNodeIds.has(semanticTarget);
-        const isEdgeSelected = Boolean(edge.selected);
-
-        if (!isConnectedToSelection && !isEdgeSelected) {
-            return edge;
-        }
-
-        const color = getTransitionHighlightColor(semanticHandle);
-
-        // Keep the same geometry. Connected transitions animate while a skill
-        // is selected, and directly selected transitions use the same semantic
-        // success/error/fatal colour.
-        return {
-            ...edge,
-            animated: isConnectedToSelection ? true : edge.animated,
-            style: {
-                ...(edge.style || {}),
-                stroke: color,
-            },
-            markerEnd: edge.markerEnd
-                ? { ...edge.markerEnd, color }
-                : edge.markerEnd,
-        };
-    });
-
-
 export const normalizeSlotPath = (path) =>
     String(path || "").trim().replace(/^\/+/, "");
 
 export const normalizeSlotType = (type) =>
     String(type || "").trim().toLowerCase();
 
-export const getAncestorSlotSourcesByPath = (
-    tabList = [],
-    activeTabId = null,
-    activeSnapshot = null
-) => {
-    const result = new Map();
-    const tabsById = new Map((tabList || []).map((tab) => [tab.id, tab]));
-
-    // The active tab stored in `tabs` is only synchronized when changing tabs.
-    // Merge in the live editor state so newly edited inheritSlots participate in
-    // the hierarchy immediately.
-    if (activeTabId && activeSnapshot) {
-        const storedActiveTab = tabsById.get(activeTabId) || { id: activeTabId };
-        tabsById.set(activeTabId, {
-            ...storedActiveTab,
-            ...activeSnapshot,
-            id: activeTabId,
-            parentTabId:
-                activeSnapshot.parentTabId ?? storedActiveTab.parentTabId ?? null,
-        });
-    }
-
-    const currentTab = tabsById.get(activeTabId);
-    if (!currentTab?.parentTabId) {
-        return result;
-    }
-
-    const inheritedDeclarationsForPath = (tab, path) => {
-        const declarations = [];
-        const addDeclaration = (declaration) => {
-            if (!declaration) return;
-            declarations.push(declaration);
-        };
-
-        (tab?.manualSlots || []).forEach((slot) => {
-            const slotPath = normalizeSlotPath(slot?.inherited?.xpath || slot?.path);
-            const inherited =
-                slot?.slotKind === "inheritSlot" || Boolean(slot?.inherited);
-            if (inherited && slotPath === path) {
-                addDeclaration({
-                    type: slot?.type || "Unknown",
-                    description: slot?.description || "",
-                    key: slot?.key || "inheritSlot",
-                    source: "manual",
-                });
-            }
-        });
-
-        (tab?.slotNodes || []).forEach((slotNode) => {
-            if (slotNode?.data?.isSlotClone) return;
-
-            const slotPath = normalizeSlotPath(
-                slotNode?.data?.path || slotNode?.data?.label
-            );
-            if (
-                slotPath === path &&
-                Boolean(slotNode?.data?.currentMachineInherited)
-            ) {
-                addDeclaration({
-                    type: slotNode?.data?.slotType || "Unknown",
-                    description: slotNode?.data?.description || "",
-                    key: slotNode?.data?.key || "inheritSlot",
-                    source: "slotNode",
-                });
-            }
-        });
-
-        (tab?.nodes || []).forEach((node) => {
-            [...(node.data?.inSlots || []), ...(node.data?.outSlots || [])].forEach(
-                (slot) => {
-                    const slotPath = normalizeSlotPath(
-                        slot?.inherited?.xpath || slot?.path
-                    );
-                    if (slotPath !== path || !slot?.inherited) return;
-
-                    addDeclaration({
-                        type: slot?.type || "Unknown",
-                        description: slot?.description || "",
-                        key: slot?.key || "inheritSlot",
-                        source: "skillSlot",
-                        nodeId: node.id,
-                    });
-                }
-            );
-        });
-
-        return declarations;
-    };
-
-    const collectInheritedPaths = (tab) => {
-        const paths = new Set();
-        const addPath = (value) => {
-            const path = normalizeSlotPath(value);
-            if (path) paths.add(path);
-        };
-
-        (tab?.manualSlots || []).forEach((slot) => {
-            if (slot?.slotKind === "inheritSlot" || slot?.inherited) {
-                addPath(slot?.inherited?.xpath || slot?.path);
-            }
-        });
-
-        (tab?.slotNodes || []).forEach((slotNode) => {
-            if (slotNode?.data?.isSlotClone) return;
-
-            if (slotNode?.data?.currentMachineInherited) {
-                addPath(slotNode?.data?.path || slotNode?.data?.label);
-            }
-        });
-
-        (tab?.nodes || []).forEach((node) => {
-            [...(node.data?.inSlots || []), ...(node.data?.outSlots || [])].forEach(
-                (slot) => {
-                    if (slot?.inherited) {
-                        addPath(slot?.inherited?.xpath || slot?.path);
-                    }
-                }
-            );
-        });
-
-        return paths;
-    };
-
-    // Build the open sourcing hierarchy from the direct parent up to the root.
-    const ancestors = [];
-    const seenTabIds = new Set();
-    let parentTabId = currentTab.parentTabId;
-    let depth = 1;
-
-    while (parentTabId && !seenTabIds.has(parentTabId)) {
-        seenTabIds.add(parentTabId);
-        const parentTab = tabsById.get(parentTabId);
-        if (!parentTab) break;
-
-        ancestors.push({ tab: parentTab, depth });
-        parentTabId = parentTab.parentTabId;
-        depth += 1;
-    }
-
-    // We only need ancestry for paths that are inherited by the current state
-    // machine. This avoids unrelated parent slots appearing in Slot Details.
-    const candidatePaths = collectInheritedPaths(currentTab);
-
-    candidatePaths.forEach((path) => {
-        const entries = [];
-
-        for (const { tab: parentTab, depth: ancestorDepth } of ancestors) {
-            const parentMachineName =
-                parentTab.title || parentTab.fileName || "Parent state machine";
-            const inheritedDeclarations = inheritedDeclarationsForPath(
-                parentTab,
-                path
-            );
-            const isInheritedDeclaration = inheritedDeclarations.length > 0;
-
-            const writers = [];
-            const writerKeys = new Set();
-            const registerWriter = (writer) => {
-                const dedupeKey = [
-                    writer.nodeId || "",
-                    writer.key || "",
-                    writer.slotIndex ?? "",
-                    writer.sourceKind || "skill",
-                ].join("|");
-                if (writerKeys.has(dedupeKey)) return;
-                writerKeys.add(dedupeKey);
-
-                const entry = {
-                    ...writer,
-                    path: `/${path}`,
-                    parentTabId: parentTab.id,
-                    parentMachineName,
-                    ancestorDepth,
-                    sourceKind: writer.sourceKind || "skill",
-                    hierarchyKind: "writer",
-                };
-                writers.push(entry);
-                entries.push(entry);
-            };
-
-            (parentTab.nodes || []).forEach((node) => {
-                const skillName =
-                    node.data?.fullSkillName || node.data?.label || node.id;
-
-                (node.data?.outSlots || []).forEach((slot, slotIndex) => {
-                    if (normalizeSlotPath(slot?.path) !== path) return;
-
-                    registerWriter({
-                        nodeId: node.id,
-                        skillName,
-                        key: slot?.key || `output ${slotIndex + 1}`,
-                        type: slot?.type || "Unknown",
-                        description: slot?.description || "",
-                        access: "write",
-                        slotIndex,
-                        sourceKind: "skill",
-                    });
-                });
-
-                // A nested sub-state-machine that exposes a write inheritSlot is
-                // also a writer of the parent machine's slot.
-                if (node.type === "submachine") {
-                    (node.data?.inheritedSlots || []).forEach((slot, slotIndex) => {
-                        if (
-                            slot?.access !== "write" ||
-                            normalizeSlotPath(slot?.path) !== path
-                        ) {
-                            return;
-                        }
-
-                        registerWriter({
-                            nodeId: node.id,
-                            skillName,
-                            key: slot?.key || `inheritSlot ${slotIndex + 1}`,
-                            type: slot?.type || "Unknown",
-                            description: slot?.description || "",
-                            access: "write",
-                            slotIndex,
-                            sourceKind: "submachine",
-                        });
-                    });
-                }
-            });
-
-            if (isInheritedDeclaration) {
-                const declaration = inheritedDeclarations[0];
-                entries.push({
-                    nodeId: declaration.nodeId || null,
-                    skillName: "inheritSlot",
-                    key: declaration.key || "inheritSlot",
-                    type: declaration.type || "Unknown",
-                    description: declaration.description || "",
-                    access: "inherit",
-                    slotIndex: null,
-                    sourceKind: "inheritSlot",
-                    hierarchyKind: "inherit",
-                    path: `/${path}`,
-                    parentTabId: parentTab.id,
-                    parentMachineName,
-                    ancestorDepth,
-                });
-            }
-
-            // The slot may cross another state-machine boundary only when that
-            // parent declares the same path as inheritSlot. A writer in a
-            // non-inheriting parent is the root source for this chain.
-            if (!isInheritedDeclaration) {
-                break;
-            }
-        }
-
-        if (entries.length > 0) {
-            // Root-most source first, then move down toward the current machine.
-            entries.sort((a, b) => {
-                const depthDifference =
-                    (b.ancestorDepth || 0) - (a.ancestorDepth || 0);
-                if (depthDifference !== 0) return depthDifference;
-
-                if (a.hierarchyKind !== b.hierarchyKind) {
-                    return a.hierarchyKind === "writer" ? -1 : 1;
-                }
-                return String(a.skillName || "").localeCompare(
-                    String(b.skillName || "")
-                );
-            });
-            result.set(path, entries);
-        }
-    });
-
-    return result;
-};
-
-export const extractInheritedSlotsFromScxml = (xmlText) => {
-    if (!xmlText) return [];
-
-    try {
-        const parser = new DOMParser();
-        const xmlDoc = parser.parseFromString(xmlText, "application/xml");
-
-        if (xmlDoc.getElementsByTagName("parsererror")[0]) {
-            return [];
-        }
-
-        const slotData = Array.from(
-            xmlDoc.getElementsByTagName("*")
-        ).find(
-            (element) =>
-                element.localName === "data" &&
-                element.getAttribute("id") === "#_SLOTS"
-        );
-
-        if (!slotData) return [];
-
-        const seenPaths = new Set();
-
-        return Array.from(slotData.getElementsByTagName("*"))
-            .filter((element) => element.localName === "inheritSlot")
-            .map((element) => ({
-                key: element.getAttribute("key") || "",
-                state: element.getAttribute("state") || "",
-                path: normalizeSlotPath(element.getAttribute("xpath") || ""),
-            }))
-            .filter((slot) => {
-                if (!slot.path || seenPaths.has(slot.path)) return false;
-                seenPaths.add(slot.path);
-                return true;
-            });
-    } catch (error) {
-        console.warn("Could not parse inheritSlot declarations:", error);
-        return [];
-    }
-};
 
 export const collectInheritedSlotUsages = (parsedNodes, declaredSlots = []) => {
     const usages = [];
-    const seen = new Set();
+    const usageByKey = new Map();
 
-    const addUsage = (slot, access, node) => {
-        const path = normalizeSlotPath(slot?.path);
+    const addUsage = (slot, access, node, subMachinePath = []) => {
+        const path = normalizeSlotPath(slot?.inherited?.xpath || slot?.path);
         if (!path) return;
 
-        const key = [access || "inherit", path, slot?.key || "", slot?.type || "Unknown"].join("|");
-        if (seen.has(key)) return;
-        seen.add(key);
-
-        usages.push({
-            key: slot?.key || "",
-            state:
-                slot?.inherited?.state ||
-                node?.data?.fullSkillName ||
-                node?.data?.label ||
-                "",
+        const nestedPath = Array.isArray(slot?.subMachinePath)
+            ? slot.subMachinePath.filter(Boolean)
+            : [];
+        const hierarchyPath = [...subMachinePath, ...nestedPath];
+        const resolvedAccess = access || slot?.access || null;
+        const usageKey = [
+            resolvedAccess || "inherit",
             path,
-            access,
-            type: slot?.type || "Unknown",
+            slot?.key || "",
+            slot?.type || "Unknown",
+            hierarchyPath.join("/"),
+        ].join("|");
+
+        let usage = usageByKey.get(usageKey);
+        if (!usage) {
+            usage = {
+                key: slot?.key || "",
+                state: slot?.inherited?.state || slot?.state || "",
+                path,
+                access: resolvedAccess,
+                type: slot?.type || "Unknown",
+                description: slot?.description || "",
+                subMachinePath: hierarchyPath,
+                skillAccesses: [],
+            };
+            usageByKey.set(usageKey, usage);
+            usages.push(usage);
+        }
+
+        const concreteSkillAccesses = Array.isArray(slot?.skillAccesses)
+            ? slot.skillAccesses
+            : [];
+        const nodeSkillNodeId = String(node?.id || slot?.skillNodeId || "").trim();
+        const nodeSkillName = String(
+            node?.data?.fullSkillName ||
+            node?.data?.label ||
+            slot?.skillName ||
+            nodeSkillNodeId ||
+            ""
+        ).trim();
+
+        const candidates = concreteSkillAccesses.length > 0
+            ? concreteSkillAccesses
+            : nodeSkillName
+                ? [{
+                    skillNodeId: nodeSkillNodeId || null,
+                    skillName: nodeSkillName,
+                    description: slot?.description || "",
+                }]
+                : [];
+
+        candidates.forEach((candidate) => {
+            const skillNodeId = String(candidate?.skillNodeId || "").trim();
+            const skillName = String(candidate?.skillName || "").trim();
+            if (!skillName) return;
+
+            const duplicate = usage.skillAccesses.some(
+                (entry) =>
+                    entry.skillNodeId === (skillNodeId || null) &&
+                    entry.skillName === skillName
+            );
+            if (duplicate) return;
+
+            usage.skillAccesses.push({
+                skillNodeId: skillNodeId || null,
+                skillName,
+                description:
+                    candidate?.description || slot?.description || "",
+            });
+            if (!usage.state) usage.state = skillName;
         });
     };
 
@@ -573,12 +385,27 @@ export const collectInheritedSlotUsages = (parsedNodes, declaredSlots = []) => {
         (node.data?.outSlots || []).forEach((slot) => {
             if (slot?.inherited) addUsage(slot, "write", node);
         });
+
+        // Hydrated nested Sub-SMs already expose their descendant consumers.
+        // Bubble those up without creating one visual inherited-slot edge per
+        // skill: concrete consumers live in skillAccesses on the usage.
+        if (node.type === "submachine") {
+            const subMachineLabel =
+                node.data?.label ||
+                node.data?.fullSkillName ||
+                node.data?.src ||
+                "Sub-state machine";
+
+            (node.data?.inheritedSlots || []).forEach((slot) => {
+                addUsage(slot, slot?.access || null, null, [subMachineLabel]);
+            });
+        }
     });
 
     // Keep an inherited slot visible even when its concrete read/write usage
     // cannot be resolved (for example because skill metadata is unavailable).
     (declaredSlots || []).forEach((slot) => {
-        const path = normalizeSlotPath(slot?.path);
+        const path = normalizeSlotPath(slot?.xpath || slot?.path);
         if (!path) return;
 
         const alreadyRepresented = usages.some(
@@ -590,7 +417,9 @@ export const collectInheritedSlotUsages = (parsedNodes, declaredSlots = []) => {
             ...slot,
             path,
             access: null,
-            type: "Unknown",
+            type: slot?.type || "Unknown",
+            subMachinePath: [],
+            skillAccesses: [],
         });
     });
 
@@ -605,8 +434,35 @@ export const isSlotEdge = (edge) =>
 export const getSlotPathFromNode = (slotNode) =>
     normalizeSlotPath(slotNode?.data?.path || slotNode?.data?.label || "");
 
+// Aliases may disappear without deleting the declaration. Canonical inherited
+// slots and fixed child requirements must keep their path in the parent.
+export const isSlotDeletionProtected = (node, model = {}) => {
+    if (node?.type !== "slot" || (node.data?.isSlotClone && node.data?.cloneOfNodeId)) return false;
+    const data = node.data || {};
+    if (data.currentMachineInherited || data.inherited || data.slotKind === "inheritSlot" ||
+        data.requiredByChild || data.requiredByChildren?.length) return true;
+    const path = getSlotPathFromNode(node);
+    if (!path) return false;
+    return (model.manualSlots || []).some((slot) =>
+        normalizeSlotPath(slot?.inherited?.xpath || slot?.path) === path &&
+        (slot?.slotKind === "inheritSlot" || slot?.inherited)) ||
+        (model.nodes || []).some((child) => child.type === "submachine" && child.data?.src &&
+            !child.data?.isStateClone && !child.data?.isSkillClone &&
+            (child.data?.inheritedSlots || []).some((slot) =>
+                normalizeSlotPath(slot?.path || slot?.inherited?.xpath) === path));
+};
+
 export const parseSlotConnectionHandle = (handleId) => {
     const value = String(handleId || "");
+
+    const inherited = value.match(/^slot-submachine-(read|write)-(\d+)$/);
+    if (inherited) {
+        return {
+            origin: "submachine",
+            access: inherited[1],
+            inheritIndex: Number(inherited[2]),
+        };
+    }
 
     const skillRead = value.match(/^slot-skill-read-(\d+)$/);
     if (skillRead) {
@@ -637,832 +493,181 @@ export const parseSlotConnectionHandle = (handleId) => {
     return null;
 };
 
-export const getBehaviorSourceKey = (src) => {
-    const match = String(src || "")
-        .trim()
-        .match(/^\$\{([^}]+)\}(?:[\\/]|$)/);
-
-    return match
-        ? match[1].trim().toUpperCase()
-        : null;
+export const isKnownSlotType = (type) => {
+    const normalized = normalizeSlotType(type);
+    return Boolean(normalized && normalized !== "unknown");
 };
 
-
-const VARIABLE_IDENTIFIER_PATTERN = /@?[A-Za-z_#][A-Za-z0-9_:#.]*/g;
-const VARIABLE_EXPRESSION_KEYWORDS = new Set([
-    "true",
-    "false",
-    "null",
-    "undefined",
-    "NaN",
-    "Infinity",
-]);
-
-const stripQuotedExpressionParts = (value) => {
-    const text = String(value || "");
-    let result = "";
-    let quote = null;
-    let escaped = false;
-
-    for (let index = 0; index < text.length; index += 1) {
-        const char = text[index];
-
-        if (quote) {
-            if (!escaped && char === quote) {
-                quote = null;
-            }
-            escaped = !escaped && char === "\\";
-            if (char !== "\\") escaped = false;
-            result += " ";
-            continue;
-        }
-
-        if (char === "'" || char === '"') {
-            quote = char;
-            escaped = false;
-            result += " ";
-            continue;
-        }
-
-        result += char;
+export const getSlotConnectionEndpoint = (nodeId, handleId, model) => {
+    const handle = parseSlotConnectionHandle(handleId);
+    if (!handle) return null;
+    const node = (handle.origin === "slot" ? model.slotNodes : model.nodes)
+        ?.find((candidate) => candidate.id === nodeId);
+    if (!node || node.data?.isSkillClone || node.data?.isStateClone) return null;
+    let slot;
+    if (handle.origin === "slot") {
+        if (node.type !== "slot" || !getSlotPathFromNode(node)) return null;
+        const canonicalId = node.data?.cloneOfNodeId || node.id;
+        const canonical = model.slotNodes?.find((candidate) => candidate.id === canonicalId);
+        if (!canonical || getSlotPathFromNode(canonical) !== getSlotPathFromNode(node)) return null;
+        slot = { type: canonical.data?.slotType, path: canonical.data?.path };
+    } else if (handle.origin === "submachine") {
+        if (node.type !== "submachine" || !node.data?.src) return null;
+        slot = node.data?.inheritedSlots?.[handle.inheritIndex];
+        if (slot?.access !== handle.access || !normalizeSlotPath(slot?.path)) return null;
+    } else {
+        if (!["custom", "submachine"].includes(node.type)) return null;
+        slot = node.data?.[handle.access === "read" ? "inSlots" : "outSlots"]?.[handle.slotIndex];
     }
-
-    return result;
+    if (!slot || !isKnownSlotType(slot.type)) return null;
+    return { ...handle, node, slot, nodeId, handleId, slotType: normalizeSlotType(slot.type) };
 };
 
-const getVariableReferences = (value, { includeBare = true } = {}) => {
-    const text = stripQuotedExpressionParts(value);
-    const references = new Set();
-
-    for (const match of text.matchAll(VARIABLE_IDENTIFIER_PATTERN)) {
-        const raw = String(match[0] || "");
-        if (!includeBare && !raw.startsWith("@")) continue;
-        const name = raw.replace(/^@/, "");
-        if (!name || VARIABLE_EXPRESSION_KEYWORDS.has(name)) continue;
-
-        const start = match.index || 0;
-        const end = start + raw.length;
-        const before = text[start - 1] || "";
-        const after = text.slice(end).trimStart();
-
-        // Property names and function identifiers are not datamodel variables.
-        if (!raw.startsWith("@") && before === ".") continue;
-        if (!raw.startsWith("@") && after.startsWith("(")) continue;
-
-        references.add(name);
-    }
-
-    return [...references];
+export const resolveSlotConnection = (connection, model) => {
+    const source = getSlotConnectionEndpoint(connection?.source, connection?.sourceHandle, model);
+    const target = getSlotConnectionEndpoint(connection?.target, connection?.targetHandle, model);
+    if (!source || !target || source.access !== target.access || source.slotType !== target.slotType
+        || (source.origin === "slot") === (target.origin === "slot")) return null;
+    return source.origin === "slot"
+        ? { consumer: target, slot: source }
+        : { consumer: source, slot: target };
 };
 
-const normalizeAssignmentLocation = (value) =>
-    String(value || "").trim().replace(/^@/, "");
+export const getSlotEdgeEndpoints = (consumerId, slotNodeId, access, consumerHandleId) =>
+    access === "read"
+        ? { source: slotNodeId, target: consumerId, sourceHandle: "slot-node-read", targetHandle: consumerHandleId }
+        : { source: consumerId, target: slotNodeId, sourceHandle: consumerHandleId, targetHandle: "slot-node-write" };
 
-export const buildEditorProblems = (
-    nodes,
-    edges,
-    globalDataModel,
-    behaviorDirectories,
-    isBehaviorWorkflow = false,
-    manualSlots = [],
-    ancestorSlotSourcesByPath = new Map(),
-    currentSlotNodes = [],
-    availableDataModel = globalDataModel
-) => {
-    const problems = [];
-    const nodeMap = new Map((nodes || []).map((node) => [node.id, node]));
-
-    const nodeLabel = (node) =>
-        node?.data?.label ||
-        node?.data?.fullSkillName ||
-        node?.id ||
-        "Unknown state";
-
-    const baseNodeName = (node) =>
-        String(
-            node?.data?.fullSkillName ||
-            node?.data?.label ||
-            ""
-        )
-            .split("#")[0]
-            .split(".")
-            .pop()
-            .toLowerCase();
-
-    const isValidBehaviorTerminal = (node) => {
-        const name = baseNodeName(node);
-
-        return (
-            Boolean(node?.data?.isFinal) ||
-            Boolean(node?.data?.isBehaviorExit) ||
-            name === "end" ||
-            name === "fatal"
-        );
+export const getDefaultSlotPath = (model) => {
+    const paths = new Set();
+    const add = (slot) => {
+        for (const path of [slot?.path, slot?.inherited?.xpath]) {
+            const normalized = normalizeSlotPath(path);
+            if (normalized) paths.add(normalized);
+        }
     };
-
-    const exposesImplicitFatal = (node) =>
-        node?.type === "custom" && !isValidBehaviorTerminal(node);
-
-    const addProblem = (problem) => {
-        problems.push({
-            severity: "error",
-            category: "Workflow",
-            focusNodeIds: problem.nodeId ? [problem.nodeId] : [],
-            ...problem,
-        });
-    };
-
-    // Workflow
-    const rootNodes = (nodes || []).filter(
-        (node) =>
-            !node.parentId &&
-            node.type !== "slot" &&
-            node.type !== "parallelLane"
-    );
-
-    if (rootNodes.length > 0) {
-        const initialNodes = rootNodes.filter((node) => node.data?.isInitial);
-
-        if (initialNodes.length === 0) {
-            addProblem({
-                id: "workflow-no-initial",
-                severity: "warning",
-                category: "Workflow",
-                title: "No initial state",
-                message: "No root state is marked as initial.",
-            });
-        } else if (initialNodes.length > 1) {
-            initialNodes.forEach((node) => {
-                addProblem({
-                    id: `workflow-multiple-initial-${node.id}`,
-                    category: "Workflow",
-                    title: "Multiple initial states",
-                    message: `${nodeLabel(node)} is one of multiple initial states.`,
-                    nodeId: node.id,
-                    detailTab: "allgemein",
-                    mode: "event",
-                });
-            });
-        }
-    }
-
-    // Every compound state requires exactly one immediate initial child.
-    (nodes || [])
-        .filter(
-            (node) => node.type === "compound" && !node.data?.isCollapsed
-        )
-        .forEach((compound) => {
-            const children = (nodes || []).filter(
-                (node) =>
-                    node.parentId === compound.id &&
-                    isCompoundInitialChildCandidate(node)
-            );
-            const initialChildren = children.filter(
-                (node) => node.data?.isInitial
-            );
-
-            if (children.length === 0) {
-                addProblem({
-                    id: `compound-empty-${compound.id}`,
-                    category: "Workflow",
-                    title: "Compound needs an initial state",
-                    message: `${nodeLabel(compound)} does not contain a state that can be initial.`,
-                    nodeId: compound.id,
-                    detailTab: "allgemein",
-                    mode: "event",
-                });
-                return;
-            }
-
-            if (initialChildren.length !== 1) {
-                addProblem({
-                    id: `compound-initial-${compound.id}`,
-                    category: "Workflow",
-                    title: "Compound needs one initial state",
-                    message: `${nodeLabel(compound)} must have exactly one initial child state.`,
-                    nodeId: compound.id,
-                    detailTab: "allgemein",
-                    mode: "event",
-                    focusNodeIds: [
-                        compound.id,
-                        ...initialChildren.map(
-                            (node) => node.id
-                        ),
-                    ],
-                });
-            }
-        });
-
-    // Datamodel
-    const ids = new Map();
-    (globalDataModel || []).forEach((entry) => {
-        const id = String(entry?.id || "").trim();
-        if (!id) return;
-        ids.set(id, (ids.get(id) || 0) + 1);
+    (model.nodes || []).forEach((node) => {
+        [...(node.data?.inSlots || []), ...(node.data?.outSlots || []), ...(node.data?.inheritedSlots || [])].forEach(add);
     });
+    (model.manualSlots || []).forEach(add);
+    (model.slotNodes || []).forEach((node) => add(node.data));
+    let index = 1;
+    while (paths.has(index === 1 ? "defaultslot" : `defaultslot${index}`)) index += 1;
+    return index === 1 ? "defaultslot" : `defaultslot${index}`;
+};
 
-    ids.forEach((count, id) => {
-        if (count > 1) {
-            addProblem({
-                id: `datamodel-duplicate-${id}`,
-                category: "Datamodel",
-                title: "Duplicate data ID",
-                message: `${id} is defined ${count} times.`,
-            });
-        }
-    });
+const slotMatchesPath = (slot, path) =>
+    normalizeSlotPath(slot?.path) === path || normalizeSlotPath(slot?.inherited?.xpath) === path;
 
-    const availableVariableEntries = Array.isArray(availableDataModel)
-        ? availableDataModel
-        : globalDataModel || [];
-    const globalVariableIds = new Set(
-        availableVariableEntries
-            .map((entry) => String(entry?.id || "").trim())
-            .filter(Boolean)
-    );
-
-    const getLocalVariableIds = (entries = []) =>
-        new Set(
-            (Array.isArray(entries) ? entries : [])
-                .map((entry) => String(entry?.id || "").trim())
-                .filter(Boolean)
-        );
-
-    const addMissingVariableProblem = ({
-        node,
-        variableName,
-        usage,
-        detailTab = "allgemein",
-        edgeId = null,
-        suffix = "",
-    }) => {
-        addProblem({
-            id: `variable-missing-${node?.id || "workflow"}-${variableName}-${usage}-${suffix}`
-                .replace(/[^A-Za-z0-9_.:#-]+/g, "-"),
-            category: "Variables",
-            title: "Undefined variable",
-            message: `${nodeLabel(node)} uses “${variableName}” ${usage}, but it is not defined in this state machine.`,
-            nodeId: node?.id || null,
-            edgeId,
-            detailTab,
-            mode: "event",
-        });
-    };
-
-    const validateExpressionReferences = ({
-        node,
-        expression,
-        availableIds,
-        usage,
-        detailTab,
-        edgeId = null,
-        suffix = "",
-    }) => {
-        getVariableReferences(expression).forEach((variableName) => {
-            if (availableIds.has(variableName)) return;
-            addMissingVariableProblem({
-                node,
-                variableName,
-                usage,
-                detailTab,
-                edgeId,
-                suffix,
-            });
-        });
-    };
-
-    // State actions. Assignment targets must exist in the datamodel they write
-    // to; expressions are evaluated in the current/parent workflow scope.
-    (nodes || []).forEach((node) => {
-        const actionTargetVariableIds =
-            node.type === "submachine" &&
-            Array.isArray(node.data?.localDataModel)
-                ? getLocalVariableIds(node.data.localDataModel)
-                : globalVariableIds;
-
-        [
-            ["onEntry", node.data?.onEntry || []],
-            ["onExit", node.data?.onExit || []],
-        ].forEach(([actionName, assignments]) => {
-            (assignments || []).forEach((assignment, index) => {
-                const location = normalizeAssignmentLocation(
-                    assignment?.location
-                );
-                if (location && !actionTargetVariableIds.has(location)) {
-                    addMissingVariableProblem({
-                        node,
-                        variableName: location,
-                        usage: `as the ${actionName} assignment target`,
-                        detailTab: "actions",
-                        suffix: `${actionName}-location-${index}`,
-                    });
+// The fixed child declaration is a requirement, not a writable child binding.
+// Only an unbound derived placeholder may be replaced by the renamed parent.
+export const planInheritedSlotRename = (model, consumer, slotEndpoint) => {
+    const oldPath = getSlotPathFromNode(slotEndpoint.node);
+    const newPath = normalizeSlotPath(consumer.slot.path);
+    const canonicalId = slotEndpoint.node.data?.cloneOfNodeId || slotEndpoint.node.id;
+    const canonical = model.slotNodes?.find((node) => node.id === canonicalId);
+    const bindings = [];
+    const declarations = [];
+    const coalescedDeclarations = [];
+    const requirements = [];
+    let error = "";
+    (model.nodes || []).forEach((node) => {
+        for (const [key, access] of [["inSlots", "read"], ["outSlots", "write"]]) {
+            (node.data?.[key] || []).forEach((slot, index) => {
+                if (oldPath !== newPath && slotMatchesPath(slot, newPath)) error = `/${newPath} already has a parent binding.`;
+                if (!slotMatchesPath(slot, oldPath)) return;
+                if (!isKnownSlotType(slot.type) || normalizeSlotType(slot.type) !== consumer.slotType) {
+                    error = "The parent slot has incompatible binding types.";
                 }
-
-                validateExpressionReferences({
-                    node,
-                    expression: assignment?.expr,
-                    availableIds: globalVariableIds,
-                    usage: `in the ${actionName} assignment expression`,
-                    detailTab: "actions",
-                    suffix: `${actionName}-expr-${index}`,
-                });
-            });
-        });
-    });
-
-    // Transition assignments belong to the current workflow datamodel and are
-    // reported on the semantic source skill so Problems navigation can focus it.
-    (edges || []).forEach((edge) => {
-        const source = nodeMap.get(
-            edge.data?.boundaryOriginalSource ||
-            edge.data?.compoundOriginalSource ||
-            edge.data?.parallelOriginalSource ||
-            edge.source
-        );
-        if (!source) return;
-
-        const assignments = Array.isArray(edge.data?.assignments)
-            ? edge.data.assignments
-            : edge.data?.assign?.location
-                ? [edge.data.assign]
-                : [];
-
-        assignments.forEach((assignment, index) => {
-            const location = normalizeAssignmentLocation(assignment?.location);
-            if (location && !globalVariableIds.has(location)) {
-                addMissingVariableProblem({
-                    node: source,
-                    variableName: location,
-                    usage: "as a transition assignment target",
-                    detailTab: "allgemein",
-                    edgeId: edge.id,
-                    suffix: `transition-location-${edge.id}-${index}`,
-                });
-            }
-
-            validateExpressionReferences({
-                node: source,
-                expression: assignment?.expr,
-                availableIds: globalVariableIds,
-                usage: "in a transition assignment expression",
-                detailTab: "allgemein",
-                edgeId: edge.id,
-                suffix: `transition-expr-${edge.id}-${index}`,
-            });
-        });
-    });
-
-    // Transitions
-    (edges || []).forEach((edge) => {
-        const source = nodeMap.get(edge.source);
-        const target = nodeMap.get(edge.target);
-        const eventName = edge.sourceHandle || edge.label || "transition";
-
-        if (!source) {
-            addProblem({
-                id: `transition-missing-source-${edge.id}`,
-                category: "Transitions",
-                title: "Missing transition source",
-                message: `${eventName} starts from a state that no longer exists.`,
-                edgeId: edge.id,
-                mode: "event",
-                focusNodeIds: target ? [target.id] : [],
-            });
-            return;
-        }
-
-        if (!target) {
-            addProblem({
-                id: `transition-missing-target-${edge.id}`,
-                category: "Transitions",
-                title: "Missing transition target",
-                message: `${nodeLabel(source)}.${eventName} points to a state that no longer exists.`,
-                nodeId: source.id,
-                edgeId: edge.id,
-                detailTab: "allgemein",
-                mode: "event",
+                bindings.push({ nodeId: node.id, nodeLabel: node.data?.label || node.id, key: slot.key || "", access, index, slot });
             });
         }
-
-        if (
-            edge.sourceHandle &&
-            edge.sourceHandle !== "*" &&
-            !(
-                edge.sourceHandle === "fatal" &&
-                exposesImplicitFatal(source)
-            ) &&
-            !(source.data?.events || []).some(
-                (event) =>
-                    event?.id === edge.sourceHandle &&
-                    !event?.editorImportedSynthetic &&
-                    !event?.editorBoundarySynthetic
-            )
-        ) {
-            addProblem({
-                id: `transition-unknown-event-${edge.id}`,
-                severity: "warning",
-                category: "Transitions",
-                title: "Unknown exit token",
-                message: `${nodeLabel(source)} does not expose ${edge.sourceHandle}.`,
-                nodeId: source.id,
-                edgeId: edge.id,
-                detailTab: "allgemein",
-                mode: "event",
-                focusNodeIds: target
-                    ? [source.id, target.id]
-                    : [source.id],
-            });
-        }
-    });
-
-    // Missing transitions / exit-token coverage.
-    // Every exposed event must have an outgoing transition. A connected "*"
-    // handle is a catch-all and therefore covers every possible event.
-    (nodes || []).forEach((node) => {
-        if (isValidBehaviorTerminal(node)) return;
-
-        const exposedEventIds = [
-            ...new Set([
-                ...(node.data?.events || [])
-                    .filter(
-                        (event) =>
-                            !event?.editorImportedSynthetic &&
-                            !event?.editorBoundarySynthetic
-                    )
-                    .map((event) => String(event?.id || "").trim())
-                    .filter(Boolean),
-                ...(exposesImplicitFatal(node) ? ["fatal"] : []),
-            ]),
-        ];
-
-        if (exposedEventIds.length === 0) return;
-
-        const outgoingEventIds = new Set(
-            (edges || [])
-                .filter((edge) => edge.source === node.id)
-                .map((edge) =>
-                    String(edge.sourceHandle || edge.label || "").trim()
-                )
-                .filter(Boolean)
-        );
-
-        // A wildcard transition handles every event emitted by this state.
-        if (outgoingEventIds.has("*")) return;
-
-        exposedEventIds
-            .filter((eventId) => eventId !== "*")
-            .forEach((eventId) => {
-                if (outgoingEventIds.has(eventId)) return;
-
-                addProblem({
-                    id: `transition-missing-${node.id}-${eventId}`,
-                    category: "Transitions",
-                    title: "Missing transition",
-                    message: `${nodeLabel(node)}.${eventId} has no transition.`,
-                    nodeId: node.id,
-                    detailTab: "allgemein",
-                    mode: "event",
-                });
-            });
-    });
-
-    // Parameters: required values and type compatibility. This is also run
-    // immediately after SCXML import, so a stale/wrongly typed value from a
-    // file is surfaced in Problems without requiring the user to edit it first.
-    (nodes || []).forEach((node) => {
-        const nodeParameters = node.data?.params || [];
-        const parameterVariables = [
-            ...availableVariableEntries,
-            ...nodeParameters
-                .filter((parameter) => parameter?.key)
-                .map((parameter) => ({
-                    id: parameter.key,
-                    type: parameter.type,
-                    valueType: parameter.type,
-                    expr: parameter.expr ?? parameter.default ?? "",
-                })),
-        ];
-
-        nodeParameters.forEach((parameter, index) => {
-            const value = String(parameter.expr ?? "").trim();
-            const defaultValue = String(parameter.default ?? "").trim();
-            const parameterName =
-                parameter.key || `parameter ${index + 1}`;
-
-            if (parameter?.required && !value && !defaultValue) {
-                addProblem({
-                    id: `parameter-required-${node.id}-${index}`,
-                    category: "Parameters",
-                    title: "Required parameter is missing",
-                    message: `${nodeLabel(node)}.${parameterName} needs a value.`,
-                    nodeId: node.id,
-                    detailTab: "parameter",
-                    mode: "event",
-                });
-                return;
+        (node.data?.inheritedSlots || []).forEach((slot, index) => {
+            if (!slotMatchesPath(slot, oldPath) && !slotMatchesPath(slot, newPath)) return;
+            requirements.push({ nodeId: node.id, src: node.data?.src || "", index, slot });
+            if (normalizeSlotPath(slot.path) === oldPath && oldPath !== newPath) {
+                error = "The parent slot is required at its current path by another child declaration.";
             }
-
-            const effectiveValue = value || defaultValue;
-            if (!effectiveValue) return;
-
-            const parameterVariableIds = new Set(
-                parameterVariables
-                    .map((variable) => String(variable?.id || "").trim())
-                    .filter(Boolean)
-            );
-            const missingParameterReferences = getVariableReferences(
-                effectiveValue,
-                { includeBare: false }
-            ).filter((variableName) => !parameterVariableIds.has(variableName));
-
-            if (missingParameterReferences.length > 0) {
-                missingParameterReferences.forEach((variableName) =>
-                    addMissingVariableProblem({
-                        node,
-                        variableName,
-                        usage: `for parameter ${parameterName}`,
-                        detailTab: "parameter",
-                        suffix: `parameter-${index}`,
-                    })
-                );
-                return;
+            if (normalizeSlotPath(slot.path) === newPath && node.id !== consumer.nodeId && oldPath !== newPath) {
+                error = `/${newPath} is already required by another child.`;
             }
-
-            const normalizedParameterType = normalizeValueType(parameter.type);
-            if (!normalizedParameterType) return;
-
-            const validation = normalizeTypedValue(
-                effectiveValue,
-                normalizedParameterType,
-                parameterVariables,
-                { allowEmpty: true }
-            );
-
-            if (!validation.valid) {
-                addProblem({
-                    id: `parameter-type-${node.id}-${index}`,
-                    category: "Parameters",
-                    title: "Invalid parameter type",
-                    message: `${nodeLabel(node)}.${parameterName}: ${validation.error || `expected ${parameter.type || "the configured type"}.`}`,
-                    nodeId: node.id,
-                    detailTab: "parameter",
-                    mode: "event",
-                });
+            if (isKnownSlotType(slot.type) && normalizeSlotType(slot.type) !== consumer.slotType) {
+                error = "Child requirements have incompatible slot types.";
             }
         });
     });
-
-    // Behavior Library source validation.
-    const configuredBehaviorKeys = new Set(
-        (behaviorDirectories || [])
-            .map((directory) =>
-                String(directory?.key || "")
-                    .trim()
-                    .toUpperCase()
-            )
-            .filter(Boolean)
-    );
-
-    (nodes || []).forEach((node) => {
-        if (node.type !== "submachine") return;
-
-        const src = String(node.data?.src || "").trim();
-        if (!src) return;
-
-        const sourceKey = getBehaviorSourceKey(src);
-        if (!sourceKey) return;
-
-        if (!configuredBehaviorKeys.has(sourceKey)) {
-            addProblem({
-                id: `behavior-library-key-${node.id}-${sourceKey}`,
-                severity: "warning",
-                category: "Behavior Library",
-                title: "Behavior Library key is not configured",
-                message: `${nodeLabel(node)} sources ${src}, but ${sourceKey} is not defined in the Behavior Library.`,
-                nodeId: node.id,
-                detailTab: "allgemein",
-                mode: "event",
-            });
+    (model.manualSlots || []).forEach((slot, index) => {
+        if (oldPath !== newPath && slotMatchesPath(slot, newPath)) {
+            // Only the automatic, otherwise-unbound requirement declaration may
+            // be coalesced by this explicit confirmation. Real manual slots,
+            // parent inheritance, bindings, aliases and other children still veto.
+            if (slot.createdForChildRequirements === true && slot.slotKind === "slot" && !slot.inherited && !slot.key && !slot.state &&
+                (!isKnownSlotType(slot.type) || normalizeSlotType(slot.type) === consumer.slotType)) {
+                coalescedDeclarations.push({ index, id: slot.id, slot });
+            } else error = `/${newPath} is already declared in the parent workflow.`;
         }
+        if (!slotMatchesPath(slot, oldPath)) return;
+        if (isKnownSlotType(slot.type) && normalizeSlotType(slot.type) !== consumer.slotType) {
+            error = "The parent declaration has an incompatible slot type.";
+        }
+        declarations.push({ index, id: slot.id, key: slot.key || "", state: slot.inherited?.state || slot.state || "", slot });
     });
-
-    // A sourced behavior must have a way to leave the state machine.
-    // Valid terminals are End, Fatal, or a Nop forwarding node that sends
-    // an event outside the sub-state-machine.
-    if (isBehaviorWorkflow) {
-        const stateNodes = (nodes || []).filter(
-            (node) =>
-                node.type !== "slot" &&
-                node.type !== "parallelLane"
-        );
-
-        const hasValidTerminal = stateNodes.some(
-            isValidBehaviorTerminal
-        );
-
-        if (stateNodes.length > 0 && !hasValidTerminal) {
-            addProblem({
-                id: "behavior-exit-missing",
-                severity: "warning",
-                category: "Behavior exits",
-                title: "State machine has no exit",
-                message:
-                    "A sourced state machine must send an event outward through Nop or end in End/Fatal.",
-            });
-        }
-
-        const childrenByParent = new Map();
-        stateNodes.forEach((node) => {
-            if (!node.parentId) return;
-            if (!childrenByParent.has(node.parentId)) {
-                childrenByParent.set(node.parentId, []);
-            }
-            childrenByParent.get(node.parentId).push(node.id);
-        });
-
-        stateNodes.forEach((node) => {
-            // Containers terminate through their children.
-            if ((childrenByParent.get(node.id) || []).length > 0) {
-                return;
-            }
-
-            if (isValidBehaviorTerminal(node)) {
-                return;
-            }
-
-            const hasOutgoingTransition = (edges || []).some(
-                (edge) => edge.source === node.id
-            );
-
-            if (!hasOutgoingTransition) {
-                addProblem({
-                    id: `behavior-dead-end-${node.id}`,
-                    severity: "warning",
-                    category: "Behavior exits",
-                    title: "State machine can stop without an exit",
-                    message: `${nodeLabel(node)} has no outgoing transition. Use a Nop forwarding exit or End/Fatal if this path should leave the state machine.`,
-                    nodeId: node.id,
-                    detailTab: "allgemein",
-                    mode: "event",
-                });
-            }
-        });
+    const clones = (model.slotNodes || []).filter((node) => node.data?.isSlotClone && node.data?.cloneOfNodeId === canonicalId);
+    const placeholders = (model.slotNodes || []).filter((node) => getSlotPathFromNode(node) === newPath && node.id !== canonicalId);
+    if (oldPath !== newPath && placeholders.some((node) => node.data?.isSlotClone || !node.data?.requiredByChild)) {
+        error = `/${newPath} already exists; slots cannot be merged.`;
     }
-
-    // Slots
-    const readers = new Map();
-    const writers = new Map();
-
-    const registerSlot = (map, path, value) => {
-        if (!map.has(path)) map.set(path, []);
-        map.get(path).push(value);
+    if (!canonical || !oldPath || !newPath) error = "The parent slot or child requirement no longer exists.";
+    return {
+        oldPath, newPath, canonicalId, newCanonicalId: `slot-${newPath}`, bindings, declarations, coalescedDeclarations, clones, placeholders, error,
+        signature: JSON.stringify({
+            oldPath, newPath, canonicalId, type: canonical?.data?.slotType,
+            inherited: canonical?.data?.inherited, inheritedFrom: canonical?.data?.inheritedFrom,
+            bindings, declarations, coalescedDeclarations, requirements,
+            clones: clones.map((node) => [node.id, node.data?.cloneOfNodeId, getSlotPathFromNode(node)]),
+            placeholders: placeholders.map((node) => [node.id, node.data?.slotType, node.data?.requiredByChildren]),
+        }),
     };
-
-    (nodes || []).forEach((node) => {
-        (node.data?.inSlots || []).forEach((slot, index) => {
-            const path = normalizeSlotPath(slot.path);
-
-            if (!path) {
-                addProblem({
-                    id: `slot-input-empty-${node.id}-${index}`,
-                    severity: "warning",
-                    category: "Slots",
-                    title: "Input slot is not connected",
-                    message: `${nodeLabel(node)}.${slot.key || `input ${index + 1}`} has no slot path.`,
-                    nodeId: node.id,
-                    detailTab: "slots",
-                    mode: "overview",
-                });
-                return;
-            }
-
-            registerSlot(readers, path, { node, slot, index });
-        });
-
-        (node.data?.outSlots || []).forEach((slot, index) => {
-            const path = normalizeSlotPath(slot.path);
-
-            if (!path) {
-                addProblem({
-                    id: `slot-output-empty-${node.id}-${index}`,
-                    severity: "warning",
-                    category: "Slots",
-                    title: "Output slot is not connected",
-                    message: `${nodeLabel(node)}.${slot.key || `output ${index + 1}`} has no slot path.`,
-                    nodeId: node.id,
-                    detailTab: "slots",
-                    mode: "overview",
-                });
-                return;
-            }
-
-            registerSlot(writers, path, { node, slot, index });
-        });
-    });
-
-    // A current-machine inheritSlot can come from several representations:
-    // manual declarations, imported skill slot metadata, or the generated
-    // visual slot node. Problems validation must recognize all of them, just
-    // like Slot Details does, otherwise an upstream writer is found but the
-    // path is still incorrectly treated as an ordinary local slot.
-    const inheritedPaths = new Set();
-    const registerInheritedPath = (value) => {
-        const path = normalizeSlotPath(value);
-        if (path) inheritedPaths.add(path);
-    };
-
-    (manualSlots || []).forEach((slot) => {
-        if (slot?.slotKind === "inheritSlot" || Boolean(slot?.inherited)) {
-            registerInheritedPath(slot?.inherited?.xpath || slot?.path);
-        }
-    });
-
-    (nodes || []).forEach((node) => {
-        [...(node.data?.inSlots || []), ...(node.data?.outSlots || [])].forEach(
-            (slot) => {
-                if (slot?.inherited) {
-                    registerInheritedPath(slot?.inherited?.xpath || slot?.path);
-                }
-            }
-        );
-    });
-
-    (currentSlotNodes || []).forEach((slotNode) => {
-        if (slotNode?.data?.currentMachineInherited) {
-            registerInheritedPath(
-                slotNode?.data?.path || slotNode?.data?.label
-            );
-        }
-    });
-
-    const paths = new Set([...readers.keys(), ...writers.keys()]);
-
-    paths.forEach((path) => {
-        const pathReaders = readers.get(path) || [];
-        const pathWriters = writers.get(path) || [];
-
-        pathReaders.forEach((reader) => {
-            pathWriters.forEach((writer) => {
-                const inputType = normalizeSlotType(reader.slot?.type);
-                const outputType = normalizeSlotType(writer.slot?.type);
-
-                if (
-                    inputType &&
-                    outputType &&
-                    inputType !== outputType
-                ) {
-                    addProblem({
-                        id: `slot-type-${path}-${reader.node.id}-${reader.index}-${writer.node.id}-${writer.index}`,
-                        category: "Slots",
-                        title: "Slot type mismatch",
-                        message: `/${path}: ${nodeLabel(writer.node)}.${writer.slot?.key} (${writer.slot?.type}) → ${nodeLabel(reader.node)}.${reader.slot?.key} (${reader.slot?.type}).`,
-                        nodeId: reader.node.id,
-                        detailTab: "slots",
-                        mode: "overview",
-                        focusNodeIds: [writer.node.id, reader.node.id],
-                    });
-                }
-            });
-        });
-
-        if (pathReaders.length > 0 && pathWriters.length === 0) {
-            const isInheritedPath = inheritedPaths.has(path);
-            const ancestorSources = ancestorSlotSourcesByPath.get(path) || [];
-            const hasAncestorWriter = ancestorSources.some(
-                (entry) => entry?.hierarchyKind === "writer"
-            );
-
-            // An inheritSlot may be supplied through multiple parent state
-            // machines. It is valid when a writer is reachable through the
-            // complete inheritSlot chain, even if there is no local writer.
-            if (isInheritedPath && hasAncestorWriter) {
-                return;
-            }
-
-            pathReaders.forEach((reader) => {
-                addProblem({
-                    id: `slot-no-writer-${path}-${reader.node.id}-${reader.index}`,
-                    severity: "warning",
-                    category: "Slots",
-                    title: "Slot has no writer",
-                    message: `/${path} is read by ${nodeLabel(reader.node)}, but no skill writes to it.`,
-                    nodeId: reader.node.id,
-                    detailTab: "slots",
-                    mode: "overview",
-                });
-            });
-        }
-
-    });
-
-    const severityOrder = { error: 0, warning: 1, info: 2 };
-
-    return problems.sort(
-        (a, b) =>
-            (severityOrder[a.severity] ?? 99) -
-            (severityOrder[b.severity] ?? 99) ||
-            String(a.category).localeCompare(String(b.category)) ||
-            String(a.title).localeCompare(String(b.title))
-    );
 };
 
+export const renameParentSlot = (model, plan) => {
+    const update = (slot) => {
+        if (!slotMatchesPath(slot, plan.oldPath)) return slot;
+        return {
+            ...slot, path: `/${plan.newPath}`,
+            ...(slot.inherited ? { inherited: { ...slot.inherited, xpath: `/${plan.newPath}` } } : {}),
+        };
+    };
+    const nodes = model.nodes.map((node) => {
+        let data = node.data;
+        for (const key of ["inSlots", "outSlots"]) {
+            const before = node.data?.[key];
+            if (!before?.some((slot) => slotMatchesPath(slot, plan.oldPath))) continue;
+            data = { ...data, [key]: before.map(update) };
+        }
+        return data === node.data ? node : { ...node, data };
+    });
+    const manualSlots = (model.manualSlots || []).filter((_slot, index) =>
+        !plan.coalescedDeclarations?.some((entry) => entry.index === index)).map(update);
+    const slotNodes = model.slotNodes.filter((node) => !plan.placeholders.some((placeholder) => placeholder.id === node.id)).map((node) => {
+        const canonical = node.id === plan.canonicalId;
+        const clone = node.data?.isSlotClone && node.data?.cloneOfNodeId === plan.canonicalId;
+        if (!canonical && !clone) return node;
+        return {
+            ...node, id: canonical ? plan.newCanonicalId : node.id,
+            data: { ...node.data, path: `/${plan.newPath}`, label: `/${plan.newPath}`,
+                ...(clone ? { cloneOfNodeId: plan.newCanonicalId } : {}) },
+        };
+    });
+    const slotEdges = (model.slotEdges || []).map((edge) => {
+        if (edge.data?.canonicalSlotNodeId !== plan.canonicalId && !slotMatchesPath(edge.data, plan.oldPath)) return edge;
+        return {
+            ...edge,
+            source: edge.source === plan.canonicalId ? plan.newCanonicalId : edge.source,
+            target: edge.target === plan.canonicalId ? plan.newCanonicalId : edge.target,
+            data: { ...edge.data, path: plan.newPath, canonicalSlotNodeId: plan.newCanonicalId,
+                slotNodeId: edge.data?.slotNodeId === plan.canonicalId ? plan.newCanonicalId : edge.data?.slotNodeId },
+        };
+    });
+    return { ...model, nodes, manualSlots, slotNodes, slotEdges };
+};

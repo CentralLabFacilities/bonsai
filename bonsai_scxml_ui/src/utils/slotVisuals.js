@@ -41,6 +41,55 @@ const SLOT_TYPE_VISUALS = Object.freeze({
     },
 });
 
+export function getStateSlotEntries(data = {}, nodeType = "custom") {
+    const isSubMachine = nodeType === "submachine";
+    const regularSlots = ["read", "write"].flatMap((access) =>
+        (data[access === "read" ? "inSlots" : "outSlots"] || []).map((slot, index) => ({
+            key: slot?.key,
+            path: slot?.path,
+            type: slot?.type,
+            access,
+            index,
+            handleId: `slot-skill-${access}-${index}`,
+            inherited: isSubMachine
+                ? Boolean(slot?.inherited)
+                : Boolean(slot?.inherited && (String(slot.path || "").trim() || String(slot.inherited?.xpath || "").trim())),
+        }))
+    );
+    const inheritedSlots = isSubMachine ? (data.inheritedSlots || [])
+        .map((slot, index) => ({
+            key: slot?.key,
+            path: slot?.path,
+            type: slot?.type,
+            access: slot?.access,
+            index,
+            handleId: `slot-submachine-${slot?.access}-${index}`,
+            inherited: true,
+        }))
+        .filter((slot) => slot.access === "read" || slot.access === "write") : [];
+
+    // Keep source-array indices: connections refer to these exact handle IDs.
+    return [...regularSlots, ...inheritedSlots].filter((slot) =>
+        String(slot.key || (isSubMachine && slot.path) || "").trim()
+    );
+}
+
+export function getSlotHandleDragClass({ drag, nodeId, handleId, access, origin, slotType }) {
+    if (!drag?.active) return "";
+    if (drag.nodeId === nodeId && drag.handleId === handleId) {
+        return "slot-handle-compatible slot-handle-active";
+    }
+
+    const destinationSide = origin === "slot"
+        ? drag.origin === "skill" || drag.origin === "submachine"
+        : (origin === "skill" || origin === "submachine") && drag.origin === "slot";
+    const type = String(slotType || "").trim().toLowerCase();
+    const dragType = String(drag.slotType || "").trim().toLowerCase();
+    const compatible = destinationSide && drag.access === access && Boolean(type)
+        && type !== "unknown" && type === dragType;
+    return compatible ? "slot-handle-compatible" : "slot-handle-incompatible";
+}
+
 export function getSlotTypeVisual(type) {
     const normalized = String(type || "").trim().toLowerCase();
 

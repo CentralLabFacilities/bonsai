@@ -1,4 +1,5 @@
-import { getAbsoluteNodePosition } from "./editorGeometry";
+import { getAbsoluteNodePosition } from "./editorGeometry.js";
+import { createEditorNodeIndex } from "./editorGraph.js";
 
 export const getSkillPackageName = (fullSkillName) => {
     let baseName = String(fullSkillName || "").split("#")[0];
@@ -64,10 +65,10 @@ export const normalizeAssignmentExpressionForScxml = (value) => {
     let expression = String(value ?? "").trim();
     if (!expression) return "";
 
-    // Keep a direct editor variable reference marked until scxmlExport serializes
+    // Keep a direct editor variable reference marked until the Rust SCXML serializer handles
     // it. The exporter knows that @foo is a reference and emits foo without
     // turning it into the string literal 'foo'.
-    if (/^@[A-Za-z_#][A-Za-z0-9_:#.\-]*$/.test(expression)) {
+    if (/^@[A-Za-z_#][A-Za-z0-9_:#.-]*$/.test(expression)) {
         return expression;
     }
 
@@ -337,7 +338,7 @@ export const getExportFullSkillName = (node) => {
     return String(node.data?.fullSkillName || "").trim();
 };
 
-export const prepareGraphForScxml = (sourceNodes = [], sourceEdges = []) => {
+const createScxmlNodeContext = (sourceNodes = []) => {
     // End, Fatal, and identical forwarding-Nop exits may appear multiple times
     // visually while representing one SCXML state. Normal skill clones are
     // editor-only aliases as well: they never become SCXML states, but incoming
@@ -346,9 +347,8 @@ export const prepareGraphForScxml = (sourceNodes = [], sourceEdges = []) => {
         (sourceNodes || []).map(normalizeSharedScxmlStateIdentity)
     );
 
-    const nodeById = new Map(
-        normalizedNodes.map((node) => [node.id, node])
-    );
+    const graphIndex = createEditorNodeIndex(normalizedNodes);
+    const nodeById = graphIndex.byId;
 
     const skillCloneNodes = normalizedNodes.filter(
         (node) =>
@@ -372,6 +372,7 @@ export const prepareGraphForScxml = (sourceNodes = [], sourceEdges = []) => {
 
     const aliasToCanonicalId = new Map();
     const clonePositionsByCanonicalId = new Map();
+    const sharedGroupByCanonicalId = new Map();
     // Stable visual instance ids let editor-only edge routing survive a
     // save/reload. They are meaningful only to the editor; SCXML semantics
     // still target the canonical state id.
@@ -394,70 +395,66 @@ export const prepareGraphForScxml = (sourceNodes = [], sourceEdges = []) => {
         const original = nodeById.get(originalId);
         if (!original) return;
 
-        const originalPosition = getAbsoluteNodePosition(
-            original,
-            normalizedNodes
-        );
         const originalInstanceId =
             String(original.data?.editorInstanceId || "").trim() || "original";
         visualInstanceIdByNodeId.set(original.id, originalInstanceId);
 
-        const positions = [
-            {
-                instanceId: originalInstanceId,
-                x: Number(originalPosition.x || 0),
-                y: Number(originalPosition.y || 0),
-                isSkillClone: false,
-                cloneType: "",
-            },
-            ...clones.map((cloneNode, cloneIndex) => {
-                const absolutePosition = getAbsoluteNodePosition(
-                    cloneNode,
-                    normalizedNodes
-                );
-                const instanceId =
-                    String(cloneNode.data?.editorInstanceId || "").trim() ||
-                    `clone-${cloneIndex + 1}`;
-                visualInstanceIdByNodeId.set(cloneNode.id, instanceId);
-                return {
-                    instanceId,
-                    x: Number(absolutePosition.x || 0),
-                    y: Number(absolutePosition.y || 0),
-                    isSkillClone: Boolean(cloneNode.data?.isSkillClone),
-                    cloneType: cloneNode.data?.isSkillClone
-                        ? "skill"
-                        : String(cloneNode.data?.sourceNodeType || "state"),
-                };
-            }),
-        ];
-
-        clonePositionsByCanonicalId.set(originalId, positions);
+        clones.forEach((cloneNode, cloneIndex) => {
+            const instanceId =
+                String(cloneNode.data?.editorInstanceId || "").trim() ||
+                `clone-${cloneIndex + 1}`;
+            visualInstanceIdByNodeId.set(cloneNode.id, instanceId);
+        });
     });
 
     sharedGroups.forEach((group) => {
         const canonical = group.find((node) => !node.parentId) || group[0];
+        sharedGroupByCanonicalId.set(canonical.id, group);
         group.forEach((node) => aliasToCanonicalId.set(node.id, canonical.id));
 
-        clonePositionsByCanonicalId.set(
-            canonical.id,
-            group.map((node, index) => {
-                const absolutePosition = getAbsoluteNodePosition(
-                    node,
-                    normalizedNodes
-                );
-                const instanceId =
-                    String(node.data?.editorInstanceId || "").trim() ||
-                    String(index + 1);
-                visualInstanceIdByNodeId.set(node.id, instanceId);
-
-                return {
-                    instanceId,
-                    x: Number(absolutePosition.x || 0),
-                    y: Number(absolutePosition.y || 0),
-                };
-            })
-        );
+        group.forEach((node, index) => {
+            const instanceId =
+                String(node.data?.editorInstanceId || "").trim() ||
+                String(index + 1);
+            visualInstanceIdByNodeId.set(node.id, instanceId);
+        });
     });
+
+    // Geometry is needed only for the requested canonical states. Keep this
+    // cache inside the preparation call so edits cannot reuse stale positions.
+    const getClonePositions = (canonicalId) => {
+        if (clonePositionsByCanonicalId.has(canonicalId)) {
+            return clonePositionsByCanonicalId.get(canonicalId);
+        }
+
+        const group = sharedGroupByCanonicalId.get(canonicalId);
+        const clones = skillClonesByOriginalId.get(canonicalId);
+        const original = nodeById.get(canonicalId);
+        if (!group && (!clones || !original)) return undefined;
+
+        const instances = group || [original, ...clones];
+        const positions = instances.map((node, index) => {
+            const absolute = getAbsoluteNodePosition(node, normalizedNodes, graphIndex);
+            return {
+                instanceId: String(node.data?.editorInstanceId || "").trim() ||
+                    (group ? String(index + 1) : index === 0 ? "original" : `clone-${index}`),
+                x: Number(absolute.x || 0),
+                y: Number(absolute.y || 0),
+                ...(!group
+                    ? {
+                        isSkillClone: index > 0 && Boolean(node.data?.isSkillClone),
+                        cloneType: index === 0
+                            ? ""
+                            : node.data?.isSkillClone
+                                ? "skill"
+                                : String(node.data?.sourceNodeType || "state"),
+                    }
+                    : {}),
+            };
+        });
+        clonePositionsByCanonicalId.set(canonicalId, positions);
+        return positions;
+    };
 
     const remapNodeId = (nodeId) => aliasToCanonicalId.get(nodeId) || nodeId;
     const seenSharedStates = new Set();
@@ -476,51 +473,81 @@ export const prepareGraphForScxml = (sourceNodes = [], sourceEdges = []) => {
 
             seenSharedStates.add(sharedKey);
             return true;
-        })
-        .map((node) => ({
-            ...node,
-            data: {
-                ...(node.data || {}),
-                fullSkillName: getExportFullSkillName(node),
-                editorClonePositions:
-                    clonePositionsByCanonicalId.get(node.id) || undefined,
-                onEntry: Array.isArray(node.data?.onEntry)
-                    ? node.data.onEntry.map(normalizeAssignmentForScxml)
-                    : node.data?.onEntry,
-                onExit: Array.isArray(node.data?.onExit)
-                    ? node.data.onExit.map(normalizeAssignmentForScxml)
-                    : node.data?.onExit,
-                events: Array.isArray(node.data?.events)
-                    ? node.data.events
-                        // Compound/Parallel border events are editor-only
-                        // handles for visualizing a child skill transition at
-                        // the container boundary. The semantic external edge
-                        // below is already collapsed back to the real skill,
-                        // so exporting these handles as container transitions
-                        // would create duplicates such as
-                        // compound_2.Wait.success.
-                        .filter(
-                            (event) =>
-                                !(
-                                    (node.type === "compound" ||
-                                        node.type === "parallelLane") &&
-                                    event?.sourceNodeId &&
-                                    event?.transitionHandleId
-                                )
-                        )
-                        .map((event) => ({
-                            ...event,
-                            target: event.target ? remapNodeId(event.target) : event.target,
-                            assignments: Array.isArray(event.assignments)
-                                ? event.assignments.map(normalizeAssignmentForScxml)
-                                : event.assignments,
-                            assignExpr: event.assignExpr !== undefined
-                                ? normalizeAssignmentExpressionForScxml(event.assignExpr)
-                                : event.assignExpr,
-                        }))
-                    : node.data?.events,
-            },
-        }));
+        });
+    const prepareNode = (node) => ({
+        ...node,
+        data: {
+            ...(node.data || {}),
+            fullSkillName: getExportFullSkillName(node),
+            editorClonePositions: getClonePositions(node.id),
+            onEntry: Array.isArray(node.data?.onEntry)
+                ? node.data.onEntry.map(normalizeAssignmentForScxml)
+                : node.data?.onEntry,
+            onExit: Array.isArray(node.data?.onExit)
+                ? node.data.onExit.map(normalizeAssignmentForScxml)
+                : node.data?.onExit,
+            events: Array.isArray(node.data?.events)
+                ? node.data.events
+                    // Border events visualize child transitions; their semantic
+                    // edges already export those transitions without duplicates.
+                    .filter(
+                        (event) =>
+                            !(
+                                (node.type === "compound" ||
+                                    node.type === "parallelLane") &&
+                                event?.sourceNodeId &&
+                                event?.transitionHandleId
+                            )
+                    )
+                    .map((event) => ({
+                        ...event,
+                        target: event.target ? remapNodeId(event.target) : event.target,
+                        assignments: Array.isArray(event.assignments)
+                            ? event.assignments.map(normalizeAssignmentForScxml)
+                            : event.assignments,
+                        assignExpr: event.assignExpr !== undefined
+                            ? normalizeAssignmentExpressionForScxml(event.assignExpr)
+                            : event.assignExpr,
+                    }))
+                : node.data?.events,
+        },
+    });
+
+    return {
+        nodes: exportNodes,
+        prepareNode,
+        getClonePositions,
+        remapNodeId,
+        skillCloneIdSet,
+        visualInstanceIdByNodeId,
+    };
+};
+
+export const prepareNodesForScxml = (sourceNodes = [], stateIds = null) => {
+    const context = createScxmlNodeContext(sourceNodes);
+    const requestedIds = stateIds == null ? null : new Set(stateIds);
+    return context.nodes
+        .filter((node) => !requestedIds || requestedIds.has(node.id))
+        .map(context.prepareNode);
+};
+
+export const prepareStateEditorPositionsForScxml = (sourceNodes = [], stateId) => {
+    const context = createScxmlNodeContext(sourceNodes);
+    const state = context.nodes.find((node) => node.id === stateId);
+    if (!state) return null;
+
+    return context.getClonePositions(state.id) || [{
+        x: Number(state.position?.x || 0),
+        y: Number(state.position?.y || 0),
+        instanceId: null,
+        cloneType: null,
+    }];
+};
+
+export const prepareGraphForScxml = (sourceNodes = [], sourceEdges = []) => {
+    const context = createScxmlNodeContext(sourceNodes);
+    const exportNodes = context.nodes.map(context.prepareNode);
+    const { remapNodeId, skillCloneIdSet, visualInstanceIdByNodeId } = context;
 
     const seenExportEdges = new Set();
     const exportEdges = (sourceEdges || [])
@@ -684,4 +711,3 @@ export const collectDescendantGlobals = (
 
     return result;
 };
-

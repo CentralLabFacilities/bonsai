@@ -32,23 +32,3 @@ export const measureContainerTask = (label, task, details = null) => {
         logMeasurement(label, getNow() - startedAt, details || undefined);
     }
 };
-
-export const measureContainerTaskAsync = async (label, task, details = null) => {
-    const startedAt = getNow();
-    try {
-        return await task();
-    } finally {
-        logMeasurement(label, getNow() - startedAt, details || undefined);
-    }
-};
-
-export const createContainerPerfTimer = (label, details = null) => {
-    const startedAt = getNow();
-    let finished = false;
-
-    return () => {
-        if (finished) return;
-        finished = true;
-        logMeasurement(label, getNow() - startedAt, details || undefined);
-    };
-};

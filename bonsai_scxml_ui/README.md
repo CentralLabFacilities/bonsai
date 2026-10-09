@@ -42,8 +42,25 @@ bun --bun tauri:build       # produces src-tauri/target/release/bonsai-ui
 The resulting binary (~5–10 MB) opens as a native window. It supports:
 
 - **Open**: Native file picker for `.xml` / `.scxml` files
-- **Speichern** (Save): Directly overwrites the currently open file (no dialog)
+- **Speichern** (Save): Atomically replaces the currently open file (no dialog)
 - **Speichern unter** (Save As): Opens save dialog when no file is open
+
+---
+
+## Verification
+
+Use Node 22.23.3 (pinned in `.node-version`) and a Rust toolchain. Install dependencies with `npm ci`, then prepare Chromium with `npx playwright install --with-deps chromium` on supported Linux hosts, or `npx playwright install chromium` when browser libraries are already available.
+
+```bash
+npm run verify                 # lint, JS tests, headless Rust tests, build, browser tests
+npm run test:rust              # native core and real atomic-file tests, no desktop GTK required
+npm run test:browser           # real Chromium interaction and screenshot checks
+npm run test:browser:update    # explicitly regenerate reviewed visual baselines
+```
+
+Verification uses an existing project-local Pixi Rust/linker environment when available and otherwise uses Cargo from PATH. Browser tests use deterministic API fixtures, not a running Bonsai service; screenshot fonts are pinned. CI runs the same verification command in Debian Bookworm and retains browser traces/screenshots on failure. Live desktop windows, native pickers, and quit behavior still require a graphical Tauri smoke check.
+
+Atomic saves preserve existing bytes until replacement commits. On Unix, a directory-sync failure after replacement explicitly reports that the new file already committed but crash durability is unconfirmed. Replacement changes file identity and does not preserve ownership, ACLs, extended attributes, or hard-link aliases.
 
 ---
 
@@ -78,20 +95,32 @@ The server automatically proxies `/api/*` requests to `http://localhost:8080/*` 
 
 ## Project Structure
 
-```
-bonsai_ui/
-├── src/                          # React frontend
-│   ├── components/               # UI components
-│   ├── utils/                    # SCXML import/export, layout
-│   └── tauri-client.js           # Tauri IPC bridge
-├── src-tauri/                    # Rust/Tauri backend
-│   ├── src/main.rs               # File open/save/read commands
-│   ├── Cargo.toml                # Rust dependencies
-│   ├── tauri.conf.json           # App config
-│   └── capabilities/             # Permission grants
-├── build.sh                      # Unified build script
-├── server.js                     # Standalone server entry point
-├── embed-assets.js               # Asset bundler (base64 → binary)
-└── target/                       # Build output (gitignored)
-    └── bonsai-ui                 # Standalone binary
+```text
+src/
+  App.jsx                         # Editor composition and controller wiring
+  components/
+    canvas/                       # Canvas, context actions, Code View and find
+    graph/                        # Node and edge renderers, shared node chrome
+    inspector/                    # Details, data, problems and runtime panels
+    library/                      # Skill and behavior browsing
+    inputs/                       # Typed values, expressions and state actions
+    overlays/                     # Dialogs, shortcut help and introduction
+    ui/                           # Shared controls and feedback primitives
+    EditorChrome.jsx              # Top-level header and adaptive panel shell
+    WorkflowTabBar.jsx            # Top-level document tabs
+  hooks/
+    graph/                        # Graph state, projections and mutations
+      editorActions/              # Focused graph-editing actions
+      transitionGraph/            # Transition and slot routing helpers
+    interaction/                  # Selection, drag, clipboard and keyboard
+    document/                     # Tabs, persistence, history and Rust bridge
+    library/                      # Skill definitions, browsing and insertion
+    editor/                       # Inspector coordination, preferences and replay
+  utils/                          # Pure graph, SCXML and layout helpers
+  tauri-client.js                 # Tauri IPC bridge
+  server.js                       # Standalone server entry point
+  embed-assets.js                 # Asset bundler
+src-tauri/                        # Native backend and atomic file persistence
+scripts/verify.mjs                # Unified verification runner
+tests/                           # Unit, native-bridge and browser regressions
 ```

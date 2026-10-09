@@ -14,6 +14,25 @@ const getSkillNameCandidates = (sourceSkillName) => {
 export const isWildcardTransitionEvent = (eventId) =>
     String(eventId || "").includes("*");
 
+export const isManagedBoundaryEvent = (nodeType, event) =>
+    ["compound", "parallelLane"].includes(nodeType) &&
+    Boolean(event?.sourceNodeId && event?.transitionHandleId);
+
+// Compare entire descriptor coverage: a specific child event does not shadow
+// an ancestor wildcard's remaining event namespace.
+export const transitionDescriptorCovers = (covering, covered) => {
+    const tokens = (value) => String(value || "").trim().split(/\s+/).filter(Boolean);
+    const outer = tokens(covering);
+    const inner = tokens(covered);
+    return inner.length > 0 && inner.every((event) => outer.some((descriptor) => {
+        if (descriptor === "*" || descriptor === "**" || descriptor === event) return true;
+        const wildcard = /\.\*{1,2}$/.test(descriptor);
+        const prefix = wildcard ? descriptor.replace(/\.\*{1,2}$/, "") : descriptor;
+        const eventPrefix = event.replace(/\.\*{1,2}$/, "");
+        return eventPrefix.startsWith(`${prefix}.`) || eventPrefix === prefix;
+    }));
+};
+
 const normalizeExitToken = (token) => {
     const value = String(token || "").trim();
     if (!value) return "success";
@@ -58,26 +77,4 @@ export const getTransitionExitToken = (rawEvent, sourceSkillName = "") => {
     // Already-normalized/custom event ids and wildcard descriptors are kept
     // unchanged when no source prefix can be identified safely.
     return eventName;
-};
-
-/**
- * Convert a UI exit-token id back to the SCXML event name for a skill node.
- */
-export const getScxmlTransitionEvent = (exitToken, sourceSkillName) => {
-    const token = String(exitToken || "success").trim() || "success";
-    const sourceWithoutInstance = String(sourceSkillName || "").split("#")[0];
-    const skillBaseName = sourceWithoutInstance.split(".").filter(Boolean).pop() || sourceWithoutInstance;
-
-    if (!skillBaseName) return token;
-
-    // Keep an event that is already explicitly prefixed with this skill.
-    if (token === skillBaseName || token.startsWith(`${skillBaseName}.`)) {
-        return token;
-    }
-
-    if (token === "*") {
-        return `${skillBaseName}.*`;
-    }
-
-    return `${skillBaseName}.${token}`;
 };
