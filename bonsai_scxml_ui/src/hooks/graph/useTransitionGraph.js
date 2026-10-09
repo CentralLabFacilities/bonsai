@@ -34,9 +34,12 @@ export function useTransitionGraph({
     edges,
     slotNodes,
     slotEdges,
+    manualSlots,
     setNodes,
     setEdges,
+    setSlotNodes,
     setSlotEdges,
+    setManualSlots,
     setGlobalDataModel,
     setSelectedNodeId,
     updateNodeInternals,
@@ -45,6 +48,12 @@ export function useTransitionGraph({
     checkSlotConnection,
     syncSlotsAfterCommit,
     onSkillSlotConnectionApplied,
+    getDocumentSnapshot,
+    getActiveDocumentIdentity,
+    screenToFlowPosition,
+    flowContainerRef,
+    cancelFlowConnection,
+    onSlotConnectionError,
 }) {
     const reconnectingEdgeRef = useRef(null);
     const [drawerData, setDrawerData] = useState(
@@ -52,22 +61,36 @@ export function useTransitionGraph({
     );
     const {
         slotConnectionDrag,
-        setSlotConnectionDrag,
+        pendingSlotRename,
+        cancelSlotConnection,
+        cancelSlotRename,
+        confirmSlotRename,
         validateSlotConnection,
         handleConnectStart,
         handleConnectEnd,
         handleFlowSlotConnect,
         handleSlotReconnect,
+        handleSlotReconnectStart,
+        handleSlotReconnectEnd,
     } = useSlotConnections({
         nodes,
         slotNodes,
         slotEdges,
+        manualSlots,
         setNodes,
+        setSlotNodes,
         setSlotEdges,
+        setManualSlots,
         setSelectedNodeId,
         checkSlotConnection,
         syncSlotsAfterCommit,
         onSkillSlotConnectionApplied,
+        getDocumentSnapshot,
+        getActiveDocumentIdentity,
+        screenToFlowPosition,
+        flowContainerRef,
+        cancelFlowConnection,
+        onSlotConnectionError,
     });
 
     const openConditionDrawer = useCallback(
@@ -126,7 +149,7 @@ export function useTransitionGraph({
             return false;
         }
 
-        const slotValidation = validateSlotConnection(connection);
+        const slotValidation = validateSlotConnection(connection, reconnectingEdgeRef.current);
         if (slotValidation !== null) {
             return slotValidation;
         }
@@ -195,12 +218,13 @@ export function useTransitionGraph({
         // the fixed opposite handle here, so keep the edge itself regardless
         // of that handleType value for validation during the drag.
         reconnectingEdgeRef.current = edge;
-        setSlotConnectionDrag(null);
-    }, [setSlotConnectionDrag]);
+        handleSlotReconnectStart(edge);
+    }, [handleSlotReconnectStart]);
 
     const handleReconnectEnd = useCallback(() => {
         reconnectingEdgeRef.current = null;
-    }, []);
+        handleSlotReconnectEnd();
+    }, [handleSlotReconnectEnd]);
 
     const onReconnect = useCallback(
         (oldEdge, connection) => {
@@ -1336,6 +1360,10 @@ export function useTransitionGraph({
         drawerData,
         setDrawerData,
         slotConnectionDrag,
+        pendingSlotRename,
+        cancelSlotConnection,
+        cancelSlotRename,
+        confirmSlotRename,
         openConditionDrawer,
         isValidConnection,
         handleConnectStart,

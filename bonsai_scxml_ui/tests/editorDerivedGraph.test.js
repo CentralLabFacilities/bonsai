@@ -8,6 +8,7 @@ import { Window } from "happy-dom";
 import { projectSemanticNodes, useDerivedGraphSnapshot, useSemanticNodeSnapshot } from "../src/hooks/graph/useEditorGraphMaintenance.js";
 import { projectOutgoingTransitionHandles, useEditorPresentationGraph } from "../src/hooks/graph/useEditorPresentationGraph.js";
 import { projectRoutingNodes, projectStructureEdges, useEditorDisplay } from "../src/hooks/graph/useEditorDisplay.js";
+import { projectNodeWarningTitles } from "../src/utils/editorValidation.js";
 
 function node(id, extra = {}) {
     return { id, type: "custom", position: { x: 10, y: 20 }, data: { label: id }, ...extra };
@@ -16,6 +17,26 @@ function node(id, extra = {}) {
 function edge(id, extra = {}) {
     return { id, source: "a", target: "b", sourceHandle: "success", data: {}, ...extra };
 }
+
+test("node warnings use diagnostic owners and stable IDs, not navigation focus or array identity", () => {
+    const problems = Object.freeze([
+        Object.freeze({ id: "z", severity: "warning", nodeId: "a", title: "Slots", message: "Missing path", focusNodeIds: ["a", "target"] }),
+        Object.freeze({ id: "a", severity: "error", nodeId: "a", title: "Parameters", message: "Invalid Integer" }),
+        Object.freeze({ id: "b", severity: "error", nodeId: "b", title: "Variables", message: "Unknown reference" }),
+        Object.freeze({ id: "workflow", severity: "error", title: "Workflow", focusNodeIds: ["target"] }),
+        Object.freeze({ id: "info", severity: "info", nodeId: "target", title: "Informational" }),
+    ]);
+    const warnings = projectNodeWarningTitles(new Map(), problems);
+    assert.deepEqual([...warnings.keys()], ["a", "b"]);
+    assert.equal(warnings.get("a"), "Parameters: Invalid Integer\nSlots: Missing path");
+    assert.equal(warnings.has("target"), false);
+    assert.equal(projectNodeWarningTitles(warnings, [...problems].reverse().map((problem) => ({ ...problem }))), warnings);
+    const changed = projectNodeWarningTitles(warnings, [{ ...problems[0], message: "Changed path" }, ...problems.slice(1)]);
+    assert.notEqual(changed, warnings);
+    assert.equal(changed.get("b"), warnings.get("b"));
+    assert.equal(warnings.get("a"), "Parameters: Invalid Integer\nSlots: Missing path");
+    assert.deepEqual([...projectNodeWarningTitles(changed, []).keys()], []);
+});
 
 test("semantic projection ignores selection, dimensions and live geometry", () => {
     const nodes = [node("a"), node("b", { parentId: "a" })];
@@ -217,8 +238,8 @@ test("React graph snapshots preserve identities, policies and bounded interactio
         nodes: [node("a"), node("b"), node("c"), node("d"), node("unrelated")],
         edges: [edge("ab"), edge("cd", { source: "c", target: "d" })],
         slotNodes: [node("slot-a", { type: "slot" }), node("slot-c", { type: "slot" })],
-        slotEdges: [edge("slot-ab", { target: "slot-a", data: { skillNodeId: "a", slotNodeId: "slot-a", access: "read" } }),
-            edge("slot-cd", { source: "c", target: "slot-c", data: { skillNodeId: "c", slotNodeId: "slot-c", access: "write" } })],
+        slotEdges: [edge("slot-ab", { source: "slot-a", target: "a", sourceHandle: "slot-node-read", targetHandle: "slot-skill-read-0", data: { skillNodeId: "a", slotNodeId: "slot-a", access: "read" } }),
+            edge("slot-cd", { source: "c", target: "slot-c", sourceHandle: "slot-skill-write-0", targetHandle: "slot-node-write", data: { skillNodeId: "c", slotNodeId: "slot-c", access: "write" } })],
         selectedNodes: [], selectedNodeId: null, hoveredEditorNodeId: null,
         hoveredEditorEdgeId: null, hoveredSlotAccessNodeId: null,
         tabs: [], activeTabId: "root", activeMode: "overview", showSlotEdges: true,
@@ -287,6 +308,36 @@ test("React graph snapshots preserve identities, policies and bounded interactio
             assert.equal(edgeHover.visibleNodes[4], before.visibleNodes[4]);
         });
 
+        await t.test("warning projection reuses equal maps and changes only the owning UI node", async (t) => {
+            key += 1;
+            const titles = new Map([["a", "Invalid parameter type: a.count requires Integer"], ["c", "Unknown variable: c.input"]]);
+            const inputs = { ...defaults, nodeWarningTitles: titles, problemNodeIds: new Set(["c"]) };
+            const before = await render(inputs);
+            assert.equal(before.visibleNodes[0].data.editorWarningTitle, titles.get("a"));
+            assert.match(before.visibleNodes[2].className, /editor-node-problem/);
+            for (const source of [...defaults.nodes, ...before.semanticNodes, ...before.injectedNodes]) {
+                assert.equal(Object.hasOwn(source.data, "editorWarningTitle"), false);
+            }
+            const equal = await render({ ...inputs, nodeWarningTitles: new Map(titles), problemNodeIds: new Set(["c"]) });
+            assert.equal(equal.visibleNodes, before.visibleNodes);
+            const changedTitles = new Map(titles);
+            changedTitles.set("a", "Required parameter is missing: a.count");
+            const changed = await render({ ...inputs, nodeWarningTitles: changedTitles });
+            assert.equal(changed.injectedNodes, before.injectedNodes);
+            assert.equal(changed.smartRoutingNodes, before.smartRoutingNodes);
+            assert.equal(changed.nodeById, before.nodeById);
+            assert.notEqual(changed.visibleNodes[0], before.visibleNodes[0]);
+            for (let index = 1; index < before.visibleNodes.length; index += 1) {
+                assert.equal(changed.visibleNodes[index], before.visibleNodes[index]);
+                assert.equal(changed.visibleNodes[index].data, before.visibleNodes[index].data);
+            }
+            const cleared = await render({ ...inputs, nodeWarningTitles: new Map([["c", titles.get("c")]]) });
+            assert.equal(cleared.visibleNodes[0], cleared.injectedNodes[0]);
+            assert.equal(cleared.visibleNodes[0].data.editorWarningTitle, undefined);
+            assert.equal(cleared.visibleNodes[2], before.visibleNodes[2]);
+            t.diagnostic("Equal warning Maps: 0 node/data replacements; one changed owner: 1 node/data replacement, all unrelated nodes/routing/semantic indexes retained");
+        });
+
         await t.test("drag freezes geometry and semantics, reuses untouched nodes, and refreshes on drop", async () => {
             key += 1;
             const inputs = { ...defaults, edges: [defaults.edges[0], { ...defaults.edges[1], selected: true }] };
@@ -334,7 +385,8 @@ test("React graph snapshots preserve identities, policies and bounded interactio
                 node("alias", { data: { cloneOfNodeId: "outside", isSkillClone: true } }),
             ];
             const inputs = { ...defaults, nodes, edges: [edge("exit", { source: "leaf", target: "outside" })],
-                slotEdges: [edge("slot-exit", { source: "leaf", target: "slot-a" })] };
+                slotEdges: [edge("slot-exit", { source: "slot-a", target: "leaf", sourceHandle: "slot-node-read", targetHandle: "slot-skill-read-0", data: { access: "read", skillNodeId: "leaf", slotNodeId: "slot-a" } }),
+                    edge("slot-write", { source: "leaf", target: "slot-c", sourceHandle: "slot-skill-write-0", targetHandle: "slot-node-write", data: { access: "write", skillNodeId: "leaf", slotNodeId: "slot-c" } })] };
             const expanded = await render(inputs);
             assert.equal(expanded.visibleEdges.find(({ data }) => data.compoundInitialEdge)?.target, "initial");
             const parallelEntry = expanded.visibleEdges.find(({ data }) => data.parallelEntryEdge);
@@ -346,7 +398,21 @@ test("React graph snapshots preserve identities, policies and bounded interactio
             assert.deepEqual([...collapsed.hiddenNodeIds].sort(), ["auto", "lane", "leaf"]);
             assert.equal(collapsed.visibleEdges.find(({ id }) => id === "exit").source, "parallel");
             assert.equal(collapsed.visibleEdges.find(({ id }) => id === "exit").sourceHandle, "leaf-success");
-            assert.equal(collapsed.visibleEdges.find(({ id }) => id === "slot-exit").sourceHandle, "collapsed-slot-source");
+            const read = collapsed.visibleEdges.find(({ id }) => id === "slot-exit");
+            assert.equal(read.source, "slot-a");
+            assert.equal(read.target, "parallel");
+            assert.equal(read.sourceHandle, "slot-node-read");
+            assert.equal(read.targetHandle, "collapsed-slot-source");
+            assert.equal(read.reconnectable, "source");
+            assert.equal(read.data.collapsedSlotOriginalTarget, "leaf");
+            assert.equal(read.data.skillNodeId, "leaf");
+            const write = collapsed.visibleEdges.find(({ id }) => id === "slot-write");
+            assert.equal(write.source, "parallel");
+            assert.equal(write.target, "slot-c");
+            assert.equal(write.sourceHandle, "collapsed-slot-source");
+            assert.equal(write.targetHandle, "slot-node-write");
+            assert.equal(write.reconnectable, "target");
+            assert.equal(write.data.collapsedSlotOriginalSource, "leaf");
             assert.equal(collapsed.injectedNodes[2].data.collapsedTransitionHandles[0].id, "leaf-success");
             assert.ok(!collapsed.visibleEdges.some(({ data }) => data.parallelEntryEdge));
             assert.ok(collapsed.injectedNodes[5].hidden);
@@ -364,7 +430,7 @@ test("React graph snapshots preserve identities, policies and bounded interactio
         await t.test("slot preview variants reuse inactive objects and keep globally hidden unrelated edges untouched", async () => {
             key += 1;
             const inputs = { ...defaults, selectedNodeId: "slot-a",
-                slotEdges: [...defaults.slotEdges, edge("slot-unrelated", { source: "unrelated", target: "slot-c" })] };
+                slotEdges: [...defaults.slotEdges, edge("slot-unrelated", { source: "slot-c", target: "unrelated", sourceHandle: "slot-node-read", targetHandle: "slot-skill-read-0", data: { access: "read", skillNodeId: "unrelated", slotNodeId: "slot-c" } })] };
             const before = await render(inputs);
             const preview = await render({ ...inputs, hoveredSlotAccessNodeId: "a" });
             const inactive = preview.visibleEdges.find(({ id }) => id === "slot-unrelated");
@@ -389,6 +455,7 @@ test("React graph snapshots preserve identities, policies and bounded interactio
                 slotNodes: [node("pending-slot", { type: "slot" })],
                 handleOpenTransition: () => calls.push("abandoned"),
                 hoveredEditorNodeId: "a",
+                nodeWarningTitles: new Map([["a", "Abandoned validation result"]]),
             };
             await render(pending, { strict: true, transition: true, suspend });
             assert.equal(latest, before);
@@ -401,6 +468,7 @@ test("React graph snapshots preserve identities, policies and bounded interactio
             assert.equal(dragging.injectedNodes, before.injectedNodes);
             assert.equal(dragging.injectedSlotNodes, before.injectedSlotNodes);
             assert.equal(dragging.smartRoutingNodes[0].position.x, 10);
+            assert.equal(dragging.visibleNodes[0].data.editorWarningTitle, undefined);
         });
 
         await t.test("840-node/840-edge hover and selection updates do no semantic or outgoing-edge visits", async (t) => {
@@ -451,16 +519,24 @@ test("consolidated node renderers preserve their public graph and presentation c
         optimizeDeps: { noDiscovery: true, include: [] },
         appType: "custom",
     });
+    const window = new Window();
     try {
         const states = await server.ssrLoadModule("/src/components/graph/StateNodes.jsx");
         const containers = await server.ssrLoadModule("/src/components/graph/ContainerNodes.jsx");
         const chrome = await server.ssrLoadModule("/src/components/graph/NodeChrome.jsx");
+        const { default: SlotNode } = await server.ssrLoadModule("/src/components/graph/SlotNode.jsx");
         const render = (component, data = {}, selected = false) => {
             const node = { id: "node", type: "fixture", position: { x: 0, y: 0 }, width: 520, height: 320, data, selected };
             return renderToStaticMarkup(createElement(ReactFlowProvider, { initialNodes: [node] },
                 createElement(ReactFlow, { nodes: [node], nodeTypes: { fixture: component }, width: 800, height: 600 })));
         };
         const handles = (html) => [...html.matchAll(/data-handleid="([^"]+)"/g)].map((match) => match[1]);
+        const handle = (html, id) => {
+            window.document.body.innerHTML = html;
+            const element = window.document.querySelector(`[data-handleid="${id}"]`);
+            assert.ok(element, `Expected handle ${id}`);
+            return element;
+        };
         const data = {
             label: "Navigate", fullSkillName: "org.skills.Navigate", events: [{ id: "done" }],
             inSlots: [{ key: "input", path: "/input", type: "String" }],
@@ -481,6 +557,28 @@ test("consolidated node renderers preserve their public graph and presentation c
             assert.ok(!child.includes("click to edit"));
         });
 
+        await t.test("warning badges render authoritative diagnostics in every mode without local transition decisions", () => {
+            const diagnostics = [
+                { id: "parameter-type-node-0", nodeId: "node", severity: "error", title: "Invalid parameter type", message: "Navigate.count requires Integer" },
+                { id: "slot-input-empty-node-0", nodeId: "node", severity: "warning", title: "Input slot is not connected", message: "Navigate.input has no slot path" },
+            ];
+            const title = projectNodeWarningTitles(new Map(), diagnostics).get("node");
+            const source = { ...data, params: [{ key: "count", type: "Integer", expr: "'text'" }],
+                inSlots: [{ key: "input", type: "String", path: "" }],
+                outgoingTransitionHandles: [], unexposedTransitionHandles: ["ignored.unknown"] };
+            for (const component of [states.SkillNode, states.SubMachineNode]) {
+                for (const mode of ["overview", "event", "slots"]) {
+                    window.document.body.innerHTML = render(component, { ...source, mode, editorWarningTitle: title });
+                    const badge = window.document.querySelector(".node-warning-badge");
+                    assert.equal(badge.title, title);
+                    assert.ok(badge.querySelector("svg"));
+                    assert.ok(!badge.title.includes("Not every transition"));
+                    window.document.body.innerHTML = render(component, { ...source, mode, editorWarningTitle: "" });
+                    assert.equal(window.document.querySelector(".node-warning-badge"), null);
+                }
+            }
+        });
+
         await t.test("terminals suppress outgoing skill events, not incoming transitions", () => {
             for (const terminal of [{ isFinal: true }, { isBehaviorExit: true }, { fullSkillName: "org.skills.End#instance" }, { fullSkillName: "org.skills.Fatal" }]) {
                 assert.deepEqual(handles(render(states.SkillNode, { ...data, ...terminal, mode: "event" })), ["transition-target"]);
@@ -488,6 +586,77 @@ test("consolidated node renderers preserve their public graph and presentation c
             const initial = render(states.SkillNode, { label: "A", isInitial: true, mode: "slots" });
             assert.ok(initial.includes("width:260px;max-width:520px"));
             assert.ok(initial.includes("INITIAL"));
+            assert.ok(initial.includes('class="node-title-label" title="A">A</span>'));
+        });
+
+        await t.test("slot endpoints expose semantic flow while allowing starts and ends on either side", () => {
+            const skill = render(states.SkillNode, { ...data, mode: "overview", outSlots: [{ key: "output", path: "/output", type: "String" }] });
+            const slot = render(SlotNode, { path: "/input", slotType: "String" });
+            for (const [html, id, type, position, title] of [
+                [skill, "slot-skill-read-0", "target", "bottom", "Read input (into skill)"],
+                [skill, "slot-skill-write-0", "source", "bottom", "Write output (out of skill)"],
+                [slot, "slot-node-read", "source", "top", "Read from slot /input"],
+                [slot, "slot-node-write", "target", "top", "Write into slot /input"],
+            ]) {
+                const endpoint = handle(html, id);
+                assert.ok(endpoint.classList.contains(type));
+                assert.ok(endpoint.classList.contains("connectablestart"));
+                assert.ok(endpoint.classList.contains("connectableend"));
+                assert.ok(endpoint.classList.contains("connection-handle"));
+                assert.equal(endpoint.dataset.handlepos, position);
+                assert.equal(endpoint.getAttribute("role"), "button");
+                assert.equal(endpoint.getAttribute("tabindex"), "0");
+                assert.equal(endpoint.getAttribute("title"), title);
+                assert.equal(endpoint.getAttribute("aria-label"), title);
+            }
+            const incoming = handle(skill, "transition-target");
+            assert.ok(incoming.classList.contains("target"));
+            assert.ok(!incoming.classList.contains("connectablestart"));
+            assert.ok(incoming.classList.contains("connectableend"));
+            const outgoing = handle(skill, "done");
+            assert.ok(outgoing.classList.contains("source"));
+            assert.ok(outgoing.classList.contains("connectablestart"));
+            assert.ok(!outgoing.classList.contains("connectableend"));
+        });
+
+        await t.test("inherited child ports preserve original indices and disable unresolved type metadata", () => {
+            const inheritedSlots = Object.freeze([
+                Object.freeze({ key: "unresolved", path: "/unresolved", access: null, type: "Unknown" }),
+                Object.freeze({ key: "input", path: "/input", access: "read", type: " String ", state: "child-reader" }),
+                Object.freeze({ key: "output", path: "/output", access: "write", type: "String", state: "child-writer" }),
+                Object.freeze({ key: "unknown", path: "/unknown", access: "read", type: "Unknown" }),
+            ]);
+            const html = render(states.SubMachineNode, { label: "Child", mode: "slots", inheritedSlots });
+            assert.deepEqual(handles(html), ["slot-submachine-read-1", "slot-submachine-write-2", "slot-submachine-read-3"]);
+            for (const [id, type] of [["slot-submachine-read-1", "target"], ["slot-submachine-write-2", "source"]]) {
+                const endpoint = handle(html, id);
+                assert.ok(endpoint.classList.contains(type));
+                assert.ok(endpoint.classList.contains("connectablestart"));
+                assert.ok(endpoint.classList.contains("connectableend"));
+            }
+            const unresolved = handle(html, "slot-submachine-read-3");
+            assert.equal(unresolved.getAttribute("aria-disabled"), "true");
+            assert.ok(!unresolved.classList.contains("connectablestart"));
+            assert.ok(!unresolved.classList.contains("connectableend"));
+            assert.match(unresolved.title, /metadata unavailable/);
+            assert.equal(inheritedSlots[1].state, "child-reader");
+        });
+
+        await t.test("named handles reuse native click connections for keyboard activation, not display-only anchors", () => {
+            const clicks = [];
+            const endpoint = chrome.ConnectionHandle({ id: "slot-node-read", title: "Read", "aria-label": "Read" });
+            for (const key of ["Enter", " ", "Tab"]) {
+                endpoint.props.onKeyDown({ key, preventDefault: () => clicks.push("prevent"), stopPropagation: () => clicks.push("stop"), currentTarget: { click: () => clicks.push("click") } });
+            }
+            assert.deepEqual(clicks, ["prevent", "stop", "click", "prevent", "stop", "click"]);
+            const anchor = chrome.ConnectionHandle({ isConnectableStart: false, isConnectableEnd: false });
+            assert.equal(anchor.props.role, "img");
+            assert.equal(anchor.props.tabIndex, undefined);
+            assert.equal(anchor.props.onKeyDown, undefined);
+            const unresolved = chrome.ConnectionHandle({ isConnectable: false });
+            assert.equal(unresolved.props.isConnectableStart, false);
+            assert.equal(unresolved.props.isConnectableEnd, false);
+            assert.equal(unresolved.props.onKeyDown, undefined);
         });
 
         await t.test("skill instance labels retain falsy-ID fallback and explicit string IDs", () => {
@@ -530,6 +699,13 @@ test("consolidated node renderers preserve their public graph and presentation c
             assert.ok(!render(containers.CompoundNode, container).includes("state-action-badges"));
             assert.ok(render(containers.ParallelNode, container).includes("state-action-badges"));
             assert.deepEqual(handles(render(containers.ParallelNode, { ...container, isCollapsed: true, collapsedTransitionHandles: [{ id: "choice" }] })), ["target", "collapsed-slot-source", "exit", "choice"]);
+            for (const component of [containers.CompoundNode, containers.ParallelNode]) {
+                const html = render(component, { label: "Collapsed", isCollapsed: true, mode: "overview", events: [{ id: "one", target: "next" }, { id: "two", target: "next" }, { id: "three", target: "next" }] });
+                assert.equal(handle(html, "one").style.top, "calc(50% + -24px)");
+                assert.equal(handle(html, "two").style.top, "calc(50% + 0px)");
+                assert.equal(handle(html, "three").style.top, "calc(50% + 24px)");
+                assert.equal(handle(html, "collapsed-slot-source").getAttribute("role"), "img");
+            }
         });
 
         await t.test("action badges filter incomplete assignments and invoke the current callback", () => {
@@ -547,5 +723,6 @@ test("consolidated node renderers preserve their public graph and presentation c
         });
     } finally {
         await server.close();
+        await window.happyDOM.abort();
     }
 });

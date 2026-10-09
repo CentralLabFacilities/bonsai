@@ -16,6 +16,7 @@ import {
     resolveNodeCollisionsAndRefit,
 } from "../../utils/editorGeometry";
 import { getOverviewLayoutNodeSize } from "../../utils/layoutUtils";
+import { getSlotPathFromNode, isKnownSlotType, normalizeSlotPath, normalizeSlotType } from "../../utils/editorGraph";
 import { isEditorModalOpen } from "../interaction/useGlobalEditorShortcuts.js";
 
 export function useEditorLibraryDrop({
@@ -23,24 +24,40 @@ export function useEditorLibraryDrop({
     nodes,
     flowContainerRef,
     getTabSnapshot,
+    getActiveDocumentIdentity,
+    getDocumentSnapshot,
     screenToFlowPosition,
     setParallelDropTargetId,
     setCompoundDropTargetId,
     createBehaviorNode,
     createNode,
     checkSlotConnection,
-    getNodes,
     setNodes,
+    setManualSlots,
     setSelectedNodeId,
     syncInsertedEditorStatesAfterCommit,
     syncInsertedParallelLaneStateAfterCommit,
+    syncSlotsAfterCommit,
 }) {
     const activeModeRef = useRef(activeMode);
+    const lifetimeRef = useRef(0);
+    const mountedRef = useRef(false);
+    const pendingFramesRef = useRef(new Set());
     const [libraryDropError, setLibraryDropError] = useState(null);
     const dismissLibraryDropError = useCallback(() => setLibraryDropError(null), []);
     useLayoutEffect(() => {
         activeModeRef.current = activeMode;
     }, [activeMode]);
+    useLayoutEffect(() => {
+        mountedRef.current = true;
+        const frames = pendingFramesRef.current;
+        return () => {
+            mountedRef.current = false;
+            lifetimeRef.current += 1;
+            frames.forEach((id) => cancelAnimationFrame(id));
+            frames.clear();
+        };
+    }, []);
 
     const handleLibraryDragOver = useCallback(
         (event) => {
@@ -102,9 +119,18 @@ export function useEditorLibraryDrop({
             setParallelDropTargetId(null);
             setCompoundDropTargetId(null);
 
-            if (activeModeRef.current === "code" || isEditorModalOpen()) return false;
+            if (!mountedRef.current || activeModeRef.current === "code" || isEditorModalOpen()) return false;
             const origin = getTabSnapshot();
             if (!origin) return false;
+            const identity = getActiveDocumentIdentity();
+            const lifetime = lifetimeRef.current;
+            const getOwnedDocument = () => {
+                if (!mountedRef.current || lifetimeRef.current !== lifetime ||
+                    getActiveDocumentIdentity() !== identity) return null;
+                const tab = getTabSnapshot();
+                return tab?.id === origin.id && tab.documentGeneration === origin.documentGeneration
+                    ? getDocumentSnapshot() : null;
+            };
             const isBehaviorDrop = Boolean(behaviorPayload);
 
             let newNode;
@@ -129,10 +155,9 @@ export function useEditorLibraryDrop({
 
             // Skill inspection is asynchronous. Never append its result to a
             // different or replaced workflow, and rebase onto live node edits.
-            const current = getTabSnapshot();
+            const current = getOwnedDocument();
             if (
-                !newNode || !current || current.id !== origin.id ||
-                current.documentGeneration !== origin.documentGeneration ||
+                !newNode || !current ||
                 activeModeRef.current === "code" || isEditorModalOpen()
             ) return false;
             const nodes = current.nodes;
@@ -144,10 +169,100 @@ export function useEditorLibraryDrop({
                 : null;
             const insertionCompound = targetCompound || targetLaneCompound;
 
-            const refreshBehaviorSlots = () => {
-                if (!isBehaviorDrop) return;
-                requestAnimationFrame(() => {
-                    checkSlotConnection(getNodes());
+            const finishInsertion = (laneId = null) => {
+                const reportSyncError = (error) => {
+                    if (!getOwnedDocument()) return;
+                    setLibraryDropError({
+                        action: "sync",
+                        title: `Could not synchronize ${origin.title || "workflow"}`,
+                        message: String(error?.message || error || "Native synchronization failed."),
+                        guidance: "The item remains in the editor. Save the workflow to retry persistence.",
+                    });
+                };
+                const syncInsertion = () => laneId
+                    ? syncInsertedParallelLaneStateAfterCommit?.(newNode.id, laneId)
+                    : syncInsertedEditorStatesAfterCommit?.(newNode.id);
+                if (!isBehaviorDrop) {
+                    void Promise.resolve(syncInsertion()).catch(reportSyncError);
+                    return;
+                }
+
+                const live = getOwnedDocument();
+                if (!live) return;
+                const declarations = [...live.manualSlots];
+                const conflicts = new Set();
+                (newNode.data?.inheritedSlots || []).forEach((requirement) => {
+                    const path = normalizeSlotPath(requirement?.path || requirement?.inherited?.xpath || requirement?.xpath);
+                    if (!path) return;
+                    const declaration = declarations.find((slot) =>
+                        normalizeSlotPath(slot?.inherited?.xpath || slot?.path) === path);
+                    const bindings = live.nodes.flatMap((node) =>
+                        [...(node.data?.inSlots || []), ...(node.data?.outSlots || [])]).filter((slot) =>
+                        normalizeSlotPath(slot?.path) && String(slot?.key || "").trim() &&
+                        normalizeSlotPath(slot?.inherited?.xpath || slot?.path) === path);
+                    const canonical = live.slotNodes.find((node) => !node.data?.isSlotClone && getSlotPathFromNode(node) === path);
+                    const parentType = (isKnownSlotType(declaration?.type) ? declaration.type : null) ||
+                        bindings.find((slot) => isKnownSlotType(slot.type))?.type ||
+                        (isKnownSlotType(canonical?.data?.slotType) ? canonical.data.slotType : null) ||
+                        declaration?.type || bindings[0]?.type || canonical?.data?.slotType;
+                    if (isKnownSlotType(parentType) && isKnownSlotType(requirement.type) &&
+                        normalizeSlotType(parentType) !== normalizeSlotType(requirement.type)) {
+                        conflicts.add(`/${path}: parent ${parentType}, child ${requirement.type}`);
+                    }
+                    if (declaration || bindings.length) return;
+
+                    // A visual derived slot is not a declaration. Materialize
+                    // its existing path/type without moving it or its aliases.
+                    // Child inheritance never promotes a normal parent slot.
+                    const inherited = Boolean(canonical?.data?.currentMachineInherited ||
+                        canonical?.data?.inherited || canonical?.data?.slotKind === "inheritSlot");
+                    declarations.push({
+                        id: `manual-${crypto.randomUUID()}`,
+                        path: `/${path}`,
+                        type: parentType || requirement.type || "Unknown",
+                        slotKind: inherited ? "inheritSlot" : "slot",
+                        inherited: inherited ? { state: canonical.data?.inheritedFrom || "", xpath: `/${path}` } : null,
+                        createdForChildRequirements: true,
+                    });
+                });
+                if (declarations.length !== live.manualSlots.length) setManualSlots(declarations);
+                checkSlotConnection(live.nodes, declarations, live.slotNodes, live.slotEdges);
+                if (conflicts.size) {
+                    setLibraryDropError({
+                        action: "slot-type",
+                        title: `Slot type conflict in ${origin.title || "workflow"}`,
+                        message: [...conflicts].join("; "),
+                        guidance: "Existing parent types were preserved. Resolve the child requirements before connecting incompatible slots.",
+                    });
+                }
+
+                const getOwnedInsertion = () => {
+                    const snapshot = getOwnedDocument();
+                    const inserted = snapshot?.nodes.find((node) => node.id === newNode.id);
+                    return inserted?.type === newNode.type && inserted.data?.src === newNode.data?.src &&
+                        inserted.data?.inheritedSlots === newNode.data?.inheritedSlots ? snapshot : null;
+                };
+                const scheduleFrame = (callback) => {
+                    const id = requestAnimationFrame(() => {
+                        pendingFramesRef.current.delete(id);
+                        const snapshot = getOwnedInsertion();
+                        if (snapshot) callback(snapshot);
+                    });
+                    pendingFramesRef.current.add(id);
+                };
+                scheduleFrame(() => {
+                    // Persist the state (including lane reconciliation) first.
+                    // Only then sync #_SLOTS from the latest committed parent,
+                    // not an override captured before unrelated native edits.
+                    void Promise.resolve(syncInsertion()).then(() => {
+                        if (!getOwnedInsertion()) return;
+                        scheduleFrame((snapshot) => {
+                            checkSlotConnection(snapshot.nodes, snapshot.manualSlots, snapshot.slotNodes, snapshot.slotEdges);
+                            void Promise.resolve(syncSlotsAfterCommit?.(null, {
+                                reason: "library-child-requirements", nodeId: newNode.id,
+                            })).catch(reportSyncError);
+                        });
+                    }).catch(reportSyncError);
                 });
             };
 
@@ -213,8 +328,7 @@ export function useEditorLibraryDrop({
                 });
 
                 setSelectedNodeId(newNode.id);
-                refreshBehaviorSlots();
-                void syncInsertedEditorStatesAfterCommit?.(newNode.id);
+                finishInsertion();
                 return true;
             }
 
@@ -367,11 +481,7 @@ export function useEditorLibraryDrop({
                 });
 
                 setSelectedNodeId(newNode.id);
-                refreshBehaviorSlots();
-                void syncInsertedParallelLaneStateAfterCommit?.(
-                    newNode.id,
-                    targetLane.id
-                );
+                finishInsertion(targetLane.id);
                 return true;
             }
 
@@ -387,28 +497,33 @@ export function useEditorLibraryDrop({
                 )
             );
             setSelectedNodeId(newNode.id);
-            refreshBehaviorSlots();
-            void syncInsertedEditorStatesAfterCommit?.(newNode.id);
+            finishInsertion();
             return true;
         },
         [
             checkSlotConnection,
             createBehaviorNode,
             createNode,
-            getNodes,
+            getActiveDocumentIdentity,
+            getDocumentSnapshot,
             getTabSnapshot,
             setCompoundDropTargetId,
             setNodes,
+            setManualSlots,
             setParallelDropTargetId,
             setSelectedNodeId,
             syncInsertedEditorStatesAfterCommit,
             syncInsertedParallelLaneStateAfterCommit,
+            syncSlotsAfterCommit,
         ]
     );
 
     const handleLibraryDrop = useCallback(async (event) => {
         event.preventDefault();
+        if (!mountedRef.current) return false;
         const origin = getTabSnapshot();
+        const identity = getActiveDocumentIdentity();
+        const lifetime = lifetimeRef.current;
         setLibraryDropError(null);
         try {
             return await insertLibraryItem(
@@ -417,6 +532,8 @@ export function useEditorLibraryDrop({
                 event.dataTransfer.getData("behavior"),
             );
         } catch (error) {
+            if (!mountedRef.current || lifetimeRef.current !== lifetime ||
+                getActiveDocumentIdentity() !== identity) return false;
             console.error("Could not insert library item:", error);
             setLibraryDropError({
                 action: "insert",
@@ -426,7 +543,7 @@ export function useEditorLibraryDrop({
             });
             return false;
         }
-    }, [getTabSnapshot, insertLibraryItem, screenToFlowPosition]);
+    }, [getActiveDocumentIdentity, getTabSnapshot, insertLibraryItem, screenToFlowPosition]);
 
     const handleAddLibrarySkill = useCallback((skill) => {
         const rect = flowContainerRef.current?.getBoundingClientRect();

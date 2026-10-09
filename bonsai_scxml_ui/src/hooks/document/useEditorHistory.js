@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
-import { isEditorModalOpen } from "../interaction/useGlobalEditorShortcuts";
+import { isEditorShortcutBlocked } from "../interaction/useGlobalEditorShortcuts";
 
 const cloneGraphValue = (value) => {
     if (Array.isArray(value)) return value.map(cloneGraphValue);
@@ -505,7 +505,7 @@ export function useEditorHistory({
 
     useEffect(() => {
         const handleUndoRedoShortcut = (event) => {
-            if (event.defaultPrevented || isEditorModalOpen()) return;
+            if (event.defaultPrevented || isEditorShortcutBlocked(event)) return;
             if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
             if (activeMode === "code") return;
             if (isUndoRedoEditableTarget(event.target)) return;

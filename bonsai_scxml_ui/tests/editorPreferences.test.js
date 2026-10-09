@@ -5,17 +5,68 @@ import {
     loadBehaviorDirectories,
     loadEdgeVisibility,
     loadPanelPreferences,
+    loadRuntimeConfiguration,
     PANEL_DOCK_BREAKPOINT,
     PANEL_LIMITS,
     PANEL_MIN_CANVAS_WIDTH,
     PANEL_RESIZE_WIDTH,
     saveEditorPreferences,
     savePanelPreferences,
+    saveRuntimeConfiguration,
 } from "../src/utils/editorPreferences.js";
 
 function storageWith(value) {
     return { getItem: () => value };
 }
+
+test("runtime configuration uses its own key and preserves the exact configured path", () => {
+    const values = new Map([["bonsai.panelLayout", "unchanged"], ["bonsai.behaviorDirectories", "[]"]]);
+    const storage = {
+        getItem(key) { assert.equal(key, "bonsai.runtimeConfiguration"); return values.get(key) ?? null; },
+        setItem(key, value) { assert.equal(key, "bonsai.runtimeConfiguration"); values.set(key, value); },
+    };
+    assert.equal(loadRuntimeConfiguration(storage), "");
+    for (const path of ["/configs/bonsai.xml", " /workspace/config with spaces.xml ", ""]) {
+        saveRuntimeConfiguration(path, storage);
+        assert.equal(loadRuntimeConfiguration(storage), path);
+    }
+    assert.equal(values.get("bonsai.panelLayout"), "unchanged");
+    assert.equal(values.get("bonsai.behaviorDirectories"), "[]");
+});
+
+test("runtime configuration cache is optional with missing, blocked or full storage", () => {
+    for (const value of [null, undefined, ""]) assert.equal(loadRuntimeConfiguration(storageWith(value)), "");
+    for (const storage of [{}, {
+        getItem() { throw new Error("Access denied"); }, setItem() { throw new Error("Quota exceeded"); },
+    }, {
+        get getItem() { throw new Error("Storage blocked"); }, get setItem() { throw new Error("Storage blocked"); },
+    }]) {
+        assert.equal(loadRuntimeConfiguration(storage), "");
+        assert.doesNotThrow(() => saveRuntimeConfiguration("/configs/current.xml", storage));
+    }
+    assert.equal(loadRuntimeConfiguration(), "");
+    assert.doesNotThrow(() => saveRuntimeConfiguration("/configs/current.xml"));
+});
+
+test("default runtime cache survives a fresh consumer and blocked localStorage access", (context) => {
+    const original = Object.getOwnPropertyDescriptor(globalThis, "window");
+    const values = new Map();
+    Object.defineProperty(globalThis, "window", { configurable: true, value: {
+        localStorage: { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) },
+    } });
+    context.after(() => {
+        if (original) Object.defineProperty(globalThis, "window", original);
+        else delete globalThis.window;
+    });
+    saveRuntimeConfiguration("/configs/restart.xml");
+    assert.equal(loadRuntimeConfiguration(), "/configs/restart.xml");
+    assert.equal(loadRuntimeConfiguration(), "/configs/restart.xml");
+    Object.defineProperty(globalThis, "window", { configurable: true, value: {
+        get localStorage() { throw new Error("Access denied"); },
+    } });
+    assert.equal(loadRuntimeConfiguration(), "");
+    assert.doesNotThrow(() => saveRuntimeConfiguration("/configs/usable-without-cache.xml"));
+});
 
 test("behavior directories preserve custom mappings and remove only retired built-ins", () => {
     const stored = [

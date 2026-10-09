@@ -305,7 +305,8 @@ fn replace_slots_snapshot(
         let key = declaration.key.trim().to_string();
         let state = declaration.state.trim().to_string();
         let xpath = normalize_xpath(&declaration.xpath);
-        if key.is_empty() || state.is_empty() || xpath.is_empty() {
+        // Normal resources need only a path; key/state describe optional bindings.
+        if xpath.is_empty() || (declaration.inherited && (key.is_empty() || state.is_empty())) {
             continue;
         }
         push_unique_slot_declaration(
@@ -1251,3 +1252,114 @@ fn replace_targeted_transitions(
     })
 }
 
+#[cfg(test)]
+mod tests {
+    use crate::core::document::{WorkflowCommandDto, WorkflowDocumentStore};
+    use crate::core::model::Workflow;
+    use crate::core::scxml::{parse_scxml, serialize_scxml};
+
+    #[test]
+    fn slot_snapshot_retains_reopened_resources_without_changing_document_metadata() {
+        let original = parse_scxml(
+            r##"<scxml initial="Root" name="Parent">
+            <datamodel><data id="count" type="integer" expr="0"/>
+                <data id="#_SLOTS"><slots><slot xpath="/manual"/></slots></data>
+            </datamodel>
+            <state id="Root" initial="Child">
+                <metadata><editor:position instance="root" x="10.5" y="20"/>
+                    <editor:position instance="copy" clone="reference" x="-4" y="6"/>
+                </metadata>
+                <datamodel><data id="text" type="String" expr="'keep'"/></datamodel>
+                <onentry><assign location="count" expr="1"/></onentry>
+                <transition event="Child.success" target="End" cond="count &gt; 0"/>
+                <state id="Child" src="${BEH}/child.xml">
+                    <metadata><editor:position x="80" y="90"/></metadata>
+                </state>
+            </state><final id="End"/>
+        </scxml>"##,
+        )
+        .unwrap();
+        let original_dto = original.to_dto();
+        let store = WorkflowDocumentStore::default();
+        store.replace(original).unwrap();
+        let command = serde_json::from_value(serde_json::json!({
+            "type": "replaceSlotsSnapshot",
+            "states": [{"stateId": "state-1", "stateName": "Root",
+                        "inputSlots": [{"key": "Model", "path": "/manual", "typeName": "Object"}],
+                        "outputSlots": [{"key": "Own", "path": "/local", "inherited": true,
+                                         "inheritedState": "Ancestor", "inheritedXpath": "/outer"}]}],
+            "extraSlotDeclarations": [
+                {"xpath": "/manual"},
+                {"xpath": "needed"},
+                {"key": "", "state": "", "xpath": " /needed "},
+                {"xpath": "/"},
+                {"key": "Detached", "xpath": "/key-only"},
+                {"state": "Root", "xpath": "/state-only"},
+                {"key": "Model", "state": "Root", "xpath": "/manual"},
+                {"key": "Own", "state": "Ancestor", "xpath": "/outer", "inherited": true},
+                {"key": "Invalid", "state": "Root", "xpath": " "},
+                {"xpath": ""},
+                {"xpath": "/invalid-inherit", "inherited": true}
+            ]
+        })).unwrap();
+        let result = store.apply(Some(1), command).unwrap();
+        let declarations = serde_json::json!([
+            {"key": "Model", "state": "Root", "xpath": "/manual", "inherited": false},
+            {"key": "Own", "state": "Ancestor", "xpath": "/outer", "inherited": true},
+            {"key": "", "state": "", "xpath": "/manual", "inherited": false},
+            {"key": "", "state": "", "xpath": "/needed", "inherited": false},
+            {"key": "", "state": "", "xpath": "/", "inherited": false},
+            {"key": "Detached", "state": "", "xpath": "/key-only", "inherited": false},
+            {"key": "", "state": "Root", "xpath": "/state-only", "inherited": false}
+        ]);
+        assert_eq!(result.revision, 2);
+        assert_eq!(
+            serde_json::to_value(result.patch.slot_declarations.unwrap()).unwrap(),
+            declarations
+        );
+        let snapshot = store.snapshot().unwrap().unwrap();
+        assert_eq!(snapshot.revision, 2);
+        assert_eq!(
+            serde_json::to_value(&snapshot.workflow.slot_declarations).unwrap(),
+            declarations
+        );
+        assert_eq!(snapshot.workflow.states[0].input_slots[0].key, "Model");
+        assert_eq!(
+            snapshot.workflow.states[0].output_slots[0]
+                .inherited
+                .as_deref(),
+            Some("/outer")
+        );
+        let mut expected_dto = original_dto;
+        expected_dto.states[0].input_slots = snapshot.workflow.states[0].input_slots.clone();
+        expected_dto.states[0].output_slots = snapshot.workflow.states[0].output_slots.clone();
+        expected_dto.slot_declarations = snapshot.workflow.slot_declarations.clone();
+        assert_eq!(
+            serde_json::to_value(&snapshot.workflow).unwrap(),
+            serde_json::to_value(expected_dto).unwrap()
+        );
+
+        let xml = serialize_scxml(&Workflow::from_dto(snapshot.workflow).unwrap()).unwrap();
+        let reopened = parse_scxml(&xml).unwrap();
+        assert_eq!(
+            serde_json::to_value(reopened.to_dto().slot_declarations).unwrap(),
+            declarations
+        );
+        store.replace(reopened).unwrap();
+        let command: WorkflowCommandDto = serde_json::from_value(serde_json::json!({
+            "type": "replaceSlotsSnapshot", "extraSlotDeclarations": declarations
+        }))
+        .unwrap();
+        let result = store.apply(Some(3), command).unwrap();
+        assert_eq!(result.revision, 4);
+        assert_eq!(
+            serde_json::to_value(result.patch.slot_declarations.unwrap()).unwrap(),
+            declarations
+        );
+        let after = store.snapshot().unwrap().unwrap();
+        assert_eq!(
+            serialize_scxml(&Workflow::from_dto(after.workflow).unwrap()).unwrap(),
+            xml
+        );
+    }
+}

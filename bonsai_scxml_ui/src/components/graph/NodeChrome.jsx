@@ -3,6 +3,34 @@ import { FiAlertCircle } from "react-icons/fi";
 import { startTargetEdgeReconnectFromEntry } from "../../utils/edgeReconnect";
 import { getConfiguredAssignments } from "../../utils/stateActions";
 
+export function ConnectionHandle({
+    className = "",
+    isConnectable = true,
+    isConnectableStart = true,
+    isConnectableEnd = true,
+    ...props
+}) {
+    const displayOnly = !isConnectableStart && !isConnectableEnd;
+    return (
+        <Handle
+            {...props}
+            className={`connection-handle ${className}`}
+            isConnectable={isConnectable}
+            isConnectableStart={isConnectable && isConnectableStart}
+            isConnectableEnd={isConnectable && isConnectableEnd}
+            role={displayOnly ? "img" : "button"}
+            tabIndex={displayOnly || !isConnectable ? undefined : 0}
+            aria-disabled={!displayOnly && !isConnectable ? true : undefined}
+            onKeyDown={displayOnly || !isConnectable ? undefined : (event) => {
+                if (event.key !== "Enter" && event.key !== " ") return;
+                event.preventDefault();
+                event.stopPropagation();
+                event.currentTarget.click();
+            }}
+        />
+    );
+}
+
 export function NodeTitle({
     className,
     initial = false,
@@ -20,7 +48,13 @@ export function NodeTitle({
                 <span className="initial-state-badge initial-state-badge-inline">INITIAL</span>
             )}
             {typeLabel && <span className={badgeClassName}>{typeLabel}</span>}
-            {labelClassName ? <strong className={labelClassName}>{label}</strong> : label}
+            {label != null && (labelClassName ? (
+                <strong className={`${labelClassName} node-title-label`} title={String(label)}>
+                    {label}
+                </strong>
+            ) : (
+                <span className="node-title-label" title={String(label)}>{label}</span>
+            ))}
             {children}
         </div>
     );
@@ -32,8 +66,11 @@ export function IncomingTransitionHandle({
     className = "target-handle",
     reconnect = false,
 }) {
+    const title = reconnect && data.reconnectIncomingEdgeId
+        ? "Drag to reconnect the incoming transition"
+        : "Incoming transition";
     return (
-        <Handle
+        <ConnectionHandle
             id={handleId}
             type="target"
             position={Position.Left}
@@ -46,11 +83,8 @@ export function IncomingTransitionHandle({
                           startTargetEdgeReconnectFromEntry(event, data.reconnectIncomingEdgeId)
                     : undefined
             }
-            title={
-                reconnect && data.reconnectIncomingEdgeId
-                    ? "Drag to reconnect the incoming transition"
-                    : undefined
-            }
+            title={title}
+            aria-label={title}
         />
     );
 }

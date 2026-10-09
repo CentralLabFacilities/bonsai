@@ -28,7 +28,13 @@ function SeverityIcon({ severity }) {
 export default function ProblemsPanel({
     problems = [],
     onProblemClick,
+    validationStatus = "ready",
 }) {
+    const validationNotice = {
+        pending: { title: "Validation running", message: "Waiting for validation of the current workflow." },
+        unavailable: { title: "Full workflow validation unavailable", message: "Only local parameter and slot checks are available. Use the desktop app for full workflow validation." },
+        error: { title: "Workflow validation failed", message: "Validation did not complete. Check the desktop backend before treating the workflow as valid." },
+    }[validationStatus];
     const errorCount = problems.filter(
         (problem) => problem.severity === "error"
     ).length;
@@ -51,16 +57,13 @@ export default function ProblemsPanel({
                 </div>
 
                 <div className="problems-empty-state">
-                    <FiCheckCircle
-                        className="problems-empty-icon"
-                        aria-hidden="true"
-                    />
+                    {validationNotice ? <FiAlertCircle className="problems-empty-icon" style={{ color: "var(--ui-text-muted)" }} aria-hidden="true" />
+                        : <FiCheckCircle className="problems-empty-icon" aria-hidden="true" />}
                     <div className="problems-empty-title">
-                        No problems found
+                        {validationNotice?.title || "No problems found"}
                     </div>
                     <div className="problems-empty-copy">
-                        Transitions, slots, parameters, variables and workflow
-                        configuration look consistent.
+                        {validationNotice?.message || "Transitions, slots, parameters, variables and workflow configuration look consistent."}
                     </div>
                 </div>
             </div>
@@ -98,6 +101,7 @@ export default function ProblemsPanel({
                         {warningCount} warning
                         {warningCount === 1 ? "" : "s"}
                     </div>
+                    {validationNotice && <div className="problems-panel-summary" role="status">{validationNotice.message}</div>}
                 </div>
             </div>
 
@@ -162,4 +166,3 @@ export default function ProblemsPanel({
         </div>
     );
 }
-

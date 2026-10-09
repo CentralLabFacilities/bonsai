@@ -5,7 +5,12 @@ import {
     normalizeSlotPath,
     normalizeSlotType,
 } from "../../utils/editorGraph";
-import { buildActiveValidationRequest } from "../../utils/editorValidation";
+import {
+    buildActiveValidationRequest,
+    buildEditorValidationRequest,
+    projectNodeWarningTitles,
+} from "../../utils/editorValidation";
+import { validateParameterValue } from "../../utils/valueValidation.js";
 import { measureEditorAsync, measureEditorTask } from "../../utils/editorPerf";
 import { slotDebug, summarizeProblems } from "../../utils/slotDebug";
 import {
@@ -20,6 +25,56 @@ import {
     validateActiveWorkflow,
 } from "../../tauri-client";
 
+const EMPTY_PROBLEMS = [];
+const EMPTY_SLOT_SOURCES = new Map();
+
+// Browser feedback covers committed scalar parameters and unconnected slots
+// only. Full workflow/transition validation remains exclusively native.
+function collectBrowserNodeProblems(source) {
+    const problems = [];
+    const globals = (source.availableDataModel.length
+        ? source.availableDataModel : source.globalDataModel)
+        .map((variable) => ({ id: variable.id, type: variable.typeName, expr: variable.expression }));
+    for (const node of source.nodes) {
+        if (node.isReference) continue;
+        const label = node.fullSkillName || node.label || node.id;
+        const variables = [...globals, ...node.parameters.map((parameter) => ({
+            id: parameter.key,
+            type: parameter.typeName,
+            expr: parameter.expression.trim() || parameter.defaultValue.trim(),
+        }))];
+        node.parameters.forEach((parameter, index) => {
+            const value = parameter.expression.trim() || parameter.defaultValue.trim();
+            const name = parameter.key || `parameter ${index + 1}`;
+            const missing = parameter.required && !value;
+            const validation = validateParameterValue(
+                { key: parameter.key, type: parameter.typeName }, value, variables,
+            );
+            if (!missing && validation.valid) return;
+            problems.push({
+                id: `parameter-${missing ? "required" : "type"}-${node.id}-${index}`,
+                severity: "error", category: "Parameters",
+                title: missing ? "Required parameter is missing" : "Invalid parameter type",
+                message: missing ? `${label}.${name} needs a value.` : `${label}.${name}: ${validation.error}`,
+                nodeId: node.id, detailTab: "parameter", mode: "event",
+            });
+        });
+        for (const [access, slots] of [["input", node.inputSlots], ["output", node.outputSlots]]) {
+            slots.forEach((slot, index) => {
+                if (normalizeSlotPath(slot.path)) return;
+                problems.push({
+                    id: `slot-${access}-empty-${node.id}-${index}`,
+                    severity: "warning", category: "Slots",
+                    title: `${access === "input" ? "Input" : "Output"} slot is not connected`,
+                    message: `${label}.${slot.key || `${access} ${index + 1}`} has no slot path.`,
+                    nodeId: node.id, detailTab: "slots", mode: "overview",
+                });
+            });
+        }
+    }
+    return problems;
+}
+
 export function useEditorAnalysis({
     tabs,
     activeTabId,
@@ -32,12 +87,20 @@ export function useEditorAnalysis({
     globalDataModel,
     availableDataModel = globalDataModel,
     behaviorDirectories,
+    getActiveDocumentIdentity = null,
     runRustReadQuery = null,
     validationRevision = 0,
 }) {
-    const [ancestorSlotSourcesByPath, setAncestorSlotSourcesByPath] = useState(
-        () => new Map()
+    const documentIdentity = getActiveDocumentIdentity?.() ?? activeTabId;
+    const documentContext = useDerivedGraphSnapshot(
+        [activeTabId, documentIdentity], () => ({ activeTabId, documentIdentity }),
     );
+    const nativeValidationAvailable = isTauri();
+    const [slotAncestryResult, setSlotAncestryResult] = useState(
+        () => ({ documentContext: null, sources: EMPTY_SLOT_SOURCES })
+    );
+    const ancestorSlotSourcesByPath = slotAncestryResult.documentContext === documentContext
+        ? slotAncestryResult.sources : EMPTY_SLOT_SOURCES;
     const slotAncestryRevisionRef = useRef(0);
 
     const slotAncestryRequest = useMemo(
@@ -66,17 +129,17 @@ export function useEditorAnalysis({
         const revision = ++slotAncestryRevisionRef.current;
         let cancelled = false;
 
+        const isCurrent = () => !cancelled && revision === slotAncestryRevisionRef.current &&
+            (!getActiveDocumentIdentity || getActiveDocumentIdentity() === documentIdentity);
         const commit = (next) => {
-            if (cancelled || revision !== slotAncestryRevisionRef.current) {
-                return;
-            }
-            setAncestorSlotSourcesByPath(next);
+            if (!isCurrent()) return;
+            setSlotAncestryResult({ documentContext, sources: next });
         };
 
-        if (!isTauri()) {
+        if (!nativeValidationAvailable) {
             // Browser/Vite mode is UI-only. Semantic ancestry is owned by the
             // Rust backend and is intentionally unavailable without Tauri.
-            commit(new Map());
+            commit(EMPTY_SLOT_SOURCES);
             return () => {
                 cancelled = true;
             };
@@ -85,6 +148,7 @@ export function useEditorAnalysis({
         // Several node/slot state updates commonly happen in the same React
         // turn. Coalesce them so Rust receives only the final semantic snapshot.
         const timer = window.setTimeout(async () => {
+            if (!isCurrent()) return;
             try {
                 const response = await measureEditorAsync(
                     "IPC resolve slot ancestry",
@@ -103,6 +167,7 @@ export function useEditorAnalysis({
                     commit(slotAncestryResponseToMap(response));
                 }
             } catch (error) {
+                if (!isCurrent()) return;
                 console.error("Rust slot ancestry failed:", error);
                 // Desktop mode treats Rust as the semantic authority. Do not
                 // silently project a second implementation after an IPC/backend
@@ -124,6 +189,11 @@ export function useEditorAnalysis({
         semanticSlotNodes,
         manualSlots,
         runRustReadQuery,
+        documentContext,
+        documentIdentity,
+        getActiveDocumentIdentity,
+        validationRevision,
+        nativeValidationAvailable,
     ]);
 
     const selectedIsContainer = selectedRawNode?.type === "compound" ||
@@ -521,18 +591,29 @@ export function useEditorAnalysis({
         activeWorkflowTab?.sourcePath || activeWorkflowTab?.parentTabId
     );
 
-    const validationRequest = useMemo(
+    const validationRequestCandidate = useMemo(
         () =>
             measureEditorTask(
                 "Build validation request",
-                () =>
-                    buildActiveValidationRequest({
+                () => {
+                    const options = {
                         nodes: semanticNodes,
+                        edges,
+                        globalDataModel,
                         availableDataModel,
                         behaviorDirectories,
                         isBehaviorWorkflow,
                         ancestorSlotSourcesByPath,
-                    }),
+                        manualSlots,
+                        currentSlotNodes: semanticSlotNodes,
+                    };
+                    const source = buildEditorValidationRequest(options);
+                    return {
+                        request: buildActiveValidationRequest(options),
+                        source,
+                        signature: JSON.stringify(source),
+                    };
+                },
                 {
                     nodes: semanticNodes?.length || 0,
                     overlays: semanticNodes?.length || 0,
@@ -540,14 +621,43 @@ export function useEditorAnalysis({
             ),
         [
             semanticNodes,
+            edges,
+            globalDataModel,
             availableDataModel,
             behaviorDirectories,
             isBehaviorWorkflow,
             ancestorSlotSourcesByPath,
+            manualSlots,
+            semanticSlotNodes,
         ]
     );
 
-    const [editorProblems, setEditorProblems] = useState([]);
+    // Signature guards exclude selection/geometry, while retaining native source
+    // settings and current API metadata, even before a Rust revision is acked.
+    const validationSnapshot = useDerivedGraphSnapshot(
+        [validationRequestCandidate.signature], () => validationRequestCandidate,
+    );
+    const validationRequest = validationSnapshot.request;
+    const validationSource = useDerivedGraphSnapshot(
+        [documentContext, validationSnapshot.signature, nativeValidationAvailable],
+        () => ({ documentContext, signature: validationSnapshot.signature }),
+    );
+    const validationQuery = useDerivedGraphSnapshot(
+        [validationSource, validationRevision, runRustReadQuery], () => ({ validationSource, validationRevision }),
+    );
+    const [validationResult, setValidationResult] = useState(() => ({
+        query: null, status: "pending", problems: EMPTY_PROBLEMS,
+    }));
+    const browserProblems = useMemo(() => nativeValidationAvailable
+        ? EMPTY_PROBLEMS : collectBrowserNodeProblems(validationSnapshot.source),
+    [nativeValidationAvailable, validationSnapshot.source]);
+    const validationStatus = !nativeValidationAvailable ? "unavailable"
+        : validationResult.query === validationQuery ? validationResult.status : "pending";
+    // A revision-only refresh can retain diagnostics for the identical source.
+    // Changed documents/configuration hide old ownership synchronously in render.
+    const editorProblems = !nativeValidationAvailable ? browserProblems
+        : validationResult.query?.validationSource === validationSource
+            ? validationResult.problems : EMPTY_PROBLEMS;
     const validationRevisionRef = useRef(0);
     const semanticNodeCount = semanticNodes?.length || 0;
     const edgeCount = edges?.length || 0;
@@ -571,8 +681,10 @@ export function useEditorAnalysis({
             manualSlots: manualSlotCount,
         });
 
-        const commitProblems = (next) => {
-            if (cancelled || revision !== validationRevisionRef.current) {
+        const isCurrent = () => !cancelled && revision === validationRevisionRef.current &&
+            (!getActiveDocumentIdentity || getActiveDocumentIdentity() === documentIdentity);
+        const commitProblems = (next, status = "ready") => {
+            if (!isCurrent()) {
                 slotDebug("validation: result discarded", {
                     effectRevision: revision,
                     currentEffectRevision: validationRevisionRef.current,
@@ -580,27 +692,17 @@ export function useEditorAnalysis({
                 });
                 return;
             }
-            // Always commit a fresh array with fresh problem objects.  The
-            // Problems panel is intentionally small, so correctness is more
-            // important here than preserving object identity across validation
-            // runs.  This also protects the UI if the Tauri bridge ever reuses
-            // a result array/object reference.
-            const normalized = Array.isArray(next)
-                ? next.map((problem) => ({ ...problem }))
-                : [];
+            const normalized = next.map((problem) => ({ ...problem }));
             slotDebug("validation: Problems panel committed", {
                 effectRevision: revision,
                 validationRevision,
                 problemCount: normalized.length,
                 problems: summarizeProblems(normalized),
             });
-            setEditorProblems(normalized);
+            setValidationResult({ query: validationQuery, status, problems: normalized });
         };
 
-        if (!isTauri()) {
-            // Browser/Vite mode intentionally has no semantic validator. Rust
-            // is the single source of truth for workflow validation.
-            commitProblems([]);
+        if (!nativeValidationAvailable) {
             return () => {
                 cancelled = true;
             };
@@ -609,6 +711,7 @@ export function useEditorAnalysis({
         // Coalesce bursts caused by one editor operation (for example moving a
         // state into a container updates several pieces of semantic state).
         const timer = window.setTimeout(async () => {
+            if (!isCurrent()) return;
             try {
                 slotDebug("validation: Rust query begin", {
                     effectRevision: revision,
@@ -636,7 +739,8 @@ export function useEditorAnalysis({
                             Array.isArray(next) ? next : []
                         ),
                     });
-                    commitProblems(Array.isArray(next) ? next : []);
+                    if (!Array.isArray(next)) throw new Error("Rust validation returned an invalid Problems response.");
+                    commitProblems(next);
                 } else {
                     slotDebug("validation: Rust query returned no result", {
                         effectRevision: revision,
@@ -644,6 +748,7 @@ export function useEditorAnalysis({
                     });
                 }
             } catch (error) {
+                if (!isCurrent()) return;
                 slotDebug("validation: Rust query failed", {
                     effectRevision: revision,
                     validationRevision,
@@ -661,7 +766,7 @@ export function useEditorAnalysis({
                         title: "Workflow validation unavailable",
                         message: `Rust validation failed: ${message}`,
                     },
-                ]);
+                ], "error");
             }
         }, 100);
 
@@ -672,13 +777,20 @@ export function useEditorAnalysis({
     }, [
         isDraggingNode,
         validationRequest,
+        validationQuery,
+        documentIdentity,
+        getActiveDocumentIdentity,
+        nativeValidationAvailable,
+        runRustReadQuery,
+        validationRevision,
         semanticNodeCount,
         edgeCount,
         manualSlotCount,
-        runRustReadQuery,
-        validationRevision,
     ]);
 
+    const nodeWarningTitles = useDerivedGraphSnapshot(
+        [editorProblems], (previous) => projectNodeWarningTitles(previous, editorProblems),
+    );
     const errorProblemCount = useMemo(
         () =>
             editorProblems.filter((problem) => problem.severity === "error")
@@ -693,6 +805,8 @@ export function useEditorAnalysis({
         canvasSkillSlotOptions,
         selectedContainerOutgoingTransitions,
         editorProblems,
+        nodeWarningTitles,
+        validationStatus,
         errorProblemCount,
     };
 }

@@ -120,6 +120,27 @@ export async function serializeEditorWorkflow(request) {
   });
 }
 
+/** Load a canonical in-memory snapshot without saving the user's workflow. */
+export async function loadRuntimeWorkflow(
+  request,
+  pathToConfig,
+  includeMapping,
+  forceConfigure,
+  currentFilePath = null,
+) {
+  if (!isTauri()) {
+    throw new Error('Loading an in-memory workflow requires the Rust/Tauri desktop backend.');
+  }
+
+  return await invoke('load_runtime_workflow', {
+    request,
+    pathToConfig,
+    includeMapping,
+    forceConfigure,
+    currentFilePath,
+  });
+}
+
 /**
  * Validate the current editor state in Rust.
  *

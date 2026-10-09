@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { MarkerType } from "@xyflow/react";
-import { SLOT_CONNECTION_COLORS, normalizeSlotPath } from "../../utils/editorGraph";
+import { SLOT_CONNECTION_COLORS, getSlotEdgeEndpoints, isKnownSlotType, isSlotDeletionProtected, normalizeSlotPath } from "../../utils/editorGraph";
 import { getAbsoluteNodePosition, getNodeSize } from "../../utils/editorGeometry";
 
 const isSlotCloneNode = (node) => Boolean(
@@ -14,8 +14,9 @@ export function useSlotGraph({
                                  manualSlots,
                                  slotNodes,
                                  slotEdges,
-                                 setSlotNodes,
-                                 setSlotEdges,
+                                  setSlotNodes,
+                                  setSlotEdges,
+                                  getDocumentSnapshot,
                              }) {
     const checkSlotConnection = useCallback((
         customNodes = null,
@@ -23,22 +24,26 @@ export function useSlotGraph({
         customSlotNodes = null,
         customSlotEdges = null
     ) => {
-        const targetNodes = Array.isArray(customNodes) ? customNodes : nodes;
+        const live = getDocumentSnapshot?.();
+        const targetNodes = Array.isArray(customNodes) ? customNodes : live?.nodes || nodes;
         const activeManualSlots =
-            customManualSlots !== null ? customManualSlots : manualSlots;
+            customManualSlots !== null ? customManualSlots : live?.manualSlots || manualSlots;
         const activeSlotNodes = Array.isArray(customSlotNodes)
             ? customSlotNodes
-            : slotNodes;
+            : live?.slotNodes || slotNodes;
         const activeSlotEdges = Array.isArray(customSlotEdges)
             ? customSlotEdges
-            : slotEdges;
-        if (!targetNodes || targetNodes.length === 0) {
+            : live?.slotEdges || slotEdges;
+        if (!targetNodes?.length && !activeManualSlots?.length) {
             setSlotNodes([]);
             setSlotEdges([]);
             return;
         }
 
         const usedPaths = new Map();
+        const existingSlotNodeById = new Map(
+            (activeSlotNodes || []).map((node) => [node.id, node])
+        );
 
         // The current machine's inheritance status must come from the current
         // SCXML's own #_SLOTS declarations. Child-machine inheritSlot metadata
@@ -71,8 +76,8 @@ export function useSlotGraph({
         });
 
         const registerSlotUsage = (s, options = {}) => {
-            if (!s.path || !s.path.trim()) return;
             const cleanPath = normalizeSlotPath(s.path);
+            if (!cleanPath) return;
             const existing = usedPaths.get(cleanPath) || {};
             const requiredByChildren = [
                 ...(existing.requiredByChildren || []),
@@ -120,7 +125,15 @@ export function useSlotGraph({
             }
 
             usedPaths.set(cleanPath, {
-                type: s.type || existing.type || "Unknown",
+                // Known parent types win over child metadata. Resolved child
+                // metadata can fill Unknown without rewriting the declaration
+                // or enabling unresolved child/skill request handles.
+                type: options.requiredByChild
+                    ? isKnownSlotType(existing.type) ? existing.type
+                        : isKnownSlotType(existingSlotNodeById.get(`slot-${cleanPath}`)?.data?.slotType)
+                            ? existingSlotNodeById.get(`slot-${cleanPath}`).data.slotType
+                            : isKnownSlotType(s.type) ? s.type : existing.type || s.type || "Unknown"
+                    : isKnownSlotType(existing.type) ? existing.type : s.type || existing.type || "Unknown",
                 // Keep the two inheritance directions independent:
                 // - currentMachineInherited: this workflow itself declares the
                 //   path as <inheritSlot> and receives it from its own parent.
@@ -135,6 +148,9 @@ export function useSlotGraph({
             });
         };
 
+        (activeManualSlots || []).forEach((slot) => registerSlotUsage({
+            ...slot, path: slot?.inherited?.xpath || slot?.path,
+        }));
         targetNodes.forEach((node) => {
             (node.data.inSlots || []).forEach((slot) =>
                 registerSlotUsage(slot, { accessNodeId: node.id })
@@ -142,7 +158,9 @@ export function useSlotGraph({
             (node.data.outSlots || []).forEach((slot) =>
                 registerSlotUsage(slot, { accessNodeId: node.id })
             );
+        });
 
+        targetNodes.forEach((node) => {
             if (node.type === "submachine") {
                 (node.data.inheritedSlots || []).forEach((slot) => {
                     const concreteSkillAccesses = Array.isArray(
@@ -194,20 +212,15 @@ export function useSlotGraph({
             }
         });
 
-        (activeManualSlots || []).forEach(registerSlotUsage);
-
         const generatedSlotNodes = [];
         let index = 0;
-        const existingSlotNodeById = new Map(
-            (activeSlotNodes || []).map((node) => [node.id, node])
-        );
         const existingSlotEdgeByKey = new Map();
         (activeSlotEdges || []).forEach((edge) => {
             if (edge.data?.edgeKind !== "slot") return;
 
             if (edge.data?.subMachineInherited === true) {
                 existingSlotEdgeByKey.set(
-                    `sub:${edge.data?.subMachineNodeId || edge.source}:` +
+                    `sub:${edge.data?.subMachineNodeId || edge.data?.skillNodeId || (edge.data?.access === "read" ? edge.target : edge.source)}:` +
                     `${edge.data?.access || ""}:${Number(edge.data?.inheritIndex)}`,
                     edge
                 );
@@ -215,7 +228,7 @@ export function useSlotGraph({
             }
 
             existingSlotEdgeByKey.set(
-                `skill:${edge.data?.skillNodeId || edge.source}:` +
+                `skill:${edge.data?.skillNodeId || (edge.data?.access === "read" ? edge.target : edge.source)}:` +
                 `${edge.data?.access || ""}:${Number(edge.data?.slotIndex)}`,
                 edge
             );
@@ -309,7 +322,8 @@ export function useSlotGraph({
                 const slotNodeId = `slot-${path}`;
                 const existingSlotNode = existingSlotNodeById.get(slotNodeId);
 
-                generatedSlotNodes.push({
+                const generated = {
+                    ...existingSlotNode,
                     id: slotNodeId,
                     position:
                         existingSlotNode?.position ||
@@ -319,6 +333,7 @@ export function useSlotGraph({
                         },
                     type: "slot",
                     data: {
+                        ...existingSlotNode?.data,
                         path: `/${path}`,
                         label: `/${path}`,
                         slotType: type,
@@ -335,7 +350,12 @@ export function useSlotGraph({
                         requiredByChild: requiredByChildren.length > 0,
                         requiredByChildren,
                     },
+                };
+                generated.deletable = !isSlotDeletionProtected(generated, {
+                    nodes: targetNodes,
+                    manualSlots: activeManualSlots,
                 });
+                generatedSlotNodes.push(generated);
 
                 index++;
             }
@@ -358,7 +378,9 @@ export function useSlotGraph({
             generatedSlotNodes.push({
                 ...cloneNode,
                 type: "slot",
+                deletable: true,
                 data: {
+                    ...cloneNode.data,
                     ...canonicalNode.data,
                     isSlotClone: true,
                     cloneOfNodeId: canonicalNode.id,
@@ -367,7 +389,8 @@ export function useSlotGraph({
         });
 
         const resolveVisualSlotNodeId = (existingEdge, canonicalSlotNodeId) => {
-            const existingTargetId = existingEdge?.target;
+            const existingTargetId = existingEdge?.data?.slotNodeId
+                || (existingEdge?.data?.access === "read" ? existingEdge?.source : existingEdge?.target);
             if (!existingTargetId || existingTargetId === canonicalSlotNodeId) {
                 return canonicalSlotNodeId;
             }
@@ -422,6 +445,7 @@ export function useSlotGraph({
 
                 const equivalent =
                     current.type === generated.type &&
+                    current.deletable === generated.deletable &&
                     current.position?.x === generated.position?.x &&
                     current.position?.y === generated.position?.y &&
                     current.data?.path === generated.data?.path &&
@@ -452,7 +476,7 @@ export function useSlotGraph({
         targetNodes.forEach((node) => {
             (node.data.inSlots || []).forEach((inslot, inIndex) => {
                 if (inslot.path && inslot.path.trim() !== "") {
-                    const cleanPath = inslot.path.trim().replace(/^\//, "");
+                    const cleanPath = normalizeSlotPath(inslot.path);
                     const slotNodeId = `slot-${cleanPath}`;
                     const existingReadEdge = existingSlotEdgeByKey.get(
                         `skill:${node.id}:read:${inIndex}`
@@ -464,13 +488,11 @@ export function useSlotGraph({
                     );
 
                     newSlotEdges.push({
+                        ...existingReadEdge,
                         id:
                             existingReadEdge?.id ||
                             `edge-read-${slotNodeId}-${node.id}-${inIndex}`,
-                        source: node.id,
-                        target: visualSlotNodeId,
-                        sourceHandle: `slot-skill-read-${inIndex}`,
-                        targetHandle: "slot-node-read",
+                        ...getSlotEdgeEndpoints(node.id, visualSlotNodeId, "read", `slot-skill-read-${inIndex}`),
                         type: "smartTransition",
                         selected: Boolean(existingReadEdge?.selected),
                         style: {
@@ -483,6 +505,7 @@ export function useSlotGraph({
                             color: SLOT_CONNECTION_COLORS.read,
                         },
                         data: {
+                            ...existingReadEdge?.data,
                             edgeKind: "slot",
                             access: "read",
                             slotIndex: inIndex,
@@ -499,7 +522,7 @@ export function useSlotGraph({
 
             (node.data.outSlots || []).forEach((outslot, outIndex) => {
                 if (outslot.path && outslot.path.trim() !== "") {
-                    const cleanPath = outslot.path.trim().replace(/^\//, "");
+                    const cleanPath = normalizeSlotPath(outslot.path);
                     const slotNodeId = `slot-${cleanPath}`;
                     const existingWriteEdge = existingSlotEdgeByKey.get(
                         `skill:${node.id}:write:${outIndex}`
@@ -511,13 +534,11 @@ export function useSlotGraph({
                     );
 
                     newSlotEdges.push({
+                        ...existingWriteEdge,
                         id:
                             existingWriteEdge?.id ||
                             `edge-write-${node.id}-${slotNodeId}-${outIndex}`,
-                        source: node.id,
-                        target: visualSlotNodeId,
-                        sourceHandle: `slot-skill-write-${outIndex}`,
-                        targetHandle: "slot-node-write",
+                        ...getSlotEdgeEndpoints(node.id, visualSlotNodeId, "write", `slot-skill-write-${outIndex}`),
                         type: "smartTransition",
                         selected: Boolean(existingWriteEdge?.selected),
                         style: {
@@ -530,6 +551,7 @@ export function useSlotGraph({
                             color: SLOT_CONNECTION_COLORS.write,
                         },
                         data: {
+                            ...existingWriteEdge?.data,
                             edgeKind: "slot",
                             access: "write",
                             slotIndex: outIndex,
@@ -547,7 +569,7 @@ export function useSlotGraph({
             if (node.type === "submachine") {
                 (node.data.inheritedSlots || []).forEach((slot, inheritIndex) => {
                     if (
-                        !slot?.access ||
+                        !["read", "write"].includes(slot?.access) ||
                         !slot?.path ||
                         !String(slot.path).trim()
                     ) {
@@ -569,16 +591,12 @@ export function useSlotGraph({
                     );
 
                     newSlotEdges.push({
+                        ...existingInheritedEdge,
+                        deletable: false,
                         id:
                             existingInheritedEdge?.id ||
                             `edge-inherited-${access}-${node.id}-${inheritIndex}-${slotNodeId}`,
-                        source: node.id,
-                        target: visualSlotNodeId,
-                        sourceHandle: handleId,
-                        targetHandle:
-                            access === "read"
-                                ? "slot-node-read"
-                                : "slot-node-write",
+                        ...getSlotEdgeEndpoints(node.id, visualSlotNodeId, access, handleId),
                         type: "smartTransition",
                         selected: Boolean(existingInheritedEdge?.selected),
                         style: {
@@ -591,6 +609,7 @@ export function useSlotGraph({
                             color: SLOT_CONNECTION_COLORS[access],
                         },
                         data: {
+                            ...existingInheritedEdge?.data,
                             edgeKind: "slot",
                             access,
                             path: cleanPath,
@@ -598,6 +617,7 @@ export function useSlotGraph({
                             canonicalSlotNodeId: slotNodeId,
                             subMachineInherited: true,
                             subMachineNodeId: node.id,
+                            skillNodeId: node.id,
                             inheritIndex,
                             controlPoints:
                                 existingInheritedEdge?.data?.controlPoints || [],
@@ -638,6 +658,7 @@ export function useSlotGraph({
 
                 const equivalent =
                     current.source === generated.source &&
+                    current.deletable === generated.deletable &&
                     current.target === generated.target &&
                     current.sourceHandle === generated.sourceHandle &&
                     current.targetHandle === generated.targetHandle &&
@@ -672,6 +693,7 @@ export function useSlotGraph({
         slotEdges,
         setSlotNodes,
         setSlotEdges,
+        getDocumentSnapshot,
     ]);
 
     return { checkSlotConnection };

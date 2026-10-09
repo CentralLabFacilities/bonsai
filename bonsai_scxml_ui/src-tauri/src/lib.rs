@@ -13,10 +13,12 @@ mod workspace;
 pub fn run() {
     tauri::Builder::default()
         .manage(core::document::WorkflowDocumentStore::default())
+        .manage(workspace::execution::RuntimeWorkflowStaging::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .invoke_handler(tauri::generate_handler![
             commands::api::api_request,
+            commands::api::load_runtime_workflow,
             commands::files::open_file,
             commands::files::pick_directory,
             commands::workflows::list_behavior_directory,

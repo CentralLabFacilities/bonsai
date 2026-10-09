@@ -1,8 +1,9 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
     ReactFlowProvider,
     useReactFlow,
     useUpdateNodeInternals,
+    useStoreApi,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
@@ -14,7 +15,7 @@ import EditorOverlays from "./components/overlays/EditorOverlays.jsx";
 import WorkflowTabBar from "./components/WorkflowTabBar";
 import EditorFindOverlay from "./components/canvas/EditorFindOverlay";
 import EditorInspectorPanel from "./components/inspector/EditorInspectorPanel.jsx";
-import { FeedbackProvider } from "./components/ui/index.js";
+import { FeedbackProvider, useFeedback } from "./components/ui/index.js";
 
 import {
     isTauri,
@@ -47,6 +48,7 @@ import { useProblemNavigation } from "./hooks/interaction/useProblemNavigation";
 import { useEditorSelectionController } from "./hooks/interaction/useEditorSelectionController";
 import { useEditorContextMenu } from "./hooks/interaction/useEditorContextMenu";
 import { useRuntimeReplay } from "./hooks/editor/useRuntimeReplay";
+import { useLiveExecution } from "./hooks/editor/useLiveExecution.js";
 import { useEditorFind } from "./hooks/interaction/useEditorFind";
 import { useGlobalEditorShortcuts } from "./hooks/interaction/useGlobalEditorShortcuts";
 import { useEditorLibraryDrop } from "./hooks/library/useEditorLibraryDrop";
@@ -65,7 +67,15 @@ initApiProxy();
 
 // Detect if running in Tauri desktop app
 const IS_DESKTOP = isTauri();
+const EMPTY_RUNTIME_CONTAINERS = [];
 function AppContent() {
+    const { notify } = useFeedback();
+    const [isRuntimeCommanderOpen, setIsRuntimeCommanderOpen] = useState(false);
+    const [liveExecution, setLiveExecution] = useState(null);
+    const [runtimeExpandedContainers, setRuntimeExpandedContainers] = useState({});
+    const liveRunRef = useRef(null);
+    const flowStore = useStoreApi();
+    const cancelFlowConnection = useCallback(() => flowStore.getState().cancelConnection(), [flowStore]);
     const {
         skills,
         isReloadingSkills,
@@ -187,6 +197,7 @@ function AppContent() {
         slotEdges,
         setSlotNodes,
         setSlotEdges,
+        getDocumentSnapshot,
     });
 
     const rustWorkflowDocument = useRustWorkflowDocument({
@@ -198,6 +209,8 @@ function AppContent() {
         setEdges,
         setGlobalDataModel,
     });
+    const invalidateRustDocument = rustWorkflowDocument.invalidate;
+    useLayoutEffect(() => () => invalidateRustDocument(), [invalidateRustDocument]);
 
     const {
         selectEditorNode,
@@ -217,6 +230,7 @@ function AppContent() {
         moveContainerTransition,
         updateNodeName,
         updateNodeSource,
+        getNodeParameterEditSource,
         updateNodeParameter,
         toggleContainerCollapse,
         updateEdgeControlPoints,
@@ -228,6 +242,8 @@ function AppContent() {
         deleteGlobalParameter,
     } = useEditorActions({
         nodes,
+        getDocumentSnapshot,
+        getActiveDocumentIdentity: () => getActiveDocumentIdentity(),
         edges,
         slotNodes,
         slotEdges,
@@ -344,6 +360,9 @@ function AppContent() {
         drawerData,
         setDrawerData,
         slotConnectionDrag,
+        pendingSlotRename,
+        cancelSlotRename,
+        confirmSlotRename,
         openConditionDrawer,
         isValidConnection,
         handleConnectStart,
@@ -359,11 +378,13 @@ function AppContent() {
         edges,
         slotNodes,
         slotEdges,
+        manualSlots,
         selectedNodeId,
         setNodes,
         setEdges,
         setSlotNodes,
         setSlotEdges,
+        setManualSlots,
         setGlobalDataModel,
         setSelectedNodeId,
         updateNodeInternals,
@@ -372,6 +393,13 @@ function AppContent() {
             rustWorkflowDocument.syncTransitionsForSource,
         checkSlotConnection,
         syncSlotsAfterCommit: rustWorkflowDocument.syncSlotsAfterCommit,
+        getDocumentSnapshot,
+        // The tab hook below publishes identity before replacing the graph.
+        getActiveDocumentIdentity: () => getActiveDocumentIdentity(),
+        screenToFlowPosition,
+        flowContainerRef,
+        cancelFlowConnection,
+        onSlotConnectionError: (message) => notify({ tone: "danger", title: "Slot connection", message }),
     });
 
     const {
@@ -428,6 +456,7 @@ function AppContent() {
         tabs,
         activeTabId,
         activeTab: activeWorkflowTab,
+        activeFingerprint: activeWorkflowFingerprint,
         getActiveDocumentIdentity,
         getTabSnapshot,
         getTabsSnapshot,
@@ -575,6 +604,8 @@ function AppContent() {
 
     const {
         semanticSlotNodes,
+        displaySemanticNodes,
+        displayNodes,
         nodeById,
         childIdsByParent,
         semanticChildrenByParent,
@@ -584,6 +615,7 @@ function AppContent() {
         injectedSlotNodes,
     } = useEditorPresentationGraph({
         semanticNodes,
+        runtimeExpandedContainerIds: runtimeExpandedContainers[activeTabId] || EMPTY_RUNTIME_CONTAINERS,
         slotNodes,
         isDraggingNode,
         nodes,
@@ -640,10 +672,13 @@ function AppContent() {
         canvasSkillSlotOptions,
         selectedContainerOutgoingTransitions,
         editorProblems,
+        nodeWarningTitles,
+        validationStatus,
         errorProblemCount,
     } = useEditorAnalysis({
         tabs,
         activeTabId,
+        getActiveDocumentIdentity,
         semanticNodes,
         semanticSlotNodes,
         manualSlots,
@@ -768,6 +803,7 @@ function AppContent() {
         edgeFocusMode,
         nodeFocusMode,
     } = useEditorDisplay({
+        nodeWarningTitles,
         hoveredEditorNodeId,
         hoveredEditorEdgeId,
         selectedNodes,
@@ -780,9 +816,9 @@ function AppContent() {
         controlPointInsertRequest,
         onControlPointContextMenu: handleControlPointContextMenu,
         hoveredSlotAccessNodeId,
-        semanticNodes,
+        semanticNodes: displaySemanticNodes,
         semanticChildrenByParent,
-        nodes,
+        nodes: displayNodes,
         childIdsByParent,
         activeMode,
         showTransitionEdges,
@@ -829,6 +865,26 @@ function AppContent() {
         setActiveMode,
     });
 
+    const handleExecutionUpdate = useCallback((update) => {
+        if (update.action === "load") setRuntimeExpandedContainers({});
+        if (update.action === "load" && update.workflow) {
+            liveRunRef.current = { workflow: update.workflow, tabsSnapshot: update.tabsSnapshot || [update.workflow] };
+        }
+        if (!update.following || !update.workflow) {
+            setRuntimeExpandedContainers((current) => Object.keys(current).length ? {} : current);
+            setLiveExecution(null);
+            return;
+        }
+        if (liveRunRef.current?.workflow !== update.workflow) {
+            liveRunRef.current = { workflow: update.workflow, tabsSnapshot: [update.workflow] };
+        }
+        if (update.action === "start" || update.action === "resume") {
+            handleClearRuntimeLog();
+            setActiveMode("overview");
+        }
+        setLiveExecution({ ...update, tabsSnapshot: liveRunRef.current.tabsSnapshot });
+    }, [handleClearRuntimeLog, setActiveMode]);
+
     const {
         handleNodesChange,
         handleVisibleEdgesChange,
@@ -846,6 +902,11 @@ function AppContent() {
         setNodes,
         setEdges,
         setSlotEdges,
+        manualSlots,
+        setManualSlots,
+        getDocumentSnapshot,
+        checkSlotConnection,
+        syncSlotsAfterCommit: rustWorkflowDocument.syncSlotsAfterCommit,
         updateNodeInternals,
         syncRemovedStates: rustWorkflowDocument.syncRemovedStates,
         syncTransitionSources: rustWorkflowDocument.syncTransitionSources,
@@ -857,6 +918,8 @@ function AppContent() {
     } = useEditorContextMenu({
         contextMenu,
         setContextMenu,
+        manualSlots,
+        getDocumentSnapshot,
         nodes,
         edges,
         slotNodes,
@@ -951,6 +1014,31 @@ function AppContent() {
         onStateMachineLoadEnd: endStateMachineLoad,
     });
 
+    const expandRuntimeContainer = useCallback((tabId, containerId) => {
+        setRuntimeExpandedContainers((previous) => {
+            const ids = previous[tabId] || EMPTY_RUNTIME_CONTAINERS;
+            return ids.includes(containerId) ? previous : { ...previous, [tabId]: [...ids, containerId] };
+        });
+    }, []);
+
+    const { liveVisibleNodes, liveVisibleEdges, liveActive, unresolvedStates } = useLiveExecution({
+        liveExecution: runtimeLog ? null : liveExecution,
+        onOpenSubMachine: handleOpenSubMachine,
+        onExpandContainer: expandRuntimeContainer,
+        tabs,
+        activeTabId,
+        activeDocumentGeneration: activeWorkflowTab?.documentGeneration,
+        activeFingerprint: activeWorkflowFingerprint,
+        visibleNodes: playbackVisibleNodes,
+        visibleEdges: playbackVisibleEdges,
+        fitView,
+        switchTab,
+        getActiveDocumentIdentity,
+        suspendFollow: isDraggingNode || drawerData.isOpen || activeMode === "code" || isHintPageOpen
+            || isCreateSlotModalOpen || Boolean(documentGuard || pendingSubMachineCreation || pendingSkillPaste
+                || pendingSlotRename || stateMachineLoading || runtimePreparation || contextMenu),
+    });
+
     const {
         handleLibraryDragOver,
         handleLibraryDragLeave,
@@ -963,19 +1051,22 @@ function AppContent() {
         nodes,
         flowContainerRef,
         getTabSnapshot,
+        getActiveDocumentIdentity,
+        getDocumentSnapshot,
         screenToFlowPosition,
         setParallelDropTargetId,
         setCompoundDropTargetId,
         createBehaviorNode,
         createNode,
         checkSlotConnection,
-        getNodes,
         setNodes,
+        setManualSlots,
         setSelectedNodeId,
         syncInsertedEditorStatesAfterCommit:
             rustWorkflowDocument.syncInsertedEditorStatesAfterCommit,
         syncInsertedParallelLaneStateAfterCommit:
             rustWorkflowDocument.syncInsertedParallelLaneStateAfterCommit,
+        syncSlotsAfterCommit: rustWorkflowDocument.syncSlotsAfterCommit,
     });
 
     const addLibrarySkill = useCallback(async (skill) => {
@@ -1041,8 +1132,9 @@ function AppContent() {
         onUpdateSrc: updateNodeSource,
         onUpdateEvent: updateNodeEvent,
         onSetEventTarget: setExistingTargetForEvent,
-        onUpdateParameter: (index, value, commit = false) =>
-            updateNodeParameter(selectedNode.id, index, value, commit),
+        getParameterEditSource: getNodeParameterEditSource,
+        onUpdateParameter: (index, value, commit = false, source) =>
+            updateNodeParameter(source?.nodeId || selectedNode.id, index, value, commit, source),
         onUpdateStateActions: updateStateActions,
         onUpdateSendEvents: updateSendEvents,
         onUpdateInSlotPath: (index, value, commit = false) => updateSkillSlotPath(selectedNode.id, "read", index, value, commit),
@@ -1192,8 +1284,9 @@ function AppContent() {
                             edges={edges}
                             globalDataModel={globalDataModel}
                             manualSlots={manualSlots}
-                            visibleNodes={playbackVisibleNodes}
-                            visibleEdges={playbackVisibleEdges}
+                            visibleNodes={liveVisibleNodes}
+                            visibleEdges={liveVisibleEdges}
+                            liveExecutionActive={liveActive}
                             smartRoutingNodes={smartRoutingNodes}
                             edgeFocusMode={edgeFocusMode}
                             nodeFocusMode={nodeFocusMode}
@@ -1201,7 +1294,7 @@ function AppContent() {
                             setContextMenu={setContextMenu}
                             handleSelectAction={handleSelectAction}
                             hasGraphClipboard={hasGraphClipboard}
-                            setIsCreateSlotModalOpen={setIsCreateSlotModalOpen}
+                            slotConnectionDrag={slotConnectionDrag}
                             isDraggingNode={isDraggingNode}
                             isOverTrash={isOverTrash}
                             handleNodesChange={handleNodesChange}
@@ -1228,6 +1321,9 @@ function AppContent() {
                             handleNodeDrag={handleNodeDrag}
                             handleNodeDragStop={handleNodeDragStop}
                             runtimePlayback={runtimePlayback}
+                            runtimeCommanderOpen={isRuntimeCommanderOpen}
+                            runtimeExpansionActive={Boolean(runtimeExpandedContainers[activeTabId]?.length)}
+                            onOpenRuntimeCommander={() => setIsRuntimeCommanderOpen(true)}
                             onLoadRuntimeLog={handleLoadRuntimeLog}
                             onRuntimePlayPause={toggleRuntimePlayback}
                             onRuntimeRestart={restartRuntimePlayback}
@@ -1267,6 +1363,7 @@ function AppContent() {
                         }}
                         problems={{
                             items: editorProblems,
+                            status: validationStatus,
                             errorCount: errorProblemCount,
                             onClick: handleProblemClick,
                         }}
@@ -1308,6 +1405,23 @@ function AppContent() {
             </button>
 
             <EditorOverlays
+                runtimeCommander={{
+                    isOpen: isRuntimeCommanderOpen,
+                    onClose: () => setIsRuntimeCommanderOpen(false),
+                    workflowTab: activeWorkflowTab,
+                    workflowFingerprint: activeWorkflowFingerprint,
+                    getTabSnapshot,
+                    getTabsSnapshot,
+                    getActiveDocumentIdentity,
+                    onExecutionUpdate: handleExecutionUpdate,
+                    unresolvedStates,
+                    behaviorDirectories,
+                }}
+                slotRename={pendingSlotRename ? {
+                    pending: pendingSlotRename,
+                    onCancel: cancelSlotRename,
+                    onConfirm: () => confirmSlotRename(pendingSlotRename.id),
+                } : null}
                 documentGuard={documentGuard}
                 loading={stateMachineLoading}
                 runtimePreparation={runtimePreparation}

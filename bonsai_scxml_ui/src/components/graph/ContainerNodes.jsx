@@ -1,7 +1,7 @@
 import { Handle, NodeResizer, Position, useReactFlow } from "@xyflow/react";
 import { useCallback } from "react";
 import { FiChevronDown, FiChevronRight, FiPlus } from "react-icons/fi";
-import { IncomingTransitionHandle, NodeTitle, StateActionBadges } from "./NodeChrome";
+import { ConnectionHandle, IncomingTransitionHandle, NodeTitle, StateActionBadges } from "./NodeChrome";
 import { getContainerExitEvents, resizeParallelLanes } from "../../utils/containerState.js";
 import { PARALLEL_BOTTOM_PADDING, PARALLEL_HEADER_HEIGHT } from "../../utils/editorGeometry.js";
 
@@ -39,13 +39,15 @@ function ContainerHeader({ id, data, type }) {
 function CollapsedSlotAnchor({ data }) {
     if (!data.isCollapsed || (data.mode !== "slots" && data.mode !== "overview")) return null;
     return (
-        <Handle
+        <ConnectionHandle
             id="collapsed-slot-source"
             type="source"
             position={Position.Bottom}
             className="collapsed-slot-source-handle"
             isConnectableStart={false}
             isConnectableEnd={false}
+            title="Collapsed slot connections"
+            aria-label="Collapsed slot connections"
         />
     );
 }
@@ -71,13 +73,15 @@ function BoundaryExits({ events }) {
                         <span className="compound-frame-exit-label" title={label}>
                             {label}
                         </span>
-                        <Handle
+                        <ConnectionHandle
                             id={event.id}
                             type="source"
                             position={Position.Right}
                             className="compound-frame-source-handle"
                             isConnectableStart={true}
                             isConnectableEnd={false}
+                            title={`Outgoing transition: ${label}`}
+                            aria-label={`Outgoing transition: ${label}`}
                         />
                     </div>
                 );
@@ -129,15 +133,18 @@ export function CompoundNode({ id, data = {}, selected = false }) {
             <ContainerHeader id={id} data={data} type="compound" />
             <CollapsedSlotAnchor data={data} />
             {!isCollapsed && <BoundaryExits events={events} />}
-            {isCollapsed && events.map((event) => (
-                <Handle
+            {isCollapsed && events.map((event, index) => (
+                <ConnectionHandle
                     key={`collapsed-source-${event.id}`}
                     id={event.id}
                     type="source"
                     position={Position.Right}
                     className="compound-frame-source-handle compound-collapsed-source-handle"
+                    style={{ top: `calc(50% + ${(index - (events.length - 1) / 2) * 24}px)` }}
                     isConnectableStart={true}
                     isConnectableEnd={false}
+                    title={`Outgoing transition: ${event.name || event.rawEvent || event.id}`}
+                    aria-label={`Outgoing transition: ${event.name || event.rawEvent || event.id}`}
                 />
             ))}
         </div>
@@ -177,19 +184,21 @@ export function ParallelNode({ id, data, selected = false }) {
             <ContainerHeader id={id} data={data} type="parallel" />
             <CollapsedSlotAnchor data={data} />
             {isCollapsed && events.map((event, index) => (
-                <Handle
+                <ConnectionHandle
                     key={`collapsed-parallel-source-${event.id}`}
                     id={event.id}
                     type="source"
                     position={Position.Right}
                     className="parallel-collapsed-source-handle"
                     style={{
-                        top: `${Math.min(78, 42 + index * 14)}%`,
+                        top: `calc(50% + ${(index - (events.length - 1) / 2) * 24}px)`,
                         left: "auto",
-                        right: "-6px",
+                        right: "0",
                     }}
                     isConnectableStart={true}
                     isConnectableEnd={false}
+                    title={`Outgoing transition: ${event.name || event.rawEvent || event.id}`}
+                    aria-label={`Outgoing transition: ${event.name || event.rawEvent || event.id}`}
                 />
             ))}
             {!isCollapsed && (
@@ -229,20 +238,22 @@ export function ParallelLaneNode({ id, data = {}, selected = false }) {
                 {data.label || id || "Lane"}
             </div>
             {/* Display-only entry point for this parallel branch. */}
-            <Handle
+            <ConnectionHandle
                 type="source"
                 position={Position.Right}
                 id="parallel-entry"
                 className="target-handle"
                 style={{
                     top: "50%",
-                    left: "-5px",
+                    left: "0",
                     right: "auto",
-                    backgroundColor: "#0284c7",
-                    borderColor: "#ffffff",
+                    transform: "translate(-50%, -50%)",
+                    "--connection-handle-color": "#0284c7",
                 }}
                 isConnectableStart={false}
                 isConnectableEnd={false}
+                title="Parallel branch entry"
+                aria-label="Parallel branch entry"
             />
             <BoundaryExits events={events} />
         </div>

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { installApiProxy } from "../src/utils/apiProxy.js";
-import { openFile, saveFile, readFile, selectDirectory } from "../src/tauri-client.js";
+import { loadRuntimeWorkflow, openFile, saveFile, readFile, selectDirectory } from "../src/tauri-client.js";
 
 function proxyEnvironment(result = { status: 200, body: "{}" }) {
     const calls = [];
@@ -28,6 +28,63 @@ test("desktop proxy intercepts API paths and preserves method, query and JSON bo
     assert.deepEqual(calls, [["api_request", {
         method: "POST", path: "/api/skills?package=test", body: '{"value":1}',
     }]]);
+});
+
+test("desktop proxy preserves WebCommander status routing and raw event/Boolean payloads", async () => {
+    const { environment, calls } = proxyEnvironment({ status: 200, body: "RUNNING" });
+    assert.equal(await (await environment.fetch("/api/status")).text(), "RUNNING");
+    const payload = { pathToConfig: "/bonsai.xml", pathToTask: "/workflow.xml",
+        includeMapping: { BEH: "/behaviors" }, forceConfigure: false };
+    await environment.fetch("/api/bonsai/load", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    await environment.fetch("/api/bonsai/fire_event", { method: "POST", headers: { "Content-Type": "application/json" }, body: "Work.success" });
+    await environment.fetch("/api/bonsai/stop_events", { method: "POST", body: "true" });
+    await environment.fetch("/api/bonsai/stop_events", { method: "POST", body: "false" });
+    assert.deepEqual(calls.map(([, request]) => request), [
+        { method: "GET", path: "/api/status", body: null },
+        { method: "POST", path: "/api/bonsai/load", body: JSON.stringify(payload) },
+        { method: "POST", path: "/api/bonsai/fire_event", body: "Work.success" },
+        { method: "POST", path: "/api/bonsai/stop_events", body: "true" },
+        { method: "POST", path: "/api/bonsai/stop_events", body: "false" },
+    ]);
+});
+
+test("native runtime staging passes the canonical request and original path without file or API IPC", async (context) => {
+    const original = Object.getOwnPropertyDescriptor(globalThis, "window");
+    const calls = [];
+    const request = { nodes: [], edges: [], dataModel: [], extraSlotDeclarations: [
+        { key: "", state: "", xpath: "/needed", inherited: false },
+    ] };
+    const before = structuredClone(request);
+    const result = { status: 200, body: '{"success":false,"messages":["Load diagnostics"]}', headers: { "content-type": "application/json" } };
+    Object.defineProperty(globalThis, "window", { configurable: true, value: {
+        __TAURI_INTERNALS__: { invoke: async (command, args) => { calls.push({ command, args }); return result; } },
+    } });
+    context.after(() => {
+        if (original) Object.defineProperty(globalThis, "window", original);
+        else delete globalThis.window;
+    });
+    assert.deepEqual(await loadRuntimeWorkflow(request, "/configs/bonsai.xml", { BEH: "/behaviors" }, true, "/workflows/current.xml"), result);
+    assert.deepEqual(await loadRuntimeWorkflow(request, "/configs/bonsai.xml", {}, false), result);
+    assert.deepEqual(calls, [
+        { command: "load_runtime_workflow", args: { request, pathToConfig: "/configs/bonsai.xml", includeMapping: { BEH: "/behaviors" },
+            forceConfigure: true, currentFilePath: "/workflows/current.xml" } },
+        { command: "load_runtime_workflow", args: { request, pathToConfig: "/configs/bonsai.xml", includeMapping: {},
+            forceConfigure: false, currentFilePath: null } },
+    ]);
+    assert.deepEqual(request, before);
+});
+
+test("native staging failures preserve the rejection instead of returning a cancelled save", async (context) => {
+    const original = Object.getOwnPropertyDescriptor(globalThis, "window");
+    const reason = "Could not stage immutable SCXML";
+    Object.defineProperty(globalThis, "window", { configurable: true, value: {
+        __TAURI_INTERNALS__: { invoke: async (command) => { assert.equal(command, "load_runtime_workflow"); throw reason; } },
+    } });
+    context.after(() => {
+        if (original) Object.defineProperty(globalThis, "window", original);
+        else delete globalThis.window;
+    });
+    await assert.rejects(loadRuntimeWorkflow({}, "/configs/bonsai.xml", {}, false), (error) => error === reason);
 });
 
 test("Request inputs are proxied without consuming the original body", async () => {

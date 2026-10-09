@@ -3,7 +3,8 @@ import { parseScxmlWorkflow } from "../tauri-client.js";
 import { workflowDtoToScxmlDocument } from "./scxmlRustDocument.js";
 import { getLayoutedElements } from "./layoutUtils";
 import { parseStateAssignments } from "./stateActions.js";
-import { getTransitionExitToken } from "./transitionEvents.js";
+import { getTransitionExitToken, transitionDescriptorCovers } from "./transitionEvents.js";
+import { normalizeSlotPath } from "./editorGraph.js";
 import {
     deserializeScxmlConditionForEditor,
     deserializeScxmlValueForEditor,
@@ -30,7 +31,7 @@ const makeImportedSelfLoopControlPoints = () => [
     { id: `cp-${crypto.randomUUID()}`, anchor: "target", dx: -76, dy: -92 },
 ];
 
-const getImportedBoundaryLogicalSources = (sourceNode, sourceHandle, allNodes) => {
+const getImportedBoundaryLogicalSources = (sourceNode, sourceHandle, allNodes, handlersByNodeId) => {
     if (!sourceNode || !["compound", "parallelLane"].includes(sourceNode.type)) {
         return [];
     }
@@ -55,13 +56,9 @@ const getImportedBoundaryLogicalSources = (sourceNode, sourceHandle, allNodes) =
      *
      *   <transition event="Talk.*" target="ExecSpeech"/>
      *
-     * on ExecSetup must be matched back to every nested Talk skill such as
-     * dialog.Talk#setup or dialog.Talk#gripper. SCXML does not encode which
-     * Talk instance emitted the event; while each instance is active it may
-     * emit Talk.*. Therefore the editor must connect ALL matching nested skill
-     * instances to the SAME Compound boundary transition. Do not require a
-     * unique skill match here or the border transition will be rendered
-     * without its internal skill -> boundary connection.
+     * on ExecSetup applies to every eligible nested Talk instance. A deeper,
+     * unconditional handler covering the entire descriptor takes precedence.
+     * Partial and conditional handlers must retain the ancestor fallback.
      *
      * Match by the longest available skill-name prefix rather than splitting
      * on the last dot, because exit-token ids may themselves contain dots.
@@ -89,6 +86,25 @@ const getImportedBoundaryLogicalSources = (sourceNode, sourceHandle, allNodes) =
                 (prefix) => rawEvent.startsWith(`${prefix}.`)
             );
             if (!matchedPrefix) return;
+
+            const normalizeDescriptor = (value) => String(value || "").trim().split(/\s+/)
+                .filter(Boolean).map((token) => getTransitionExitToken(token,
+                    node.data?.scxmlStateId || fullName || simpleName)).join(" ");
+            let current = node;
+            const visited = new Set();
+            let shadowed = false;
+            while (current && current.id !== sourceNode.id && !visited.has(current.id)) {
+                visited.add(current.id);
+                if ((handlersByNodeId.get(current.id) || []).some((handler) =>
+                    !handler.cond && handler.eventId && transitionDescriptorCovers(
+                        normalizeDescriptor(handler.eventId), normalizeDescriptor(rawEvent),
+                    ))) {
+                    shadowed = true;
+                    break;
+                }
+                current = allNodes.find((candidate) => candidate.id === current.parentId);
+            }
+            if (shadowed) return;
 
             matches.push({
                 logicalSourceNode: node,
@@ -197,7 +213,7 @@ const getImportedExitedBoundaries = (sourceNode, targetNode, allNodes) => {
     return steps;
 };
 
-const materializeImportedBoundaryTransitions = (allNodes, sourceEdges) => {
+const materializeImportedBoundaryTransitions = (allNodes, sourceEdges, handlersByNodeId) => {
     const semanticEdges = (sourceEdges || []).filter(
         (edge) => !String(edge.id || "").startsWith("edge-internal-")
     );
@@ -213,6 +229,7 @@ const materializeImportedBoundaryTransitions = (allNodes, sourceEdges) => {
             target: targetId,
             sourceNodeId: logicalSourceNode.id,
             transitionHandleId: logicalHandle,
+            editorBoundarySynthetic: true,
         });
     };
 
@@ -227,7 +244,8 @@ const materializeImportedBoundaryTransitions = (allNodes, sourceEdges) => {
         const boundarySources = getImportedBoundaryLogicalSources(
             sourceNode,
             edge.sourceHandle,
-            allNodes
+            allNodes,
+            handlersByNodeId,
         );
         boundarySources.forEach(ensureImportedBoundarySourceHandle);
 
@@ -1138,10 +1156,16 @@ export const parseScxmlFile = async (
             (child) => child.localName === "state" || child.localName === "parallel"
         );
 
+    const handlersByNodeId = new Map();
+    const rememberDirectHandler = (nodeId, eventId, cond) => {
+        if (!handlersByNodeId.has(nodeId)) handlersByNodeId.set(nodeId, []);
+        handlersByNodeId.get(nodeId).push({ eventId, cond: String(cond || "").trim() });
+    };
     const registerDirectTransitions = (element, nodeId, sourceSkillName) => {
         Array.from(element.children)
             .filter((child) => child.localName === "transition")
             .forEach((transitionElement) => {
+                rememberDirectHandler(nodeId, transitionElement.getAttribute("event"), transitionElement.getAttribute("cond"));
                 const targetState = transitionElement.getAttribute("target");
                 if (!targetState) return;
                 const assignments = parseTransitionAssignments(transitionElement);
@@ -1581,6 +1605,7 @@ export const parseScxmlFile = async (
                     const assignments = parseTransitionAssignments(tr);
                     const firstAssignment = assignments[0] || null;
 
+                    rememberDirectHandler(compoundNodeId, eventName, cond);
                     if (targetState) {
                         rawTransitions.push({
                             sourceNodeId: compoundNodeId,
@@ -1632,6 +1657,7 @@ export const parseScxmlFile = async (
             const assignments = parseTransitionAssignments(tr);
             const firstAssignment = assignments[0] || null;
 
+            rememberDirectHandler(nodeId, eventName, cond);
             if (targetState) {
                 rawTransitions.push({
                     sourceNodeId: nodeId,
@@ -1932,7 +1958,8 @@ export const parseScxmlFile = async (
     let finalNodes = normalizedImportedNodes;
     let finalEdges = materializeImportedBoundaryTransitions(
         normalizedImportedNodes,
-        newEdges
+        newEdges,
+        handlersByNodeId,
     );
 
     // 5. Automatisches Dagre-Layouting (Dagre nutzt exakt berechnete Maße)
@@ -2017,9 +2044,27 @@ export const parseScxmlFile = async (
         };
     });
 
+    const bindingTypes = new Map();
+    for (const node of finalNodes) {
+        for (const slot of [...(node.data?.inSlots || []), ...(node.data?.outSlots || [])]) {
+            const path = normalizeSlotPath(slot.path);
+            if (!path || !slot.type) continue;
+            const key = JSON.stringify([path, slot.key || ""]);
+            if (!bindingTypes.has(key)) bindingTypes.set(key, slot.type);
+            if (!bindingTypes.has(path)) bindingTypes.set(path, slot.type);
+        }
+    }
     return {
         nodes: finalNodes,
         edges: finalEdges,
+        manualSlots: parsedSlots.filter((slot) => normalizeSlotPath(slot.xpath)).map((slot, index) => {
+            const cleanPath = normalizeSlotPath(slot.xpath);
+            const path = `/${cleanPath}`;
+            return { id: `imported-slot-declaration-${index}`, path, key: slot.key || "", state: slot.state || "",
+                type: bindingTypes.get(JSON.stringify([cleanPath, slot.key || ""])) || bindingTypes.get(cleanPath) || "Unknown",
+                slotKind: slot.inherited ? "inheritSlot" : "slot",
+                inherited: slot.inherited ? { ...slot.inherited, xpath: path } : null };
+        }),
         globalDataModel: globalDataEntries,
         parameterErrors,
     };

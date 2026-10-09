@@ -253,11 +253,13 @@ fn parse_root_datamodel(root: &XmlNode) -> (Vec<DataModelEntryDto>, Vec<SlotDecl
 fn collect_slot_declarations(node: &XmlNode, output: &mut Vec<SlotDeclarationDto>) {
     for child in &node.children {
         if child.local_name() == "slot" || child.local_name() == "inheritSlot" {
-            if let Some(key) = non_empty(child.attr("key")) {
+            let key = child.attr("key").unwrap_or_default().trim().to_string();
+            let xpath = child.attr("xpath").unwrap_or_default().trim().to_string();
+            if !key.is_empty() || (child.local_name() == "slot" && !xpath.is_empty()) {
                 output.push(SlotDeclarationDto {
                     key,
                     state: child.attr("state").unwrap_or_default().trim().to_string(),
-                    xpath: child.attr("xpath").unwrap_or_default().trim().to_string(),
+                    xpath,
                     inherited: child.local_name() == "inheritSlot",
                 });
             }
@@ -499,4 +501,65 @@ fn parse_f64(value: Option<&str>) -> f64 {
     value
         .and_then(|value| value.parse::<f64>().ok())
         .unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_scxml;
+    use crate::core::scxml::serialize_scxml;
+
+    #[test]
+    fn parses_unbound_normal_resources_and_keeps_xml_order_and_duplicates() {
+        let workflow = parse_scxml(
+            r##"<scxml><datamodel><data id="#_SLOTS"><slots>
+            <slot xpath=" /needed "/>
+            <slot key="" state="" xpath="/needed"/>
+            <group><slot key=" Detached " xpath="/key-only"/></group>
+            <slot state=" Root " xpath="/state-only"/>
+            <slot xpath="/"/>
+            <slot key="Model" state="Root" xpath="/model"/>
+            <inheritSlot key="Own" state="Ancestor" xpath="/outer"/>
+        </slots></data></datamodel><state id="Root"/></scxml>"##,
+        )
+        .unwrap();
+        let declarations = serde_json::json!([
+            {"key": "", "state": "", "xpath": "/needed", "inherited": false},
+            {"key": "", "state": "", "xpath": "/needed", "inherited": false},
+            {"key": "Detached", "state": "", "xpath": "/key-only", "inherited": false},
+            {"key": "", "state": "Root", "xpath": "/state-only", "inherited": false},
+            {"key": "", "state": "", "xpath": "/", "inherited": false},
+            {"key": "Model", "state": "Root", "xpath": "/model", "inherited": false},
+            {"key": "Own", "state": "Ancestor", "xpath": "/outer", "inherited": true}
+        ]);
+        assert_eq!(
+            serde_json::to_value(workflow.to_dto().slot_declarations).unwrap(),
+            declarations
+        );
+        let xml = serialize_scxml(&workflow).unwrap();
+        assert_eq!(
+            serde_json::to_value(parse_scxml(&xml).unwrap().to_dto().slot_declarations).unwrap(),
+            declarations
+        );
+    }
+
+    #[test]
+    fn keeps_legacy_key_based_parsing_and_ignores_empty_unbound_paths() {
+        let workflow = parse_scxml(
+            r##"<scxml><datamodel><data id="#_SLOTS"><slots>
+            <slot/>
+            <slot key=" " state="Root" xpath="  "/>
+            <inheritSlot xpath="/not-a-normal-resource"/>
+            <slot key="Legacy" state="Root"/>
+            <inheritSlot key="Own" state="Ancestor"/>
+        </slots></data></datamodel></scxml>"##,
+        )
+        .unwrap();
+        assert_eq!(
+            serde_json::to_value(workflow.to_dto().slot_declarations).unwrap(),
+            serde_json::json!([
+                {"key": "Legacy", "state": "Root", "xpath": "", "inherited": false},
+                {"key": "Own", "state": "Ancestor", "xpath": "", "inherited": true}
+            ])
+        );
+    }
 }

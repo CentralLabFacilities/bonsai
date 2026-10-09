@@ -10,6 +10,10 @@ export function isEditorModalOpen() {
     ));
 }
 
+export function isEditorShortcutBlocked(event) {
+    return isEditorModalOpen() || Boolean(event.target?.closest?.("[data-editor-shortcut-scope]"));
+}
+
 const isTypingTarget = (target) => {
     if (!(target instanceof Element)) return false;
 
@@ -84,7 +88,7 @@ export function useGlobalEditorShortcuts({
 
     useEffect(() => {
         const handleGlobalShortcut = (event) => {
-            if (event.defaultPrevented || isEditorModalOpen()) return;
+            if (event.defaultPrevented || isEditorShortcutBlocked(event)) return;
             const live = liveStateRef.current;
             if (!live) return;
 

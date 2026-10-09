@@ -25,6 +25,48 @@ fn skill_name_candidates(source_skill_name: &str) -> Vec<String> {
     candidates
 }
 
+pub(crate) fn normalize_exit_token<'a>(raw_event: &'a str, source_skill_name: &str) -> &'a str {
+    let event_name = raw_event.trim();
+    let mut candidates = skill_name_candidates(source_skill_name);
+    if let Some((qualified_name, instance)) = source_skill_name.trim().split_once('#') {
+        let simple_name = qualified_name.rsplit('.').next().unwrap_or(qualified_name);
+        candidates.push(format!("{simple_name}#{instance}"));
+    }
+
+    for source_name in candidates {
+        if let Some(suffix) = event_name
+            .strip_prefix(source_name.as_str())
+            .and_then(|suffix| suffix.strip_prefix('.'))
+        {
+            return suffix.trim();
+        }
+    }
+
+    // Validation must not strip a different owner's/instance's qualification,
+    // unlike the permissive legacy transition_exit_token fallback below.
+    event_name
+}
+
+pub(crate) fn event_descriptor_matches(descriptor: &str, event: &str) -> bool {
+    let descriptor = descriptor.trim();
+    let event = event.trim();
+    if descriptor.is_empty() || event.is_empty() {
+        return false;
+    }
+    if descriptor == "*" {
+        return true;
+    }
+
+    // SCXML descriptors match dot-separated token prefixes. A trailing .*
+    // denotes the same namespace, not a character glob or just one subtype.
+    let prefix = descriptor.strip_suffix(".*").unwrap_or(descriptor);
+    !prefix.is_empty()
+        && (event == prefix
+            || event
+                .strip_prefix(prefix)
+                .is_some_and(|suffix| suffix.starts_with('.')))
+}
+
 pub(crate) fn transition_exit_token(raw_event: &str, source_skill_name: &str) -> String {
     let event_name = raw_event.trim();
     if event_name.is_empty() {
@@ -85,12 +127,80 @@ pub(crate) fn scxml_transition_event(exit_token: &str, source_skill_name: &str) 
 
 #[cfg(test)]
 mod tests {
-    use super::{scxml_transition_event, transition_exit_token};
+    use super::{
+        event_descriptor_matches, normalize_exit_token, scxml_transition_event,
+        transition_exit_token,
+    };
+
+    #[test]
+    fn validation_normalization_strips_only_known_owner_qualification() {
+        for descriptor in [
+            "speech.Talk#setup.error.not_found",
+            "speech.Talk.error.not_found",
+            "Talk#setup.error.not_found",
+            "Talk.error.not_found",
+        ] {
+            assert_eq!(
+                normalize_exit_token(descriptor, "speech.Talk#setup"),
+                "error.not_found"
+            );
+        }
+        for descriptor in [
+            "Talk#other.*",
+            "Other.error",
+            "visual-talk.*",
+            "error.not_found",
+        ] {
+            assert_eq!(
+                normalize_exit_token(descriptor, "speech.Talk#setup"),
+                descriptor
+            );
+        }
+        assert_eq!(normalize_exit_token(" Talk.* ", "speech.Talk#setup"), "*");
+        assert_eq!(normalize_exit_token("", "speech.Talk#setup"), "");
+        assert_eq!(normalize_exit_token("Talk.*", ""), "Talk.*");
+        assert_eq!(
+            transition_exit_token("Other.error", "speech.Talk#setup"),
+            "error"
+        );
+    }
+
+    #[test]
+    fn validation_descriptors_match_scxml_token_namespaces() {
+        for (descriptor, event) in [
+            ("*", "fatal"),
+            ("error", "error.not_found"),
+            ("error.*", "error"),
+            ("error.*", "error.not_found.detail"),
+            ("error.not_found", "error.not_found.detail"),
+        ] {
+            assert!(
+                event_descriptor_matches(descriptor, event),
+                "{descriptor} -> {event}"
+            );
+        }
+        for (descriptor, event) in [
+            ("", "success"),
+            ("*", ""),
+            ("error", "errorish"),
+            ("error.*", "fatal"),
+            ("error.not_found", "error"),
+            ("error*", "error.not_found"),
+        ] {
+            assert!(
+                !event_descriptor_matches(descriptor, event),
+                "{descriptor} -> {event}"
+            );
+        }
+    }
 
     #[test]
     fn extracts_exit_tokens_without_losing_subtypes_or_wildcards() {
         assert_eq!(
-            transition_exit_token("SetupPlanningScene.success", "planning.SetupPlanningScene#main"),
+            transition_exit_token(
+                "SetupPlanningScene.success",
+                "planning.SetupPlanningScene#main"
+            ),
             "success"
         );
         assert_eq!(
@@ -98,7 +208,10 @@ mod tests {
             "error.not_grasped"
         );
         assert_eq!(transition_exit_token("Talk.*", "Talk"), "*");
-        assert_eq!(transition_exit_token("success.maybe", "Other"), "success.maybe");
+        assert_eq!(
+            transition_exit_token("success.maybe", "Other"),
+            "success.maybe"
+        );
     }
 
     #[test]

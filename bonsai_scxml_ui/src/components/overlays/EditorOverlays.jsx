@@ -7,6 +7,7 @@ const CreateSlotModal = lazy(() => import("./CreateSlotModal.jsx"));
 const CreateSubMachineModal = lazy(() => import("./CreateSubMachineModal.jsx"));
 const EditorShortcutHelp = lazy(() => import("./EditorShortcutHelp.jsx"));
 const HintPage = lazy(() => import("./HintPage.jsx"));
+const RuntimeCommander = lazy(() => import("./RuntimeCommander.jsx"));
 
 export function CreationDialog({
     children,
@@ -69,6 +70,8 @@ export function CreationDialog({
                 if (event.target === event.currentTarget) cancel();
             }}
             onKeyDown={(event) => {
+                // Portalled dialogs must also isolate window-level canvas shortcuts.
+                event.stopPropagation();
                 if (event.defaultPrevented) return;
                 if (event.key === "Escape") {
                     event.preventDefault();
@@ -194,12 +197,22 @@ export default function EditorOverlays({
     tabPathTooltip,
     condition,
     slots,
+    slotRename = null,
     documentGuard = null,
+    runtimeCommander = null,
 }) {
     const progressPercent = Math.round(Math.max(0, Math.min(1, runtimePreparation?.progress || 0)) * 100);
     const shortcutHelpId = useId();
     const shortcutHelpButtonRef = useRef(null);
     const pasteCancelButtonRef = useRef(null);
+    const renameCancelButtonRef = useRef(null);
+    const renameTitleId = useId();
+    const renameDescriptionId = useId();
+    const affectedBindings = new Map();
+    for (const binding of slotRename?.pending?.plan.bindings || []) {
+        const key = JSON.stringify([binding.nodeId, binding.access]);
+        if (!affectedBindings.has(key)) affectedBindings.set(key, binding);
+    }
 
     return (
         <>
@@ -233,6 +246,7 @@ export default function EditorOverlays({
             )}
 
             <Suspense fallback={null}>
+                {runtimeCommander && <RuntimeCommander {...runtimeCommander} />}
                 {hint.isOpen && <HintPage onClose={hint.onClose} />}
                 {subMachine.pending && (
                     <CreateSubMachineModal
@@ -312,6 +326,44 @@ export default function EditorOverlays({
 
             {documentGuard && (
                 <UnsavedWorkflowDialog key={`${documentGuard.tabId}:${documentGuard.action}`} {...documentGuard} />
+            )}
+
+            {slotRename?.pending && (
+                <CreationDialog
+                    className="slot-create-modal-overlay"
+                    labelledBy={renameTitleId}
+                    describedBy={renameDescriptionId}
+                    onCancel={slotRename.onCancel}
+                    initialFocusRef={renameCancelButtonRef}
+                >
+                    <div className="slot-create-modal slot-rename-dialog">
+                        <div className="slot-create-modal-header">
+                            <h3 id={renameTitleId}>Rename Parent Slot</h3>
+                        </div>
+                        <p id={renameDescriptionId}>
+                            Connect <strong>{slotRename.pending.childLabel}</strong> by renaming the parent slot
+                            {" "}<code>/{slotRename.pending.plan.oldPath}</code> to the child's fixed path
+                            {" "}<code>/{slotRename.pending.plan.newPath}</code>?
+                        </p>
+                        <p>The sourced child <code>{slotRename.pending.childSource}</code> will not be changed.</p>
+                        <p>Affected parent bindings:</p>
+                        <ul className="slot-rename-affected">
+                            {[...affectedBindings].map(([key, binding]) => (
+                                <li key={key}>
+                                    {binding.nodeLabel}{" "}
+                                    <span className={`slot-access-badge slot-access-${binding.access}`}>
+                                        {binding.access === "read" ? "Read" : "Write"}
+                                    </span>
+                                </li>
+                            ))}
+                            {affectedBindings.size === 0 && <li>No existing parent skill bindings.</li>}
+                        </ul>
+                        <div className="slot-rename-actions">
+                            <Button ref={renameCancelButtonRef} onClick={slotRename.onCancel}>Cancel</Button>
+                            <Button variant="primary" onClick={slotRename.onConfirm}>Rename and Connect</Button>
+                        </div>
+                    </div>
+                </CreationDialog>
             )}
 
             {paste.pending && (

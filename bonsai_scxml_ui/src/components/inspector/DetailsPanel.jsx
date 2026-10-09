@@ -6,6 +6,7 @@ import {
     CloneReferencesSection,
     ParametersSection,
     SlotsSection,
+    SubMachineSlotsSection,
     StateActionsSection,
 } from "./DetailsTabSections.jsx";
 import { MetadataRow } from "./DetailsPanelPrimitives.jsx";
@@ -26,6 +27,7 @@ function DetailsPanel({
                           availableTargetNodes = [],
                           onSetEventTarget,
                           onUpdateParameter,
+                          getParameterEditSource,
                           onUpdateInSlotPath,
                           onUpdateOutSlotPath,
                           availableSlotPaths = [],
@@ -110,11 +112,9 @@ function DetailsPanel({
     const inspectorTabs = [{ id: "allgemein", label: "Overall" }];
     if (!isEditorClone) {
         if (hasClones) inspectorTabs.push({ id: "clones", label: "References" });
-        if (!isSubMachine && !hidesParameterAndSlots) {
-            inspectorTabs.push(
-                { id: "parameter", label: "Parameter" },
-                { id: "slots", label: "Slots" },
-            );
+        if (!hidesParameterAndSlots) {
+            if (!isSubMachine) inspectorTabs.push({ id: "parameter", label: "Parameter" });
+            inspectorTabs.push({ id: "slots", label: "Slots" });
         }
         if (isNopSkill) inspectorTabs.push({ id: "send", label: "Send" });
         if (!hidesEntryExit) inspectorTabs.push({ id: "actions", label: "Entry / Exit" });
@@ -187,7 +187,7 @@ function DetailsPanel({
             if (parameterIndex >= 0) {
                 inputId = `param-${selectedNode.id}-${parameterIndex}`;
             }
-        } else if (activeTab === "slots" && slotFocusRequest) {
+        } else if (activeTab === "slots" && slotFocusRequest && !isSubMachine) {
             kind = "slots";
             request = slotFocusRequest;
             const slots =
@@ -261,6 +261,7 @@ function DetailsPanel({
         selectedNode.data?.inSlots,
         selectedNode.data?.outSlots,
         editableExitTokens,
+        isSubMachine,
     ]);
 
     useEffect(() => {
@@ -452,6 +453,7 @@ function DetailsPanel({
                         selectedNode={selectedNode}
                         valueVariables={actionValueVariables || globalDataModel || []}
                         onUpdateParameter={onUpdateParameter}
+                        getParameterEditSource={getParameterEditSource}
                     />
                 )}
 
@@ -462,6 +464,10 @@ function DetailsPanel({
                         onUpdateInSlotPath={onUpdateInSlotPath}
                         onUpdateOutSlotPath={onUpdateOutSlotPath}
                     />
+                )}
+
+                {visibleActiveTab === "slots" && isSubMachine && (
+                    <SubMachineSlotsSection selectedNode={selectedNode} onNavigateDescendantSkill={onNavigateDescendantSlotSkill} />
                 )}
 
                 {visibleActiveTab === "send" && isNopSkill && (

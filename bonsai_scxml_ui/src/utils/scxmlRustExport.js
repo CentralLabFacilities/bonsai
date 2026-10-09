@@ -62,10 +62,17 @@ const normalizeEvent = (event) => ({
 });
 
 const normalizeParameter = (parameter) => {
-    const rawExpression = String(parameter?.expr || parameter?.default || "");
+    const explicit = String(parameter?.expr ?? "");
+    const rawExpression = explicit.trim() ? explicit : String(parameter?.default ?? "");
+    const trimmed = rawExpression.trim();
+    const canonicalString = trimmed.length >= 2 &&
+        ((trimmed.startsWith("'") && trimmed.endsWith("'")) ||
+            (trimmed.startsWith('"') && trimmed.endsWith('"')));
     return {
         key: String(parameter?.key || ""),
-        expression: serializeEditorValueForScxml(rawExpression, {
+        // Typed editors already escape canonical quoted literals. Re-escaping
+        // them would change the value on every save/configuration sync.
+        expression: canonicalString ? trimmed : serializeEditorValueForScxml(rawExpression, {
             preserveReferenceMarker: true,
         }),
     };
@@ -218,8 +225,8 @@ export const buildRustStateParameters = (parameters = []) =>
     (Array.isArray(parameters) ? parameters : [])
         .filter(
             (parameter) =>
-                String(parameter?.expr || "").trim() !== "" ||
-                String(parameter?.default || "").trim() !== ""
+                String(parameter?.expr ?? "").trim() !== "" ||
+                String(parameter?.default ?? "").trim() !== ""
         )
         .map(normalizeParameter);
 
@@ -369,8 +376,7 @@ export const getWorkflowDocumentFingerprint = ({
                 xpath: path && !path.startsWith("/") ? `/${path}` : path,
                 inherited,
             };
-        })
-        .filter((slot) => slot.key && slot.state && slot.xpath);
+        });
     const boundNodeSlots = (slots, node) => normalizeBindings(slots
         // Rust only declares slots with a binding; API type/description are not saved.
         .filter((slot) => slot.path.trim())
@@ -380,7 +386,7 @@ export const getWorkflowDocumentFingerprint = ({
                 node.fullSkillName.trim() || node.label.trim() || node.id,
             xpath: (slot.inherited && slot.inheritedXpath.trim()) || slot.path,
             inherited: slot.inherited,
-        })));
+        }))).filter((slot) => slot.key && slot.state && slot.xpath);
 
     return JSON.stringify({
         ...request,
@@ -390,7 +396,8 @@ export const getWorkflowDocumentFingerprint = ({
             inputSlots: boundNodeSlots(node.inputSlots, node),
             outputSlots: boundNodeSlots(node.outputSlots, node),
         })),
-        extraSlotDeclarations: normalizeBindings(request.extraSlotDeclarations),
+        extraSlotDeclarations: normalizeBindings(request.extraSlotDeclarations)
+            .filter((slot) => slot.xpath && (!slot.inherited || (slot.key && slot.state))),
     });
 };
 

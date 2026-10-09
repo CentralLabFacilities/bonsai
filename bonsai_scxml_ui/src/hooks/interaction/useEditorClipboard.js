@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { isDocumentGuardOpen, isEditorModalOpen } from "./useGlobalEditorShortcuts";
+import { isDocumentGuardOpen, isEditorShortcutBlocked } from "./useGlobalEditorShortcuts";
 
 import {
     buildEditorCloneNode,
@@ -571,7 +571,7 @@ export const useEditorClipboard = ({
         requestGraphPasteRef.current = requestPasteClipboard;
 
         const handleGraphClipboardShortcut = (event) => {
-            if (event.defaultPrevented || isEditorModalOpen()) return;
+            if (event.defaultPrevented || isEditorShortcutBlocked(event)) return;
             if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
             if (activeMode === "code" || isTypingTarget(event.target)) return;
 

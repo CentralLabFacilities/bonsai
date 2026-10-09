@@ -491,6 +491,42 @@ test("real Rust workflow hooks preserve committed snapshots and native queue own
             assert.equal(current.workflow.validationRevision, 0);
             assert.equal(frames.size, 0);
         });
+        await t.test("slot commit waits and queued overrides cannot cross document generations", async () => {
+            await mount();
+            await prime();
+            let slots;
+            await React.act(async () => { slots = current.workflow.syncSlotsAfterCommit(); });
+            assert.equal(frames.size, 1);
+            await React.act(async () => {
+                current.workflow.invalidate();
+                current.graph.setNodes([node("first", "New document")]);
+            });
+            await advanceFrame();
+            assert.equal(await slots, null);
+            assert.equal(calls.length, 0);
+            assert.equal(current.workflow.getRevision(), null);
+
+            await mount();
+            await prime();
+            const obsolete = deferred();
+            respond = () => obsolete.promise;
+            let earlier;
+            let override;
+            await React.act(async () => {
+                earlier = current.workflow.applyWorkflowCommand({ type: "renameState", stateId: "first", name: "Old" });
+                override = current.workflow.syncSlotsAfterCommit({ nodes: [node("old")], manualSlots: [{ path: "/old", type: "String" }] });
+            });
+            await React.act(async () => {
+                current.workflow.invalidate();
+                current.graph.setNodes([node("first", "New document")]);
+                obsolete.resolve({ revision: 900 });
+            });
+            assert.equal(await earlier, null);
+            assert.equal(await override, null);
+            assert.equal(calls.length, 1);
+            assert.equal(current.graph.nodes[0].data.label, "New document");
+            assert.equal(frames.size, 0);
+        });
     } finally {
         if (root) await React.act(async () => root.unmount());
         container?.remove();

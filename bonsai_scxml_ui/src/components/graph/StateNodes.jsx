@@ -1,7 +1,8 @@
 import { useEffect, useMemo } from "react";
-import { Handle, Position, useUpdateNodeInternals } from "@xyflow/react";
+import { Position, useUpdateNodeInternals } from "@xyflow/react";
 import { FiExternalLink, FiLink2 } from "react-icons/fi";
 import {
+    ConnectionHandle,
     IncomingTransitionHandle,
     NodeTitle,
     NodeWarning,
@@ -70,35 +71,6 @@ function getParameterEntries(data) {
         });
 }
 
-function getSkillWarning(data, { showEvents, showSlots, terminal }) {
-    const missingSlots =
-        showSlots &&
-        [...(data.inSlots || []), ...(data.outSlots || [])].some(
-            (slot) => !slot.path || String(slot.path).trim() === "",
-        );
-    const missingParams = (data.params || []).some(
-        (parameter) =>
-            parameter.required && !textValue(parameter.expr) && !textValue(parameter.default),
-    );
-    // Validation consumes the per-node projection, never the entire edge store.
-    const outgoing = new Set(data.outgoingTransitionHandles || []);
-    const missingTransitions =
-        showEvents &&
-        !terminal &&
-        !outgoing.has("*") &&
-        (data.events || []).some((event) => event.id !== "*" && !outgoing.has(event.id));
-    const unexposed = (data.unexposedTransitionHandles || []).filter(Boolean);
-    return [
-        missingSlots && "Not every slot has a path",
-        missingParams && "Required parameters are missing",
-        missingTransitions && "Not every transition is set",
-        unexposed.length > 0 &&
-            `Transition uses unexposed exit token${unexposed.length === 1 ? "" : "s"}: ${unexposed.join(", ")}`,
-    ]
-        .filter(Boolean)
-        .join("\n");
-}
-
 function EventPorts({ id, data, eventIds, editable }) {
     return (
         <div className="event-list">
@@ -114,13 +86,15 @@ function EventPorts({ id, data, eventIds, editable }) {
                     >
                         {eventId}
                     </span>
-                    <Handle
+                    <ConnectionHandle
                         id={eventId}
                         type="source"
                         position={Position.Right}
                         className="source-handle"
                         isConnectableStart={true}
                         isConnectableEnd={false}
+                        title={`Outgoing transition: ${eventId}`}
+                        aria-label={`Outgoing transition: ${eventId}`}
                     />
                 </div>
             ))}
@@ -272,12 +246,19 @@ function SlotDock({ id, data, entries, submachine }) {
                             ? String(entry.key || entry.path || "Slot")
                             : entry.key;
                         const access = entry.access === "read" ? "Read" : "Write";
+                        const origin = entry.handleId.startsWith("slot-submachine-")
+                            ? "submachine"
+                            : "skill";
+                        const slotType = String(entry.type || "").trim().toLowerCase();
+                        const isConnectable = origin !== "submachine" ||
+                            Boolean(slotType && slotType !== "unknown");
+                        const handleTitle = `${access} ${label} (${entry.access === "read" ? "into" : "out of"} ${submachine ? "sub-state machine" : "skill"})${isConnectable ? "" : " - slot type metadata unavailable"}`;
                         const dragClass = getSlotHandleDragClass({
                             drag: data.slotConnectionDrag,
                             nodeId: id,
                             handleId: entry.handleId,
                             access: entry.access,
-                            origin: submachine ? "submachine" : "skill",
+                            origin,
                             slotType: entry.type,
                         });
                         return (
@@ -297,14 +278,16 @@ function SlotDock({ id, data, entries, submachine }) {
                                 >
                                     <span className="node-slot-key">{label}</span>
                                 </span>
-                                <Handle
+                                <ConnectionHandle
                                     id={entry.handleId}
-                                    type="source"
+                                    type={entry.access === "read" ? "target" : "source"}
+                                    isConnectable={isConnectable}
                                     isConnectableStart={true}
-                                    isConnectableEnd={false}
+                                    isConnectableEnd={true}
                                     position={Position.Bottom}
                                     className={`source-handle skill-slot-handle slot-skill-${entry.access}-handle ${dragClass}`}
-                                    title={`${access} ${label}`}
+                                    title={handleTitle}
+                                    aria-label={handleTitle}
                                 />
                             </div>
                         );
@@ -425,27 +408,13 @@ function StateCard({ id, data, selected, submachine = false }) {
         width || "auto",
     ].join("|");
     useNodeHandleLayout(id, signature);
-    const warning = useMemo(() => {
-        if (!submachine) return getSkillWarning(data, { showEvents, showSlots, terminal });
-        const unexposed = [
-            ...new Set(
-                (data.unexposedTransitionHandles || [])
-                    .map((handle) => String(handle || "").trim())
-                    .filter(Boolean),
-            ),
-        ];
-        return unexposed.length
-            ? `Transition uses unexposed exit token${unexposed.length === 1 ? "" : "s"}: ${unexposed.join(", ")}`
-            : "";
-    }, [data, submachine, showEvents, showSlots, terminal]);
-
     return (
         <div
             className={`${submachine ? "submachine-node" : "costum-node"} ${data.isInitial ? "initial-node" : ""} ${selected ? "selected-node" : ""} ${isFinalState ? "terminal-final-node" : ""} ${isBehaviorExit ? "behavior-exit-node" : ""} ${hasSlots ? "has-slot-dock" : ""} mode-${mode}`}
             style={width ? { width: `${width}px`, maxWidth: "520px" } : undefined}
         >
             <StateActionBadges id={id} data={data} />
-            <NodeWarning title={warning} />
+            <NodeWarning title={data.editorWarningTitle || ""} />
             {showEvents && <IncomingTransitionHandle data={data} reconnect />}
             {submachine ? (
                 <>
@@ -480,7 +449,7 @@ function StateCard({ id, data, selected, submachine = false }) {
                     label={data.label}
                 >
                     {instanceId && (
-                        <span style={{ marginLeft: "4px", color: "#64748b", fontWeight: 600 }}>
+                        <span className="node-instance-id" title={instanceId} style={{ marginLeft: "4px", color: "#64748b", fontWeight: 600 }}>
                             {instanceId}
                         </span>
                     )}

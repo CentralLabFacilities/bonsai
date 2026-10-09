@@ -85,7 +85,7 @@ export function useEditorLibraryItems({
                     edges: parsed.edges,
                     slotNodes: [],
                     slotEdges: [],
-                    manualSlots: [],
+                    manualSlots: parsed.manualSlots || [],
                     parentTabId: null,
                     selectedNodeId: null,
                     viewport: null,
@@ -99,7 +99,7 @@ export function useEditorLibraryItems({
                 });
                 checkSlotConnection(
                     parsedNodes,
-                    [],
+                    parsed.manualSlots || [],
                     parsed.editorSlotNodes || []
                 );
             } catch (error) {

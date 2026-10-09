@@ -141,13 +141,14 @@ fn render_root_datamodel(workflow: &Workflow, output: &mut String) {
             } else {
                 "slot"
             };
-            output.push_str(&format!(
-                "                <{} key=\"{}\" state=\"{}\" xpath=\"{}\"/>\n",
-                tag,
-                escape_attr(&slot.key),
-                escape_attr(&slot.state),
-                escape_attr(&slot.xpath)
-            ));
+            output.push_str(&format!("                <{}", tag));
+            if slot.inherited || !slot.key.is_empty() {
+                output.push_str(&format!(" key=\"{}\"", escape_attr(&slot.key)));
+            }
+            if slot.inherited || !slot.state.is_empty() {
+                output.push_str(&format!(" state=\"{}\"", escape_attr(&slot.state)));
+            }
+            output.push_str(&format!(" xpath=\"{}\"/>\n", escape_attr(&slot.xpath)));
         }
         output.push_str("            </slots>\n");
         output.push_str("        </data>\n");
@@ -455,6 +456,33 @@ mod tests {
             escape_attr("'de.unibi.citec.clf.bonsai.skills.'"),
             "'de.unibi.citec.clf.bonsai.skills.'"
         );
+    }
+
+    #[test]
+    fn omits_empty_normal_binding_attributes_but_keeps_bound_and_inherited_xml() {
+        let workflow = Workflow::from_dto(
+            serde_json::from_value(serde_json::json!({
+                "slotDeclarations": [
+                    {"key": "", "state": "", "xpath": "/needed"},
+                    {"key": "Key", "state": "", "xpath": "/key-only"},
+                    {"key": "", "state": "Root", "xpath": "/state-only"},
+                    {"key": "Key", "state": "Root", "xpath": "/bound"},
+                    {"key": "Own", "state": "Ancestor", "xpath": "/outer", "inherited": true},
+                    {"key": "Legacy", "state": "", "xpath": "", "inherited": true}
+                ]
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        let xml = serialize_scxml(&workflow).unwrap();
+        assert!(xml.contains(concat!(
+            "                <slot xpath=\"/needed\"/>\n",
+            "                <slot key=\"Key\" xpath=\"/key-only\"/>\n",
+            "                <slot state=\"Root\" xpath=\"/state-only\"/>\n",
+            "                <slot key=\"Key\" state=\"Root\" xpath=\"/bound\"/>\n",
+            "                <inheritSlot key=\"Own\" state=\"Ancestor\" xpath=\"/outer\"/>\n",
+            "                <inheritSlot key=\"Legacy\" state=\"\" xpath=\"\"/>\n"
+        )));
     }
 
     #[test]

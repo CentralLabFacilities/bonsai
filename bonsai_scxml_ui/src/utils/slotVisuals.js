@@ -81,10 +81,12 @@ export function getSlotHandleDragClass({ drag, nodeId, handleId, access, origin,
     }
 
     const destinationSide = origin === "slot"
-        ? drag.origin === "skill"
-        : drag.origin !== origin;
-    const compatible = destinationSide && drag.access === access && Boolean(drag.slotType)
-        && String(slotType || "").trim().toLowerCase() === drag.slotType;
+        ? drag.origin === "skill" || drag.origin === "submachine"
+        : (origin === "skill" || origin === "submachine") && drag.origin === "slot";
+    const type = String(slotType || "").trim().toLowerCase();
+    const dragType = String(drag.slotType || "").trim().toLowerCase();
+    const compatible = destinationSide && drag.access === access && Boolean(type)
+        && type !== "unknown" && type === dragType;
     return compatible ? "slot-handle-compatible" : "slot-handle-incompatible";
 }
 

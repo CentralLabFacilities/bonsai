@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { isEditorModalOpen } from "./useGlobalEditorShortcuts";
+import { isEditorShortcutBlocked } from "./useGlobalEditorShortcuts";
 import { normalizeSlotPath } from "../../utils/editorGraph";
 
 export function useEditorFind({
@@ -41,7 +41,7 @@ export function useEditorFind({
     // native search while the user is actively editing code.
     useEffect(() => {
         const handleEditorFindShortcut = (event) => {
-            if (event.defaultPrevented || isEditorModalOpen()) return;
+            if (event.defaultPrevented || isEditorShortcutBlocked(event)) return;
             if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
             if (String(event.key || "").toLowerCase() !== "f") return;
 

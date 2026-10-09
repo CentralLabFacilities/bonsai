@@ -1,10 +1,17 @@
-import { useCallback } from "react";
+import { useCallback, useLayoutEffect, useRef } from "react";
 import { isSlotEdge } from "../../../utils/editorGraph";
 import { getForwardingNopScxmlStateId } from "../../../utils/editorScxml";
-import {
-    validateParameterList,
-    validateParameterValue,
-} from "../../../utils/valueValidation.js";
+import { validateParameterValue } from "../../../utils/valueValidation.js";
+
+const getParameterNodeIdentity = (node) => [
+    node.type,
+    node.data?.fullSkillName,
+    node.data?.src,
+    node.data?.isSkillClone,
+    node.data?.isStateClone,
+    node.data?.cloneOfNodeId,
+    node.data?.scxmlStateId,
+];
 
 /**
  * Persistent state/skill property mutations used by DetailsPanel.
@@ -15,6 +22,8 @@ import {
  */
 export function useEditorNodeDataActions({
     nodes,
+    getDocumentSnapshot,
+    getActiveDocumentIdentity,
     valueVariables = [],
     setNodes,
     setEdges,
@@ -25,6 +34,28 @@ export function useEditorNodeDataActions({
     syncSlotsAfterCommit,
     updateEventsFromParameters,
 }) {
+    const parameterCallbacksRef = useRef(null);
+    const committedParameterListsRef = useRef(new WeakSet());
+    useLayoutEffect(() => {
+        parameterCallbacksRef.current = {
+            nodes, getDocumentSnapshot, getActiveDocumentIdentity, valueVariables,
+            setNodes, syncStateParameters, updateEventsFromParameters,
+        };
+    });
+
+    const getNodeParameterEditSource = useCallback((nodeId, parameterKey) => {
+        const current = parameterCallbacksRef.current;
+        const liveNodes = current.getDocumentSnapshot?.().nodes || current.nodes;
+        const node = liveNodes.find((candidate) => candidate.id === nodeId);
+        if (!node || !node.data?.params?.some((parameter) => parameter.key === parameterKey)) return null;
+        return {
+            nodeId,
+            parameterKey,
+            nodeIdentity: getParameterNodeIdentity(node),
+            documentIdentity: current.getActiveDocumentIdentity?.() || null,
+        };
+    }, []);
+
     const updateNodeName = useCallback(
         (nodeId, name, commit = false) => {
             if (!nodeId) return;
@@ -174,48 +205,70 @@ export function useEditorNodeDataActions({
     );
 
     const updateNodeParameter = useCallback(
-        (nodeId, parameterIndex, expression, commit = false) => {
-            const sourceNode = nodes.find((node) => node.id === nodeId);
+        (nodeId, parameterIndex, expression, commit = false, source = undefined) => {
+            const current = parameterCallbacksRef.current;
+            const document = current.getDocumentSnapshot?.();
+            const liveNodes = document?.nodes || current.nodes;
+            const sourceNode = liveNodes.find((node) => node.id === nodeId);
             if (!sourceNode) return null;
+            if (source === null || (source && (
+                source.nodeId !== nodeId ||
+                source.documentIdentity !== (current.getActiveDocumentIdentity?.() || null) ||
+                !Array.isArray(source.nodeIdentity) ||
+                !getParameterNodeIdentity(sourceNode).every((value, index) => Object.is(value, source.nodeIdentity[index]))
+            ))) return null;
 
             const parameters = sourceNode.data?.params || [];
-            const parameter = parameters[parameterIndex];
+            // A focused row keeps its key even if a configuration response
+            // reorders the list before blur. Ambiguous duplicate keys cannot
+            // safely identify that row after a reorder.
+            const targetIndex = source
+                ? parameters.findIndex((parameter) => parameter.key === source.parameterKey)
+                : parameterIndex;
+            if (source && parameters.filter((parameter) => parameter.key === source.parameterKey).length !== 1) return null;
+            const parameter = parameters[targetIndex];
             if (!parameter) return null;
+
+            const seen = new Set();
+            const variables = document?.globalDataModel || document?.inheritedGlobalDataModel
+                ? [...(document.inheritedGlobalDataModel || []), ...(document.globalDataModel || [])].filter((variable) => {
+                    if (!variable?.id || seen.has(variable.id)) return false;
+                    seen.add(variable.id);
+                    return true;
+                })
+                : current.valueVariables;
 
             // This action is the write boundary for parameter values. UI
             // editors may validate earlier for feedback, but every semantic
             // write is checked again here before it can reach graph state or
-            // the Rust document.
+            // the Rust document. Carry raw UI input in the transient edit source
+            // so string quoting is applied once, not once per validation layer.
             const validation = validateParameterValue(
                 parameter,
-                expression,
-                valueVariables,
+                source?.inputValue ?? expression,
+                variables,
                 { allowEmpty: true }
             );
             if (!validation.valid) return null;
+            const unchanged = Object.is(parameter.expr, validation.value);
+            if (unchanged && (!commit || committedParameterListsRef.current.has(parameters))) return parameters;
 
-            const nextParameters = parameters.map((currentParameter, index) =>
-                index === parameterIndex
+            const nextParameters = unchanged ? parameters : parameters.map((currentParameter, index) =>
+                index === targetIndex
                     ? { ...currentParameter, expr: validation.value }
                     : currentParameter
             );
 
-            const listValidation = validateParameterList(
-                nextParameters,
-                valueVariables,
-                { allowEmpty: true }
-            );
-            if (!listValidation.valid) return null;
-
-            const normalizedParameters = listValidation.parameters;
-            setNodes((currentNodes) =>
-                currentNodes.map((node) =>
+            // Only this row is being written. Imported invalid siblings must
+            // neither veto a correction/reset nor get silently normalized.
+            if (!unchanged) current.setNodes(
+                liveNodes.map((node) =>
                     node.id === nodeId
                         ? {
                               ...node,
                               data: {
                                   ...(node.data || {}),
-                                  params: normalizedParameters,
+                                  params: nextParameters,
                               },
                           }
                         : node
@@ -223,29 +276,24 @@ export function useEditorNodeDataActions({
             );
 
             if (commit) {
-                void syncStateParameters?.(nodeId, normalizedParameters);
-                void updateEventsFromParameters?.(
+                committedParameterListsRef.current.add(nextParameters);
+                void current.syncStateParameters?.(nodeId, nextParameters);
+                void current.updateEventsFromParameters?.(
                     nodeId,
-                    normalizedParameters
+                    nextParameters
                 );
             } else if (String(validation.value ?? "").trim() === "") {
                 // Optional parameters affect dynamic slot/event definitions as
                 // soon as they are cleared, matching the previous behavior.
-                void updateEventsFromParameters?.(
+                void current.updateEventsFromParameters?.(
                     nodeId,
-                    normalizedParameters
+                    nextParameters
                 );
             }
 
-            return normalizedParameters;
+            return nextParameters;
         },
-        [
-            nodes,
-            setNodes,
-            valueVariables,
-            syncStateParameters,
-            updateEventsFromParameters,
-        ]
+        []
     );
 
     const updateStateActions = useCallback(
@@ -433,6 +481,7 @@ export function useEditorNodeDataActions({
     return {
         updateNodeName,
         updateNodeSource,
+        getNodeParameterEditSource,
         updateNodeParameter,
         updateStateActions,
         updateSendEvents,

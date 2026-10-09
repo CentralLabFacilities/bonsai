@@ -6,7 +6,10 @@ use super::helpers::{
 use super::index::ValidationIndex;
 use super::types::{EditorProblemDto, ValidationNodeDto, ValidationRequestDto};
 
-pub(super) fn validate_behavior_sources(request: &ValidationRequestDto, problems: &mut Vec<EditorProblemDto>) {
+pub(super) fn validate_behavior_sources(
+    request: &ValidationRequestDto,
+    problems: &mut Vec<EditorProblemDto>,
+) {
     let configured: HashSet<String> = request
         .behavior_directory_keys
         .iter()
@@ -14,7 +17,11 @@ pub(super) fn validate_behavior_sources(request: &ValidationRequestDto, problems
         .filter(|key| !key.is_empty())
         .collect();
 
-    for node in request.nodes.iter().filter(|node| node.node_type == "submachine") {
+    for node in request
+        .nodes
+        .iter()
+        .filter(|node| node.node_type == "submachine")
+    {
         let src = node.source.trim();
         if src.is_empty() {
             continue;
@@ -48,7 +55,7 @@ pub(super) fn validate_behavior_exits(
     index: &ValidationIndex<'_>,
     problems: &mut Vec<EditorProblemDto>,
 ) {
-    if !request.is_behavior_workflow {
+    if !request.is_behavior_workflow || index.final_states_disabled {
         return;
     }
 
@@ -58,7 +65,11 @@ pub(super) fn validate_behavior_exits(
         .filter(|node| node.node_type != "slot" && node.node_type != "parallelLane")
         .collect();
 
-    if !state_nodes.is_empty() && !state_nodes.iter().any(|node| is_valid_behavior_terminal(node)) {
+    if !state_nodes.is_empty()
+        && !state_nodes
+            .iter()
+            .any(|node| is_valid_behavior_terminal(node))
+    {
         problems.push(problem(
             "behavior-exit-missing",
             "warning",
@@ -69,7 +80,14 @@ pub(super) fn validate_behavior_exits(
     }
 
     for node in state_nodes {
-        if index.children_by_parent.get(node.id.as_str()).is_some_and(|children| !children.is_empty()) {
+        if index.transition_ignored_node_ids.contains(node.id.as_str()) {
+            continue;
+        }
+        if index
+            .children_by_parent
+            .get(node.id.as_str())
+            .is_some_and(|children| !children.is_empty())
+        {
             continue;
         }
         if is_valid_behavior_terminal(node) || index.sources_with_edges.contains(node.id.as_str()) {

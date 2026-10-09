@@ -1,8 +1,7 @@
-import { memo, useCallback, useEffect, useMemo, useRef } from "react";
+import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef } from "react";
 import {
     FiEye,
     FiEyeOff,
-    FiPlus,
     FiTrash2,
 } from "react-icons/fi";
 import {
@@ -10,6 +9,7 @@ import {
     ConnectionMode,
     Controls,
     ReactFlow,
+    getBezierPath,
 } from "@xyflow/react";
 import { SmartEdgeProvider } from "@tisoap/react-flow-smart-edge";
 import { SkillNode, SubMachineNode, StateReferenceNode } from "../graph/StateNodes.jsx";
@@ -20,7 +20,35 @@ import CodeView from "./CodeView";
 import ModeSwitcher from "./ModeSwitcher.jsx";
 import RuntimeLogPlayer from "../inspector/RuntimeLogPlayer.jsx";
 import CanvasContextMenu from "./CanvasContextMenu.jsx";
-import { getTransitionHighlightColor } from "../../utils/editorGraph";
+import { SLOT_CONNECTION_COLORS, getTransitionHighlightColor, parseSlotConnectionHandle } from "../../utils/editorGraph";
+
+const SlotConnectionPreviewContext = createContext(null);
+
+function EditorConnectionLine({ fromHandle, fromX, fromY, toX, toY, fromPosition, toPosition,
+    toNode, toHandle, connectionLineStyle }) {
+    const drag = useContext(SlotConnectionPreviewContext);
+    const handle = parseSlotConnectionHandle(fromHandle?.id);
+    const reverse = handle && (handle.origin === "slot" ? handle.access === "write" : handle.access === "read");
+    const [path] = getBezierPath(reverse
+        ? { sourceX: toX, sourceY: toY, sourcePosition: toPosition, targetX: fromX, targetY: fromY, targetPosition: fromPosition }
+        : { sourceX: fromX, sourceY: fromY, sourcePosition: fromPosition, targetX: toX, targetY: toY, targetPosition: toPosition });
+    const color = handle ? SLOT_CONNECTION_COLORS[handle.access] : undefined;
+    return (
+        <g style={{ pointerEvents: "none" }}>
+            <path className="react-flow__connection-path" d={path} fill="none"
+                style={{ ...connectionLineStyle, ...(color ? { stroke: color, strokeWidth: 1.7, strokeDasharray: "5 5" } : {}) }} />
+            {drag?.canCreate && !toNode && !toHandle && (
+                <foreignObject x={toX} y={toY} width={190} height={86} aria-hidden="true">
+                    <div className="slot-connection-preview" style={{ "--slot-preview-color": color, pointerEvents: "none" }}>
+                        <div className="slot-connection-preview-path">{drag.previewPath}</div>
+                        <div className="slot-connection-preview-type">{drag.previewType}</div>
+                        <div className="slot-connection-preview-access">{drag.access.toUpperCase()}</div>
+                    </div>
+                </foreignObject>
+            )}
+        </g>
+    );
+}
 
 const nodeTypes = {
     custom: memo(SkillNode),
@@ -95,7 +123,7 @@ export default function EditorCanvas({
     setContextMenu,
     handleSelectAction,
     hasGraphClipboard,
-    setIsCreateSlotModalOpen,
+    slotConnectionDrag,
     isDraggingNode,
     isOverTrash,
     handleNodesChange,
@@ -118,6 +146,10 @@ export default function EditorCanvas({
     handleNodeDrag,
     handleNodeDragStop,
     runtimePlayback,
+    runtimeCommanderOpen = false,
+    runtimeExpansionActive = false,
+    liveExecutionActive = false,
+    onOpenRuntimeCommander,
     onLoadRuntimeLog,
     onRuntimePlayPause,
     onRuntimeRestart,
@@ -405,20 +437,13 @@ export default function EditorCanvas({
                         </button>
                     </div>
 
-                    {(activeMode === "slots" || activeMode === "overview") && (
-                        <button
-                            type="button"
-                            className="create-slot-button-floating"
-                            onClick={() => setIsCreateSlotModalOpen(true)}
-                        >
-                            <FiPlus /> New Slot
-                        </button>
-                    )}
                 </div>
             </div>
 
             <RuntimeLogPlayer
                 runtimePlayback={runtimePlayback}
+                isRunPanelOpen={runtimeCommanderOpen}
+                onOpenRuntimeCommander={onOpenRuntimeCommander}
                 isDraggingNode={isDraggingNode}
                 onLoadRuntimeLog={onLoadRuntimeLog}
                 onRuntimePlayPause={onRuntimePlayPause}
@@ -449,6 +474,7 @@ export default function EditorCanvas({
 
 
             <SmartEdgeProvider nodes={smartRoutingNodes}>
+                <SlotConnectionPreviewContext.Provider value={slotConnectionDrag}>
                 <ReactFlow
                     className={
                         [
@@ -457,7 +483,7 @@ export default function EditorCanvas({
                             !showSlotEdges && "editor-slots-context-only",
                             edgeFocusMode && "editor-edge-focus-mode",
                             nodeFocusMode && "editor-node-focus-mode",
-                            runtimePlayback?.loaded && "runtime-log-focus-mode",
+                            (runtimePlayback?.loaded || liveExecutionActive) && "runtime-log-focus-mode",
                             isDraggingNode && "editor-node-dragging",
                         ]
                             .filter(Boolean)
@@ -470,7 +496,14 @@ export default function EditorCanvas({
                     // This significantly reduces DOM/SVG work on large state
                     // machines without changing the semantic graph in memory.
                     onlyRenderVisibleElements={useViewportCulling}
-                    onNodesChange={handleNodesChange}
+                    onNodesChange={(changes) => {
+                        // Synthetic React Flow measurements of an expanded live
+                        // presentation must never leak into the saved graph.
+                        const edits = runtimeExpansionActive
+                            ? changes.filter((change) => change.type !== "dimensions")
+                            : changes;
+                        if (edits.length) handleNodesChange(edits);
+                    }}
                     onEdgesChange={handleVisibleEdgesChange}
                     onSelectionChange={onSelectionChange}
                     onConnect={onConnect}
@@ -482,6 +515,7 @@ export default function EditorCanvas({
                     edgesReconnectable
                     isValidConnection={isValidConnection}
                     connectionMode={ConnectionMode.Loose}
+                    connectionLineComponent={EditorConnectionLine}
                     onEdgeClick={handleEdgeClick}
                     onEdgeDoubleClick={handleEdgeDoubleClick}
                     onEdgeContextMenu={(event, edge) =>
@@ -524,8 +558,9 @@ export default function EditorCanvas({
                     onMoveEnd={handleViewportMoveEnd}
                 >
                     <Background />
-                    <Controls position={runtimePlayback?.loaded ? "bottom-right" : "bottom-left"} />
+                    <Controls position={runtimePlayback?.loaded || liveExecutionActive ? "bottom-right" : "bottom-left"} />
                 </ReactFlow>
+                </SlotConnectionPreviewContext.Provider>
             </SmartEdgeProvider>
         </>
     );

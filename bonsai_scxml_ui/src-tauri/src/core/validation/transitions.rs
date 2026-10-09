@@ -1,5 +1,7 @@
 use std::collections::HashSet;
 
+use crate::core::transitions::events::{event_descriptor_matches, normalize_exit_token};
+
 use super::helpers::{
     exposes_implicit_fatal, focus_node, is_valid_behavior_terminal, node_label, problem,
 };
@@ -36,6 +38,12 @@ pub(super) fn validate_transitions(
             problems.push(item);
             continue;
         };
+        if index
+            .transition_ignored_node_ids
+            .contains(source.id.as_str())
+        {
+            continue;
+        }
 
         if target.is_none() {
             let mut item = problem(
@@ -57,14 +65,23 @@ pub(super) fn validate_transitions(
         }
 
         let source_handle = edge.source_handle.trim();
-        if !source_handle.is_empty()
-            && source_handle != "*"
-            && !(source_handle == "fatal" && exposes_implicit_fatal(source))
-            && !source
-                .events
-                .iter()
-                .any(|event| event.id == source_handle && !event.synthetic)
-        {
+        let known_source_handle = source_handle.split_whitespace().all(|descriptor| {
+            let descriptor = normalize_exit_token(descriptor, &source.full_skill_name);
+            descriptor == "*"
+                || (exposes_implicit_fatal(source) && event_descriptor_matches(descriptor, "fatal"))
+                || source
+                    .events
+                    .iter()
+                    .filter(|event| !event.synthetic)
+                    .flat_map(|event| event.id.split_whitespace())
+                    .any(|event| {
+                        event_descriptor_matches(
+                            descriptor,
+                            normalize_exit_token(event, &source.full_skill_name),
+                        )
+                    })
+        });
+        if !known_source_handle {
             let mut item = problem(
                 format!("transition-unknown-event-{}", edge.id),
                 "warning",
@@ -85,14 +102,15 @@ pub(super) fn validate_transitions(
     }
 
     for node in &request.nodes {
-        if is_valid_behavior_terminal(node) {
+        if is_valid_behavior_terminal(node)
+            || index.transition_ignored_node_ids.contains(node.id.as_str())
+        {
             continue;
         }
 
         let mut exposed = HashSet::new();
         for event in node.events.iter().filter(|event| !event.synthetic) {
-            let id = event.id.trim();
-            if !id.is_empty() {
+            for id in event.id.split_whitespace() {
                 exposed.insert(id.to_string());
             }
         }
@@ -112,7 +130,14 @@ pub(super) fn validate_transitions(
             if event_id == "*" {
                 continue;
             }
-            if outgoing.is_some_and(|events| events.contains(event_id.as_str())) {
+            if outgoing.is_some_and(|events| {
+                events.iter().any(|descriptor| {
+                    event_descriptor_matches(
+                        descriptor,
+                        normalize_exit_token(&event_id, &node.full_skill_name),
+                    )
+                })
+            }) {
                 continue;
             }
 

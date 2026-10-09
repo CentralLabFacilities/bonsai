@@ -155,7 +155,7 @@ test("shared slot preparation preserves source indices and family-specific inher
     assert.deepEqual(getStateSlotEntries(), []);
 });
 
-test("shared slot drag policy retains access, type, origin and active-handle rules", () => {
+test("shared slot drag policy matches slot-to-consumer access, known types and active handles", () => {
     const endpoint = { nodeId: "node", handleId: "handle", access: "read", slotType: " Pose " };
     const drag = { active: true, nodeId: "other", handleId: "other", origin: "slot", access: "read", slotType: "pose" };
     const classify = (origin, changes = {}) => getSlotHandleDragClass({ ...endpoint, origin, drag: { ...drag, ...changes } });
@@ -168,10 +168,14 @@ test("shared slot drag policy retains access, type, origin and active-handle rul
     assert.equal(classify("skill", { slotType: "" }), "slot-handle-incompatible");
     assert.equal(classify("slot", { origin: "skill" }), "slot-handle-compatible");
     assert.equal(classify("slot"), "slot-handle-incompatible");
-    // Submachine policy intentionally differs from both skill and data-slot ports.
-    assert.equal(classify("submachine", { origin: "skill" }), "slot-handle-compatible");
+    assert.equal(classify("submachine"), "slot-handle-compatible");
+    assert.equal(classify("submachine", { origin: "skill" }), "slot-handle-incompatible");
     assert.equal(classify("submachine", { origin: "submachine" }), "slot-handle-incompatible");
-    assert.equal(classify("slot", { origin: "submachine" }), "slot-handle-incompatible");
+    assert.equal(classify("slot", { origin: "submachine" }), "slot-handle-compatible");
+    assert.equal(classify("skill", { origin: "submachine" }), "slot-handle-incompatible");
+    assert.equal(classify("skill", { slotType: " Pose " }), "slot-handle-compatible");
+    assert.equal(getSlotHandleDragClass({ ...endpoint, origin: "skill", slotType: "Unknown", drag: { ...drag, slotType: "unknown" } }), "slot-handle-incompatible");
+    assert.equal(classify("unknown"), "slot-handle-incompatible");
     assert.equal(classify("slot", { nodeId: "node", handleId: "handle", access: "write", slotType: "" }), "slot-handle-compatible slot-handle-active");
 });
 

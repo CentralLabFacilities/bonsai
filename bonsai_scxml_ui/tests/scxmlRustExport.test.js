@@ -8,9 +8,32 @@ import {
     buildRustEditorStructureSnapshot,
     buildRustParallelLaneMoveContext,
     buildRustSlotsSnapshot,
+    buildRustStateParameters,
     buildRustStateEditorPositions,
     getWorkflowDocumentFingerprint,
 } from "../src/utils/scxmlRustExport.js";
+
+test("parameter snapshots preserve falsy values and canonical quoted literals without re-escaping", () => {
+    const quoted = "'say \\\"hello\\\" and \\\\path'";
+    assert.deepEqual(buildRustStateParameters([
+        { key: "count", expr: 0, default: "7" },
+        { key: "enabled", expr: false, default: "true" },
+        { key: "default-zero", expr: "", default: 0 },
+        { key: "default-false", expr: "", default: false },
+        { key: "quoted", expr: quoted },
+        { key: "text", expr: "hello" },
+        { key: "reference", expr: "@count" },
+        { key: "empty", expr: "", default: "" },
+    ]), [
+        { key: "count", expression: "0" },
+        { key: "enabled", expression: "false" },
+        { key: "default-zero", expression: "0" },
+        { key: "default-false", expression: "false" },
+        { key: "quoted", expression: quoted },
+        { key: "text", expression: "'hello'" },
+        { key: "reference", expression: "@count" },
+    ]);
+});
 
 const makeFixture = () => {
     const nodes = [
@@ -381,6 +404,45 @@ test("document fingerprints normalize API-only declarations, defaults and actual
     inherited.manualSlots[0] = { key: "extra", slotKind: "inheritSlot",
         inherited: { state: "parent", xpath: "/extra" } };
     assert.notEqual(getWorkflowDocumentFingerprint(inherited), fingerprint);
+});
+
+test("document fingerprints include normal path-only resources without weakening binding filters", () => {
+    const empty = getWorkflowDocumentFingerprint();
+    const resources = [
+        { path: " needed " }, { key: " Key ", path: " /key-only " },
+        { state: " Owner ", path: "/state-only" }, { path: "/" },
+        { key: "bound", state: "Owner", path: "/bound" },
+        { key: "inherited", slotKind: "inheritSlot", inherited: { state: "Parent", xpath: " outer " } },
+        { key: "ignored", state: "Owner", path: " " },
+        { slotKind: "inheritSlot", inherited: { state: "Parent", xpath: "/incomplete" } },
+    ];
+    const fingerprint = getWorkflowDocumentFingerprint({ manualSlots: resources });
+    assert.notEqual(fingerprint, empty);
+    assert.deepEqual(JSON.parse(fingerprint).extraSlotDeclarations, [
+        { key: "", state: "", xpath: "/needed", inherited: false },
+        { key: "Key", state: "", xpath: "/key-only", inherited: false },
+        { key: "", state: "Owner", xpath: "/state-only", inherited: false },
+        { key: "", state: "", xpath: "/", inherited: false },
+        { key: "bound", state: "Owner", xpath: "/bound", inherited: false },
+        { key: "inherited", state: "Parent", xpath: "/outer", inherited: true },
+    ]);
+    const normalized = resources.map((slot) => ({ ...slot, type: "String", id: "visual",
+        createdForChildRequirements: ["child"], position: { x: 900, y: 800 } }));
+    normalized[0].path = "/needed";
+    assert.equal(getWorkflowDocumentFingerprint({ manualSlots: normalized }), fingerprint);
+    for (const change of [
+        (slots) => { slots[0].path = "/renamed"; },
+        (slots) => { slots.splice(0, 1); },
+        (slots) => { slots.push({ path: "/new" }); },
+        (slots) => { [slots[0], slots[1]] = [slots[1], slots[0]]; },
+    ]) {
+        const edited = structuredClone(resources);
+        change(edited);
+        assert.notEqual(getWorkflowDocumentFingerprint({ manualSlots: edited }), fingerprint);
+    }
+    assert.deepEqual(JSON.parse(getWorkflowDocumentFingerprint({ nodes: [{ id: "node", type: "custom",
+        data: { inSlots: [{ path: "/unbound" }], outSlots: [{ key: "", path: "/unbound" }] },
+    }] })).nodes[0].inputSlots, []);
 });
 
 test("document fingerprints ignore regenerated boundary helpers and managed border events", () => {

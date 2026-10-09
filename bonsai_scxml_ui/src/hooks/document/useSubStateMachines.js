@@ -244,7 +244,7 @@ export function useSubStateMachines({
         );
     };
 
-    const handleOpenSubMachineImpl = async (srcPath, label) => {
+    const handleOpenSubMachineImpl = async (srcPath, label, options = {}) => {
         if (!srcPath) return;
 
         const originTab = getTabSnapshot(activeTabId);
@@ -414,7 +414,7 @@ export function useSubStateMachines({
                 edges: parsed.edges,
                 slotNodes: [],
                 slotEdges: [],
-                manualSlots: [],
+                manualSlots: parsed.manualSlots || [],
                 parentTabId: originTab.id,
                 selectedNodeId: null,
                 viewport: null,
@@ -425,7 +425,11 @@ export function useSubStateMachines({
             const opened = openTab(newTabObj, {
                 originTabId: originTab.id,
                 originGeneration: originTab.documentGeneration,
-                currentTabPatch,
+                // Runtime navigation must not synchronize metadata into the
+                // editor document. A no-op patch preserves the generation and
+                // fingerprint guard against edits during the async file load.
+                currentTabPatch: options.runtimeNavigation ? () => ({}) : currentTabPatch,
+                expectedFingerprint: options.runtimeNavigation ? originTab.fingerprint : undefined,
                 fit: true,
                 fitOptions: { duration: 300 },
             });

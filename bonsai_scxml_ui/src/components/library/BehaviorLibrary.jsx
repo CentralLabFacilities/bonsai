@@ -16,6 +16,7 @@ import {
 } from "../../tauri-client.js";
 import { areBehaviorLibraryPropsEqual } from "./canvasLibraryProps.js";
 import { Button, InlineFeedback, SegmentedButton, SegmentedControl, TextInput } from "../ui/index.js";
+import { createFuzzyMatcher, createFuzzySearchIndex } from "../../utils/fuzzySearch.js";
 
 const normalizeKey = (value) =>
     String(value || "")
@@ -26,39 +27,45 @@ const normalizeKey = (value) =>
 const errorMessage = (error) =>
     String(error?.message || error || "").trim() || "Unknown error.";
 
-const filterEntries = (entries, searchText) => {
-    const query = searchText.trim().toLowerCase();
+const createBehaviorSearchIndex = (entries, packageKey) => {
+    const byEntry = new Map();
+    const addEntries = (children) => {
+        createFuzzySearchIndex(children, (entry) => [
+            entry.name,
+            entry.name.replace(/\.(xml|scxml)$/i, ""),
+            entry.path,
+            entry.source,
+            packageKey,
+        ]).forEach((indexed) => {
+            byEntry.set(indexed.item, indexed);
+            if (indexed.item.kind === "directory") addEntries(indexed.item.children || []);
+        });
+    };
+    addEntries(entries);
+    return byEntry;
+};
 
-    if (!query) return entries;
-
-    return (entries || [])
-        .map((entry) => {
-            if (entry.kind === "directory") {
-                const children = filterEntries(
-                    entry.children || [],
-                    searchText
-                );
-                const ownMatch = entry.name
-                    .toLowerCase()
-                    .includes(query);
-
-                if (ownMatch || children.length > 0) {
-                    return {
-                        ...entry,
-                        children,
-                    };
-                }
-
-                return null;
-            }
-
-            return entry.name
-                .toLowerCase()
-                .includes(query)
-                ? entry
-                : null;
-        })
-        .filter(Boolean);
+const filterEntries = (entries, searchText, searchIndex) => {
+    if (!searchText.trim()) return entries;
+    const match = createFuzzyMatcher(searchText);
+    const filterLevel = (children) => {
+        const ranked = [];
+        children.forEach((entry, order) => {
+            const ownScore = match(searchIndex.get(entry));
+            const nested = entry.kind === "directory" ? filterLevel(entry.children || []) : null;
+            const score = Math.min(ownScore ?? Infinity, nested?.score ?? Infinity);
+            if (score === Infinity) return;
+            ranked.push({
+                // Files keep their exact source object for open and drag payloads.
+                entry: nested ? { ...entry, children: nested.entries } : entry,
+                score,
+                order,
+            });
+        });
+        ranked.sort((a, b) => a.score - b.score || a.order - b.order);
+        return { entries: ranked.map(({ entry }) => entry), score: ranked[0]?.score ?? null };
+    };
+    return filterLevel(entries).entries;
 };
 
 function BehaviorTreeEntry({
@@ -264,9 +271,13 @@ function BehaviorRoot({
         };
     }, [source, revision]);
 
+    const searchIndex = useMemo(
+        () => createBehaviorSearchIndex(entries, directory.key),
+        [entries, directory.key],
+    );
     const visibleEntries = useMemo(
-        () => filterEntries(entries, searchText),
-        [entries, searchText]
+        () => filterEntries(entries, searchText, searchIndex),
+        [entries, searchText, searchIndex]
     );
 
     const choosePath = async () => {

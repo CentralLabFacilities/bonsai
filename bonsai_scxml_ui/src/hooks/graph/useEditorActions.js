@@ -38,6 +38,8 @@ export function useEditorActions(options) {
 
     const nodeDataActions = useEditorNodeDataActions({
         nodes: options.nodes,
+        getDocumentSnapshot: options.getDocumentSnapshot,
+        getActiveDocumentIdentity: options.getActiveDocumentIdentity,
         valueVariables: options.valueVariables,
         setNodes: options.setNodes,
         setEdges: options.setEdges,

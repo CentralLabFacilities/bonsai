@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo } from "react";
-import { isSlotEdge } from "../../utils/editorGraph";
+import { isSlotDeletionProtected, isSlotEdge } from "../../utils/editorGraph";
 import { getAbsoluteNodePosition } from "../../utils/editorGeometry";
 import {
     isCloneableEditorNode,
@@ -24,6 +24,8 @@ export function useEditorContextMenu({
     edges,
     slotNodes,
     slotEdges,
+    manualSlots,
+    getDocumentSnapshot,
     selectedNodes,
     activeMode,
     behaviorDirectories,
@@ -225,6 +227,10 @@ export function useEditorContextMenu({
                     clickedNode.data?.autoParallelLaneCompound
                 );
                 const isReference = isEditorCloneNode(clickedNode);
+                const live = getDocumentSnapshot?.() || { nodes, slotNodes, manualSlots };
+                const protectedSlot = isSlotDeletionProtected(
+                    live.slotNodes.find((node) => node.id === clickedNode.id) || clickedNode, live
+                );
                 const canSetInitial = Boolean(
                     clickedNode.parentId &&
                         !isReference &&
@@ -299,8 +305,10 @@ export function useEditorContextMenu({
                     canAddState: addStateTargets.length > 0,
                     canAddLane: clickedNode.type === "parallel",
                     canDelete:
+                        !protectedSlot &&
                         !isStructuralHelper &&
                         (!isStructuralLane || siblingLaneCount > 1),
+                    slotDeletionProtected: protectedSlot,
                 });
                 return;
             }
@@ -323,6 +331,8 @@ export function useEditorContextMenu({
             setSelectedNodeId,
             setSlotNodes,
             slotNodes,
+            manualSlots,
+            getDocumentSnapshot,
         ]
     );
 
@@ -402,6 +412,11 @@ export function useEditorContextMenu({
             } else if (type === "add-lane" && contextNodeId) {
                 handleAddLaneToParallel(contextNodeId);
             } else if (type === "delete-node" && contextNodeId) {
+                const live = getDocumentSnapshot?.() || { nodes, slotNodes, manualSlots };
+                if (isSlotDeletionProtected(live.slotNodes.find((node) => node.id === contextNodeId), live)) {
+                    setContextMenu(null);
+                    return;
+                }
                 const removalIds = new Set([contextNodeId]);
                 let foundDescendant = true;
                 while (foundDescendant) {
@@ -615,9 +630,23 @@ export function useEditorContextMenu({
             setRightPanelTab,
             setSelectedNodeId,
             slotEdges,
+            slotNodes,
+            manualSlots,
+            getDocumentSnapshot,
             updatePersistentEdgeControlPoints,
         ]
     );
+
+    useEffect(() => {
+        if (contextMenu?.kind !== "node" || contextMenu.nodeType !== "slot") return;
+        const live = getDocumentSnapshot?.() || { nodes, slotNodes, manualSlots };
+        const node = live.slotNodes.find((node) => node.id === contextMenu.nodeId);
+        const protectedSlot = isSlotDeletionProtected(node, live);
+        const canDelete = Boolean(node && !protectedSlot);
+        if (contextMenu.canDelete === canDelete && contextMenu.slotDeletionProtected === protectedSlot) return;
+        setContextMenu((menu) => menu?.nodeId === contextMenu.nodeId
+            ? { ...menu, canDelete, slotDeletionProtected: protectedSlot } : menu);
+    }, [contextMenu, nodes, slotNodes, manualSlots, getDocumentSnapshot, setContextMenu]);
 
     useEffect(() => {
         const handleClickOutside = () => {

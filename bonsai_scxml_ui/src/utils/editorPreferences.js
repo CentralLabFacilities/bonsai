@@ -1,5 +1,6 @@
 const BEHAVIOR_DIRECTORIES_KEY = "bonsai.behaviorDirectories";
 const PANEL_PREFERENCES_KEY = "bonsai.panelLayout";
+const RUNTIME_CONFIGURATION_KEY = "bonsai.runtimeConfiguration";
 
 export const PANEL_DOCK_BREAKPOINT = 1100;
 export const PANEL_MIN_CANVAS_WIDTH = 420;
@@ -41,6 +42,22 @@ export function loadEdgeVisibility(kind, storage) {
         return (storage ?? window.localStorage).getItem(EDGE_VISIBILITY_KEYS[kind]) !== "false";
     } catch {
         return true;
+    }
+}
+
+export function loadRuntimeConfiguration(storage) {
+    try {
+        return (storage ?? window.localStorage).getItem(RUNTIME_CONFIGURATION_KEY) || "";
+    } catch {
+        return "";
+    }
+}
+
+export function saveRuntimeConfiguration(path, storage) {
+    try {
+        (storage ?? window.localStorage).setItem(RUNTIME_CONFIGURATION_KEY, path);
+    } catch {
+        // The configuration remains usable when optional caching is unavailable.
     }
 }
 

@@ -12,7 +12,7 @@ import {
     ensureSharedEditorInstanceIds,
     normalizeSharedScxmlStateIdentity,
 } from "../../utils/editorScxml";
-import { isEditorModalOpen } from "../interaction/useGlobalEditorShortcuts.js";
+import { isEditorShortcutBlocked } from "../interaction/useGlobalEditorShortcuts.js";
 import { useFeedback } from "../../components/ui/index.js";
 
 const checkpoint = (snapshot) =>
@@ -316,7 +316,7 @@ export function useWorkflowDocument({
                         edges: parsed.edges,
                         slotNodes: [],
                         slotEdges: [],
-                        manualSlots: [],
+                        manualSlots: parsed.manualSlots || [],
                         globalDataModel: parsed.globalDataModel,
                         inheritedGlobalDataModel: [],
                     },
@@ -450,7 +450,7 @@ export function useWorkflowDocument({
 
     useEffect(() => {
         const handleSaveShortcut = (event) => {
-            if (event.defaultPrevented || isEditorModalOpen()) return;
+            if (event.defaultPrevented || isEditorShortcutBlocked(event)) return;
             if (
                 !(event.ctrlKey || event.metaKey) ||
                 event.altKey ||

@@ -1,6 +1,7 @@
 import { useCallback, useLayoutEffect, useMemo, useRef } from "react";
 
 import { getCollapsedTransitionSource } from "../../utils/editorGraph.js";
+import { toggleContainerCollapse as expandRuntimeContainer } from "../../utils/containerState.js";
 import { getLocalDataModelEntries } from "../../utils/editorScxml.js";
 import { useDerivedGraphSnapshot, useSemanticNodeSnapshot } from "./useEditorGraphMaintenance.js";
 
@@ -55,7 +56,8 @@ function useNodeActionForwarders(handlers) {
  * editor mutations and keeps node object identity stable across visual updates.
  */
 export function useEditorPresentationGraph({
-    semanticNodes,
+    semanticNodes: baseSemanticNodes,
+    runtimeExpandedContainerIds = [],
     slotNodes,
     isDraggingNode,
     nodes,
@@ -72,6 +74,31 @@ export function useEditorPresentationGraph({
     handleOpenSubMachine,
     handleToggleContainerCollapse,
 }) {
+    // Clone the *full* editor nodes when revealing containers. The semantic
+    // snapshot intentionally omits positions and dimensions, so expanding it
+    // would produce incorrect layout and still leave React Flow collapsed.
+    const displayNodes = useMemo(() => {
+        if (!runtimeExpandedContainerIds.length) return nodes;
+        let projected = nodes;
+        for (const id of runtimeExpandedContainerIds) {
+            if (projected.some((node) => node.id === id && node.data?.isCollapsed)) {
+                projected = expandRuntimeContainer(projected, id);
+            }
+        }
+        return projected;
+    }, [nodes, runtimeExpandedContainerIds]);
+
+    // Keep semantic analysis tied to the original document, but let the
+    // presentation hierarchy see the temporary expanded flags.
+    const semanticNodes = useMemo(() => {
+        if (!runtimeExpandedContainerIds.length) return baseSemanticNodes;
+        const projectedById = new Map(displayNodes.map((node) => [node.id, node]));
+        return baseSemanticNodes.map((node) => {
+            const projected = projectedById.get(node.id);
+            return projected && projected.data !== node.data
+                ? { ...node, data: projected.data } : node;
+        });
+    }, [baseSemanticNodes, displayNodes, runtimeExpandedContainerIds]);
     const semanticSlotNodes = useSemanticNodeSnapshot(slotNodes, isDraggingNode);
     const { onAddLane, onOpenStateActions, onOpenParameter, onOpenSlot,
         onOpenTransition, onOpenSubMachine, onToggleCollapse } = useNodeActionForwarders({
@@ -358,7 +385,7 @@ export function useEditorPresentationGraph({
     // only the moved node; recreating wrappers for every other node forces
     // unnecessary custom-node renders.
     const injectedGraph = useDerivedGraphSnapshot([
-        nodes,
+        displayNodes,
         outgoingTransitionHandlesByNodeId,
         unexposedTransitionHandlesByNodeId,
         collapsedParallelTransitionHandlesByNodeId,
@@ -378,7 +405,7 @@ export function useEditorPresentationGraph({
         const previousCache = injectedNodeSnapshot.cache;
         const nextCache = new Map();
 
-        const result = nodes.map((n) => {
+        const result = displayNodes.map((n) => {
             const hidden = hiddenNodeIds.has(n.id);
             const outgoingTransitionInfo =
                 outgoingTransitionHandlesByNodeId.get(n.id) || null;
@@ -534,6 +561,8 @@ export function useEditorPresentationGraph({
 
     return {
         semanticSlotNodes,
+        displayNodes,
+        displaySemanticNodes: semanticNodes,
         nodeById,
         childIdsByParent,
         semanticChildrenByParent,

@@ -209,8 +209,70 @@ test("keyboard controls, creation dialogs, and library insertion preserve editor
             "/src/hooks/graph/useContainerCreation.js",
             "/src/hooks/interaction/useEditorClipboard.js", "/src/hooks/interaction/useEditorFind.js",
             "/src/hooks/document/useEditorHistory.js", "/src/hooks/document/useWorkflowDocument.js",
+            "/src/hooks/graph/useEditorFlowChanges.js",
         ].map((path) => server.ssrLoadModule(path)));
-        const [details, slots, submachines, overlays, skills, drop, items, graphState, tabState, shortcuts, chrome, behaviors, feedback, codeView, containers, clipboard, find, history, workflowDocument] = modules;
+        const [details, slots, submachines, overlays, skills, drop, items, graphState, tabState, shortcuts, chrome, behaviors, feedback, codeView, containers, clipboard, find, history, workflowDocument, flowChanges] = modules;
+
+        await t.test("slot clone removal remaps the read SOURCE and write TARGET without clearing bindings", async () => {
+            let current;
+            const skill = { ...node("skill"), data: { ...node("skill").data,
+                inSlots: [{ key: "input", type: "String", path: "/path" }], outSlots: [{ key: "output", type: "String", path: "/path" }] } };
+            const canonical = { id: "slot-path", type: "slot", position: { x: 10, y: 30 }, data: { path: "path", slotType: "String" } };
+            const clone = { ...canonical, id: "slot-clone", data: { ...canonical.data, isSlotClone: true, cloneOfNodeId: canonical.id } };
+            const connections = [
+                { id: "read", source: clone.id, target: skill.id, data: { edgeKind: "slot", access: "read", slotIndex: 0, slotNodeId: clone.id, skillNodeId: skill.id, controlPoints: [{ x: 1, y: 2 }] } },
+                { id: "write", source: skill.id, target: clone.id, data: { edgeKind: "slot", access: "write", slotIndex: 0, slotNodeId: clone.id, skillNodeId: skill.id } },
+            ];
+            function Harness() {
+                const graph = graphState.useEditorGraphState();
+                const { replaceDocument } = graph;
+                const changes = flowChanges.useEditorFlowChanges({ ...graph,
+                    nodeById: new Map(graph.nodes.map((entry) => [entry.id, entry])),
+                    slotNodeIdSet: new Set(graph.slotNodes.map((entry) => entry.id)),
+                    updateNodeInternals: noop, syncRemovedStates: noop, syncTransitionSources: noop });
+                React.useLayoutEffect(() => { replaceDocument({ nodes: [skill], edges: [], slotNodes: [canonical, clone], slotEdges: connections }); }, [replaceDocument]);
+                React.useLayoutEffect(() => { current = { graph, changes }; });
+                return null;
+            }
+            await mount(element(Harness));
+            await React.act(async () => current.changes.handleNodesChange([{ id: clone.id, type: "remove" }]));
+            assert.deepEqual(current.graph.slotNodes.map((entry) => entry.id), [canonical.id]);
+            const read = current.graph.slotEdges.find((edge) => edge.data.access === "read");
+            const write = current.graph.slotEdges.find((edge) => edge.data.access === "write");
+            assert.equal(read.source, canonical.id);
+            assert.equal(read.target, skill.id);
+            assert.equal(write.source, skill.id);
+            assert.equal(write.target, canonical.id);
+            assert.deepEqual(read.data.controlPoints, []);
+            await React.act(async () => current.changes.handleVisibleEdgesChange([{ id: "read", type: "remove" }, { id: "write", type: "remove" }]));
+            assert.equal(current.graph.slotEdges.length, 2);
+            assert.equal(current.graph.nodes[0].data.inSlots[0].path, "/path");
+            assert.equal(current.graph.nodes[0].data.outSlots[0].path, "/path");
+            await React.act(async () => current.changes.handleVisibleEdgesChange([{ id: read.id, type: "remove" }]));
+            assert.equal(current.graph.nodes[0].data.inSlots[0].path, "");
+            assert.equal(current.graph.nodes[0].data.outSlots[0].path, "/path");
+        });
+
+        await t.test("removing a sourced-child display edge cannot edit fixed inherited requirements", async () => {
+            let current;
+            const child = { ...node("child"), type: "submachine", data: { ...node("child").data,
+                inSlots: [{ key: "input", path: "/path" }], inheritedSlots: [{ path: "/path", access: "read", type: "String" }] } };
+            const edge = { id: "child-read", source: "slot-path", target: child.id,
+                data: { edgeKind: "slot", access: "read", skillNodeId: child.id, slotIndex: 0, subMachineInherited: true } };
+            function Harness() {
+                const graph = graphState.useEditorGraphState();
+                const { replaceDocument } = graph;
+                const changes = flowChanges.useEditorFlowChanges({ ...graph, nodeById: new Map(), slotNodeIdSet: new Set(),
+                    updateNodeInternals: noop, syncRemovedStates: noop, syncTransitionSources: noop });
+                React.useLayoutEffect(() => { replaceDocument({ nodes: [child], edges: [], slotNodes: [], slotEdges: [edge] }); }, [replaceDocument]);
+                React.useLayoutEffect(() => { current = { graph, changes }; });
+                return null;
+            }
+            await mount(element(Harness));
+            await React.act(async () => current.changes.handleVisibleEdgesChange([{ id: edge.id, type: "remove" }]));
+            assert.deepEqual(current.graph.nodes[0], child);
+            assert.deepEqual(current.graph.slotEdges, [edge]);
+        });
 
         await t.test("container selection is linear, sibling-scoped, stable on ties and frozen during drag", async () => {
             const a = { ...node("a"), selected: true, parentId: "first" };
@@ -893,10 +955,12 @@ test("keyboard controls, creation dialogs, and library insertion preserve editor
                 fetchSkillData: async (skill) => { insertionCalls.push(["definition", skill]); return definition(); } });
             const insertion = drop.useEditorLibraryDrop({ activeMode, nodes: graph.nodes,
                 flowContainerRef: { current: { getBoundingClientRect: () => ({ left: 100, top: 50, width: 800, height: 600 }) } },
-                getTabSnapshot: tabs.getTabSnapshot, screenToFlowPosition: ({ x, y }) => ({ x: x / 2, y: y / 2 }),
+                getTabSnapshot: tabs.getTabSnapshot, getActiveDocumentIdentity: tabs.getActiveDocumentIdentity,
+                getDocumentSnapshot: graph.getDocumentSnapshot,
+                screenToFlowPosition: ({ x, y }) => ({ x: x / 2, y: y / 2 }),
                 setParallelDropTargetId: noop, setCompoundDropTargetId: noop, createNode: library.createNode,
                 createBehaviorNode: library.createBehaviorNode, checkSlotConnection: noop, getNodes: () => graph.getDocumentSnapshot().nodes,
-                setNodes: graph.setNodes, setSelectedNodeId,
+                setNodes: graph.setNodes, setManualSlots: graph.setManualSlots, syncSlotsAfterCommit: noop, setSelectedNodeId,
                 syncInsertedEditorStatesAfterCommit: (id) => insertionCalls.push(["sync", id]),
             });
             React.useLayoutEffect(() => { current = { graph, tabs, insertion, selected, setActiveMode }; }, [graph, tabs, insertion, selected, setActiveMode]);

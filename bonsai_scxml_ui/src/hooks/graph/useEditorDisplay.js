@@ -16,6 +16,7 @@ import { useDerivedGraphSnapshot } from "./useEditorGraphMaintenance.js";
 const SLOT_EDGE_INACTIVE_COLOR = "#64748b";
 const COMPOUND_ROUTING_GRID_CELL_SIZE = 640;
 const EMPTY_NODES = [];
+const EMPTY_WARNING_TITLES = new Map();
 
 export function projectStructureEdges(previous, edges) {
     const unchanged =
@@ -231,6 +232,7 @@ export function useEditorDisplay({
     parallelDropTargetId,
     compoundDropTargetId,
     problemNodeIds,
+    nodeWarningTitles = EMPTY_WARNING_TITLES,
 }) {
     const routingHandlersRef = useRef({ updatePersistentEdgeControlPoints, onControlPointContextMenu });
     useLayoutEffect(() => {
@@ -1049,10 +1051,11 @@ export function useEditorDisplay({
         () =>
             slotStructureEdges.map((edge) => {
                 const access = edge.data?.access === "write" ? "write" : "read";
-                let collapsedSourceId = null;
+                const consumerId = access === "read" ? edge.target : edge.source;
+                let collapsedConsumerId = null;
 
-                if (hiddenNodeIds.has(edge.source)) {
-                    let current = transitionNodeById.get(edge.source);
+                if (hiddenNodeIds.has(consumerId)) {
+                    let current = transitionNodeById.get(consumerId);
                     const visited = new Set();
 
                     while (current?.parentId && !visited.has(current.parentId)) {
@@ -1065,7 +1068,7 @@ export function useEditorDisplay({
                             parent.data?.isCollapsed &&
                             !hiddenNodeIds.has(parent.id)
                         ) {
-                            collapsedSourceId = parent.id;
+                            collapsedConsumerId = parent.id;
                         }
 
                         current = parent;
@@ -1074,20 +1077,24 @@ export function useEditorDisplay({
 
                 return {
                     ...edge,
-                    source: collapsedSourceId || edge.source,
-                    sourceHandle: collapsedSourceId
+                    source: access === "write" ? collapsedConsumerId || edge.source : edge.source,
+                    target: access === "read" ? collapsedConsumerId || edge.target : edge.target,
+                    sourceHandle: access === "write" && collapsedConsumerId
                         ? "collapsed-slot-source"
                         : edge.sourceHandle,
+                    targetHandle: access === "read" && collapsedConsumerId
+                        ? "collapsed-slot-source"
+                        : edge.targetHandle,
                     type: "smartTransition",
                     // Slot connections are semantically owned by the skill
-                    // handle. Reconnecting them may only move the slot end;
-                    // allowing the source end to be re-dragged would leave the
-                    // edge metadata pointing at the old skill.
-                    reconnectable: "target",
+                    // handle. Reconnecting them may only move the slot end.
+                    reconnectable: access === "read" ? "source" : "target",
                     data: {
                         ...(edge.data || {}),
-                        ...(collapsedSourceId
-                            ? { collapsedSlotOriginalSource: edge.source }
+                        ...(collapsedConsumerId
+                            ? access === "read"
+                                ? { collapsedSlotOriginalTarget: consumerId }
+                                : { collapsedSlotOriginalSource: consumerId }
                             : {}),
                         access,
                         // During a node drag, obstacle routing is deliberately
@@ -1798,25 +1805,40 @@ export function useEditorDisplay({
         cloneGroupByNodeId,
     ]);
 
-    const problemVisibleNodes = useMemo(() => {
-        if (!problemNodeIds?.size) return baseVisibleNodes;
-
-        return baseVisibleNodes.map((node) => {
-            if (!problemNodeIds.has(node.id)) return node;
-
-            const classNames = String(node.className || "")
-                .split(/\s+/)
-                .filter(Boolean);
-            if (!classNames.includes("editor-node-problem")) {
-                classNames.push("editor-node-problem");
+    // Diagnostics are UI-only. Reuse each source node unless its own warning or
+    // Variables styling changed, before building the cached hover variants.
+    const problemNodeSnapshot = useDerivedGraphSnapshot([
+        baseVisibleNodes,
+        problemNodeIds,
+        nodeWarningTitles,
+    ], (snapshot = { cache: new Map(), nodes: [] }) => {
+        const cache = new Map();
+        const projected = baseVisibleNodes.map((node) => {
+            const warningTitle = nodeWarningTitles.get(node.id) || "";
+            const hasProblem = Boolean(problemNodeIds?.has(node.id));
+            const cached = snapshot.cache.get(node.id);
+            if (cached?.sourceNode === node && cached.warningTitle === warningTitle &&
+                cached.hasProblem === hasProblem) {
+                cache.set(node.id, cached);
+                return cached.value;
             }
 
-            return {
-                ...node,
-                className: classNames.join(" "),
-            };
+            let value = node;
+            if ((node.data?.editorWarningTitle || "") !== warningTitle) {
+                value = { ...value, data: { ...node.data, editorWarningTitle: warningTitle } };
+            }
+            const classNames = String(node.className || "").split(/\s+/).filter(Boolean);
+            if (hasProblem && !classNames.includes("editor-node-problem")) {
+                value = { ...value, className: [...classNames, "editor-node-problem"].join(" ") };
+            }
+            cache.set(node.id, { sourceNode: node, warningTitle, hasProblem, value });
+            return value;
         });
-    }, [baseVisibleNodes, problemNodeIds]);
+        if (projected.length === snapshot.nodes.length &&
+            projected.every((node, index) => node === snapshot.nodes[index])) return snapshot;
+        return { cache, nodes: projected };
+    });
+    const problemVisibleNodes = problemNodeSnapshot.nodes;
 
     const nodeIndexById = useMemo(
         () =>

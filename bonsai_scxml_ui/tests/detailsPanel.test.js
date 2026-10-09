@@ -278,12 +278,14 @@ test("isolated inspector editors preserve draft, focus, commit and render contra
             server: { middlewareMode: true, hmr: false, ws: false, watch: { ignored: () => true } },
             optimizeDeps: { noDiscovery: true, include: [] },
         });
-        const [lanes, slots, general, nop, details, inspector] = await Promise.all([
+        const [lanes, slots, general, nop, details, inspector, libraryView, behaviors, detailsController] = await Promise.all([
             "/src/components/inspector/ParallelLaneEditor.jsx",
             "/src/components/inspector/SlotDetailsPanel.jsx",
             "/src/components/inspector/GeneralDetailsSection.jsx",
             "/src/components/inspector/NopSendEditor.jsx",
             "/src/components/inspector/DetailsPanel.jsx", "/src/components/inspector/EditorInspectorPanel.jsx",
+            "/src/hooks/library/useSkillLibraryView.js", "/src/components/library/BehaviorLibrary.jsx",
+            "/src/hooks/editor/useEditorDetailsController.js",
         ].map((path) => server.ssrLoadModule(path)));
 
         await t.test("lane Escape cancels synchronous blur while Enter commits once and external renames resync", async () => {
@@ -401,6 +403,247 @@ test("isolated inspector editors preserve draft, focus, commit and render contra
             await type(input, "other-node-draft");
             await render(element(slots.SkillSlotSection, { ...props, nodeId: "other" }));
             assert.equal(container.querySelector("input").value, "");
+        });
+
+        await t.test("submachine Slots exposes fixed child requirements read-only, not its normal in/out controls", async () => {
+            const writes = [];
+            const navigations = [];
+            const inheritedSlots = Object.freeze([
+                Object.freeze({ key: "child-input", path: "parent/input", type: "Integer", access: "read", description: "Required child input",
+                    state: "child.Work", subMachinePath: Object.freeze(["Nested", "Deep"]),
+                    skillAccesses: Object.freeze([
+                        Object.freeze({ skillNodeId: "child-skill", skillName: "skills.Work", description: "Consumes the input" }),
+                        Object.freeze({ skillNodeId: "another-instance", skillName: "skills.Work" }),
+                        Object.freeze({ skillName: "skills.Transform" }),
+                    ]) }),
+                Object.freeze({ key: "child-output", path: "parent/output", type: "String", access: "write", skillAccesses: Object.freeze([
+                    Object.freeze({ skillName: "skills.Output", description: "Writes the result" }),
+                    Object.freeze({ skillName: "skills.Output", description: "Writes the result" }),
+                ]) }),
+                Object.freeze({ xpath: "parent/unresolved", path: "parent/unresolved", type: "Unknown", access: null }),
+            ]);
+            const selectedNode = Object.freeze({ id: "child", type: "submachine", data: Object.freeze({ label: "Child", src: "${ROOT}/Child.scxml", inheritedSlots,
+                inSlots: Object.freeze([Object.freeze({ key: "not-a-child-requirement", path: "/own", type: "Integer" })]),
+                outSlots: Object.freeze([Object.freeze({ key: "also-not-a-child-requirement", path: "/own-output", type: "String" })]),
+            }) });
+            const props = { selectedNode, activeTab: "slots", setActiveTab: noop,
+                onNavigateDescendantSlotSkill: (access) => navigations.push(access),
+                onUpdateInSlotPath: (...args) => writes.push(["in", ...args]), onUpdateOutSlotPath: (...args) => writes.push(["out", ...args]) };
+            await mount(element(details.default, props));
+            const tab = container.querySelector("#details-tab-slots");
+            assert.ok(tab);
+            assert.equal(tab.getAttribute("aria-selected"), "true");
+            assert.equal(container.querySelector("#details-tab-parameter"), null);
+            const panel = container.querySelector('[role="tabpanel"]');
+            assert.equal(panel.getAttribute("aria-labelledby"), "details-tab-slots");
+            assert.equal(panel.querySelectorAll('section[aria-label^="Child slot requirement"]').length, 3);
+            assert.match(panel.textContent, /Child Slot Requirements/);
+            assert.equal(panel.querySelector(".compact-slot-name").getAttribute("title"), "parent/input");
+            assert.match(panel.textContent, /Read.*Write/s);
+            assert.match(panel.textContent, /Integer/);
+            assert.match(panel.textContent, /skills.Work/);
+            assert.match(panel.textContent, /skills.Transform/);
+            assert.match(panel.textContent, /Required child input/);
+            assert.match(panel.textContent, /Writes the result/);
+            const cards = [...panel.querySelectorAll('section[aria-label^="Child slot requirement"]')];
+            assert.equal(panel.querySelector(".metadata-label"), null);
+            const references = [...cards[0].querySelectorAll('[role="button"]')];
+            assert.equal(references.length, 3);
+            assert.ok(references.every((reference) => reference.querySelector(".slot-access-read").textContent === "Read"));
+            assert.equal(cards[1].querySelectorAll('[role="button"]').length, 1);
+            assert.equal(cards[1].querySelector(".slot-access-write").textContent, "Write");
+            await click(references[0]);
+            await key(references[1], "Enter");
+            await key(references[2], " ");
+            await click(cards[1].querySelector('[role="button"]'));
+            assert.deepEqual(navigations.map(({ nodeId, skillName, access }) => ({ nodeId, skillName, access })), [
+                { nodeId: "child-skill", skillName: "skills.Work", access: "read" },
+                { nodeId: "another-instance", skillName: "skills.Work", access: "read" },
+                { nodeId: null, skillName: "skills.Transform", access: "read" },
+                { nodeId: null, skillName: "skills.Output", access: "write" },
+            ]);
+            assert.deepEqual(navigations[0].subMachinePath, ["Child", "Nested", "Deep"]);
+            assert.equal(navigations[0].childNodeId, "child");
+            assert.equal(navigations[0].slotPath, "parent/input");
+            assert.equal(navigations[0].key, "child-input");
+            assert.deepEqual(navigations[3].subMachinePath, ["Child"]);
+            assert.equal(cards[0].querySelectorAll(".parameter-description").length, 1);
+            assert.equal(cards[1].querySelectorAll(".parameter-description").length, 1);
+            assert.equal(cards[2].querySelectorAll(".parameter-description").length, 0);
+            for (const removed of ["Skill access", "Child node", "Child source", "Required parent path", "Nested machine", "child-skill", "Consumes the input", "Read-only requirement"]) {
+                assert.equal(panel.textContent.includes(removed), false, removed);
+            }
+            assert.match(panel.textContent, /Access unresolved/);
+            assert.match(panel.textContent, /Skill not resolved/);
+            assert.match(panel.textContent, /fixed by the child state machine/);
+            assert.equal(panel.textContent.includes("not-a-child-requirement"), false);
+            assert.equal(panel.querySelector("input,select,textarea,button,[role=combobox]"), null);
+            assert.deepEqual(writes, []);
+            assert.equal(selectedNode.data.inheritedSlots, inheritedSlots);
+
+            await render(element(details.default, { ...props, selectedNode: { ...selectedNode, data: { ...selectedNode.data, inheritedSlots: [] } } }));
+            assert.match(panel.textContent, /No inherited slot requirements are declared/);
+            assert.equal(panel.textContent.includes("unavailable"), false);
+            await render(element(details.default, { ...props, selectedNode: { ...selectedNode, data: { ...selectedNode.data, inheritedSlots: undefined } } }));
+            assert.match(panel.textContent, /Child slot metadata unavailable/);
+            assert.match(panel.textContent, /does not mean the child has no requirements/);
+            assert.equal(panel.textContent.includes("No inherited slot requirements"), false);
+
+            await render(element(details.default, { ...props, selectedNode: skill("normal", { inSlots: [{ key: "own-input", type: "Integer", path: "/own" }], inheritedSlots }) }));
+            const input = container.querySelector("#in-slot-normal-0");
+            assert.ok(input);
+            assert.equal(input.value, "/own");
+            assert.equal(container.textContent.includes("child-input"), false);
+            await focus(input);
+            await type(input, "/normal-edit");
+            await key(input, "Enter");
+            assert.deepEqual(writes, [["in", 0, "/normal-edit", true]]);
+            await render(element(details.default, { ...props, selectedNode: { id: "own-slot", type: "slot", data: { path: "/own", slotType: "Integer" } } }));
+            assert.ok(container.querySelector(".slot-inherit-checkbox"));
+            assert.ok(container.querySelector("#slot-detail-path-own-slot"));
+        });
+
+        await t.test("child slot reference cards open direct and nested machines and focus the concrete skill", async () => {
+            for (const nested of [false, true]) {
+                const opened = [];
+                const selected = [];
+                const centered = [];
+                const target = { ...skill("consumer", { fullSkillName: "skills.Work" }), position: { x: 10, y: 20 }, width: 240, height: 100 };
+                const other = skill("other-consumer", { fullSkillName: "skills.Work" });
+                const hierarchy = nested ? ["Nested", "Deep"] : [];
+                const child = { id: "child", type: "submachine", data: { label: "Child", src: "Child.scxml",
+                    inheritedSlots: [{ key: "input", path: "/input", type: "String", access: "read", subMachinePath: hierarchy,
+                        skillAccesses: [{ skillName: "skills.Work", skillNodeId: target.id }] }] } };
+                let currentNodes = [child];
+                let pending;
+                function Harness() {
+                    const controller = detailsController.useEditorDetailsController({ selectedRawNode: child,
+                        semanticNodes: [child], tabs: [], activeTabId: "parent", availableDataModelParameters: [],
+                        selectedContainerOutgoingTransitions: [], moveContainerTransition: noop, getNodes: () => currentNodes,
+                        setNodes: (update) => { currentNodes = typeof update === "function" ? update(currentNodes) : update; },
+                        updateNodeInternals: noop, handleToggleContainerCollapse: noop, clearAllEdgeSelection: noop,
+                        selectEditorNode: (id, options) => selected.push({ id, options }), fitView: noop,
+                        setCenter: (...args) => centered.push(args), setHoveredSlotAccessNodeId: noop, switchTab: noop,
+                        setRightPanelTab: noop, updateSlotPath: noop, updateSlotInherited: noop,
+                        handleOpenSubMachine: async (src, label) => {
+                            opened.push({ src, label });
+                            currentNodes = nested && src !== "Deep.scxml"
+                                ? [{ id: src === "Child.scxml" ? "nested" : "deep", type: "submachine",
+                                    data: { label: src === "Child.scxml" ? "Nested" : "Deep", src: src === "Child.scxml" ? "Nested.scxml" : "Deep.scxml" } }]
+                                : [other, target];
+                        } });
+                    return element(details.default, { selectedNode: child, activeTab: "slots", setActiveTab: noop,
+                        onNavigateDescendantSlotSkill: (access) => { pending = controller.handleNavigateDescendantSlotSkill(access); } });
+                }
+                await mount(element(Harness));
+                const card = container.querySelector('.slot-access-skill-card[role="button"]');
+                assert.ok(card);
+                await React.act(async () => {
+                    if (nested) card.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+                    else card.click();
+                    await pending;
+                });
+                assert.deepEqual(opened.map(({ src }) => src), nested ? ["Child.scxml", "Nested.scxml", "Deep.scxml"] : ["Child.scxml"]);
+                assert.equal(selected.length, 1);
+                assert.equal(selected[0].id, target.id);
+                assert.deepEqual(centered, [[130, 70, { zoom: 1, duration: 300 }]]);
+            }
+        });
+
+        await t.test("skill library fuzzy results retain category/package browsing, rank once and keep source identifiers", async () => {
+            const skills = Object.freeze(["org.skills.nav.wrok", "org.skills.nav.wo_r_k", "org.skills.person.homework", "org.skills.nav.worker", "org.skills.nav.work", "org.skills.nav.inner.Other", "org.skills.Direct"]);
+            let view;
+            function Harness(props) {
+                view = libraryView.useSkillLibraryView(props);
+                return null;
+            }
+            let props = { skills, selectedPackage: null, selectedSubPackage: null, activeFilter: "Everything", searchText: "work" };
+            await mount(element(Harness, props));
+            assert.deepEqual(view.searchedSkills, [skills[4], skills[3], skills[2], skills[1], skills[0]]);
+            assert.deepEqual(view.filteredSkills, view.searchedSkills);
+            assert.deepEqual(view.packages, ["nav", "person"]);
+            assert.deepEqual(view.directSkills, [skills[6]]);
+            const ranked = view.searchedSkills;
+            props = { ...props, activeFilter: "nav", selectedPackage: "nav" };
+            await render(element(Harness, props));
+            assert.equal(view.searchedSkills, ranked, "package/category changes reuse the search ranking");
+            assert.deepEqual(view.packageSkills, [skills[4], skills[3], skills[1], skills[0]]);
+            assert.deepEqual(view.filteredSkills, view.packageSkills);
+            assert.deepEqual(view.subPackages, ["inner"]);
+            await render(element(Harness, { ...props, searchText: "wrk" }));
+            assert.ok(view.packageSkills.includes(skills[4]));
+            await render(element(Harness, { ...props, searchText: "wrok" }));
+            assert.equal(view.packageSkills[0], skills[0]);
+            assert.ok(view.packageSkills.includes(skills[4]));
+            await render(element(Harness, { ...props, searchText: "" }));
+            assert.deepEqual(view.packageSkills, [skills[0], skills[1], skills[3], skills[4]]);
+            await render(element(Harness, { ...props, selectedSubPackage: "inner", searchText: "othr" }));
+            assert.deepEqual(view.packageSkills, [skills[5]]);
+            assert.deepEqual(view.packages, ["nav", "person"]);
+        });
+
+        await t.test("behavior fuzzy trees rank matches while preserving ancestors, source payloads and cached search state", async (context) => {
+            context.mock.method(console, "error", noop);
+            const file = (name, folder = "") => Object.freeze({ kind: "file", name: `${name}.scxml`, path: `/robot/${folder}${name}.scxml`, source: `\${ROOT}/${folder}${name}.scxml` });
+            const exact = file("work", "parent-a/deep/");
+            const prefix = file("worker", "parent-a/deep/");
+            const contiguous = file("homework", "parent-a/deep/");
+            const subsequence = file("wo-r-k", "parent-z/");
+            const typo = file("wrok");
+            const directory = (name, path, children) => Object.freeze({ kind: "directory", name, path, children: Object.freeze(children) });
+            const entries = Object.freeze([typo, directory("Z parent", "/robot/parent-z", [subsequence]),
+                directory("A parent", "/robot/parent-a", [directory("Deep", "/robot/parent-a/deep", [contiguous, prefix, exact])])]);
+            let failure = null;
+            let listings = 0;
+            const previousNative = window.__TAURI_INTERNALS__;
+            window.__TAURI_INTERNALS__ = { invoke: async (command) => {
+                assert.equal(command, "list_behavior_directory");
+                listings += 1;
+                if (failure) throw failure;
+                return entries;
+            } };
+            const opened = [];
+            const rows = () => [...container.querySelectorAll(".behavior-file-row")].map((row) => row.textContent.trim());
+            try {
+                await mount(element(behaviors.default, { directories: [{ key: "ROOT", path: "/robot" }], onDirectoriesChange: noop, onOpenBehavior: (entry) => opened.push(entry) }));
+                for (const name of ["Z parent", "A parent", "Deep"]) {
+                    await click([...container.querySelectorAll(".behavior-directory-row")].find((row) => row.textContent.trim() === name));
+                }
+                assert.deepEqual(rows(), ["wrok", "wo-r-k", "homework", "worker", "work"]);
+                const search = container.querySelector('[aria-label="Search behaviors"]');
+                await type(search, "work");
+                assert.deepEqual(rows(), ["work", "worker", "homework", "wo-r-k", "wrok"]);
+                assert.deepEqual([...container.querySelectorAll(".behavior-directory-row")].map((row) => row.textContent.trim()), ["A parent", "Deep", "Z parent"]);
+                const exactRow = container.querySelector(".behavior-file-row");
+                const payloads = [];
+                const drag = new window.Event("dragstart", { bubbles: true });
+                Object.defineProperty(drag, "dataTransfer", { value: { setData: (...args) => payloads.push(args) } });
+                await React.act(async () => exactRow.dispatchEvent(drag));
+                assert.deepEqual(payloads, [["behavior", JSON.stringify(exact)]]);
+                await React.act(async () => exactRow.dispatchEvent(new window.MouseEvent("dblclick", { bubbles: true })));
+                assert.equal(opened[0], exact);
+                const loadsBeforeSearch = listings;
+                await type(search, "ROOT wrk");
+                assert.ok(rows().includes("work"));
+                await type(search, "wrok");
+                assert.deepEqual(rows(), ["wrok", "work"]);
+                assert.equal(listings, loadsBeforeSearch);
+                failure = "Read permission denied";
+                await click(container.querySelector('[title="Refresh"]'));
+                assert.match(container.querySelector('[role="alert"]').textContent, /Read permission denied/);
+                assert.ok(container.querySelector(".behavior-library-cached"));
+                assert.deepEqual(rows(), ["wrok", "work"]);
+                assert.equal(search.value, "wrok");
+                await type(search, "not-a-matching-behavior");
+                assert.match(container.textContent, /No behaviors match your search/);
+                await type(search, "");
+                assert.deepEqual(rows(), ["wrok", "wo-r-k", "homework", "worker", "work"]);
+                assert.equal(opened[0].source, "${ROOT}/parent-a/deep/work.scxml");
+                assert.equal(entries[2].children[0].children[0], contiguous);
+            } finally {
+                if (previousNative) window.__TAURI_INTERNALS__ = previousNative;
+                else delete window.__TAURI_INTERNALS__;
+            }
         });
 
         await t.test("target typing is row-local, external targets/names resync, and blur/Escape cancel lookup drafts", async () => {

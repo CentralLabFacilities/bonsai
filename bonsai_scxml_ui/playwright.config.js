@@ -20,7 +20,7 @@ export default defineConfig({
     },
     expect: { toHaveScreenshot: { animations: "disabled", maxDiffPixelRatio: 0.001 } },
     webServer: {
-        command: "npm run preview -- --host 127.0.0.1 --port 1421 --strictPort",
+        command: "bun run --bun preview -- --host 127.0.0.1 --port 1421 --strictPort",
         url: "http://127.0.0.1:1421",
         reuseExistingServer: false,
         timeout: 30000,

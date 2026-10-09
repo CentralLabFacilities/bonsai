@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { createFuzzySearchIndex, rankFuzzySearch } from "../../utils/fuzzySearch.js";
 
 export function useSkillLibraryView({
     skills,
@@ -7,6 +8,12 @@ export function useSkillLibraryView({
     searchText,
     activeFilter,
 }) {
+    const searchIndex = useMemo(() => createFuzzySearchIndex(skills), [skills]);
+    const searchedSkills = useMemo(
+        () => rankFuzzySearch(searchIndex, searchText),
+        [searchIndex, searchText],
+    );
+
     return useMemo(() => {
         const packages = [];
         const directSkills = [];
@@ -57,34 +64,24 @@ export function useSkillLibraryView({
             });
         }
 
-        const normalizedSearch = searchText.toLowerCase();
-        packageSkills = packageSkills.filter((skill) =>
-            skill.toLowerCase().includes(normalizedSearch)
-        );
+        const packageSkillNames = new Set(packageSkills);
+        packageSkills = searchedSkills.filter((skill) => packageSkillNames.has(skill));
 
         return {
             packages,
             directSkills,
             packageSkills,
             subPackages,
-            searchedSkills: allSkills.filter((skill) =>
-                skill.toLowerCase().includes(normalizedSearch)
+            searchedSkills,
+            filteredSkills: searchedSkills.filter((skill) =>
+                activeFilter === "Everything" || skill.includes(activeFilter)
             ),
-            filteredSkills: allSkills
-                .filter((skill) =>
-                    activeFilter === "Everything"
-                        ? true
-                        : skill.includes(activeFilter)
-                )
-                .filter((skill) =>
-                    skill.toLowerCase().includes(normalizedSearch)
-                ),
         };
     }, [
         skills,
         selectedPackage,
         selectedSubPackage,
-        searchText,
+        searchedSkills,
         activeFilter,
     ]);
 }

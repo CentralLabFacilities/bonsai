@@ -78,6 +78,73 @@ test("failed backend loading is distinct from empty and recovers with retry", as
     await expect(page.getByText("The skill library is empty", { exact: true })).toBeVisible();
 });
 
+test("skill finding accepts noncontiguous fuzzy matches and recovers from no match", async ({ page }) => {
+    await openEditor(page);
+    const search = page.getByRole("textbox", { name: "Search skills" });
+    await search.fill("wk");
+    await expect(page.getByRole("button", { name: `Add ${skill} to canvas`, exact: true })).toBeVisible();
+    await search.fill("zzzzzzzzzzzzzz");
+    await expect(page.getByText("No matching skills", { exact: true })).toBeVisible();
+    await search.fill("");
+    await expect(page.getByRole("button", { name: `Add ${skill} to canvas`, exact: true })).toBeVisible();
+});
+
+test("a committed Integer mismatch shows a badge and clearing a valid row works with an invalid sibling", async ({ page }) => {
+    const parameters = [
+        { key: "count", type: "Integer", default: "1", required: true },
+        { key: "broken", type: "Integer", default: "'not-an-integer'", required: true },
+    ];
+    await page.route("**/api/skill/**", (route) => route.fulfill({ json: { ...definition, params: parameters, inSlots: [], outSlots: [] } }));
+    await openEditor(page);
+    await page.getByRole("button", { name: `Add ${skill} to canvas`, exact: true }).click();
+    const node = page.locator(".react-flow__node-custom");
+    await expect(node.locator(".node-warning-badge")).toBeVisible();
+    await expect(node.locator(".node-warning-badge")).toHaveAttribute("title", /broken.*Integer|Integer.*broken/);
+    await node.click();
+    await page.getByRole("tab", { name: "Parameter", exact: true }).click();
+    const groups = page.locator(".parameter-card");
+    const count = groups.nth(0).getByRole("combobox");
+    const broken = groups.nth(1).getByRole("combobox");
+    await count.fill("7");
+    await count.press("Enter");
+    await expect(count).toHaveValue("7");
+    await count.fill("");
+    await count.press("Enter");
+    await page.getByRole("tab", { name: "Overall", exact: true }).click();
+    await page.getByRole("tab", { name: "Parameter", exact: true }).click();
+    await expect(count).toHaveValue("");
+    await expect(broken).toHaveValue("");
+    await expect(broken).toHaveAttribute("placeholder", "'not-an-integer'");
+    await broken.fill("9");
+    await broken.press("Enter");
+    await expect(node.locator(".node-warning-badge")).toHaveCount(0);
+    await page.getByRole("tab", { name: "Problems", exact: true }).click();
+    await expect(page.locator(".problems-panel")).toContainText("Full workflow validation unavailable");
+    await expect(page.getByText("No problems found", { exact: true })).toHaveCount(0);
+});
+
+test("all connection points are smaller circles with the original large hit areas", async ({ page }) => {
+    await openEditor(page);
+    await page.getByRole("button", { name: `Add ${skill} to canvas`, exact: true }).click();
+    const node = page.locator(".react-flow__node-custom");
+    const paint = (element) => {
+        const style = getComputedStyle(element, "::after");
+        const outline = getComputedStyle(element, "::before");
+        const bounds = element.getBoundingClientRect();
+        return { clipPath: style.clipPath, borderRadius: style.borderRadius, visibleWidth: style.width,
+            outlineWidth: outline.width, width: bounds.width, height: bounds.height };
+    };
+    for (const name of [".source-handle", ".target-handle", ".slot-skill-read-handle"]) {
+        const style = await node.locator(name).first().evaluate(paint);
+        expect(style.clipPath).toBe("none");
+        expect(style.borderRadius).toBe("50%");
+        expect(style.visibleWidth).toBe("10px");
+        expect(style.outlineWidth).toBe("14px");
+        expect(style.width).toBeGreaterThanOrEqual(24);
+        expect(style.height).toBeGreaterThanOrEqual(24);
+    }
+});
+
 test("slow skill inspection cannot append to a newly active workflow", async ({ page }) => {
     let release;
     const pending = new Promise((resolve) => { release = resolve; });

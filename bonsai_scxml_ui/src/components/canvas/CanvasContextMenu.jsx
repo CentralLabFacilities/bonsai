@@ -225,12 +225,17 @@ export default function CanvasContextMenu({ contextMenu, activeMode, hasGraphCli
                         </>
                     )}
 
-                    {contextMenu.canDelete && (
+                    {(contextMenu.canDelete || contextMenu.nodeType === "slot") && (
                         <>
                             <div className="context-menu-divider" aria-hidden="true" />
                             <button
                                 className="context-menu-item context-menu-item-danger"
                                 onClick={() => handleSelectAction("delete-node")}
+                                disabled={!contextMenu.canDelete}
+                                aria-disabled={!contextMenu.canDelete}
+                                title={contextMenu.slotDeletionProtected
+                                    ? "This canonical slot is inherited by the workflow or required by a child. Visual references can be removed."
+                                    : undefined}
                             >
                                 Delete
                             </button>

@@ -193,7 +193,7 @@ const rebuildBoundaryTransitionsImpl = (sourceNodes = [], sourceEdges = []) => {
             boundaryEventsByNode.set(anchor.id, new Map());
         }
         const map = boundaryEventsByNode.get(anchor.id);
-        if (!map.has(event.id)) map.set(event.id, event);
+        if (!map.has(event.id)) map.set(event.id, { ...event, editorBoundarySynthetic: true });
     };
 
     semanticEdges.forEach(

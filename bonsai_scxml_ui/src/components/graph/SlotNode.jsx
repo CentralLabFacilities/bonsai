@@ -1,5 +1,6 @@
-import { Handle, Position } from "@xyflow/react";
+import { Position } from "@xyflow/react";
 import { FiDatabase } from "react-icons/fi";
+import { ConnectionHandle } from "./NodeChrome.jsx";
 import { getSlotHandleDragClass, getSlotTypeStyle } from "../../utils/slotVisuals";
 
 function SlotNode({ id, data, selected = false }) {
@@ -75,10 +76,10 @@ function SlotNode({ id, data, selected = false }) {
                 </div>
             )}
 
-            <Handle
+            <ConnectionHandle
                 id={writeHandleId}
                 type="target"
-                isConnectableStart={false}
+                isConnectableStart={true}
                 isConnectableEnd={true}
                 position={Position.Top}
                 style={{ left: "35%" }}
@@ -90,13 +91,14 @@ function SlotNode({ id, data, selected = false }) {
                     origin: "slot",
                     slotType,
                 })}`}
-                title="Write"
+                title={`Write into slot ${normalizedPath}`}
+                aria-label={`Write into slot ${normalizedPath}`}
             />
 
-            <Handle
+            <ConnectionHandle
                 id={readHandleId}
-                type="target"
-                isConnectableStart={false}
+                type="source"
+                isConnectableStart={true}
                 isConnectableEnd={true}
                 position={Position.Top}
                 style={{ left: "65%" }}
@@ -108,7 +110,8 @@ function SlotNode({ id, data, selected = false }) {
                     origin: "slot",
                     slotType,
                 })}`}
-                title="Read"
+                title={`Read from slot ${normalizedPath}`}
+                aria-label={`Read from slot ${normalizedPath}`}
             />
 
             <div className="slot-node-header">

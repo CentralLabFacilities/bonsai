@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { getWorkflowDocumentFingerprint } from "../../utils/scxmlRustExport.js";
-import { isEditorModalOpen } from "../interaction/useGlobalEditorShortcuts.js";
+import { isEditorShortcutBlocked } from "../interaction/useGlobalEditorShortcuts.js";
 import { getWorkflowFileKey } from "../../utils/workflowLoader.js";
 
 const checkpointTab = (tab) => ({
@@ -554,7 +554,7 @@ export function useWorkflowTabs({
     // responsibility instead of leaking tab internals back into App.jsx.
     useEffect(() => {
         const handleTabShortcut = (event) => {
-            if (event.defaultPrevented || isEditorModalOpen()) return;
+            if (event.defaultPrevented || isEditorShortcutBlocked(event)) return;
             if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
 
             const isTabShortcut =
@@ -588,6 +588,7 @@ export function useWorkflowTabs({
         tabs,
         activeTabId,
         activeTab,
+        activeFingerprint,
         getActiveDocumentIdentity,
         getTabSnapshot,
         getTabsSnapshot,

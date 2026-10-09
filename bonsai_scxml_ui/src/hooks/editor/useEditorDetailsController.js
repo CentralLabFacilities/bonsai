@@ -32,6 +32,7 @@ export function useEditorDetailsCallbacks(callbacks) {
         onUpdateSrc: (...args) => latest.current.onUpdateSrc?.(...args),
         onUpdateEvent: (...args) => latest.current.onUpdateEvent?.(...args),
         onSetEventTarget: (...args) => latest.current.onSetEventTarget?.(...args),
+        getParameterEditSource: (...args) => latest.current.getParameterEditSource?.(...args),
         onUpdateParameter: (...args) => latest.current.onUpdateParameter?.(...args),
         onUpdateStateActions: (...args) => latest.current.onUpdateStateActions?.(...args),
         onUpdateSendEvents: (...args) => latest.current.onUpdateSendEvents?.(...args),

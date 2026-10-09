@@ -11,6 +11,8 @@ function TypedValueEditor({
                               id,
                               value,
                               expectedType,
+                              sourceIdentity,
+                              getCommitContext,
                               variables = [],
                               onCommit,
                               onDraftChange,
@@ -25,31 +27,42 @@ function TypedValueEditor({
     const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false);
     const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
     const inputRef = useRef(null);
+    const draftRef = useRef(String(value ?? ""));
+    const cancelValueRef = useRef(String(value ?? ""));
+    const editRevisionRef = useRef(0);
+    const committedRevisionRef = useRef(0);
+    const commitContextRef = useRef(undefined);
     const lastEmittedValueRef = useRef(null);
-    const sourceRef = useRef({ value, expectedType });
+    const sourceRef = useRef({ value, expectedType, sourceIdentity });
     const suggestionsId = useId();
 
     useLayoutEffect(() => {
         const previousSource = sourceRef.current;
         const typeChanged = !Object.is(previousSource.expectedType, expectedType);
         const valueChanged = !Object.is(previousSource.value, value);
-        sourceRef.current = { value, expectedType };
+        const sourceChanged = !Object.is(previousSource.sourceIdentity, sourceIdentity);
+        sourceRef.current = { value, expectedType, sourceIdentity };
 
-        if (typeChanged) setError("");
-        if (!valueChanged) return;
+        if (!valueChanged && !typeChanged && !sourceChanged) return;
 
         const nextValue = String(value ?? "");
         // A parent draft echo is not an external reset of autocomplete.
-        if (lastEmittedValueRef.current === nextValue) {
+        if (!typeChanged && lastEmittedValueRef.current === nextValue) {
             lastEmittedValueRef.current = null;
             return;
         }
 
+        draftRef.current = nextValue;
+        cancelValueRef.current = nextValue;
+        editRevisionRef.current += 1;
+        committedRevisionRef.current = editRevisionRef.current;
+        commitContextRef.current = undefined;
+        lastEmittedValueRef.current = null;
         setDraft(nextValue);
         setError("");
         setIsAutocompleteOpen(false);
         setActiveSuggestionIndex(-1);
-    }, [value, expectedType]);
+    }, [value, expectedType, sourceIdentity]);
 
     const normalizedType = normalizeValueType(expectedType) || expectedType || null;
 
@@ -119,7 +132,7 @@ function TypedValueEditor({
                 : -1
             : activeSuggestionIndex;
 
-    const commitValue = (nextValue = draft) => {
+    const commitValue = (nextValue = draftRef.current) => {
         const result = validateTypedValueInput(
             nextValue,
             normalizedType,
@@ -132,26 +145,38 @@ function TypedValueEditor({
             return false;
         }
 
+        // Enter blurs synchronously, before React renders the accepted draft.
+        // Validate for feedback, but never emit that accepted edit a second time.
+        if (nextValue === draftRef.current && committedRevisionRef.current === editRevisionRef.current) return true;
+
+        let accepted;
+        try {
+            accepted = onCommit?.(result.value, commitContextRef.current, nextValue);
+        } catch (commitError) {
+            setError(String(commitError?.message || commitError || "Value was not applied."));
+            return false;
+        }
+        if (accepted === null || accepted === false || accepted?.valid === false) {
+            setError(accepted?.error || "Value was not applied. The parameter or workflow may have changed.");
+            return false;
+        }
+
+        draftRef.current = result.value;
+        cancelValueRef.current = result.value;
+        committedRevisionRef.current = editRevisionRef.current;
         setDraft(result.value);
         setError("");
         setIsAutocompleteOpen(false);
         setActiveSuggestionIndex(-1);
         lastEmittedValueRef.current = result.value;
         onDraftChange?.(result.value);
-        onCommit?.(result.value);
         return true;
     };
 
     const selectSuggestion = (suggestion) => {
         if (!suggestion) return;
 
-        setDraft(suggestion.value);
-        setError("");
-        setIsAutocompleteOpen(false);
-        setActiveSuggestionIndex(-1);
-        lastEmittedValueRef.current = suggestion.value;
-        onDraftChange?.(suggestion.value);
-        onCommit?.(suggestion.value);
+        if (!commitValue(suggestion.value)) return;
 
         requestAnimationFrame(() => {
             inputRef.current?.focus();
@@ -188,6 +213,15 @@ function TypedValueEditor({
         }
 
         if (event.key === "Escape") {
+            const sourceValue = cancelValueRef.current;
+            draftRef.current = sourceValue;
+            editRevisionRef.current += 1;
+            committedRevisionRef.current = editRevisionRef.current;
+            commitContextRef.current = undefined;
+            lastEmittedValueRef.current = onDraftChange ? sourceValue : null;
+            setDraft(sourceValue);
+            setError("");
+            onDraftChange?.(sourceValue);
             setIsAutocompleteOpen(false);
             setActiveSuggestionIndex(-1);
             return;
@@ -231,6 +265,7 @@ function TypedValueEditor({
                         ? `${suggestionsId}-${visibleSuggestionIndex}` : undefined}
                     autoComplete="off"
                     onFocus={() => {
+                        commitContextRef.current = getCommitContext?.();
                         if (String(draft || "").trim() && matchingSuggestions.length > 0) {
                             setIsAutocompleteOpen(true);
                             setActiveSuggestionIndex(0);
@@ -238,9 +273,12 @@ function TypedValueEditor({
                     }}
                     onChange={(event) => {
                         const nextValue = event.target.value;
+                        if (commitContextRef.current === undefined) commitContextRef.current = getCommitContext?.();
+                        draftRef.current = nextValue;
+                        editRevisionRef.current += 1;
                         setDraft(nextValue);
                         setError("");
-                        lastEmittedValueRef.current = nextValue;
+                        lastEmittedValueRef.current = onDraftChange ? nextValue : null;
                         onDraftChange?.(nextValue);
 
                         const hasText = nextValue.trim().length > 0;

@@ -1,4 +1,32 @@
-import { normalizeSlotPath } from "./editorGraph";
+import { normalizeSlotPath } from "./editorGraph.js";
+import { isManagedBoundaryEvent } from "./transitionEvents.js";
+
+export function projectNodeWarningTitles(previous = new Map(), problems = []) {
+    const byNodeId = new Map();
+    for (const problem of problems) {
+        if (problem?.severity !== "warning" && problem?.severity !== "error") continue;
+        const nodeId = String(problem.nodeId ?? "");
+        if (!nodeId) continue;
+        const text = [problem.title, problem.message]
+            .map((value) => String(value ?? "").trim())
+            .filter(Boolean)
+            .join(": ");
+        if (!text) continue;
+        if (!byNodeId.has(nodeId)) byNodeId.set(nodeId, []);
+        byNodeId.get(nodeId).push({ id: String(problem.id ?? ""), text });
+    }
+
+    const next = new Map();
+    let changed = previous.size !== byNodeId.size;
+    for (const nodeId of [...byNodeId.keys()].sort()) {
+        const entries = byNodeId.get(nodeId);
+        entries.sort((a, b) => a.id.localeCompare(b.id) || a.text.localeCompare(b.text));
+        const title = entries.map((entry) => entry.text).join("\n");
+        next.set(nodeId, title);
+        if (previous.get(nodeId) !== title) changed = true;
+    }
+    return changed ? next : previous;
+}
 
 const mapVariable = (entry) => ({
     id: String(entry?.id || ""),
@@ -100,7 +128,8 @@ export const buildEditorValidationRequest = ({
         events: (node?.data?.events || []).map((event) => ({
             id: String(event?.id || ""),
             synthetic: Boolean(
-                event?.editorImportedSynthetic || event?.editorBoundarySynthetic
+                event?.editorImportedSynthetic || event?.editorBoundarySynthetic ||
+                isManagedBoundaryEvent(node?.type, event)
             ),
         })),
         parameters: (node?.data?.params || []).map((parameter) => ({
@@ -188,7 +217,8 @@ export const buildActiveValidationRequest = ({
                 id: String(event?.id || ""),
                 synthetic: Boolean(
                     event?.editorImportedSynthetic ||
-                        event?.editorBoundarySynthetic
+                        event?.editorBoundarySynthetic ||
+                        isManagedBoundaryEvent(node?.type, event)
                 ),
             })),
             parameters: (node?.data?.params || []).map((parameter) => ({

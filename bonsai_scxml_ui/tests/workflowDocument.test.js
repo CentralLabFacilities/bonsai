@@ -110,13 +110,14 @@ test.before(async () => {
     });
     // Sub-SM creation captures desktop mode when its module is evaluated.
     window.__TAURI_INTERNALS__ = {};
-    const [graph, tabs, documents, submachines] = await Promise.all([
+    const [graph, tabs, documents, submachines, library] = await Promise.all([
         server.ssrLoadModule("/src/hooks/graph/useEditorGraphState.js"),
         server.ssrLoadModule("/src/hooks/document/useWorkflowTabs.js"),
         server.ssrLoadModule("/src/hooks/document/useWorkflowDocument.js"),
         server.ssrLoadModule("/src/hooks/document/useSubStateMachines.js"),
+        server.ssrLoadModule("/src/hooks/library/useEditorLibraryItems.js"),
     ]);
-    hooks = { ...graph, ...tabs, ...documents, ...submachines };
+    hooks = { ...graph, ...tabs, ...documents, ...submachines, ...library };
     overlays = (await server.ssrLoadModule("/src/components/overlays/EditorOverlays.jsx")).default;
     tabBar = (await server.ssrLoadModule("/src/components/WorkflowTabBar.jsx")).default;
     feedback = await server.ssrLoadModule("/src/components/ui/index.js");
@@ -190,9 +191,13 @@ test.beforeEach(async () => {
             hydrateSubMachineInheritedSlots: async (nodes) => native.hydrate ? native.hydrate(nodes) : nodes,
             checkSlotConnection: (...args) => calls.push({ command: "slots", args }),
         });
+        const library = hooks.useEditorLibraryItems({ nodes: graph.nodes, ...tabs, fetchSkillData: async () => null,
+            hydrateSubMachineInheritedSlots: async (nodes) => nodes,
+            beginStateMachineLoad: () => {}, endStateMachineLoad: () => {},
+            behaviorDirectories: [], checkSlotConnection: (...args) => calls.push({ command: "slots", args }) });
         React.useLayoutEffect(() => {
-            current = { graph, tabs, documents, submachines, setIsDraggingNode };
-        }, [graph, tabs, documents, submachines, setIsDraggingNode]);
+            current = { graph, tabs, documents, submachines, library, setIsDraggingNode };
+        }, [graph, tabs, documents, submachines, library, setIsDraggingNode]);
         return React.createElement(
             React.Fragment,
             null,
@@ -297,6 +302,54 @@ test("modified markers ignore selection and measurements, and clear when content
     await edit("1");
     assert.equal(current.tabs.activeTab.isModified, false);
     assert.equal(container.querySelector('[aria-label="Unsaved changes"]'), null);
+});
+
+test("path-only resource changes get dirty markers, unsaved-close protection and saved checkpoints", async () => {
+    await openTab();
+    await React.act(async () => current.graph.setManualSlots([{ id: "resource", path: "/needed", type: "String" }]));
+    assert.equal(current.tabs.activeTab.isModified, true);
+    assert.ok(container.querySelector('[aria-label="Unsaved changes"]'));
+    const closing = await begin(() => current.documents.handleCloseTab("a"));
+    assert.ok(dialog());
+    await choose("Cancel");
+    assert.equal(await settle(closing), false);
+    assert.equal(current.tabs.getTabSnapshot("a").manualSlots[0].path, "/needed");
+    const saved = await settle(await begin(() => current.documents.handleSaveCurrentTab()));
+    assert.equal(saved.success, true);
+    assert.equal(saved.isCurrent, true);
+    assert.equal(current.tabs.activeTab.isModified, false);
+    assert.deepEqual(JSON.parse(calls.find((call) => call.command === "save_file").args.content).extraSlotDeclarations,
+        [{ key: "", state: "", xpath: "/needed", inherited: false }]);
+    await React.act(async () => current.graph.setManualSlots([]));
+    assert.equal(current.tabs.activeTab.isModified, true);
+    await React.act(async () => current.graph.setManualSlots([{ path: " needed ", type: "Unknown" }]));
+    assert.equal(current.tabs.activeTab.isModified, false);
+    await React.act(async () => current.graph.setManualSlots([{ path: "/renamed" }]));
+    assert.equal(current.tabs.activeTab.isModified, true);
+});
+
+test("path-only edits during serialization or writing stay dirty after an older resource snapshot saves", async () => {
+    for (const phase of ["serialize", "write"]) {
+        await openTab(phase);
+        await React.act(async () => current.graph.setManualSlots([{ path: "/older" }]));
+        const pending = deferred();
+        let serialized;
+        native.serialize = (request) => {
+            serialized = request;
+            return phase === "serialize" ? pending.promise : JSON.stringify(request);
+        };
+        native.save = ({ path, title }) => phase === "write" ? pending.promise
+            : { success: true, path, file_name: title };
+        const saving = await begin(() => current.documents.handleSaveCurrentTab());
+        assert.deepEqual(serialized.extraSlotDeclarations, [{ key: "", state: "", xpath: "/older", inherited: false }]);
+        await React.act(async () => current.graph.setManualSlots([{ path: "/newer" }]));
+        const result = await settle(saving, () => pending.resolve(phase === "serialize" ? JSON.stringify(serialized)
+            : { success: true, path: `/${phase}.xml`, file_name: `${phase}.xml` }));
+        assert.equal(result.success, true);
+        assert.equal(result.isCurrent, false);
+        assert.equal(current.tabs.activeTab.isModified, true);
+        assert.equal(current.tabs.getTabSnapshot().manualSlots[0].path, "/newer");
+    }
 });
 
 test("saving updates its originating tab after a tab switch without replacing either graph", async () => {
@@ -1251,6 +1304,30 @@ test("creation modality prevents workflow switching and saving beneath the dialo
     }
 });
 
+test("floating shortcut scopes block capture-phase save and tab keys without blocking the outside editor", async () => {
+    await openTab("a"); await edit();
+    const panel = document.createElement("section");
+    panel.setAttribute("data-editor-shortcut-scope", "");
+    const control = document.createElement("button");
+    panel.append(control); document.body.append(panel);
+    const dispatch = (target, key) => React.act(async () => target.dispatchEvent(new window.KeyboardEvent("keydown", {
+        key, ctrlKey: true, bubbles: true, cancelable: true,
+    })));
+    try {
+        control.focus();
+        await dispatch(control, "Tab"); await dispatch(control, "s");
+        assert.equal(current.tabs.activeTabId, "a");
+        assert.equal(calls.some((call) => ["save_file", "serialize_editor_workflow"].includes(call.command)), false);
+        assert.equal(document.querySelector("dialog[open]"), null);
+        const outside = document.getElementById("original-focus");
+        outside.focus(); await dispatch(outside, "s");
+        assert.equal(calls.some((call) => call.command === "save_file"), true);
+        await dispatch(outside, "Tab"); assert.equal(current.tabs.activeTabId, "tab-1");
+    } finally {
+        panel.remove();
+    }
+});
+
 test("write failures remain errors with actionable origin-owned feedback and do not advance the saved checkpoint", async (context) => {
     context.mock.method(console, "error", () => {});
     await openTab("a");
@@ -1373,4 +1450,27 @@ test("missing native save confirmation is an error rather than cancellation or a
         assert.equal(current.documents.lastSavedAt, null);
         assert.equal(current.documents.documentNotice.canRetry, true);
     }
+});
+
+test("Open, behavior-library opening and sourced-child opening retain path-only and inherited declarations", async () => {
+    native.open = () => "/slots.xml";
+    native.inspect = (args) => {
+        const loaded = inspection(args.source);
+        loaded.workflow.slotDeclarations = [
+            { key: "", state: "", xpath: "/needed", inherited: false },
+            { key: "", state: "", xpath: "/parent", inherited: true },
+        ];
+        return loaded;
+    };
+    const paths = (tab) => tab.manualSlots.map(({ path, slotKind, inherited }) => ({ path, slotKind, inherited: Boolean(inherited) }));
+    const expected = [{ path: "/needed", slotKind: "slot", inherited: false }, { path: "/parent", slotKind: "inheritSlot", inherited: true }];
+    await settle(await begin(() => current.documents.handleOpenDocument()));
+    assert.deepEqual(paths(current.tabs.getTabSnapshot()), expected);
+    assert.equal(current.tabs.getTabSnapshot().isModified, false);
+    await settle(await begin(() => current.library.handleOpenBehaviorFile({ source: "/library-slots.xml", path: "/library-slots.xml", name: "library-slots.xml" })));
+    assert.deepEqual(paths(current.tabs.getTabSnapshot()), expected);
+    assert.ok(calls.some((call) => call.command === "slots" && call.args[1]?.length === 2));
+    await settle(await begin(() => current.submachines.handleOpenSubMachine("/child-slots.xml", "Child slots")));
+    assert.deepEqual(paths(current.tabs.getTabSnapshot()), expected);
+    assert.equal(current.tabs.getTabSnapshot().isModified, false);
 });

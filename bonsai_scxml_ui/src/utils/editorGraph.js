@@ -434,8 +434,35 @@ export const isSlotEdge = (edge) =>
 export const getSlotPathFromNode = (slotNode) =>
     normalizeSlotPath(slotNode?.data?.path || slotNode?.data?.label || "");
 
+// Aliases may disappear without deleting the declaration. Canonical inherited
+// slots and fixed child requirements must keep their path in the parent.
+export const isSlotDeletionProtected = (node, model = {}) => {
+    if (node?.type !== "slot" || (node.data?.isSlotClone && node.data?.cloneOfNodeId)) return false;
+    const data = node.data || {};
+    if (data.currentMachineInherited || data.inherited || data.slotKind === "inheritSlot" ||
+        data.requiredByChild || data.requiredByChildren?.length) return true;
+    const path = getSlotPathFromNode(node);
+    if (!path) return false;
+    return (model.manualSlots || []).some((slot) =>
+        normalizeSlotPath(slot?.inherited?.xpath || slot?.path) === path &&
+        (slot?.slotKind === "inheritSlot" || slot?.inherited)) ||
+        (model.nodes || []).some((child) => child.type === "submachine" && child.data?.src &&
+            !child.data?.isStateClone && !child.data?.isSkillClone &&
+            (child.data?.inheritedSlots || []).some((slot) =>
+                normalizeSlotPath(slot?.path || slot?.inherited?.xpath) === path));
+};
+
 export const parseSlotConnectionHandle = (handleId) => {
     const value = String(handleId || "");
+
+    const inherited = value.match(/^slot-submachine-(read|write)-(\d+)$/);
+    if (inherited) {
+        return {
+            origin: "submachine",
+            access: inherited[1],
+            inheritIndex: Number(inherited[2]),
+        };
+    }
 
     const skillRead = value.match(/^slot-skill-read-(\d+)$/);
     if (skillRead) {
@@ -464,4 +491,183 @@ export const parseSlotConnectionHandle = (handleId) => {
     }
 
     return null;
+};
+
+export const isKnownSlotType = (type) => {
+    const normalized = normalizeSlotType(type);
+    return Boolean(normalized && normalized !== "unknown");
+};
+
+export const getSlotConnectionEndpoint = (nodeId, handleId, model) => {
+    const handle = parseSlotConnectionHandle(handleId);
+    if (!handle) return null;
+    const node = (handle.origin === "slot" ? model.slotNodes : model.nodes)
+        ?.find((candidate) => candidate.id === nodeId);
+    if (!node || node.data?.isSkillClone || node.data?.isStateClone) return null;
+    let slot;
+    if (handle.origin === "slot") {
+        if (node.type !== "slot" || !getSlotPathFromNode(node)) return null;
+        const canonicalId = node.data?.cloneOfNodeId || node.id;
+        const canonical = model.slotNodes?.find((candidate) => candidate.id === canonicalId);
+        if (!canonical || getSlotPathFromNode(canonical) !== getSlotPathFromNode(node)) return null;
+        slot = { type: canonical.data?.slotType, path: canonical.data?.path };
+    } else if (handle.origin === "submachine") {
+        if (node.type !== "submachine" || !node.data?.src) return null;
+        slot = node.data?.inheritedSlots?.[handle.inheritIndex];
+        if (slot?.access !== handle.access || !normalizeSlotPath(slot?.path)) return null;
+    } else {
+        if (!["custom", "submachine"].includes(node.type)) return null;
+        slot = node.data?.[handle.access === "read" ? "inSlots" : "outSlots"]?.[handle.slotIndex];
+    }
+    if (!slot || !isKnownSlotType(slot.type)) return null;
+    return { ...handle, node, slot, nodeId, handleId, slotType: normalizeSlotType(slot.type) };
+};
+
+export const resolveSlotConnection = (connection, model) => {
+    const source = getSlotConnectionEndpoint(connection?.source, connection?.sourceHandle, model);
+    const target = getSlotConnectionEndpoint(connection?.target, connection?.targetHandle, model);
+    if (!source || !target || source.access !== target.access || source.slotType !== target.slotType
+        || (source.origin === "slot") === (target.origin === "slot")) return null;
+    return source.origin === "slot"
+        ? { consumer: target, slot: source }
+        : { consumer: source, slot: target };
+};
+
+export const getSlotEdgeEndpoints = (consumerId, slotNodeId, access, consumerHandleId) =>
+    access === "read"
+        ? { source: slotNodeId, target: consumerId, sourceHandle: "slot-node-read", targetHandle: consumerHandleId }
+        : { source: consumerId, target: slotNodeId, sourceHandle: consumerHandleId, targetHandle: "slot-node-write" };
+
+export const getDefaultSlotPath = (model) => {
+    const paths = new Set();
+    const add = (slot) => {
+        for (const path of [slot?.path, slot?.inherited?.xpath]) {
+            const normalized = normalizeSlotPath(path);
+            if (normalized) paths.add(normalized);
+        }
+    };
+    (model.nodes || []).forEach((node) => {
+        [...(node.data?.inSlots || []), ...(node.data?.outSlots || []), ...(node.data?.inheritedSlots || [])].forEach(add);
+    });
+    (model.manualSlots || []).forEach(add);
+    (model.slotNodes || []).forEach((node) => add(node.data));
+    let index = 1;
+    while (paths.has(index === 1 ? "defaultslot" : `defaultslot${index}`)) index += 1;
+    return index === 1 ? "defaultslot" : `defaultslot${index}`;
+};
+
+const slotMatchesPath = (slot, path) =>
+    normalizeSlotPath(slot?.path) === path || normalizeSlotPath(slot?.inherited?.xpath) === path;
+
+// The fixed child declaration is a requirement, not a writable child binding.
+// Only an unbound derived placeholder may be replaced by the renamed parent.
+export const planInheritedSlotRename = (model, consumer, slotEndpoint) => {
+    const oldPath = getSlotPathFromNode(slotEndpoint.node);
+    const newPath = normalizeSlotPath(consumer.slot.path);
+    const canonicalId = slotEndpoint.node.data?.cloneOfNodeId || slotEndpoint.node.id;
+    const canonical = model.slotNodes?.find((node) => node.id === canonicalId);
+    const bindings = [];
+    const declarations = [];
+    const coalescedDeclarations = [];
+    const requirements = [];
+    let error = "";
+    (model.nodes || []).forEach((node) => {
+        for (const [key, access] of [["inSlots", "read"], ["outSlots", "write"]]) {
+            (node.data?.[key] || []).forEach((slot, index) => {
+                if (oldPath !== newPath && slotMatchesPath(slot, newPath)) error = `/${newPath} already has a parent binding.`;
+                if (!slotMatchesPath(slot, oldPath)) return;
+                if (!isKnownSlotType(slot.type) || normalizeSlotType(slot.type) !== consumer.slotType) {
+                    error = "The parent slot has incompatible binding types.";
+                }
+                bindings.push({ nodeId: node.id, nodeLabel: node.data?.label || node.id, key: slot.key || "", access, index, slot });
+            });
+        }
+        (node.data?.inheritedSlots || []).forEach((slot, index) => {
+            if (!slotMatchesPath(slot, oldPath) && !slotMatchesPath(slot, newPath)) return;
+            requirements.push({ nodeId: node.id, src: node.data?.src || "", index, slot });
+            if (normalizeSlotPath(slot.path) === oldPath && oldPath !== newPath) {
+                error = "The parent slot is required at its current path by another child declaration.";
+            }
+            if (normalizeSlotPath(slot.path) === newPath && node.id !== consumer.nodeId && oldPath !== newPath) {
+                error = `/${newPath} is already required by another child.`;
+            }
+            if (isKnownSlotType(slot.type) && normalizeSlotType(slot.type) !== consumer.slotType) {
+                error = "Child requirements have incompatible slot types.";
+            }
+        });
+    });
+    (model.manualSlots || []).forEach((slot, index) => {
+        if (oldPath !== newPath && slotMatchesPath(slot, newPath)) {
+            // Only the automatic, otherwise-unbound requirement declaration may
+            // be coalesced by this explicit confirmation. Real manual slots,
+            // parent inheritance, bindings, aliases and other children still veto.
+            if (slot.createdForChildRequirements === true && slot.slotKind === "slot" && !slot.inherited && !slot.key && !slot.state &&
+                (!isKnownSlotType(slot.type) || normalizeSlotType(slot.type) === consumer.slotType)) {
+                coalescedDeclarations.push({ index, id: slot.id, slot });
+            } else error = `/${newPath} is already declared in the parent workflow.`;
+        }
+        if (!slotMatchesPath(slot, oldPath)) return;
+        if (isKnownSlotType(slot.type) && normalizeSlotType(slot.type) !== consumer.slotType) {
+            error = "The parent declaration has an incompatible slot type.";
+        }
+        declarations.push({ index, id: slot.id, key: slot.key || "", state: slot.inherited?.state || slot.state || "", slot });
+    });
+    const clones = (model.slotNodes || []).filter((node) => node.data?.isSlotClone && node.data?.cloneOfNodeId === canonicalId);
+    const placeholders = (model.slotNodes || []).filter((node) => getSlotPathFromNode(node) === newPath && node.id !== canonicalId);
+    if (oldPath !== newPath && placeholders.some((node) => node.data?.isSlotClone || !node.data?.requiredByChild)) {
+        error = `/${newPath} already exists; slots cannot be merged.`;
+    }
+    if (!canonical || !oldPath || !newPath) error = "The parent slot or child requirement no longer exists.";
+    return {
+        oldPath, newPath, canonicalId, newCanonicalId: `slot-${newPath}`, bindings, declarations, coalescedDeclarations, clones, placeholders, error,
+        signature: JSON.stringify({
+            oldPath, newPath, canonicalId, type: canonical?.data?.slotType,
+            inherited: canonical?.data?.inherited, inheritedFrom: canonical?.data?.inheritedFrom,
+            bindings, declarations, coalescedDeclarations, requirements,
+            clones: clones.map((node) => [node.id, node.data?.cloneOfNodeId, getSlotPathFromNode(node)]),
+            placeholders: placeholders.map((node) => [node.id, node.data?.slotType, node.data?.requiredByChildren]),
+        }),
+    };
+};
+
+export const renameParentSlot = (model, plan) => {
+    const update = (slot) => {
+        if (!slotMatchesPath(slot, plan.oldPath)) return slot;
+        return {
+            ...slot, path: `/${plan.newPath}`,
+            ...(slot.inherited ? { inherited: { ...slot.inherited, xpath: `/${plan.newPath}` } } : {}),
+        };
+    };
+    const nodes = model.nodes.map((node) => {
+        let data = node.data;
+        for (const key of ["inSlots", "outSlots"]) {
+            const before = node.data?.[key];
+            if (!before?.some((slot) => slotMatchesPath(slot, plan.oldPath))) continue;
+            data = { ...data, [key]: before.map(update) };
+        }
+        return data === node.data ? node : { ...node, data };
+    });
+    const manualSlots = (model.manualSlots || []).filter((_slot, index) =>
+        !plan.coalescedDeclarations?.some((entry) => entry.index === index)).map(update);
+    const slotNodes = model.slotNodes.filter((node) => !plan.placeholders.some((placeholder) => placeholder.id === node.id)).map((node) => {
+        const canonical = node.id === plan.canonicalId;
+        const clone = node.data?.isSlotClone && node.data?.cloneOfNodeId === plan.canonicalId;
+        if (!canonical && !clone) return node;
+        return {
+            ...node, id: canonical ? plan.newCanonicalId : node.id,
+            data: { ...node.data, path: `/${plan.newPath}`, label: `/${plan.newPath}`,
+                ...(clone ? { cloneOfNodeId: plan.newCanonicalId } : {}) },
+        };
+    });
+    const slotEdges = (model.slotEdges || []).map((edge) => {
+        if (edge.data?.canonicalSlotNodeId !== plan.canonicalId && !slotMatchesPath(edge.data, plan.oldPath)) return edge;
+        return {
+            ...edge,
+            source: edge.source === plan.canonicalId ? plan.newCanonicalId : edge.source,
+            target: edge.target === plan.canonicalId ? plan.newCanonicalId : edge.target,
+            data: { ...edge.data, path: plan.newPath, canonicalSlotNodeId: plan.newCanonicalId,
+                slotNodeId: edge.data?.slotNodeId === plan.canonicalId ? plan.newCanonicalId : edge.data?.slotNodeId },
+        };
+    });
+    return { ...model, nodes, manualSlots, slotNodes, slotEdges };
 };

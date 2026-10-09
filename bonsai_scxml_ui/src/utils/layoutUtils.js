@@ -40,6 +40,17 @@ const estimateOverviewWidth = (node) => {
     const labelLength = String(data.label || data.fullSkillName || "").length;
     let requiredWidth = Math.max(DEFAULT_NODE_WIDTH, 95 + labelLength * 6.5);
 
+    if (nodeType === "custom" && (data.initial || data.isInitial) && !data.isSkillClone) {
+        const label = String(data.label || data.fullSkillName || "Skill");
+        const explicitInstance = String(data.editorInstanceId || "").trim();
+        const fullName = String(data.fullSkillName || "");
+        const suffix = fullName.includes("#") ? fullName.slice(fullName.lastIndexOf("#") + 1).trim() : "";
+        const rawInstance = explicitInstance || suffix;
+        const instanceId = rawInstance ? rawInstance.startsWith("#") ? rawInstance : `#${rawInstance}` : "";
+        requiredWidth = Math.max(requiredWidth, Math.min(MAX_OVERVIEW_WIDTH,
+            Math.max(260, 150 + `${label} ${instanceId}`.trim().length * 7)));
+    }
+
     if (nodeType === "custom") {
         const parameters = (data.params || []).filter((parameter) =>
             String(parameter?.key || "").trim()
@@ -94,9 +105,11 @@ const estimateOverviewHeight = (node) => {
     if (data.isSkillClone || nodeType === "stateClone") return 72;
     if (data.isFinal || data.isBehaviorExit) return 58;
 
-    const eventCount = new Set(
+    const events = new Set(
         (data.events || []).map((event) => String(event?.id || "").trim()).filter(Boolean)
-    ).size;
+    );
+    if (nodeType === "custom") events.add("fatal");
+    const eventCount = events.size;
     const slotCount = getStateSlotEntries(data, nodeType).length;
 
     if (nodeType === "submachine") {
@@ -108,7 +121,7 @@ const estimateOverviewHeight = (node) => {
         return Math.max(
             DEFAULT_NODE_HEIGHT,
             66 +
-                eventCount * 18 +
+                eventCount * 24 +
                 (localDataCount > 0 ? 10 + localDataCount * 22 : 0) +
                 (slotCount > 0 ? 112 : 0)
         );
@@ -120,8 +133,8 @@ const estimateOverviewHeight = (node) => {
 
     return Math.max(
         DEFAULT_NODE_HEIGHT,
-        48 +
-            eventCount * 18 +
+        52 +
+            eventCount * 24 +
             (parameterCount > 0 ? 10 + parameterCount * 22 : 0) +
             (slotCount > 0 ? 112 : 0)
     );

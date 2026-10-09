@@ -3,6 +3,7 @@ import { applyEdgeChanges } from "@xyflow/react";
 
 import { rebuildBoundaryTransitionsIncremental } from "../../utils/boundaryTransitions";
 import { isWildcardTransitionEvent } from "../../utils/transitionEvents";
+import { getSlotPathFromNode, isSlotDeletionProtected, normalizeSlotPath } from "../../utils/editorGraph";
 import {
     PARALLEL_BOTTOM_PADDING,
     PARALLEL_HEADER_HEIGHT,
@@ -24,9 +25,14 @@ export function useEditorFlowChanges({
     edges,
     slotNodes,
     slotEdges,
+    manualSlots,
+    getDocumentSnapshot,
     setNodes,
     setEdges,
     setSlotEdges,
+    setManualSlots,
+    checkSlotConnection,
+    syncSlotsAfterCommit,
     updateNodeInternals,
     syncRemovedStates,
     syncTransitionSources,
@@ -36,6 +42,7 @@ export function useEditorFlowChanges({
     // React Flow may still emit a remove for the old edge afterwards; remember
     // those edge IDs so the follow-up removal can be ignored once.
     const remappedSlotCloneEdgeIdsRef = useRef(new Set());
+    const protectedSlotEdgeIdsRef = useRef(new Set());
 
     // React Flow replaces the nodes array for every live position update. The
     // change handlers only need the full arrays for rare structural/removal
@@ -43,20 +50,39 @@ export function useEditorFlowChanges({
     // callbacks on every drag frame.
     const nodesRef = useRef(nodes);
     const slotNodesRef = useRef(slotNodes);
+    const slotModelRef = useRef({ slotEdges, manualSlots });
     useLayoutEffect(() => {
         nodesRef.current = nodes;
         slotNodesRef.current = slotNodes;
-    }, [nodes, slotNodes]);
+        slotModelRef.current = { slotEdges, manualSlots };
+    }, [nodes, slotNodes, slotEdges, manualSlots]);
 
     const handleNodesChange = useCallback(
         (changes) => {
             const graphChanges = [];
             const slotChanges = [];
+            const live = changes.some((change) => change.type === "remove")
+                ? getDocumentSnapshot?.() || { nodes: nodesRef.current, slotNodes: slotNodesRef.current, ...slotModelRef.current }
+                : null;
 
             changes.forEach((change) => {
-                if (nodeById.has(change.id)) {
+                if (nodeById.has(change.id) || live?.nodes.some((node) => node.id === change.id)) {
                     graphChanges.push(change);
-                } else if (slotNodeIdSet.has(change.id)) {
+                } else if (slotNodeIdSet.has(change.id) || live?.slotNodes.some((node) => node.id === change.id)) {
+                    if (change.type === "remove" && isSlotDeletionProtected(
+                        live.slotNodes.find((node) => node.id === change.id), live
+                    )) {
+                        (live.slotEdges || []).forEach((edge) => {
+                            if (edge.source === change.id || edge.target === change.id) {
+                                protectedSlotEdgeIdsRef.current.add(edge.id);
+                            }
+                        });
+                        // React Flow emits connected-edge removals in the same
+                        // deletion batch. Do not let a rejected node removal
+                        // disconnect its bindings, or veto a later manual unlink.
+                        queueMicrotask(() => protectedSlotEdgeIdsRef.current.clear());
+                        return;
+                    }
                     slotChanges.push(change);
                 }
             });
@@ -76,7 +102,7 @@ export function useEditorFlowChanges({
                 if (removalChanges.length === 0) {
                     onNodesChange(graphChanges);
                 } else {
-                    const currentNodes = nodesRef.current;
+                    const currentNodes = live.nodes;
                     const removedNodeIds = new Set(
                         removalChanges.map((change) => change.id)
                     );
@@ -329,7 +355,8 @@ export function useEditorFlowChanges({
                     const refreshSlots = removedSemanticNodes.some(
                         (node) =>
                             (node.data?.inSlots || []).some((slot) => slot?.path) ||
-                            (node.data?.outSlots || []).some((slot) => slot?.path)
+                            (node.data?.outSlots || []).some((slot) => slot?.path) ||
+                            (node.data?.inheritedSlots || []).some((slot) => slot?.path)
                     );
                     void syncRemovedStates(
                         [...semanticRemovalIds],
@@ -339,15 +366,17 @@ export function useEditorFlowChanges({
                             referenceSourceIds,
                         }
                     );
+                    if (getDocumentSnapshot && checkSlotConnection) checkSlotConnection();
                 }
                 }
             }
             if (slotChanges.length > 0) {
                 const removedSlotCloneIds = new Map();
+                const removedPaths = new Set();
                 slotChanges
                     .filter((change) => change.type === "remove")
                     .forEach((change) => {
-                        const removedNode = slotNodesRef.current.find(
+                        const removedNode = live.slotNodes.find(
                             (node) => node.id === change.id
                         );
                         if (
@@ -358,6 +387,8 @@ export function useEditorFlowChanges({
                                 removedNode.id,
                                 removedNode.data.cloneOfNodeId
                             );
+                        } else if (removedNode) {
+                            removedPaths.add(getSlotPathFromNode(removedNode));
                         }
                     });
 
@@ -365,7 +396,8 @@ export function useEditorFlowChanges({
                     setSlotEdges((currentEdges) =>
                         currentEdges.map((edge) => {
                             const canonicalSlotNodeId =
-                                removedSlotCloneIds.get(edge.target);
+                                removedSlotCloneIds.get(edge.data?.slotNodeId ||
+                                    (edge.data?.access === "read" ? edge.source : edge.target));
                             if (!canonicalSlotNodeId) return edge;
 
                             remappedSlotCloneEdgeIdsRef.current.add(edge.id);
@@ -373,7 +405,9 @@ export function useEditorFlowChanges({
                             return {
                                 ...edge,
                                 id: `${edge.id}-clone-remap-${crypto.randomUUID()}`,
-                                target: canonicalSlotNodeId,
+                                ...(edge.data?.access === "read"
+                                    ? { source: canonicalSlotNodeId }
+                                    : { target: canonicalSlotNodeId }),
                                 data: {
                                     ...(edge.data || {}),
                                     slotNodeId: canonicalSlotNodeId,
@@ -385,7 +419,38 @@ export function useEditorFlowChanges({
                     );
                 }
 
+                if (removedPaths.size > 0) {
+                    setNodes((currentNodes) => currentNodes.map((node) => {
+                        let data = node.data;
+                        for (const key of ["inSlots", "outSlots"]) {
+                            const slots = data?.[key];
+                            if (!slots?.some((slot) => removedPaths.has(normalizeSlotPath(slot?.inherited?.xpath || slot?.path)))) continue;
+                            data = { ...data, [key]: slots.map((slot) =>
+                                removedPaths.has(normalizeSlotPath(slot?.inherited?.xpath || slot?.path))
+                                    ? { ...slot, path: "", inherited: null } : slot) };
+                        }
+                        return data === node.data ? node : { ...node, data };
+                    }));
+                    setManualSlots?.((slots) => slots.filter((slot) =>
+                        !removedPaths.has(normalizeSlotPath(slot?.inherited?.xpath || slot?.path))));
+                    const removedVisualIds = new Set(live.slotNodes.filter((node) =>
+                        removedPaths.has(getSlotPathFromNode(node))).map((node) => node.id));
+                    setSlotEdges((currentEdges) => currentEdges.filter((edge) =>
+                        !removedPaths.has(normalizeSlotPath(edge.data?.path)) &&
+                        !removedVisualIds.has(edge.source) && !removedVisualIds.has(edge.target)));
+                    (live.slotNodes || []).forEach((node) => {
+                        if (node.data?.isSlotClone && removedPaths.has(getSlotPathFromNode(node)) &&
+                            !slotChanges.some((change) => change.type === "remove" && change.id === node.id)) {
+                            slotChanges.push({ id: node.id, type: "remove" });
+                        }
+                    });
+                }
                 onSlotNodesChange(slotChanges);
+                if (removedPaths.size > 0) {
+                    if (getDocumentSnapshot && checkSlotConnection) checkSlotConnection();
+                    void Promise.resolve(syncSlotsAfterCommit?.()).catch((error) =>
+                        console.warn("Could not synchronize slot deletion.", error));
+                }
             }
         },
         [
@@ -397,23 +462,37 @@ export function useEditorFlowChanges({
             setNodes,
             setSlotEdges,
             syncRemovedStates,
+            getDocumentSnapshot,
+            setManualSlots,
+            checkSlotConnection,
+            syncSlotsAfterCommit,
         ]
     );
 
     const handleVisibleEdgesChange = useCallback(
         (changes) => {
             const ignoredRemapIds = remappedSlotCloneEdgeIdsRef.current;
+            const live = getDocumentSnapshot?.() || { nodes: nodesRef.current, slotNodes: slotNodesRef.current, ...slotModelRef.current };
+            const currentSlotEdges = live.slotEdges || [];
             const effectiveChanges = changes.filter((change) => {
                 const shouldIgnore =
-                    change.type === "remove" && ignoredRemapIds.has(change.id);
+                    change.type === "remove" && (ignoredRemapIds.has(change.id) || protectedSlotEdgeIdsRef.current.has(change.id));
                 if (shouldIgnore) {
                     ignoredRemapIds.delete(change.id);
                 }
-                return !shouldIgnore;
+                if (shouldIgnore) return false;
+                const edge = change.type === "remove" && currentSlotEdges.find((edge) => edge.id === change.id);
+                if (change.type === "remove" && !edge && !(live.edges || edges).some((edge) => edge.id === change.id)) return false;
+                // Fixed child requirements are not writable child bindings.
+                // Also guard the selected canonical slot if Flow reports its
+                // connected edges before the rejected node-removal callback.
+                if (edge && (edge.data?.subMachineInherited || live.slotNodes.some((node) =>
+                    node.selected && (edge.source === node.id || edge.target === node.id) && isSlotDeletionProtected(node, live)))) return false;
+                return true;
             });
 
             const slotEdgeIds = new Set(
-                (slotEdges || []).map((edge) => edge.id)
+                currentSlotEdges.map((edge) => edge.id)
             );
 
             const slotChanges = effectiveChanges.filter((change) =>
@@ -616,7 +695,7 @@ export function useEditorFlowChanges({
             );
 
             if (removedIds.size > 0) {
-                const removedEdges = (slotEdges || []).filter((edge) =>
+                const removedEdges = currentSlotEdges.filter((edge) =>
                     removedIds.has(edge.id)
                 );
 
@@ -625,12 +704,15 @@ export function useEditorFlowChanges({
                         let nextNode = node;
 
                         removedEdges.forEach((edge) => {
+                            if (edge.data?.subMachineInherited) return;
                             const access = edge.data?.access;
+                            const skillNodeId = edge.data?.skillNodeId ||
+                                (access === "read" ? edge.target : edge.source);
                             const slotIndex = Number(edge.data?.slotIndex);
 
                             if (
                                 access === "read" &&
-                                (edge.data?.skillNodeId || edge.source) === node.id &&
+                                skillNodeId === node.id &&
                                 Number.isInteger(slotIndex) &&
                                 node.data?.inSlots?.[slotIndex]
                             ) {
@@ -650,7 +732,7 @@ export function useEditorFlowChanges({
 
                             if (
                                 access === "write" &&
-                                (edge.data?.skillNodeId || edge.source) === node.id &&
+                                skillNodeId === node.id &&
                                 Number.isInteger(slotIndex) &&
                                 node.data?.outSlots?.[slotIndex]
                             ) {
@@ -675,9 +757,12 @@ export function useEditorFlowChanges({
             }
 
             onSlotEdgesChange(slotChanges);
+            if (removedIds.size > 0) {
+                void Promise.resolve(syncSlotsAfterCommit?.()).catch((error) =>
+                    console.warn("Could not synchronize slot disconnection.", error));
+            }
         },
         [
-            slotEdges,
             edges,
             onEdgesChange,
             onSlotEdgesChange,
@@ -685,6 +770,8 @@ export function useEditorFlowChanges({
             setEdges,
             updateNodeInternals,
             syncTransitionSources,
+            getDocumentSnapshot,
+            syncSlotsAfterCommit,
         ]
     );
 

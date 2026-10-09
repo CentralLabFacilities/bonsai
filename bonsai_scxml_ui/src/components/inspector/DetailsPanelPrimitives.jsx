@@ -20,12 +20,14 @@ function NodeReferenceCard({
                                onNavigate,
                                onHover,
                                hoverFallbackId = null,
+                               className = "slot-text-field compact-slot-card slot-access-skill-card exit-token-node-reference",
+                               badgeClassName = "slot-access-badge exit-token-node-reference-badge",
                            }) {
     if (!nodeId || !name) return null;
 
     return (
         <div
-            className="slot-text-field compact-slot-card slot-access-skill-card exit-token-node-reference"
+            className={className}
             role="button"
             tabIndex={0}
             title={`Open ${name}`}
@@ -55,7 +57,7 @@ function NodeReferenceCard({
                 <div className="compact-slot-name">{name}</div>
                 <div className="compact-slot-badges">
                     {badge && (
-                        <span className="slot-access-badge exit-token-node-reference-badge">
+                        <span className={badgeClassName}>
                             {badge}
                         </span>
                     )}

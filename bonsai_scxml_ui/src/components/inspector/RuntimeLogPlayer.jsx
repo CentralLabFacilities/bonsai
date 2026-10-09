@@ -12,6 +12,8 @@ import {
 export default function RuntimeLogPlayer({
     runtimePlayback,
     isDraggingNode = false,
+    isRunPanelOpen = false,
+    onOpenRuntimeCommander,
     onLoadRuntimeLog,
     onRuntimePlayPause,
     onRuntimeRestart,
@@ -22,6 +24,18 @@ export default function RuntimeLogPlayer({
     onRuntimeDelayChange,
 }) {
     const runtimeLogInputRef = useRef(null);
+    const runButton = onOpenRuntimeCommander && (
+        <button
+            type="button"
+            className="runtime-run-button"
+            onClick={onOpenRuntimeCommander}
+            title="Run the open state machine with Bonsai WebCommander"
+            aria-haspopup="dialog"
+        >
+            <FiPlay aria-hidden="true" />
+            <span>Run</span>
+        </button>
+    );
 
     return (
         <>
@@ -45,19 +59,22 @@ export default function RuntimeLogPlayer({
             />
 
             {!runtimePlayback?.loaded ? (
-                <button
-                    type="button"
-                    className="runtime-log-load-button"
-                    hidden={isDraggingNode}
-                    onClick={() => runtimeLogInputRef.current?.click()}
-                    title="Load a SkillStateMachine runtime log"
-                >
-                    <FiFolder />
-                    <span>Load log</span>
-                </button>
+                <div className="runtime-launch-controls" hidden={isDraggingNode || isRunPanelOpen}>
+                    {runButton}
+                    <button
+                        type="button"
+                        className="runtime-log-load-button"
+                        onClick={() => runtimeLogInputRef.current?.click()}
+                        title="Load a SkillStateMachine runtime log"
+                    >
+                        <FiFolder />
+                        <span>Load log</span>
+                    </button>
+                </div>
             ) : (
-                <div className="runtime-log-player" role="region" aria-label="Runtime log playback" hidden={isDraggingNode}>
+                <div className="runtime-log-player" role="region" aria-label="Runtime log playback" hidden={isDraggingNode || isRunPanelOpen}>
                     <div className="runtime-log-player-header">
+                        {runButton}
                         <button
                             type="button"
                             className="runtime-log-file-button"

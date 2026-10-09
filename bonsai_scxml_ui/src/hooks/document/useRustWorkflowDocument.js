@@ -823,8 +823,9 @@ export function useRustWorkflowDocument({
     );
 
     const syncSlotsAfterCommit = useCallback(
-        (editorStateOverride = null, debugContext = null) =>
-            enqueue(async () => {
+        (editorStateOverride = null, debugContext = null) => {
+            const generation = documentGenerationRef.current;
+            return enqueue(async () => {
                 if (!isTauri()) return null;
 
                 slotDebug("slot-sync: queued operation started", {
@@ -843,6 +844,7 @@ export function useRustWorkflowDocument({
                 if (!editorStateOverride) {
                     await waitForEditorCommit();
                 }
+                if (generation !== documentGenerationRef.current) return null;
 
                 const currentEditorState = editorStateRef.current || {};
                 const editorState = editorStateOverride
@@ -872,7 +874,8 @@ export function useRustWorkflowDocument({
                     patchedStates: result?.patch?.states?.length || 0,
                 });
                 return result;
-            }),
+            }, generation);
+        },
         [applyCommandNow, enqueue]
     );
 
