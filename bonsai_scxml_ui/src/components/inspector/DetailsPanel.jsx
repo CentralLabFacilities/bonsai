@@ -54,6 +54,7 @@ function DetailsPanel({
                           skillOutgoingTransitions = [],
                           onNavigateTransitionNode,
                           onHoverTransitionNode,
+                          onHoverTransitionEdge,
                           onOpenTransitionPanel,
                           parallelLanes = [],
                           onAddParallelLane,
@@ -213,7 +214,7 @@ function DetailsPanel({
                     String(request.eventId || "")
             );
             if (eventIndex >= 0) {
-                inputId = `transition-target-${selectedNode.id}-${eventIndex}`;
+                inputId = `exit-token-${selectedNode.id}-${eventIndex}`;
             }
         }
 
@@ -433,6 +434,7 @@ function DetailsPanel({
                         onSetEventTarget={onSetEventTarget}
                         onNavigateTransitionNode={onNavigateTransitionNode}
                         onHoverTransitionNode={onHoverTransitionNode}
+                        onHoverTransitionEdge={onHoverTransitionEdge}
                         onOpenTransitionPanel={onOpenTransitionPanel}
                         onAddParallelLane={onAddParallelLane}
                         onRenameParallelLane={onRenameParallelLane}

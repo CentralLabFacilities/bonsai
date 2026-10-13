@@ -163,7 +163,8 @@ fn build_normal_transitions(
     }
 
     for (event_index, event) in node.events.iter().enumerate() {
-        if event.target.trim().is_empty() {
+        if event.target.trim().is_empty() ||
+            !index.nodes_by_id.contains_key(index.semantic_state_id(&event.target).as_str()) {
             continue;
         }
         if index.transition_owner_id(&node.id, &event.target) != Some(node.id.as_str()) {
@@ -201,7 +202,8 @@ fn build_normal_transitions(
     combined
         .into_iter()
         .filter_map(|(raw_event, target_id, condition, assignments, id, logical_sources)| {
-            if target_id.trim().is_empty() {
+            if target_id.trim().is_empty()
+                || !index.nodes_by_id.contains_key(index.semantic_state_id(&target_id).as_str()) {
                 return None;
             }
             let (target_state_id, target_scxml_id) = target_details(&target_id, index);
@@ -261,6 +263,9 @@ fn build_container_transitions(
     let mut seen = HashMap::new();
 
     for (_, edge) in leaving {
+        if !index.nodes_by_id.contains_key(index.semantic_state_id(&edge.target).as_str()) {
+            continue;
+        }
         let source = index.nodes_by_id.get(edge.source.as_str());
         let raw_handle = if !edge.source_handle.trim().is_empty() {
             edge.source_handle.trim()
@@ -300,6 +305,7 @@ fn build_container_transitions(
 
     for (event_index, event) in node.events.iter().enumerate() {
         if event.target.trim().is_empty()
+            || !index.nodes_by_id.contains_key(index.semantic_state_id(&event.target).as_str())
             || (!event.source_node_id.trim().is_empty()
                 && !event.transition_handle_id.trim().is_empty())
         {

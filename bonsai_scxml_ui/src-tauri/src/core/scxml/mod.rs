@@ -58,6 +58,31 @@ mod tests {
     }
 
     #[test]
+    fn reads_legacy_and_prefixed_editor_metadata_and_writes_only_prefixed() {
+        let legacy = SAMPLE;
+        let prefixed = legacy.replace("<metadata>", "<editor:metadata>")
+            .replace("</metadata>", "</editor:metadata>");
+
+        for source in [legacy, prefixed.as_str()] {
+            let workflow = parse_scxml(source).expect("both metadata formats must parse");
+            let state = workflow.states.iter()
+                .find(|state| state.scxml_id == "ExecSetup")
+                .expect("compound state");
+            assert_eq!(state.editor.x, 100.0);
+            assert_eq!(state.editor.y, 200.0);
+
+            let saved = serialize_scxml(&workflow).expect("save must succeed");
+            assert!(saved.contains("<editor:metadata>"));
+            assert!(saved.contains("</editor:metadata>"));
+            assert!(!saved.contains("<metadata>"));
+            let reopened = parse_scxml(&saved).expect("prefixed output must reopen");
+            assert_eq!(reopened.states.iter()
+                .find(|state| state.scxml_id == "ExecSetup")
+                .unwrap().editor.x, 100.0);
+        }
+    }
+
+    #[test]
     fn preserves_duplicate_scxml_ids_with_unique_internal_ids() {
         let workflow = parse_scxml(
             r#"<scxml initial="lookAtFace"><parallel id="P"><state id="lookAtFace" initial="lookAtFace"><state id="lookAtFace"/></state></parallel></scxml>"#,

@@ -21,6 +21,7 @@ export function useEditorDetailsCallbacks(callbacks) {
         onMoveContainerTransition: (...args) => latest.current.onMoveContainerTransition?.(...args),
         onNavigateTransitionNode: (...args) => latest.current.onNavigateTransitionNode?.(...args),
         onHoverTransitionNode: (...args) => latest.current.onHoverTransitionNode?.(...args),
+        onHoverTransitionEdge: (...args) => latest.current.onHoverTransitionEdge?.(...args),
         onOpenTransitionPanel: (...args) => latest.current.onOpenTransitionPanel?.(...args),
         onAddParallelLane: (...args) => latest.current.onAddParallelLane?.(...args),
         onRenameParallelLane: (...args) => latest.current.onRenameParallelLane?.(...args),

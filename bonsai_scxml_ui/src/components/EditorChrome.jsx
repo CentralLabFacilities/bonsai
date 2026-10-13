@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
     FiFolder,
     FiSave,
@@ -8,6 +8,7 @@ import {
     FiX,
     FiChevronLeft,
     FiChevronRight,
+    FiChevronDown,
     FiAlertCircle,
 } from "react-icons/fi";
 import { isTauri } from "../tauri-client.js";
@@ -18,57 +19,121 @@ import { Button, IconButton } from "./ui/index.js";
 function Header({ onOpenFile, onSaveFile, onSaveAsFile, hasFilePath, isSaving = false, isOpening = false, panels }) {
     const IS_DESKTOP = isTauri();
 
+    const [fileMenuOpen, setFileMenuOpen] = useState(false);
+    const fileMenuRef = useRef(null);
+    const fileMenuButtonRef = useRef(null);
+
+    useEffect(() => {
+        if (!fileMenuOpen) return undefined;
+        const closeOnOutsideClick = (event) => {
+            if (!fileMenuRef.current?.contains(event.target)) setFileMenuOpen(false);
+        };
+        const closeOnEscape = (event) => {
+            if (event.key !== "Escape") return;
+            event.preventDefault();
+            event.stopPropagation();
+            setFileMenuOpen(false);
+            fileMenuButtonRef.current?.focus();
+        };
+        const frame = window.requestAnimationFrame(() => {
+            fileMenuRef.current?.querySelector('[role="menuitem"]:not(:disabled)')?.focus();
+        });
+        document.addEventListener("pointerdown", closeOnOutsideClick);
+        document.addEventListener("keydown", closeOnEscape, true);
+        return () => {
+            window.cancelAnimationFrame(frame);
+            document.removeEventListener("pointerdown", closeOnOutsideClick);
+            document.removeEventListener("keydown", closeOnEscape, true);
+        };
+    }, [fileMenuOpen]);
+
+    const runFileAction = (action) => {
+        setFileMenuOpen(false);
+        void action?.();
+    };
+
+    const handleFileMenuKeys = (event) => {
+        if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+        const items = Array.from(fileMenuRef.current?.querySelectorAll('[role="menuitem"]:not(:disabled)') || []);
+        if (items.length === 0) return;
+        event.preventDefault();
+        const index = items.indexOf(document.activeElement);
+        const next = event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 :
+            event.key === "ArrowDown" ? (index + 1) % items.length :
+                (index - 1 + items.length) % items.length;
+        items[next].focus();
+    };
+
     return (
         <header className="header">
             <div className="header-left">
-                <Button
-                    size="sm"
-                    className="menu-button"
-                    leadingIcon={<FiFolder />}
-                    onClick={() => void onOpenFile?.()}
-                    disabled={isSaving || isOpening}
+                <div
+                    className="editor-file-menu"
+                    ref={fileMenuRef}
+                    onKeyDown={handleFileMenuKeys}
+                    onBlurCapture={(event) => {
+                        if (!event.currentTarget.contains(event.relatedTarget)) {
+                            setFileMenuOpen(false);
+                        }
+                    }}
                 >
-                    {isOpening ? "Opening..." : "Open"}
-                </Button>
-
-                {/* Save button - direct save when a desktop path is known. */}
-                {IS_DESKTOP && hasFilePath ? (
                     <Button
-                        variant="primary"
+                        ref={fileMenuButtonRef}
                         size="sm"
-                        className="menu-button highlight-save-button"
-                        leadingIcon={<FiSave />}
-                        onClick={() => void onSaveFile?.()}
-                        disabled={isSaving || isOpening}
+                        className={`menu-button editor-file-menu-trigger ${fileMenuOpen ? "active" : ""}`}
+                        trailingIcon={<FiChevronDown />}
+                        aria-haspopup="menu"
+                        aria-expanded={fileMenuOpen}
+                        aria-controls="editor-file-menu-items"
+                        onClick={() => setFileMenuOpen((open) => !open)}
+                        onKeyDown={(event) => {
+                            if (!fileMenuOpen && ["ArrowDown", "ArrowUp"].includes(event.key)) {
+                                event.preventDefault();
+                                setFileMenuOpen(true);
+                            }
+                        }}
                     >
-                        {isSaving ? "Saving…" : "Save"}
+                        File
                     </Button>
-                ) : null}
-
-                {/* SCXML file operations require the desktop Rust backend. */}
-                {IS_DESKTOP ? (
-                    <Button
-                        variant="primary"
-                        size="sm"
-                        className="menu-button highlight-save-button"
-                        leadingIcon={<FiDownload />}
-                        onClick={() => void onSaveAsFile?.()}
-                        disabled={isSaving || isOpening}
-                    >
-                        Save as..
-                    </Button>
-                ) : (
-                    <Button
-                        variant="primary"
-                        size="sm"
-                        className="menu-button highlight-save-button"
-                        leadingIcon={<FiSave />}
-                        onClick={() => void onSaveFile?.()}
-                        disabled={isSaving || isOpening}
-                    >
-                        {isSaving ? "Saving…" : "Save"}
-                    </Button>
-                )}
+                    {fileMenuOpen && (
+                        <div
+                            id="editor-file-menu-items"
+                            className="editor-file-menu-dropdown"
+                            role="menu"
+                            aria-label="File"
+                        >
+                            <button
+                                type="button"
+                                role="menuitem"
+                                disabled={isSaving || isOpening}
+                                onClick={() => runFileAction(onOpenFile)}
+                            >
+                                <FiFolder aria-hidden="true" />
+                                {isOpening ? "Opening..." : "Open"}
+                            </button>
+                            <button
+                                type="button"
+                                role="menuitem"
+                                disabled={isSaving || isOpening || (IS_DESKTOP && !hasFilePath)}
+                                onClick={() => runFileAction(onSaveFile)}
+                            >
+                                <FiSave aria-hidden="true" />
+                                {isSaving ? "Saving…" : "Save"}
+                            </button>
+                            {IS_DESKTOP && (
+                                <button
+                                    type="button"
+                                    role="menuitem"
+                                    disabled={isSaving || isOpening}
+                                    onClick={() => runFileAction(onSaveAsFile)}
+                                >
+                                    <FiDownload aria-hidden="true" />
+                                    Save As…
+                                </button>
+                            )}
+                        </div>
+                    )}
+                </div>
 
                 <h2>Bonsai UI</h2>
             </div>

@@ -19,7 +19,7 @@
 
 /* Hover is deliberately lighter than selection. EditorCanvas applies this
    class imperatively so large graphs do not re-render on pointer movement. */
-.react-flow__node.editor-hover-highlight {
+.react-flow__node:is(.editor-hover-highlight, .editor-canvas-fast-hover-highlight) {
     outline: none !important;
     box-shadow: var(--ui-state-hover-ring);
 }
@@ -49,7 +49,7 @@
         0 0 0 6px rgba(56, 189, 248, 0.42) !important;
 }
 
-.react-flow__node.editor-node-problem.editor-hover-highlight:not(.selected) {
+.react-flow__node.editor-node-problem:is(.editor-hover-highlight, .editor-canvas-fast-hover-highlight):not(.selected) {
     box-shadow:
         var(--ui-state-invalid-ring),
         0 0 0 6px rgba(147, 197, 253, 0.28) !important;
@@ -65,12 +65,12 @@
 /* A reference target is related, not hovered or selected. A dashed cyan ring
    makes that relationship clear while allowing selection/problem rings to
    remain visible at the same time. */
-.react-flow__node.editor-reference-target-highlight {
+.react-flow__node:is(.editor-reference-target-highlight, .editor-canvas-fast-reference-target-highlight) {
     outline: 2px dashed var(--ui-state-reference-target) !important;
     outline-offset: 5px;
 }
 
-.react-flow__node.editor-reference-target-highlight.selected {
+.react-flow__node:is(.editor-reference-target-highlight, .editor-canvas-fast-reference-target-highlight).selected {
     outline-offset: 6px;
 }
 
@@ -111,13 +111,13 @@
 }
 
 /* Focus mode ------------------------------------------------------------- */
-.react-flow.editor-node-focus-mode
-.react-flow__node:not(.editor-node-context-visible):not(.selected) {
+.react-flow:is(.editor-node-focus-mode, .editor-canvas-fast-node-focus-mode)
+.react-flow__node:not(.editor-node-context-visible):not(.editor-canvas-fast-node-context-visible):not(.selected) {
     opacity: var(--ui-state-dimmed-opacity);
 }
 
-.react-flow.editor-node-focus-mode
-.react-flow__node.editor-reference-target-highlight {
+.react-flow:is(.editor-node-focus-mode, .editor-canvas-fast-node-focus-mode)
+.react-flow__node:is(.editor-reference-target-highlight, .editor-canvas-fast-reference-target-highlight) {
     opacity: 1;
     filter: none;
 }
@@ -131,7 +131,7 @@
 }
 
 /* Hover/focus keeps the semantic edge colour but increases weight. */
-.react-flow__edge.editor-edge-focus-active .react-flow__edge-path {
+.react-flow__edge:is(.editor-edge-focus-active, .editor-canvas-fast-edge-focus-active) .react-flow__edge-path {
     stroke-width: 2.7px !important;
     filter: drop-shadow(0 0 2px rgba(147, 197, 253, 0.48));
 }
@@ -168,10 +168,10 @@
         drop-shadow(0 0 5px rgba(56, 189, 248, 0.42));
 }
 
-.react-flow.editor-edge-focus-mode
-.react-flow__edge.editor-transition-edge:not(.editor-edge-focus-active):not(.editor-edge-selection-related):not(.selected),
-.react-flow.editor-edge-focus-mode
-.react-flow__edge.editor-slot-edge:not(.editor-edge-focus-active):not(.editor-edge-selection-related):not(.selected) {
+.react-flow:is(.editor-edge-focus-mode, .editor-canvas-fast-edge-focus-mode)
+.react-flow__edge.editor-transition-edge:not(.editor-edge-focus-active):not(.editor-canvas-fast-edge-focus-active):not(.editor-edge-selection-related):not(.selected),
+.react-flow:is(.editor-edge-focus-mode, .editor-canvas-fast-edge-focus-mode)
+.react-flow__edge.editor-slot-edge:not(.editor-edge-focus-active):not(.editor-canvas-fast-edge-focus-active):not(.editor-edge-selection-related):not(.selected) {
     opacity: var(--ui-state-dimmed-opacity);
 }
 

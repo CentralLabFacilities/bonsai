@@ -1006,7 +1006,7 @@ export function useRustWorkflowDocument({
     );
 
     const syncTransitionSources = useCallback(
-        (sourceStateIds) =>
+        (sourceStateIds, { preserveContainerOrder = false } = {}) =>
             enqueue(async () => {
                 if (!isTauri()) return null;
 
@@ -1037,7 +1037,7 @@ export function useRustWorkflowDocument({
                 // rules. Rebuild only the transition projection in Rust so their
                 // logical SCXML owner, full event and target-instance routing stay
                 // correct without replacing unrelated workflow state.
-                if (plans.some((plan) => plan?.mode === "full")) {
+                if (preserveContainerOrder || plans.some((plan) => plan?.mode === "full")) {
                     return syncEditorTransitionsNow(editorState);
                 }
 
@@ -1052,7 +1052,7 @@ export function useRustWorkflowDocument({
     );
 
     const syncTransitionsForSource = useCallback(
-        (sourceStateId) => syncTransitionSources([sourceStateId]),
+        (sourceStateId, options) => syncTransitionSources([sourceStateId], options),
         [syncTransitionSources]
     );
 

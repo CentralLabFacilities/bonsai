@@ -269,8 +269,11 @@ export default function EditorOverlays({
                         availableEvents={condition.drawer.availableEvents}
                         availableTargets={condition.drawer.availableTargets}
                         initialTransitionId={condition.drawer.initialTransitionId}
+                        initialFocusSection={condition.drawer.initialFocusSection}
+                        onHoverTransitionEdge={condition.onHoverTransitionEdge}
                         initialTargetId={condition.drawer.initialTargetId}
                         targetOnlyMode={condition.drawer.targetOnlyMode}
+                        defaultScope={condition.drawer.defaultScope}
                     />
                 )}
                 {slots.isOpen && (

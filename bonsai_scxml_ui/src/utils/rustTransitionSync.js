@@ -6,7 +6,7 @@ import {
 } from "./transitionSemantics";
 import {
     serializeEditorConditionForScxml,
-    serializeEditorValueForScxml,
+    serializeEditorAssignmentForScxml,
 } from "./valueTypes";
 
 const isSemanticTransitionEdge = (edge) =>
@@ -26,7 +26,7 @@ const normalizeAssignments = (edge) =>
         )
         .map((assignment) => ({
             location: String(assignment.location).trim().replace(/^@/, ""),
-            expression: serializeEditorValueForScxml(assignment.expr ?? ""),
+            expression: serializeEditorAssignmentForScxml(assignment.expr ?? ""),
         }));
 
 const semanticTargetId = (edge, nodes, nodeById) => {

@@ -288,8 +288,8 @@ const rebuildBoundaryTransitionsImpl = (sourceNodes = [], sourceEdges = []) => {
                             selectable: false,
                             focusable: false,
                             style: {
-                                strokeDasharray: "4 4",
-                                stroke: "#0284c7",
+                                // The helper is solid and neutral at rest.
+                                // Hover and selection style it like its outer transition.
                                 strokeWidth: 1.5,
                             },
                             data: {

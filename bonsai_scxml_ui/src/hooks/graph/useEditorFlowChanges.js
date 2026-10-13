@@ -3,6 +3,7 @@ import { applyEdgeChanges } from "@xyflow/react";
 
 import { rebuildBoundaryTransitionsIncremental } from "../../utils/boundaryTransitions";
 import { isWildcardTransitionEvent } from "../../utils/transitionEvents";
+import { cleanEventsForDeletedStates } from "../../utils/transitionDeletion";
 import { getSlotPathFromNode, isSlotDeletionProtected, normalizeSlotPath } from "../../utils/editorGraph";
 import {
     PARALLEL_BOTTOM_PADDING,
@@ -195,35 +196,17 @@ export function useEditorFlowChanges({
                         })
                     );
 
-                    // Remove the editor-only border handle belonging to a
-                    // deleted source skill as well. Otherwise the Compound or
-                    // Parallel could keep showing a stale skill.event point.
+                    // Deleting a target removes its visible edge, but event
+                    // transition metadata lives independently on the source
+                    // node. Clear both or Rust can export a dangling target ID.
                     setNodes((currentNodes) =>
                         currentNodes.map((node) => {
-                            if (
-                                node.type !== "compound" &&
-                                node.type !== "parallelLane"
-                            ) {
-                                return node;
-                            }
-
                             const currentEvents = node.data?.events || [];
-                            const nextEvents = currentEvents.filter(
-                                (event) =>
-                                    !removedNodeIds.has(event?.sourceNodeId)
-                            );
-
-                            if (nextEvents.length === currentEvents.length) {
-                                return node;
-                            }
-
-                            return {
-                                ...node,
-                                data: {
-                                    ...(node.data || {}),
-                                    events: nextEvents,
-                                },
-                            };
+                            const nextEvents = cleanEventsForDeletedStates(currentEvents, removedNodeIds);
+                            return nextEvents.length === currentEvents.length &&
+                                nextEvents.every((event, index) => event === currentEvents[index])
+                                ? node
+                                : { ...node, data: { ...node.data, events: nextEvents } };
                         })
                     );
 

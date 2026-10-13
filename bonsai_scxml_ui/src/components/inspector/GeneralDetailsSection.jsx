@@ -1,12 +1,10 @@
-import { memo, useMemo, useRef, useState } from "react";
-import { FiActivity, FiChevronDown, FiExternalLink, FiLayers } from "react-icons/fi";
+import { memo, useMemo } from "react";
+import { FiActivity, FiExternalLink, FiLayers } from "react-icons/fi";
 import ParallelLaneEditor from "./ParallelLaneEditor.jsx";
 import { NodeReferenceCard } from "./DetailsPanelPrimitives.jsx";
 import {
     createDetailsTargetIndex,
     getExitTokenType,
-    getMatchingTargetNodeOptions,
-    getSemanticTargetNodeIds as selectSemanticTargetNodeIds,
     getSkillPackageName,
 } from "./selectors.js";
 
@@ -18,205 +16,129 @@ const formatResourceKeys = (items) => {
     return keys.length > 0 ? keys.join(", ") : "—";
 };
 
+/** The badges reflect transitions, not exit-token definitions without an edge. */
+function TransitionDetailBadges({ transitions, onOpen, onHover }) {
+    const conditioned = transitions.find((transition) => String(transition.cond || "").trim());
+    const assigned = transitions.find((transition) =>
+        Array.isArray(transition.assignments) &&
+        transition.assignments.some((assignment) => assignment?.location)
+    );
+    if (!conditioned && !assigned) return null;
+    return (
+        <span className="exit-token-transition-annotations">
+            {conditioned && <button type="button" className="editor-transition-annotation"
+                title={`Condition: ${conditioned.cond}`}
+                aria-label="Edit transition condition"
+                onMouseEnter={(event) => onHover?.(conditioned.edgeId, event)}
+                onMouseLeave={(event) => onHover?.(null, event)}
+                onFocus={(event) => onHover?.(conditioned.edgeId, event)}
+                onBlur={(event) => onHover?.(null, event)}
+                onClick={(event) => { event.stopPropagation(); onOpen?.(conditioned, "condition"); }}>c</button>}
+            {assigned && <button type="button" className="editor-transition-annotation"
+                title={assigned.assignments.filter((entry) => entry?.location)
+                    .map((entry) => `${entry.location} = ${entry.expr || ""}`).join("\n")}
+                aria-label="Edit transition assignments"
+                onMouseEnter={(event) => onHover?.(assigned.edgeId, event)}
+                onMouseLeave={(event) => onHover?.(null, event)}
+                onFocus={(event) => onHover?.(assigned.edgeId, event)}
+                onBlur={(event) => onHover?.(null, event)}
+                onClick={(event) => { event.stopPropagation(); onOpen?.(assigned, "assignment"); }}>a</button>}
+        </span>
+    );
+}
+
+/** One exit-token definition with zero or more actual outgoing transitions. */
 const ExitTokenRow = memo(function ExitTokenRow({
     nodeId,
     event,
     index,
     targetNodeIndex,
-    onSetEventTarget,
+    eventVariants = [],
     onNavigateTransitionNode,
     onHoverTransitionNode,
+    onHoverTransitionEdge,
+    onOpenTransitionPanel,
+    outgoingTransitions = [],
 }) {
-    const targetNodeIds = selectSemanticTargetNodeIds(event, targetNodeIndex);
-    const targetNodeId = targetNodeIds[0] || null;
-    const displayName = String(targetNodeIndex.byId.get(targetNodeId)?.displayName || targetNodeId || "");
-    const source = JSON.stringify([event.target, targetNodeIds, displayName]);
-    const [draft, setDraft] = useState({ source, value: displayName, committed: displayName, selectedId: null });
-    const [isOpen, setIsOpen] = useState(false);
-    const [activeIndex, setActiveIndex] = useState(-1);
-    const inputRef = useRef(null);
-
-    // Target identities/names can change on undo or rename; unrelated hover renders cannot reset typing.
-    if (draft.source !== source) {
-        setDraft({ source, value: displayName, committed: displayName, selectedId: null });
-        setIsOpen(false);
-        setActiveIndex(-1);
-    }
-
-    const matches = isOpen ? getMatchingTargetNodeOptions(draft.value, targetNodeIndex) : [];
-    const visibleActiveIndex = Math.min(activeIndex, matches.length - 1);
-    const inputId = `transition-target-${nodeId}-${index}`;
-    const suggestionsId = `${inputId}-suggestions`;
-
-    const selectTarget = (option) => {
-        const isCurrentTarget = draft.selectedId === null && targetNodeIds.length === 1 && targetNodeId === option.id && event.target === option.id;
-        if (draft.selectedId !== option.id && !isCurrentTarget) {
-            const accepted = onSetEventTarget?.(
-                { ...event, target: targetNodeId || event.target },
-                option.id,
+    // The graph edges, not the individual duplicated SCXML event entries,
+    // determine the targets shown here. Keep each edge separate: two conditions
+    // can lead from the same exit token to the same skill.
+    const targets = outgoingTransitions.length > 0
+        ? outgoingTransitions.map((transition) => ({
+            id: transition.targetNodeId,
+            transition,
+            key: transition.edgeId || `${transition.targetNodeId}-${transition.cond || ""}`,
+        }))
+        : eventVariants
+            .filter((variant) => variant?.target)
+            .map((variant) => ({
+                id: targetNodeIndex.byAlias.get(variant.target)?.id || variant.target,
+                transition: null,
+                key: variant.target,
+            }))
+            .filter((item, itemIndex, items) =>
+                targetNodeIndex.byId.has(item.id) &&
+                items.findIndex((other) => other.id === item.id) === itemIndex
             );
-            if (accepted === false) {
-                setDraft({ ...draft, value: draft.committed });
-                return;
-            }
-        }
-        setDraft({ ...draft, value: option.displayName, committed: option.displayName, selectedId: option.id });
-        inputRef.current?.focus();
-        setIsOpen(false);
-        setActiveIndex(-1);
-    };
-
-    const handleKeyDown = (keyboardEvent) => {
-        if (keyboardEvent.key === "Escape") {
-            keyboardEvent.preventDefault();
-            keyboardEvent.stopPropagation();
-            if (draft.value !== draft.committed) setDraft({ ...draft, value: draft.committed });
-            inputRef.current?.focus();
-            setIsOpen(false);
-            setActiveIndex(-1);
-            return;
-        }
-        if (keyboardEvent.target !== inputRef.current) return;
-
-        if (keyboardEvent.key === "ArrowDown" || keyboardEvent.key === "ArrowUp") {
-            const options = isOpen ? matches : getMatchingTargetNodeOptions(draft.value, targetNodeIndex);
-            if (options.length === 0) return;
-            keyboardEvent.preventDefault();
-            setIsOpen(true);
-            const current = Math.min(activeIndex, options.length - 1);
-            setActiveIndex(keyboardEvent.key === "ArrowDown"
-                ? current < options.length - 1 ? current + 1 : 0
-                : current > 0 ? current - 1 : options.length - 1);
-            return;
-        }
-        if (keyboardEvent.key !== "Enter") return;
-        keyboardEvent.preventDefault();
-
-        if (isOpen && visibleActiveIndex >= 0) {
-            selectTarget(matches[visibleActiveIndex]);
-            return;
-        }
-        const query = draft.value.trim();
-        if (!query) return;
-        const exactMatch = targetNodeIndex.byExactQuery.get(query.toLowerCase());
-        const options = getMatchingTargetNodeOptions(query, targetNodeIndex);
-        const match = exactMatch || (options.length === 1 ? options[0] : null);
-        if (match) selectTarget(match);
-    };
 
     return (
-        <div
-            className={`slot-text-field compact-slot-card exit-token-card exit-token-${getExitTokenType(event.id)}`}
-            onMouseEnter={() => onHoverTransitionNode?.(targetNodeId)}
-            onMouseLeave={() => onHoverTransitionNode?.(null)}
-        >
+        <div className={`slot-text-field compact-slot-card exit-token-card exit-token-${getExitTokenType(event.id)}`}>
             <div className="compact-slot-header">
-                <span className="compact-slot-name detail-card-title">{event.id}</span>
-                <div className="exit-token-header-actions">
-                    <span className={`detail-badge exit-token-badge exit-token-badge-${getExitTokenType(event.id)}`}>
-                        Exit Token
-                    </span>
-                </div>
+                <button
+                    id={`exit-token-${nodeId}-${index}`}
+                    type="button"
+                    className="compact-slot-name detail-card-title exit-token-name-action"
+                    title={`Edit transitions for ${event.id}`}
+                    onClick={() => onOpenTransitionPanel?.(nodeId, event.id, null)}
+                >
+                    {event.id}
+                </button>
+                <span className={`detail-badge exit-token-badge exit-token-badge-${getExitTokenType(event.id)}`}>
+                    Exit Token
+                </span>
             </div>
 
             {event.description && <div className="detail-description">{event.description}</div>}
 
-            {targetNodeIds.length > 0 && (
+            {targets.length > 0 && (
                 <div className="exit-token-node-references">
-                    {targetNodeIds.map((id) => (
-                        <NodeReferenceCard
-                            key={`${event.id}-${id}`}
-                            nodeId={id}
-                            name={targetNodeIndex.byId.get(id)?.displayName || id}
-                            badge="Target"
-                            onNavigate={onNavigateTransitionNode}
-                            onHover={onHoverTransitionNode}
-                            hoverFallbackId={id}
-                        />
+                    {targets.map(({ id, transition, key }, targetIndex) => (
+                        <div
+                            className="slot-text-field compact-slot-card slot-access-skill-card exit-token-node-reference exit-token-target-row"
+                            key={`${event.id}-${key}-${targetIndex}`}
+                        >
+                            <div className="compact-slot-header exit-token-node-reference-header">
+                                <button
+                                    type="button"
+                                    className="exit-token-target-link"
+                                    title={`Open ${targetNodeIndex.byId.get(id)?.displayName || id}`}
+                                    onClick={() => onNavigateTransitionNode?.(id)}
+                                    onMouseEnter={(pointerEvent) => onHoverTransitionNode?.(id, pointerEvent)}
+                                    onMouseLeave={(pointerEvent) => onHoverTransitionNode?.(null, pointerEvent)}
+                                    onFocus={(focusEvent) => onHoverTransitionNode?.(id, focusEvent)}
+                                    onBlur={(blurEvent) => onHoverTransitionNode?.(null, blurEvent)}
+                                >
+                                    {targetNodeIndex.byId.get(id)?.displayName || id}
+                                </button>
+                                {transition && (
+                                    <TransitionDetailBadges
+                                        transitions={[transition]}
+                                        onHover={onHoverTransitionEdge}
+                                        onOpen={(item, section) => onOpenTransitionPanel?.(
+                                            nodeId, event.id, item.targetNodeId,
+                                            { edgeId: item.edgeId, focusSection: section }
+                                        )}
+                                    />
+                                )}
+                                <div className="exit-token-target-suffix">
+                                    <span className="slot-access-badge exit-token-node-reference-badge">Target</span>
+                                    <FiExternalLink className="slot-access-open-icon" aria-hidden="true" />
+                                </div>
+                            </div>
+                        </div>
                     ))}
                 </div>
             )}
-
-            <div className="editable-field">
-                <label className="editable-field-label" htmlFor={inputId}>Target</label>
-                <div
-                    className="exit-target-selector"
-                    onKeyDown={handleKeyDown}
-                    onBlur={(blurEvent) => {
-                        if (blurEvent.currentTarget.contains(blurEvent.relatedTarget)) return;
-                        if (draft.value !== draft.committed) setDraft({ ...draft, value: draft.committed });
-                        setIsOpen(false);
-                        setActiveIndex(-1);
-                    }}
-                >
-                    <div className="exit-target-input-row">
-                        <input
-                            id={inputId}
-                            ref={inputRef}
-                            className="exit-target-input"
-                            type="text"
-                            value={draft.value}
-                            placeholder="Type or select an existing node..."
-                            autoComplete="off"
-                            role="combobox"
-                            aria-autocomplete="list"
-                            aria-expanded={isOpen}
-                            aria-controls={isOpen ? suggestionsId : undefined}
-                            aria-activedescendant={isOpen && visibleActiveIndex >= 0
-                                ? `${suggestionsId}-${visibleActiveIndex}` : undefined}
-                            onFocus={() => setIsOpen(true)}
-                            onChange={(changeEvent) => {
-                                setDraft({ ...draft, value: changeEvent.target.value });
-                                setIsOpen(true);
-                                setActiveIndex(-1);
-                            }}
-                        />
-                        <button
-                            type="button"
-                            className="exit-target-dropdown-button"
-                            title="Show nodes in current workflow"
-                            aria-label="Show nodes in current workflow"
-                            aria-expanded={isOpen}
-                            aria-controls={isOpen ? suggestionsId : undefined}
-                            onMouseDown={(mouseEvent) => mouseEvent.preventDefault()}
-                            onClick={() => {
-                                setIsOpen((open) => !open);
-                                setActiveIndex(-1);
-                            }}
-                        >
-                            <FiChevronDown />
-                        </button>
-                    </div>
-
-                    {isOpen && (
-                        <div className="exit-target-suggestions" id={suggestionsId} role="listbox">
-                            {matches.length > 0 ? matches.map((option, optionIndex) => (
-                                <button
-                                    type="button"
-                                    className={`exit-target-suggestion ${targetNodeIds.includes(option.id) ? "selected" : ""}`}
-                                    key={option.id}
-                                    id={`${suggestionsId}-${optionIndex}`}
-                                    role="option"
-                                    aria-selected={optionIndex === visibleActiveIndex}
-                                    onMouseDown={(mouseEvent) => mouseEvent.preventDefault()}
-                                    onClick={() => selectTarget(option)}
-                                >
-                                    <span className="exit-target-suggestion-name">{option.displayName}</span>
-                                    <span className="exit-target-suggestion-path">
-                                        {option.isReference
-                                            ? `Reference ID: ${option.referenceId}`
-                                            : option.packageName
-                                                ? `${option.packageName}.${option.skillName}`
-                                                : option.fullSkillName}
-                                    </span>
-                                </button>
-                            )) : (
-                                <div className="exit-target-no-match">No matching nodes in this workflow</div>
-                            )}
-                        </div>
-                    )}
-                </div>
-            </div>
         </div>
     );
 });
@@ -238,9 +160,9 @@ function GeneralDetailsSection({
     onUpdateName,
     onUpdateNameCommit,
     onUpdateSrc,
-    onSetEventTarget,
     onNavigateTransitionNode,
     onHoverTransitionNode,
+    onHoverTransitionEdge,
     onOpenTransitionPanel,
     onAddParallelLane,
     onRenameParallelLane,
@@ -257,10 +179,9 @@ function GeneralDetailsSection({
     const transitionButtonEventId = isContainerState
         ? ""
         : firstEditableExitToken?.id || null;
-    const transitionButtonTargetId =
-        !isContainerState && firstEditableExitToken
-            ? selectSemanticTargetNodeIds(firstEditableExitToken, targetNodeIndex)[0] || null
-            : null;
+    const transitionButtonTargetId = !isContainerState && firstEditableExitToken
+        ? skillOutgoingTransitions.find((transition) => transition.eventId === firstEditableExitToken.id)?.targetNodeId || null
+        : null;
     const canOpenTransitionPanel =
         isContainerState || Boolean(transitionButtonSourceId && transitionButtonEventId);
 
@@ -526,13 +447,11 @@ function GeneralDetailsSection({
                                         transition.eventId
                                     )}`}
                                     key={`container-${transition.edgeId}`}
-                                    onMouseEnter={() =>
-                                        onHoverTransitionNode?.(
-                                            transition.targetNodeId
-                                        )
+                                    onMouseEnter={(event) =>
+                                        onHoverTransitionNode?.(transition.targetNodeId, event)
                                     }
-                                    onMouseLeave={() =>
-                                        onHoverTransitionNode?.(null)
+                                    onMouseLeave={(event) =>
+                                        onHoverTransitionNode?.(null, event)
                                     }
                                 >
                                     <div className="compact-slot-header">
@@ -541,6 +460,15 @@ function GeneralDetailsSection({
                                         </span>
 
                                         <div className="exit-token-header-actions">
+                                            <TransitionDetailBadges
+                                                transitions={[transition]}
+                                                onHover={onHoverTransitionEdge}
+                                                onOpen={(item, section) => onOpenTransitionPanel?.(
+                                                    selectedNode.id, "", null,
+                                                    { containerMode: true, containerTransitions: containerOutgoingTransitions,
+                                                        edgeId: item.edgeId, focusSection: section }
+                                                )}
+                                            />
                                             <span
                                                 className={`detail-badge exit-token-badge exit-token-badge-${getExitTokenType(
                                                     transition.eventId
@@ -579,9 +507,16 @@ function GeneralDetailsSection({
                                 event={event}
                                 index={index}
                                 targetNodeIndex={targetNodeIndex}
-                                onSetEventTarget={onSetEventTarget}
                                 onNavigateTransitionNode={onNavigateTransitionNode}
                                 onHoverTransitionNode={onHoverTransitionNode}
+                                onHoverTransitionEdge={onHoverTransitionEdge}
+                                onOpenTransitionPanel={onOpenTransitionPanel}
+                                eventVariants={(selectedNode.data.events || []).filter((variant) =>
+                                    variant?.id === event.id && !variant.transitionHandleId
+                                )}
+                                outgoingTransitions={skillOutgoingTransitions.filter((transition) =>
+                                    transition.eventId === event.id
+                                )}
                             />
                         ))}
                     </div>

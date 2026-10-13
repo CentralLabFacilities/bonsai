@@ -154,20 +154,25 @@ export function getExitTokenType(eventId) {
 }
 
 export function getEditableExitTokens(events, includeImplicitFatal = false) {
-    const editable = (events || []).filter(
-        (event) => !(event?.sourceNodeId && event?.transitionHandleId)
-    );
+    const byName = new Map();
+    (events || []).forEach((event) => {
+        if (!event?.id || (event.sourceNodeId && event.transitionHandleId)) return;
+        const id = String(event.id);
+        if (!byName.has(id)) {
+            byName.set(id, { ...event });
+        } else if (!byName.get(id).description && event.description) {
+            // Event objects may repeat for each target/condition. They share
+            // one exit-token definition in the inspector.
+            byName.get(id).description = event.description;
+        }
+    });
 
-    // Sub-machines expose only declared exits; normal executable skills also expose fatal.
-    if (
-        includeImplicitFatal &&
-        !editable.some((event) => String(event?.id || "").trim() === "fatal")
-    ) {
-        editable.push({ id: "fatal", description: "" });
+    if (includeImplicitFatal && !byName.has("fatal")) {
+        byName.set("fatal", { id: "fatal", description: "" });
     }
 
     const priority = { success: 0, error: 1, fatal: 2, other: 3 };
-    return editable
+    return [...byName.values()]
         .map((event, index) => ({ event, index, priority: priority[getExitTokenType(event.id)] }))
         .sort((a, b) => a.priority - b.priority || a.index - b.index)
         .map(({ event }) => event);

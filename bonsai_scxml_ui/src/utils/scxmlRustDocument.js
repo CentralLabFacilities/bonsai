@@ -110,7 +110,7 @@ const buildMetadataNode = (state) => {
         );
     });
 
-    return children.length > 0 ? xmlNode("metadata", {}, children) : null;
+    return children.length > 0 ? xmlNode("metadata", {}, children, "editor:metadata") : null;
 };
 
 const buildLocalDatamodelNode = (state) => {

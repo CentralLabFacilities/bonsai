@@ -7,17 +7,19 @@ import { createEditorNodeIndex } from "./editorGraph.js";
 import { getConfiguredAssignments } from "./stateActions.js";
 import {
     serializeEditorConditionForScxml,
+    serializeEditorAssignmentForScxml,
     serializeEditorValueForScxml,
 } from "./valueTypes.js";
 import { serializeEditorWorkflow } from "../tauri-client.js";
 
-const normalizeAssignment = (assignment) => ({
+const normalizeAssignment = (assignment, serialize = serializeEditorValueForScxml) => ({
     location: String(assignment?.location || "").trim().replace(/^@/, ""),
-    expression: serializeEditorValueForScxml(assignment?.expr ?? ""),
+    expression: serialize(assignment?.expr ?? ""),
 });
 
 const normalizeAssignments = (assignments) =>
-    getConfiguredAssignments(assignments || []).map(normalizeAssignment);
+    getConfiguredAssignments(assignments || []).map((assignment) =>
+        normalizeAssignment(assignment, serializeEditorAssignmentForScxml));
 
 // Transition assignments historically allow an explicitly empty expression;
 // state on-entry/on-exit actions do not. Preserve that distinction during the
@@ -29,7 +31,7 @@ const normalizeTransitionAssignments = (assignments) =>
                 String(assignment?.location || "").trim() !== "" &&
                 assignment?.expr !== undefined
         )
-        .map(normalizeAssignment);
+        .map((assignment) => normalizeAssignment(assignment, serializeEditorAssignmentForScxml));
 
 const normalizeSlot = (slot) => ({
     key: String(slot?.key || ""),
@@ -230,6 +232,77 @@ export const buildRustStateParameters = (parameters = []) =>
         )
         .map(normalizeParameter);
 
+// A slot node is visual; only read/write bindings (or a sourced child's
+// inherited requirement) give a declaration a connection to save. Include
+// state identity here, not just path: two skills can share one slot path, and
+// disconnecting one must not leave its old SCXML declaration behind.
+const getConnectedSlotBindings = (nodes = []) => {
+    const bindings = [];
+    for (const node of nodes) {
+        if (node?.data?.isSkillClone || node?.data?.isStateClone) continue;
+        const state = String(node?.data?.fullSkillName || node?.data?.label || node?.id || "").trim();
+        for (const slot of [...(node?.data?.inSlots || []), ...(node?.data?.outSlots || [])]) {
+            const inherited = Boolean(slot?.inherited);
+            const xpath = inherited && slot.inherited?.xpath || slot?.path || "";
+            const path = String(xpath).trim().replace(/^\/+/, "");
+            // Keep unbound requests here too, so we can recognize a declaration
+            // whose exact key was disconnected while another key remains bound
+            // to the same state and path.
+            bindings.push({
+                path,
+                key: String(slot?.key || "").trim(),
+                state: inherited && slot.inherited?.state || state,
+            });
+        }
+        if (node?.type === "submachine") {
+            for (const slot of node?.data?.inheritedSlots || []) {
+                const path = String(slot?.path || "").trim().replace(/^\/+/, "");
+                if (path) bindings.push({ path, key: String(slot?.key || "").trim(), state: "", childRequirement: true });
+            }
+        }
+    }
+    return bindings;
+};
+
+const buildConnectedManualSlotDeclarations = (manualSlots = [], nodes = []) => {
+    const bindings = getConnectedSlotBindings(nodes);
+    return (manualSlots || []).flatMap((slot) => {
+        const inherited = slot?.slotKind === "inheritSlot" || Boolean(slot?.inherited);
+        const key = String(slot?.key || "");
+        const state = String(slot?.inherited?.state || slot?.state || "");
+        const xpath = String(slot?.inherited?.xpath || slot?.path || "");
+        const path = xpath.trim().replace(/^\/+/, "");
+        if (!path) return [];
+
+        // Imported declarations can remain in manualSlots after an edge is
+        // deleted. A path may still be used by *another* skill, so match the
+        // declaring skill's state too instead of matching only its path.
+        const matchesState = (binding) =>
+            !state || state === "*" ||
+            binding.state === state || binding.state.startsWith(`${state}#`);
+        // A declaration key present in a skill's API identifies one specific
+        // request. For an alias key not present in that API, keep the older
+        // state+path fallback so imported logical aliases still round-trip.
+        const keyIdentifiesRequest = !inherited && key && bindings.some((binding) =>
+            !binding.childRequirement && matchesState(binding) && binding.key === key
+        );
+        const connected = bindings.some((binding) =>
+            binding.path === path &&
+            (inherited || matchesState(binding)) &&
+            (!keyIdentifiesRequest || binding.key === key)
+        );
+        if (!connected) return [];
+
+        // Older versions produced this redundant wildcard declaration while
+        // drawing a default slot. Its actual skill bindings are exported
+        // separately with the correct key and state.
+        if (!inherited && /^defaultslot\d*$/.test(key) && key === path && state === "*") {
+            return [];
+        }
+        return [{ key, state, xpath, inherited }];
+    });
+};
+
 export const buildRustSlotsSnapshot = ({
     nodes = [],
     manualSlots = [],
@@ -250,16 +323,7 @@ export const buildRustSlotsSnapshot = ({
 
     return {
         states,
-        extraSlotDeclarations: (manualSlots || []).map((slot) => {
-            const inherited =
-                slot?.slotKind === "inheritSlot" || Boolean(slot?.inherited);
-            return {
-                key: String(slot?.key || ""),
-                state: String(slot?.inherited?.state || slot?.state || ""),
-                xpath: String(slot?.inherited?.xpath || slot?.path || ""),
-                inherited,
-            };
-        }),
+        extraSlotDeclarations: buildConnectedManualSlotDeclarations(manualSlots, exportNodes),
     };
 };
 
@@ -345,16 +409,7 @@ export const buildRustEditorExportRequest = ({
     return {
         ...structure,
         dataModel: buildRustDataModelEntries(globalDataModel),
-        extraSlotDeclarations: (manualSlots || []).map((slot) => {
-            const inherited =
-                slot?.slotKind === "inheritSlot" || Boolean(slot?.inherited);
-            return {
-                key: String(slot?.key || ""),
-                state: String(slot?.inherited?.state || slot?.state || ""),
-                xpath: String(slot?.inherited?.xpath || slot?.path || ""),
-                inherited,
-            };
-        }),
+        extraSlotDeclarations: buildConnectedManualSlotDeclarations(manualSlots, nodes),
     };
 };
 

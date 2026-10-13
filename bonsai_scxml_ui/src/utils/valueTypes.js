@@ -378,3 +378,60 @@ export function deserializeScxmlConditionForEditor(condition) {
 
     return `${left} ${operator} ${right}`;
 }
+
+
+// Assignment RHS is executable JEXL, not a typed string value. Remove the
+// editor-only @ markers from identifiers, but never alter quoted literals.
+const mapAssignmentExpression = (expression, mapIdentifier) => {
+    const source = String(expression ?? "").trim();
+    let result = "";
+    let quote = null;
+    for (let index = 0; index < source.length;) {
+        const char = source[index];
+        if (quote) {
+            result += char;
+            if (char === "\\" && index + 1 < source.length) {
+                result += source[index + 1];
+                index += 2;
+                continue;
+            }
+            if (char === quote) quote = null;
+            index++;
+            continue;
+        }
+        if (char === "'" || char === '"') {
+            quote = char;
+            result += char;
+            index++;
+            continue;
+        }
+        const match = source.slice(index).match(/^@?[A-Za-z_][A-Za-z0-9_.:]*/);
+        if (match && (index === 0 || !/[\w.@:]/.test(source[index - 1]))) {
+            const token = match[0];
+            const next = source.slice(index + token.length).trimStart();
+            result += mapIdentifier(token, next);
+            index += token.length;
+            continue;
+        }
+        result += char;
+        index++;
+    }
+    return result;
+};
+
+export const serializeEditorAssignmentForScxml = (expression) =>
+    mapAssignmentExpression(expression, (token) => token.replace(/^@/, ""));
+
+export const deserializeScxmlAssignmentForEditor = (expression, variableIds = null) => {
+    const names = variableIds ? new Set(variableIds.map((id) =>
+        typeof id === "string" ? id : id?.id).filter(Boolean)) : null;
+    const reserved = new Set(["true", "false", "null", "undefined", "NaN", "Infinity", "and", "or", "not", "empty", "new"]);
+    return mapAssignmentExpression(expression, (token, next) => {
+        if (token.startsWith("@") || reserved.has(token) || next.startsWith("(")) return token;
+        // With a known datamodel, preserve method/property names and literals
+        // not actually referring to a variable. Without one, infer ordinary
+        // identifiers for backward-compatible legacy SCXML imports.
+        if (names ? names.has(token) : !token.includes(".")) return `@${token}`;
+        return token;
+    });
+};

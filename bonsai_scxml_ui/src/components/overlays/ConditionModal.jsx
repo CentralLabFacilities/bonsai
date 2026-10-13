@@ -1,13 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
     FiArrowRight,
     FiCheck,
     FiChevronDown,
     FiChevronUp,
     FiPlus,
+    FiMove,
     FiTrash2,
     FiX,
+    FiAlertTriangle,
 } from "react-icons/fi";
+import { groupTransitionsByScope, getShadowedTransitions } from "../../utils/transitionScopes.js";
 import TypedValueEditor from "../inputs/TypedValueEditor";
 import {
     VALUE_TYPES,
@@ -96,6 +99,9 @@ function hydrateTransition(transition, index, variables, fallbackEvent = "") {
             transition.edgeId ||
             createTransitionId(`existing-${index}`),
         edgeId: transition.edgeId || null,
+        scopeId: transition.scopeId || "",
+        scopeLabel: transition.scopeLabel || "Current state",
+        scopeDepth: Number(transition.scopeDepth || 0),
         event:
             transition.event ||
             transition.eventId ||
@@ -132,6 +138,20 @@ function hydrateTransition(transition, index, variables, fallbackEvent = "") {
     };
 }
 
+/** Insert an item before or after a target while keeping transition identities stable. */
+export function reorderTransitionItems(items, movingId, targetId, position = "before") {
+    const sourceIndex = items.findIndex((item) => item.transitionId === movingId);
+    const targetIndex = items.findIndex((item) => item.transitionId === targetId);
+    if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return items;
+    if (String(items[sourceIndex].scopeId || "") !== String(items[targetIndex].scopeId || "")) return items;
+    const reordered = [...items];
+    const [moving] = reordered.splice(sourceIndex, 1);
+    const targetAfterRemoval = reordered.findIndex((item) => item.transitionId === targetId);
+    reordered.splice(targetAfterRemoval + (position === "after" ? 1 : 0), 0, moving);
+    if (reordered.every((item, index) => item === items[index])) return items;
+    return reordered;
+}
+
 function getTargetDisplayName(targetId, availableTargets) {
     if (!targetId) return "";
 
@@ -150,8 +170,11 @@ function ConditionModal({
                             availableEvents = [],
                             availableTargets = [],
                             initialTransitionId = null,
+                            initialFocusSection = null,
+                            onHoverTransitionEdge,
                             initialTargetId = null,
                             targetOnlyMode = false,
+                            defaultScope = null,
                         }) {
     const drawerRef = useRef(null);
 
@@ -182,6 +205,15 @@ function ConditionModal({
     }, [availableEvents, sourceEventName]);
 
     const [transitionsState, setTransitionsState] = useState([]);
+    const scopeGroups = useMemo(() => groupTransitionsByScope(transitionsState), [transitionsState]);
+    const orderedTransitions = useMemo(
+        () => scopeGroups.flatMap((group) => group.items),
+        [scopeGroups]
+    );
+    const shadowedTransitions = useMemo(
+        () => getShadowedTransitions(scopeGroups),
+        [scopeGroups]
+    );
     const [selectedTransitionId, setSelectedTransitionId] = useState("");
     const [newTransitionEvent, setNewTransitionEvent] = useState("");
     const [errorMessage, setErrorMessage] = useState("");
@@ -194,6 +226,47 @@ function ConditionModal({
     const [activeAssignmentExpressionSuggestionIndex, setActiveAssignmentExpressionSuggestionIndex] = useState(-1);
     const [assignmentExpressionErrors, setAssignmentExpressionErrors] = useState({});
     const assignmentExpressionInputRefs = useRef({});
+    const conditionCardRef = useRef(null);
+    const assignmentCardRef = useRef(null);
+    const lastFocusRequestRef = useRef(null);
+    const transitionListRef = useRef(null);
+    const previousOrderPositionsRef = useRef(null);
+    const draggedTransitionIdRef = useRef(null);
+    const [draggedTransitionId, setDraggedTransitionId] = useState(null);
+    const [dropIndicator, setDropIndicator] = useState(null);
+
+    const captureOrderPositions = () => {
+        const positions = new Map();
+        transitionListRef.current?.querySelectorAll("[data-transition-id]").forEach((element) => {
+            positions.set(element.dataset.transitionId, element.getBoundingClientRect().top);
+        });
+        previousOrderPositionsRef.current = positions;
+    };
+
+    // FLIP: animate from each card's former position to its new position.
+    // Both the arrow buttons and drag-and-drop use this same animation.
+    useLayoutEffect(() => {
+        const previous = previousOrderPositionsRef.current;
+        previousOrderPositionsRef.current = null;
+        if (!previous || window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) return;
+        transitionListRef.current?.querySelectorAll("[data-transition-id]").forEach((element) => {
+            const oldTop = previous.get(element.dataset.transitionId);
+            if (oldTop === undefined) return;
+            const offset = oldTop - element.getBoundingClientRect().top;
+            if (Math.abs(offset) < 1) return;
+            element.animate?.(
+                [{ transform: `translateY(${offset}px)` }, { transform: "translateY(0)" }],
+                { duration: 220, easing: "cubic-bezier(.2,.8,.2,1)" }
+            );
+        });
+    }, [transitionsState]);
+
+    const finishDraggingTransition = () => {
+        onHoverTransitionEdge?.(null);
+        draggedTransitionIdRef.current = null;
+        setDraggedTransitionId(null);
+        setDropIndicator(null);
+    };
 
     useEffect(() => {
         if (!isOpen) return;
@@ -207,6 +280,7 @@ function ConditionModal({
         setTransitionsState(hydrated);
         setErrorMessage("");
         setAssignmentExpressionErrors({});
+        lastFocusRequestRef.current = null;
 
         let selectedId = initialTransitionId;
 
@@ -252,6 +326,24 @@ function ConditionModal({
     const selectedTransition = transitionsState.find(
         (transition) => transition.transitionId === selectedTransitionId
     );
+
+    useEffect(() => {
+        if (!isOpen || !initialFocusSection || !selectedTransition ||
+            selectedTransition.transitionId !== initialTransitionId) return;
+        const focusKey = `${initialTransitionId}:${initialFocusSection}`;
+        if (lastFocusRequestRef.current === focusKey) return;
+        lastFocusRequestRef.current = focusKey;
+        const card = initialFocusSection === "assignment"
+            ? assignmentCardRef.current : conditionCardRef.current;
+        card?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        if (initialFocusSection === "assignment") {
+            const first = selectedTransition.assignments?.[0];
+            const control = first && assignmentExpressionInputRefs.current[first.assignmentId];
+            (control || card?.querySelector("button, input"))?.focus({ preventScroll: true });
+        } else {
+            card?.querySelector("input, button")?.focus({ preventScroll: true });
+        }
+    }, [isOpen, initialFocusSection, initialTransitionId, selectedTransition]);
 
     const customVariables = useMemo(() => {
         const seen = new Set(usableVars.map((variable) => variable.id));
@@ -590,17 +682,54 @@ function ConditionModal({
         }
     };
 
-    const handleMove = (index, direction, event) => {
+    const handleMove = (transitionId, neighborId, event) => {
         event.stopPropagation();
-
-        const nextIndex = index + direction;
-        if (nextIndex < 0 || nextIndex >= transitionsState.length) return;
-
+        if (targetOnlyMode || !neighborId) return;
+        onHoverTransitionEdge?.(null);
+        captureOrderPositions();
         setTransitionsState((current) => {
-            const copy = [...current];
-            [copy[index], copy[nextIndex]] = [copy[nextIndex], copy[index]];
-            return copy;
+            const movingIndex = current.findIndex((item) => item.transitionId === transitionId);
+            const neighborIndex = current.findIndex((item) => item.transitionId === neighborId);
+            return reorderTransitionItems(current, transitionId, neighborId,
+                neighborIndex < movingIndex ? "before" : "after");
         });
+    };
+
+    const handleDragOverTransition = (event, targetId) => {
+        if (targetOnlyMode || !draggedTransitionIdRef.current) return;
+        const moving = transitionsState.find((item) => item.transitionId === draggedTransitionIdRef.current);
+        const target = transitionsState.find((item) => item.transitionId === targetId);
+        if (!moving || !target || moving.scopeId !== target.scopeId) {
+            setDropIndicator(null);
+            return;
+        }
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+        const bounds = event.currentTarget.getBoundingClientRect();
+        const position = event.clientY < bounds.top + bounds.height / 2 ? "before" : "after";
+        setDropIndicator((previous) =>
+            previous?.id === targetId && previous.position === position
+                ? previous : { id: targetId, position }
+        );
+    };
+
+    const handleDropTransition = (event, targetId) => {
+        if (targetOnlyMode) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const movingId = draggedTransitionIdRef.current;
+        const moving = transitionsState.find((item) => item.transitionId === movingId);
+        const target = transitionsState.find((item) => item.transitionId === targetId);
+        if (movingId && movingId !== targetId && moving?.scopeId === target?.scopeId) {
+            captureOrderPositions();
+            setTransitionsState((current) =>
+                reorderTransitionItems(current, movingId, targetId, dropIndicator?.id === targetId
+                    ? dropIndicator.position
+                    : event.clientY < event.currentTarget.getBoundingClientRect().top +
+                        event.currentTarget.getBoundingClientRect().height / 2 ? "before" : "after")
+            );
+        }
+        finishDraggingTransition();
     };
 
     const handleAddTransition = () => {
@@ -616,6 +745,9 @@ function ConditionModal({
         const newTransition = {
             transitionId,
             edgeId: null,
+            scopeId: defaultScope?.id || "",
+            scopeLabel: defaultScope?.label || sourceNodeName || "Current state",
+            scopeDepth: defaultScope?.depth || 0,
             event: eventId,
             target: "",
             targetLabel: "",
@@ -636,6 +768,7 @@ function ConditionModal({
 
     const handleDeleteTransition = (transitionId, event) => {
         event.stopPropagation();
+        onHoverTransitionEdge?.(null);
 
         setTransitionsState((current) => {
             const index = current.findIndex(
@@ -660,6 +793,9 @@ function ConditionModal({
         updateSelectedTransition({
             target: target.id,
             targetLabel: target.displayName || target.label || target.id,
+            scopeId: target.scopeId || defaultScope?.id || "",
+            scopeLabel: target.scopeLabel || defaultScope?.label || sourceNodeName || "Current state",
+            scopeDepth: target.scopeDepth || 0,
         });
         setTargetQuery(target.displayName || target.label || target.id);
         setTargetAutocompleteOpen(false);
@@ -765,7 +901,7 @@ function ConditionModal({
         const newVariablesById = new Map();
         const allVariables = [...usableVars];
 
-        for (const transition of transitionsState) {
+        for (const transition of orderedTransitions) {
             if (!transition.conditionEnabled || !transition.conditionVariableIsNew) {
                 continue;
             }
@@ -795,8 +931,8 @@ function ConditionModal({
 
         const normalizedTransitions = [];
 
-        for (let index = 0; index < transitionsState.length; index += 1) {
-            const transition = transitionsState[index];
+        for (let index = 0; index < orderedTransitions.length; index += 1) {
+            const transition = orderedTransitions[index];
 
             if (!transition.event) {
                 setSelectedTransitionId(transition.transitionId);
@@ -941,7 +1077,7 @@ function ConditionModal({
                         <span className="transition-drawer-subtitle">
                             {targetOnlyMode
                                 ? "Only transition targets can be reassigned."
-                                : "Order is evaluated from top to bottom."}
+                                : "Child transitions are evaluated before parent transitions. Reorder within each scope."}
                         </span>
                     </div>
                     <button className="modal-close-button" onClick={onClose}>
@@ -967,9 +1103,15 @@ function ConditionModal({
                         </div>
 
                         <div className="step-card-body transition-step-body">
-                            <div className="transition-order-list">
-                                {transitionsState.length > 0 ? (
-                                    transitionsState.map((transition, index) => {
+                            <div ref={transitionListRef} className="transition-order-list">
+                                {orderedTransitions.length > 0 ? (
+                                    orderedTransitions.map((transition, index) => {
+                                        const scope = scopeGroups.find((group) => group.id === (transition.scopeId || "unscoped"));
+                                        const localIndex = scope?.items.findIndex((item) => item.transitionId === transition.transitionId) ?? index;
+                                        const previousInScope = scope?.items[localIndex - 1];
+                                        const nextInScope = scope?.items[localIndex + 1];
+                                        const showScopeHeading = index === 0 || orderedTransitions[index - 1]?.scopeId !== transition.scopeId;
+                                        const shadowedBy = shadowedTransitions.get(transition.transitionId);
                                         const isSelected =
                                             transition.transitionId === selectedTransitionId;
                                         const targetName =
@@ -980,21 +1122,69 @@ function ConditionModal({
                                             );
 
                                         return (
+                                            <Fragment key={transition.transitionId}>
+                                            {showScopeHeading && !targetOnlyMode && (
+                                                <div className="transition-scope-heading">
+                                                    <div className="transition-scope-title">
+                                                        <span className="transition-scope-name">{scope?.label || sourceNodeName}</span>
+                                                        <span className="transition-scope-type">
+                                                            {scope?.depth === 0 ? "Local transitions" : "Parent scope"}
+                                                        </span>
+                                                    </div>
+                                                    <span className="transition-scope-order">
+                                                        {scope?.depth === 0 ? "Evaluated first" : "Evaluated if no child transition matches"}
+                                                    </span>
+                                                </div>
+                                            )}
                                             <div
-                                                key={transition.transitionId}
+                                                data-transition-id={transition.transitionId}
                                                 className={`transition-order-card ${
                                                     isSelected ? "selected" : ""
+                                                } ${draggedTransitionId === transition.transitionId ? "dragging" : ""} ${
+                                                    dropIndicator?.id === transition.transitionId
+                                                        ? `drop-${dropIndicator.position}` : ""
                                                 }`}
+                                                onDragOver={(event) => handleDragOverTransition(event, transition.transitionId)}
+                                                onDrop={(event) => handleDropTransition(event, transition.transitionId)}
                                                 onClick={() =>
                                                     setSelectedTransitionId(
                                                         transition.transitionId
                                                     )
                                                 }
+                                                onMouseEnter={(event) => onHoverTransitionEdge?.(transition.edgeId || null, event)}
+                                                onMouseLeave={(event) => onHoverTransitionEdge?.(null, event)}
                                             >
-                                                <div className="transition-order-main">
+                                                <span
+                                                    className="transition-drag-handle"
+                                                    role="button"
+                                                    tabIndex={targetOnlyMode ? -1 : 0}
+                                                    draggable={!targetOnlyMode}
+                                                    aria-label={`Drag to reorder transition ${localIndex + 1} within ${scope?.label || "scope"}`}
+                                                    title={targetOnlyMode ? "Reordering is disabled" : "Reorder only within this SCXML scope"}
+                                                    onClick={(event) => event.stopPropagation()}
+                                                    onKeyDown={(event) => {
+                                                        if (targetOnlyMode || !["ArrowUp", "ArrowDown"].includes(event.key)) return;
+                                                        event.preventDefault();
+                                                        handleMove(transition.transitionId, event.key === "ArrowUp"
+                                                            ? previousInScope?.transitionId : nextInScope?.transitionId, event);
+                                                    }}
+                                                    onDragStart={(event) => {
+                                                        if (targetOnlyMode) { event.preventDefault(); return; }
+                                                        onHoverTransitionEdge?.(null);
+                                                        draggedTransitionIdRef.current = transition.transitionId;
+                                                        setDraggedTransitionId(transition.transitionId);
+                                                        event.dataTransfer.effectAllowed = "move";
+                                                        event.dataTransfer.setData("text/plain", transition.transitionId);
+                                                    }}
+                                                    onDragEnd={finishDraggingTransition}
+                                                ><FiMove aria-hidden="true" /></span>
+                                                <div className="transition-order-main" title={
+                                                    (transition.assignments || []).map((assignment) =>
+                                                        `${assignment.location} = ${assignment.expr}`).join("\n") || undefined
+                                                }>
                                                     <div className="transition-order-title-row">
                                                         <span className="transition-priority">
-                                                            #{index + 1}
+                                                            #{localIndex + 1}
                                                         </span>
                                                         <span className="transition-event-name">
                                                             {transition.eventDisplayName ||
@@ -1017,6 +1207,12 @@ function ConditionModal({
                                                             {targetName || "No target"}
                                                         </span>
                                                     </div>
+                                                    {shadowedBy && (
+                                                        <div className="transition-scope-warning" title="This event is already handled by an unconditional transition at a higher priority">
+                                                            <FiAlertTriangle aria-hidden="true" />
+                                                            Unreachable: unconditional transition in {shadowedBy.label} has priority
+                                                        </div>
+                                                    )}
                                                 </div>
 
                                                 <div
@@ -1026,10 +1222,10 @@ function ConditionModal({
                                                     <button
                                                         className="order-btn"
                                                         disabled={
-                                                            targetOnlyMode || index === 0
+                                                            targetOnlyMode || !previousInScope
                                                         }
                                                         onClick={(event) =>
-                                                            handleMove(index, -1, event)
+                                                            handleMove(transition.transitionId, previousInScope?.transitionId, event)
                                                         }
                                                         title="Move up"
                                                     >
@@ -1039,11 +1235,10 @@ function ConditionModal({
                                                         className="order-btn"
                                                         disabled={
                                                             targetOnlyMode ||
-                                                            index ===
-                                                            transitionsState.length - 1
+                                                            !nextInScope
                                                         }
                                                         onClick={(event) =>
-                                                            handleMove(index, 1, event)
+                                                            handleMove(transition.transitionId, nextInScope?.transitionId, event)
                                                         }
                                                         title="Move down"
                                                     >
@@ -1064,6 +1259,7 @@ function ConditionModal({
                                                     </button>
                                                 </div>
                                             </div>
+                                            </Fragment>
                                         );
                                     })
                                 ) : (
@@ -1106,6 +1302,7 @@ function ConditionModal({
                     </div>
 
                     <div
+                        ref={conditionCardRef}
                         className={`step-card ${
                             targetOnlyMode ? "transition-step-locked" : ""
                         }`}
@@ -1324,6 +1521,7 @@ function ConditionModal({
                     </div>
 
                     <div
+                        ref={assignmentCardRef}
                         className={`step-card ${
                             targetOnlyMode ? "transition-step-locked" : ""
                         }`}

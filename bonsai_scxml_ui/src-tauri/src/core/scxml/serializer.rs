@@ -298,7 +298,7 @@ fn render_editor_metadata(state: &State, depth: usize, output: &mut String) {
     }
 
     let indent = "    ".repeat(depth);
-    output.push_str(&format!("{}<metadata>\n", indent));
+    output.push_str(&format!("{}<editor:metadata>\n", indent));
 
     if state.editor.positions.is_empty() {
         output.push_str(&format!(
@@ -335,7 +335,7 @@ fn render_editor_metadata(state: &State, depth: usize, output: &mut String) {
         ));
     }
 
-    output.push_str(&format!("{}</metadata>\n", indent));
+    output.push_str(&format!("{}</editor:metadata>\n", indent));
 }
 
 fn render_local_datamodel(state: &State, depth: usize, output: &mut String) {
@@ -548,11 +548,11 @@ mod tests {
     <final id="End"/>
 
     <state id="Root" initial="Repeated">
-        <metadata>
+        <editor:metadata>
             <editor:position x="1.5" y="2"/>
             <editor:position instance="copy" clone="reference" x="-3" y="4.25"/>
             <editor:edgeTarget event="done" target="End" occurrence="2" instance="end-copy"/>
-        </metadata>
+        </editor:metadata>
         <onentry>
             <assign location="count" expr="1"/>
             <assign location="text" expr="'a&amp;b'"/>
