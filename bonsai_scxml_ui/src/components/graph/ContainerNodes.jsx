@@ -1,9 +1,21 @@
-import { Handle, NodeResizer, Position, useReactFlow } from "@xyflow/react";
-import { useCallback } from "react";
+import { Handle, NodeResizer, Position, useReactFlow, useUpdateNodeInternals } from "@xyflow/react";
+import { useCallback, useEffect } from "react";
 import { FiChevronDown, FiChevronRight, FiPlus } from "react-icons/fi";
 import { ConnectionHandle, IncomingTransitionHandle, NodeTitle, StateActionBadges } from "./NodeChrome";
 import { getContainerExitEvents, resizeParallelLanes } from "../../utils/containerState.js";
 import { PARALLEL_BOTTOM_PADDING, PARALLEL_HEADER_HEIGHT } from "../../utils/editorGeometry.js";
+
+// A Compound/Parallel switches between a different set of handles when
+// collapsed, and imported boundary events may add handles after first render.
+// Invalidate React Flow's handle measurements when that topology changes.
+function useContainerHandleLayout(id, events, collapsed = false) {
+    const updateNodeInternals = useUpdateNodeInternals();
+    const signature = `${collapsed}|${events.map((event) => String(event.id)).join("|")}`;
+    useEffect(() => {
+        const frame = requestAnimationFrame(() => updateNodeInternals(id));
+        return () => cancelAnimationFrame(frame);
+    }, [id, signature, updateNodeInternals]);
+}
 
 function ContainerHeader({ id, data, type }) {
     const isParallel = type === "parallel";
@@ -94,6 +106,7 @@ export function CompoundNode({ id, data = {}, selected = false }) {
     const isCollapsed = Boolean(data.isCollapsed);
     const isParallelLaneWrapper = Boolean(data.autoParallelLaneCompound);
     const events = getContainerExitEvents(data, "compound");
+    useContainerHandleLayout(id, events, isCollapsed);
 
     return (
         <div
@@ -154,6 +167,7 @@ export function CompoundNode({ id, data = {}, selected = false }) {
 export function ParallelNode({ id, data, selected = false }) {
     const isCollapsed = Boolean(data.isCollapsed);
     const events = getContainerExitEvents(data, "parallel");
+    useContainerHandleLayout(id, events, isCollapsed);
     const { setNodes } = useReactFlow();
     const laneCount = Math.max(1, Array.isArray(data.lanes) ? data.lanes.length : 1);
     const minHeight = PARALLEL_HEADER_HEIGHT + PARALLEL_BOTTOM_PADDING + laneCount * 90;
@@ -219,6 +233,7 @@ export function ParallelNode({ id, data, selected = false }) {
 
 export function ParallelLaneNode({ id, data = {}, selected = false }) {
     const events = getContainerExitEvents(data, "parallelLane");
+    useContainerHandleLayout(id, events);
 
     return (
         <div
@@ -237,6 +252,8 @@ export function ParallelLaneNode({ id, data = {}, selected = false }) {
             >
                 {data.label || id || "Lane"}
             </div>
+            {/* Explicit entry for SCXML transitions targeting the lane itself. */}
+            <IncomingTransitionHandle />
             {/* Display-only entry point for this parallel branch. */}
             <ConnectionHandle
                 type="source"

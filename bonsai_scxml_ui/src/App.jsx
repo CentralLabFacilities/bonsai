@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
     ReactFlowProvider,
     useReactFlow,
@@ -22,7 +22,8 @@ import {
     initApiProxy,
 } from "./tauri-client.js";
 import { getParallelLaneSummaries } from "./utils/containerState.js";
-import { collectDescendantGlobals } from "./utils/editorScxml";
+import { collectDescendantGlobals, getStoredTransitionAssignments } from "./utils/editorScxml";
+import { getLogicalEdgeSourceHandle, getLogicalEdgeSourceId } from "./utils/transitionSemantics";
 import { useEditorHistory } from "./hooks/document/useEditorHistory";
 import { useNodeInteraction } from "./hooks/interaction/useNodeInteraction";
 import { useSlotGraph } from "./hooks/graph/useSlotGraph";
@@ -177,6 +178,8 @@ function AppContent() {
         setHoveredEditorNodeId,
         hoveredEditorEdgeId,
         setHoveredEditorEdgeId,
+        hoverTransitionEdge,
+        hoverTransitionNode,
         parameterFocusRequest,
         slotFocusRequest,
         transitionFocusRequest,
@@ -489,8 +492,16 @@ function AppContent() {
         getViewport,
         setViewport,
         syncRustDocument: rustWorkflowDocument.syncEditorState,
+        cancelFlowConnection,
         isDraggingNode,
     });
+
+    // A replaced/reloaded workflow may reuse edge ids; never retain a hover
+    // originating from the previous canvas or its now-unmounted details panel.
+    useEffect(() => {
+        hoverTransitionEdge(null);
+        hoverTransitionNode(null);
+    }, [activeTabId, activeWorkflowTab?.documentGeneration, hoverTransitionEdge, hoverTransitionNode]);
 
     const { updateEventsFromParameters } = useDynamicSkillConfiguration({
         getDocumentSnapshot,
@@ -796,6 +807,23 @@ function AppContent() {
         [editorProblems]
     );
 
+    const hoverTransitionBadge = useCallback((edgeId, event) => {
+        if (edgeId) hoverTransitionNode(null);
+        hoverTransitionEdge(edgeId, event);
+    }, [hoverTransitionEdge, hoverTransitionNode]);
+
+    const handleTransitionBadgeClick = useCallback((edge, section) => {
+        hoverTransitionEdge(null);
+        selectTransitionEdge(edge.id);
+        openConditionDrawer(
+            getLogicalEdgeSourceId(edge),
+            getLogicalEdgeSourceHandle(edge),
+            edge.target,
+            null,
+            { edgeId: edge.id, focusSection: section }
+        );
+    }, [selectTransitionEdge, openConditionDrawer, hoverTransitionEdge]);
+
     const {
         visibleNodes,
         visibleEdges,
@@ -815,6 +843,8 @@ function AppContent() {
         updatePersistentEdgeControlPoints: updateEdgeControlPoints,
         controlPointInsertRequest,
         onControlPointContextMenu: handleControlPointContextMenu,
+        onOpenTransitionBadge: handleTransitionBadgeClick,
+        onHoverTransitionBadge: hoverTransitionBadge,
         hoveredSlotAccessNodeId,
         semanticNodes: displaySemanticNodes,
         semanticChildrenByParent,
@@ -1112,12 +1142,60 @@ function AppContent() {
     }, [setSelectedPackage, setSelectedSubPackage]);
     const reloadSkills = useCallback(() => fetchSkills({ manual: true }), [fetchSkills]);
 
+    const selectedSkillOutgoingTransitions = useMemo(() => {
+        if (!selectedNode || selectedNode.type === "compound" || selectedNode.type === "parallel") return [];
+        return edges.filter((edge) =>
+            !edge.data?.boundaryInternalEdge && !edge.data?.compoundInternalEdge &&
+            !edge.data?.parallelInternalEdge && getLogicalEdgeSourceId(edge) === selectedNode.id
+        ).map((edge) => {
+            const eventId = getLogicalEdgeSourceHandle(edge);
+            const matchingEvent = (selectedNode.data?.events || []).find((event) =>
+                event.id === eventId && event.target === edge.target &&
+                String(event.cond || "") === String(edge.data?.cond || "")
+            ) || (selectedNode.data?.events || []).find((event) =>
+                event.id === eventId && event.target === edge.target
+            );
+            return {
+                edgeId: edge.id, sourceNodeId: selectedNode.id,
+                eventId, targetNodeId: edge.target,
+                cond: edge.data?.cond || matchingEvent?.cond || "",
+                assignments: getStoredTransitionAssignments(edge.data).length
+                    ? getStoredTransitionAssignments(edge.data)
+                    : getStoredTransitionAssignments(matchingEvent),
+            };
+        });
+    }, [edges, selectedNode]);
+
+    const selectedContainerTransitionDetails = useMemo(() => {
+        if (!selectedContainerOutgoingTransitions.length) return selectedContainerOutgoingTransitions;
+        const edgeById = new Map(edges.map((edge) => [edge.id, edge]));
+        const nodeById = new Map(nodes.map((node) => [node.id, node]));
+        return selectedContainerOutgoingTransitions.map((transition) => {
+            const edge = edgeById.get(transition.edgeId);
+            const source = nodeById.get(transition.sourceNodeId);
+            const matchingEvent = (source?.data?.events || []).find((event) =>
+                event.id === transition.eventId && event.target === transition.targetNodeId &&
+                String(event.cond || "") === String(edge?.data?.cond || "")
+            ) || (source?.data?.events || []).find((event) =>
+                event.id === transition.eventId && event.target === transition.targetNodeId
+            );
+            return {
+                ...transition,
+                cond: edge?.data?.cond || matchingEvent?.cond || "",
+                assignments: getStoredTransitionAssignments(edge?.data).length
+                    ? getStoredTransitionAssignments(edge?.data)
+                    : getStoredTransitionAssignments(matchingEvent),
+            };
+        });
+    }, [selectedContainerOutgoingTransitions, edges, nodes]);
+
     const detailsCallbacks = useEditorDetailsCallbacks({
         onNavigateCloneSource: handleNavigateCloneSource,
         onNavigateClone: handleNavigateCloneSource,
         onMoveContainerTransition: handleMoveContainerTransition,
         onNavigateTransitionNode: handleNavigateCloneSource,
-        onHoverTransitionNode: (nodeId) => setHoveredEditorNodeId(nodeId || null),
+        onHoverTransitionNode: hoverTransitionNode,
+        onHoverTransitionEdge: hoverTransitionBadge,
         onOpenTransitionPanel: (sourceNodeId, eventId, targetNodeId = null, options = null) => {
             if (!sourceNodeId || (!options?.containerMode && !eventId)) return;
             openConditionDrawer(sourceNodeId, eventId, targetNodeId || null, null, options);
@@ -1286,6 +1364,7 @@ function AppContent() {
                             manualSlots={manualSlots}
                             visibleNodes={liveVisibleNodes}
                             visibleEdges={liveVisibleEdges}
+                            documentKey={`${activeTabId}:${activeWorkflowTab?.documentGeneration ?? 0}`}
                             liveExecutionActive={liveActive}
                             smartRoutingNodes={smartRoutingNodes}
                             edgeFocusMode={edgeFocusMode}
@@ -1346,7 +1425,8 @@ function AppContent() {
                             selectedNode,
                             cloneSourceNode: selectedCloneSourceNode,
                             cloneNodes: selectedNodeClones,
-                            containerOutgoingTransitions: selectedContainerOutgoingTransitions,
+                            containerOutgoingTransitions: selectedContainerTransitionDetails,
+                            skillOutgoingTransitions: selectedSkillOutgoingTransitions,
                             parallelLanes: selectedParallelLanes,
                             hasInitialNode,
                             actionDataModel: selectedActionDataModel,
@@ -1442,8 +1522,13 @@ function AppContent() {
                 condition={{
                     drawer: drawerData,
                     variables: availableDataModelParameters,
-                    onConfirm: handleConfirmDrawer,
+                    onConfirm: (...args) => {
+                        hoverTransitionEdge(null);
+                        return handleConfirmDrawer(...args);
+                    },
+                    onHoverTransitionEdge: hoverTransitionBadge,
                     onClose: () => {
+                        hoverTransitionEdge(null);
                         setDrawerData((prev) => ({ ...prev, isOpen: false }));
                         clearTransitionSelection();
                     },

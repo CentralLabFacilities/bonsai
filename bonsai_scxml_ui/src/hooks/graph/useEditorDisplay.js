@@ -9,9 +9,11 @@ import {
 } from "../../utils/editorGraph.js";
 import {
     getNodeSize,
+    getTransitionTargetHandleForNode,
     isAutoParallelLaneCompound,
 } from "../../utils/editorGeometry.js";
 import { useDerivedGraphSnapshot } from "./useEditorGraphMaintenance.js";
+import { boundaryTransitionKeys, buildBoundaryHelperIndex, isBoundaryHelperEdge } from "../../utils/transitionBoundaryHighlight.js";
 
 const SLOT_EDGE_INACTIVE_COLOR = "#64748b";
 const COMPOUND_ROUTING_GRID_CELL_SIZE = 640;
@@ -217,6 +219,8 @@ export function useEditorDisplay({
     updatePersistentEdgeControlPoints,
     controlPointInsertRequest,
     onControlPointContextMenu,
+    onOpenTransitionBadge,
+    onHoverTransitionBadge,
     hoveredSlotAccessNodeId,
     semanticNodes,
     semanticChildrenByParent,
@@ -234,13 +238,15 @@ export function useEditorDisplay({
     problemNodeIds,
     nodeWarningTitles = EMPTY_WARNING_TITLES,
 }) {
-    const routingHandlersRef = useRef({ updatePersistentEdgeControlPoints, onControlPointContextMenu });
+    const routingHandlersRef = useRef({ updatePersistentEdgeControlPoints, onControlPointContextMenu, onOpenTransitionBadge, onHoverTransitionBadge });
     useLayoutEffect(() => {
-        routingHandlersRef.current = { updatePersistentEdgeControlPoints, onControlPointContextMenu };
+        routingHandlersRef.current = { updatePersistentEdgeControlPoints, onControlPointContextMenu, onOpenTransitionBadge, onHoverTransitionBadge };
     });
     const routingHandlers = useMemo(() => ({
         updateControlPoints: (...args) => routingHandlersRef.current.updatePersistentEdgeControlPoints(...args),
         openControlPointContextMenu: (...args) => routingHandlersRef.current.onControlPointContextMenu?.(...args),
+        openTransitionBadge: (...args) => routingHandlersRef.current.onOpenTransitionBadge?.(...args),
+        hoverTransitionBadge: (...args) => routingHandlersRef.current.onHoverTransitionBadge?.(...args),
     }), []);
 
     // Dragging should stay on the cheapest possible render path. Hover/focus
@@ -402,16 +408,10 @@ export function useEditorDisplay({
 
                 if (!normalizedEdge.targetHandle) {
                     const targetNode = transitionNodeById.get(normalizedEdge.target);
-
-                    if (
-                        targetNode &&
-                        targetNode.type !== "compound" &&
-                        targetNode.type !== "parallel" &&
-                        targetNode.type !== "parallelLane"
-                    ) {
+                    if (targetNode) {
                         normalizedEdge = {
                             ...normalizedEdge,
-                            targetHandle: "transition-target",
+                            targetHandle: getTransitionTargetHandleForNode(targetNode),
                         };
                     }
                 }
@@ -766,6 +766,10 @@ export function useEditorDisplay({
                                 pointId,
                                 "transition"
                             ),
+                        onOpenTransitionBadge: (section) =>
+                            routingHandlers.openTransitionBadge(edge, section),
+                        onHoverTransitionBadge: (hovered, event) =>
+                            routingHandlers.hoverTransitionBadge(hovered ? edge.id : null, event),
                     },
                 })
             ),
@@ -800,6 +804,9 @@ export function useEditorDisplay({
         const selectedFocusedEdges = [];
 
         smartTransitionEdges.forEach((rawEdge) => {
+            // Boundary helpers must be neutral when not highlighted, just like
+            // their outer transition. Normalize even legacy helpers whose
+            // serialized style contains a permanent (or old blue) stroke.
             const clearedEdge = clearTransientTransitionHighlight(rawEdge);
             const isInternalHelper = Boolean(
                 clearedEdge.data?.boundaryInternalEdge ||
@@ -817,6 +824,23 @@ export function useEditorDisplay({
                     semanticEdge,
                     "editor-user-transition-edge"
                 );
+            } else if (isBoundaryHelperEdge(clearedEdge)) {
+                semanticEdge = withEdgeClassName(
+                    semanticEdge,
+                    "editor-boundary-helper-edge"
+                );
+                // Helpers are synthetic presentation edges. Never retain a
+                // stored/default stroke color or dash pattern; both inner and
+                // outer transitions are solid at rest. Focused and selected
+                // variants below apply the same semantic color.
+                const style = { ...(semanticEdge.style || {}) };
+                delete style.stroke;
+                delete style.strokeDasharray;
+                const markerEnd = semanticEdge.markerEnd
+                    ? { ...semanticEdge.markerEnd }
+                    : semanticEdge.markerEnd;
+                if (markerEnd) delete markerEnd.color;
+                semanticEdge = { ...semanticEdge, style, markerEnd };
             }
             const edge = useLightweightBackgroundTransitions
                 ? {
@@ -901,6 +925,17 @@ export function useEditorDisplay({
                 animated: true,
             };
 
+            // React Flow edge labels use a separate portal, so SVG visibility
+            // rules cannot hide them. Track which annotations belong to a
+            // selected/focused transition without re-routing the edge.
+            if (edge.data?.cond || edge.data?.assignments?.length || edge.data?.assign?.location) {
+                const annotationData = { ...edge.data, annotationContextVisible: true };
+                focusedEdge.data = annotationData;
+                selectionRelatedEdge.data = annotationData;
+                selectedEdge.data = annotationData;
+                selectedFocusedEdge.data = annotationData;
+            }
+
             baseEdges.push(edge);
             focusedEdges.push(focusedEdge);
             selectionRelatedEdges.push(selectionRelatedEdge);
@@ -909,6 +944,7 @@ export function useEditorDisplay({
         });
 
         return {
+            boundaryHelperIdsByKey: buildBoundaryHelperIndex(baseEdges),
             baseEdges,
             focusedEdges,
             selectionRelatedEdges,
@@ -935,6 +971,7 @@ export function useEditorDisplay({
             selectedFocusedEdges,
             indexByNodeId,
             indexByEdgeId,
+            boundaryHelperIdsByKey,
         } = transitionRenderCache;
 
         // Node selection is semantic context, not edge selection. Give all
@@ -962,6 +999,29 @@ export function useEditorDisplay({
             const hoveredIndex = indexByEdgeId.get(activeHoveredEditorEdgeId);
             if (hoveredIndex !== undefined) focusedIndexes.add(hoveredIndex);
         }
+
+        // A boundary exit is visually split into an inner helper and
+        // its outer semantic transition. Panel hover/selection normally names
+        // only the outer edge; include every helper on that same event path.
+        // The helpers can be shared by multiple target transitions.
+        const relatedHelpersFor = (edgeId) => {
+            const index = indexByEdgeId.get(edgeId);
+            if (index === undefined) return [];
+            const keys = boundaryTransitionKeys(baseEdges[index]);
+            return [...new Set(keys.flatMap((key) => boundaryHelperIdsByKey.get(key) || []))];
+        };
+        const addRelatedHelpers = (targetIndexes, edgeId) => {
+            relatedHelpersFor(edgeId).forEach((helperId) => {
+                const index = indexByEdgeId.get(helperId);
+                if (index !== undefined) targetIndexes.add(index);
+            });
+        };
+        if (activeHoveredEditorEdgeId) {
+            addRelatedHelpers(focusedIndexes, activeHoveredEditorEdgeId);
+        }
+        selectedTransitionEdgeIds.forEach((edgeId) =>
+            addRelatedHelpers(selectionRelatedIndexes, edgeId)
+        );
 
         // Keep every transition mounted after load. The visibility toggle is
         // implemented by a CSS class on React Flow instead of removing edges
@@ -996,6 +1056,7 @@ export function useEditorDisplay({
             // A directly selected edge is always stronger than contextual
             // highlighting from a selected skill.
             if (edgeId && selectedTransitionEdgeIds.has(edgeId)) return;
+            if (focusedIndexes.has(edgeIndex)) return;
 
             displayed[edgeIndex] = selectionRelatedEdges[edgeIndex];
         });

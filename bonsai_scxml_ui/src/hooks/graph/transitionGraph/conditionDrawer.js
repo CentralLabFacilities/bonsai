@@ -1,4 +1,5 @@
 import { isNodeInsideContainer } from "../../../utils/editorGeometry";
+import { getTransitionScope } from "../../../utils/transitionScopes";
 import {
     getSkillPackageName,
     getStoredTransitionAssignments,
@@ -16,6 +17,7 @@ export const createClosedConditionDrawerState = () => ({
     sourceEventName: "",
     initialTargetId: null,
     initialTransitionId: null,
+    initialFocusSection: null,
     candidateTransitions: [],
     availableEvents: [],
     availableTargets: [],
@@ -142,7 +144,9 @@ const buildContainerDrawerData = ({
         })
         .filter(Boolean);
 
-    const initialTransition = transitions[0] || null;
+    const initialTransition = transitions.find((transition) =>
+        options?.edgeId && transition.edgeId === options.edgeId
+    ) || transitions[0] || null;
 
     return {
         isOpen: true,
@@ -154,6 +158,7 @@ const buildContainerDrawerData = ({
         sourceEventName: "",
         initialTargetId: initialTransition?.target || "",
         initialTransitionId: initialTransition?.transitionId || null,
+        initialFocusSection: options?.focusSection || null,
         candidateTransitions: transitions,
         availableEvents: [],
         availableTargets: [...availableTargetMap.values()],
@@ -235,7 +240,11 @@ export const buildConditionDrawerData = ({
 
         const targetNode = nodes.find((node) => node.id === edge.target);
 
+        const scope = getTransitionScope(sourceId, edge.target, nodes);
         return {
+            scopeId: scope?.id || sourceId,
+            scopeLabel: scope?.label || sourceNode.data?.label || sourceId,
+            scopeDepth: scope?.depth || 0,
             transitionId: edge.id,
             edgeId: edge.id,
             event:
@@ -260,7 +269,7 @@ export const buildConditionDrawerData = ({
 
     const consumedCounts = new Map();
     sourceEvents
-        .filter((event) => event.target)
+        .filter((event) => event.target && nodes.some((node) => node.id === event.target))
         .forEach((event, index) => {
             const key = `${event.id}::${event.target}`;
             const consumed = consumedCounts.get(key) || 0;
@@ -272,7 +281,11 @@ export const buildConditionDrawerData = ({
             }
 
             const targetNode = nodes.find((node) => node.id === event.target);
+            const scope = getTransitionScope(sourceId, event.target, nodes);
             transitions.push({
+                scopeId: scope?.id || sourceId,
+                scopeLabel: scope?.label || sourceNode.data?.label || sourceId,
+                scopeDepth: scope?.depth || 0,
                 transitionId: `node-transition-${sourceId}-${index}`,
                 edgeId: null,
                 event: event.id,
@@ -299,7 +312,15 @@ export const buildConditionDrawerData = ({
 
     const availableTargets = nodes
         .filter((node) => canTargetVisualNode(sourceNode, node, nodes))
-        .map(toTargetOption);
+        .map((node) => {
+            const scope = getTransitionScope(sourceId, node.id, nodes);
+            return {
+                ...toTargetOption(node),
+                scopeId: scope?.id || sourceId,
+                scopeLabel: scope?.label || sourceNode.data?.label || sourceId,
+                scopeDepth: scope?.depth || 0,
+            };
+        });
 
     const targetOnlyMode = Boolean(options?.targetOnly);
     const targetOnlyEdgeId = options?.edgeId ? String(options.edgeId) : null;
@@ -327,6 +348,8 @@ export const buildConditionDrawerData = ({
         : transitions;
 
     const initialTransition =
+        drawerTransitions.find((transition) =>
+            options?.edgeId && transition.edgeId === options.edgeId) ||
         drawerTransitions.find(
             (transition) =>
                 (!sourceHandle || transition.event === sourceHandle) &&
@@ -345,10 +368,16 @@ export const buildConditionDrawerData = ({
         sourceEventName: sourceHandle,
         initialTargetId: initialTargetId || initialTransition?.target || "",
         initialTransitionId: initialTransition?.transitionId || null,
+        initialFocusSection: options?.focusSection || null,
         candidateTransitions: drawerTransitions,
         availableEvents: [...eventMap.values()],
         availableTargets,
         targetOnlyMode,
         containerNodeId: null,
+        defaultScope: {
+            id: sourceId,
+            label: sourceNode.data?.label || sourceNode.id,
+            depth: 0,
+        },
     };
 };

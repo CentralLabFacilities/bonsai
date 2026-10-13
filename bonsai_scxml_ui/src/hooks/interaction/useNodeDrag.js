@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { resolveCollisionScope } from "../../utils/nodeCollisions";
+import { cleanEventsForDeletedStates } from "../../utils/transitionDeletion";
 import { rebuildBoundaryTransitions } from "../../utils/boundaryTransitions";
 import { getOverviewLayoutNodeSize } from "../../utils/layoutUtils";
 import { createEditorNodeIndex } from "../../utils/editorGraph";
@@ -494,23 +495,12 @@ export function useNodeDrag({
                 allNodes
                     .filter((candidate) => !idsToDelete.has(candidate.id))
                     .map((candidate) => {
-                        if (
-                            candidate.type !== "compound" &&
-                            candidate.type !== "parallelLane"
-                        ) {
-                            return candidate;
-                        }
-
-                        return {
-                            ...candidate,
-                            data: {
-                                ...candidate.data,
-                                events: (candidate.data?.events || []).filter(
-                                    (event) =>
-                                        !idsToDelete.has(event.sourceNodeId)
-                                ),
-                            },
-                        };
+                        const currentEvents = candidate.data?.events || [];
+                        const nextEvents = cleanEventsForDeletedStates(currentEvents, idsToDelete);
+                        return nextEvents.length === currentEvents.length &&
+                            nextEvents.every((event, index) => event === currentEvents[index])
+                            ? candidate
+                            : { ...candidate, data: { ...candidate.data, events: nextEvents } };
                     })
             );
 

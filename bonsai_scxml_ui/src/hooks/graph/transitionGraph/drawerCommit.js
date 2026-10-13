@@ -13,6 +13,10 @@ import {
 } from "../../../utils/transitionSemantics";
 import { rebuildBoundaryTransitionsIncremental } from "../../../utils/boundaryTransitions";
 import { isWildcardTransitionEvent } from "../../../utils/transitionEvents";
+import {
+    getTransitionScope,
+    mergeContainerTransitionOrder,
+} from "../../../utils/transitionScopes.js";
 
 export const createTransitionDrawerCommitHandler = ({
     drawerData,
@@ -486,12 +490,64 @@ export const createTransitionDrawerCommitHandler = ({
             sourceIds: [sourceId],
         }
     );
-    setNodes(normalized.nodes);
+
+    // The Rust exporter hoists outgoing transitions to the *outermost exited*
+    // Compound/Parallel. Edge-array order alone cannot preserve priority among
+    // different child sources. Keep an explicit order per SCXML owner instead.
+    const actualEdges = (list) => list.filter((edge) =>
+        !edge.data?.boundaryInternalEdge &&
+        !edge.data?.compoundInternalEdge &&
+        !edge.data?.parallelInternalEdge &&
+        !edge.data?.compoundInitialEdge &&
+        !edge.data?.parallelEntryEdge &&
+        !String(edge.id).startsWith("edge-internal-")
+    );
+    const ownerEdgesByContainer = (list) => {
+        const byOwner = new Map();
+        for (const edge of actualEdges(list)) {
+            const logicalSourceId = getLogicalEdgeSourceId(edge);
+            const ownerId = getTransitionScope(logicalSourceId, edge.target, nodes)?.id;
+            if (!ownerId) continue;
+            if (!byOwner.has(ownerId)) byOwner.set(ownerId, []);
+            byOwner.get(ownerId).push({ id: edge.id, logicalSourceId });
+        }
+        return byOwner;
+    };
+    const previousByOwner = ownerEdgesByContainer(edges);
+    const nextByOwner = ownerEdgesByContainer(normalized.edges);
+    const updatedOrders = new Map();
+    nodes.filter((node) => node.type === "compound" || node.type === "parallel")
+        .forEach((container) => {
+            const before = previousByOwner.get(container.id) || [];
+            const after = nextByOwner.get(container.id) || [];
+            if (!before.some((edge) => edge.logicalSourceId === sourceId) &&
+                !after.some((edge) => edge.logicalSourceId === sourceId)) return;
+            updatedOrders.set(container.id, mergeContainerTransitionOrder({
+                previousOrder: container.data?.containerTransitionOrder || [],
+                previousOwnerEdges: before,
+                nextOwnerEdges: after,
+                editedSourceId: sourceId,
+            }));
+        });
+    const orderedNodes = normalized.nodes.map((node) =>
+        updatedOrders.has(node.id)
+            ? { ...node, data: {
+                ...node.data,
+                containerTransitionOrder: updatedOrders.get(node.id),
+            } }
+            : node
+    );
+    setNodes(orderedNodes);
     setEdges(normalized.edges);
     (normalized.affectedNodeIds || []).forEach((nodeId) => {
         requestAnimationFrame(() => updateNodeInternals(nodeId));
     });
-    void syncTransitionsForSource?.(sourceId);
+    // A scoped order is a property of the enclosing state, not merely the
+    // skill. Refresh the Rust transition projection in one transaction so
+    // cross-source priority is not lost to targeted replacement/appending.
+    void syncTransitionsForSource?.(sourceId, {
+        preserveContainerOrder: updatedOrders.size > 0,
+    });
 
     setDrawerData((previous) => ({ ...previous, isOpen: false }));
 };

@@ -38,6 +38,39 @@ const ForcedSmartTransitionEdge = createSmartEdge(
     }
 );
 
+/** Compact, interactive SCXML annotations anchored at the transition midpoint. */
+function TransitionAnnotationBadges({ data, x, y, hasLabel = false, selected = false }) {
+    if (data?.boundaryInternalEdge || data?.compoundInternalEdge ||
+        data?.parallelInternalEdge || data?.compoundInitialEdge || data?.parallelEntryEdge) return null;
+    const condition = String(data?.cond || "").trim();
+    const assignments = Array.isArray(data?.assignments)
+        ? data.assignments.filter((assignment) => assignment?.location)
+        : data?.assign?.location ? [data.assign] : [];
+    if (!condition && !assignments.length) return null;
+    return (
+        <EdgeLabelRenderer>
+            <div className={`editor-transition-annotations nodrag nopan ${data?.annotationContextVisible || selected ? "editor-transition-annotation-context-visible" : ""}`}
+                style={{ position: "absolute", transform: `translate(-50%, -50%) translate(${x}px, ${y + (hasLabel ? 18 : 0)}px)`, pointerEvents: "all" }}
+                onPointerDown={(event) => event.stopPropagation()}>
+                {condition && <button type="button" className="editor-transition-annotation" title={`Condition: ${condition}`}
+                    aria-label={`Edit transition condition: ${condition}`}
+                    onMouseEnter={(event) => data?.onHoverTransitionBadge?.(true, event)}
+                    onMouseLeave={(event) => data?.onHoverTransitionBadge?.(false, event)}
+                    onFocus={(event) => data?.onHoverTransitionBadge?.(true, event)}
+                    onBlur={(event) => data?.onHoverTransitionBadge?.(false, event)}
+                    onClick={(event) => { event.preventDefault(); event.stopPropagation(); data?.onOpenTransitionBadge?.("condition"); }}>c</button>}
+                {assignments.length > 0 && <button type="button" className="editor-transition-annotation" title={assignments.map((assignment) => `${assignment.location} = ${assignment.expr ?? ""}`).join("\n")}
+                    aria-label="Edit transition assignments"
+                    onMouseEnter={(event) => data?.onHoverTransitionBadge?.(true, event)}
+                    onMouseLeave={(event) => data?.onHoverTransitionBadge?.(false, event)}
+                    onFocus={(event) => data?.onHoverTransitionBadge?.(true, event)}
+                    onBlur={(event) => data?.onHoverTransitionBadge?.(false, event)}
+                    onClick={(event) => { event.preventDefault(); event.stopPropagation(); data?.onOpenTransitionBadge?.("assignment"); }}>a</button>}
+            </div>
+        </EdgeLabelRenderer>
+    );
+}
+
 const CONTROL_POINT_SIZE = 14;
 const ADD_POINT_SIZE = 18;
 const EMPTY_ARRAY = Object.freeze([]);
@@ -654,6 +687,7 @@ function ManualEditableTransitionEdge(
                 }
             />
 
+            <TransitionAnnotationBadges data={data} selected={selected} x={labelPoint.x} y={labelPoint.y} hasLabel={Boolean(label)} />
             <EdgeLabelRenderer>
                 {label && (
                     <div
@@ -963,6 +997,7 @@ function AutoEditableTransitionEdge(props) {
                 <SmartTransitionEdge {...props} />
             )}
 
+            <TransitionAnnotationBadges data={data} selected={selected} x={(sourceX + targetX) / 2} y={(sourceY + targetY) / 2} hasLabel={Boolean(props.label)} />
             {selected && (
                 <EdgeLabelRenderer>
                     <button

@@ -37,14 +37,14 @@ function NodeReferenceCard({
             }}
             onMouseEnter={(event) => {
                 event.stopPropagation();
-                onHover?.(nodeId);
+                onHover?.(nodeId, event);
             }}
             onMouseLeave={(event) => {
                 event.stopPropagation();
-                onHover?.(hoverFallbackId);
+                onHover?.(hoverFallbackId, event);
             }}
-            onFocus={() => onHover?.(nodeId)}
-            onBlur={() => onHover?.(hoverFallbackId)}
+            onFocus={(event) => onHover?.(nodeId, event)}
+            onBlur={(event) => onHover?.(hoverFallbackId, event)}
             onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();

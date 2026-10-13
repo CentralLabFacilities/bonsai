@@ -213,6 +213,13 @@ export function useTransitionGraph({
         );
     }, [nodes, validateSlotConnection]);
 
+    const handleNewConnectStart = useCallback((event, params) => {
+        // An interrupted reconnect (e.g. while loading another workflow)
+        // must not make ordinary new connections use the reconnect validator.
+        reconnectingEdgeRef.current = null;
+        handleConnectStart(event, params);
+    }, [handleConnectStart]);
+
     const handleReconnectStart = useCallback((_, edge) => {
         // Only target-end transition reconnects are exposed. React Flow reports
         // the fixed opposite handle here, so keep the edge itself regardless
@@ -1366,7 +1373,7 @@ export function useTransitionGraph({
         confirmSlotRename,
         openConditionDrawer,
         isValidConnection,
-        handleConnectStart,
+        handleConnectStart: handleNewConnectStart,
         handleConnectEnd,
         handleReconnectStart,
         handleReconnectEnd,

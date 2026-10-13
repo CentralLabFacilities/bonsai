@@ -61,6 +61,58 @@
     border-color: #8fa0b5;
 }
 
+/* File operations live in a single accessible dropdown in the header. */
+.editor-file-menu {
+    position: relative;
+    flex: 0 0 auto;
+}
+
+.editor-file-menu-trigger.active {
+    background: #3b4e60;
+    border-color: #8fa0b5;
+}
+
+.editor-file-menu-dropdown {
+    position: absolute;
+    z-index: 2100;
+    top: calc(100% + 5px);
+    left: 0;
+    min-width: 172px;
+    padding: 5px;
+    border: 1px solid #52657a;
+    border-radius: 7px;
+    background: var(--header-background, #202a36);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
+}
+
+.editor-file-menu-dropdown [role="menuitem"] {
+    width: 100%;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: #f1f5f9;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    text-align: left;
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.editor-file-menu-dropdown [role="menuitem"]:hover:not(:disabled),
+.editor-file-menu-dropdown [role="menuitem"]:focus-visible {
+    background: #3b4e60;
+    outline: 1px solid #8fa0b5;
+}
+
+.editor-file-menu-dropdown [role="menuitem"]:disabled {
+    color: #94a3b8;
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
 .editor-operation-notice {
     display: flex;
     flex: 0 0 auto;
@@ -3659,10 +3711,13 @@
 }
 
 
+/* Keep type, variable, comparison operator, and value on one row.
+ * Flexible zero-minimum columns prevent the condition editor from
+ * overflowing its card into the adjacent Assignments section. */
 .condition-expression-row {
     display: grid;
-    grid-template-columns: auto minmax(72px, 0.8fr) 74px minmax(120px, 1.4fr);
-    gap: 8px;
+    grid-template-columns: max-content minmax(0, 0.8fr) 76px minmax(0, 1.2fr);
+    gap: 4px;
     align-items: center;
     min-width: 0;
     width: 100%;
@@ -3679,24 +3734,12 @@
 }
 
 .condition-expression-operator {
-    width: 74px;
-    min-width: 74px;
+    width: 100%;
+    min-width: 0;
 }
 
 .condition-expression-value {
     min-width: 0;
-}
-
-@media (max-width: 1150px) {
-    .condition-expression-row {
-        grid-template-columns: auto minmax(60px, 1fr) 68px minmax(100px, 1.3fr);
-        gap: 6px;
-    }
-
-    .condition-expression-operator {
-        width: 68px;
-        min-width: 68px;
-    }
 }
 
 /* ==========================================================================
@@ -4327,13 +4370,6 @@
         padding: 10px 12px;
     }
 
-    .condition-expression-row {
-        grid-template-columns: auto minmax(0, 1fr) 68px;
-    }
-
-    .condition-expression-value {
-        grid-column: 2 / -1;
-    }
 }
 
 
@@ -7580,7 +7616,7 @@ dialog.skill-paste-choice-overlay {
 
 /* Hover/focus emphasis is intentionally visual-only. Do not reuse React
    Flow's selected flag here, because hover must not alter multi-selection. */
-.react-flow__node.editor-hover-highlight {
+.react-flow__node:is(.editor-hover-highlight, .editor-canvas-fast-hover-highlight) {
     outline: 3px solid rgba(37, 99, 235, 0.72);
     outline-offset: 3px;
     border-radius: 8px;
@@ -7597,7 +7633,7 @@ dialog.skill-paste-choice-overlay {
 }
 
 .react-flow__node.editor-node-problem.selected,
-.react-flow__node.editor-node-problem.editor-hover-highlight {
+.react-flow__node.editor-node-problem:is(.editor-hover-highlight, .editor-canvas-fast-hover-highlight) {
     outline-color: #dc2626;
     box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.26);
 }
@@ -7939,7 +7975,7 @@ dialog.skill-paste-choice-overlay {
  * already-cached edges connected to the hovered/selected context are painted.
  */
 .react-flow.editor-transitions-context-only
-.react-flow__edge.editor-transition-edge:not(.editor-edge-context-visible):not(.selected) {
+.react-flow__edge.editor-transition-edge:not(.editor-edge-context-visible):not(.editor-canvas-fast-edge-context-visible):not(.selected) {
     visibility: hidden;
     pointer-events: none;
 }
@@ -7950,7 +7986,7 @@ dialog.skill-paste-choice-overlay {
  * does not create and smart-route the complete slot graph in one frame.
  */
 .react-flow.editor-slots-context-only
-.react-flow__edge.editor-slot-edge:not(.editor-edge-context-visible):not(.selected) {
+.react-flow__edge.editor-slot-edge:not(.editor-edge-context-visible):not(.editor-canvas-fast-edge-context-visible):not(.selected) {
     visibility: hidden;
     pointer-events: none;
 }
@@ -7963,24 +7999,24 @@ dialog.skill-paste-choice-overlay {
  * .editor-edge-focus-active, while the canvas class dims all other mounted
  * transition SVG groups directly in CSS.
  */
-.react-flow.editor-edge-focus-mode
-.react-flow__edge.editor-transition-edge:not(.editor-edge-focus-active):not(.editor-edge-selection-related):not(.selected),
-.react-flow.editor-edge-focus-mode
-.react-flow__edge.editor-slot-edge:not(.editor-edge-focus-active):not(.editor-edge-selection-related):not(.selected) {
+.react-flow:is(.editor-edge-focus-mode, .editor-canvas-fast-edge-focus-mode)
+.react-flow__edge.editor-transition-edge:not(.editor-edge-focus-active):not(.editor-canvas-fast-edge-focus-active):not(.editor-edge-selection-related):not(.selected),
+.react-flow:is(.editor-edge-focus-mode, .editor-canvas-fast-edge-focus-mode)
+.react-flow__edge.editor-slot-edge:not(.editor-edge-focus-active):not(.editor-canvas-fast-edge-focus-active):not(.editor-edge-selection-related):not(.selected) {
     opacity: 0.22;
 }
 
-.react-flow.editor-edge-focus-mode
-.react-flow__edge.editor-transition-edge.editor-edge-focus-active,
-.react-flow.editor-edge-focus-mode
+.react-flow:is(.editor-edge-focus-mode, .editor-canvas-fast-edge-focus-mode)
+.react-flow__edge.editor-transition-edge:is(.editor-edge-focus-active, .editor-canvas-fast-edge-focus-active),
+.react-flow:is(.editor-edge-focus-mode, .editor-canvas-fast-edge-focus-mode)
 .react-flow__edge.editor-transition-edge.editor-edge-selection-related,
-.react-flow.editor-edge-focus-mode
+.react-flow:is(.editor-edge-focus-mode, .editor-canvas-fast-edge-focus-mode)
 .react-flow__edge.editor-transition-edge.selected,
-.react-flow.editor-edge-focus-mode
-.react-flow__edge.editor-slot-edge.editor-edge-focus-active,
-.react-flow.editor-edge-focus-mode
+.react-flow:is(.editor-edge-focus-mode, .editor-canvas-fast-edge-focus-mode)
+.react-flow__edge.editor-slot-edge:is(.editor-edge-focus-active, .editor-canvas-fast-edge-focus-active),
+.react-flow:is(.editor-edge-focus-mode, .editor-canvas-fast-edge-focus-mode)
 .react-flow__edge.editor-slot-edge.editor-edge-selection-related,
-.react-flow.editor-edge-focus-mode
+.react-flow:is(.editor-edge-focus-mode, .editor-canvas-fast-edge-focus-mode)
 .react-flow__edge.editor-slot-edge.selected {
     opacity: 1;
 }
@@ -7991,16 +8027,16 @@ dialog.skill-paste-choice-overlay {
  * handful of context nodes; CSS dims the rest. This avoids mapping and cloning
  * every node whenever the pointer moves across a large state machine.
  */
-.react-flow.editor-node-focus-mode
-.react-flow__node:not(.editor-node-context-visible):not(.selected) {
+.react-flow:is(.editor-node-focus-mode, .editor-canvas-fast-node-focus-mode)
+.react-flow__node:not(.editor-node-context-visible):not(.editor-canvas-fast-node-context-visible):not(.selected) {
     opacity: 0.42;
     filter: grayscale(0.72);
     transition: opacity 120ms ease, filter 120ms ease;
 }
 
-.react-flow.editor-node-focus-mode
-.react-flow__node.editor-node-context-visible,
-.react-flow.editor-node-focus-mode
+.react-flow:is(.editor-node-focus-mode, .editor-canvas-fast-node-focus-mode)
+.react-flow__node:is(.editor-node-context-visible, .editor-canvas-fast-node-context-visible),
+.react-flow:is(.editor-node-focus-mode, .editor-canvas-fast-node-focus-mode)
 .react-flow__node.selected {
     opacity: 1;
     filter: none;
@@ -8017,15 +8053,26 @@ dialog.skill-paste-choice-overlay {
  * Keep inactive user transitions visually stable without mutating edge data.
  * React Flow's animated edge class uses a dashed SVG stroke; imported edges
  * may also carry a dash pattern. While an edge is not focused or selected,
- * render it as one solid, non-animated line. Structural helper edges keep
- * their intentional dashed presentation.
+ * render it as one solid, non-animated line. Compound/Parallel boundary
+ * helpers must be solid at rest too, exactly like their outer segments.
  */
-.react-flow__edge.editor-user-transition-edge:not(.editor-edge-focus-active):not(.selected)
+.react-flow__edge:is(.editor-user-transition-edge, .editor-boundary-helper-edge):not(.editor-edge-focus-active):not(.editor-canvas-fast-edge-focus-active):not(.selected)
     .react-flow__edge-path {
     stroke-dasharray: none !important;
     animation: none !important;
 }
 
+
+/* Fast canvas hover is DOM-only. Its classes and colour variable belong to
+ * EditorCanvas, never to React Flow or the inspector's React presentation. */
+.react-flow__edge.editor-canvas-fast-edge-animated .react-flow__edge-path {
+    stroke: var(--editor-canvas-hover-stroke) !important;
+    stroke-dasharray: 5 5 !important;
+    animation: editor-canvas-fast-dashes 600ms linear infinite !important;
+}
+@keyframes editor-canvas-fast-dashes {
+    to { stroke-dashoffset: -10; }
+}
 
 /* Container transition editor: Compound/Parallel transitions are target-only. */
 .transition-container-target-only .transition-add-row .skill-select:disabled,
@@ -8780,9 +8827,9 @@ dialog.skill-paste-choice-overlay {
    only: it does not change the current runtime step or playback state.
    -------------------------------------------------------------------------- */
 .react-flow.runtime-log-focus-mode
-.react-flow__node.runtime-log-dimmed-node.editor-node-context-visible,
+.react-flow__node.runtime-log-dimmed-node:is(.editor-node-context-visible, .editor-canvas-fast-node-context-visible),
 .react-flow.runtime-log-focus-mode
-.react-flow__node.runtime-log-dimmed-node.editor-hover-highlight,
+.react-flow__node.runtime-log-dimmed-node:is(.editor-hover-highlight, .editor-canvas-fast-hover-highlight),
 .react-flow.runtime-log-focus-mode
 .react-flow__node.runtime-log-dimmed-node.selected {
     opacity: 1 !important;
@@ -8790,9 +8837,9 @@ dialog.skill-paste-choice-overlay {
 }
 
 .react-flow.runtime-log-focus-mode
-.react-flow__edge.runtime-log-dimmed-edge.editor-edge-focus-active,
+.react-flow__edge.runtime-log-dimmed-edge:is(.editor-edge-focus-active, .editor-canvas-fast-edge-focus-active),
 .react-flow.runtime-log-focus-mode
-.react-flow__edge.runtime-log-dimmed-edge.editor-edge-context-visible,
+.react-flow__edge.runtime-log-dimmed-edge:is(.editor-edge-context-visible, .editor-canvas-fast-edge-context-visible),
 .react-flow.runtime-log-focus-mode
 .react-flow__edge.runtime-log-dimmed-edge.selected {
     visibility: visible !important;
@@ -9726,3 +9773,162 @@ dialog.skill-paste-choice-overlay {
     .runtime-commander-manual-event { grid-template-columns: minmax(0, 1fr) auto; }
     .runtime-commander-manual-event label { grid-column: 1 / -1; }
 }
+
+/* Transition expression annotations. Accessible on hover and by keyboard. */
+.editor-transition-annotations {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    z-index: 1002;
+}
+.editor-transition-annotation {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 19px;
+    height: 19px;
+    border-radius: 5px;
+    border: 1px solid #64748b;
+    background: #1e293b;
+    color: #e2e8f0;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    padding: 0;
+    cursor: pointer;
+    box-shadow: 0 1px 3px #0005;
+}
+.editor-transition-annotation:hover,
+.editor-transition-annotation:focus-visible {
+    background: #334155;
+    border-color: #facc15;
+    color: #fde68a;
+    outline-offset: 2px;
+}
+
+/* The edge labels live in a portal, separate from hidden SVG transitions. */
+.react-flow.editor-transitions-context-only
+.editor-transition-annotations:not(.editor-transition-annotation-context-visible) {
+    visibility: hidden;
+    pointer-events: none !important;
+}
+
+/* Reorder affordance for the transition editor (also used by the Details panel badges). */
+.transition-order-card { position: relative; }
+.transition-order-card.dragging { opacity: .42; }
+.transition-order-card.drop-before::before,
+.transition-order-card.drop-after::after {
+    position: absolute;
+    content: "";
+    left: 0;
+    right: 0;
+    height: 3px;
+    border-radius: 3px;
+    background: #38bdf8;
+    box-shadow: 0 0 7px rgba(56, 189, 248, .35);
+    pointer-events: none;
+}
+.transition-order-card.drop-before::before { top: -5px; }
+.transition-order-card.drop-after::after { bottom: -5px; }
+.transition-drag-handle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    align-self: stretch;
+    flex: 0 0 18px;
+    color: #94a3b8;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+}
+.transition-drag-handle:hover, .transition-drag-handle:focus-visible { color: #e2e8f0; }
+.transition-drag-handle:active { cursor: grabbing; }
+.transition-drag-handle[draggable="false"] { opacity: .4; cursor: default; }
+.exit-token-transition-annotations {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.exit-token-transition-annotations .editor-transition-annotation {
+    width: 19px;
+    height: 19px;
+    box-shadow: none;
+}
+
+/* Exit token definitions are grouped by name; only the transition drawer edits targets. */
+.exit-token-name-action {
+    display: block;
+    padding: 0;
+    border: none;
+    background: transparent;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    text-align: left;
+    cursor: pointer;
+}
+.exit-token-name-action:hover { text-decoration: underline; text-underline-offset: 3px; }
+.exit-token-name-action:focus-visible {
+    outline: 2px solid #60a5fa;
+    outline-offset: 3px;
+    border-radius: 2px;
+}
+/* Target names navigate, while their c/a badges open the transition editor. */
+.exit-token-target-row {
+    min-width: 0;
+    margin: 0;
+}
+.exit-token-target-row .exit-token-node-reference-header {
+    justify-content: flex-start;
+    gap: 6px;
+}
+.exit-token-target-link {
+    display: inline-flex;
+    flex: 0 1 auto;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    text-align: left;
+    overflow-wrap: anywhere;
+    cursor: pointer;
+}
+.exit-token-target-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+.exit-token-target-link:focus-visible, .exit-token-target-row .editor-transition-annotation:focus-visible {
+    outline: 2px solid #60a5fa;
+    outline-offset: 2px;
+}
+.exit-token-target-row .exit-token-transition-annotations {
+    flex: 0 0 auto;
+}
+.exit-token-target-suffix {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-left: auto;
+    flex: 0 0 auto;
+}
+
+/* Transition ordering reflects SCXML owners, not the visual edge origin. */
+.transition-scope-heading {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 10px 7px 5px;
+    margin-top: 4px;
+    border-top: 1px solid #334155;
+}
+.transition-scope-heading:first-child { margin-top: 0; border-top: none; padding-top: 2px; }
+.transition-scope-title { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.transition-scope-name { font-size: 12px; font-weight: 700; color: #e2e8f0; }
+.transition-scope-type { font-size: 9px; border: 1px solid #475569; padding: 2px 5px; border-radius: 4px; color: #94a3b8; }
+.transition-scope-order { color: #94a3b8; font-size: 10px; line-height: 1.3; }
+.transition-scope-warning { display: flex; gap: 4px; align-items: flex-start; font-size: 10px; line-height: 1.35; color: #fbbf24; margin-top: 4px; }
+.transition-scope-warning svg { flex: 0 0 12px; margin-top: 1px; }
+.transition-order-card:has(.transition-scope-warning) { border-left-color: #f59e0b; }
+/* Leave room for multiple priority sections without growing the entire drawer. */
+.transition-list-step .transition-order-list { max-height: min(370px, 50dvh); }

@@ -7,17 +7,19 @@ import { createEditorNodeIndex } from "./editorGraph.js";
 import { getConfiguredAssignments } from "./stateActions.js";
 import {
     serializeEditorConditionForScxml,
+    serializeEditorAssignmentForScxml,
     serializeEditorValueForScxml,
 } from "./valueTypes.js";
 import { serializeEditorWorkflow } from "../tauri-client.js";
 
-const normalizeAssignment = (assignment) => ({
+const normalizeAssignment = (assignment, serialize = serializeEditorValueForScxml) => ({
     location: String(assignment?.location || "").trim().replace(/^@/, ""),
-    expression: serializeEditorValueForScxml(assignment?.expr ?? ""),
+    expression: serialize(assignment?.expr ?? ""),
 });
 
 const normalizeAssignments = (assignments) =>
-    getConfiguredAssignments(assignments || []).map(normalizeAssignment);
+    getConfiguredAssignments(assignments || []).map((assignment) =>
+        normalizeAssignment(assignment, serializeEditorAssignmentForScxml));
 
 // Transition assignments historically allow an explicitly empty expression;
 // state on-entry/on-exit actions do not. Preserve that distinction during the
@@ -29,7 +31,7 @@ const normalizeTransitionAssignments = (assignments) =>
                 String(assignment?.location || "").trim() !== "" &&
                 assignment?.expr !== undefined
         )
-        .map(normalizeAssignment);
+        .map((assignment) => normalizeAssignment(assignment, serializeEditorAssignmentForScxml));
 
 const normalizeSlot = (slot) => ({
     key: String(slot?.key || ""),

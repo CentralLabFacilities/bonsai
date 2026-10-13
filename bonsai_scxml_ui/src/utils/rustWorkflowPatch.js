@@ -1,13 +1,14 @@
 import {
     deserializeScxmlConditionForEditor,
     deserializeScxmlValueForEditor,
+    deserializeScxmlAssignmentForEditor,
     deserializeStateDatamodelValueForEditor,
 } from "./valueTypes";
 import { getTransitionExitToken } from "./transitionEvents";
 
 const toEditorAssignment = (assignment) => ({
     location: String(assignment?.location || ""),
-    expr: deserializeScxmlValueForEditor(assignment?.expression || ""),
+    expr: deserializeScxmlAssignmentForEditor(assignment?.expression || ""),
 });
 
 const getPrimaryEditorPosition = (state) => {

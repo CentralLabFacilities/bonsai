@@ -8,6 +8,7 @@ import { normalizeSlotPath } from "./editorGraph.js";
 import {
     deserializeScxmlConditionForEditor,
     deserializeScxmlValueForEditor,
+    deserializeScxmlAssignmentForEditor,
     deserializeStateDatamodelValueForEditor,
 } from "./valueTypes.js";
 import { validateParameterValue } from "./valueValidation.js";
@@ -19,6 +20,7 @@ import {
     getCompoundExitGutterWidth,
     getLaneForNode,
     isNodeInsideContainer,
+    getTransitionTargetHandleForNode,
 } from "./editorGeometry.js";
 const normalizeLegacyScxmlComments = (xmlText) =>
     String(xmlText || "")
@@ -1756,7 +1758,7 @@ export const parseScxmlFile = async (
 
         transition.assignments = assignments.map((assignment) => ({
             location: assignment.location,
-            expr: deserializeScxmlValueForEditor(assignment.expr),
+            expr: deserializeScxmlAssignmentForEditor(assignment.expr, globalDataEntries),
         }));
         transition.assignLocation = transition.assignments[0]?.location || "";
         transition.assignExpr = transition.assignments[0]?.expr || "";
@@ -1765,7 +1767,7 @@ export const parseScxmlFile = async (
     newNodes.forEach((node) => {
         (node.data?.events || []).forEach((event) => {
             event.cond = deserializeScxmlConditionForEditor(event.cond);
-            event.assignExpr = deserializeScxmlValueForEditor(event.assignExpr);
+            event.assignExpr = deserializeScxmlAssignmentForEditor(event.assignExpr, globalDataEntries);
         });
     });
 
@@ -1786,13 +1788,17 @@ export const parseScxmlFile = async (
 
         if (!sourceNode) return;
 
-        const targetCandidates = newNodes.filter(
-            (n) =>
-                n.data.scxmlStateId === trans.targetStateName ||
-                n.data.fullSkillName === trans.targetStateName ||
-                n.data.label === trans.targetStateName ||
-                n.id === trans.targetStateName
+        // Prefer the actual SCXML state id. Labels are only a legacy fallback:
+        // two skills can share a display label (or a clone of one), and a
+        // label match must not steal a transition from its real target.
+        const exactTargets = newNodes.filter((n) =>
+            n.data?.scxmlStateId === trans.targetStateName ||
+            n.data?.fullSkillName === trans.targetStateName ||
+            n.id === trans.targetStateName
         );
+        const targetCandidates = exactTargets.length > 0
+            ? exactTargets
+            : newNodes.filter((n) => n.data?.label === trans.targetStateName);
 
         if (targetCandidates.length === 0) return;
 
@@ -1863,12 +1869,10 @@ export const parseScxmlFile = async (
             source: sourceNode.id,
             target: targetNode.id,
             sourceHandle: eventHandleId,
-            targetHandle:
-                targetNode.type === "compound" ||
-                targetNode.type === "parallel" ||
-                targetNode.type === "parallelLane"
-                    ? null
-                    : "transition-target",
+            // Explicit handles are essential on containers: React Flow may
+            // otherwise choose an internal boundary target (or no target at
+            // all), leaving an existing SCXML transition invisible.
+            targetHandle: getTransitionTargetHandleForNode(targetNode),
             type: sourceNode.id === targetNode.id ? "smoothstep" : "default",
             label: labelText,
             markerEnd: { type: MarkerType.ArrowClosed },

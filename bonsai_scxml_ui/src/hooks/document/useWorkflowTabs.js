@@ -89,6 +89,7 @@ export function useWorkflowTabs({
     getViewport,
     setViewport,
     syncRustDocument,
+    cancelFlowConnection,
     isDraggingNode = false,
 }) {
     const [storedTabs, setTabsState] = useState(() => [createInitialTab()]);
@@ -278,12 +279,17 @@ export function useWorkflowTabs({
     const loadTabState = useCallback(
         (tab, { fit = false, fitOptions = null } = {}) => {
             if (!tab) return;
+            // Invalidate pending edits first: cancelConnection may invoke a
+            // stale gesture callback, which must not commit into the new tab.
             activeDocumentIdentityRef.current = {
                 id: tab.id,
                 documentGeneration: tab.documentGeneration ?? 0,
                 activationGeneration:
                     activeDocumentIdentityRef.current.activationGeneration + 1,
             };
+            // A load/tab change can interrupt a native edge gesture. Reset it
+            // before replacing the graph so new drags start from a clean state.
+            cancelFlowConnection?.();
             const nextDocument = {
                 nodes: tab.nodes || [],
                 edges: tab.edges || [],
@@ -338,7 +344,7 @@ export function useWorkflowTabs({
                 });
             });
         },
-        [replaceDocument, setSelectedNodeId, fitView, setViewport, syncRustDocument],
+        [replaceDocument, setSelectedNodeId, fitView, setViewport, syncRustDocument, cancelFlowConnection],
     );
 
     const replaceTabDocument = useCallback(
