@@ -267,12 +267,10 @@ export const useSlotConnections = (options) => {
         const model = getModel();
         const endpoint = getSlotConnectionEndpoint(params?.nodeId, params?.handleId, model);
         if (!endpoint || pendingRef.current) return;
-        const inheritedPath = endpoint.slot.inherited && normalizeSlotPath(endpoint.slot.inherited.xpath || endpoint.slot.path);
         const drag = {
             active: true, nodeId: endpoint.nodeId, handleId: endpoint.handleId,
             origin: endpoint.origin, access: endpoint.access, slotType: endpoint.slotType,
             slotIndex: endpoint.slotIndex, inheritIndex: endpoint.inheritIndex,
-            previewPath: `/${inheritedPath || getDefaultSlotPath(model)}`, previewType: endpoint.slot.type,
             canCreate: endpoint.origin === "skill" && !reconnectRef.current,
         };
         dragRef.current = { ...drag, identity: getIdentity(), signature: endpointSignature(endpoint), completed: false };
@@ -296,14 +294,14 @@ export const useSlotConnections = (options) => {
             return false;
         }
         const formattedPath = `/${path}`;
-        const newInherited = inherited ? { ...inherited, xpath: formattedPath } : null;
-        const manualSlots = [...(model.manualSlots || []), {
-            id: `manual-${crypto.randomUUID()}`, path: formattedPath, type: consumer.slot.type,
-            access: consumer.access, slotKind: inherited ? "inheritSlot" : "slot", inherited: newInherited,
-        }];
+        const inheritedState = inherited ? String(inherited.state || "*") : null;
+        const newInherited = inherited ? { ...inherited, state: inheritedState, xpath: formattedPath } : null;
+        // The new slot node is a visual endpoint, not an independent SCXML
+        // declaration. Connecting this skill slot below creates the actual
+        // key/state/path binding. Do not persist a second wildcard <slot>.
         const slotNodes = [...model.slotNodes, {
             id: `slot-${path}`, type: "slot", position,
-            data: { path: formattedPath, label: formattedPath, slotType: consumer.slot.type,
+            data: { path: formattedPath, label: formattedPath, key: path, state: "*", slotType: consumer.slot.type,
                 inherited: Boolean(inherited), currentMachineInherited: Boolean(inherited),
                 inheritedFrom: inherited?.state || "", ...(inherited ? { slotKind: "inheritSlot" } : {}) },
         }];
@@ -312,7 +310,7 @@ export const useSlotConnections = (options) => {
             ...node, data: { ...node.data, [key]: node.data[key].map((slot, index) => index === consumer.slotIndex
                 ? { ...slot, path: formattedPath, inherited: newInherited } : slot) },
         });
-        return commit({ ...model, nodes, manualSlots, slotNodes }, model, consumer, `slot-${path}`);
+        return commit({ ...model, nodes, slotNodes }, model, consumer, `slot-${path}`);
     }, [cancelSlotConnection, getIdentity, getModel, reportError, commit]);
 
     const handleSlotReconnectStart = useCallback((edge) => {

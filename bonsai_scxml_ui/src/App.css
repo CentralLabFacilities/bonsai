@@ -7908,50 +7908,6 @@ dialog.skill-paste-choice-overlay {
     background: #64748b;
 }
 
-.slot-connection-preview {
-    --slot-preview-color: #818cf8;
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    width: 190px;
-    height: 86px;
-    padding: 10px 12px;
-    box-sizing: border-box;
-    overflow: hidden;
-    border: 1.5px dashed var(--slot-preview-color, #818cf8);
-    border-radius: 10px;
-    background: rgba(29, 40, 61, 0.72);
-    color: #e8edf7;
-    opacity: 0.55;
-    pointer-events: none;
-}
-
-.slot-connection-preview-path {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    font-size: 12px;
-    font-weight: 700;
-}
-
-.slot-connection-preview-type {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: #c7d2fe;
-    font-size: 10px;
-}
-
-.slot-connection-preview-access {
-    color: var(--slot-preview-color, #a5b4fc);
-    font-size: 9px;
-    font-weight: 800;
-    letter-spacing: 0.45px;
-    text-transform: uppercase;
-}
-
 .slot-rename-affected {
     max-height: 220px;
     overflow-y: auto;

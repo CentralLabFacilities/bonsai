@@ -805,9 +805,12 @@ export const parseScxmlFile = async (
             const exactKeyMatch = candidates.find((ps) => ps.key === slotKey);
             if (exactKeyMatch) return exactKeyMatch;
 
-            // A single declaration for the state is unambiguous, even when the
-            // configured skill exposes separate read/write request keys.
-            if (candidates.length === 1) return candidates[0];
+            // An explicit state may use a logical declaration key different
+            // from the API's read/write keys. However, a wildcard declaration
+            // is not an implicit connection to every skill in the workflow:
+            // automatically created default slots have state="*" and must not
+            // attach to unrelated requests when the document is reopened.
+            if (candidates.length === 1 && candidates[0].state !== "*") return candidates[0];
 
             // Multiple declarations without a matching key are ambiguous. Do
             // not guess a path, because that could connect the request to the

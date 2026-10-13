@@ -1,4 +1,4 @@
-import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import {
     FiEye,
     FiEyeOff,
@@ -22,11 +22,8 @@ import RuntimeLogPlayer from "../inspector/RuntimeLogPlayer.jsx";
 import CanvasContextMenu from "./CanvasContextMenu.jsx";
 import { SLOT_CONNECTION_COLORS, getTransitionHighlightColor, parseSlotConnectionHandle } from "../../utils/editorGraph";
 
-const SlotConnectionPreviewContext = createContext(null);
-
 function EditorConnectionLine({ fromHandle, fromX, fromY, toX, toY, fromPosition, toPosition,
-    toNode, toHandle, connectionLineStyle }) {
-    const drag = useContext(SlotConnectionPreviewContext);
+    connectionLineStyle }) {
     const handle = parseSlotConnectionHandle(fromHandle?.id);
     const reverse = handle && (handle.origin === "slot" ? handle.access === "write" : handle.access === "read");
     const [path] = getBezierPath(reverse
@@ -37,15 +34,6 @@ function EditorConnectionLine({ fromHandle, fromX, fromY, toX, toY, fromPosition
         <g style={{ pointerEvents: "none" }}>
             <path className="react-flow__connection-path" d={path} fill="none"
                 style={{ ...connectionLineStyle, ...(color ? { stroke: color, strokeWidth: 1.7, strokeDasharray: "5 5" } : {}) }} />
-            {drag?.canCreate && !toNode && !toHandle && (
-                <foreignObject x={toX} y={toY} width={190} height={86} aria-hidden="true">
-                    <div className="slot-connection-preview" style={{ "--slot-preview-color": color, pointerEvents: "none" }}>
-                        <div className="slot-connection-preview-path">{drag.previewPath}</div>
-                        <div className="slot-connection-preview-type">{drag.previewType}</div>
-                        <div className="slot-connection-preview-access">{drag.access.toUpperCase()}</div>
-                    </div>
-                </foreignObject>
-            )}
         </g>
     );
 }
@@ -123,7 +111,6 @@ export default function EditorCanvas({
     setContextMenu,
     handleSelectAction,
     hasGraphClipboard,
-    slotConnectionDrag,
     isDraggingNode,
     isOverTrash,
     handleNodesChange,
@@ -474,7 +461,6 @@ export default function EditorCanvas({
 
 
             <SmartEdgeProvider nodes={smartRoutingNodes}>
-                <SlotConnectionPreviewContext.Provider value={slotConnectionDrag}>
                 <ReactFlow
                     className={
                         [
@@ -560,7 +546,6 @@ export default function EditorCanvas({
                     <Background />
                     <Controls position={runtimePlayback?.loaded || liveExecutionActive ? "bottom-right" : "bottom-left"} />
                 </ReactFlow>
-                </SlotConnectionPreviewContext.Provider>
             </SmartEdgeProvider>
         </>
     );
