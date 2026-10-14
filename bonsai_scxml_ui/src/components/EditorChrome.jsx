@@ -9,6 +9,8 @@ import {
     FiChevronLeft,
     FiChevronRight,
     FiChevronDown,
+    FiCheck,
+    FiEye,
     FiAlertCircle,
 } from "react-icons/fi";
 import { isTauri } from "../tauri-client.js";
@@ -16,12 +18,15 @@ import { PANEL_LIMITS } from "../utils/editorPreferences.js";
 import { isDocumentGuardOpen } from "../hooks/interaction/useGlobalEditorShortcuts.js";
 import { Button, IconButton } from "./ui/index.js";
 
-function Header({ onOpenFile, onSaveFile, onSaveAsFile, hasFilePath, isSaving = false, isOpening = false, panels }) {
+function Header({ onOpenFile, onSaveFile, onSaveAsFile, hasFilePath, isSaving = false, isOpening = false, panels, colorblindMode = false, onToggleColorblindMode }) {
     const IS_DESKTOP = isTauri();
 
     const [fileMenuOpen, setFileMenuOpen] = useState(false);
     const fileMenuRef = useRef(null);
     const fileMenuButtonRef = useRef(null);
+    const [optionsMenuOpen, setOptionsMenuOpen] = useState(false);
+    const optionsMenuRef = useRef(null);
+    const optionsButtonRef = useRef(null);
 
     useEffect(() => {
         if (!fileMenuOpen) return undefined;
@@ -46,6 +51,30 @@ function Header({ onOpenFile, onSaveFile, onSaveAsFile, hasFilePath, isSaving = 
             document.removeEventListener("keydown", closeOnEscape, true);
         };
     }, [fileMenuOpen]);
+
+    useEffect(() => {
+        if (!optionsMenuOpen) return undefined;
+        const closeOnOutsideClick = (event) => {
+            if (!optionsMenuRef.current?.contains(event.target)) setOptionsMenuOpen(false);
+        };
+        const closeOnEscape = (event) => {
+            if (event.key !== "Escape") return;
+            event.preventDefault();
+            event.stopPropagation();
+            setOptionsMenuOpen(false);
+            optionsButtonRef.current?.focus();
+        };
+        const frame = window.requestAnimationFrame(() => {
+            optionsMenuRef.current?.querySelector('[role="menuitemcheckbox"]')?.focus();
+        });
+        document.addEventListener("pointerdown", closeOnOutsideClick);
+        document.addEventListener("keydown", closeOnEscape, true);
+        return () => {
+            window.cancelAnimationFrame(frame);
+            document.removeEventListener("pointerdown", closeOnOutsideClick);
+            document.removeEventListener("keydown", closeOnEscape, true);
+        };
+    }, [optionsMenuOpen]);
 
     const runFileAction = (action) => {
         setFileMenuOpen(false);
@@ -85,7 +114,10 @@ function Header({ onOpenFile, onSaveFile, onSaveAsFile, hasFilePath, isSaving = 
                         aria-haspopup="menu"
                         aria-expanded={fileMenuOpen}
                         aria-controls="editor-file-menu-items"
-                        onClick={() => setFileMenuOpen((open) => !open)}
+                        onClick={() => {
+                            setOptionsMenuOpen(false);
+                            setFileMenuOpen((open) => !open);
+                        }}
                         onKeyDown={(event) => {
                             if (!fileMenuOpen && ["ArrowDown", "ArrowUp"].includes(event.key)) {
                                 event.preventDefault();
@@ -131,6 +163,63 @@ function Header({ onOpenFile, onSaveFile, onSaveAsFile, hasFilePath, isSaving = 
                                     Save As…
                                 </button>
                             )}
+                        </div>
+                    )}
+                </div>
+
+                <div
+                    className="editor-file-menu editor-options-menu"
+                    ref={optionsMenuRef}
+                    onBlurCapture={(event) => {
+                        if (!event.currentTarget.contains(event.relatedTarget)) setOptionsMenuOpen(false);
+                    }}
+                    onKeyDown={(event) => {
+                        if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+                        const items = Array.from(optionsMenuRef.current?.querySelectorAll('[role="menuitemcheckbox"]') || []);
+                        if (!items.length) return;
+                        event.preventDefault();
+                        const index = items.indexOf(document.activeElement);
+                        const next = event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 :
+                            event.key === "ArrowDown" ? (index + 1) % items.length :
+                                (index - 1 + items.length) % items.length;
+                        items[next].focus();
+                    }}
+                >
+                    <Button
+                        ref={optionsButtonRef}
+                        size="sm"
+                        className={`menu-button editor-file-menu-trigger ${optionsMenuOpen ? "active" : ""}`}
+                        trailingIcon={<FiChevronDown />}
+                        aria-haspopup="menu"
+                        aria-expanded={optionsMenuOpen}
+                        aria-controls="editor-options-menu-items"
+                        onClick={() => {
+                            setFileMenuOpen(false);
+                            setOptionsMenuOpen((open) => !open);
+                        }}
+                        onKeyDown={(event) => {
+                            if (!optionsMenuOpen && ["ArrowDown", "ArrowUp"].includes(event.key)) {
+                                event.preventDefault();
+                                setFileMenuOpen(false);
+                                setOptionsMenuOpen(true);
+                            }
+                        }}
+                    >
+                        Options
+                    </Button>
+                    {optionsMenuOpen && (
+                        <div id="editor-options-menu-items" className="editor-file-menu-dropdown editor-options-menu-dropdown"
+                            role="menu" aria-label="Options">
+                            <button type="button" role="menuitemcheckbox" aria-checked={colorblindMode}
+                                className="editor-options-menu-toggle"
+                                onClick={() => onToggleColorblindMode?.()}>
+                                <FiEye aria-hidden="true" />
+                                <span>Colorblind mode</span>
+                                <span className="editor-options-menu-check" aria-hidden="true">
+                                    {colorblindMode && <FiCheck />}
+                                </span>
+                            </button>
+                            <p className="editor-options-menu-help">Colorblind-friendly transition, slot and status colors.</p>
                         </div>
                     )}
                 </div>

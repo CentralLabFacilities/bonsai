@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
     loadBehaviorDirectories,
     loadEdgeVisibility,
+    loadColorblindMode,
     saveEditorPreferences,
     loadPanelPreferences,
     savePanelPreferences,
@@ -15,10 +16,17 @@ export function useEditorPreferences() {
         loadEdgeVisibility("transitions"),
     );
     const [showSlotEdges, setShowSlotEdges] = useState(() => loadEdgeVisibility("slots"));
+    const [colorblindMode, setColorblindMode] = useState(loadColorblindMode);
+
+    // CSS variables also resolve inside existing React Flow SVG paths and arrowheads.
+    // Apply before paint; toggling must not rebuild the workflow or alter its data.
+    useLayoutEffect(() => {
+        document.documentElement.toggleAttribute("data-colorblind-mode", colorblindMode);
+    }, [colorblindMode]);
 
     useEffect(() => {
-        saveEditorPreferences({ behaviorDirectories, showTransitionEdges, showSlotEdges });
-    }, [behaviorDirectories, showTransitionEdges, showSlotEdges]);
+        saveEditorPreferences({ behaviorDirectories, showTransitionEdges, showSlotEdges, colorblindMode });
+    }, [behaviorDirectories, showTransitionEdges, showSlotEdges, colorblindMode]);
 
     return {
         behaviorDirectories,
@@ -27,6 +35,8 @@ export function useEditorPreferences() {
         setShowTransitionEdges,
         showSlotEdges,
         setShowSlotEdges,
+        colorblindMode,
+        setColorblindMode,
     };
 }
 

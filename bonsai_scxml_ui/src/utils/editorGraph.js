@@ -140,12 +140,28 @@ export const TRANSITION_HIGHLIGHT_COLORS = {
     other: "#38bdf8",
 };
 
-// Slot connections intentionally use a separate palette from transition
-// semantics so Read/Write stay visually distinct from success/error/fatal.
+// Okabe-Ito-inspired colors chosen to separate transition types without
+// relying on red/green perception. Labels and edge styles remain meaningful.
+export const COLORBLIND_TRANSITION_COLORS = {
+    success: "#56b4e9",
+    error: "#e69f00",
+    fatal: "#cc79a7",
+    other: "#009e73",
+};
+
+// Slot connections intentionally use a separate palette from transitions.
 export const SLOT_CONNECTION_COLORS = {
     read: "#6366f1",
     write: "#d946ef",
 };
+export const COLORBLIND_SLOT_CONNECTION_COLORS = {
+    read: "#8ab4f8",
+    write: "#f0e442",
+};
+
+export const getSlotConnectionColor = (access, colorblindMode = false) =>
+    (colorblindMode ? COLORBLIND_SLOT_CONNECTION_COLORS : SLOT_CONNECTION_COLORS)[access === "write" ? "write" : "read"];
+
 
 export const EDITOR_SHORTCUTS = [
     { keys: "Ctrl + F", action: "Find skill or slot" },
@@ -234,7 +250,7 @@ export const getCollapsedTransitionSource = (edge, nodeById) => {
     };
 };
 
-export const getTransitionHighlightColor = (sourceHandle) => {
+export const getTransitionHighlightColor = (sourceHandle, colorblindMode = false) => {
     const parts = String(sourceHandle || "")
         .trim()
         .toLowerCase()
@@ -245,12 +261,13 @@ export const getTransitionHighlightColor = (sourceHandle) => {
         part === "success" || part === "error" || part === "fatal"
     );
 
-    return TRANSITION_HIGHLIGHT_COLORS[mainType || "other"];
+    return (colorblindMode ? COLORBLIND_TRANSITION_COLORS : TRANSITION_HIGHLIGHT_COLORS)[mainType || "other"];
 };
 
-export const TRANSITION_HIGHLIGHT_COLOR_VALUES = new Set(
-    Object.values(TRANSITION_HIGHLIGHT_COLORS)
-);
+export const TRANSITION_HIGHLIGHT_COLOR_VALUES = new Set([
+    ...Object.values(TRANSITION_HIGHLIGHT_COLORS),
+    ...Object.values(COLORBLIND_TRANSITION_COLORS),
+]);
 
 export const clearTransientTransitionHighlight = (edge) => {
     const hadTransientStroke = TRANSITION_HIGHLIGHT_COLOR_VALUES.has(

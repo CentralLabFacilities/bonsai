@@ -9932,3 +9932,42 @@ dialog.skill-paste-choice-overlay {
 .transition-order-card:has(.transition-scope-warning) { border-left-color: #f59e0b; }
 /* Leave room for multiple priority sections without growing the entire drawer. */
 .transition-list-step .transition-order-list { max-height: min(370px, 50dvh); }
+
+/* Header display preference; the File and Options menus share a layout. */
+.editor-options-menu-dropdown {
+    min-width: 245px;
+}
+.editor-file-menu-dropdown [role="menuitemcheckbox"] {
+    width: 100%;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: #f1f5f9;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    text-align: left;
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+}
+.editor-file-menu-dropdown [role="menuitemcheckbox"]:is(:hover, :focus-visible) {
+    background: #3b4e60;
+    outline: 1px solid var(--ui-focus);
+}
+.editor-options-menu-check {
+    margin-left: auto;
+    display: inline-flex;
+    width: 16px;
+    height: 16px;
+    justify-content: center;
+    align-items: center;
+    color: var(--ui-state-selected);
+}
+.editor-options-menu-help {
+    margin: 4px 10px 6px;
+    color: #cbd5e1;
+    font-size: 11px;
+    line-height: 1.35;
+}

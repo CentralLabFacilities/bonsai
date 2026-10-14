@@ -20,7 +20,7 @@ import CodeView from "./CodeView";
 import ModeSwitcher from "./ModeSwitcher.jsx";
 import RuntimeLogPlayer from "../inspector/RuntimeLogPlayer.jsx";
 import CanvasContextMenu from "./CanvasContextMenu.jsx";
-import { SLOT_CONNECTION_COLORS, getTransitionHighlightColor, parseSlotConnectionHandle } from "../../utils/editorGraph";
+import { getSlotConnectionColor, getTransitionHighlightColor, parseSlotConnectionHandle } from "../../utils/editorGraph";
 import { boundaryTransitionKeys, buildBoundaryHelperIndex } from "../../utils/transitionBoundaryHighlight.js";
 
 function EditorConnectionLine({ fromHandle, fromX, fromY, toX, toY, fromPosition, toPosition,
@@ -30,7 +30,7 @@ function EditorConnectionLine({ fromHandle, fromX, fromY, toX, toY, fromPosition
     const [path] = getBezierPath(reverse
         ? { sourceX: toX, sourceY: toY, sourcePosition: toPosition, targetX: fromX, targetY: fromY, targetPosition: fromPosition }
         : { sourceX: fromX, sourceY: fromY, sourcePosition: fromPosition, targetX: toX, targetY: toY, targetPosition: toPosition });
-    const color = handle ? SLOT_CONNECTION_COLORS[handle.access] : undefined;
+    const color = handle ? getSlotConnectionColor(handle.access, document.documentElement.hasAttribute("data-colorblind-mode")) : undefined;
     return (
         <g style={{ pointerEvents: "none" }}>
             <path className="react-flow__connection-path" d={path} fill="none"
@@ -84,7 +84,7 @@ const getHoverTransitionColor = (edge) => {
         edge?.data?.parallelOriginalSourceHandle ||
         edge?.sourceHandle ||
         edge?.label;
-    return getTransitionHighlightColor(semanticHandle);
+    return getTransitionHighlightColor(semanticHandle, document.documentElement.hasAttribute("data-colorblind-mode"));
 };
 
 const escapeDataId = (value) =>
@@ -99,6 +99,7 @@ export default function EditorCanvas({
     setShowTransitionEdges,
     showSlotEdges,
     setShowSlotEdges,
+    colorblindMode = false,
     nodes,
     edges,
     globalDataModel,
@@ -377,7 +378,7 @@ export default function EditorCanvas({
     // without sending onEdgeMouseLeave. Clear any imperative hover on graph
     // changes, pane movement, window blur and mouse departure from the canvas.
     useEffect(() => clearFastHover, [clearFastHover]);
-    useEffect(() => { clearFastHover(); }, [documentKey, activeMode, showTransitionEdges, showSlotEdges, clearFastHover]);
+    useEffect(() => { clearFastHover(); }, [documentKey, activeMode, showTransitionEdges, showSlotEdges, colorblindMode, clearFastHover]);
     useEffect(() => {
         // Missing mouseleave (for instance when React Flow replaces an edge
         // while the pointer is over it) must never leave DOM-only hover classes.

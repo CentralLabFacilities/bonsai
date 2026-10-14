@@ -61,6 +61,7 @@ import { useEditorUiState, useRestoreCanvasViewportOnModeChange } from "./hooks/
 import "./App.css";
 import "./styles/design-system.css";
 import "./styles/interaction-states.css";
+import "./styles/colorblind-mode.css";
 
 // Initialize API proxy for Tauri desktop mode (intercepts /api/* fetch calls)
 initApiProxy();
@@ -95,6 +96,8 @@ function AppContent() {
         setShowTransitionEdges,
         showSlotEdges,
         setShowSlotEdges,
+        colorblindMode,
+        setColorblindMode,
     } = useEditorPreferences();
     const panels = useEditorPanelLayout();
     const { showPanel } = panels;
@@ -853,6 +856,7 @@ function AppContent() {
         activeMode,
         showTransitionEdges,
         showSlotEdges,
+        colorblindMode,
         injectedNodes,
         injectedSlotNodes,
         isDraggingNode,
@@ -1235,6 +1239,8 @@ function AppContent() {
                 isSaving={isWorkflowSaving}
                 isOpening={isWorkflowOpening}
                 panels={panels}
+                colorblindMode={colorblindMode}
+                onToggleColorblindMode={() => setColorblindMode((value) => !value)}
             />
             <EditorNotice notice={documentNotice} onDismiss={dismissDocumentNotice}
                 onRetry={handleRetryDocumentAction}
@@ -1358,6 +1364,7 @@ function AppContent() {
                             setShowTransitionEdges={setShowTransitionEdges}
                             showSlotEdges={showSlotEdges}
                             setShowSlotEdges={setShowSlotEdges}
+                            colorblindMode={colorblindMode}
                             nodes={nodes}
                             edges={edges}
                             globalDataModel={globalDataModel}

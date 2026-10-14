@@ -1,5 +1,6 @@
 const BEHAVIOR_DIRECTORIES_KEY = "bonsai.behaviorDirectories";
 const PANEL_PREFERENCES_KEY = "bonsai.panelLayout";
+const COLORBLIND_MODE_KEY = "bonsai.colorblindMode";
 const RUNTIME_CONFIGURATION_KEY = "bonsai.runtimeConfiguration";
 
 export const PANEL_DOCK_BREAKPOINT = 1100;
@@ -16,7 +17,11 @@ export const EDGE_VISIBILITY_KEYS = {
 };
 
 function defaultBehaviorDirectories() {
-    return [{ key: "ROBOCUP", path: "/robocup_ws/robocup", isDefault: true }];
+    return [
+        { key: "ROBOCUP", path: "~/robocup_ws/src/robocuptasks/robocuptasks-scxml/src/main/config/state_machines", isDefault: true },
+        { key: "EXERCISE", path: "~/robocup-exercise/src/exercise_pkgs/bonsai_exercises/bonsai_exercises-scxml/src/main/config/state_machines", isDefault: true },
+        { key: "CHALLENGE", path: "~/robocup-exercise/src/challenge_pkgs/bonsai_challenge/bonsai_challenge-scxml/src/main/config/state_machines", isDefault: true },
+    ];
 }
 
 export function loadBehaviorDirectories(storage) {
@@ -45,6 +50,15 @@ export function loadEdgeVisibility(kind, storage) {
     }
 }
 
+// Display accessibility is an editor preference, never part of SCXML documents.
+export function loadColorblindMode(storage) {
+    try {
+        return (storage ?? window.localStorage).getItem(COLORBLIND_MODE_KEY) === "true";
+    } catch {
+        return false;
+    }
+}
+
 export function loadRuntimeConfiguration(storage) {
     try {
         return (storage ?? window.localStorage).getItem(RUNTIME_CONFIGURATION_KEY) || "";
@@ -66,6 +80,7 @@ export function saveEditorPreferences(preferences, storage) {
         [BEHAVIOR_DIRECTORIES_KEY, JSON.stringify(preferences.behaviorDirectories)],
         [EDGE_VISIBILITY_KEYS.transitions, String(preferences.showTransitionEdges)],
         [EDGE_VISIBILITY_KEYS.slots, String(preferences.showSlotEdges)],
+        [COLORBLIND_MODE_KEY, String(Boolean(preferences.colorblindMode))],
     ];
 
     for (const [key, value] of entries) {
