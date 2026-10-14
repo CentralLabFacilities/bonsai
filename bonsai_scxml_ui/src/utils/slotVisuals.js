@@ -74,20 +74,48 @@ export function getStateSlotEntries(data = {}, nodeType = "custom") {
     );
 }
 
-export function getSlotHandleDragClass({ drag, nodeId, handleId, access, origin, slotType }) {
-    if (!drag?.active) return "";
+// This is presentation feedback, not the authoritative validation. The actual
+// connection is still checked by resolveSlotConnection / validateSlotConnection.
+// Keep these basic checks aligned with that validation so invalid destinations
+// are visible and explain *why* they cannot be used during a drag.
+export function getSlotHandleDragFeedback({ drag, nodeId, handleId, access, origin, slotType }) {
+    if (!drag?.active) return { status: "idle", className: "", reason: "" };
     if (drag.nodeId === nodeId && drag.handleId === handleId) {
-        return "slot-handle-compatible slot-handle-active";
+        return { status: "active", className: "slot-handle-compatible slot-handle-active", reason: "" };
     }
 
-    const destinationSide = origin === "slot"
-        ? drag.origin === "skill" || drag.origin === "submachine"
-        : (origin === "skill" || origin === "submachine") && drag.origin === "slot";
-    const type = String(slotType || "").trim().toLowerCase();
-    const dragType = String(drag.slotType || "").trim().toLowerCase();
-    const compatible = destinationSide && drag.access === access && Boolean(type)
-        && type !== "unknown" && type === dragType;
-    return compatible ? "slot-handle-compatible" : "slot-handle-incompatible";
+    const fail = (reason) => ({
+        status: "incompatible",
+        className: "slot-handle-incompatible",
+        reason,
+    });
+    const dragIsSlot = drag.origin === "slot";
+    const destinationIsSlot = origin === "slot";
+    if (dragIsSlot === destinationIsSlot) {
+        return fail(dragIsSlot
+            ? "Connect a slot node to a skill's requested slot, not to another slot node."
+            : "Connect a skill's requested slot to a slot node, not directly to another skill.");
+    }
+    if (drag.access !== access) {
+        return fail(`Access mismatch: ${drag.access === "read" ? "Read" : "Write"} cannot connect to ${access === "read" ? "Read" : "Write"}. Connect Read to Read or Write to Write.`);
+    }
+
+    const fromType = String(drag.slotType || "").trim();
+    const toType = String(slotType || "").trim();
+    if (!fromType || fromType.toLowerCase() === "unknown") {
+        return fail("The starting slot has no known data type. Check its skill definition.");
+    }
+    if (!toType || toType.toLowerCase() === "unknown") {
+        return fail("The destination slot has no known data type. Check its slot declaration.");
+    }
+    if (fromType.toLowerCase() !== toType.toLowerCase()) {
+        return fail(`Type mismatch: ${fromType} cannot connect to ${toType}.`);
+    }
+    return { status: "compatible", className: "slot-handle-compatible", reason: "" };
+}
+
+export function getSlotHandleDragClass(options) {
+    return getSlotHandleDragFeedback(options).className;
 }
 
 // Keep type labels compact in the canvas; the unmodified type remains available
@@ -97,7 +125,7 @@ export const MAX_SLOT_TYPE_BADGE_CHARS = 10;
 export function getSlotTypeBadgeLabel(type) {
     const full = String(type || "").trim();
     if (!full) return "Unknown";
-    const readable = !/[<>\[\]]/.test(full) && full.includes(".")
+    const readable = !/[<>[\]]/.test(full) && full.includes(".")
         ? full.slice(full.lastIndexOf(".") + 1)
         : full;
     return readable.length > MAX_SLOT_TYPE_BADGE_CHARS

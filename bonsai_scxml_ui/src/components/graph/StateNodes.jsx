@@ -9,7 +9,7 @@ import {
     StateActionBadges,
 } from "./NodeChrome.jsx";
 import { estimateSlotDockWidth, estimateSlotPortWidth, estimateSummaryWidth } from "../../utils/layoutUtils.js";
-import { getSlotHandleDragClass, getSlotTypeBadgeLabel, getStateSlotEntries } from "../../utils/slotVisuals.js";
+import { getSlotHandleDragFeedback, getSlotTypeBadgeLabel, getStateSlotEntries } from "../../utils/slotVisuals.js";
 
 const textValue = (value) => String(value ?? "").trim();
 const REFERENCE_TYPES = { submachine: "SUB-SM", compound: "COMPOUND", parallel: "PARALLEL" };
@@ -256,7 +256,7 @@ function SlotDock({ id, data, entries, submachine }) {
                         const isConnectable = origin !== "submachine" ||
                             Boolean(slotType && slotType !== "unknown");
                         const handleTitle = `${access} ${label} · type: ${fullSlotType || "Unknown"} (${entry.access === "read" ? "into" : "out of"} ${submachine ? "sub-state machine" : "skill"})${isConnectable ? "" : " - slot type metadata unavailable"}`;
-                        const dragClass = getSlotHandleDragClass({
+                        const dragFeedback = getSlotHandleDragFeedback({
                             drag: data.slotConnectionDrag,
                             nodeId: id,
                             handleId: entry.handleId,
@@ -298,9 +298,10 @@ function SlotDock({ id, data, entries, submachine }) {
                                     isConnectableStart={true}
                                     isConnectableEnd={true}
                                     position={Position.Bottom}
-                                    className={`source-handle skill-slot-handle slot-skill-${entry.access}-handle ${dragClass}`}
-                                    title={handleTitle}
-                                    aria-label={handleTitle}
+                                    className={`source-handle skill-slot-handle slot-skill-${entry.access}-handle ${dragFeedback.className}`}
+                                    data-slot-incompatibility={dragFeedback.reason || undefined}
+                                    title={dragFeedback.reason || handleTitle}
+                                    aria-label={dragFeedback.reason || handleTitle}
                                 />
                             </div>
                         );

@@ -93,6 +93,7 @@ export default function EditorCanvas({
     setActiveMode,
     showTransitionEdges,
     showSlotEdges,
+    slotConnectionDrag,
     showCodeViewButton = true,
     colorblindMode = false,
     nodes,
@@ -158,6 +159,66 @@ export default function EditorCanvas({
     const hoverDomMutationsRef = useRef([]);
     const fastHoverOwnerRef = useRef(null);
     const fastHoverObserverRef = useRef(null);
+    const incompatibleSlotHintRef = useRef(null);
+
+    // During a connection gesture React Flow captures pointer events, so
+    // onMouseEnter on an individual Handle is unreliable. Hit-test the actual
+    // element below the cursor instead. This is a transient DOM-only tooltip:
+    // no graph rebuilds or canvas React renders on every pointer move.
+    useEffect(() => {
+        const hint = incompatibleSlotHintRef.current;
+        if (!hint) return undefined;
+        const hide = () => {
+            hint.hidden = true;
+            hint.textContent = "";
+        };
+        hide();
+        if (!slotConnectionDrag?.active) return undefined;
+
+        const findIncompatibleHandle = (x, y) => {
+            const underPointer = document.elementFromPoint(x, y);
+            if (!underPointer) return null;
+            const direct = underPointer.closest?.(".react-flow__handle.slot-handle-incompatible[data-slot-incompatibility]");
+            if (direct) return direct;
+            // Visual handles are larger than the underlying 8-9px hit box.
+            // Include the rim so users don't have to hit a tiny exact pixel.
+            const nodeElement = underPointer.closest?.(".react-flow__node");
+            if (!nodeElement) return null;
+            for (const handle of nodeElement.querySelectorAll(
+                ".react-flow__handle.slot-handle-incompatible[data-slot-incompatibility]"
+            )) {
+                const rect = handle.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                if (Math.hypot(centerX - x, centerY - y) <= 15) return handle;
+            }
+            return null;
+        };
+        const onPointerMove = (event) => {
+            const handle = findIncompatibleHandle(event.clientX, event.clientY);
+            const explanation = handle?.dataset.slotIncompatibility;
+            if (!explanation) {
+                if (!hint.hidden) hide();
+                return;
+            }
+            if (hint.textContent !== explanation) hint.textContent = explanation;
+            hint.hidden = false;
+            // Keep the message on-screen and away from the pointer/port.
+            hint.style.left = `${Math.max(12, Math.min(event.clientX + 20, window.innerWidth - 312))}px`;
+            hint.style.top = `${Math.max(12, Math.min(event.clientY + 20, window.innerHeight - hint.offsetHeight - 12))}px`;
+        };
+        document.addEventListener("pointermove", onPointerMove, true);
+        document.addEventListener("pointerup", hide, true);
+        document.addEventListener("pointercancel", hide, true);
+        window.addEventListener("blur", hide);
+        return () => {
+            document.removeEventListener("pointermove", onPointerMove, true);
+            document.removeEventListener("pointerup", hide, true);
+            document.removeEventListener("pointercancel", hide, true);
+            window.removeEventListener("blur", hide);
+            hide();
+        };
+    }, [slotConnectionDrag?.active, documentKey]);
 
     const hoverEdgeIndex = useMemo(() => {
         const edgeById = new Map();
@@ -485,6 +546,14 @@ export default function EditorCanvas({
                     <span>Drop here to delete</span>
                 </div>
             )}
+
+            <div
+                ref={incompatibleSlotHintRef}
+                className="slot-connection-incompatibility-tooltip"
+                role="status"
+                aria-live="polite"
+                hidden
+            />
 
             <CanvasContextMenu
                 contextMenu={contextMenu}
