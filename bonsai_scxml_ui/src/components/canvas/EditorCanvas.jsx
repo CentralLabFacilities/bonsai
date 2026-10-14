@@ -402,6 +402,14 @@ export default function EditorCanvas({
         return () => window.removeEventListener("blur", clearFastHover);
     }, [clearFastHover]);
 
+    // Only update a paint-only class when zoom crosses the badge visibility
+    // threshold. No per-node viewport subscription or React rerender is needed.
+    const updateSlotTypeZoom = useCallback((zoom, flowElement = null) => {
+        if (!Number.isFinite(zoom)) return;
+        const element = flowElement || document.querySelector(".react-flow");
+        element?.classList.toggle("editor-slot-types-compact", zoom <= 0.5);
+    }, []);
+
     // Viewport movement must not feed back into React state. A previous attempt
     // used state in onMoveStart/onMoveEnd and could recurse through React Flow's
     // lifecycle. Toggle a paint-only class directly on the mounted flow element
@@ -570,7 +578,9 @@ export default function EditorCanvas({
                     onNodeDrag={handleNodeDrag}
                     onNodeDragStop={handleNodeDragStop}
                     onMoveStart={handleViewportMoveStart}
+                    onMove={(_, viewport) => updateSlotTypeZoom(viewport.zoom, movingFlowElementRef.current)}
                     onMoveEnd={handleViewportMoveEnd}
+                    onInit={(instance) => updateSlotTypeZoom(instance.getZoom())}
                 >
                     <Background />
                     <Controls position={runtimePlayback?.loaded || liveExecutionActive ? "bottom-right" : "bottom-left"} />

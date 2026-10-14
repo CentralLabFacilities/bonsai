@@ -1,30 +1,33 @@
 import dagre from "@dagrejs/dagre";
-import { getStateSlotEntries } from "./slotVisuals.js";
+import { getSlotTypeBadgeLabel, getStateSlotEntries } from "./slotVisuals.js";
 
 const DEFAULT_NODE_WIDTH = 210;
 const DEFAULT_NODE_HEIGHT = 80;
 const MAX_OVERVIEW_WIDTH = 520;
 
+// Badges sit immediately above the connection point, independent of the
+// slot name. Reserve enough horizontal space for whichever is wider (the
+// projected name for slanted labels or the abbreviated type badge).
+export const estimateSlotPortWidth = (entry, slanted = false) => {
+    const label = String(entry.key || entry.path || "Slot");
+    const nameWidth = Math.min(92, Math.max(25, 12 + label.length * 6.5));
+    const typeLabel = getSlotTypeBadgeLabel(entry.type);
+    const badgeWidth = Math.min(78, 13 + typeLabel.length * 6.2);
+    const projectedNameWidth = slanted
+        ? nameWidth * Math.cos(55 * Math.PI / 180)
+        : nameWidth;
+    return Math.max(slanted ? 47 : 40, projectedNameWidth + 10, badgeWidth + 10);
+};
+
 export const estimateSlotDockWidth = (slotEntries) => {
     if (!slotEntries.length) return 0;
-
-    const slotGutters = 16 + 24;
-    const minimumPortWidth = 25;
-    const requiredSlotWidth =
-        slotEntries.length <= 2
-            ? slotGutters +
-              slotEntries.reduce((total, entry) => {
-                  const label = String(entry.key || entry.path || "Slot");
-                  const estimatedLabelWidth = Math.min(
-                      92,
-                      Math.max(minimumPortWidth, 12 + label.length * 6.5)
-                  );
-                  return total + estimatedLabelWidth;
-              }, 0) +
-              Math.max(0, slotEntries.length - 1) * 12
-            : slotGutters + slotEntries.length * minimumPortWidth;
-
-    return Math.min(MAX_OVERVIEW_WIDTH, Math.max(180, requiredSlotWidth));
+    const slanted = slotEntries.length >= 3;
+    const gutters = 16 + 24;
+    const gaps = slanted ? 4 : 12;
+    const required = gutters + slotEntries.reduce(
+        (sum, entry) => sum + estimateSlotPortWidth(entry, slanted), 0,
+    ) + (slotEntries.length - 1) * gaps;
+    return Math.min(MAX_OVERVIEW_WIDTH, Math.max(180, Math.ceil(required)));
 };
 
 export const estimateSummaryWidth = (label, rows) => {
@@ -123,7 +126,7 @@ const estimateOverviewHeight = (node) => {
             66 +
                 eventCount * 24 +
                 (localDataCount > 0 ? 10 + localDataCount * 22 : 0) +
-                (slotCount > 0 ? 112 : 0)
+                (slotCount > 0 ? (slotCount >= 3 ? 182 : 112) : 0)
         );
     }
 
@@ -136,7 +139,7 @@ const estimateOverviewHeight = (node) => {
         52 +
             eventCount * 24 +
             (parameterCount > 0 ? 10 + parameterCount * 22 : 0) +
-            (slotCount > 0 ? 112 : 0)
+            (slotCount > 0 ? (slotCount >= 3 ? 182 : 112) : 0)
     );
 };
 

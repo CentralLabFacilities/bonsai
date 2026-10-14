@@ -90,6 +90,21 @@ export function getSlotHandleDragClass({ drag, nodeId, handleId, access, origin,
     return compatible ? "slot-handle-compatible" : "slot-handle-incompatible";
 }
 
+// Keep type labels compact in the canvas; the unmodified type remains available
+// in a native tooltip. A qualified Java name uses its simple class name.
+export const MAX_SLOT_TYPE_BADGE_CHARS = 10;
+
+export function getSlotTypeBadgeLabel(type) {
+    const full = String(type || "").trim();
+    if (!full) return "Unknown";
+    const readable = !/[<>\[\]]/.test(full) && full.includes(".")
+        ? full.slice(full.lastIndexOf(".") + 1)
+        : full;
+    return readable.length > MAX_SLOT_TYPE_BADGE_CHARS
+        ? `${readable.slice(0, MAX_SLOT_TYPE_BADGE_CHARS - 1)}…`
+        : readable;
+}
+
 export function getSlotTypeVisual(type) {
     const normalized = String(type || "").trim().toLowerCase();
 

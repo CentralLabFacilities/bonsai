@@ -6209,6 +6209,64 @@ dialog.skill-paste-choice-overlay {
     color: #fdba74;
 }
 
+/* Place type information by the actual connection point, not alongside
+   the slot name. Both use their own row: the name stays higher in the dock,
+   while the badge is centered immediately above its handle on the rail. */
+:is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-entry {
+    bottom: 34px;
+}
+
+:is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-type-badge {
+    position: absolute;
+    left: 50%;
+    bottom: 7px;
+    transform: translateX(-50%);
+    display: block;
+    box-sizing: border-box;
+    width: max-content;
+    max-width: calc(100% - 4px);
+    padding: 2px 5px;
+    border: 1px solid rgba(148, 163, 184, 0.4);
+    border-radius: 4px;
+    background: #334155;
+    color: #f1f5f9;
+    font-size: 9px;
+    font-weight: 650;
+    line-height: 1.15;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-shadow: none;
+    pointer-events: auto;
+    cursor: help;
+    z-index: 4;
+    transition: opacity 120ms ease;
+}
+
+/* Keep adequate vertical space for slanted names above the port badges. */
+:is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-summary-slanted,
+:is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-summary-slanted .node-slot-ports {
+    height: 150px;
+}
+
+:is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-summary-slanted .node-slot-row {
+    min-height: 150px;
+}
+
+:is(.costum-node, .submachine-node).submachine-node.has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-type-badge {
+    color: #334155;
+    background: rgba(248, 250, 252, 0.96);
+    border-color: rgba(100, 116, 139, 0.4);
+}
+
+/* Apply this class directly to React Flow on zoom, without rerendering nodes.
+   Hide only type badges, preserving port and handle positions. */
+.react-flow.editor-slot-types-compact :is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-type-badge {
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+}
+
 /* Use the same access legend as the standalone slot node. The individual
    ports no longer need R/W badges; colour communicates the access direction. */
 :is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .skill-slot-access-guide {
