@@ -22,6 +22,7 @@ pub fn run() {
             commands::files::open_file,
             commands::files::pick_directory,
             commands::workflows::list_behavior_directory,
+            commands::workflows::resolve_behavior_directory,
             commands::files::save_file,
             commands::files::read_file,
             commands::workflows::read_workflow_source,

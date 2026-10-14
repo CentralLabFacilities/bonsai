@@ -16,6 +16,9 @@ export const EDGE_VISIBILITY_KEYS = {
     slots: "bonsai.showSlotEdges",
 };
 
+// All built-in Behavior Library roots live here. The filesystem check in
+// useEditorPreferences determines whether each one is visible. CHALLENGE has
+// no known installation path yet; a saved CHALLENGE path overrides this blank.
 function defaultBehaviorDirectories() {
     return [
         { key: "ROBOCUP", path: "~/robocup_ws/src/robocuptasks/robocuptasks-scxml/src/main/config/state_machines", isDefault: true },
@@ -25,21 +28,35 @@ function defaultBehaviorDirectories() {
 }
 
 export function loadBehaviorDirectories(storage) {
+    const defaults = defaultBehaviorDirectories();
     try {
         const raw = (storage ?? window.localStorage).getItem(BEHAVIOR_DIRECTORIES_KEY);
-        if (raw === null) return defaultBehaviorDirectories();
+        if (raw === null) return defaults;
 
         const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed)) return defaultBehaviorDirectories();
+        if (!Array.isArray(parsed)) return defaults;
 
-        return parsed
+        const saved = parsed
             .filter((entry) => entry && typeof entry.key === "string" && typeof entry.path === "string")
-            .map((entry) => ({ ...entry, key: entry.key.trim().toUpperCase() }))
-            // Remove retired built-in mappings, but retain user-created mappings.
-            .filter((entry) => !(entry.isDefault === true && ["EXERCISE", "CHALLENGE"].includes(entry.key)));
+            .map((entry) => ({ ...entry, key: entry.key.trim().toUpperCase(), path: entry.path.trim() }))
+            .filter((entry) => entry.key && entry.path);
+
+        // Keep user-configured paths, including CHALLENGE, in preference to
+        // built-ins. Add defaults missing from settings saved by old versions.
+        const savedByKey = new Map(saved.map((entry) => [entry.key, entry]));
+        const defaultKeys = new Set(defaults.map((entry) => entry.key));
+        return [
+            ...defaults.map((entry) => savedByKey.get(entry.key) ?? entry),
+            ...saved.filter((entry) => !defaultKeys.has(entry.key)),
+        ];
     } catch {
-        return defaultBehaviorDirectories();
+        return defaults;
     }
+}
+
+export function isAutoBehaviorDirectory(entry) {
+    return entry?.isDefault === true ||
+        defaultBehaviorDirectories().some(({ key }) => key === entry?.key);
 }
 
 export function loadEdgeVisibility(kind, storage) {

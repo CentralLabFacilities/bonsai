@@ -53,6 +53,12 @@ export async function listBehaviorDirectory(key, path) {
   });
 }
 
+/** Return the canonical directory path, or null if the directory is missing.
+ * The Rust backend expands leading ~ (the browser cannot expand it). */
+export async function resolveBehaviorDirectory(path) {
+  return await invoke('resolve_behavior_directory', { path });
+}
+
 /**
  * Resolve, read and inspect one workflow in Rust.
  *

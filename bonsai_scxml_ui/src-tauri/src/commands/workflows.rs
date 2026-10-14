@@ -8,12 +8,18 @@ use crate::workspace::inspection::{
     inspect_workflow_source as inspect_workflow_source_impl, WorkflowInspectionResult,
 };
 use crate::workspace::library::{
-    list_behavior_directory as list_behavior_directory_impl, BehaviorDirectoryMapping,
+    list_behavior_directory as list_behavior_directory_impl,
+    resolve_behavior_directory as resolve_behavior_directory_impl, BehaviorDirectoryMapping,
     BehaviorTreeEntry,
 };
 use crate::workspace::resolver::{
     read_workflow_source as read_workflow_source_impl, WorkflowSourceResult,
 };
+
+#[tauri::command]
+pub(crate) async fn resolve_behavior_directory(path: String) -> Option<String> {
+    resolve_behavior_directory_impl(&path)
+}
 
 #[tauri::command]
 pub(crate) async fn list_behavior_directory(
