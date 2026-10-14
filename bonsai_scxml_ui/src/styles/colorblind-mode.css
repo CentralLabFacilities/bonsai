@@ -1,0 +1,293 @@
+/*
+ * Optional accessible graph palette (Okabe-Ito inspired).
+ * Each semantic meaning also has its text/label and, where helpful, a
+ * distinct stroke/border pattern. This is display-only: SCXML is unchanged.
+ */
+:root[data-colorblind-mode] {
+    --editor-transition-success: #009e73; /* green */
+    --editor-transition-error: #e69f00;   /* amber */
+    --editor-transition-fatal: #cc79a7;   /* magenta */
+    --editor-transition-other: #56b4e9;   /* blue */
+    --editor-slot-read: #8ab4f8;
+    --editor-slot-write: #f0e442;
+    --ui-success: #009e73;
+    --ui-warning: #f0e442;
+    --ui-danger: #cc79a7;
+    --ui-danger-text: #f2b7d5;
+    --ui-state-invalid: #cc79a7;
+    --ui-state-warning: #f0e442;
+    --ui-state-selected: #56b4e9;
+    --ui-state-hover: #a8dbfa;
+    --ui-state-invalid-ring: 0 0 0 3px rgba(204, 121, 167, 0.84);
+    --ui-state-selected-ring: 0 0 0 3px rgba(86, 180, 233, 0.85);
+    --ui-state-hover-ring: 0 0 0 2px rgba(168, 219, 250, 0.62);
+}
+
+/* Exit tokens are always named, and border treatments provide an extra cue. */
+:root[data-colorblind-mode] .exit-token-success {
+    border-left-color: var(--editor-transition-success);
+    border-left-style: solid;
+}
+:root[data-colorblind-mode] .exit-token-success .detail-card-title,
+:root[data-colorblind-mode] .exit-token-badge-success {
+    color: #8be0bc;
+}
+:root[data-colorblind-mode] .exit-token-badge-success {
+    border-color: var(--editor-transition-success);
+    background: rgba(0, 158, 115, 0.13);
+}
+:root[data-colorblind-mode] .exit-token-other {
+    border-left-color: var(--editor-transition-other);
+    border-left-style: solid;
+}
+:root[data-colorblind-mode] .exit-token-other .detail-card-title,
+:root[data-colorblind-mode] .exit-token-badge-other {
+    color: #a8dfff;
+}
+:root[data-colorblind-mode] .exit-token-badge-other {
+    border-color: var(--editor-transition-other);
+    background: rgba(86, 180, 233, 0.13);
+}
+:root[data-colorblind-mode] .exit-token-error {
+    border-left-color: var(--editor-transition-error);
+    border-left-style: dashed;
+}
+:root[data-colorblind-mode] .exit-token-error .detail-card-title,
+:root[data-colorblind-mode] .exit-token-badge-error {
+    color: #ffd780;
+}
+:root[data-colorblind-mode] .exit-token-badge-error {
+    border-color: var(--editor-transition-error);
+    border-style: dashed;
+    background: rgba(230, 159, 0, 0.12);
+}
+:root[data-colorblind-mode] .exit-token-fatal {
+    border-left: 5px double var(--editor-transition-fatal);
+}
+:root[data-colorblind-mode] .exit-token-fatal .detail-card-title,
+:root[data-colorblind-mode] .exit-token-badge-fatal {
+    color: #f2b7d5;
+}
+:root[data-colorblind-mode] .exit-token-badge-fatal {
+    border-color: var(--editor-transition-fatal);
+    border-style: double;
+    background: rgba(204, 121, 167, 0.14);
+}
+
+/* Slot read/write endpoints match the respective connection colors. */
+:root[data-colorblind-mode] .slot-access-read {
+    color: #b5d3ff;
+    border-color: var(--editor-slot-read);
+    background: rgba(138, 180, 248, 0.14);
+}
+:root[data-colorblind-mode] .slot-access-write {
+    color: #f0e442;
+    border-color: var(--editor-slot-write);
+    /* Keep yellow accents solid, just like the slot rail and port markers. */
+    border-style: solid;
+    background: rgba(240, 228, 66, 0.12);
+}
+:root[data-colorblind-mode] .compact-slot-read {
+    border-left-color: var(--editor-slot-read);
+    background: rgba(138, 180, 248, 0.06);
+}
+:root[data-colorblind-mode] .compact-slot-write {
+    border-left-color: var(--editor-slot-write);
+    border-left-style: solid;
+    background: rgba(240, 228, 66, 0.06);
+}
+:root[data-colorblind-mode] .skill-slot-border-segment-read,
+:root[data-colorblind-mode] .skill-slot-access-read .skill-slot-access-dot {
+    background: var(--editor-slot-read) !important;
+    box-shadow: none;
+}
+:root[data-colorblind-mode] .skill-slot-border-segment-write,
+:root[data-colorblind-mode] .skill-slot-access-write .skill-slot-access-dot {
+    background: var(--editor-slot-write) !important;
+    box-shadow: none;
+}
+:root[data-colorblind-mode] .skill-slot-access-read,
+:root[data-colorblind-mode] .node-slot-access-read {
+    color: #b5d3ff !important;
+}
+:root[data-colorblind-mode] .skill-slot-access-write,
+:root[data-colorblind-mode] .node-slot-access-write {
+    color: #f0e442 !important;
+}
+/* Read is short-dashed; write is long-dashed, even without color perception. */
+:root[data-colorblind-mode] .react-flow__edge.editor-slot-edge-read .react-flow__edge-path {
+    stroke-dasharray: 3 6 !important;
+}
+:root[data-colorblind-mode] .react-flow__edge.editor-slot-edge-write .react-flow__edge-path {
+    stroke-dasharray: 10 3 !important;
+}
+
+/*
+ * Slot nodes are data endpoints rather than states.  Keep their surface
+ * neutral in accessible mode and communicate read/write through the port
+ * positions, labels, shapes, and the split accent rail (not hue alone).
+ */
+:root[data-colorblind-mode] .slot-node {
+    background: linear-gradient(145deg, #223044, #1b293a 65%, #172536);
+    border-color: #8899ad;
+}
+:root[data-colorblind-mode] .slot-node:hover {
+    background: linear-gradient(145deg, #2b3b50, #223246 65%, #1b2e40);
+    border-color: #bac8d5;
+}
+:root[data-colorblind-mode] .slot-node::before,
+:root[data-colorblind-mode] .slot-node.slot-node-reference::before,
+:root[data-colorblind-mode] .slot-node.slot-node-inherited::before {
+    /* Write (left) / Read (right), matching the actual two slot handles. */
+    background: linear-gradient(90deg,
+        var(--editor-slot-write) 0%,
+        var(--editor-slot-write) 47%,
+        transparent 47%,
+        transparent 53%,
+        var(--editor-slot-read) 53%,
+        var(--editor-slot-read) 100%);
+    opacity: 1;
+}
+:root[data-colorblind-mode] .slot-node.selected-slot-node,
+:root[data-colorblind-mode] .slot-node.slot-node-reference.selected-slot-node,
+:root[data-colorblind-mode] .slot-node.slot-node-inherited.selected-slot-node,
+:root[data-colorblind-mode] .slot-node.slot-node-child-required.selected-slot-node {
+    border-color: #e2e8f0;
+    box-shadow: 0 0 0 3px rgba(226, 232, 240, 0.30),
+                0 8px 20px rgba(9, 15, 28, 0.36);
+}
+:root[data-colorblind-mode] .slot-node.slot-node-inherited {
+    border-color: #009e73;
+    border-style: dashed;
+}
+:root[data-colorblind-mode] .slot-node.slot-node-reference {
+    border-color: #9caec3;
+    border-style: dashed;
+}
+:root[data-colorblind-mode] .slot-node-inherited .slot-node-kind,
+:root[data-colorblind-mode] .slot-node-inherited .slot-node-kind svg {
+    /* SlotNode currently supplies inline amber for inherited headings. */
+    color: #8be0bc !important;
+}
+:root[data-colorblind-mode] .slot-node-kind,
+:root[data-colorblind-mode] .slot-node-kind svg,
+:root[data-colorblind-mode] .slot-node-type {
+    color: #d8e6f4;
+}
+:root[data-colorblind-mode] .slot-node-type {
+    background: rgba(148, 163, 184, 0.13);
+    border-color: rgba(203, 213, 225, 0.5);
+}
+:root[data-colorblind-mode] .slot-node-clone-badge {
+    color: #d8e6f4;
+    border-color: #9caec3;
+}
+:root[data-colorblind-mode] .slot-node-access-read,
+:root[data-colorblind-mode] .skill-slot-access-read,
+:root[data-colorblind-mode] .node-slot-access-read {
+    color: #b5d3ff !important;
+}
+:root[data-colorblind-mode] .slot-node-access-write,
+:root[data-colorblind-mode] .skill-slot-access-write,
+:root[data-colorblind-mode] .node-slot-access-write {
+    color: #f0e442 !important;
+}
+:root[data-colorblind-mode] .slot-node-access-read .slot-node-access-dot,
+:root[data-colorblind-mode] .skill-slot-access-read .skill-slot-access-dot {
+    background: var(--editor-slot-read) !important;
+    border-radius: 50%;
+    box-shadow: none;
+}
+:root[data-colorblind-mode] .slot-node-access-write .slot-node-access-dot,
+:root[data-colorblind-mode] .skill-slot-access-write .skill-slot-access-dot {
+    background: var(--editor-slot-write) !important;
+    border-radius: 1px;
+    transform: rotate(45deg);
+    box-shadow: none;
+}
+
+/*
+ * App.css uses very specific selectors for skill-dock handles (including
+ * :is(...).has-slot-dock:not(...)), which override a normal theme selector.
+ * Give the semantic custom properties precedence only while this mode is on.
+ * All four endpoints then use the same palette, including when a drag is active.
+ */
+:root[data-colorblind-mode] .react-flow__handle.connection-handle:is(.slot-skill-read-handle, .slot-node-read-handle) {
+    --connection-handle-color: var(--editor-slot-read) !important;
+    --connection-handle-outline: #eaf2ff !important;
+}
+:root[data-colorblind-mode] .react-flow__handle.connection-handle:is(.slot-skill-write-handle, .slot-node-write-handle) {
+    --connection-handle-color: var(--editor-slot-write) !important;
+    /* Dark outline is visible against the skill's light background. */
+    --connection-handle-outline: #243041 !important;
+}
+/* Replace the original purple/pink drag rings with matching theme colors. */
+:root[data-colorblind-mode] .react-flow__handle.connection-handle:is(.slot-skill-read-handle, .slot-node-read-handle).slot-handle-compatible {
+    box-shadow: 0 0 0 3px rgba(138, 180, 248, 0.36) !important;
+}
+:root[data-colorblind-mode] .react-flow__handle.connection-handle:is(.slot-skill-write-handle, .slot-node-write-handle).slot-handle-compatible {
+    box-shadow: 0 0 0 3px rgba(240, 228, 66, 0.36) !important;
+}
+:root[data-colorblind-mode] .react-flow__handle.connection-handle:is(.slot-skill-read-handle, .slot-node-read-handle).slot-handle-active {
+    box-shadow: 0 0 0 4px rgba(138, 180, 248, 0.48) !important;
+}
+:root[data-colorblind-mode] .react-flow__handle.connection-handle:is(.slot-skill-write-handle, .slot-node-write-handle).slot-handle-active {
+    box-shadow: 0 0 0 4px rgba(240, 228, 66, 0.48) !important;
+}
+/* Read ports are circles; write ports are diamonds, on both skills and slots. */
+:root[data-colorblind-mode] .react-flow__handle.connection-handle:is(.slot-skill-write-handle, .slot-node-write-handle)::before,
+:root[data-colorblind-mode] .react-flow__handle.connection-handle:is(.slot-skill-write-handle, .slot-node-write-handle)::after {
+    border-radius: 2px;
+    transform: translate(-50%, -50%) rotate(45deg);
+}
+:root[data-colorblind-mode] .react-flow__handle.connection-handle:is(.slot-skill-read-handle, .slot-node-read-handle)::before,
+:root[data-colorblind-mode] .react-flow__handle.connection-handle:is(.slot-skill-read-handle, .slot-node-read-handle)::after {
+    border-radius: 50%;
+}
+:root[data-colorblind-mode] .react-flow__handle.connection-handle:is(.slot-skill-read-handle, .slot-node-read-handle).slot-handle-compatible::before,
+:root[data-colorblind-mode] .react-flow__handle.connection-handle:is(.slot-skill-read-handle, .slot-node-read-handle).slot-handle-active::before {
+    filter: drop-shadow(0 0 4px var(--editor-slot-read));
+}
+:root[data-colorblind-mode] .react-flow__handle.connection-handle:is(.slot-skill-write-handle, .slot-node-write-handle).slot-handle-compatible::before,
+:root[data-colorblind-mode] .react-flow__handle.connection-handle:is(.slot-skill-write-handle, .slot-node-write-handle).slot-handle-active::before {
+    filter: drop-shadow(0 0 4px var(--editor-slot-write));
+}
+/* Use solid accent rails for both directions. Port shape (circle/diamond),
+ * labels, and edge dash patterns provide the non-color distinction. */
+:root[data-colorblind-mode] .skill-slot-border-segment-read {
+    background: var(--editor-slot-read) !important;
+}
+:root[data-colorblind-mode] .skill-slot-border-segment-write {
+    background: var(--editor-slot-write) !important;
+}
+
+/* Warning accents stay solid; severity remains identifiable by icon and color. */
+:root[data-colorblind-mode] .problem-item-error {
+    border-left: 4px solid var(--ui-state-invalid);
+}
+:root[data-colorblind-mode] .problem-item-warning {
+    border-left: 4px solid var(--ui-state-warning);
+}
+:root[data-colorblind-mode] .problem-severity-error {
+    color: #f2b7d5;
+}
+:root[data-colorblind-mode] .problem-severity-warning,
+:root[data-colorblind-mode] .transition-scope-warning {
+    color: #f0e442;
+}
+:root[data-colorblind-mode] .transition-order-card:has(.transition-scope-warning) {
+    border-left-color: var(--ui-state-warning);
+    border-left-style: solid;
+}
+:root[data-colorblind-mode] .runtime-commander-status-pill.running .runtime-commander-status-dot {
+    background: var(--editor-transition-success);
+}
+:root[data-colorblind-mode] .runtime-commander-status-pill.warning .runtime-commander-status-dot {
+    background: var(--ui-state-warning);
+}
+:root[data-colorblind-mode] .runtime-commander-diagnostic.error {
+    border-left: 4px solid var(--ui-state-invalid);
+}
+:root[data-colorblind-mode] .runtime-commander-diagnostic.warning {
+    border-left: 4px solid var(--ui-state-warning);
+}

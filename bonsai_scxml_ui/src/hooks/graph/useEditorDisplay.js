@@ -1,7 +1,7 @@
 import { useLayoutEffect, useMemo, useRef } from "react";
 import { MarkerType } from "@xyflow/react";
 import {
-    SLOT_CONNECTION_COLORS,
+    getSlotConnectionColor,
     clearTransientTransitionHighlight,
     getCollapsedTransitionSource,
     getTransitionHighlightColor,
@@ -81,9 +81,9 @@ function useRoutingNodeSnapshot(nodes, isDraggingNode) {
     );
 }
 
-function withSlotEdgeEmphasis(edge, hovered) {
+function withSlotEdgeEmphasis(edge, hovered, colorblindMode = false) {
     const color = hovered
-        ? SLOT_CONNECTION_COLORS[edge.data?.access === "write" ? "write" : "read"]
+        ? getSlotConnectionColor(edge.data?.access, colorblindMode)
         : SLOT_EDGE_INACTIVE_COLOR;
     return {
         ...edge,
@@ -208,6 +208,7 @@ const withEdgeClassName = (edge, className) => {
 };
 
 export function useEditorDisplay({
+    colorblindMode = false,
     hoveredEditorNodeId,
     hoveredEditorEdgeId,
     selectedNodes,
@@ -857,7 +858,7 @@ export function useEditorDisplay({
                 edge.data?.parallelOriginalSourceHandle ||
                 edge.sourceHandle ||
                 edge.label;
-            const color = getTransitionHighlightColor(semanticHandle);
+            const color = getTransitionHighlightColor(semanticHandle, colorblindMode);
 
             const fullDetailEdge = useLightweightBackgroundTransitions
                 ? {
@@ -958,7 +959,7 @@ export function useEditorDisplay({
                 baseEdges.map((edge, index) => [edge.id, index])
             ),
         };
-    }, [smartTransitionEdges, useLightweightBackgroundTransitions]);
+    }, [smartTransitionEdges, useLightweightBackgroundTransitions, colorblindMode]);
 
     const transitionEdgesForDisplay = useMemo(() => {
         if (activeMode === "code") return [];
@@ -1214,7 +1215,19 @@ export function useEditorDisplay({
         const selectedHoveredEdges = [];
 
         routedSlotEdgeCache.forEach((rawEdge) => {
-            const edge = withEdgeClassName(rawEdge, "editor-slot-edge");
+            const coloredEdge = colorblindMode
+                ? {
+                    ...rawEdge,
+                    style: { ...(rawEdge.style || {}), stroke: getSlotConnectionColor(rawEdge.data?.access, true) },
+                    markerEnd: rawEdge.markerEnd
+                        ? { ...rawEdge.markerEnd, color: getSlotConnectionColor(rawEdge.data?.access, true) }
+                        : rawEdge.markerEnd,
+                }
+                : rawEdge;
+            const edge = withEdgeClassName(
+                withEdgeClassName(coloredEdge, "editor-slot-edge"),
+                `editor-slot-edge-${rawEdge.data?.access === "write" ? "write" : "read"}`
+            );
             const contextEdge = withEdgeClassName(
                 edge,
                 "editor-edge-context-visible"
@@ -1254,7 +1267,7 @@ export function useEditorDisplay({
                 baseEdges.map((edge, index) => [edge.id, index])
             ),
         };
-    }, [routedSlotEdgeCache]);
+    }, [routedSlotEdgeCache, colorblindMode]);
 
     const slotSelectionRelatedIndexes = useMemo(() => {
         const indexes = new Set();
@@ -1422,7 +1435,7 @@ export function useEditorDisplay({
             const cached = nextCache.get(edge);
             if (cached?.[emphasis]) return cached[emphasis];
 
-            const value = withSlotEdgeEmphasis(edge, isHoveredSlotDetailsConnection);
+            const value = withSlotEdgeEmphasis(edge, isHoveredSlotDetailsConnection, colorblindMode);
             if (nextCache === snapshot.byEdge) nextCache = new Map(nextCache);
             nextCache.set(edge, { ...cached, [emphasis]: value });
             return value;

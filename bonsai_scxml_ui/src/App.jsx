@@ -61,6 +61,7 @@ import { useEditorUiState, useRestoreCanvasViewportOnModeChange } from "./hooks/
 import "./App.css";
 import "./styles/design-system.css";
 import "./styles/interaction-states.css";
+import "./styles/colorblind-mode.css";
 
 // Initialize API proxy for Tauri desktop mode (intercepts /api/* fetch calls)
 initApiProxy();
@@ -95,6 +96,10 @@ function AppContent() {
         setShowTransitionEdges,
         showSlotEdges,
         setShowSlotEdges,
+        showCodeViewButton,
+        setShowCodeViewButton,
+        colorblindMode,
+        setColorblindMode,
     } = useEditorPreferences();
     const panels = useEditorPanelLayout();
     const { showPanel } = panels;
@@ -853,6 +858,7 @@ function AppContent() {
         activeMode,
         showTransitionEdges,
         showSlotEdges,
+        colorblindMode,
         injectedNodes,
         injectedSlotNodes,
         isDraggingNode,
@@ -1235,6 +1241,18 @@ function AppContent() {
                 isSaving={isWorkflowSaving}
                 isOpening={isWorkflowOpening}
                 panels={panels}
+                showTransitionEdges={showTransitionEdges}
+                onToggleTransitionEdges={() => setShowTransitionEdges((value) => !value)}
+                showSlotEdges={showSlotEdges}
+                onToggleSlotEdges={() => setShowSlotEdges((value) => !value)}
+                showCodeViewButton={showCodeViewButton}
+                onToggleCodeViewButton={() => {
+                    // Do not leave Code View active with its entry button hidden.
+                    if (showCodeViewButton && activeMode === "code") setActiveMode("overview");
+                    setShowCodeViewButton((value) => !value);
+                }}
+                colorblindMode={colorblindMode}
+                onToggleColorblindMode={() => setColorblindMode((value) => !value)}
             />
             <EditorNotice notice={documentNotice} onDismiss={dismissDocumentNotice}
                 onRetry={handleRetryDocumentAction}
@@ -1355,9 +1373,9 @@ function AppContent() {
                             activeMode={activeMode}
                             setActiveMode={setActiveMode}
                             showTransitionEdges={showTransitionEdges}
-                            setShowTransitionEdges={setShowTransitionEdges}
                             showSlotEdges={showSlotEdges}
-                            setShowSlotEdges={setShowSlotEdges}
+                            showCodeViewButton={showCodeViewButton}
+                            colorblindMode={colorblindMode}
                             nodes={nodes}
                             edges={edges}
                             globalDataModel={globalDataModel}

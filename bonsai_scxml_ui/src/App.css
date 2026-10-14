@@ -6,7 +6,6 @@
     display: flex;
     flex-direction: column;
     width: 100%;
-    height: 100vh;
     height: 100dvh;
     min-width: 0;
     overflow: hidden;
@@ -2064,7 +2063,6 @@
 
 .submachine-node.selected-node {
     border-color: #38bdf8 !important;
-    border-top-color: #38bdf8 !important;
     box-shadow:
             0 0 0 3px rgba(56, 189, 248, 0.30),
             0 8px 20px rgba(76, 29, 149, 0.18) !important;
@@ -4023,7 +4021,6 @@
 
 .transition-order-card.selected {
     border-color: #38bdf8;
-    border-left-color: #38bdf8;
     background: rgba(56, 189, 248, 0.08);
 }
 
@@ -5116,7 +5113,6 @@
 .costum-node.terminal-final-node.selected-node,
 .costum-node.behavior-exit-node.selected-node {
     border-color: #38bdf8 !important;
-    border-top-color: #38bdf8 !important;
 }
 
 
@@ -5224,12 +5220,20 @@
     right: auto;
 }
 
-/* During a slot drag, only the matching Read or Write endpoint remains
-   connectable and visible. */
+/* Keep rejected endpoints visible and hit-testable: the user can hover a
+   dimmed port to learn why it cannot be connected. Actual rejection remains
+   in React Flow's isValidConnection callback. */
 .skill-slot-handle.slot-handle-incompatible,
 .slot-node-handle.slot-handle-incompatible {
-    opacity: 0 !important;
-    pointer-events: none !important;
+    opacity: 0.34 !important;
+    pointer-events: auto !important;
+    cursor: not-allowed;
+    transition: opacity 100ms ease, box-shadow 100ms ease;
+}
+.skill-slot-handle.slot-handle-incompatible:hover,
+.slot-node-handle.slot-handle-incompatible:hover {
+    opacity: 0.9 !important;
+    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.45) !important;
 }
 
 .skill-slot-handle.slot-handle-compatible,
@@ -5646,7 +5650,6 @@ dialog.skill-paste-choice-overlay {
 /* Keep selection dominant over the dark skill palette. */
 .costum-node:not(.terminal-final-node):not(.behavior-exit-node).selected-node {
     border-color: #38bdf8 !important;
-    border-top-color: #38bdf8 !important;
     box-shadow:
             0 0 0 3px rgba(56, 189, 248, 0.30),
             0 8px 20px rgba(8, 15, 22, 0.36) !important;
@@ -6184,7 +6187,7 @@ dialog.skill-paste-choice-overlay {
    centre would swing half of the text below the skill's lower border. */
 :is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-summary-slanted .node-slot-entry {
     transform: translateX(-1px) rotate(-55deg);
-    transform-origin: 0% 100%;
+    transform-origin: 0 100%;
 }
 
 :is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-summary-horizontal .node-slot-key {
@@ -6207,6 +6210,64 @@ dialog.skill-paste-choice-overlay {
 
 :is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-entry-inherited .node-slot-key {
     color: #fdba74;
+}
+
+/* Place type information by the actual connection point, not alongside
+   the slot name. Both use their own row: the name stays higher in the dock,
+   while the badge is centered immediately above its handle on the rail. */
+:is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-entry {
+    bottom: 34px;
+}
+
+:is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-type-badge {
+    position: absolute;
+    left: 50%;
+    bottom: 7px;
+    transform: translateX(-50%);
+    display: block;
+    box-sizing: border-box;
+    width: max-content;
+    max-width: calc(100% - 4px);
+    padding: 2px 5px;
+    border: 1px solid rgba(148, 163, 184, 0.4);
+    border-radius: 4px;
+    background: #334155;
+    color: #f1f5f9;
+    font-size: 9px;
+    font-weight: 650;
+    line-height: 1.15;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-shadow: none;
+    pointer-events: auto;
+    cursor: help;
+    z-index: 4;
+    transition: opacity 120ms ease;
+}
+
+/* Keep adequate vertical space for slanted names above the port badges. */
+:is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-summary-slanted,
+:is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-summary-slanted .node-slot-ports {
+    height: 150px;
+}
+
+:is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-summary-slanted .node-slot-row {
+    min-height: 150px;
+}
+
+:is(.costum-node, .submachine-node).submachine-node.has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-type-badge {
+    color: #334155;
+    background: rgba(248, 250, 252, 0.96);
+    border-color: rgba(100, 116, 139, 0.4);
+}
+
+/* Apply this class directly to React Flow on zoom, without rerendering nodes.
+   Hide only type badges, preserving port and handle positions. */
+.react-flow.editor-slot-types-compact :is(.costum-node, .submachine-node).has-slot-dock:not(.terminal-final-node):not(.behavior-exit-node) .node-slot-type-badge {
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
 }
 
 /* Use the same access legend as the standalone slot node. The individual
@@ -7974,8 +8035,7 @@ dialog.skill-paste-choice-overlay {
  * single frame. When transitions are hidden (or Slot Mode is active), only the
  * already-cached edges connected to the hovered/selected context are painted.
  */
-.react-flow.editor-transitions-context-only
-.react-flow__edge.editor-transition-edge:not(.editor-edge-context-visible):not(.editor-canvas-fast-edge-context-visible):not(.selected) {
+.react-flow.editor-transitions-context-only .react-flow__edge.editor-transition-edge:not(.editor-edge-context-visible):not(.editor-canvas-fast-edge-context-visible):not(.selected) {
     visibility: hidden;
     pointer-events: none;
 }
@@ -7985,8 +8045,7 @@ dialog.skill-paste-choice-overlay {
  * Slot edges stay mounted/routed in Slot and Overview modes, so enabling them
  * does not create and smart-route the complete slot graph in one frame.
  */
-.react-flow.editor-slots-context-only
-.react-flow__edge.editor-slot-edge:not(.editor-edge-context-visible):not(.editor-canvas-fast-edge-context-visible):not(.selected) {
+.react-flow.editor-slots-context-only .react-flow__edge.editor-slot-edge:not(.editor-edge-context-visible):not(.editor-canvas-fast-edge-context-visible):not(.selected) {
     visibility: hidden;
     pointer-events: none;
 }
@@ -7999,25 +8058,17 @@ dialog.skill-paste-choice-overlay {
  * .editor-edge-focus-active, while the canvas class dims all other mounted
  * transition SVG groups directly in CSS.
  */
-.react-flow:is(.editor-edge-focus-mode, .editor-canvas-fast-edge-focus-mode)
-.react-flow__edge.editor-transition-edge:not(.editor-edge-focus-active):not(.editor-canvas-fast-edge-focus-active):not(.editor-edge-selection-related):not(.selected),
-.react-flow:is(.editor-edge-focus-mode, .editor-canvas-fast-edge-focus-mode)
-.react-flow__edge.editor-slot-edge:not(.editor-edge-focus-active):not(.editor-canvas-fast-edge-focus-active):not(.editor-edge-selection-related):not(.selected) {
+.react-flow:is(.editor-edge-focus-mode, .editor-canvas-fast-edge-focus-mode) .react-flow__edge.editor-transition-edge:not(.editor-edge-focus-active):not(.editor-canvas-fast-edge-focus-active):not(.editor-edge-selection-related):not(.selected),
+.react-flow:is(.editor-edge-focus-mode, .editor-canvas-fast-edge-focus-mode) .react-flow__edge.editor-slot-edge:not(.editor-edge-focus-active):not(.editor-canvas-fast-edge-focus-active):not(.editor-edge-selection-related):not(.selected) {
     opacity: 0.22;
 }
 
-.react-flow:is(.editor-edge-focus-mode, .editor-canvas-fast-edge-focus-mode)
-.react-flow__edge.editor-transition-edge:is(.editor-edge-focus-active, .editor-canvas-fast-edge-focus-active),
-.react-flow:is(.editor-edge-focus-mode, .editor-canvas-fast-edge-focus-mode)
-.react-flow__edge.editor-transition-edge.editor-edge-selection-related,
-.react-flow:is(.editor-edge-focus-mode, .editor-canvas-fast-edge-focus-mode)
-.react-flow__edge.editor-transition-edge.selected,
-.react-flow:is(.editor-edge-focus-mode, .editor-canvas-fast-edge-focus-mode)
-.react-flow__edge.editor-slot-edge:is(.editor-edge-focus-active, .editor-canvas-fast-edge-focus-active),
-.react-flow:is(.editor-edge-focus-mode, .editor-canvas-fast-edge-focus-mode)
-.react-flow__edge.editor-slot-edge.editor-edge-selection-related,
-.react-flow:is(.editor-edge-focus-mode, .editor-canvas-fast-edge-focus-mode)
-.react-flow__edge.editor-slot-edge.selected {
+.react-flow:is(.editor-edge-focus-mode, .editor-canvas-fast-edge-focus-mode) .react-flow__edge.editor-transition-edge:is(.editor-edge-focus-active, .editor-canvas-fast-edge-focus-active),
+.react-flow:is(.editor-edge-focus-mode, .editor-canvas-fast-edge-focus-mode) .react-flow__edge.editor-transition-edge.editor-edge-selection-related,
+.react-flow:is(.editor-edge-focus-mode, .editor-canvas-fast-edge-focus-mode) .react-flow__edge.editor-transition-edge.selected,
+.react-flow:is(.editor-edge-focus-mode, .editor-canvas-fast-edge-focus-mode) .react-flow__edge.editor-slot-edge:is(.editor-edge-focus-active, .editor-canvas-fast-edge-focus-active),
+.react-flow:is(.editor-edge-focus-mode, .editor-canvas-fast-edge-focus-mode) .react-flow__edge.editor-slot-edge.editor-edge-selection-related,
+.react-flow:is(.editor-edge-focus-mode, .editor-canvas-fast-edge-focus-mode) .react-flow__edge.editor-slot-edge.selected {
     opacity: 1;
 }
 
@@ -8027,17 +8078,14 @@ dialog.skill-paste-choice-overlay {
  * handful of context nodes; CSS dims the rest. This avoids mapping and cloning
  * every node whenever the pointer moves across a large state machine.
  */
-.react-flow:is(.editor-node-focus-mode, .editor-canvas-fast-node-focus-mode)
-.react-flow__node:not(.editor-node-context-visible):not(.editor-canvas-fast-node-context-visible):not(.selected) {
+.react-flow:is(.editor-node-focus-mode, .editor-canvas-fast-node-focus-mode) .react-flow__node:not(.editor-node-context-visible):not(.editor-canvas-fast-node-context-visible):not(.selected) {
     opacity: 0.42;
     filter: grayscale(0.72);
     transition: opacity 120ms ease, filter 120ms ease;
 }
 
-.react-flow:is(.editor-node-focus-mode, .editor-canvas-fast-node-focus-mode)
-.react-flow__node:is(.editor-node-context-visible, .editor-canvas-fast-node-context-visible),
-.react-flow:is(.editor-node-focus-mode, .editor-canvas-fast-node-focus-mode)
-.react-flow__node.selected {
+.react-flow:is(.editor-node-focus-mode, .editor-canvas-fast-node-focus-mode) .react-flow__node:is(.editor-node-context-visible, .editor-canvas-fast-node-context-visible),
+.react-flow:is(.editor-node-focus-mode, .editor-canvas-fast-node-focus-mode) .react-flow__node.selected {
     opacity: 1;
     filter: none;
 }
@@ -8056,8 +8104,7 @@ dialog.skill-paste-choice-overlay {
  * render it as one solid, non-animated line. Compound/Parallel boundary
  * helpers must be solid at rest too, exactly like their outer segments.
  */
-.react-flow__edge:is(.editor-user-transition-edge, .editor-boundary-helper-edge):not(.editor-edge-focus-active):not(.editor-canvas-fast-edge-focus-active):not(.selected)
-    .react-flow__edge-path {
+.react-flow__edge:is(.editor-user-transition-edge, .editor-boundary-helper-edge):not(.editor-edge-focus-active):not(.editor-canvas-fast-edge-focus-active):not(.selected) .react-flow__edge-path {
     stroke-dasharray: none !important;
     animation: none !important;
 }
@@ -8065,6 +8112,10 @@ dialog.skill-paste-choice-overlay {
 
 /* Fast canvas hover is DOM-only. Its classes and colour variable belong to
  * EditorCanvas, never to React Flow or the inspector's React presentation. */
+.react-flow__edge.editor-canvas-fast-edge-animated {
+    --editor-canvas-hover-stroke: #38bdf8;
+}
+
 .react-flow__edge.editor-canvas-fast-edge-animated .react-flow__edge-path {
     stroke: var(--editor-canvas-hover-stroke) !important;
     stroke-dasharray: 5 5 !important;
@@ -8634,14 +8685,10 @@ dialog.skill-paste-choice-overlay {
 
 /* Runtime trace visibility wins over the normal transition/slot visibility
    toggles so the loaded execution path is never hidden accidentally. */
-.react-flow.runtime-log-focus-mode
-.react-flow__edge.runtime-log-trace-edge,
-.react-flow.runtime-log-focus-mode
-.react-flow__edge.runtime-log-active-edge,
-.react-flow.runtime-log-focus-mode
-.react-flow__edge.runtime-log-active-slot-edge,
-.react-flow.runtime-log-focus-mode
-.react-flow__edge.runtime-log-dimmed-edge {
+.react-flow.runtime-log-focus-mode .react-flow__edge.runtime-log-trace-edge,
+.react-flow.runtime-log-focus-mode .react-flow__edge.runtime-log-active-edge,
+.react-flow.runtime-log-focus-mode .react-flow__edge.runtime-log-active-slot-edge,
+.react-flow.runtime-log-focus-mode .react-flow__edge.runtime-log-dimmed-edge {
     visibility: visible !important;
 }
 
@@ -8791,15 +8838,13 @@ dialog.skill-paste-choice-overlay {
 /* Runtime-log parameter snapshots replace the configured expression in the
    skill's parameter row for the selected playback step. The small badge makes
    it explicit that this is an observed execution value, not an SCXML edit. */
-.costum-node:not(.terminal-final-node):not(.behavior-exit-node)
-    .node-parameter-row-runtime {
+.costum-node:not(.terminal-final-node):not(.behavior-exit-node) .node-parameter-row-runtime {
     border-radius: 5px;
     background: rgba(219, 234, 254, 0.72);
     box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.28);
 }
 
-.costum-node:not(.terminal-final-node):not(.behavior-exit-node)
-    .node-parameter-runtime-value {
+.costum-node:not(.terminal-final-node):not(.behavior-exit-node) .node-parameter-runtime-value {
     font-weight: 800;
 }
 
@@ -8826,22 +8871,16 @@ dialog.skill-paste-choice-overlay {
    context therefore temporarily wins over runtime dimming. This is visual
    only: it does not change the current runtime step or playback state.
    -------------------------------------------------------------------------- */
-.react-flow.runtime-log-focus-mode
-.react-flow__node.runtime-log-dimmed-node:is(.editor-node-context-visible, .editor-canvas-fast-node-context-visible),
-.react-flow.runtime-log-focus-mode
-.react-flow__node.runtime-log-dimmed-node:is(.editor-hover-highlight, .editor-canvas-fast-hover-highlight),
-.react-flow.runtime-log-focus-mode
-.react-flow__node.runtime-log-dimmed-node.selected {
+.react-flow.runtime-log-focus-mode .react-flow__node.runtime-log-dimmed-node:is(.editor-node-context-visible, .editor-canvas-fast-node-context-visible),
+.react-flow.runtime-log-focus-mode .react-flow__node.runtime-log-dimmed-node:is(.editor-hover-highlight, .editor-canvas-fast-hover-highlight),
+.react-flow.runtime-log-focus-mode .react-flow__node.runtime-log-dimmed-node.selected {
     opacity: 1 !important;
     filter: none !important;
 }
 
-.react-flow.runtime-log-focus-mode
-.react-flow__edge.runtime-log-dimmed-edge:is(.editor-edge-focus-active, .editor-canvas-fast-edge-focus-active),
-.react-flow.runtime-log-focus-mode
-.react-flow__edge.runtime-log-dimmed-edge:is(.editor-edge-context-visible, .editor-canvas-fast-edge-context-visible),
-.react-flow.runtime-log-focus-mode
-.react-flow__edge.runtime-log-dimmed-edge.selected {
+.react-flow.runtime-log-focus-mode .react-flow__edge.runtime-log-dimmed-edge:is(.editor-edge-focus-active, .editor-canvas-fast-edge-focus-active),
+.react-flow.runtime-log-focus-mode .react-flow__edge.runtime-log-dimmed-edge:is(.editor-edge-context-visible, .editor-canvas-fast-edge-context-visible),
+.react-flow.runtime-log-focus-mode .react-flow__edge.runtime-log-dimmed-edge.selected {
     visibility: visible !important;
     opacity: 1 !important;
     filter: none !important;
@@ -8849,8 +8888,7 @@ dialog.skill-paste-choice-overlay {
 
 /* Keep the actually executed transition visually stronger than an inspected
    hover/selection context when the two overlap. */
-.react-flow.runtime-log-focus-mode
-.react-flow__edge.runtime-log-active-edge {
+.react-flow.runtime-log-focus-mode .react-flow__edge.runtime-log-active-edge {
     opacity: 1 !important;
     filter: drop-shadow(0 0 5px rgba(250, 204, 21, 0.9)) !important;
 }
@@ -9807,8 +9845,7 @@ dialog.skill-paste-choice-overlay {
 }
 
 /* The edge labels live in a portal, separate from hidden SVG transitions. */
-.react-flow.editor-transitions-context-only
-.editor-transition-annotations:not(.editor-transition-annotation-context-visible) {
+.react-flow.editor-transitions-context-only .editor-transition-annotations:not(.editor-transition-annotation-context-visible) {
     visibility: hidden;
     pointer-events: none !important;
 }
@@ -9932,3 +9969,105 @@ dialog.skill-paste-choice-overlay {
 .transition-order-card:has(.transition-scope-warning) { border-left-color: #f59e0b; }
 /* Leave room for multiple priority sections without growing the entire drawer. */
 .transition-list-step .transition-order-list { max-height: min(370px, 50dvh); }
+
+/* Header display preference; the File and Options menus share a layout. */
+.editor-options-menu-dropdown {
+    min-width: 245px;
+}
+.editor-file-menu-dropdown [role="menuitemcheckbox"] {
+    width: 100%;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: #f1f5f9;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    text-align: left;
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+}
+.editor-file-menu-dropdown [role="menuitemcheckbox"]:is(:hover, :focus-visible) {
+    background: #3b4e60;
+    outline: 1px solid var(--ui-focus);
+}
+.editor-options-menu-check {
+    margin-left: auto;
+    display: inline-flex;
+    width: 16px;
+    height: 16px;
+    justify-content: center;
+    align-items: center;
+    color: var(--ui-state-selected);
+}
+.editor-options-menu-help {
+    margin: 4px 10px 6px;
+    color: #cbd5e1;
+    font-size: 11px;
+    line-height: 1.35;
+}
+
+/* Slot drag guidance: give the matching port AND its adjacent type indicator
+   a clear affordance. Nonmatching handles remain discoverable for help. */
+.node-slot-row:has(.skill-slot-handle.slot-handle-compatible:not(.slot-handle-active)) .node-slot-type-badge {
+    outline: 2px solid #6366f1;
+    outline-offset: 1px;
+}
+.node-slot-row-write:has(.skill-slot-handle.slot-handle-compatible:not(.slot-handle-active)) .node-slot-type-badge {
+    outline-color: var(--editor-slot-write, #d946ef);
+}
+.node-slot-row-read:has(.skill-slot-handle.slot-handle-compatible:not(.slot-handle-active)) .node-slot-type-badge {
+    outline-color: var(--editor-slot-read, #6366f1);
+}
+.slot-node:has(.slot-node-read-handle.slot-handle-compatible:not(.slot-handle-active)) {
+    outline: 2px solid var(--editor-slot-read, #6366f1);
+    outline-offset: 2px;
+}
+.slot-node:has(.slot-node-write-handle.slot-handle-compatible:not(.slot-handle-active)) {
+    outline: 2px solid var(--editor-slot-write, #d946ef);
+    outline-offset: 2px;
+}
+/* Fixed-position overlay bypasses React Flow's pointer capture during drags. */
+.slot-connection-incompatibility-tooltip {
+    position: fixed;
+    z-index: 20000;
+    pointer-events: none;
+    box-sizing: border-box;
+    max-width: min(300px, calc(100vw - 24px));
+    padding: 8px 11px;
+    border: 1px solid #f59e0b;
+    border-radius: 7px;
+    background: #172033;
+    color: #f8fafc;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.24);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.4;
+    white-space: normal;
+}
+.slot-connection-incompatibility-tooltip[hidden] { display: none; }
+
+/* During a slot connection, de-emphasize destinations that cannot accept it.
+   A slot node has both Read and Write handles: only dim the whole card when
+   BOTH are incompatible. This keeps the dragged origin and any compatible
+   destination prominent, while retaining hoverable handles for explanations. */
+.slot-node:has(.slot-node-read-handle.slot-handle-incompatible):has(.slot-node-write-handle.slot-handle-incompatible) {
+    opacity: 0.5;
+    transition: opacity 120ms ease;
+}
+.slot-node:has(.slot-node-read-handle.slot-handle-incompatible):has(.slot-node-write-handle.slot-handle-incompatible):hover {
+    opacity: 0.72;
+}
+
+/* A skill may request slots of several types. Dim only the mismatching slot's
+   label and type badge, not its parent skill or other compatible slot ports.
+   The incompatible handle has its own hover and tooltip styling above. */
+.node-slot-row:has(> .skill-slot-handle.slot-handle-incompatible) :is(.node-slot-entry, .node-slot-type-badge) {
+    opacity: 0.32;
+    transition: opacity 120ms ease;
+}
+.node-slot-row:has(> .skill-slot-handle.slot-handle-incompatible):hover :is(.node-slot-entry, .node-slot-type-badge) {
+    opacity: 0.7;
+}

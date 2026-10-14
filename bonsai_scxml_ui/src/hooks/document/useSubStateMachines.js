@@ -32,7 +32,7 @@ const getSymbolicBehaviorSource = (filePath, behaviorDirectories = []) => {
     const matches = (behaviorDirectories || [])
         .map((entry) => ({
             entry,
-            root: normalizeFsPath(entry?.path),
+            root: normalizeFsPath(entry?.resolvedPath || entry?.path),
         }))
         .filter(({ entry, root }) =>
             entry?.key && root &&

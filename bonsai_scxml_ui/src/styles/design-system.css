@@ -61,6 +61,14 @@
 
     /* Shared interaction-state palette. Keep these semantic rather than
        tying hover/selection/problem feedback to individual components. */
+    /* Semantic graph colors: runtime theme changes apply to SVG strokes too. */
+    --editor-transition-success: #22c55e;
+    --editor-transition-error: #f59e0b;
+    --editor-transition-fatal: #ef4444;
+    --editor-transition-other: #38bdf8;
+    --editor-slot-read: #6366f1;
+    --editor-slot-write: #d946ef;
+
     --ui-state-hover: #93c5fd;
     --ui-state-selected: #38bdf8;
     --ui-state-focus: #e0f2fe;

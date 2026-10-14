@@ -1,7 +1,7 @@
 import { Position } from "@xyflow/react";
 import { FiDatabase } from "react-icons/fi";
 import { ConnectionHandle } from "./NodeChrome.jsx";
-import { getSlotHandleDragClass, getSlotTypeStyle } from "../../utils/slotVisuals";
+import { getSlotHandleDragFeedback, getSlotTypeStyle } from "../../utils/slotVisuals";
 
 function SlotNode({ id, data, selected = false }) {
     const displayPath = data.path || data.label || "Undefined slot";
@@ -46,6 +46,14 @@ function SlotNode({ id, data, selected = false }) {
 
     const writeHandleId = "slot-node-write";
     const readHandleId = "slot-node-read";
+    const writeFeedback = getSlotHandleDragFeedback({
+        drag: data.slotConnectionDrag, nodeId: id, handleId: writeHandleId,
+        access: "write", origin: "slot", slotType,
+    });
+    const readFeedback = getSlotHandleDragFeedback({
+        drag: data.slotConnectionDrag, nodeId: id, handleId: readHandleId,
+        access: "read", origin: "slot", slotType,
+    });
     const runtimeSlotValue = data.runtimeSlotValueMeta || null;
     const runtimeValueText = runtimeSlotValue
         ? runtimeSlotValue.value === ""
@@ -83,16 +91,10 @@ function SlotNode({ id, data, selected = false }) {
                 isConnectableEnd={true}
                 position={Position.Top}
                 style={{ left: "35%" }}
-                className={`source-handle slot-node-handle slot-node-write-handle ${getSlotHandleDragClass({
-                    drag: data.slotConnectionDrag,
-                    nodeId: id,
-                    handleId: writeHandleId,
-                    access: "write",
-                    origin: "slot",
-                    slotType,
-                })}`}
-                title={`Write into slot ${normalizedPath}`}
-                aria-label={`Write into slot ${normalizedPath}`}
+                className={`source-handle slot-node-handle slot-node-write-handle ${writeFeedback.className}`}
+                data-slot-incompatibility={writeFeedback.reason || undefined}
+                title={writeFeedback.reason || `Write into slot ${normalizedPath}`}
+                aria-label={writeFeedback.reason || `Write into slot ${normalizedPath}`}
             />
 
             <ConnectionHandle
@@ -102,16 +104,10 @@ function SlotNode({ id, data, selected = false }) {
                 isConnectableEnd={true}
                 position={Position.Top}
                 style={{ left: "65%" }}
-                className={`source-handle slot-node-handle slot-node-read-handle ${getSlotHandleDragClass({
-                    drag: data.slotConnectionDrag,
-                    nodeId: id,
-                    handleId: readHandleId,
-                    access: "read",
-                    origin: "slot",
-                    slotType,
-                })}`}
-                title={`Read from slot ${normalizedPath}`}
-                aria-label={`Read from slot ${normalizedPath}`}
+                className={`source-handle slot-node-handle slot-node-read-handle ${readFeedback.className}`}
+                data-slot-incompatibility={readFeedback.reason || undefined}
+                title={readFeedback.reason || `Read from slot ${normalizedPath}`}
+                aria-label={readFeedback.reason || `Read from slot ${normalizedPath}`}
             />
 
             <div className="slot-node-header">

@@ -1,24 +1,80 @@
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
     loadBehaviorDirectories,
+    isAutoBehaviorDirectory,
     loadEdgeVisibility,
+    loadColorblindMode,
+    loadCodeViewButtonVisibility,
     saveEditorPreferences,
     loadPanelPreferences,
     savePanelPreferences,
     getEditorPanelLayout,
     PANEL_LIMITS,
 } from "../../utils/editorPreferences.js";
+import { isTauri, resolveBehaviorDirectory } from "../../tauri-client.js";
+
+const behaviorDirectoryIdentity = (entry) => `${entry.key}\u0000${entry.path}`;
 
 export function useEditorPreferences() {
-    const [behaviorDirectories, setBehaviorDirectories] = useState(loadBehaviorDirectories);
+    const [configuredBehaviorDirectories, setConfiguredBehaviorDirectories] = useState(loadBehaviorDirectories);
+    const [checkedRoots, setCheckedRoots] = useState({});
+
+    useEffect(() => {
+        if (!isTauri()) return undefined;
+        let canceled = false;
+        const roots = configuredBehaviorDirectories.filter((entry) => isAutoBehaviorDirectory(entry) && entry.path.trim());
+        Promise.all(roots.map(async (entry) => {
+            try {
+                return [behaviorDirectoryIdentity(entry), await resolveBehaviorDirectory(entry.path)];
+            } catch (error) {
+                // IPC errors must not silently erase a configured library.
+                console.error("Could not check Behavior Library directory:", entry.path, error);
+                return [behaviorDirectoryIdentity(entry), undefined];
+            }
+        })).then((values) => {
+            if (!canceled) setCheckedRoots(Object.fromEntries(values));
+        });
+        return () => { canceled = true; };
+    }, [configuredBehaviorDirectories]);
+
+    const behaviorDirectories = useMemo(() => configuredBehaviorDirectories
+        // Never show an unverified built-in root (including before the
+        // filesystem check completes or when Tauri is unavailable).
+        .filter((entry) => !isAutoBehaviorDirectory(entry)
+            || typeof checkedRoots[behaviorDirectoryIdentity(entry)] === "string")
+        .map((entry) => {
+            const resolvedPath = checkedRoots[behaviorDirectoryIdentity(entry)];
+            return typeof resolvedPath === "string" ? { ...entry, resolvedPath } : entry;
+        }), [configuredBehaviorDirectories, checkedRoots]);
+
+    const setBehaviorDirectories = useCallback((updater) => {
+        setConfiguredBehaviorDirectories((current) => {
+            // The library edits the displayed roots. Preserve unavailable
+            // defaults so they can automatically return when the path exists.
+            const visibleIds = new Set(behaviorDirectories.map(behaviorDirectoryIdentity));
+            const updated = typeof updater === "function" ? updater(behaviorDirectories) : updater;
+            const updatedKeys = new Set(updated.map((entry) => entry.key));
+            const hidden = current.filter((entry) =>
+                !visibleIds.has(behaviorDirectoryIdentity(entry)) && !updatedKeys.has(entry.key));
+            return [...updated.map(({ resolvedPath, ...entry }) => entry), ...hidden];
+        });
+    }, [behaviorDirectories]);
     const [showTransitionEdges, setShowTransitionEdges] = useState(() =>
         loadEdgeVisibility("transitions"),
     );
     const [showSlotEdges, setShowSlotEdges] = useState(() => loadEdgeVisibility("slots"));
+    const [colorblindMode, setColorblindMode] = useState(loadColorblindMode);
+    const [showCodeViewButton, setShowCodeViewButton] = useState(loadCodeViewButtonVisibility);
+
+    // CSS variables also resolve inside existing React Flow SVG paths and arrowheads.
+    // Apply before paint; toggling must not rebuild the workflow or alter its data.
+    useLayoutEffect(() => {
+        document.documentElement.toggleAttribute("data-colorblind-mode", colorblindMode);
+    }, [colorblindMode]);
 
     useEffect(() => {
-        saveEditorPreferences({ behaviorDirectories, showTransitionEdges, showSlotEdges });
-    }, [behaviorDirectories, showTransitionEdges, showSlotEdges]);
+        saveEditorPreferences({ behaviorDirectories: configuredBehaviorDirectories, showTransitionEdges, showSlotEdges, colorblindMode, showCodeViewButton });
+    }, [configuredBehaviorDirectories, showTransitionEdges, showSlotEdges, colorblindMode, showCodeViewButton]);
 
     return {
         behaviorDirectories,
@@ -27,6 +83,10 @@ export function useEditorPreferences() {
         setShowTransitionEdges,
         showSlotEdges,
         setShowSlotEdges,
+        showCodeViewButton,
+        setShowCodeViewButton,
+        colorblindMode,
+        setColorblindMode,
     };
 }
 

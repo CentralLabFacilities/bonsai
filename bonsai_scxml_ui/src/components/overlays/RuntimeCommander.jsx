@@ -217,7 +217,7 @@ export default function RuntimeCommander({
                 if (ownerRef.current !== owner) return;
                 const includeMapping = Object.fromEntries(behaviorDirectories
                     .filter((directory) => directory.key?.trim() && directory.path?.trim())
-                    .map((directory) => [directory.key.trim(), directory.path.trim()]));
+                    .map((directory) => [directory.key.trim(), (directory.resolvedPath || directory.path).trim()]));
                 sent = true;
                 followingRef.current = false;
                 observedRunningRef.current = false;

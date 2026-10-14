@@ -8,8 +8,8 @@ import {
     NodeWarning,
     StateActionBadges,
 } from "./NodeChrome.jsx";
-import { estimateSlotDockWidth, estimateSummaryWidth } from "../../utils/layoutUtils.js";
-import { getSlotHandleDragClass, getStateSlotEntries } from "../../utils/slotVisuals.js";
+import { estimateSlotDockWidth, estimateSlotPortWidth, estimateSummaryWidth } from "../../utils/layoutUtils.js";
+import { getSlotHandleDragFeedback, getSlotTypeBadgeLabel, getStateSlotEntries } from "../../utils/slotVisuals.js";
 
 const textValue = (value) => String(value ?? "").trim();
 const REFERENCE_TYPES = { submachine: "SUB-SM", compound: "COMPOUND", parallel: "PARALLEL" };
@@ -249,11 +249,14 @@ function SlotDock({ id, data, entries, submachine }) {
                         const origin = entry.handleId.startsWith("slot-submachine-")
                             ? "submachine"
                             : "skill";
-                        const slotType = String(entry.type || "").trim().toLowerCase();
+                        const fullSlotType = String(entry.type || "").trim();
+                        const badgeLabel = getSlotTypeBadgeLabel(fullSlotType);
+                        const slanted = entries.length >= 3;
+                        const slotType = fullSlotType.toLowerCase();
                         const isConnectable = origin !== "submachine" ||
                             Boolean(slotType && slotType !== "unknown");
-                        const handleTitle = `${access} ${label} (${entry.access === "read" ? "into" : "out of"} ${submachine ? "sub-state machine" : "skill"})${isConnectable ? "" : " - slot type metadata unavailable"}`;
-                        const dragClass = getSlotHandleDragClass({
+                        const handleTitle = `${access} ${label} · type: ${fullSlotType || "Unknown"} (${entry.access === "read" ? "into" : "out of"} ${submachine ? "sub-state machine" : "skill"})${isConnectable ? "" : " - slot type metadata unavailable"}`;
+                        const dragFeedback = getSlotHandleDragFeedback({
                             drag: data.slotConnectionDrag,
                             nodeId: id,
                             handleId: entry.handleId,
@@ -265,6 +268,7 @@ function SlotDock({ id, data, entries, submachine }) {
                             <div
                                 key={entry.handleId}
                                 className={`node-slot-row node-slot-row-${entry.access}`}
+                                style={{ flexGrow: estimateSlotPortWidth(entry, slanted) }}
                             >
                                 <span
                                     className={`node-slot-entry ${entry.inherited ? "node-slot-entry-inherited" : ""} ${submachine ? "" : "nodrag nopan"}`}
@@ -273,10 +277,19 @@ function SlotDock({ id, data, entries, submachine }) {
                                         : editHandlers(() =>
                                               data.onOpenSlot?.(id, entry.access, entry.key),
                                           ))}
-                                    title={`${access} slot ${label}${submachine ? "" : " \u2014 click to edit path"}`}
+                                    title={`Access: ${access}\nType: ${fullSlotType || "Unknown"}`}
                                     style={submachine ? undefined : { cursor: "pointer" }}
                                 >
                                     <span className="node-slot-key">{label}</span>
+                                </span>
+                                <span
+                                    className="node-slot-type-badge nodrag nopan"
+                                    title={fullSlotType || "Slot type unavailable"}
+                                    aria-label={`Slot type: ${fullSlotType || "Unknown"}`}
+                                    onPointerDown={(event) => event.stopPropagation()}
+                                    onClick={(event) => event.stopPropagation()}
+                                >
+                                    {badgeLabel}
                                 </span>
                                 <ConnectionHandle
                                     id={entry.handleId}
@@ -285,9 +298,10 @@ function SlotDock({ id, data, entries, submachine }) {
                                     isConnectableStart={true}
                                     isConnectableEnd={true}
                                     position={Position.Bottom}
-                                    className={`source-handle skill-slot-handle slot-skill-${entry.access}-handle ${dragClass}`}
-                                    title={handleTitle}
-                                    aria-label={handleTitle}
+                                    className={`source-handle skill-slot-handle slot-skill-${entry.access}-handle ${dragFeedback.className}`}
+                                    data-slot-incompatibility={dragFeedback.reason || undefined}
+                                    title={dragFeedback.reason || handleTitle}
+                                    aria-label={dragFeedback.reason || handleTitle}
                                 />
                             </div>
                         );

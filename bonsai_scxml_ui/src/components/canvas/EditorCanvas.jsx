@@ -1,9 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef } from "react";
-import {
-    FiEye,
-    FiEyeOff,
-    FiTrash2,
-} from "react-icons/fi";
+import { FiTrash2 } from "react-icons/fi";
 import {
     Background,
     ConnectionMode,
@@ -20,7 +16,7 @@ import CodeView from "./CodeView";
 import ModeSwitcher from "./ModeSwitcher.jsx";
 import RuntimeLogPlayer from "../inspector/RuntimeLogPlayer.jsx";
 import CanvasContextMenu from "./CanvasContextMenu.jsx";
-import { SLOT_CONNECTION_COLORS, getTransitionHighlightColor, parseSlotConnectionHandle } from "../../utils/editorGraph";
+import { getSlotConnectionColor, getTransitionHighlightColor, parseSlotConnectionHandle } from "../../utils/editorGraph";
 import { boundaryTransitionKeys, buildBoundaryHelperIndex } from "../../utils/transitionBoundaryHighlight.js";
 
 function EditorConnectionLine({ fromHandle, fromX, fromY, toX, toY, fromPosition, toPosition,
@@ -30,7 +26,7 @@ function EditorConnectionLine({ fromHandle, fromX, fromY, toX, toY, fromPosition
     const [path] = getBezierPath(reverse
         ? { sourceX: toX, sourceY: toY, sourcePosition: toPosition, targetX: fromX, targetY: fromY, targetPosition: fromPosition }
         : { sourceX: fromX, sourceY: fromY, sourcePosition: fromPosition, targetX: toX, targetY: toY, targetPosition: toPosition });
-    const color = handle ? SLOT_CONNECTION_COLORS[handle.access] : undefined;
+    const color = handle ? getSlotConnectionColor(handle.access, document.documentElement.hasAttribute("data-colorblind-mode")) : undefined;
     return (
         <g style={{ pointerEvents: "none" }}>
             <path className="react-flow__connection-path" d={path} fill="none"
@@ -84,7 +80,7 @@ const getHoverTransitionColor = (edge) => {
         edge?.data?.parallelOriginalSourceHandle ||
         edge?.sourceHandle ||
         edge?.label;
-    return getTransitionHighlightColor(semanticHandle);
+    return getTransitionHighlightColor(semanticHandle, document.documentElement.hasAttribute("data-colorblind-mode"));
 };
 
 const escapeDataId = (value) =>
@@ -96,9 +92,10 @@ export default function EditorCanvas({
     activeMode,
     setActiveMode,
     showTransitionEdges,
-    setShowTransitionEdges,
     showSlotEdges,
-    setShowSlotEdges,
+    slotConnectionDrag,
+    showCodeViewButton = true,
+    colorblindMode = false,
     nodes,
     edges,
     globalDataModel,
@@ -162,6 +159,66 @@ export default function EditorCanvas({
     const hoverDomMutationsRef = useRef([]);
     const fastHoverOwnerRef = useRef(null);
     const fastHoverObserverRef = useRef(null);
+    const incompatibleSlotHintRef = useRef(null);
+
+    // During a connection gesture React Flow captures pointer events, so
+    // onMouseEnter on an individual Handle is unreliable. Hit-test the actual
+    // element below the cursor instead. This is a transient DOM-only tooltip:
+    // no graph rebuilds or canvas React renders on every pointer move.
+    useEffect(() => {
+        const hint = incompatibleSlotHintRef.current;
+        if (!hint) return undefined;
+        const hide = () => {
+            hint.hidden = true;
+            hint.textContent = "";
+        };
+        hide();
+        if (!slotConnectionDrag?.active) return undefined;
+
+        const findIncompatibleHandle = (x, y) => {
+            const underPointer = document.elementFromPoint(x, y);
+            if (!underPointer) return null;
+            const direct = underPointer.closest?.(".react-flow__handle.slot-handle-incompatible[data-slot-incompatibility]");
+            if (direct) return direct;
+            // Visual handles are larger than the underlying 8-9px hit box.
+            // Include the rim so users don't have to hit a tiny exact pixel.
+            const nodeElement = underPointer.closest?.(".react-flow__node");
+            if (!nodeElement) return null;
+            for (const handle of nodeElement.querySelectorAll(
+                ".react-flow__handle.slot-handle-incompatible[data-slot-incompatibility]"
+            )) {
+                const rect = handle.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                if (Math.hypot(centerX - x, centerY - y) <= 15) return handle;
+            }
+            return null;
+        };
+        const onPointerMove = (event) => {
+            const handle = findIncompatibleHandle(event.clientX, event.clientY);
+            const explanation = handle?.dataset.slotIncompatibility;
+            if (!explanation) {
+                if (!hint.hidden) hide();
+                return;
+            }
+            if (hint.textContent !== explanation) hint.textContent = explanation;
+            hint.hidden = false;
+            // Keep the message on-screen and away from the pointer/port.
+            hint.style.left = `${Math.max(12, Math.min(event.clientX + 20, window.innerWidth - 312))}px`;
+            hint.style.top = `${Math.max(12, Math.min(event.clientY + 20, window.innerHeight - hint.offsetHeight - 12))}px`;
+        };
+        document.addEventListener("pointermove", onPointerMove, true);
+        document.addEventListener("pointerup", hide, true);
+        document.addEventListener("pointercancel", hide, true);
+        window.addEventListener("blur", hide);
+        return () => {
+            document.removeEventListener("pointermove", onPointerMove, true);
+            document.removeEventListener("pointerup", hide, true);
+            document.removeEventListener("pointercancel", hide, true);
+            window.removeEventListener("blur", hide);
+            hide();
+        };
+    }, [slotConnectionDrag?.active, documentKey]);
 
     const hoverEdgeIndex = useMemo(() => {
         const edgeById = new Map();
@@ -377,7 +434,7 @@ export default function EditorCanvas({
     // without sending onEdgeMouseLeave. Clear any imperative hover on graph
     // changes, pane movement, window blur and mouse departure from the canvas.
     useEffect(() => clearFastHover, [clearFastHover]);
-    useEffect(() => { clearFastHover(); }, [documentKey, activeMode, showTransitionEdges, showSlotEdges, clearFastHover]);
+    useEffect(() => { clearFastHover(); }, [documentKey, activeMode, showTransitionEdges, showSlotEdges, colorblindMode, clearFastHover]);
     useEffect(() => {
         // Missing mouseleave (for instance when React Flow replaces an edge
         // while the pointer is over it) must never leave DOM-only hover classes.
@@ -405,6 +462,14 @@ export default function EditorCanvas({
         window.addEventListener("blur", clearFastHover);
         return () => window.removeEventListener("blur", clearFastHover);
     }, [clearFastHover]);
+
+    // Only update a paint-only class when zoom crosses the badge visibility
+    // threshold. No per-node viewport subscription or React rerender is needed.
+    const updateSlotTypeZoom = useCallback((zoom, flowElement = null) => {
+        if (!Number.isFinite(zoom)) return;
+        const element = flowElement || document.querySelector(".react-flow");
+        element?.classList.toggle("editor-slot-types-compact", zoom <= 0.5);
+    }, []);
 
     // Viewport movement must not feed back into React state. A previous attempt
     // used state in onMoveStart/onMoveEnd and could recurse through React Flow's
@@ -446,6 +511,7 @@ export default function EditorCanvas({
                 manualSlots={manualSlots}
                 activeMode={activeMode}
                 setActiveMode={setActiveMode}
+                showCodeViewButton={showCodeViewButton}
             />
         );
     }
@@ -453,42 +519,8 @@ export default function EditorCanvas({
     return (
         <>
             <div className="editor-canvas-toolbar">
-                <ModeSwitcher activeMode={activeMode} setActiveMode={setActiveMode} />
-
-                <div className="editor-canvas-toolbar-actions">
-                    <div className="edge-visibility-toggle-group">
-                        <button
-                            type="button"
-                            className={`edge-visibility-toggle ${showTransitionEdges ? "active" : ""}`}
-                            aria-pressed={showTransitionEdges}
-                            title={
-                                showTransitionEdges
-                                    ? "Hide transitions except for hovered/selected nodes"
-                                    : "Show all transitions"
-                            }
-                            onClick={() => setShowTransitionEdges((value) => !value)}
-                        >
-                            {showTransitionEdges ? <FiEye /> : <FiEyeOff />}
-                            <span>Transitions</span>
-                        </button>
-
-                        <button
-                            type="button"
-                            className={`edge-visibility-toggle ${showSlotEdges ? "active" : ""}`}
-                            aria-pressed={showSlotEdges}
-                            title={
-                                showSlotEdges
-                                    ? "Hide slot edges except for hovered/selected skills or slots"
-                                    : "Show all slot edges"
-                            }
-                            onClick={() => setShowSlotEdges((value) => !value)}
-                        >
-                            {showSlotEdges ? <FiEye /> : <FiEyeOff />}
-                            <span>Slot edges</span>
-                        </button>
-                    </div>
-
-                </div>
+                <ModeSwitcher activeMode={activeMode} setActiveMode={setActiveMode}
+                    showCodeViewButton={showCodeViewButton} />
             </div>
 
             <RuntimeLogPlayer
@@ -514,6 +546,14 @@ export default function EditorCanvas({
                     <span>Drop here to delete</span>
                 </div>
             )}
+
+            <div
+                ref={incompatibleSlotHintRef}
+                className="slot-connection-incompatibility-tooltip"
+                role="status"
+                aria-live="polite"
+                hidden
+            />
 
             <CanvasContextMenu
                 contextMenu={contextMenu}
@@ -607,7 +647,9 @@ export default function EditorCanvas({
                     onNodeDrag={handleNodeDrag}
                     onNodeDragStop={handleNodeDragStop}
                     onMoveStart={handleViewportMoveStart}
+                    onMove={(_, viewport) => updateSlotTypeZoom(viewport.zoom, movingFlowElementRef.current)}
                     onMoveEnd={handleViewportMoveEnd}
+                    onInit={(instance) => updateSlotTypeZoom(instance.getZoom())}
                 >
                     <Background />
                     <Controls position={runtimePlayback?.loaded || liveExecutionActive ? "bottom-right" : "bottom-left"} />
