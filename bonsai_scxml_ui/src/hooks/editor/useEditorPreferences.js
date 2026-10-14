@@ -4,6 +4,7 @@ import {
     isAutoBehaviorDirectory,
     loadEdgeVisibility,
     loadColorblindMode,
+    loadCodeViewButtonVisibility,
     saveEditorPreferences,
     loadPanelPreferences,
     savePanelPreferences,
@@ -63,6 +64,7 @@ export function useEditorPreferences() {
     );
     const [showSlotEdges, setShowSlotEdges] = useState(() => loadEdgeVisibility("slots"));
     const [colorblindMode, setColorblindMode] = useState(loadColorblindMode);
+    const [showCodeViewButton, setShowCodeViewButton] = useState(loadCodeViewButtonVisibility);
 
     // CSS variables also resolve inside existing React Flow SVG paths and arrowheads.
     // Apply before paint; toggling must not rebuild the workflow or alter its data.
@@ -71,8 +73,8 @@ export function useEditorPreferences() {
     }, [colorblindMode]);
 
     useEffect(() => {
-        saveEditorPreferences({ behaviorDirectories: configuredBehaviorDirectories, showTransitionEdges, showSlotEdges, colorblindMode });
-    }, [configuredBehaviorDirectories, showTransitionEdges, showSlotEdges, colorblindMode]);
+        saveEditorPreferences({ behaviorDirectories: configuredBehaviorDirectories, showTransitionEdges, showSlotEdges, colorblindMode, showCodeViewButton });
+    }, [configuredBehaviorDirectories, showTransitionEdges, showSlotEdges, colorblindMode, showCodeViewButton]);
 
     return {
         behaviorDirectories,
@@ -81,6 +83,8 @@ export function useEditorPreferences() {
         setShowTransitionEdges,
         showSlotEdges,
         setShowSlotEdges,
+        showCodeViewButton,
+        setShowCodeViewButton,
         colorblindMode,
         setColorblindMode,
     };

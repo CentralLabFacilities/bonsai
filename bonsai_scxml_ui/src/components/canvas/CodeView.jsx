@@ -12,7 +12,7 @@ import {
     editGeneratedCodeDraft,
 } from "./canvasCodeDraft.js";
 
-function CodeEditor({ code, activeMode, setActiveMode, onCodeChange }) {
+function CodeEditor({ code, activeMode, setActiveMode, showCodeViewButton = true, onCodeChange }) {
     const [copied, setCopied] = useState(false);
     const copyTimerRef = useRef(null);
     const copyAttemptRef = useRef(0);
@@ -38,7 +38,7 @@ function CodeEditor({ code, activeMode, setActiveMode, onCodeChange }) {
     return (
         <div className="inline-code-view">
             <div className="editor-canvas-toolbar code-view-toolbar">
-                <ModeSwitcher activeMode={activeMode} setActiveMode={setActiveMode} />
+                <ModeSwitcher activeMode={activeMode} setActiveMode={setActiveMode} showCodeViewButton={showCodeViewButton} />
                 <div className="code-view-actions">
                     <span>Generated SCXML / XML</span>
                     <button type="button" className="modal-copy-button" onClick={handleCopy}>

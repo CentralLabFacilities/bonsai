@@ -1,6 +1,7 @@
 const BEHAVIOR_DIRECTORIES_KEY = "bonsai.behaviorDirectories";
 const PANEL_PREFERENCES_KEY = "bonsai.panelLayout";
 const COLORBLIND_MODE_KEY = "bonsai.colorblindMode";
+const SHOW_CODE_VIEW_BUTTON_KEY = "bonsai.showCodeViewButton";
 const RUNTIME_CONFIGURATION_KEY = "bonsai.runtimeConfiguration";
 
 export const PANEL_DOCK_BREAKPOINT = 1100;
@@ -21,9 +22,13 @@ export const EDGE_VISIBILITY_KEYS = {
 // no known installation path yet; a saved CHALLENGE path overrides this blank.
 function defaultBehaviorDirectories() {
     return [
-        { key: "ROBOCUP", path: "~/robocup_ws/src/robocuptasks/robocuptasks-scxml/src/main/config/state_machines", isDefault: true },
-        { key: "EXERCISE", path: "~/robocup-exercise/src/exercise_pkgs/bonsai_exercises/bonsai_exercises-scxml/src/main/config/state_machines", isDefault: true },
-        { key: "CHALLENGE", path: "~/robocup-exercise/src/challenge_pkgs/bonsai_challenge/bonsai_challenge-scxml/src/main/config/state_machines", isDefault: true },
+        { key: "ROBOCUP", path: "/robocup_ws/robocup", isDefault: true },
+        {
+            key: "EXERCISE",
+            path: "~/robocup-exercise/src/exercise_pkgs/bonsai_exercises/bonsai_exercises-scxml/src/main/config/state_machines",
+            isDefault: true,
+        },
+        { key: "CHALLENGE", path: "", isDefault: true },
     ];
 }
 
@@ -55,13 +60,21 @@ export function loadBehaviorDirectories(storage) {
 }
 
 export function isAutoBehaviorDirectory(entry) {
-    return entry?.isDefault === true ||
-        defaultBehaviorDirectories().some(({ key }) => key === entry?.key);
+    return entry?.isDefault === true || ["ROBOCUP", "EXERCISE", "CHALLENGE"].includes(entry?.key);
 }
 
 export function loadEdgeVisibility(kind, storage) {
     try {
         return (storage ?? window.localStorage).getItem(EDGE_VISIBILITY_KEYS[kind]) !== "false";
+    } catch {
+        return true;
+    }
+}
+
+// Display preferences are editor settings, never part of SCXML documents.
+export function loadCodeViewButtonVisibility(storage) {
+    try {
+        return (storage ?? window.localStorage).getItem(SHOW_CODE_VIEW_BUTTON_KEY) !== "false";
     } catch {
         return true;
     }
@@ -97,6 +110,7 @@ export function saveEditorPreferences(preferences, storage) {
         [BEHAVIOR_DIRECTORIES_KEY, JSON.stringify(preferences.behaviorDirectories)],
         [EDGE_VISIBILITY_KEYS.transitions, String(preferences.showTransitionEdges)],
         [EDGE_VISIBILITY_KEYS.slots, String(preferences.showSlotEdges)],
+        [SHOW_CODE_VIEW_BUTTON_KEY, String(preferences.showCodeViewButton !== false)],
         [COLORBLIND_MODE_KEY, String(Boolean(preferences.colorblindMode))],
     ];
 

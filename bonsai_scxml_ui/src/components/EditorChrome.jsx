@@ -11,6 +11,9 @@ import {
     FiChevronDown,
     FiCheck,
     FiEye,
+    FiGitBranch,
+    FiShare2,
+    FiCode,
     FiAlertCircle,
 } from "react-icons/fi";
 import { isTauri } from "../tauri-client.js";
@@ -18,7 +21,14 @@ import { PANEL_LIMITS } from "../utils/editorPreferences.js";
 import { isDocumentGuardOpen } from "../hooks/interaction/useGlobalEditorShortcuts.js";
 import { Button, IconButton } from "./ui/index.js";
 
-function Header({ onOpenFile, onSaveFile, onSaveAsFile, hasFilePath, isSaving = false, isOpening = false, panels, colorblindMode = false, onToggleColorblindMode }) {
+function Header({
+    onOpenFile, onSaveFile, onSaveAsFile, hasFilePath,
+    isSaving = false, isOpening = false, panels,
+    showTransitionEdges = true, onToggleTransitionEdges,
+    showSlotEdges = true, onToggleSlotEdges,
+    showCodeViewButton = true, onToggleCodeViewButton,
+    colorblindMode = false, onToggleColorblindMode,
+}) {
     const IS_DESKTOP = isTauri();
 
     const [fileMenuOpen, setFileMenuOpen] = useState(false);
@@ -210,6 +220,33 @@ function Header({ onOpenFile, onSaveFile, onSaveAsFile, hasFilePath, isSaving = 
                     {optionsMenuOpen && (
                         <div id="editor-options-menu-items" className="editor-file-menu-dropdown editor-options-menu-dropdown"
                             role="menu" aria-label="Options">
+                            <button type="button" role="menuitemcheckbox" aria-checked={showTransitionEdges}
+                                className="editor-options-menu-toggle"
+                                onClick={() => onToggleTransitionEdges?.()}>
+                                <FiGitBranch aria-hidden="true" />
+                                <span>Show transitions</span>
+                                <span className="editor-options-menu-check" aria-hidden="true">
+                                    {showTransitionEdges && <FiCheck />}
+                                </span>
+                            </button>
+                            <button type="button" role="menuitemcheckbox" aria-checked={showSlotEdges}
+                                className="editor-options-menu-toggle"
+                                onClick={() => onToggleSlotEdges?.()}>
+                                <FiShare2 aria-hidden="true" />
+                                <span>Show slot edges</span>
+                                <span className="editor-options-menu-check" aria-hidden="true">
+                                    {showSlotEdges && <FiCheck />}
+                                </span>
+                            </button>
+                            <button type="button" role="menuitemcheckbox" aria-checked={showCodeViewButton}
+                                className="editor-options-menu-toggle"
+                                onClick={() => onToggleCodeViewButton?.()}>
+                                <FiCode aria-hidden="true" />
+                                <span>Show Code View button</span>
+                                <span className="editor-options-menu-check" aria-hidden="true">
+                                    {showCodeViewButton && <FiCheck />}
+                                </span>
+                            </button>
                             <button type="button" role="menuitemcheckbox" aria-checked={colorblindMode}
                                 className="editor-options-menu-toggle"
                                 onClick={() => onToggleColorblindMode?.()}>

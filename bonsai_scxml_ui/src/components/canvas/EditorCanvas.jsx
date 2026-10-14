@@ -1,9 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef } from "react";
-import {
-    FiEye,
-    FiEyeOff,
-    FiTrash2,
-} from "react-icons/fi";
+import { FiTrash2 } from "react-icons/fi";
 import {
     Background,
     ConnectionMode,
@@ -96,9 +92,8 @@ export default function EditorCanvas({
     activeMode,
     setActiveMode,
     showTransitionEdges,
-    setShowTransitionEdges,
     showSlotEdges,
-    setShowSlotEdges,
+    showCodeViewButton = true,
     colorblindMode = false,
     nodes,
     edges,
@@ -447,6 +442,7 @@ export default function EditorCanvas({
                 manualSlots={manualSlots}
                 activeMode={activeMode}
                 setActiveMode={setActiveMode}
+                showCodeViewButton={showCodeViewButton}
             />
         );
     }
@@ -454,42 +450,8 @@ export default function EditorCanvas({
     return (
         <>
             <div className="editor-canvas-toolbar">
-                <ModeSwitcher activeMode={activeMode} setActiveMode={setActiveMode} />
-
-                <div className="editor-canvas-toolbar-actions">
-                    <div className="edge-visibility-toggle-group">
-                        <button
-                            type="button"
-                            className={`edge-visibility-toggle ${showTransitionEdges ? "active" : ""}`}
-                            aria-pressed={showTransitionEdges}
-                            title={
-                                showTransitionEdges
-                                    ? "Hide transitions except for hovered/selected nodes"
-                                    : "Show all transitions"
-                            }
-                            onClick={() => setShowTransitionEdges((value) => !value)}
-                        >
-                            {showTransitionEdges ? <FiEye /> : <FiEyeOff />}
-                            <span>Transitions</span>
-                        </button>
-
-                        <button
-                            type="button"
-                            className={`edge-visibility-toggle ${showSlotEdges ? "active" : ""}`}
-                            aria-pressed={showSlotEdges}
-                            title={
-                                showSlotEdges
-                                    ? "Hide slot edges except for hovered/selected skills or slots"
-                                    : "Show all slot edges"
-                            }
-                            onClick={() => setShowSlotEdges((value) => !value)}
-                        >
-                            {showSlotEdges ? <FiEye /> : <FiEyeOff />}
-                            <span>Slot edges</span>
-                        </button>
-                    </div>
-
-                </div>
+                <ModeSwitcher activeMode={activeMode} setActiveMode={setActiveMode}
+                    showCodeViewButton={showCodeViewButton} />
             </div>
 
             <RuntimeLogPlayer

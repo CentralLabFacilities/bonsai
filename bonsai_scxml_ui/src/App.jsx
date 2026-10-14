@@ -96,6 +96,8 @@ function AppContent() {
         setShowTransitionEdges,
         showSlotEdges,
         setShowSlotEdges,
+        showCodeViewButton,
+        setShowCodeViewButton,
         colorblindMode,
         setColorblindMode,
     } = useEditorPreferences();
@@ -1239,6 +1241,16 @@ function AppContent() {
                 isSaving={isWorkflowSaving}
                 isOpening={isWorkflowOpening}
                 panels={panels}
+                showTransitionEdges={showTransitionEdges}
+                onToggleTransitionEdges={() => setShowTransitionEdges((value) => !value)}
+                showSlotEdges={showSlotEdges}
+                onToggleSlotEdges={() => setShowSlotEdges((value) => !value)}
+                showCodeViewButton={showCodeViewButton}
+                onToggleCodeViewButton={() => {
+                    // Do not leave Code View active with its entry button hidden.
+                    if (showCodeViewButton && activeMode === "code") setActiveMode("overview");
+                    setShowCodeViewButton((value) => !value);
+                }}
                 colorblindMode={colorblindMode}
                 onToggleColorblindMode={() => setColorblindMode((value) => !value)}
             />
@@ -1361,9 +1373,8 @@ function AppContent() {
                             activeMode={activeMode}
                             setActiveMode={setActiveMode}
                             showTransitionEdges={showTransitionEdges}
-                            setShowTransitionEdges={setShowTransitionEdges}
                             showSlotEdges={showSlotEdges}
-                            setShowSlotEdges={setShowSlotEdges}
+                            showCodeViewButton={showCodeViewButton}
                             colorblindMode={colorblindMode}
                             nodes={nodes}
                             edges={edges}

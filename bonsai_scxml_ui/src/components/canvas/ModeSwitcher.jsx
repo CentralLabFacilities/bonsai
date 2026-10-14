@@ -7,10 +7,10 @@ const MODES = [
     ["code", "Code View"],
 ];
 
-export default function ModeSwitcher({ activeMode, setActiveMode }) {
+export default function ModeSwitcher({ activeMode, setActiveMode, showCodeViewButton = true }) {
     return (
         <SegmentedControl className="mode-button-group-floating" aria-label="Editor mode">
-            {MODES.map(([mode, label]) => (
+            {MODES.filter(([mode]) => mode !== "code" || showCodeViewButton).map(([mode, label]) => (
                 <SegmentedButton
                     key={mode}
                     className="mode-button"
