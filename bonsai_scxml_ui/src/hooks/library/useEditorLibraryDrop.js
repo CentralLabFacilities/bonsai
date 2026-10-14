@@ -18,6 +18,46 @@ import {
 import { getOverviewLayoutNodeSize } from "../../utils/layoutUtils";
 import { getSlotPathFromNode, isKnownSlotType, normalizeSlotPath, normalizeSlotType } from "../../utils/editorGraph";
 import { isEditorModalOpen } from "../interaction/useGlobalEditorShortcuts.js";
+import { isEditorCloneNode } from "../../utils/editorClones";
+
+// Set the initial state as part of the same node insertion. Waiting for the
+// native workflow to infer an initial state can leave the editor's first skill
+// unmarked, particularly when the asynchronous library load completes before
+// the native insertion/initial-state patch is projected back into React.
+const SEMANTIC_STATE_TYPES = new Set(["custom", "submachine", "compound", "parallel"]);
+
+const appendLibraryNode = (currentNodes, newNode) => {
+    const parentId = newNode.parentId || null;
+    const hasSiblingState = currentNodes.some((node) =>
+        (node.parentId || null) === parentId &&
+        SEMANTIC_STATE_TYPES.has(node.type) &&
+        !isEditorCloneNode(node)
+    );
+
+    // Never take the initial flag away from an existing sibling. In particular,
+    // dropping a second skill into the root or a Compound must not change it.
+    if (hasSiblingState) return [...currentNodes, newNode];
+
+    const initialNode = {
+        ...newNode,
+        data: { ...newNode.data, isInitial: true },
+    };
+    if (!parentId) return [...currentNodes, initialNode];
+
+    // A Compound (including the automatic wrapper in a Parallel lane) also
+    // keeps an explicit initialChildId, which must agree with the child flag.
+    return [
+        ...currentNodes.map((node) =>
+            node.id === parentId && ["compound", "parallelLane"].includes(node.type)
+                ? {
+                    ...node,
+                    data: { ...node.data, initialChildId: initialNode.id },
+                }
+                : node
+        ),
+        initialNode,
+    ];
+};
 
 export function useEditorLibraryDrop({
     activeMode,
@@ -300,8 +340,8 @@ export function useEditorLibraryDrop({
                     const bottom =
                         COMPOUND_HEADER_HEIGHT + estimatedNodeHeight;
 
-                    return orderNodesParentsFirst([
-                        ...currentNodes.map((candidate) =>
+                    return orderNodesParentsFirst(appendLibraryNode(
+                        currentNodes.map((candidate) =>
                             candidate.id === insertionCompound.id
                                 ? {
                                     ...candidate,
@@ -323,8 +363,8 @@ export function useEditorLibraryDrop({
                                 }
                                 : candidate
                         ),
-                        newNode,
-                    ]);
+                        newNode
+                    ));
                 });
 
                 setSelectedNodeId(newNode.id);
@@ -357,7 +397,7 @@ export function useEditorLibraryDrop({
                 const parallelId = targetLane.parentId;
 
                 setNodes((currentNodes) => {
-                    let nextNodes = [...currentNodes, newNode];
+                    let nextNodes = appendLibraryNode(currentNodes, newNode);
 
                     const parallel = nextNodes.find(
                         (node) => node.id === parallelId
@@ -492,7 +532,7 @@ export function useEditorLibraryDrop({
 
             setNodes((currentNodes) =>
                 resolveNodeCollisionsAndRefit(
-                    [...currentNodes, newNode],
+                    appendLibraryNode(currentNodes, newNode),
                     newNode.id
                 )
             );
