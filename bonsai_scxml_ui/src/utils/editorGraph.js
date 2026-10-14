@@ -143,10 +143,10 @@ export const TRANSITION_HIGHLIGHT_COLORS = {
 // Okabe-Ito-inspired colors chosen to separate transition types without
 // relying on red/green perception. Labels and edge styles remain meaningful.
 export const COLORBLIND_TRANSITION_COLORS = {
-    success: "#56b4e9",
+    success: "#009e73",
     error: "#e69f00",
     fatal: "#cc79a7",
-    other: "#009e73",
+    other: "#56b4e9",
 };
 
 // Slot connections intentionally use a separate palette from transitions.

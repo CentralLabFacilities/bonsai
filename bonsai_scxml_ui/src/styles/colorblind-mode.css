@@ -4,13 +4,13 @@
  * distinct stroke/border pattern. This is display-only: SCXML is unchanged.
  */
 :root[data-colorblind-mode] {
-    --editor-transition-success: #56b4e9; /* blue */
+    --editor-transition-success: #009e73; /* green */
     --editor-transition-error: #e69f00;   /* amber */
     --editor-transition-fatal: #cc79a7;   /* magenta */
-    --editor-transition-other: #009e73;   /* teal */
+    --editor-transition-other: #56b4e9;   /* blue */
     --editor-slot-read: #8ab4f8;
     --editor-slot-write: #f0e442;
-    --ui-success: #56b4e9;
+    --ui-success: #009e73;
     --ui-warning: #f0e442;
     --ui-danger: #cc79a7;
     --ui-danger-text: #f2b7d5;
@@ -30,10 +30,22 @@
 }
 :root[data-colorblind-mode] .exit-token-success .detail-card-title,
 :root[data-colorblind-mode] .exit-token-badge-success {
-    color: #a8dfff;
+    color: #8be0bc;
 }
 :root[data-colorblind-mode] .exit-token-badge-success {
     border-color: var(--editor-transition-success);
+    background: rgba(0, 158, 115, 0.13);
+}
+:root[data-colorblind-mode] .exit-token-other {
+    border-left-color: var(--editor-transition-other);
+    border-left-style: solid;
+}
+:root[data-colorblind-mode] .exit-token-other .detail-card-title,
+:root[data-colorblind-mode] .exit-token-badge-other {
+    color: #a8dfff;
+}
+:root[data-colorblind-mode] .exit-token-badge-other {
+    border-color: var(--editor-transition-other);
     background: rgba(86, 180, 233, 0.13);
 }
 :root[data-colorblind-mode] .exit-token-error {
@@ -71,7 +83,8 @@
 :root[data-colorblind-mode] .slot-access-write {
     color: #f0e442;
     border-color: var(--editor-slot-write);
-    border-style: dashed;
+    /* Keep yellow accents solid, just like the slot rail and port markers. */
+    border-style: solid;
     background: rgba(240, 228, 66, 0.12);
 }
 :root[data-colorblind-mode] .compact-slot-read {
@@ -80,15 +93,8 @@
 }
 :root[data-colorblind-mode] .compact-slot-write {
     border-left-color: var(--editor-slot-write);
+    border-left-style: solid;
     background: rgba(240, 228, 66, 0.06);
-}
-:root[data-colorblind-mode] .skill-slot-handle.slot-skill-read-handle,
-:root[data-colorblind-mode] .slot-node-handle.slot-node-read-handle {
-    --connection-handle-color: var(--editor-slot-read);
-}
-:root[data-colorblind-mode] .skill-slot-handle.slot-skill-write-handle,
-:root[data-colorblind-mode] .slot-node-handle.slot-node-write-handle {
-    --connection-handle-color: var(--editor-slot-write);
 }
 :root[data-colorblind-mode] .skill-slot-border-segment-read,
 :root[data-colorblind-mode] .skill-slot-access-read .skill-slot-access-dot {
@@ -200,16 +206,33 @@
     box-shadow: none;
 }
 
-/* Explicitly override the highly specific skill dock rules from App.css. */
-:root[data-colorblind-mode] .react-flow__handle.connection-handle.slot-skill-read-handle,
-:root[data-colorblind-mode] .react-flow__handle.connection-handle.slot-node-read-handle {
-    --connection-handle-color: var(--editor-slot-read);
-    --connection-handle-outline: #eaf2ff;
+/*
+ * App.css uses very specific selectors for skill-dock handles (including
+ * :is(...).has-slot-dock:not(...)), which override a normal theme selector.
+ * Give the semantic custom properties precedence only while this mode is on.
+ * All four endpoints then use the same palette, including when a drag is active.
+ */
+:root[data-colorblind-mode] .react-flow__handle.connection-handle:is(.slot-skill-read-handle, .slot-node-read-handle) {
+    --connection-handle-color: var(--editor-slot-read) !important;
+    --connection-handle-outline: #eaf2ff !important;
 }
-:root[data-colorblind-mode] .react-flow__handle.connection-handle.slot-skill-write-handle,
-:root[data-colorblind-mode] .react-flow__handle.connection-handle.slot-node-write-handle {
-    --connection-handle-color: var(--editor-slot-write);
-    --connection-handle-outline: #fff8c0;
+:root[data-colorblind-mode] .react-flow__handle.connection-handle:is(.slot-skill-write-handle, .slot-node-write-handle) {
+    --connection-handle-color: var(--editor-slot-write) !important;
+    /* Dark outline is visible against the skill's light background. */
+    --connection-handle-outline: #243041 !important;
+}
+/* Replace the original purple/pink drag rings with matching theme colors. */
+:root[data-colorblind-mode] .react-flow__handle.connection-handle:is(.slot-skill-read-handle, .slot-node-read-handle).slot-handle-compatible {
+    box-shadow: 0 0 0 3px rgba(138, 180, 248, 0.36) !important;
+}
+:root[data-colorblind-mode] .react-flow__handle.connection-handle:is(.slot-skill-write-handle, .slot-node-write-handle).slot-handle-compatible {
+    box-shadow: 0 0 0 3px rgba(240, 228, 66, 0.36) !important;
+}
+:root[data-colorblind-mode] .react-flow__handle.connection-handle:is(.slot-skill-read-handle, .slot-node-read-handle).slot-handle-active {
+    box-shadow: 0 0 0 4px rgba(138, 180, 248, 0.48) !important;
+}
+:root[data-colorblind-mode] .react-flow__handle.connection-handle:is(.slot-skill-write-handle, .slot-node-write-handle).slot-handle-active {
+    box-shadow: 0 0 0 4px rgba(240, 228, 66, 0.48) !important;
 }
 /* Read ports are circles; write ports are diamonds, on both skills and slots. */
 :root[data-colorblind-mode] .react-flow__handle.connection-handle:is(.slot-skill-write-handle, .slot-node-write-handle)::before,
@@ -229,22 +252,21 @@
 :root[data-colorblind-mode] .react-flow__handle.connection-handle:is(.slot-skill-write-handle, .slot-node-write-handle).slot-handle-active::before {
     filter: drop-shadow(0 0 4px var(--editor-slot-write));
 }
-/* A solid read rail and a broken write rail remain distinguishable at a glance. */
+/* Use solid accent rails for both directions. Port shape (circle/diamond),
+ * labels, and edge dash patterns provide the non-color distinction. */
 :root[data-colorblind-mode] .skill-slot-border-segment-read {
     background: var(--editor-slot-read) !important;
 }
 :root[data-colorblind-mode] .skill-slot-border-segment-write {
-    background: repeating-linear-gradient(90deg,
-        var(--editor-slot-write) 0 7px,
-        transparent 7px 11px) !important;
+    background: var(--editor-slot-write) !important;
 }
 
-/* Validation severity is identifiable by icon and an additional border style. */
+/* Warning accents stay solid; severity remains identifiable by icon and color. */
 :root[data-colorblind-mode] .problem-item-error {
     border-left: 4px solid var(--ui-state-invalid);
 }
 :root[data-colorblind-mode] .problem-item-warning {
-    border-left: 4px dashed var(--ui-state-warning);
+    border-left: 4px solid var(--ui-state-warning);
 }
 :root[data-colorblind-mode] .problem-severity-error {
     color: #f2b7d5;
@@ -255,7 +277,7 @@
 }
 :root[data-colorblind-mode] .transition-order-card:has(.transition-scope-warning) {
     border-left-color: var(--ui-state-warning);
-    border-left-style: dashed;
+    border-left-style: solid;
 }
 :root[data-colorblind-mode] .runtime-commander-status-pill.running .runtime-commander-status-dot {
     background: var(--editor-transition-success);
@@ -267,5 +289,5 @@
     border-left: 4px solid var(--ui-state-invalid);
 }
 :root[data-colorblind-mode] .runtime-commander-diagnostic.warning {
-    border-left: 4px dashed var(--ui-state-warning);
+    border-left: 4px solid var(--ui-state-warning);
 }
