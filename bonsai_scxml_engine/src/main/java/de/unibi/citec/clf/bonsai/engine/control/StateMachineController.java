@@ -185,6 +185,12 @@ public class StateMachineController extends TimerTask implements SkillExceptionH
         }
     }
 
+    public Map<String, Map<String, String>> getDatamodelSnapshot() {
+        if (skillStateMachine == null)
+            return Collections.emptyMap();
+        return skillStateMachine.getDatamodelSnapshot();
+    }
+
     public void fireEvent(String string) {
         if (skillStateMachine != null) {
             skillStateMachine.fireEvent(string);
