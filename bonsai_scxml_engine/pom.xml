@@ -27,6 +27,11 @@
     </properties>
 
     <dependencies>
+        <dependency>
+            <groupId>de.unibi.citec.clf</groupId>
+            <artifactId>bonsai_monitoring</artifactId>
+            <version>0.9-SNAPSHOT</version>
+        </dependency>
 
         <dependency>
             <groupId>de.unibi.citec.clf</groupId>
