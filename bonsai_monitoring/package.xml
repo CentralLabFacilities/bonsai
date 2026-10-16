@@ -1,0 +1,12 @@
+<package format="2">
+  <name>bonsai_monitoring</name>
+  <version>0.7.0</version>
+  <description>Engine-independent runtime monitoring, JSONL recording and observable memory slots for BonSAI.</description>
+  <maintainer email="dholzmann@techfak.uni-bielefeld.de">Dennis Holzmann</maintainer>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>rosjava_build_tools</build_depend>
+  <build_depend>java</build_depend>
+  <build_depend>bonsai_core</build_depend>
+  <exec_depend>bonsai_core</exec_depend>
+</package>
