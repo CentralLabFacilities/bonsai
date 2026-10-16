@@ -3,7 +3,9 @@
        initial="dialog.Talk">
     <datamodel>
         <data id="#_SLOTS">
-            <slot key="Language" state="*" xpath="/null"/>
+            <slots>
+                <slot key="Language" state="*" xpath="/null"/>
+            </slots>
         </data>
         <data id="#_STATE_PREFIX" expr="'de.unibi.citec.clf.bonsai.skills.'" />
         <!-- Utterance to speak -->
