@@ -1,17 +1,33 @@
 package de.unibi.citec.clf.bonsai.engine;
 
+import de.unibi.citec.clf.bonsai.monitoring.events.BonsaiEventBus;
+import de.unibi.citec.clf.bonsai.monitoring.events.RuntimeEventRecorder;
+import de.unibi.citec.clf.bonsai.engine.events.ScxmlEvents;
 import de.unibi.citec.clf.bonsai.engine.communication.SCXMLServer;
 import de.unibi.citec.clf.bonsai.engine.control.StateMachineController;
+import de.unibi.citec.clf.bonsai.util.ExecutionRollingFileAppender;
 import org.apache.log4j.BasicConfigurator;
+import org.apache.log4j.FileAppender;
 import org.apache.log4j.Logger;
 import org.apache.log4j.PropertyConfigurator;
+import org.apache.log4j.helpers.OptionConverter;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 import org.kohsuke.args4j.spi.MapOptionHandler;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.net.URL;
+import java.nio.file.Path;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Properties;
 import java.util.prefs.Preferences;
 
 /**
@@ -62,6 +78,88 @@ public abstract class SCXMLStarter {
     SkillStateMachine skillStateMachine;
 
     CmdLineParser parser;
+
+    /**
+     * Starts recording to a new JSONL file alongside the configured Log4j file.
+     * The Log4j appender is the source of truth for the directory, so -l and
+     * custom logging properties automatically affect both kinds of logs.
+     */
+    private void startEventRecording() {
+        FileAppender fileAppender = configuredLogFileAppender();
+        if (fileAppender == null || fileAppender.getFile() == null) {
+            System.err.println("Bonsai event recording disabled: no active Log4j file appender. "
+                    + "Check the logging configuration selected with -l.");
+            return;
+        }
+
+        Path logPath = Path.of(fileAppender.getFile()).toAbsolutePath();
+        String logName = logPath.getFileName().toString();
+        int extension = logName.lastIndexOf('.');
+        String prefix = extension > 0 ? logName.substring(0, extension) : logName;
+        String stamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss-SSS"));
+        Path eventPath = logPath.resolveSibling(prefix + "-events-" + stamp
+                + "-" + ProcessHandle.current().pid() + ".jsonl");
+
+        RuntimeEventRecorder recorder = new RuntimeEventRecorder();
+        try {
+            recorder.start(eventPath);
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                try {
+                    recorder.stop();
+                } catch (IOException e) {
+                    LOG.error("Failed to finish Bonsai event recording", e);
+                }
+            }, "bonsai-event-recording-shutdown"));
+            LOG.info("Recording Bonsai runtime events to " + eventPath);
+            System.err.println("Bonsai event recording: " + eventPath);
+        } catch (IOException | RuntimeException e) {
+            LOG.error("Unable to start Bonsai runtime event recording at " + eventPath, e);
+            System.err.println("Bonsai event recording failed at " + eventPath + ": " + e);
+            try {
+                recorder.stop();
+            } catch (IOException stopError) {
+                LOG.warn("Unable to close Bonsai runtime event recorder", stopError);
+            }
+        }
+    }
+
+    /** Find the rolling log file if present, otherwise any configured root file appender. */
+    private static FileAppender configuredLogFileAppender() {
+        FileAppender fallback = null;
+        for (Enumeration<?> appenders = Logger.getRootLogger().getAllAppenders();
+             appenders.hasMoreElements(); ) {
+            Object appender = appenders.nextElement();
+            if (appender instanceof ExecutionRollingFileAppender rolling && rolling.getFile() != null) {
+                return rolling;
+            }
+            if (appender instanceof FileAppender file && file.getFile() != null && fallback == null) {
+                fallback = file;
+            }
+        }
+        return fallback;
+    }
+
+    /**
+     * Log4j's file appender does not create missing parent directories.
+     * Prepare them using the same file properties that Log4j will read.
+     */
+    private static void createLogDirectories(Properties properties) throws IOException {
+        for (String key : properties.stringPropertyNames()) {
+            if (!key.startsWith("log4j.appender.")
+                    || !key.toLowerCase(Locale.ROOT).endsWith(".file")) {
+                continue;
+            }
+            String configuredPath = properties.getProperty(key).trim();
+            if (configuredPath.isEmpty()) {
+                continue;
+            }
+            String resolvedPath = OptionConverter.substVars(configuredPath, properties);
+            Path directory = Path.of(resolvedPath).toAbsolutePath().getParent();
+            if (directory != null) {
+                Files.createDirectories(directory);
+            }
+        }
+    }
 
     protected SCXMLStarter() {
     }
@@ -116,12 +214,33 @@ public abstract class SCXMLStarter {
             LOG.error("Did not find logging properties file.");
         } else {
             try {
-                PropertyConfigurator.configure(pathToLoggingProperties);
+                // The bundled resource also works when the application runs from a JAR.
+                URL defaultResource = getClass().getResource("/skillsLogging.properties");
+                boolean useBundledResource = defaultResource != null
+                        && pathToLoggingProperties.equals(defaultResource.getPath());
+
+                Properties properties = new Properties();
+                try (InputStream input = useBundledResource
+                        ? defaultResource.openStream()
+                        : Files.newInputStream(Path.of(pathToLoggingProperties))) {
+                    properties.load(input);
+                }
+                createLogDirectories(properties);
+
+                if (useBundledResource) {
+                    PropertyConfigurator.configure(defaultResource);
+                } else {
+                    PropertyConfigurator.configure(pathToLoggingProperties);
+                }
+                LOG.debug("Found logging properties file. - " + pathToLoggingProperties);
             } catch (Exception e) {
+                System.err.println("Unable to configure Bonsai logging from "
+                        + pathToLoggingProperties + ": " + e);
                 BasicConfigurator.configure();
             }
-            LOG.debug("Found logging properties file. - " + pathToLoggingProperties);
         }
+
+        startEventRecording();
 
         prefs = Preferences.userRoot().node("StateMachineViewer");
         if (pathToConfig == null) {
@@ -154,6 +273,7 @@ public abstract class SCXMLStarter {
             stateMachineController.initialize(autoStartDelay, pathToLoggingProperties);
         }
 
+        BonsaiEventBus.publish(ScxmlEvents.status(skillStateMachine.getStatemachineStatus().name()));
     }
 
     public abstract SCXMLServer createServer();
