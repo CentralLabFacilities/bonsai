@@ -53,6 +53,13 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
 
     private List<SCXMLServer> scxmlServers = new ArrayList<>();
 
+    /** Current SCXML variables grouped by scope; skill parameters are reported separately. */
+    public Map<String, Map<String, String>> getDatamodelSnapshot() {
+        SCXMLRuntimeMonitor monitor = runtimeMonitor;
+        return monitor == null ? Collections.emptyMap() : monitor.getDatamodelSnapshot();
+    }
+
+
     private boolean triggerEvents = true;
     private SkillStateMachineConfig config = new SkillStateMachineConfig();
 
