@@ -1,5 +1,6 @@
 package de.unibi.citec.clf.bonsai.engine;
 
+import de.unibi.citec.clf.bonsai.engine.communication.RuntimeChanges;
 import de.unibi.citec.clf.bonsai.engine.communication.SCXMLServer;
 import de.unibi.citec.clf.bonsai.engine.control.StateMachineController;
 import org.apache.log4j.BasicConfigurator;
@@ -154,6 +155,7 @@ public abstract class SCXMLStarter {
             stateMachineController.initialize(autoStartDelay, pathToLoggingProperties);
         }
 
+        skillStateMachine.publishRuntimeChange(RuntimeChanges.status(skillStateMachine.getStatemachineStatus().name()));
     }
 
     public abstract SCXMLServer createServer();
