@@ -11,7 +11,6 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.runBlocking
-import org.apache.log4j.Logger
 
 
 /**
@@ -56,6 +55,13 @@ open class WebController(val host: String, val port: Int) : SCXMLRemote {
         return response.transitions as MutableList<String>
     }
 
+    override fun getAllAttributes(): MutableMap<String, MutableMap<String, String>> {
+        val values: Map<String, Map<String, String>> = runBlocking {
+            client.get("$bonsai/attributes").body()
+        }
+        return values.mapValues { (_, attrs) -> attrs.toMutableMap() }.toMutableMap()
+    }
+
     override fun load(
         pathToConfig: String,
         pathToTask: String,
@@ -83,7 +89,14 @@ open class WebController(val host: String, val port: Int) : SCXMLRemote {
     }
 
     override fun setParams(map: MutableMap<String, String>?): Boolean {
-        return false
+        if (map == null) return false
+        val response = runBlocking {
+            client.post("$bonsai/params") {
+                contentType(ContentType.Application.Json)
+                setBody(map)
+            }
+        }
+        return response.status.value in 200..299
     }
 
     override fun start(): Boolean {
@@ -124,7 +137,4 @@ open class WebController(val host: String, val port: Int) : SCXMLRemote {
     override fun exit() {
     }
 
-    companion object {
-        private val logger: Logger? = Logger.getLogger(WebController::class.java)
-    }
 }
