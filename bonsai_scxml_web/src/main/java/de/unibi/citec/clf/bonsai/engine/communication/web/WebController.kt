@@ -83,7 +83,14 @@ open class WebController(val host: String, val port: Int) : SCXMLRemote {
     }
 
     override fun setParams(map: MutableMap<String, String>?): Boolean {
-        return false
+        if (map == null) return false
+        val response = runBlocking {
+            client.post("$bonsai/params") {
+                contentType(ContentType.Application.Json)
+                setBody(map)
+            }
+        }
+        return response.status.value in 200..299
     }
 
     override fun start(): Boolean {

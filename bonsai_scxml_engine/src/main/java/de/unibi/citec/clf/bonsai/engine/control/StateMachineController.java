@@ -61,6 +61,13 @@ public class StateMachineController extends TimerTask implements SkillExceptionH
     /**
      * Initialize controller, setup GUI, add listener, etc.
      */
+    public void addRuntimeListener(java.util.function.Consumer<de.unibi.citec.clf.bonsai.engine.communication.RuntimeChanges.RuntimeChange> listener) {
+        if (skillStateMachine != null) skillStateMachine.addRuntimeListener(listener);
+    }
+    public void removeRuntimeListener(java.util.function.Consumer<de.unibi.citec.clf.bonsai.engine.communication.RuntimeChanges.RuntimeChange> listener) {
+        if (skillStateMachine != null) skillStateMachine.removeRuntimeListener(listener);
+    }
+
     public void initialize() {
         initialize(-1, "");
     }
@@ -185,6 +192,14 @@ public class StateMachineController extends TimerTask implements SkillExceptionH
         }
     }
 
+    public Map<String, Map<String, String>> getAllAttributes() { return getDatamodelSnapshot(); }
+
+    public Map<String, Map<String, String>> getDatamodelSnapshot() {
+        if (skillStateMachine == null)
+            return Collections.emptyMap();
+        return skillStateMachine.getDatamodelSnapshot();
+    }
+
     public void fireEvent(String string) {
         if (skillStateMachine != null) {
             skillStateMachine.fireEvent(string);
@@ -203,7 +218,9 @@ public class StateMachineController extends TimerTask implements SkillExceptionH
     }
 
     public StatemachineStatus getStatus(){
-        return skillStateMachine.getStatemachineStatus();
+        return skillStateMachine == null
+                ? StatemachineStatus.UNKNOWN
+                : skillStateMachine.getStatemachineStatus();
     }
 
 
@@ -234,6 +251,7 @@ public class StateMachineController extends TimerTask implements SkillExceptionH
     }
 
     public List<String> getCurrentStateList(boolean all) {
+        if (skillStateMachine == null) return Collections.emptyList();
         List<String> l = skillStateMachine.getActiveStates(all);
         logger.trace("active:" + l);
         return l;

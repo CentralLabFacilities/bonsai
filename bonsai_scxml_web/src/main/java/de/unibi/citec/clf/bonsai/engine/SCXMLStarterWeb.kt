@@ -16,7 +16,10 @@ import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.ktor.server.websocket.WebSockets
 import io.ktor.server.util.*
+import io.ktor.server.websocket.pingPeriod
+import io.ktor.server.websocket.timeout
 import kotlinx.html.a
 import kotlinx.html.body
 import kotlinx.html.br
@@ -31,6 +34,7 @@ import org.reflections.Reflections
 import java.io.File
 import kotlin.io.encoding.Base64
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
 
 /**
@@ -58,6 +62,10 @@ class SCXMLStarterWeb : SCXMLStarter() {
         val server = embeddedServer(Netty, port, host) {
             install(ContentNegotiation) {
                 json()
+            }
+            install(WebSockets) {
+                pingPeriod = 15.seconds
+                timeout = 15.seconds
             }
             routing {
                 serverRoutes(srv!!)
@@ -146,14 +154,14 @@ class SCXMLStarterWeb : SCXMLStarter() {
                                 <Option key="NODE_INIT_TIMEOUT">1</Option>
                                 <Option key="INIT_SLEEP_TIME">1</Option>
                             </FactoryOptions>
-                            <FactoryOptions factoryClass="de.unibi.citec.clf.bonsai.memory.MemoryFactory" />
+                            <FactoryOptions factoryClass="de.unibi.citec.clf.bonsai.engine.communication.web.memory.WebMemoryFactory" />
 
                             <CoordinateTransformer factoryClass="de.unibi.citec.clf.bonsai.ros.RosFactory"
                                                    coordinateTransformerClass="de.unibi.citec.clf.bonsai.ros.TFTransformer"
                             />
 
                             <WorkingMemory key="WorkingMemory"
-                                           factoryClass="de.unibi.citec.clf.bonsai.memory.MemoryFactory"
+                                           factoryClass="de.unibi.citec.clf.bonsai.engine.communication.web.memory.WebMemoryFactory"
                                            workingMemoryClass="de.unibi.citec.clf.bonsai.memory.DefaultMemory">
                             </WorkingMemory>
                           
@@ -186,7 +194,9 @@ class SCXMLStarterWeb : SCXMLStarter() {
                 }
             }
         }
-        server.start(wait = true)
+        // The starter must return from createServer() to finish initialization
+        // and schedule optional automatic loading/execution of a task.
+        server.start(wait = false)
 
         logger.info("Web server started")
 
@@ -215,7 +225,7 @@ class SCXMLStarterWeb : SCXMLStarter() {
         logger.debug("getSkill $id")
         val mid = if (id.startsWith(SKILL_PREFIX)) id else "${SKILL_PREFIX}.${id}"
         logger.debug("Getting real skill $mid")
-        val cls = allClassMap[mid] ?: run {
+        if (mid !in allClassMap) {
             logger.error("Skill $mid does not exist")
             logger.error("known skills: ${allClassMap.keys}")
             return null
