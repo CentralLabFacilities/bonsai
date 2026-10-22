@@ -30,6 +30,12 @@
     <dependencies>
 
         <dependency>
+            <groupId>de.unibi.citec.clf</groupId>
+            <artifactId>bonsai_core</artifactId>
+            <version>0.9-SNAPSHOT</version>
+        </dependency>
+
+        <dependency>
             <groupId>org.jetbrains.kotlin</groupId>
             <artifactId>kotlin-stdlib-jdk8</artifactId>
             <version>${kotlin.version}</version>
