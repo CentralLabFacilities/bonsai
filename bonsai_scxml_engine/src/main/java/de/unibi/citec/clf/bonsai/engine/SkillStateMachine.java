@@ -13,12 +13,17 @@ import de.unibi.citec.clf.bonsai.engine.model.ExitToken;
 import de.unibi.citec.clf.bonsai.engine.model.StateID;
 import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException;
 import de.unibi.citec.clf.bonsai.engine.communication.SCXMLServer;
-import de.unibi.citec.clf.bonsai.engine.communication.StateChangePublisher;
+import de.unibi.citec.clf.bonsai.engine.communication.SCXMLEventFactory;
+import de.unibi.citec.clf.bonsai.engine.communication.SCXMLEventPublisher;
 import de.unibi.citec.clf.bonsai.engine.communication.StatemachineStatus;
 import de.unibi.citec.clf.bonsai.engine.config.SkillStateMachineConfig;
 import de.unibi.citec.clf.bonsai.engine.scxml.BonsaiActionProvider;
 import de.unibi.citec.clf.bonsai.engine.scxml.BonsaiTransition;
 import de.unibi.citec.clf.bonsai.engine.scxml.SCXMLSkillRunner;
+import de.unibi.citec.clf.bonsai.engine.scxml.monitoring.AssignInstrumenter;
+import de.unibi.citec.clf.bonsai.engine.scxml.monitoring.ObservableEventDispatcher;
+import de.unibi.citec.clf.bonsai.engine.scxml.monitoring.ObservableSCXMLExecutor;
+import de.unibi.citec.clf.bonsai.engine.scxml.monitoring.SCXMLRuntimeMonitor;
 import de.unibi.citec.clf.bonsai.engine.scxml.SkillExceptionHandler;
 import de.unibi.citec.clf.bonsai.engine.scxml.config.StateMachineConfigurator;
 import de.unibi.citec.clf.bonsai.engine.scxml.config.StateMachineConfiguratorResults;
@@ -47,10 +52,6 @@ import java.util.stream.Collectors;
 
 public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
 
-    private final ScheduledExecutorService aliveScheduler = Executors
-            .newScheduledThreadPool(1);
-    private ScheduledFuture<?> aliveHandle;
-
     private List<SCXMLServer> scxmlServers = new ArrayList<>();
 
     private boolean triggerEvents = true;
@@ -60,6 +61,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     public void setParams(Map<String, String> m) {
         logger.info("set params:" + m);
         datamodelParams = m;
+        m.forEach((key, value) -> SCXMLEventPublisher.publish(SCXMLEventFactory.externalParameter(key, value)));
     }
 
     public void enableAutomaticEvents(Boolean aBoolean) {
@@ -193,7 +195,9 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     private SCXMLValidator validator;
     private Set<SkillExceptionHandler> exceptionHandlers = new HashSet<>();
     final private LinkedList<Throwable> exceptions = new LinkedList<>();
-    private Set<SCXMLListener> listeners = new HashSet<>();
+
+    private volatile SCXMLRuntimeMonitor runtimeMonitor;
+
     private HashMap<String, Class<?>> additionalPermanentSensors = new HashMap<>();
     private Map<String, String> datamodelParams = new HashMap<>();
 
@@ -209,34 +213,9 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     }
 
     public void addServer(SCXMLServer server) {
-        addServer(server, true);
-    }
-
-    public void addServer(SCXMLServer server, boolean sendAlive) {
         scxmlServers.add(server);
         logger.info("SCXML server set");
-
         activeStates.addStateMapInformer(server);
-
-        if (sendAlive) {
-            final Runnable alivePing = () -> {
-                StatemachineStatus status = getStatemachineStatus();
-
-                try {
-                    server.sendStatus(status);
-                    logger.trace("alive ping sent:" + status);
-                    logger.trace("active states:" + getActiveStates());
-                } catch (Exception e) {
-                    logger.debug(e.getMessage(), e);
-                    logger.warn(e.getMessage());
-                }
-
-            };
-
-            aliveHandle = aliveScheduler.scheduleAtFixedRate(alivePing, 0, 5,
-                    TimeUnit.SECONDS);
-        }
-
     }
 
     @NotNull
@@ -275,6 +254,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     public LoadingResults initalize(String pathToTask, String pathToConfig, boolean forceConfigure)
             throws StateNotFoundException, StateIDException, LoadingException, TransformerException {
         isLoading = true;
+        SCXMLEventPublisher.publish(SCXMLEventFactory.status(String.valueOf(getStatemachineStatus())));
         pathToTask = pathToTask.replaceFirst("^~/", System.getProperty("user.home"));
         pathToConfig = pathToConfig.replaceFirst("^~/", System.getProperty("user.home"));
         lastPathToTask = pathToTask;
@@ -405,6 +385,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
         }
 
         isLoading = false;
+        SCXMLEventPublisher.publish(SCXMLEventFactory.status(String.valueOf(getStatemachineStatus())));
         return results;
 
     }
@@ -415,19 +396,19 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
      * @param stateMachine The state machine
      */
     private void setupEngine(final SCXML stateMachine) throws ModelException {
-        scxmlExecutor = new SCXMLExecutor();
-        // scxmlExecutor.sete
-        //simpleScheduler = new SimpleScheduler(scxmlExecutor);
-        //scxmlExecutor.setEventdispatcher(simpleScheduler);
-        scxmlExecutor.setErrorReporter(new SimpleErrorReporter());
-        try {
-            scxmlExecutor.setEvaluator(new JexlEvaluator());
-        } catch (ModelException e) {
-            throw new RuntimeException(e);
-        }
-        scxmlExecutor.setStateMachine(stateMachine);
-        scxmlExecutor.addListener(stateMachine, this);
-
+        ObservableSCXMLExecutor executor = new ObservableSCXMLExecutor();
+        SCXMLRuntimeMonitor monitor = new SCXMLRuntimeMonitor(executor);
+        AssignInstrumenter.instrument(stateMachine, monitor);
+        executor.setErrorReporter(new SimpleErrorReporter());
+        executor.setEvaluator(new JexlEvaluator());
+        executor.setEventdispatcher(new ObservableEventDispatcher(
+                executor.getEventdispatcher(), monitor::onSend));
+        executor.setStateMachine(stateMachine);
+        monitor.refreshGlobalContext();
+        // Apache callbacks execute Bonsai skill lifecycle code on this instance.
+        runtimeMonitor = monitor;
+        scxmlExecutor = executor;
+        executor.addListener(stateMachine, this);
     }
 
     /**
@@ -536,7 +517,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
         return scxmlExecutor.getStatus().isFinal();
     }
 
-    public boolean fireEvent(final String event) {
+    public synchronized boolean fireEvent(final String event) {
         TriggerEvent evts = new TriggerEvent(event, TriggerEvent.SIGNAL_EVENT);
         try {
             logger.debug("FIRE Event: " + event);
@@ -614,21 +595,13 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
         try {
             logger.info("\n#######################\nSTARTING STATE MACHINE\n#######################");
             running = true;
-            // Set listeners
-            for (SCXMLListener listener : listeners) {
-
-                if (listener instanceof StateChangePublisher) {
-                    StateChangePublisher scp = (StateChangePublisher) listener;
-                    try {
-                        scp.publish("", scxml.getInitial(), "start");
-                    } catch (NullPointerException e) {
-                        scp.publish("", scxml.getInitial(), "start");
-                    }
-                }
-                scxmlExecutor.addListener(scxml, listener);
-            }
+            SCXMLEventPublisher.publish(SCXMLEventFactory.started(scxml.getInitial()));
+            SCXMLEventPublisher.publish(SCXMLEventFactory.status("RUNNING"));
             scxmlExecutor.go();
             activeStates.sendCurrentStates();
+            if (!running || scxmlExecutor.getStatus().isFinal()) {
+                SCXMLEventPublisher.publish(SCXMLEventFactory.status(getStatemachineStatus().name()));
+            }
         } catch (ModelException me) {
             logger.error("Error starting state machine", me);
             throw new StateMachineException("Error starting state machine", me);
@@ -642,6 +615,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     public synchronized void pauseMachine() {
         logger.info("PAUSE STATE MACHINE");
         PAUSE = true;
+        SCXMLEventPublisher.publish(SCXMLEventFactory.status("PAUSED"));
         Set<StateID> keys = new HashSet<>(activeStates.keySet());
         for (StateID key : keys) {
             activeStates.get(key).setPause(PAUSE);
@@ -654,18 +628,6 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     public synchronized void stopMachine() {
         logger.info("STOP STATE MACHINE");
         running = false;
-
-        if (scxmlExecutor!=null) {
-            scxmlExecutor.removeListener(scxml, this);
-            for (SCXMLListener listener : listeners) {
-
-                if (listener instanceof StateChangePublisher) {
-                    StateChangePublisher scp = (StateChangePublisher) listener;
-                    scp.publish("unknown", "", "cancel");
-                }
-                scxmlExecutor.removeListener(scxml, listener);
-            }
-        }
 
         Set<StateID> keys = new HashSet<>(activeStates.keySet());
         for (StateID key : keys) {
@@ -683,6 +645,8 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
 
         PAUSE = false;
         running = false;
+        SCXMLEventPublisher.publish(SCXMLEventFactory.stopped());
+        SCXMLEventPublisher.publish(SCXMLEventFactory.status(getStatemachineStatus().name()));
         logger.info("\n#######################\nSTATE MACHINE STOPPED AND RESET\n#######################");
 
     }
@@ -697,6 +661,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     public synchronized void continueStateMachine() {
         logger.info("CONTINUE STATE MACHINE");
         PAUSE = false;
+        SCXMLEventPublisher.publish(SCXMLEventFactory.status("RUNNING"));
         Set<StateID> keys = new HashSet<>(activeStates.keySet());
         for (StateID key : keys) {
             activeStates.get(key).setPause(PAUSE);
@@ -738,14 +703,15 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
         }); //logger.trace("possible actions: " + actionsStr);
     }
 
-    /**
-     * Invoke the corresponding class of a state.
-     * <p>
-     * {@inheritDoc}
-     */
-    @SuppressWarnings("unchecked")
+    /** Performs Bonsai skill invocation and terminal-state handling on state entry. */
     @Override
+    @SuppressWarnings("unchecked")
     public void onEntry(final EnterableState entered) {
+        SCXMLRuntimeMonitor monitor = runtimeMonitor;
+        if (monitor != null) {
+            try { monitor.onEntry(entered); }
+            catch (RuntimeException failure) { logger.warn("SCXML entry observation failed", failure); }
+        }
 
         logger.debug("\tOnEntry: " + entered.getId());
         logger.trace("All Current states:");
@@ -772,7 +738,6 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
         if (entered instanceof State) {
             State toEnter = (State) entered;
             Map<String, String> data = getVariables(toEnter.getDatamodel());
-
             try {
 
                 StateID state = new StateID(config.statePrefix, entered.getId());
@@ -780,10 +745,20 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
                 if (entered instanceof Final | isEndState(state.getCanonicalSkill())) {
                     running = false;
                     logger.debug("\tOnEntry: entered final State");
+                    SCXMLEventPublisher.publish(SCXMLEventFactory.status(getStatemachineStatus().name()));
                 }
 
                 // Is state a compound state (with substates)?
                 if (toEnter.getChildren().isEmpty() && !isEndState(state.getCanonicalSkill())) {
+                    // resolve datamodel parameter assigned for the skill
+                    if (toEnter.getDatamodel() != null) {
+                        for (Data variable : toEnter.getDatamodel().getData()) {
+                            if (variable != null && data.containsKey(variable.getId())) {
+                                SCXMLEventPublisher.publish(SCXMLEventFactory.parameterResolved(variable.getId(),
+                                        data.get(variable.getId()), variable.getExpr(), entered.getId()));
+                            }
+                        }
+                    }
                     boolean isStateRunning = invoke(state, data);
 
                     // stop system if state was not invoked successfully
@@ -812,12 +787,15 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
 
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    @SuppressWarnings("unchecked")
+    /** Stops exited skills and preserves existing parallel cleanup semantics. */
     @Override
+    @SuppressWarnings("unchecked")
     public void onExit(final EnterableState exited) {
+        SCXMLRuntimeMonitor monitor = runtimeMonitor;
+        if (monitor != null) {
+            try { monitor.onExit(exited); }
+            catch (RuntimeException failure) { logger.warn("SCXML exit observation failed", failure); }
+        }
         //logger.trace("Called exit for: " + exited.getId());
 
         logger.debug("\tOnExit: " + exited.getId());
@@ -865,15 +843,14 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     }
 
 
-    /**
-     * {@inheritDoc}
-     *
-     * @param from
-     * @param to
-     * @param transition
-     */
+    /** Handles the transition payload and existing Bonsai action diagnostics. */
     @Override
     public void onTransition(TransitionTarget from, TransitionTarget to, Transition transition, String event) {
+        SCXMLRuntimeMonitor monitor = runtimeMonitor;
+        if (monitor != null) {
+            try { monitor.onTransition(from, to, transition, event); }
+            catch (RuntimeException failure) { logger.warn("SCXML transition observation failed", failure); }
+        }
         // Lets have a look for payload (deprecated)
         payload = scxmlExecutor.getRootContext().get("_eventdata");
         if (payload != null) {
@@ -1034,18 +1011,6 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     }
 
     /**
-     * Add a listener to the document root.
-     *
-     * @param listener SCXMLListener to be added.
-     */
-    public void addListener(SCXMLListener listener) {
-        listeners.add(listener);
-        if (scxmlExecutor != null) {
-            scxmlExecutor.addListener(scxml, listener);
-        }
-    }
-
-    /**
      * {@link SCXML} representation of this state machine.
      *
      * @return {@link SCXML} representation of this state machine.
@@ -1058,9 +1023,14 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
      * @param scxml the scxml to set
      */
     public void setScxml(SCXML scxml) {
+        boolean replacedModel = this.scxml != scxml;
         this.scxml = scxml;
         try {
+            AssignInstrumenter.instrument(scxml, runtimeMonitor);
+            runtimeMonitor.resetDatamodelTracking();
             scxmlExecutor.setStateMachine(scxml);
+            runtimeMonitor.refreshGlobalContext();
+            if (replacedModel) scxmlExecutor.addListener(scxml, this);
         } catch (ModelException e) {
             throw new RuntimeException(e);
         }
