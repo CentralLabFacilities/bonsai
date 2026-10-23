@@ -3,6 +3,7 @@ package de.unibi.citec.clf.bonsai.engine.scxml;
 import de.unibi.citec.clf.bonsai.core.exception.ConfigurationException;
 import de.unibi.citec.clf.bonsai.engine.LoadingResults;
 import de.unibi.citec.clf.bonsai.engine.SkillStateMachine;
+import de.unibi.citec.clf.bonsai.engine.communication.SCXMLEventBus;
 import de.unibi.citec.clf.bonsai.engine.control.StateMachineController;
 import de.unibi.citec.clf.bonsai.test.TestListener;
 
@@ -56,16 +57,14 @@ public class TestTools {
 
         stateMachineController.initialize();
 
-        skillStateMachine.addListener(test);
-
-        if(!stateMachineController.load(true).success()) return false;
-
-        stateMachineController.executeStateMachine();
-
-        boolean ret = test.waitForStatus();
-
-        skillStateMachine.stopMachine();
-
-        return ret;
+        SCXMLEventBus.addListener(test);
+        try {
+            if (!stateMachineController.load(true).success()) return false;
+            stateMachineController.executeStateMachine();
+            return test.waitForStatus();
+        } finally {
+            skillStateMachine.stopMachine();
+            SCXMLEventBus.removeListener(test);
+        }
     }
 }
