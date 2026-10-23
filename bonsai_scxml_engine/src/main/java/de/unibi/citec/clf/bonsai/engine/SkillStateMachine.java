@@ -254,6 +254,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     public LoadingResults initalize(String pathToTask, String pathToConfig, boolean forceConfigure)
             throws StateNotFoundException, StateIDException, LoadingException, TransformerException {
         isLoading = true;
+        SCXMLEventPublisher.publish(SCXMLEventFactory.status(String.valueOf(getStatemachineStatus())));
         pathToTask = pathToTask.replaceFirst("^~/", System.getProperty("user.home"));
         pathToConfig = pathToConfig.replaceFirst("^~/", System.getProperty("user.home"));
         lastPathToTask = pathToTask;
@@ -384,6 +385,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
         }
 
         isLoading = false;
+        SCXMLEventPublisher.publish(SCXMLEventFactory.status(String.valueOf(getStatemachineStatus())));
         return results;
 
     }
