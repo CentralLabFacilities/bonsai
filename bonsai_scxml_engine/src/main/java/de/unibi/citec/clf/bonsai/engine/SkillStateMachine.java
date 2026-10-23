@@ -52,10 +52,6 @@ import java.util.stream.Collectors;
 
 public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
 
-    private final ScheduledExecutorService aliveScheduler = Executors
-            .newScheduledThreadPool(1);
-    private ScheduledFuture<?> aliveHandle;
-
     private List<SCXMLServer> scxmlServers = new ArrayList<>();
 
     private boolean triggerEvents = true;
@@ -217,34 +213,9 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     }
 
     public void addServer(SCXMLServer server) {
-        addServer(server, true);
-    }
-
-    public void addServer(SCXMLServer server, boolean sendAlive) {
         scxmlServers.add(server);
         logger.info("SCXML server set");
-
         activeStates.addStateMapInformer(server);
-
-        if (sendAlive) {
-            final Runnable alivePing = () -> {
-                StatemachineStatus status = getStatemachineStatus();
-
-                try {
-                    server.sendStatus(status);
-                    logger.trace("alive ping sent:" + status);
-                    logger.trace("active states:" + getActiveStates());
-                } catch (Exception e) {
-                    logger.debug(e.getMessage(), e);
-                    logger.warn(e.getMessage());
-                }
-
-            };
-
-            aliveHandle = aliveScheduler.scheduleAtFixedRate(alivePing, 0, 5,
-                    TimeUnit.SECONDS);
-        }
-
     }
 
     @NotNull
