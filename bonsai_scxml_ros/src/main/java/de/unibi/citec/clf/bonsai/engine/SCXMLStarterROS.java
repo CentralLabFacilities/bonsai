@@ -4,6 +4,7 @@ import de.unibi.citec.clf.bonsai.engine.communication.ROSServer;
 import de.unibi.citec.clf.bonsai.engine.communication.SCXMLServer;
 import de.unibi.citec.clf.bonsai.engine.communication.StateChangePublisher;
 import de.unibi.citec.clf.bonsai.engine.communication.StateChangePublisherROS;
+import de.unibi.citec.clf.bonsai.engine.communication.SCXMLEventPublisher;
 import de.unibi.citec.clf.bonsai.ros.RosFactory;
 import org.kohsuke.args4j.Option;
 import org.ros.namespace.GraphName;
@@ -58,7 +59,7 @@ public class SCXMLStarterROS extends SCXMLStarter {
 
         LOG.info("Ros server started");
 
-        skillStateMachine.addListener(pub);
+        SCXMLEventPublisher.addListener(pub);
 
         return srv;
     }
