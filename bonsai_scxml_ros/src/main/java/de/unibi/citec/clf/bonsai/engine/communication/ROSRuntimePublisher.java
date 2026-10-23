@@ -11,7 +11,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
 /** Publishes SCXML transitions and lifecycle status through two ROS topics. */
-public class ROSRuntimePublisher extends RuntimePublisher {
+public class ROSRuntimePublisher extends SCXMLRuntimeEventAdapter {
     private final RuntimeNode node;
 
     private static class RuntimeNode extends RosNode {

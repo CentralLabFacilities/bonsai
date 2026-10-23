@@ -6,8 +6,8 @@ import org.apache.log4j.Logger;
 import java.util.function.Consumer;
 
 /** Translates SCXML runtime notifications into external transition and status publications. */
-public abstract class RuntimePublisher implements Consumer<SCXMLEvent> {
-    private static final Logger LOG = Logger.getLogger(RuntimePublisher.class);
+public abstract class SCXMLRuntimeEventAdapter implements Consumer<SCXMLEvent> {
+    private static final Logger LOG = Logger.getLogger(SCXMLRuntimeEventAdapter.class);
 
     @Override
     public void accept(SCXMLEvent change) {
