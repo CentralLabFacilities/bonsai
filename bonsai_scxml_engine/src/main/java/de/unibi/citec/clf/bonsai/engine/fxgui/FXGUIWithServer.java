@@ -4,7 +4,8 @@ package de.unibi.citec.clf.bonsai.engine.fxgui;
 import de.unibi.citec.clf.bonsai.engine.SkillStateMachine;
 import de.unibi.citec.clf.bonsai.engine.communication.SCXMLServer;
 import de.unibi.citec.clf.bonsai.engine.communication.SCXMLServerWithControl;
-import de.unibi.citec.clf.bonsai.engine.communication.StateChangePublisher;
+import de.unibi.citec.clf.bonsai.engine.communication.SCXMLRuntimeEventAdapter;
+import de.unibi.citec.clf.bonsai.engine.communication.SCXMLEventBus;
 import de.unibi.citec.clf.bonsai.engine.control.StateMachineController;
 import de.unibi.citec.clf.bonsai.engine.fxgui.communication.DirectControlRemote;
 import de.unibi.citec.clf.bonsai.engine.fxgui.communication.FXGUISCXMLRemote;
@@ -15,7 +16,7 @@ import de.unibi.citec.clf.bonsai.engine.fxgui.communication.FXGUISCXMLRemote;
 public class FXGUIWithServer extends FXGUIStarter {
     private static SCXMLServer server = null;
     private static SCXMLServerWithControl remoteServer = null;
-    private static StateChangePublisher publisher = null;
+    private static SCXMLRuntimeEventAdapter publisher = null;
 
     private DirectControlRemote rem;
 
@@ -29,7 +30,7 @@ public class FXGUIWithServer extends FXGUIStarter {
 
         if (publisher != null) {
             logger.info("set publisher");
-            skillStateMachine.addListener(publisher);
+            SCXMLEventBus.addListener(publisher);
         }
 
         if (server != null) {
@@ -46,6 +47,7 @@ public class FXGUIWithServer extends FXGUIStarter {
         rem = new DirectControlRemote(stateMachineController);
 
         rem.setExitListener(() -> {
+            if (publisher != null) SCXMLEventBus.removeListener(publisher);
             if(remoteServer != null) remoteServer.shutdown();
         });
 
@@ -60,7 +62,7 @@ public class FXGUIWithServer extends FXGUIStarter {
         FXGUIWithServer.server = server;
     }
 
-    public static void setPub(StateChangePublisher pub) {
+    public static void setPub(SCXMLRuntimeEventAdapter pub) {
         FXGUIWithServer.publisher = pub;
     }
 
