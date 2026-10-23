@@ -1,9 +1,8 @@
 package de.unibi.citec.clf.bonsai.engine;
 
 import de.unibi.citec.clf.bonsai.engine.communication.ROSServer;
+import de.unibi.citec.clf.bonsai.engine.communication.ROSRuntimePublisher;
 import de.unibi.citec.clf.bonsai.engine.communication.SCXMLServer;
-import de.unibi.citec.clf.bonsai.engine.communication.StateChangePublisher;
-import de.unibi.citec.clf.bonsai.engine.communication.StateChangePublisherROS;
 import de.unibi.citec.clf.bonsai.engine.communication.SCXMLEventPublisher;
 import de.unibi.citec.clf.bonsai.ros.RosFactory;
 import org.kohsuke.args4j.Option;
@@ -14,22 +13,12 @@ import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/**
- * Starts the state machine.
- *
- * @author lkettenb
- */
+/** ROS entry point for the state-machine controller. */
 public class SCXMLStarterROS extends SCXMLStarter {
-
-    public SCXMLStarterROS() {
-        super();
-    }
-
     public static final String DEFAULT_TOPIC_TRANSITIONS = "/bonsai/transitions";
     public static final String DEFAULT_TOPIC_STATUS = "/bonsai/status";
     public static final String DEFAULT_TOPIC_STATES = "/bonsai/states";
     public static final String DEFAULT_SERVER_TOPIC = "/bonsai/server";
-
 
     @Option(name = "-s", aliases = {"--server_topic"}, metaVar = "VALUE", usage = "topic for ros server")
     private String serverTopic = DEFAULT_SERVER_TOPIC;
@@ -43,36 +32,27 @@ public class SCXMLStarterROS extends SCXMLStarter {
 
     @Override
     public SCXMLServer createServer() {
-
-        RosFactory fac = new RosFactory();
-        LOG.fatal("st: " + serverTopic);
-
-        ROSServer srv = new ROSServer(GraphName.of(serverTopic), topicStatus, topicStates);
-        srv.setController(stateMachineController);
-        StateChangePublisher pub = new StateChangePublisherROS(topicTransitions);
+        RosFactory factory = new RosFactory();
+        ROSServer server = new ROSServer(GraphName.of(serverTopic), null, topicStates);
+        server.setController(stateMachineController);
+        ROSRuntimePublisher publisher = new ROSRuntimePublisher(topicTransitions, topicStatus);
 
         try {
-            fac.spawnRosNode(srv, true);
+            factory.spawnRosNode(server, true);
         } catch (TimeoutException | ExecutionException | InterruptedException ex) {
-            Logger.getLogger(SCXMLStarterROS.class.getName()).log(Level.SEVERE, null, ex);
+            if (ex instanceof InterruptedException) Thread.currentThread().interrupt();
+            Logger.getLogger(SCXMLStarterROS.class.getName()).log(Level.SEVERE, "Could not start ROS server", ex);
+            throw new IllegalStateException("Could not start ROS server", ex);
         }
 
-        LOG.info("Ros server started");
-
-        SCXMLEventPublisher.addListener(pub);
-
-        return srv;
+        SCXMLEventPublisher.addListener(publisher);
+        // Publish the initial authoritative status, then ROS 1 latching retains it.
+        publisher.publishStatus(stateMachineController.getStatus());
+        LOG.info("ROS server started");
+        return server;
     }
 
-    /**
-     * Starts the application.
-     *
-     * @param args Arguments
-     */
     public static void main(String[] args) {
-        SCXMLStarterROS scxmlStarterROS = new SCXMLStarterROS();
-        scxmlStarterROS.startup(args);
+        new SCXMLStarterROS().startup(args);
     }
-
-
 }

@@ -1,6 +1,5 @@
 package de.unibi.citec.clf.bonsai.engine.communication;
 
-
 import bonsai_msgs.StateList;
 import de.unibi.citec.clf.bonsai.engine.scxml.BonsaiTransition;
 import de.unibi.citec.clf.bonsai.ros.RosNode;
@@ -8,7 +7,6 @@ import org.apache.log4j.Logger;
 import org.ros.message.MessageFactory;
 import org.ros.namespace.GraphName;
 import org.ros.node.ConnectedNode;
-import org.ros.node.service.ServiceServer;
 import org.ros.node.topic.Publisher;
 
 import java.util.LinkedList;
@@ -20,8 +18,6 @@ import java.util.List;
 public class ROSMinimalServer extends RosNode implements SCXMLServer {
 
     private static Logger logger = Logger.getLogger(ROSMinimalServer.class);
-
-    private List<ServiceServer> server = new LinkedList<>();
 
     String topicCurrentStates;
     String topicStatus;
@@ -56,7 +52,6 @@ public class ROSMinimalServer extends RosNode implements SCXMLServer {
 
     @Override
     public void sendCurrentStatesAndTransitions(List<String> states, List<BonsaiTransition> transitions) {
-
         final StateList stateList = stateListPublisher.newMessage();
         stateList.setStates(states);
 
@@ -69,33 +64,36 @@ public class ROSMinimalServer extends RosNode implements SCXMLServer {
             trans.add(msg);
         }
         stateList.setTransitions(trans);
-
         stateListPublisher.publish(stateList);
     }
 
     @Override
     public void sendStatus(StatemachineStatus status) {
-        std_msgs.String string = statusPublisher.newMessage();
-        string.setData(status.toString());
-        statusPublisher.publish(string);
+        // A null topic disables this legacy publisher for the ROSRuntimePublisher setup.
+        if (statusPublisher == null) return;
+        std_msgs.String message = statusPublisher.newMessage();
+        message.setData(status.toString());
+        statusPublisher.publish(message);
     }
 
     @Override
     public void onStart(ConnectedNode connectedNode) {
         stateListPublisher = connectedNode.newPublisher(topicCurrentStates, StateList._TYPE);
-        statusPublisher = connectedNode.newPublisher(topicStatus, std_msgs.String._TYPE);
+        if (topicStatus != null && !topicStatus.isBlank()) {
+            statusPublisher = connectedNode.newPublisher(topicStatus, std_msgs.String._TYPE);
+        }
         messageFactory = connectedNode.getTopicMessageFactory();
         initialized = true;
     }
 
     @Override
     public void destroyNode() {
-        stateListPublisher.shutdown();
+        if (stateListPublisher != null) stateListPublisher.shutdown();
+        if (statusPublisher != null) statusPublisher.shutdown();
     }
 
     @Override
     public GraphName getDefaultNodeName() {
         return nodeName;
     }
-
 }
