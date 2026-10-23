@@ -4,7 +4,7 @@ package de.unibi.citec.clf.bonsai.engine.fxgui;
 import de.unibi.citec.clf.bonsai.engine.SkillStateMachine;
 import de.unibi.citec.clf.bonsai.engine.communication.SCXMLServer;
 import de.unibi.citec.clf.bonsai.engine.communication.SCXMLServerWithControl;
-import de.unibi.citec.clf.bonsai.engine.communication.StateChangePublisher;
+import de.unibi.citec.clf.bonsai.engine.communication.RuntimePublisher;
 import de.unibi.citec.clf.bonsai.engine.communication.SCXMLEventPublisher;
 import de.unibi.citec.clf.bonsai.engine.control.StateMachineController;
 import de.unibi.citec.clf.bonsai.engine.fxgui.communication.DirectControlRemote;
@@ -16,7 +16,7 @@ import de.unibi.citec.clf.bonsai.engine.fxgui.communication.FXGUISCXMLRemote;
 public class FXGUIWithServer extends FXGUIStarter {
     private static SCXMLServer server = null;
     private static SCXMLServerWithControl remoteServer = null;
-    private static StateChangePublisher publisher = null;
+    private static RuntimePublisher publisher = null;
 
     private DirectControlRemote rem;
 
@@ -62,7 +62,7 @@ public class FXGUIWithServer extends FXGUIStarter {
         FXGUIWithServer.server = server;
     }
 
-    public static void setPub(StateChangePublisher pub) {
+    public static void setPub(RuntimePublisher pub) {
         FXGUIWithServer.publisher = pub;
     }
 
