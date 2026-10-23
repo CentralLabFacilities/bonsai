@@ -5,7 +5,7 @@ import de.unibi.citec.clf.bonsai.engine.SkillStateMachine;
 import de.unibi.citec.clf.bonsai.engine.communication.SCXMLServer;
 import de.unibi.citec.clf.bonsai.engine.communication.SCXMLServerWithControl;
 import de.unibi.citec.clf.bonsai.engine.communication.RuntimePublisher;
-import de.unibi.citec.clf.bonsai.engine.communication.SCXMLEventPublisher;
+import de.unibi.citec.clf.bonsai.engine.communication.SCXMLEventBus;
 import de.unibi.citec.clf.bonsai.engine.control.StateMachineController;
 import de.unibi.citec.clf.bonsai.engine.fxgui.communication.DirectControlRemote;
 import de.unibi.citec.clf.bonsai.engine.fxgui.communication.FXGUISCXMLRemote;
@@ -30,7 +30,7 @@ public class FXGUIWithServer extends FXGUIStarter {
 
         if (publisher != null) {
             logger.info("set publisher");
-            SCXMLEventPublisher.addListener(publisher);
+            SCXMLEventBus.addListener(publisher);
         }
 
         if (server != null) {
@@ -47,7 +47,7 @@ public class FXGUIWithServer extends FXGUIStarter {
         rem = new DirectControlRemote(stateMachineController);
 
         rem.setExitListener(() -> {
-            if (publisher != null) SCXMLEventPublisher.removeListener(publisher);
+            if (publisher != null) SCXMLEventBus.removeListener(publisher);
             if(remoteServer != null) remoteServer.shutdown();
         });
 

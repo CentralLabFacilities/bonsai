@@ -18,8 +18,8 @@ import java.util.function.Consumer;
  * worker delivers accepted events in sequence order to each registered listener.
  * A full queue is an explicitly reported loss, not a silent history gap.
  */
-public final class SCXMLEventPublisher {
-    private static final Logger LOG = Logger.getLogger(SCXMLEventPublisher.class);
+public final class SCXMLEventBus {
+    private static final Logger LOG = Logger.getLogger(SCXMLEventBus.class);
     private static final String CONFIG_RESOURCE = "/scxmlEventPublisher.properties";
     private static final String CAPACITY_KEY = "bonsai.scxml.events.queue.capacity";
     private static final String SHUTDOWN_KEY = "bonsai.scxml.events.shutdown.timeout.ms";
@@ -32,10 +32,10 @@ public final class SCXMLEventPublisher {
 
     // automatically shut publisher down when JVM shuts down
     static {
-        Runtime.getRuntime().addShutdownHook(new Thread(SCXMLEventPublisher::shutdown, "bonsai-scxml-events-shutdown"));
+        Runtime.getRuntime().addShutdownHook(new Thread(SCXMLEventBus::shutdown, "bonsai-scxml-events-shutdown"));
     }
 
-    private SCXMLEventPublisher() { }
+    private SCXMLEventBus() { }
 
     public static void addListener(Consumer<SCXMLEvent> listener) {
         DISPATCHER.addListener(listener);
@@ -65,7 +65,7 @@ public final class SCXMLEventPublisher {
                                   boolean terminated) { }
 
     private static PublisherSettings loadSettings() {
-        try (InputStream input = SCXMLEventPublisher.class.getResourceAsStream(CONFIG_RESOURCE)) {
+        try (InputStream input = SCXMLEventBus.class.getResourceAsStream(CONFIG_RESOURCE)) {
             if (input == null) {
                 LOG.warn("SCXML event publisher configuration not found: " + CONFIG_RESOURCE + "; using defaults");
                 return readSettings(null);
@@ -96,25 +96,25 @@ public final class SCXMLEventPublisher {
     record PublisherSettings(int queueCapacity, long shutdownTimeoutMs) { }
 
     private static int positiveInt(Properties properties) {
-        String configured = properties.getProperty(SCXMLEventPublisher.CAPACITY_KEY);
-        if (configured == null) return SCXMLEventPublisher.DEFAULT_CAPACITY;
+        String configured = properties.getProperty(SCXMLEventBus.CAPACITY_KEY);
+        if (configured == null) return SCXMLEventBus.DEFAULT_CAPACITY;
         try {
             int value = Integer.parseInt(configured.trim());
             if (value > 0) return value;
         } catch (NumberFormatException ignored) { }
-        LOG.warn("Invalid " + SCXMLEventPublisher.CAPACITY_KEY + " in " + CONFIG_RESOURCE + "; using " + SCXMLEventPublisher.DEFAULT_CAPACITY);
-        return SCXMLEventPublisher.DEFAULT_CAPACITY;
+        LOG.warn("Invalid " + SCXMLEventBus.CAPACITY_KEY + " in " + CONFIG_RESOURCE + "; using " + SCXMLEventBus.DEFAULT_CAPACITY);
+        return SCXMLEventBus.DEFAULT_CAPACITY;
     }
 
     private static long positiveLong(Properties properties) {
-        String configured = properties.getProperty(SCXMLEventPublisher.SHUTDOWN_KEY);
-        if (configured == null) return SCXMLEventPublisher.DEFAULT_SHUTDOWN_MS;
+        String configured = properties.getProperty(SCXMLEventBus.SHUTDOWN_KEY);
+        if (configured == null) return SCXMLEventBus.DEFAULT_SHUTDOWN_MS;
         try {
             long value = Long.parseLong(configured.trim());
             if (value > 0) return value;
         } catch (NumberFormatException ignored) { }
-        LOG.warn("Invalid " + SCXMLEventPublisher.SHUTDOWN_KEY + " in " + CONFIG_RESOURCE + "; using " + SCXMLEventPublisher.DEFAULT_SHUTDOWN_MS);
-        return SCXMLEventPublisher.DEFAULT_SHUTDOWN_MS;
+        LOG.warn("Invalid " + SCXMLEventBus.SHUTDOWN_KEY + " in " + CONFIG_RESOURCE + "; using " + SCXMLEventBus.DEFAULT_SHUTDOWN_MS);
+        return SCXMLEventBus.DEFAULT_SHUTDOWN_MS;
     }
 
     /** Package-private so concurrency tests can use isolated queues. */

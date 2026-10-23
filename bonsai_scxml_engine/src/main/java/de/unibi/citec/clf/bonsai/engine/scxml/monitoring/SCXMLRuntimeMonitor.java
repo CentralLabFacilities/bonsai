@@ -2,7 +2,7 @@ package de.unibi.citec.clf.bonsai.engine.scxml.monitoring;
 
 import de.unibi.citec.clf.bonsai.engine.communication.SCXMLEventFactory;
 import de.unibi.citec.clf.bonsai.engine.communication.SCXMLEventFactory.SCXMLEvent;
-import de.unibi.citec.clf.bonsai.engine.communication.SCXMLEventPublisher;
+import de.unibi.citec.clf.bonsai.engine.communication.SCXMLEventBus;
 import org.apache.commons.scxml2.Context;
 import org.apache.commons.scxml2.model.EnterableState;
 import org.apache.commons.scxml2.model.Transition;
@@ -143,7 +143,7 @@ public final class SCXMLRuntimeMonitor implements ObservableAssign.AssignmentObs
         }
         // External listeners may call back into the monitor; don't notify
         // them while holding its registry lock.
-        for (SCXMLEvent initialization : initializations) SCXMLEventPublisher.publish(initialization);
+        for (SCXMLEvent initialization : initializations) SCXMLEventBus.publish(initialization);
     }
 
     /** A missing registration is unknown, NOT global. */
@@ -166,7 +166,7 @@ public final class SCXMLRuntimeMonitor implements ObservableAssign.AssignmentObs
                              String expression, Object value) {
         String scope = scopeFor(declaringContext, sourceState);
         if (scope == null) {
-            SCXMLEventPublisher.publish(SCXMLEvent.of("observation_incomplete", "sourceState", sourceState,
+            SCXMLEventBus.publish(SCXMLEvent.of("observation_incomplete", "sourceState", sourceState,
                     "location", location, "reason", declaringContext == null
                             ? "Unsupported or unresolved assignment location"
                             : "Unable to resolve declaring SCXML context"));
@@ -174,18 +174,18 @@ public final class SCXMLRuntimeMonitor implements ObservableAssign.AssignmentObs
         }
         // Capture immediately: observers must not hold a reference to a mutable Java object.
         CapturedValue captured = captureValue(value);
-        SCXMLEventPublisher.publish(SCXMLEventFactory.assignment(
+        SCXMLEventBus.publish(SCXMLEventFactory.assignment(
                 sourceState, scope, location, expression,
                 captured.display, captured.json, captured.javaType));
         if (captured.json == null) {
-            SCXMLEventPublisher.publish(SCXMLEvent.of("observation_incomplete", "sourceState", sourceState,
+            SCXMLEventBus.publish(SCXMLEvent.of("observation_incomplete", "sourceState", sourceState,
                     "location", location, "reason", "Assignment value is not JSON-representable"));
         }
     }
 
     public void onSend(String id, String target, String targetType,
                        String event, Object data, long delayMillis) {
-        SCXMLEventPublisher.publish(SCXMLEventFactory.sendRequested(id, target, targetType, event,
+        SCXMLEventBus.publish(SCXMLEventFactory.sendRequested(id, target, targetType, event,
                 data == null ? null : captureValue(data).display, delayMillis));
     }
 
@@ -330,18 +330,18 @@ public final class SCXMLRuntimeMonitor implements ObservableAssign.AssignmentObs
         refreshGlobalContext();
         registerAncestors(state.getId());
         publishUnannouncedScopes();
-        SCXMLEventPublisher.publish(SCXMLEventFactory.stateEntered(state.getId()));
+        SCXMLEventBus.publish(SCXMLEventFactory.stateEntered(state.getId()));
     }
 
     public void onExit(EnterableState state) {
-        SCXMLEventPublisher.publish(SCXMLEventFactory.stateExited(state.getId()));
+        SCXMLEventBus.publish(SCXMLEventFactory.stateExited(state.getId()));
         // A re-entered state gets a new scope baseline even if Apache reuses its Context.
         synchronized (contextsLock) { announcedScopes.remove(state.getId()); }
     }
 
     public void onTransition(TransitionTarget from, TransitionTarget to,
                                        Transition transition, String event) {
-        SCXMLEventPublisher.publish(SCXMLEventFactory.transition(from == null ? "" : from.getId(),
+        SCXMLEventBus.publish(SCXMLEventFactory.transition(from == null ? "" : from.getId(),
                 to == null ? "" : to.getId(), event,
                 transition == null ? null : transition.getEvent()));
     }

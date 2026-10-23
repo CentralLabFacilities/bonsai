@@ -14,7 +14,7 @@ import de.unibi.citec.clf.bonsai.engine.model.StateID;
 import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException;
 import de.unibi.citec.clf.bonsai.engine.communication.SCXMLServer;
 import de.unibi.citec.clf.bonsai.engine.communication.SCXMLEventFactory;
-import de.unibi.citec.clf.bonsai.engine.communication.SCXMLEventPublisher;
+import de.unibi.citec.clf.bonsai.engine.communication.SCXMLEventBus;
 import de.unibi.citec.clf.bonsai.engine.communication.StatemachineStatus;
 import de.unibi.citec.clf.bonsai.engine.config.SkillStateMachineConfig;
 import de.unibi.citec.clf.bonsai.engine.scxml.BonsaiActionProvider;
@@ -61,7 +61,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     public void setParams(Map<String, String> m) {
         logger.info("set params:" + m);
         datamodelParams = m;
-        m.forEach((key, value) -> SCXMLEventPublisher.publish(SCXMLEventFactory.externalParameter(key, value)));
+        m.forEach((key, value) -> SCXMLEventBus.publish(SCXMLEventFactory.externalParameter(key, value)));
     }
 
     public void enableAutomaticEvents(Boolean aBoolean) {
@@ -254,7 +254,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     public LoadingResults initalize(String pathToTask, String pathToConfig, boolean forceConfigure)
             throws StateNotFoundException, StateIDException, LoadingException, TransformerException {
         isLoading = true;
-        SCXMLEventPublisher.publish(SCXMLEventFactory.status(String.valueOf(getStatemachineStatus())));
+        SCXMLEventBus.publish(SCXMLEventFactory.status(String.valueOf(getStatemachineStatus())));
         pathToTask = pathToTask.replaceFirst("^~/", System.getProperty("user.home"));
         pathToConfig = pathToConfig.replaceFirst("^~/", System.getProperty("user.home"));
         lastPathToTask = pathToTask;
@@ -385,7 +385,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
         }
 
         isLoading = false;
-        SCXMLEventPublisher.publish(SCXMLEventFactory.status(String.valueOf(getStatemachineStatus())));
+        SCXMLEventBus.publish(SCXMLEventFactory.status(String.valueOf(getStatemachineStatus())));
         return results;
 
     }
@@ -595,12 +595,12 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
         try {
             logger.info("\n#######################\nSTARTING STATE MACHINE\n#######################");
             running = true;
-            SCXMLEventPublisher.publish(SCXMLEventFactory.started(scxml.getInitial()));
-            SCXMLEventPublisher.publish(SCXMLEventFactory.status("RUNNING"));
+            SCXMLEventBus.publish(SCXMLEventFactory.started(scxml.getInitial()));
+            SCXMLEventBus.publish(SCXMLEventFactory.status("RUNNING"));
             scxmlExecutor.go();
             activeStates.sendCurrentStates();
             if (!running || scxmlExecutor.getStatus().isFinal()) {
-                SCXMLEventPublisher.publish(SCXMLEventFactory.status(getStatemachineStatus().name()));
+                SCXMLEventBus.publish(SCXMLEventFactory.status(getStatemachineStatus().name()));
             }
         } catch (ModelException me) {
             logger.error("Error starting state machine", me);
@@ -615,7 +615,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     public synchronized void pauseMachine() {
         logger.info("PAUSE STATE MACHINE");
         PAUSE = true;
-        SCXMLEventPublisher.publish(SCXMLEventFactory.status("PAUSED"));
+        SCXMLEventBus.publish(SCXMLEventFactory.status("PAUSED"));
         Set<StateID> keys = new HashSet<>(activeStates.keySet());
         for (StateID key : keys) {
             activeStates.get(key).setPause(PAUSE);
@@ -645,8 +645,8 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
 
         PAUSE = false;
         running = false;
-        SCXMLEventPublisher.publish(SCXMLEventFactory.stopped());
-        SCXMLEventPublisher.publish(SCXMLEventFactory.status(getStatemachineStatus().name()));
+        SCXMLEventBus.publish(SCXMLEventFactory.stopped());
+        SCXMLEventBus.publish(SCXMLEventFactory.status(getStatemachineStatus().name()));
         logger.info("\n#######################\nSTATE MACHINE STOPPED AND RESET\n#######################");
 
     }
@@ -661,7 +661,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     public synchronized void continueStateMachine() {
         logger.info("CONTINUE STATE MACHINE");
         PAUSE = false;
-        SCXMLEventPublisher.publish(SCXMLEventFactory.status("RUNNING"));
+        SCXMLEventBus.publish(SCXMLEventFactory.status("RUNNING"));
         Set<StateID> keys = new HashSet<>(activeStates.keySet());
         for (StateID key : keys) {
             activeStates.get(key).setPause(PAUSE);
@@ -745,7 +745,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
                 if (entered instanceof Final | isEndState(state.getCanonicalSkill())) {
                     running = false;
                     logger.debug("\tOnEntry: entered final State");
-                    SCXMLEventPublisher.publish(SCXMLEventFactory.status(getStatemachineStatus().name()));
+                    SCXMLEventBus.publish(SCXMLEventFactory.status(getStatemachineStatus().name()));
                 }
 
                 // Is state a compound state (with substates)?
@@ -754,7 +754,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
                     if (toEnter.getDatamodel() != null) {
                         for (Data variable : toEnter.getDatamodel().getData()) {
                             if (variable != null && data.containsKey(variable.getId())) {
-                                SCXMLEventPublisher.publish(SCXMLEventFactory.parameterResolved(variable.getId(),
+                                SCXMLEventBus.publish(SCXMLEventFactory.parameterResolved(variable.getId(),
                                         data.get(variable.getId()), variable.getExpr(), entered.getId()));
                             }
                         }
