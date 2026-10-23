@@ -1,7 +1,7 @@
 package de.unibi.citec.clf.bonsai.engine.scxml;
 
 import de.unibi.citec.clf.bonsai.engine.communication.SCXMLEventFactory.SCXMLEvent;
-import de.unibi.citec.clf.bonsai.engine.communication.SCXMLEventPublisher;
+import de.unibi.citec.clf.bonsai.engine.communication.SCXMLEventBus;
 import de.unibi.citec.clf.bonsai.engine.communication.StateChangePublisher;
 import de.unibi.citec.clf.bonsai.test.TestListener;
 import org.apache.log4j.PropertyConfigurator;
@@ -44,8 +44,8 @@ public class SCXMLEventIntegrationTest {
             received.add(event);
             if ("stopped".equals(event.type())) stopped.countDown();
         };
-        long droppedBefore = SCXMLEventPublisher.getStatus().dropped();
-        SCXMLEventPublisher.addListener(listener);
+        long droppedBefore = SCXMLEventBus.getStatus().dropped();
+        SCXMLEventBus.addListener(listener);
         try {
             // This helper constructs a real SkillStateMachine, loads this fixture,
             // applies TestConfig.xml and executes the test skills until End/Fatal.
@@ -60,7 +60,7 @@ public class SCXMLEventIntegrationTest {
             List<SCXMLEvent> events = new ArrayList<>(received);
             assertStrictlyIncreasingSequence(events);
             assertEquals("Publisher lost events during a small real execution",
-                    droppedBefore, SCXMLEventPublisher.getStatus().dropped());
+                    droppedBefore, SCXMLEventBus.getStatus().dropped());
 
             int started = indexOf(events, e -> "started".equals(e.type())
                     && "CheckDatamodel#1".equals(e.details().get("initial")));
@@ -100,7 +100,7 @@ public class SCXMLEventIntegrationTest {
                     events.stream().filter(e -> "datamodel_assignment".equals(e.type())
                             && "val".equals(e.details().get("location"))).count());
         } finally {
-            SCXMLEventPublisher.removeListener(listener);
+            SCXMLEventBus.removeListener(listener);
         }
     }
 
@@ -122,8 +122,8 @@ public class SCXMLEventIntegrationTest {
         };
         // Registration order matters: both callbacks run on the same worker;
         // the legacy callback for an event runs before this listener sees it.
-        SCXMLEventPublisher.addListener(legacy);
-        SCXMLEventPublisher.addListener(listener);
+        SCXMLEventBus.addListener(legacy);
+        SCXMLEventBus.addListener(listener);
         try {
             assertTrue("Real wildcard SCXML execution did not reach End",
                     TestTools.testStatemachine("TestConfig.xml", "variables.xml",
@@ -148,8 +148,8 @@ public class SCXMLEventIntegrationTest {
             assertEquals("Assignments must come from the executed SCXML, in order",
                     List.of("2", "1"), resultingCounts);
         } finally {
-            SCXMLEventPublisher.removeListener(listener);
-            SCXMLEventPublisher.removeListener(legacy);
+            SCXMLEventBus.removeListener(listener);
+            SCXMLEventBus.removeListener(legacy);
         }
     }
 

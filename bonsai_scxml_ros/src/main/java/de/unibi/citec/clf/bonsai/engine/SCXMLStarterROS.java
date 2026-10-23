@@ -3,7 +3,7 @@ package de.unibi.citec.clf.bonsai.engine;
 import de.unibi.citec.clf.bonsai.engine.communication.ROSServer;
 import de.unibi.citec.clf.bonsai.engine.communication.ROSRuntimePublisher;
 import de.unibi.citec.clf.bonsai.engine.communication.SCXMLServer;
-import de.unibi.citec.clf.bonsai.engine.communication.SCXMLEventPublisher;
+import de.unibi.citec.clf.bonsai.engine.communication.SCXMLEventBus;
 import de.unibi.citec.clf.bonsai.ros.RosFactory;
 import org.kohsuke.args4j.Option;
 import org.ros.namespace.GraphName;
@@ -45,7 +45,7 @@ public class SCXMLStarterROS extends SCXMLStarter {
             throw new IllegalStateException("Could not start ROS server", ex);
         }
 
-        SCXMLEventPublisher.addListener(publisher);
+        SCXMLEventBus.addListener(publisher);
         // Publish the initial authoritative status, then ROS 1 latching retains it.
         publisher.publishStatus(stateMachineController.getStatus());
         LOG.info("ROS server started");
