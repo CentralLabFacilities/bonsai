@@ -1,14 +1,14 @@
 package de.unibi.citec.clf.bonsai.test
 
 import de.unibi.citec.clf.bonsai.core.time.Time
-import org.apache.commons.scxml2.SCXMLListener
-import org.apache.commons.scxml2.model.EnterableState
-import org.apache.commons.scxml2.model.Transition
-import org.apache.commons.scxml2.model.TransitionTarget
+import de.unibi.citec.clf.bonsai.engine.communication.SCXMLEventFactory.SCXMLEvent
+import de.unibi.citec.clf.bonsai.engine.communication.SCXMLEventFactory.StateEntered
+import de.unibi.citec.clf.bonsai.engine.communication.SCXMLEventFactory.TransitionOccurred
+import java.util.function.Consumer
 import org.apache.log4j.Logger
 import java.util.concurrent.TimeoutException
 
-class TestListener private constructor() : SCXMLListener {
+class TestListener private constructor() : Consumer<SCXMLEvent> {
     private enum class State {
         running,
         success,
@@ -17,7 +17,7 @@ class TestListener private constructor() : SCXMLListener {
 
     private val enteredStates: Map<String, Int> = HashMap()
     private var requiredSkills: MutableMap<String, Int> = HashMap()
-    private var state = State.running
+    @Volatile private var state = State.running
     private var successState: String? = null
     private var failureState: String? = null
     private var successTransition: String? = null
@@ -38,16 +38,16 @@ class TestListener private constructor() : SCXMLListener {
         successState = state
     }
 
-    override fun onEntry(state: EnterableState) {
+    private fun onEntry(stateId: String) {
         if (this.state != State.running) return
 
-        val cleanStateId = state.id.split('#').firstOrNull() ?: state.id
+        val cleanStateId = stateId.split('#').firstOrNull() ?: stateId
 
         if (requiredSkills.containsKey(cleanStateId)) {
             requiredSkills[cleanStateId] = requiredSkills[cleanStateId]!! - 1
         }
 
-        if (state.id.split(".").last() == successState)
+        if (stateId.split(".").last() == successState)
             if (requiredSkills.isEmpty() || requiredSkills.filter { it.value != 0 }.isEmpty()) {
                 this.state = State.success
             } else {
@@ -60,16 +60,19 @@ class TestListener private constructor() : SCXMLListener {
                 }
             }
 
-        if (state.id == failureState) this.state = State.failure
+        if (stateId == failureState) this.state = State.failure
     }
 
-    override fun onExit(state: EnterableState) {}
-    override fun onTransition(from: TransitionTarget, to: TransitionTarget, transition: Transition, event: String) {
-        if (state != State.running) return
-        if (successTransition != null) {
-            if (transition != null && transition.event == successTransition) {
-                state = State.success
+    override fun accept(change: SCXMLEvent) {
+        when (change) {
+            is StateEntered -> change.state()?.let(::onEntry)
+            is TransitionOccurred -> {
+                if (state == State.running && successTransition != null &&
+                    change.event() == successTransition) {
+                    state = State.success
+                }
             }
+            else -> Unit
         }
     }
 
