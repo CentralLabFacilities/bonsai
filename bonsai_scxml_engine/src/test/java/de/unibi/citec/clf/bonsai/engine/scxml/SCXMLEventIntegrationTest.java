@@ -2,7 +2,8 @@ package de.unibi.citec.clf.bonsai.engine.scxml;
 
 import de.unibi.citec.clf.bonsai.engine.communication.SCXMLEventFactory.SCXMLEvent;
 import de.unibi.citec.clf.bonsai.engine.communication.SCXMLEventBus;
-import de.unibi.citec.clf.bonsai.engine.communication.StateChangePublisher;
+import de.unibi.citec.clf.bonsai.engine.communication.SCXMLRuntimeEventAdapter;
+import de.unibi.citec.clf.bonsai.engine.communication.StatemachineStatus;
 import de.unibi.citec.clf.bonsai.test.TestListener;
 import org.apache.log4j.PropertyConfigurator;
 import org.junit.Before;
@@ -82,6 +83,9 @@ public class SCXMLEventIntegrationTest {
                     && "CheckDatamodel#2".equals(e.details().get("state")));
             int end = indexOf(events, e -> "state_entered".equals(e.type())
                     && "End".equals(e.details().get("state")));
+            int completed = indexOf(events, e -> "completed".equals(e.type())
+                    && "End".equals(e.details().get("state"))
+                    && "success".equals(e.details().get("outcome")));
             int stoppedIndex = indexOf(events, e -> "stopped".equals(e.type()));
 
             assertPresent("started", started, events);
@@ -91,11 +95,15 @@ public class SCXMLEventIntegrationTest {
             assertPresent("declared wildcard transition", transition, events);
             assertPresent("second state entered", secondEntry, events);
             assertPresent("End entered", end, events);
+            assertPresent("natural completion", completed, events);
             assertPresent("stopped", stoppedIndex, events);
             assertTrue("Initialization must precede the value change", initial < assignment);
             assertTrue("First state must be entered before its transition", firstEntry < transition);
             assertTrue("Second state follows first", firstEntry < secondEntry);
-            assertTrue("End must occur before explicit stop", end < stoppedIndex);
+            assertTrue("End must occur before completion", end < completed);
+            assertTrue("Natural completion must precede explicit stop", completed < stoppedIndex);
+            assertEquals("Exactly one completed event per run", 1,
+                    events.stream().filter(e -> "completed".equals(e.type())).count());
             assertEquals("The fixture has exactly one <assign location=\"val\">", 1,
                     events.stream().filter(e -> "datamodel_assignment".equals(e.type())
                             && "val".equals(e.details().get("location"))).count());
@@ -110,10 +118,15 @@ public class SCXMLEventIntegrationTest {
         List<SCXMLEvent> received = new CopyOnWriteArrayList<>();
         List<String> legacyTransitions = new CopyOnWriteArrayList<>();
         CountDownLatch stopped = new CountDownLatch(1);
-        StateChangePublisher legacy = new StateChangePublisher() {
+        SCXMLRuntimeEventAdapter legacy = new SCXMLRuntimeEventAdapter() {
             @Override
-            public void publish(String from, String to, String transition) {
+            public void publishStateChange(String from, String to, String transition) {
                 legacyTransitions.add(from + " -> " + to + " : " + transition);
+            }
+
+            @Override
+            public void publishStatus(StatemachineStatus status) {
+                return;
             }
         };
         Consumer<SCXMLEvent> listener = event -> {
@@ -150,6 +163,56 @@ public class SCXMLEventIntegrationTest {
         } finally {
             SCXMLEventBus.removeListener(listener);
             SCXMLEventBus.removeListener(legacy);
+        }
+    }
+
+    @Test
+    public void fatalTerminationReportsFailureExactlyOnce() throws Exception {
+        List<SCXMLEvent> received = new CopyOnWriteArrayList<>();
+        CountDownLatch stopped = new CountDownLatch(1);
+        Consumer<SCXMLEvent> listener = event -> {
+            received.add(event);
+            if ("stopped".equals(event.type())) stopped.countDown();
+        };
+        SCXMLEventBus.addListener(listener);
+        try {
+            assertFalse("The failure fixture should reach Fatal",
+                    TestTools.testStatemachine("TestConfig.xml", "variablesInDatamodelFailure.xml",
+                            TestListener.newEndFatal()));
+            assertTrue("Timed out waiting for cleanup", stopped.await(5, TimeUnit.SECONDS));
+            List<SCXMLEvent> completions = received.stream()
+                    .filter(e -> "completed".equals(e.type())).toList();
+            assertEquals("Only one natural completion per run", 1, completions.size());
+            assertEquals("Fatal", completions.get(0).details().get("state"));
+            assertEquals("failure", completions.get(0).details().get("outcome"));
+        } finally {
+            SCXMLEventBus.removeListener(listener);
+        }
+    }
+
+    @Test
+    public void stoppingAnUnstartedMachineIsNotNaturalCompletion() throws Exception {
+        var pathSM = getClass().getResource("/state_machines/variablesInDatamodel.xml").getPath();
+        var pathConfig = getClass().getResource("/bonsai_configs/TestConfig.xml").getPath();
+        var skillStateMachine = new de.unibi.citec.clf.bonsai.engine.SkillStateMachine(
+                java.util.Map.of("TEST", getClass().getResource("/state_machines").getPath()));
+        var controller = new de.unibi.citec.clf.bonsai.engine.control.StateMachineController(
+                skillStateMachine, pathConfig, pathSM, false);
+        List<SCXMLEvent> received = new CopyOnWriteArrayList<>();
+        CountDownLatch stopped = new CountDownLatch(1);
+        Consumer<SCXMLEvent> listener = event -> {
+            received.add(event);
+            if ("stopped".equals(event.type())) stopped.countDown();
+        };
+        SCXMLEventBus.addListener(listener);
+        try {
+            assertTrue(controller.load(true).success());
+            controller.stopStateMachine();
+            assertTrue("Timed out waiting for explicit stop", stopped.await(5, TimeUnit.SECONDS));
+            assertTrue("An explicit stop is not natural completion: " + summarize(received),
+                    received.stream().noneMatch(e -> "completed".equals(e.type())));
+        } finally {
+            SCXMLEventBus.removeListener(listener);
         }
     }
 
