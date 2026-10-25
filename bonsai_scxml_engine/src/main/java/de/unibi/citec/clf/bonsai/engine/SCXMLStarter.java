@@ -141,8 +141,10 @@ public abstract class SCXMLStarter {
         stateMachineController = new StateMachineController(skillStateMachine, pathToConfig,
                 pathToTask, exitOnFaliure);
 
-        skillStateMachine.addServer(createServer());
-
+        SCXMLServer server = createServer();
+        if (server != null) {
+            skillStateMachine.addServer(server);
+        }
 
         if (headless) {
             if (autoStartDelay == -1) {
@@ -154,9 +156,14 @@ public abstract class SCXMLStarter {
             stateMachineController.initialize(autoStartDelay, pathToLoggingProperties);
         }
 
+        afterControllerInitialization();
     }
 
+    /** Optional integration server; not every starter needs engine state callbacks. */
     public abstract SCXMLServer createServer();
+
+    /** Runs after controller initialization, for transports with an independent lifecycle. */
+    protected void afterControllerInitialization() { }
 
 
 }

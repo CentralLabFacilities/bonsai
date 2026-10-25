@@ -1,6 +1,7 @@
 package de.unibi.citec.clf.bonsai.engine
 
 import de.unibi.citec.clf.bonsai.engine.communication.SCXMLServer
+import de.unibi.citec.clf.bonsai.engine.communication.web.RuntimeEventWebSocket
 import de.unibi.citec.clf.bonsai.engine.communication.web.WebServer
 import de.unibi.citec.clf.bonsai.engine.communication.web.model.*
 import de.unibi.citec.clf.bonsai.engine.communication.web.serverRoutes
@@ -17,6 +18,7 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.util.*
+import io.ktor.server.websocket.*
 import kotlinx.html.a
 import kotlinx.html.body
 import kotlinx.html.br
@@ -51,16 +53,23 @@ class SCXMLStarterWeb : SCXMLStarter() {
     @Option(name = "-h", aliases = ["--host"], metaVar = "VALUE", usage = "ip address to listen")
     private var host: String = "localhost"
 
-    override fun createServer(): SCXMLServer {
-        srv = WebServer()
-        srv!!.setController(stateMachineController)
+    // The webserver is not an engine SCXMLServer listener. It owns HTTP and WebSocket only.
+    override fun createServer(): SCXMLServer? = null
+
+    override fun afterControllerInitialization() {
+        srv = WebServer(stateMachineController)
+        val runtimeEvents = RuntimeEventWebSocket()
 
         val server = embeddedServer(Netty, port, host) {
+            install(WebSockets)
             install(ContentNegotiation) {
                 json()
             }
             routing {
                 serverRoutes(srv!!)
+                webSocket("/bonsai/events") {
+                    runtimeEvents.handle(this)
+                }
                 get("/") {
                     call.respondHtml(HttpStatusCode.OK) {
                         head {}
@@ -186,11 +195,27 @@ class SCXMLStarterWeb : SCXMLStarter() {
                 }
             }
         }
-        server.start(wait = true)
-
-        logger.info("Web server started")
-
-        return srv!!
+        // Subscribe before binding so events can be delivered from the first connection.
+        // Controller initialization has already finished; blocking here keeps the server alive.
+        try {
+            runtimeEvents.start()
+            Runtime.getRuntime().addShutdownHook(Thread({
+                runtimeEvents.stop()
+                server.stop(1_000, 3_000)
+            }, "bonsai-web-shutdown"))
+            logger.info("Starting web server on $host:$port")
+            server.start(wait = true)
+        } catch (failure: Throwable) {
+            runtimeEvents.stop()
+            try {
+                server.stop(0, 0)
+            } catch (cleanupFailure: Throwable) {
+                failure.addSuppressed(cleanupFailure)
+            }
+            throw failure
+        } finally {
+            runtimeEvents.stop()
+        }
     }
 
     @OptIn(ExperimentalTime::class)
