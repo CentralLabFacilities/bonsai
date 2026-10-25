@@ -186,6 +186,9 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
      * Is the state machine stopped?
      */
     private boolean running = false;
+
+    private boolean completionPublished = true;
+
     private enum InitlializedState {
         FALSE, TRUE, CONFIG_ERROR
     }
@@ -594,6 +597,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
 
         try {
             logger.info("\n#######################\nSTARTING STATE MACHINE\n#######################");
+            completionPublished = false;
             running = true;
             SCXMLEventBus.publish(SCXMLEventFactory.started(scxml.getInitial()));
             SCXMLEventBus.publish(SCXMLEventFactory.status("RUNNING"));
@@ -627,6 +631,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
      */
     public synchronized void stopMachine() {
         logger.info("STOP STATE MACHINE");
+        completionPublished = true;
         running = false;
 
         Set<StateID> keys = new HashSet<>(activeStates.keySet());
@@ -734,6 +739,19 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
             }
         }
 
+        // Apache SCXML Final extends EnterableState, not State. Only a root-level
+        // <final> terminates the entire machine; nested finals finish a region.
+        if (entered instanceof Final && entered.getParent() == null) {
+            running = false;
+            logger.debug("\tOnEntry: entered final State");
+            if (!completionPublished) {
+                completionPublished = true;
+                SCXMLEventBus.publish(SCXMLEventFactory.completed(entered.getId(),
+                        "Fatal".equals(entered.getId()) ? "failure" : "success"));
+            }
+            SCXMLEventBus.publish(SCXMLEventFactory.status(getStatemachineStatus().name()));
+        }
+
         // Invoke state
         if (entered instanceof State) {
             State toEnter = (State) entered;
@@ -742,9 +760,16 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
 
                 StateID state = new StateID(config.statePrefix, entered.getId());
 
-                if (entered instanceof Final | isEndState(state.getCanonicalSkill())) {
+                if (isEndState(state.getCanonicalSkill())) {
                     running = false;
                     logger.debug("\tOnEntry: entered final State");
+                    // A nested <final> completes its enclosing region, not the whole machine.
+                    // Bonsai's custom End/Fatal states only finish the machine at the root.
+                    if (!completionPublished && entered.getParent() == null) {
+                        completionPublished = true;
+                        SCXMLEventBus.publish(SCXMLEventFactory.completed(entered.getId(),
+                                "Fatal".equals(state.getCanonicalSkill()) ? "failure" : "success"));
+                    }
                     SCXMLEventBus.publish(SCXMLEventFactory.status(getStatemachineStatus().name()));
                 }
 
