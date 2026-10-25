@@ -30,8 +30,8 @@ public final class SCXMLEventBus {
     private static final Dispatcher DISPATCHER = new Dispatcher(
             SETTINGS.queueCapacity(), "bonsai-scxml-events");
 
-    // automatically shut publisher down when JVM shuts down
     static {
+        SCXMLEventRecorder.startIfEnabled();
         Runtime.getRuntime().addShutdownHook(new Thread(SCXMLEventBus::shutdown, "bonsai-scxml-events-shutdown"));
     }
 
@@ -57,6 +57,7 @@ public final class SCXMLEventBus {
     /** Called during JVM shutdown */
     public static void shutdown() {
         DISPATCHER.shutdown(SETTINGS.shutdownTimeoutMs());
+        SCXMLEventRecorder.stopIfStarted();
     }
 
     public record PublisherStatus(long accepted, long delivered, long dropped,

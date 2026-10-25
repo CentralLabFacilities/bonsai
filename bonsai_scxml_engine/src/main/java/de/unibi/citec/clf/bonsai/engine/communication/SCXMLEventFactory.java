@@ -25,6 +25,10 @@ public final class SCXMLEventFactory {
     public static SCXMLEvent stateExited(String state) { return SCXMLEvent.of("state_exited", "state", state); }
     public static SCXMLEvent started(String initial) { return SCXMLEvent.of("started", "initial", initial); }
     public static SCXMLEvent stopped() { return SCXMLEvent.of("stopped"); }
+    /** Natural completion of the entire state machine, not an intermediate nested final state. */
+    public static SCXMLEvent completed(String state, String outcome) {
+        return SCXMLEvent.of("completed", "state", state, "outcome", outcome);
+    }
     public static SCXMLEvent status(String value) { return SCXMLEvent.of("status", "value", value); }
     public static SCXMLEvent externalParameter(String name, String value) {
         return SCXMLEvent.of("parameter", "name", name, "value", value, "newValue", value,
