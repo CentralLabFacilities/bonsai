@@ -2,6 +2,7 @@ package de.unibi.citec.clf.bonsai.engine.communication.web
 
 import de.unibi.citec.clf.bonsai.engine.communication.SCXMLEventBus
 import de.unibi.citec.clf.bonsai.engine.communication.SCXMLEventFactory.SCXMLEvent
+import de.unibi.citec.clf.bonsai.engine.communication.SCXMLEventSerializer
 import io.ktor.server.websocket.DefaultWebSocketServerSession
 import io.ktor.websocket.CloseReason
 import io.ktor.websocket.Frame
@@ -19,17 +20,14 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.apache.log4j.Logger
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.function.Consumer
-import kotlin.time.Duration.Companion.milliseconds
 
-
+/** One process-wide event-bus subscriber; each browser gets an independent bounded send queue. */
 class RuntimeEventWebSocket {
     private val log = Logger.getLogger(RuntimeEventWebSocket::class.java)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -41,6 +39,7 @@ class RuntimeEventWebSocket {
     }
     private var healthJob: Job? = null
 
+    /** Called once by the webserver owner, before it begins accepting connections. */
     fun start() {
         check(!closed.get()) { "Runtime event WebSocket has been stopped" }
         if (!started.compareAndSet(false, true)) return
@@ -49,7 +48,7 @@ class RuntimeEventWebSocket {
             SCXMLEventBus.addListener(busListener)
             healthJob = scope.launch {
                 while (isActive) {
-                    delay(HEALTH_CHECK_MS.milliseconds)
+                    delay(HEALTH_CHECK_MS)
                     val dropped = SCXMLEventBus.getStatus().dropped()
                     if (dropped > previousDropped) {
                         broadcast(incompleteNotification(dropped - previousDropped))
@@ -82,7 +81,7 @@ class RuntimeEventWebSocket {
                 clients.remove(client)
                 scope.launch {
                     try {
-                        withTimeoutOrNull(CLOSE_TIMEOUT_MS.milliseconds) {
+                        withTimeoutOrNull(CLOSE_TIMEOUT_MS) {
                             session.close(CloseReason(CloseReason.Codes.GOING_AWAY, "Connection lost"))
                         }
                     } catch (failure: Exception) {
@@ -126,7 +125,7 @@ class RuntimeEventWebSocket {
                     client.queue.cancel()
                     client.writer.cancel()
                     try {
-                        withTimeoutOrNull(CLOSE_TIMEOUT_MS.milliseconds) {
+                        withTimeoutOrNull(CLOSE_TIMEOUT_MS) {
                             client.session.close(CloseReason(CloseReason.Codes.TRY_AGAIN_LATER, "Runtime event queue overflow"))
                         }
                     } catch (failure: Exception) {
@@ -148,13 +147,7 @@ class RuntimeEventWebSocket {
         private const val CLOSE_TIMEOUT_MS = 2_000L
 
         /** Fields are exactly those of the engine's SCXMLEvent record; no web event DTO. */
-        internal fun serialize(event: SCXMLEvent): String = buildJsonObject {
-            put("type", event.type())
-            put("timestamp", event.timestamp().toString())
-            put("details", JsonObject(event.details().mapValues { JsonPrimitive(it.value) }))
-            put("sequence", event.sequence())
-            put("values", JsonObject(event.values().mapValues { JsonPrimitive(it.value) }))
-        }.toString()
+        internal fun serialize(event: SCXMLEvent): String = SCXMLEventSerializer.serialize(event)
 
         internal fun incompleteNotification(newlyDropped: Long): String = buildJsonObject {
             put("type", "stream_incomplete")
