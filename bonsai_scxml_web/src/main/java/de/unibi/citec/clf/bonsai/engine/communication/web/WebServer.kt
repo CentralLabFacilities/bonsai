@@ -1,14 +1,10 @@
 package de.unibi.citec.clf.bonsai.engine.communication.web
 
-import de.unibi.citec.clf.bonsai.engine.SCXMLStarterWeb.Companion.logger
-import de.unibi.citec.clf.bonsai.engine.communication.SCXMLServerWithControl
-import de.unibi.citec.clf.bonsai.engine.communication.StatemachineStatus
 import de.unibi.citec.clf.bonsai.engine.communication.web.model.LoadData
 import de.unibi.citec.clf.bonsai.engine.communication.web.model.LoadingResult
 import de.unibi.citec.clf.bonsai.engine.communication.web.model.StateIds
 import de.unibi.citec.clf.bonsai.engine.communication.web.model.Transitions
 import de.unibi.citec.clf.bonsai.engine.control.StateMachineController
-import de.unibi.citec.clf.bonsai.engine.scxml.BonsaiTransition
 import io.ktor.http.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
@@ -19,74 +15,46 @@ import org.apache.log4j.Logger
 /**
  * @author lruegeme
  */
-class WebServer : SCXMLServerWithControl {
-    private var smc: StateMachineController? = null
-
-    override fun setController(stateMachineController: StateMachineController?) {
-        this.smc = stateMachineController
-    }
-
-    override fun shutdown() {
-        logger.info("Shutting down WebServer")
-    }
-
-    override fun sendStatesWithTransitions(): Boolean {
-        return true
-    }
-
-    override fun sendCurrentStates(states: MutableList<String?>?) {
-        logger.debug("Sending current states")
-    }
-
-    override fun sendCurrentStatesAndTransitions(
-        states: MutableList<String?>?,
-        transitions: MutableList<BonsaiTransition?>?
-    ) {
-        logger.debug("Sending current states and transitions")
-    }
-
-    override fun sendStatus(status: StatemachineStatus?) {
-        logger.debug("Sending current status")
-    }
+class WebServer(private val smc: StateMachineController) {
 
     companion object {
         private val logger: Logger = Logger.getLogger(WebServer::class.java)
     }
 
     fun fireEvent(event: String) {
-        smc!!.fireEvent(event)
+        smc.fireEvent(event)
     }
 
-    fun getCurrentStates(): StateIds {
-        return StateIds(smc!!.currentStateList)
+    fun getCurrentStates(all: Boolean = false): StateIds {
+        return StateIds(smc.getCurrentStateList(all))
     }
 
     fun getStateIds(): StateIds {
-        return StateIds(smc!!.allStateIds)
+        return StateIds(smc.allStateIds)
     }
 
     fun getTransitions(): Transitions {
-        return Transitions(smc!!.possibleTransitions.map { it.event })
+        return Transitions(smc.possibleTransitions.map { it.event })
     }
 
     fun pause() {
-        smc!!.pauseStateMachine()
+        smc.pauseStateMachine()
     }
 
     fun resume() {
-        smc!!.continueStateMachine()
+        smc.continueStateMachine()
     }
 
     fun start(state: String) {
-        smc!!.executeStateMachine(state)
+        smc.executeStateMachine(state)
     }
 
     fun stop() {
-        smc!!.stopStateMachine()
+        smc.stopStateMachine()
     }
 
     fun stopAutomaticEvents(b: Boolean) {
-        smc!!.enableAutomaticEvents(b)
+        smc.enableAutomaticEvents(b)
     }
 
     fun load(loadData: LoadData
@@ -94,7 +62,7 @@ class WebServer : SCXMLServerWithControl {
         val msg = mutableListOf<String>()
         var success = false
         try {
-            val results = smc!!.load(loadData.pathToConfig, loadData.pathToTask, loadData.forceConfigure)
+            val results = smc.load(loadData.pathToConfig, loadData.pathToTask, loadData.forceConfigure)
             success = results.success()
             msg.addAll(results.loadingExceptions.map { it.message.toString() })
             msg.addAll(results.validationResult.stateNotFoundException.map { it.message.toString() })
@@ -116,7 +84,6 @@ class WebServer : SCXMLServerWithControl {
 fun Route.serverRoutes(server: WebServer) {
     route("/bonsai") {
         post("/load") {
-            logger.debug("POST /load")
             val params = call.receive<LoadData>()
             call.respond(server.load(params))
         }
@@ -127,7 +94,8 @@ fun Route.serverRoutes(server: WebServer) {
             call.respond(server.getStateIds())
         }
         get("/states") {
-            call.respond(server.getCurrentStates())
+            val all = call.request.queryParameters["all"] == "true"
+            call.respond(server.getCurrentStates(all))
         }
         post("/stop") {
             server.stop()
