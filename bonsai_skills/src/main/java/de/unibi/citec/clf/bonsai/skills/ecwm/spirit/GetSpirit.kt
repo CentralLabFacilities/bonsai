@@ -8,11 +8,10 @@ import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
-import de.unibi.citec.clf.btl.data.world.Entity
 import de.unibi.citec.clf.btl.data.ecwm.Spirit
 import de.unibi.citec.clf.btl.data.ecwm.StorageArea
+import de.unibi.citec.clf.btl.data.world.Entity
 import java.util.concurrent.Future
-import kotlin.collections.iterator
 
 /**
  * Fetches any Spirit from an ECWM Entity, does not check if goal is reachable
@@ -22,8 +21,8 @@ import kotlin.collections.iterator
  * Options:
  *  entity:             [String] Optional
  *                          -> Entity Name to fetch goals from
- *  spirit:             [String]
- *                          -> Name of the Spirit to get
+ *  afford:             [String]
+ *                          -> The affordance Name of the Spirit to get
  *  storage:            [String] Optional (default "")
  *                          -> Storage of the spirit, if this parameter is set 'use_storage' is set to true
  *  use_storage:        [Boolean] Optional (default false)
@@ -55,7 +54,7 @@ import kotlin.collections.iterator
 class GetSpirit : AbstractSkill() {
 
     private val KEY_ENTITY = "entity"
-    private val KEY_SPIRIT = "spirit"
+    private val KEY_AFFORDANCE = "afford"
     private val KEY_STORAGE = "storage"
     private val KEY_USE_STORAGE = "use_storage"
     private val KEY_USE_STORAGE_S = "use_storage_string"
@@ -107,7 +106,7 @@ class GetSpirit : AbstractSkill() {
 
         }
 
-        spiritname = configurator.requestValue(KEY_SPIRIT)
+        spiritname = configurator.requestValue(KEY_AFFORDANCE)
 
 
     }

@@ -19,7 +19,7 @@ interface ECWMSpirit : Actuator {
         USE_NEAREST(2);
     }
 
-    enum class SpiritGoalStatus(val value: Int) {
+    enum class SpiritGoalStatus(val value: Byte) {
         SUCCESS(0),
         BLOCKED(1),
         BLOCKED_HANDLE_FAILED(2),
@@ -27,7 +27,7 @@ interface ECWMSpirit : Actuator {
         MISSING_SPIRIT(12),
         UNKNOWN_ERROR(100);
         companion object {
-            private val BY_INT: MutableMap<Int, SpiritGoalStatus> = HashMap()
+            private val BY_INT: MutableMap<Byte, SpiritGoalStatus> = HashMap()
 
             init {
                 for (e in SpiritGoalStatus.entries) {
@@ -35,7 +35,7 @@ interface ECWMSpirit : Actuator {
                 }
             }
 
-            fun valueOf(i: Int): SpiritGoalStatus {
+            fun valueOf(i: Byte): SpiritGoalStatus {
                 return BY_INT[i] ?: UNKNOWN_ERROR
             }
         }
@@ -50,7 +50,7 @@ interface ECWMSpirit : Actuator {
      * @param onBlocked how to handle if everything is blocked (nearest/best disregard global costmap for planning)
      */
     @Throws(IOException::class)
-    fun getSpiritGoal(entity: Entity, spirit: String?, storage: String?, forceMoveThreshold: Int = 255, onBlocked: BlockageHandling = BlockageHandling.USE_NEAREST, considerRoom : Boolean = true): Future<SpiritGoalResult?>
+    fun getSpiritGoal(entity: Entity, affordance: String?, storage: String?, forceMoveThreshold: Int = 255, onBlocked: BlockageHandling = BlockageHandling.USE_NEAREST, considerRoom : Boolean = true): Future<SpiritGoalResult?>
     fun getSpiritGoal(spirit: Spirit, forceMoveThreshold: Int = 255, onBlocked: BlockageHandling = BlockageHandling.USE_NEAREST, considerRoom : Boolean = true): Future<SpiritGoalResult?>
     fun getSpiritGoalCurrent(spirit: Spirit, onBlocked: BlockageHandling = BlockageHandling.USE_NEAREST, blockedMaxDist: Float = 0.2f): Future<SpiritGoal?>
 

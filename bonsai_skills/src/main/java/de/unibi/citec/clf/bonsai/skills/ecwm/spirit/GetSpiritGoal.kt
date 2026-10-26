@@ -13,7 +13,6 @@ import de.unibi.citec.clf.btl.data.ecwm.SpiritGoal
 import de.unibi.citec.clf.btl.data.navigation.NavigationGoalData
 import de.unibi.citec.clf.btl.data.world.Entity
 import java.util.concurrent.Future
-import kotlin.collections.iterator
 
 /**
  * Fetches Navigation and Spirit Goals from an ECWM Entity
@@ -23,8 +22,8 @@ import kotlin.collections.iterator
  * Options:
  *  entity:     [String] Optional
  *                  -> Entity Name to fetch goals from
- *  spirit:     [String] Optional
- *                  -> Name of the spirit
+ *  afford:     [String] Optional
+ *                  -> The affordance Name of the spirit
  *  storage     [String] Optional
  *                  -> Which storage the spirit is from (manually defined use key "")
  *  force_move: [Boolean] Optional
@@ -63,7 +62,7 @@ class GetSpiritGoal : AbstractSkill() {
     private var spiritSlot: MemorySlotReader<Spirit>? = null
 
     private val KEY_ENTITY = "entity"
-    private val KEY_SPIRIT = "spirit"
+    private val KEY_AFFORDANCE = "afford"
     private val KEY_STORAGE = "storage"
     private val KEY_FORCE_MOVE = "force_move"
     private val KEY_ROOM = "consider_room"
@@ -109,7 +108,7 @@ class GetSpiritGoal : AbstractSkill() {
             if (!configurator.hasConfigurationKey(KEY_STORAGE)) {
                 storage = configurator.getReadSlot("Storage", String::class.java)
             }
-            spiritName = configurator.requestOptionalValue(KEY_SPIRIT, spiritName)
+            spiritName = configurator.requestOptionalValue(KEY_AFFORDANCE, spiritName)
         }
 
         forceMove = configurator.requestOptionalBool(KEY_FORCE_MOVE, forceMove)
