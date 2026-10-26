@@ -5,12 +5,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/**
- * Runtime representation of the documentation belonging to a skill class.
- *
- * <p>The value is injected into compiled skill classes during the Maven build
- * by the Bonsai Dokka plugin.</p>
- */
+/** Runtime representation of a skill class description. */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
 public @interface SkillDocumentation {

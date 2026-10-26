@@ -9,23 +9,6 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 /**
  * Wait for a specified amount of time.
  *
- * <pre>
- *
- * Options:
- *  #_TIMEOUT:  [double] Required 
- *                  -> Time to wait in ms. Note that times will effectively be rounded up to half second intervals
- *
- * Slots:
- *
- * ExitTokens:
- *  success:    Specified time elapsed
- *
- * Sensors:
- *
- * Actuators:
- *
- * </pre>
- *
  * @author lkettenb
  * @author jkummert
  */
@@ -39,9 +22,9 @@ public class Wait extends AbstractSkill {
     @Override
     public void configure(ISkillConfigurator configurator) {
 
-        timeout = configurator.requestOptionalInt(DEFAULT_KEY, (int)timeout);
+        timeout = configurator.requestOptionalInt(DEFAULT_KEY, (int)timeout, "How long the skill should wait");
         
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
+        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS(), "Successfully waited");
     }
 
     @Override
