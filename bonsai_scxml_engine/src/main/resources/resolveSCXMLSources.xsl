@@ -8,7 +8,9 @@ the 'src' attribute of states. - Appends a suffix to all sourced 'id' and
 <xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
                 version="2.0" xpath-default-namespace="http://www.w3.org/2005/07/scxml"
                 xmlns:map="xalan://java.util.Map"
-                extension-element-prefixes="map">
+                xmlns:editor="http://bonsai.cit-ec.uni-bielefeld.de/editor"
+                extension-element-prefixes="map"
+                exclude-result-prefixes="editor">
 
     <xsl:output method="xml" encoding="UTF-8" indent="yes"/>
 
@@ -18,6 +20,10 @@ the 'src' attribute of states. - Appends a suffix to all sourced 'id' and
             <xsl:apply-templates select="node()|@*"/>
         </xsl:copy>
     </xsl:template>
+
+    <!-- Strip editor-specific annotations from the SCXML used by the runtime.
+         This applies to the main document and all sourced SCXML documents. -->
+    <xsl:template match="editor:* | @editor:*" priority="10"/>
 
     <!-- Special template for states with 'src' attribute. -->
     <xsl:template match="@src">
