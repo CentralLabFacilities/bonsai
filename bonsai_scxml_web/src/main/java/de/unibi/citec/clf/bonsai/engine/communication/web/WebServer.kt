@@ -67,6 +67,8 @@ class WebServer(private val smc: StateMachineController) {
             msg.addAll(results.loadingExceptions.map { it.message.toString() })
             msg.addAll(results.validationResult.stateNotFoundException.map { it.message.toString() })
             msg.addAll(results.validationResult.transitionNotFoundException.map { it.message })
+            msg.addAll(results.configurationResults.configurationExceptions.map {it.message.toString()})
+            msg.addAll(listOf(results.stateMachineResults.toString(true)))
 
             logger.info("ConfigurationResults:\n${results.configurationResults}")
             logger.info("ValidationResults:\n${results.validationResult}")
