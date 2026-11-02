@@ -53,6 +53,7 @@ interface ECWMSpirit : Actuator {
     fun getSpiritGoal(entity: Entity, affordance: String?, storage: String?, forceMoveThreshold: Int = 255, onBlocked: BlockageHandling = BlockageHandling.USE_NEAREST, considerRoom : Boolean = true): Future<SpiritGoalResult?>
     fun getSpiritGoal(spirit: Spirit, forceMoveThreshold: Int = 255, onBlocked: BlockageHandling = BlockageHandling.USE_NEAREST, considerRoom : Boolean = true): Future<SpiritGoalResult?>
     fun getSpiritGoalCurrent(spirit: Spirit, onBlocked: BlockageHandling = BlockageHandling.USE_NEAREST, blockedMaxDist: Float = 0.2f): Future<SpiritGoal?>
+    fun checkSpirit(entity: Entity, affordance: String, storage: String?): Future<SpiritGoal?>
 
     @Throws(IOException::class)
     fun getRoomsOf(pose : Pose3D): Future<EntityList?>
