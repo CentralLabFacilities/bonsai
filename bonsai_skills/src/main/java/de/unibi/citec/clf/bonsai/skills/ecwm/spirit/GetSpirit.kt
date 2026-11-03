@@ -79,19 +79,19 @@ class GetSpirit : AbstractSkill() {
     override fun configure(configurator: ISkillConfigurator) {
         tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
 
-        spiritSlot = configurator.getWriteSlot("Spirit", Spirit::class.java)
+        spiritSlot = configurator.getWriteSlot("Spirit", Spirit::class.java, "The Spirit")
 
         ecwmRobocup = configurator.getActuator("ECWMRobocup", ECWMRobocup::class.java)
 
-        entityname = configurator.requestOptionalValue(KEY_ENTITY, entityname)
+        entityname = configurator.requestOptionalValue(KEY_ENTITY, entityname, "Entity Name to fetch goals from")
         if (!configurator.hasConfigurationKey(KEY_ENTITY)) {
-            entity = configurator.getReadSlot("Entity", Entity::class.java)
+            entity = configurator.getReadSlot("Entity", Entity::class.java, "Entity to fetch goals from, is used if the 'entity' option is not set")
         }
 
-        useStorage = configurator.requestOptionalBool(KEY_USE_STORAGE, useStorage)
-        useStorageS = configurator.requestOptionalBool(KEY_USE_STORAGE_S, useStorageS)
+        useStorage = configurator.requestOptionalBool(KEY_USE_STORAGE, useStorage, "If use_storage is false, finds the first matching one if multiple exists")
+        useStorageS = configurator.requestOptionalBool(KEY_USE_STORAGE_S, useStorageS, "Use a String slot to get storage name")
 
-        storagename = configurator.requestOptionalValue(KEY_STORAGE, storagename)
+        storagename = configurator.requestOptionalValue(KEY_STORAGE, storagename, "Storage of the spirit, if this parameter is set 'use_storage' is set to true.")
         if (configurator.hasConfigurationKey(KEY_STORAGE)) {
             if(!useStorage) {
                 useStorage = true
@@ -99,14 +99,14 @@ class GetSpirit : AbstractSkill() {
             }
         } else if (useStorage) {
             if(useStorageS) {
-                storageS = configurator.getReadSlot("StorageName", String::class.java)
+                storageS = configurator.getReadSlot("StorageName", String::class.java, "The Storage, only read if use_storage is set and storage parameter is not set.")
             } else {
-                storage = configurator.getReadSlot("Storage", StorageArea::class.java)
+                storage = configurator.getReadSlot("Storage", StorageArea::class.java, "The Storage, only read if use_storage is set and storage parameter is not set.")
             }
 
         }
 
-        spiritname = configurator.requestValue(KEY_AFFORDANCE)
+        spiritname = configurator.requestValue(KEY_AFFORDANCE, "The affordance Name of the Spirit to get")
 
 
     }

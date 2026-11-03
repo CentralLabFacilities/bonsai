@@ -41,13 +41,13 @@ class GetEntitiesByType : AbstractSkill() {
     private var exp: String = ""
 
     override fun configure(configurator: ISkillConfigurator) {
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
-        tokenError = configurator.requestExitToken(ExitStatus.ERROR())
+        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS(), "Got Entities")
+        tokenError = configurator.requestExitToken(ExitStatus.ERROR(), "No Matching Entities found")
 
-        slot = configurator.getWriteSlot("EntityList", EntityList::class.java)
+        slot = configurator.getWriteSlot("EntityList", EntityList::class.java, "All Entities of the given type")
         ecwm = configurator.getActuator("ECWMCore", WorldModel::class.java)
 
-        exp = configurator.requestOptionalValue(KEY_EXPRESSION, exp)
+        exp = configurator.requestOptionalValue(KEY_EXPRESSION, exp, "The type")
     }
 
     override fun init(): Boolean {
