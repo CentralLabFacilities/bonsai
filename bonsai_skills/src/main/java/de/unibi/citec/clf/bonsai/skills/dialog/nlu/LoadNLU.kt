@@ -43,7 +43,7 @@ import de.unibi.citec.clf.btl.data.speech.NLUEntity
  */
 class LoadNLU : AbstractSkill() {
     override fun getSkillDescription(): String? {
-        return "Load an NLU with the given #_INTENT into a slot. Takes Parametes of the form #ENTITY:ROLE:GROUP" to create entities example:"
+        return "Load an NLU with the given #_INTENT into a slot. Takes Parametes of the form `#ENTITY:ROLE:GROUP` to create entities example:"
     }
 
 
