@@ -8,10 +8,6 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
 import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException;
 import org.apache.log4j.Logger;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
 import java.util.Map;
 
 
@@ -22,6 +18,10 @@ import java.util.Map;
  * @author lkettenb
  */
 public abstract class AbstractSkill {
+
+    public String getSkillDescription() {
+        return "";
+    }
 
     /**
      * The Logger.
@@ -43,17 +43,6 @@ public abstract class AbstractSkill {
      * @see ExitToken
      */
     public abstract boolean init();
-
-    /**
-     * Returns the Skills javadoc
-     * @return
-     */
-    public String getDoc() {
-        SkillDocumentation doc =
-                getClass().getAnnotation(SkillDocumentation.class);
-
-        return doc != null ? doc.value() : "";
-    }
 
     /**
      * Main function of a state that contains the actual logic and (sub-) skill.
