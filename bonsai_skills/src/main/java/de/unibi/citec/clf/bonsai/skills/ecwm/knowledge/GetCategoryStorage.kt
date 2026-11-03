@@ -92,9 +92,14 @@ class GetCategoryStorage : AbstractSkill() {
 
         ecwm = configurator.getActuator<ECWMRobocup>("ECWMRobocup", ECWMRobocup::class.java)
 
-        val useCatSlot = configurator.requestOptionalBool(KEY_USE_CATEGORY_SLOT, false)
-        val useModelSlot = configurator.requestOptionalBool(KEY_USE_MODEL_SLOT, false)
-        category = configurator.requestOptionalValue(KEY_CATEGORY, "")
+        var useCatSlot = false
+        var useModelSlot = false
+
+        category = configurator.requestOptionalValue(KEY_CATEGORY, "", "category to get storage for, uses slots if unset")
+        if(!configurator.hasConfigurationKey(KEY_CATEGORY)) {
+            useCatSlot = configurator.requestOptionalBool(KEY_USE_CATEGORY_SLOT, false, "use String instead of Entity slot")
+            useModelSlot = configurator.requestOptionalBool(KEY_USE_MODEL_SLOT, false, "use Model instead of Entity slot")
+        }
 
         if (!category.isEmpty() && useCatSlot || !category.isEmpty() && useModelSlot) {
             throw ConfigurationException("Cant combine $KEY_CATEGORY with $KEY_USE_MODEL_SLOT or $KEY_USE_CATEGORY_SLOT")
@@ -123,7 +128,8 @@ class GetCategoryStorage : AbstractSkill() {
         storageSlot = configurator.getWriteSlot<String>("Storage", String::class.java)
         containerSlot = configurator.getWriteSlot<Entity>("Container", Entity::class.java)
 
-        message = configurator.requestOptionalValue(KEY_MSG, message)
+        message = configurator.requestOptionalValue(KEY_MSG, message, "speak a message, Placeholders: \n\t#S=storage \n\t#C=category \n\t#E=entity_id \n\t#N=givenName")
+
         if (message.isNotEmpty()) {
             speechActuator = configurator.getActuator<SpeechActuator>("SpeechActuator", SpeechActuator::class.java)
         }
