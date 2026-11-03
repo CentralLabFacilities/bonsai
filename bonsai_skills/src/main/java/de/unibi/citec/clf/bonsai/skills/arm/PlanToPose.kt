@@ -19,6 +19,10 @@ import java.util.logging.Logger
  * @author lruegeme
  */
 class PlanToPose : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Arm moves to the pose given in the Key #_POSE. grasp_up, fold_up, carry_side, home"
+    }
+
 
     companion object {
         private const val KEY_ACTUATOR = "#_ACTUATOR"

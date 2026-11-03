@@ -52,6 +52,10 @@ import java.util.concurrent.Future
  * @author lruegeme
  */
 class GetSpirit : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Fetches any Spirit from an ECWM Entity, does not check if goal is reachable"
+    }
+
 
     private val KEY_ENTITY = "entity"
     private val KEY_AFFORDANCE = "afford"

@@ -62,6 +62,10 @@ import java.util.concurrent.Future
  * @author jkummert
  */
 class ConfirmYesOrNo : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Wait for confirmation by a speech command using NLU."
+    }
+
     private var confirmText = "Was that correct?"
     private var simpleYesOrNo = true
     private var timeout: Long = -1

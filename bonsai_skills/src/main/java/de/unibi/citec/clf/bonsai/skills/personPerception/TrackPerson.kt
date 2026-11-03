@@ -44,6 +44,10 @@ import java.util.concurrent.Future
  * @author lruegeme
  */
 class TrackPerson : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Starts tracking a person based on the person data stored in memory. The tracking target is normally calculated from the person's position. If a valid head position is available, the head position is used instead."
+    }
+
     private var tokenSuccess: ExitToken? = null
     private var tokenError: ExitToken? = null
     private var trackingActuator: TrackingActuator? = null

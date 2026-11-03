@@ -45,6 +45,10 @@ import java.util.concurrent.Future
 
 
 class LLMQuery : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Send a query to an LLM and optionally wait for the response."
+    }
+
 
     companion object {
         private const val KEY_TIMEOUT = "#_TIMEOUT"

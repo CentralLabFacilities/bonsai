@@ -62,6 +62,10 @@ import java.util.concurrent.Future
  */
 
 class RecognizeEntities : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Detects objects view and uses segmentation to return only those that are inside an entities' storage."
+    }
+
 
     private val KEY_STORE = "#_store"
     private val KEY_CLEAR = "#_clear"

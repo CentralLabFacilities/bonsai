@@ -44,6 +44,10 @@ import java.util.concurrent.Future
  * @author lruegeme, jzilke
  */
 class AttachEntity : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Attach an ECWM Entity to the gripper."
+    }
+
 
     private val KEY_NAME = "entity"
     private val KEY_TYPE = "type"

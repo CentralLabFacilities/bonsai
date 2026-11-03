@@ -21,6 +21,11 @@ import static de.unibi.citec.clf.btl.units.LengthUnit.METER;
  */
 public class WaitForOpenDoor extends AbstractSkill implements
         SensorListener<LaserData> {
+    @Override
+    public String getSkillDescription() {
+        return "Use this state to wait until the door opens.";
+    }
+
 
     private static final String KEY_TIMEOUT = "#_TIMEOUT";
     private static final String KEY_DIFF = "#_DIFF";

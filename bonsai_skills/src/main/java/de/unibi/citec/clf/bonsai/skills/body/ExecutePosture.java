@@ -18,6 +18,11 @@ import java.util.concurrent.Future;
  *
  */
 public class ExecutePosture extends AbstractSkill {
+    @Override
+    public String getSkillDescription() {
+        return "Executes a prerecorded movement.";
+    }
+
 
     // used tokens
     private ExitToken tokenSuccess;

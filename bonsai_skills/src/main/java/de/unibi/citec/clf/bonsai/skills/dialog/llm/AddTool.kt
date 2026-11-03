@@ -36,6 +36,10 @@ import de.unibi.citec.clf.btl.data.speech.llm.ToolParameter
  */
 
 class AddTool : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Add a tool to a list of available tools."
+    }
+
 
     companion object {
         private const val KEY_NAME = "#_NAME"

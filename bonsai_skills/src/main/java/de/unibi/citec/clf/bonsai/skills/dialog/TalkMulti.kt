@@ -41,6 +41,10 @@ import java.util.concurrent.Future
  * @author lruegeme
  */
 class TalkMulti : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Use this state to let the robot talk multilingual. Reads the Language slot to determine what text to speak"
+    }
+
     companion object {
         private const val KEY_INTERRUPT = "#_INTERRUPTIBLE"
         private const val KEY_MESSAGE_PREFIX = "#_MSG_"

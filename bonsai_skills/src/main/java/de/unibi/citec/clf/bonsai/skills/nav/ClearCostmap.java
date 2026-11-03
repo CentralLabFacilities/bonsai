@@ -33,6 +33,11 @@ import java.io.IOException;
  * @author jkummert
  */
 public class ClearCostmap extends AbstractSkill {
+    @Override
+    public String getSkillDescription() {
+        return "Clear the entire costmap.";
+    }
+
 
     private ExitToken tokenSuccess;
 

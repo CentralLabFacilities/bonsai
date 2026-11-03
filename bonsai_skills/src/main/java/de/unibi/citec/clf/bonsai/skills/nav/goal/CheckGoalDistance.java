@@ -40,6 +40,11 @@ import java.io.IOException;
  * @author pdressel, cklarhor, jkummert
  */
 public class CheckGoalDistance extends AbstractSkill {
+    @Override
+    public String getSkillDescription() {
+        return "Check if the robot is in distance of a navigation goal.";
+    }
+
 
     private static final String KEY_DISTANCE = "#_GOAL_DISTANCE";
 

@@ -67,6 +67,11 @@ import java.util.concurrent.Future;
  * @author jkummert
  */
 public class FollowPersonNeedsFix extends AbstractSkill {
+    @Override
+    public String getSkillDescription() {
+        return "Drive to a given person.";
+    }
+
 
     private static final String KEY_PERSON_LOST_TIMEOUT = "#_PERSON_LOST_TIMEOUT";
     private static final String KEY_STOP_DISTANCE = "#_STOP_DISTANCE";

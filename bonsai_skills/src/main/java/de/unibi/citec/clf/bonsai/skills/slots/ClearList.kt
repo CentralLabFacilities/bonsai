@@ -32,6 +32,10 @@ import java.lang.reflect.InvocationTargetException
  * @author lruegeme
  */
 class ClearList<L : List<*>?> : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Clear content of any List."
+    }
+
     // used tokens
     private var tokenSuccess: ExitToken? = null
 

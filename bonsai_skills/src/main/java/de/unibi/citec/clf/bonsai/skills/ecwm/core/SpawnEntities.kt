@@ -14,6 +14,10 @@ import java.util.concurrent.Future
  * Add entities to the world
  */
 class SpawnEntities : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Add entities to the world"
+    }
+
 
     private var tokenSuccess: ExitToken? = null
 

@@ -13,6 +13,10 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
  *
  */
 class CheckTimeout : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Compares the time against a timeout"
+    }
+
     private var timeout: Long = 1000
 
 

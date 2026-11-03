@@ -13,6 +13,11 @@ import de.unibi.citec.clf.bonsai.engine.model.config.SkillConfigurationException
  * @author kharmening
  */
 public class Error extends AbstractSkill {
+    @Override
+    public String getSkillDescription() {
+        return "Dummy state for Error. !!! DO NOT REMOVE !!!!";
+    }
+
 
     @Override
     public void configure(ISkillConfigurator configurator) throws SkillConfigurationException {

@@ -18,6 +18,11 @@ import de.unibi.citec.clf.btl.units.LengthUnit;
  * @author cklarhorst
  */
 public class SetPositionAsNavigationGoal extends AbstractSkill {
+    @Override
+    public String getSkillDescription() {
+        return "Set a navigation goal based on a map position.";
+    }
+
 
     private static final String KEY_X = "#_X";
     private static final String KEY_Y = "#_Y";

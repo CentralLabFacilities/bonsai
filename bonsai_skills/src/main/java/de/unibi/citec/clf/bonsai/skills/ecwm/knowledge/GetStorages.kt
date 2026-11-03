@@ -42,6 +42,10 @@ import java.util.concurrent.Future
 
 
 class GetStorages : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Retrieves all storages from an ECWM Entity"
+    }
+
 
     private val KEY_ENTITY= "entity"
     private var id: String = ""

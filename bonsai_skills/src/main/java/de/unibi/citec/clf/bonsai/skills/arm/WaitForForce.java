@@ -40,6 +40,11 @@ import java.util.concurrent.Future;
  *  @author tmarkmann
  */
 public class WaitForForce extends AbstractSkill {
+    @Override
+    public String getSkillDescription() {
+        return "Waits until a force greater than the given threshold is detected at the gripper.";
+    }
+
 
     private static final String KEY_TIMEOUT = "#_TIMEOUT";
     private static final String KEY_GROUP = "#_GROUP";

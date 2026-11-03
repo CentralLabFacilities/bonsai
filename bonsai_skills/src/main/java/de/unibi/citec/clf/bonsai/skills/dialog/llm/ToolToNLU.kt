@@ -42,6 +42,10 @@ import java.lang.StringBuilder
  */
 
 class ToolToNLU : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Convert a tool call Message into an NLU object."
+    }
+
 
     companion object {
         private const val KEY_SPLIT_KEYS = "#_SPLIT_PARAMETER"

@@ -21,6 +21,7 @@ import java.util.concurrent.TimeUnit
 /**
  *  Wait for confirmation of an understood NLU construct the question using rules and the given NLU.
  *
+ * <pre>
  *  build the confirmation message using the given intent mappings
  *
  *  example: "pick_and_place=you want the #E:object from the #E:location:arrival"
@@ -34,9 +35,8 @@ import java.util.concurrent.TimeUnit
  *  #M = intent mapping
  *  #I = nlu.intent
  *  #T = nlu.text
- *  #E:key:role:group = nlu.entity with key (role and group optional)
  *
- * <pre>
+ *  #E:key:role:group = nlu.entity with key (role and group optional)
  *
  * Options:
  *  #_USE_DEFAULT   [Boolean] Optional (default true)
@@ -69,6 +69,10 @@ import java.util.concurrent.TimeUnit
  * @author lruegeme
  */
 class ConfirmNLURegex : AbstractSkill(), SensorListener<NLU?> {
+    override fun getSkillDescription(): String? {
+        return "Wait for confirmation of an understood NLU construct the question using rules and the given NLU."
+    }
+
     companion object {
         private const val KEY_USE_LANGUAGE = "#_USE_LANGUAGE"
         private const val KEY_MAPPING = "#_INTENT_MAPPING"

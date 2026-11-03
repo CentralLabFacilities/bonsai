@@ -50,6 +50,10 @@ import java.util.concurrent.Future
  * @author jkummert
  */
 class SaySlot : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "This class is used to say something with some or all content read in from the memory."
+    }
+
     private var tokenInt: ExitToken? = null
     private var someoneSpeaking: Sensor<Boolean>? = null
     private var blocking = true

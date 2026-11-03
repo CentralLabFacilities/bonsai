@@ -43,6 +43,10 @@ import java.util.concurrent.Future
  * @author lruegeme, jzilke
  */
 class SetupPlanningScene : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Setup the planning scene by adding Entities known to the World Model"
+    }
+
 
     private val KEY_CLEAR= "clear"
     private val KEY_CLEARATTACHED= "clear_attached"

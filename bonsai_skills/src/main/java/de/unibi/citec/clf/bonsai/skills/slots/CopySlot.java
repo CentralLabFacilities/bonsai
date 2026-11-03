@@ -38,6 +38,11 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
  * @author ffriese, pvonneumanncosel
  */
 public class CopySlot extends AbstractSkill {
+    @Override
+    public String getSkillDescription() {
+        return "Read from ReadSlot and write content to WriteSlot.";
+    }
+
 
     private ExitToken tokenSuccess;
     private ExitToken tokenError;

@@ -51,6 +51,10 @@ import java.util.concurrent.Future
  * @author nschmitz
  */
 class TalkRandom : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "This a version of the Talk skill. Use this state to let the robot talk a random phrase of a semicolonseparated choice of messages."
+    }
+
     private var tokenSuccess: ExitToken? = null
     private var blocking = true
     private var text = ""

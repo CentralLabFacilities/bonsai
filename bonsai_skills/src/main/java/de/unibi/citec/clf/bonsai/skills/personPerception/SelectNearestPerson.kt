@@ -33,6 +33,10 @@ import de.unibi.citec.clf.btl.units.LengthUnit
  * @author pvonneumanncosel
  */
 class SelectNearestPerson : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Identifies the nearest person from a list of persons and saves it to memory."
+    }
+
     private var tokenSuccess: ExitToken? = null
     private var tokenError: ExitToken? = null
 

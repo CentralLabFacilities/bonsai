@@ -18,6 +18,10 @@ import java.util.concurrent.Future
  */
 
 class LookToPoint : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Turn head towards a Pose."
+    }
+
     private var actuator = "GazeActuator"
     private var blocking = true
     private var duration = 0

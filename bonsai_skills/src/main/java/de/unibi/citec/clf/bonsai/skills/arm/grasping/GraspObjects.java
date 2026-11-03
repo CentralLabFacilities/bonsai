@@ -52,6 +52,11 @@ import java.util.logging.Logger;
  * @author lruegeme
  */
 public class GraspObjects extends AbstractSkill {
+    @Override
+    public String getSkillDescription() {
+        return "Grasp an object from the list.";
+    }
+
 
     private static final String KEY_TRY_ALL = "#_TRY_ALL";
     private static final String KEY_CHOOSE_GROUP = "#_CHOOSE_GROUP";

@@ -50,6 +50,10 @@ import java.util.concurrent.Future
  */
 
 class PlaceEntity : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Will try to place an object somewhere."
+    }
+
 
     private val KEY_POSE_X = "pose_x"
     private val KEY_POSE_Y = "pose_y"

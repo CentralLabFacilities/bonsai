@@ -46,6 +46,10 @@ import java.util.concurrent.Future
  * @author lruegeme
  */
 class SayEntity : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "This skill is used to say something incorporating the entity name or first given_name attribute"
+    }
+
 
     companion object {
         private const val KEY_USE_TYPE = "#_USE_TYPE"

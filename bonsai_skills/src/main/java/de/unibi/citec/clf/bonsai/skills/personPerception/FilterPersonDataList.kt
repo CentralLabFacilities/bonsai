@@ -70,6 +70,10 @@ import de.unibi.citec.clf.btl.units.LengthUnit
  * @author
  */
 class FilterPersonDataList : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "This Skill is used to filter a List of Persons by one or more specific attributes. These Attributes can be any of the Attributes found in PersonAttribute, i.e. gesture, posture and if they are inside a specific room. Multiple values can be given, if e.g. the gestures are separated by semicolons ("waving;pointing left;neutral")"
+    }
+
     private var tokenSuccessHasPeople: ExitToken? = null
     private var tokenSuccessNoPeople: ExitToken? = null
     private var tokenError: ExitToken? = null

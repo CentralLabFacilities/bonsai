@@ -21,6 +21,8 @@ import de.unibi.citec.clf.btl.units.LengthUnit
 /**
  * Generates a NavGoal on a straight line to a position.
  *
+ * <pre>
+ *
  * Options:
  *
  * #_TARGET_DIST:   [Double] Optional (default: 1.0)
@@ -44,6 +46,10 @@ import de.unibi.citec.clf.btl.units.LengthUnit
  */
 
 class GetNavgoalToPose : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Generates a NavGoal on a straight line to a position."
+    }
+
 
     companion object {
         private const val TARGET_DIST = "#_TARGET_DIST"

@@ -14,6 +14,10 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
  * @author lruegeme
  */
 class StoreTime : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Stores the current Time"
+    }
+
     private var tokenSuccess: ExitToken? = null
     var longSlot: MemorySlotWriter<Long>? = null
 

@@ -40,6 +40,11 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
  * @author lruegeme
  */
 public class PushList<T, L extends java.util.List<T>> extends AbstractSkill {
+    @Override
+    public String getSkillDescription() {
+        return "Pushes (Appends) an item to the back of a List.";
+    }
+
 
     private ExitToken tokenSuccess;
     private ExitToken tokenError;

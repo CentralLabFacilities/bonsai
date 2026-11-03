@@ -47,6 +47,11 @@ import java.io.IOException;
  * @author jkummert
  */
 public class SetGoalNearerToRobot extends AbstractSkill {
+    @Override
+    public String getSkillDescription() {
+        return "Set a navigation goal closer to the robot. <p>";
+    }
+
 
     private static final String KEY_CLOSER = "#_CLOSER";
 

@@ -18,6 +18,11 @@ import java.util.concurrent.Future;
  *
  */
 public class HasPosture extends AbstractSkill {
+    @Override
+    public String getSkillDescription() {
+        return "Checks for a prerecorded pose.";
+    }
+
 
     // used tokens
     private ExitToken tokenSuccessYes;

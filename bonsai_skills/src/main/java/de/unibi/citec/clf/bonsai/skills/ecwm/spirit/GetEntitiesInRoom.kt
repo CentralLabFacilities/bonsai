@@ -35,6 +35,10 @@ import java.util.concurrent.Future
  * @author lruegeme
  */
 class GetEntitiesInRoom : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Gets all Entities in the given Room"
+    }
+
 
     private val KEY_ENTITY= "room"
     private val KEY_INCLUDE_OBJECTS = "objects"

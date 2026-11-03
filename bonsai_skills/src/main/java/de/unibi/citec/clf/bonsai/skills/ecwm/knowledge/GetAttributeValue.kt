@@ -42,6 +42,10 @@ import java.util.concurrent.Future
  * @author lruegeme
  */
 class GetAttributeValue : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Fetches an attribute value of the given Entity or Model"
+    }
+
 
     private val KEY_TYPE = "type"
     private val KEY_ATTRIBUTE = "attribute"

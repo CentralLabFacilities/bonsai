@@ -46,6 +46,10 @@ import java.util.logging.Logger
  * @author llach
  */
 class MoveZlift: AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Change the zlift position."
+    }
+
 
     private var jointcontroller: JointControllerActuator? = null
 

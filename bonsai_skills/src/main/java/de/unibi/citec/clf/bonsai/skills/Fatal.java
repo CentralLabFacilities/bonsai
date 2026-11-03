@@ -13,6 +13,11 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
  * @author kharmening
  */
 public class Fatal extends AbstractSkill {
+    @Override
+    public String getSkillDescription() {
+        return "Dummy state for FATAL. !!! DO NOT REMOVE !!!!";
+    }
+
 
     @Override
     public void configure(ISkillConfigurator configurator) throws SkillConfigurationException {

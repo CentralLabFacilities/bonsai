@@ -39,6 +39,10 @@ import java.util.concurrent.Future
  */
 
 class GraspEntity : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Will try to pick up an object."
+    }
+
 
     private val KEY_ENTITY= "entity"
     private val KEY_UPRIGHT = "upright_grasp"

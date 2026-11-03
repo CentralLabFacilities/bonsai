@@ -16,6 +16,8 @@ import java.util.concurrent.Future
 /**
  *  Talk, constructs the message using rules and the given NLU.
  *
+ *  <pre>
+ *
  *  build message using the given intent mappings
  *
  *  example mapping: "pick_and_place=you want the #E:object from the #E:location:arrival;confirm_yes=#T what?"
@@ -30,7 +32,6 @@ import java.util.concurrent.Future
  *  #T = nlu.text
  *  #E:key:role:group = nlu.entity with key (role and group optional)
  *
- * <pre>
  *
  * Options:
  *  #_USE_DEFAULT   [Boolean] Optional (default true)
@@ -62,6 +63,10 @@ import java.util.concurrent.Future
  * @author lruegeme
  */
 class TalkNLURegex : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Talk, constructs the message using rules and the given NLU."
+    }
+
     private var tokenInt: ExitToken? = null
     private var someoneSpeaking: Sensor<Boolean>? = null
 

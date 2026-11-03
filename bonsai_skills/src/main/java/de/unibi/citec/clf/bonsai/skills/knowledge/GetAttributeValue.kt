@@ -31,6 +31,10 @@ import java.util.concurrent.ExecutionException
  * @author lruegeme
  */
 class GetAttributeValue : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Fetches an value of the given Attributes"
+    }
+
 
     private val KEY_ATTRIBUTE = "attribute"
     private val KEY_ERROR = "error_on_multiple"

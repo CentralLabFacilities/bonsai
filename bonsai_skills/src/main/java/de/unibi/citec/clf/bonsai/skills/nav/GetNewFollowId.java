@@ -48,6 +48,11 @@ import java.io.IOException;
  * @author lruegeme, jkummert
  */
 public class GetNewFollowId extends AbstractSkill {
+    @Override
+    public String getSkillDescription() {
+        return "Find a person to follow close to the last followed person. <p> Possible recovery if target person was lost or got a new uuid";
+    }
+
 
     private ExitToken tokenSuccess;
     private ExitToken tokenError;

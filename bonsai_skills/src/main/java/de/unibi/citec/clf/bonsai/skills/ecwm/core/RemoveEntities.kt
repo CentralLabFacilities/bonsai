@@ -13,6 +13,7 @@ import java.util.concurrent.Future
 /**
  * Remove entities from the world
  *
+ * <pre>
  * Slots:
  *  Entity:     [Entity] Optional (Read)
  *                  -> Entity to be removed, used if LIST is not set
@@ -22,10 +23,15 @@ import java.util.concurrent.Future
  * Options:
  *  LIST:    [Boolean] Optional (default: false)
  *                  -> Uses a List
+ * </pre>
  *
  * @author lgraesner
 */
 class RemoveEntities : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Remove entities from the world"
+    }
+
 
     private var tokenSuccess: ExitToken? = null
 

@@ -46,6 +46,10 @@ import de.unibi.citec.clf.btl.data.speech.NLU
  * @author lruegeme
  */
 class UnpackNLU : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Unpacks Entities from NLU into Slots Takes Parametes of the form #ENTITY:ROLE:GROUP to unpack entities into specific slots example:"
+    }
+
 
     private var intent = ""
     private var tokenSuccess: ExitToken? = null

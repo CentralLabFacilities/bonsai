@@ -13,6 +13,11 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
  * @author kharmening
  */
 public class End extends AbstractSkill {
+    @Override
+    public String getSkillDescription() {
+        return "Dummy state for END. !!! DO NOT REMOVE !!!!";
+    }
+
 
     
 

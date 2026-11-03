@@ -43,6 +43,11 @@ import de.unibi.citec.clf.btl.Type;
  * @author lruegeme
  */
 public class PopList<T, L extends java.util.List<T>> extends AbstractSkill {
+    @Override
+    public String getSkillDescription() {
+        return "Removes (Pops) the last item from a List and writes the content to itemSlot.";
+    }
+
 
     private ExitToken tokenSuccess;
     private ExitToken tokenError;

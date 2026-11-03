@@ -48,6 +48,10 @@ import java.util.concurrent.Future
  */
 
 class RecognizeAllEntities : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Detects all entities in view."
+    }
+
 
     private val KEY_STORE = "#_store"
     private val KEY_PROBABILITY = "#_min_prob"

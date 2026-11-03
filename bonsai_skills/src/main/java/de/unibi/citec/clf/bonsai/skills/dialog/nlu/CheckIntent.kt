@@ -28,6 +28,10 @@ import de.unibi.citec.clf.btl.data.speech.NLU
  * @author lruegeme
  */
 class CheckIntent : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Check if NLU has one of the given intents"
+    }
+
     companion object {
         private const val KEY_DEFAULT = "#_INTENTS"
     }

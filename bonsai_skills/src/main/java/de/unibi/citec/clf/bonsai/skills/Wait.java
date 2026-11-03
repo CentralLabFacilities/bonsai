@@ -13,6 +13,11 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
  * @author jkummert
  */
 public class Wait extends AbstractSkill {
+    @Override
+    public String getSkillDescription() {
+        return "Wait for a specified amount of time.";
+    }
+
 
     private static final String DEFAULT_KEY = "#_TIMEOUT";
     private long timeout = 1000;

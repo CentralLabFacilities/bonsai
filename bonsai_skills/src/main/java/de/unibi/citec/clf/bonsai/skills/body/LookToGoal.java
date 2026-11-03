@@ -48,6 +48,11 @@ import java.util.concurrent.Future;
  * @author dleins
  */
 public class LookToGoal extends AbstractSkill {
+    @Override
+    public String getSkillDescription() {
+        return "Turn head towards a navigation goal.";
+    }
+
 
     private static final String KEY_BLOCKING = "#_BLOCKING";
     private static final String KEY_Z = "#_HEIGHT";

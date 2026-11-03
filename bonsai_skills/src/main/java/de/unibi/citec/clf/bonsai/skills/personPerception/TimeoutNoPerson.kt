@@ -54,6 +54,10 @@ import kotlin.math.abs
  * @author lkettenb, lruegeme
  */
 class TimeoutNoPerson : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Use this state to timeout if no person is recognized in front of the robot. The person should stand in a cone in front of the robot defined by #_MAX_DIST and #_MAX_ANGLE This skill loops till the robot does not recognize a person in front for #_TIMEOUT."
+    }
+
     //defaults
     private var timeout: Long = 0
     private var maxTimeout = 5000

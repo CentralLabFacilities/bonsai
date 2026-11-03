@@ -48,6 +48,11 @@ import java.util.concurrent.Future;
  * @author dleins
  */
 public class SetGaze extends AbstractSkill {
+    @Override
+    public String getSkillDescription() {
+        return "Set the robot gaze. Note that the target coordinate is relative to the torso lift link!";
+    }
+
 
     private static final String KEY_HORIZONTAL = "#_HORIZONTAL";
     private static final String KEY_VERTICAL = "#_VERTICAL";

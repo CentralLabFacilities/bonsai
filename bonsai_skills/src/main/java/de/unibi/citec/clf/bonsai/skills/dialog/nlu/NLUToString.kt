@@ -14,6 +14,10 @@ import de.unibi.citec.clf.btl.data.speech.NLU
  * @author lruegeme
  */
 class NLUToString : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Load an NLU text into a slot"
+    }
+
 
     private var tokenSuccess: ExitToken? = null
     private var nluSlot: MemorySlotReader<NLU>? = null

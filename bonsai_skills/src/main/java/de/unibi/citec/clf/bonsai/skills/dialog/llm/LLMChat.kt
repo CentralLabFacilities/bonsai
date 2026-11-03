@@ -84,6 +84,10 @@ import java.util.concurrent.Future
  */
 
 class LLMChat : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Send a message to an LLM and optionally handle the reply and tool calls."
+    }
+
 
     companion object {
         private const val KEY_TIMEOUT = "#_TIMEOUT"

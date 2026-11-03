@@ -28,6 +28,11 @@ import de.unibi.citec.clf.btl.Transform;
  * @author lruegeme
  */
 public class PrintTransform extends AbstractSkill {
+    @Override
+    public String getSkillDescription() {
+        return "Looks up and prints the transform between two coordinate frames.";
+    }
+
 
     static final String KEY_FROM = "#_FROM";
     static final String KEY_TO = "#_TO";

@@ -26,6 +26,11 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
  * @author pvonneumanncosel, lgraesner
  */
 public class IsAnySlotEmpty extends AbstractSkill {
+    @Override
+    public String getSkillDescription() {
+        return "Reads a slot and returns whether it was empty. Also treats empty strings as empty";
+    }
+
 
     private ExitToken tokenEmpty;
     private ExitToken tokenNotEmpty;

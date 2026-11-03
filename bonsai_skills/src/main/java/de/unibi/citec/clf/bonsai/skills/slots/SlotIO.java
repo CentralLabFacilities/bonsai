@@ -29,6 +29,11 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
  */
 
 public class SlotIO extends AbstractSkill {
+    @Override
+    public String getSkillDescription() {
+        return "Writes a String to a Slot";
+    }
+
 
     // used tokens
     private ExitToken tokenSuccess;

@@ -52,6 +52,11 @@ import java.io.IOException;
  * @author jkummert
  */
 public class NavigateTo extends AbstractSkill {
+    @Override
+    public String getSkillDescription() {
+        return "Plan and navigate to a navigation goal. Please note that more options, slots, and exit tokens might be available through the selected drive strategy Currently supported strategies: NearestToTarget: Try to get as close to the target as possible";
+    }
+
 
     private static final String KEY_STRATEGY = "#_STRATEGY";
     private final static String KEY_TIMEOUT = "#_TIMEOUT";

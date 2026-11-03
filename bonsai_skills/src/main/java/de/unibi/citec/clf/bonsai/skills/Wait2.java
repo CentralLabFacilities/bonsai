@@ -31,6 +31,11 @@ import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator;
  * @author jkummert
  */
 public class Wait2 extends AbstractSkill {
+    @Override
+    public String getSkillDescription() {
+        return "Identical Copy of Wait; however we can use this if we need to wait twice in a parallel state :) Wait for a specified amount of time.";
+    }
+
 
     private static final String DEFAULT_KEY = "#_TIMEOUT";
     private long timeout = 1000;

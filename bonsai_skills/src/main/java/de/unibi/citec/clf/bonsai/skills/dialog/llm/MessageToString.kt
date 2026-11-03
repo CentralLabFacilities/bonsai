@@ -15,6 +15,10 @@ import de.unibi.citec.clf.btl.data.speech.llm.Role
  * @author lruegeme
  */
 class MessageToString : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Load Message content into a string slot"
+    }
+
 
     private var tokenSuccess: ExitToken? = null
     private var messageSlot: MemorySlotReader<Message>? = null

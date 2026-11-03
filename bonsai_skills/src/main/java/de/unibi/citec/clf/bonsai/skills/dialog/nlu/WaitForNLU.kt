@@ -45,6 +45,10 @@ import java.util.concurrent.TimeUnit
  * @author lruegeme
  */
 class WaitForNLU : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Wait for the robot to understand something with certain intents."
+    }
+
 
     companion object {
         private const val KEY_SET_LANGUAGE = "#_SET_LANGUAGE"

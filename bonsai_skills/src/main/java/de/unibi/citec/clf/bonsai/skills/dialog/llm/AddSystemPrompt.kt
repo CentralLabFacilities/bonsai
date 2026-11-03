@@ -32,6 +32,10 @@ import de.unibi.citec.clf.btl.data.speech.llm.Role
 
 
 class AddSystemPrompt : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Add a system prompt to a conversation history."
+    }
+
 
     companion object {
         private const val KEY_PROMPT = "#_PROMPT"

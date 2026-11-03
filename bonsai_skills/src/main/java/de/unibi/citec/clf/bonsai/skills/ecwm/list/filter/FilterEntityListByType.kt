@@ -40,6 +40,10 @@ import de.unibi.citec.clf.btl.data.world.EntityList
  * @author lruegeme, lgraesner
  */
 class FilterEntityListByType : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Filter an [EntityList] by type"
+    }
+
 
     private var tokenSuccess: ExitToken? = null
     private var tokenEmptyFilteredList: ExitToken? = null

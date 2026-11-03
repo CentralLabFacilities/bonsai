@@ -23,6 +23,10 @@ import java.util.concurrent.Future
  * @author lruegeme, jzilke
  */
 class ClearPlanningScene : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Clear the planning scene."
+    }
+
 
     private val KEY_CLEARATTACHED= "clear_attached"
 

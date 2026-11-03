@@ -51,6 +51,10 @@ import java.util.regex.Matcher
  * @author lruegeme, lgraesner
  */
 class GetCategoryStorage : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Takes in the given name of an object and returns its category and default storage (along with the container entity). Default to read Entity, but can also read from Category or Model"
+    }
+
     private val KEY_USE_CATEGORY_SLOT = "USE_CATEGORY_SLOT"
     private val KEY_USE_MODEL_SLOT = "USE_MODEL_SLOT"
     private val KEY_MSG = "MSG"

@@ -17,6 +17,11 @@ import java.io.IOException;
  * @author kharmening, now maintained by cklarhor
  */
 public class StoreCurrentPosition extends AbstractSkill {
+    @Override
+    public String getSkillDescription() {
+        return "Stores the current robot position in the memory.";
+    }
+
 
     private ExitToken tokenSuccess;
 

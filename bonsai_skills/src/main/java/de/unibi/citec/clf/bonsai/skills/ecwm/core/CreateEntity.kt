@@ -38,6 +38,10 @@ import de.unibi.citec.clf.btl.units.LengthUnit
  * @author lruegeme
  */
 class CreateEntity : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Create a new Entity and saves it in a slot. The entity will not be added to the world model Will use slots if option not set"
+    }
+
 
     private val KEY_NAME = "name"
     private val KEY_TYPE = "type"

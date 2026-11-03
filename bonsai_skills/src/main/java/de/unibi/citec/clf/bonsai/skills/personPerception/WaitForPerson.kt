@@ -59,6 +59,10 @@ import kotlin.math.abs
  * @author lkettenb, lruegeme
  */
 class WaitForPerson : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Use this state to wait until a person is recognized in front of the robot. The person should stand in a cone in front of the robot defined by #_MAX_DIST and #_MAX_ANGLE This skill loops till the robot recognized a person in front."
+    }
+
     //defaults
     private var timeout: Long = -1
     private var maxDist = 2.0

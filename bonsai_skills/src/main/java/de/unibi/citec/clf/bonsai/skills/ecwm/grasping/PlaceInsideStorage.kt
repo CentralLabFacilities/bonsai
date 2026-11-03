@@ -61,6 +61,10 @@ import kotlin.math.max
  * @author lruegeme
  */
 class PlaceInsideStorage : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Place the Entity anywhere inside the Storage. (Prefers Center) TODO: currently samples gripper target poses inside the storage, set min_z/max_z depending on task The Place Task will sample goal positions starting from the center of the area"
+    }
+
     private var lum = LengthUnit.METER
 
     companion object {

@@ -65,6 +65,11 @@ import java.util.concurrent.Future;
  *
  */
 public class DriveDirect extends AbstractSkill {
+    @Override
+    public String getSkillDescription() {
+        return "Turn and drive without planning.";
+    }
+
 
     private ExitToken tokenErrorTimeout;
     private ExitToken tokenSuccess;

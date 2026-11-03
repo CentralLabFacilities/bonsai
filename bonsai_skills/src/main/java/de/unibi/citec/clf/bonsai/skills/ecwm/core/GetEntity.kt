@@ -32,6 +32,10 @@ import javax.naming.CommunicationException
  * @author lruegeme
  */
 class GetEntity : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Gets Entity with the given id from the world model"
+    }
+
 
     private var fur: Future<Entity?>? = null
     private var ecwm: WorldModel? = null

@@ -49,6 +49,10 @@ import java.util.concurrent.Future
  * @author lruegeme, jkummert
  */
 class TurnTo<IOException> : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Turns the robot to a given navigation goal."
+    }
+
     private var timeout: Long = -1
 
     private var tokenSuccess: ExitToken? = null

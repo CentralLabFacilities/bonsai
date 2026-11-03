@@ -29,6 +29,10 @@ import java.util.concurrent.Future
  * @author lruegeme
  */
 class GetEntitiesByType : AbstractSkill() {
+    override fun getSkillDescription(): String? {
+        return "Gets all Entity with the given type (by Model Type Name)"
+    }
+
 
     private val KEY_EXPRESSION = "expr"
 
