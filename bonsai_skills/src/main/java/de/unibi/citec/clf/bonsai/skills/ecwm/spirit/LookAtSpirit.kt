@@ -22,31 +22,6 @@ import java.util.concurrent.Future
 /**
  * @author lruegeme
  *
- * Assumes the target pose of the current location inside a spirit.
- *
- * Requires to be inside the spirit unless "#_ALWAYS" is set.
- * Mind that the resulting pose may be wrong as only the gaze target is used. (see #_FALLBACK_Z)
- *
- * <pre>
- *
- * Options:
- *  #_ALWAYS:               [Boolean] Optional (Default: false)
- *                              -> Look at Target even if outside spirit area.
- *  #_FALLBACK_Z            []
- *  #_FALLBACK_STORAGE      []
- *  #_Z_OFFSET              []
- *  #_TIMEOUT               []
- *  #_TIMEOUT_Z             []
- *
- * Slots:
- *  Spirit                  [Spirit]
- *                              -> The Spirit
- *
- * ExitTokens:
- *  success:        Spirit exists
- *
- * </pre>
- *
  */
 
 class LookAtSpirit : AbstractSkill() {

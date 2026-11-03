@@ -25,43 +25,6 @@ import java.util.concurrent.Future;
 /**
  * Turn and drive without planning.
  *
- * <pre>
- *
- * Options:
- *  #_DIST:         [double] Optional (default: NaN)
- *                      -> Distance to drive in m
- *  #_MOVE_SPEED:   [double] Optional (default: 0.5)
- *                      -> Move speed in m/s
- *  #_ROT_SPEED:    [double] Optional (default: 0.5)
- *                      -> Turn speed in rad/s
- *  #_ANGLE:        [double] Optional (default: NaN)
- *                      -> Angle to turn in rad
- *  #_TIMEOUT:      [long] Optional (default: -1)
- *                      -> Skill timeout in ms
- *  #_DIR_X:        [double] Optional (default: 1.0)
- *                      -> X component of drive direction
- *  #_DIR_Y:        [double] Optional (default: 0.0)
- *                      -> Y component of drive direction
- *
- * Slots:
- *  NavigationGoalDataSlot: [NavigationGoalData] [Read]
- *      -> If neither #_DIST nor #_TURN is set use this slot to drive to
- *
- * ExitTokens:
- *  success:            Drive successful
- *  error.timeout:    Timeout reached (only used when #_TIMEOUT is set)
- *  error.cancelled:    Drive was cancelled by NavigationActuator
- *  error.unknownResult: Drive was failed with unknown result
- *
- * Sensors:
- *
- * Actuators:
- *  NavigationActuator: [NavigationActuator]
- *      -> Called to execute drive
- *
- * </pre>
- *
- * @author prenner, cklarhorst, jkummert
  *
  */
 public class DriveDirect extends AbstractSkill {

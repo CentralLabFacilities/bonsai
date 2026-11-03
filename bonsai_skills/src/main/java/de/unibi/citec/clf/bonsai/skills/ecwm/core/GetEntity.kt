@@ -14,22 +14,6 @@ import javax.naming.CommunicationException
 /**
  * Gets Entity with the given id from the world model
  *
- * <pre>
- *
- * Options:
- *  id:   [String] (optional) Entity id
- *
- * Slots:
- *  StringSlot: [String] [Read]
- *  Entity: [Entity] [Write]
- *
- * ExitTokens:
- *  success:    Got Entities
- *  error:      No Matching Entities found
- *
- * </pre>
- *
- * @author lruegeme
  */
 class GetEntity : AbstractSkill() {
 

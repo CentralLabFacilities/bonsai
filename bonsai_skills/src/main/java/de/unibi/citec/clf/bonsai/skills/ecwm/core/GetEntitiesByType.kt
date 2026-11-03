@@ -12,21 +12,6 @@ import java.util.concurrent.Future
 /**
  * Gets all Entity with the given type (by Model Type Name)
  *
- * <pre>
- *
- * Options:
- *  expr:               [String] Type name
- *
- * Slots:
- *  Entities: [EntityList]
- *
- * ExitTokens:
- *  success:    Got Entities
- *  error:      No Matching Entities found
- *
- * </pre>
- *
- * @author lruegeme
  */
 class GetEntitiesByType : AbstractSkill() {
 

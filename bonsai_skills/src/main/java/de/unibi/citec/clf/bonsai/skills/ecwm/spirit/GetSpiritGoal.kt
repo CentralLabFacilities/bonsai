@@ -17,42 +17,6 @@ import java.util.concurrent.Future
 /**
  * Fetches Navigation and Spirit Goals from an ECWM Entity
  *
- * <pre>
- *
- * Options:
- *  entity:     [String] Optional
- *                  -> Entity Name to fetch goals from
- *  afford:     [String] Optional
- *                  -> The affordance Name of the spirit
- *  storage     [String] Optional
- *                  -> Which storage the spirit is from (manually defined use key "")
- *  force_move: [Boolean] Optional
- *                  -> Force Movement even if current position is inside the spirit
- *
- *
- * Slots:
- *  Entity:   [de.unibi.citec.clf.btl.data.world.Entity] Optional
- *                  -> Entity to fetch goals from, is used if the 'entity' option is not set
- *  NavigationGoalData [de.unibi.citec.clf.btl.data.navigation.NavigationGoalData]
- *                  -> Slot the NavGoal of the SpiritGoal will be written to
- *  SpiritGoal [de.unibi.citec.clf.btl.data.ecwm.SpiritGoal]
- *                  -> The SpiritGoal fetched from the entity
- *
- * ExitTokens:
- *  success:        Got a Reacheable Goal
- *  error.blocked:  All possible poses are blocked in costmaps,
- *                      goal is using nearest target disregarding costmaps
- *                      try to clear costmaps and try again or use NearestToTarget drive strategy
- *
- * Sensors:
- *
- * Actuators:
- *  ECWMSpiritActuator: [de.unibi.citec.clf.bonsai.actuators.ECWMSpirit]
- *      -> Used to get the current World Model
- *
- * </pre>
- *
- * @author lruegeme, jzilke
  */
 class GetSpiritGoal : AbstractSkill() {
 

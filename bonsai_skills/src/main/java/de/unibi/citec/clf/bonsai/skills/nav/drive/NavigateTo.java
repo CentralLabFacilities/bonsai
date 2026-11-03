@@ -19,37 +19,6 @@ import java.io.IOException;
 /**
  * Plan and navigate to a navigation goal.
  *
- * Please note that more options, slots, and exit tokens might be available
- * through the selected drive strategy
- *
- * Currently supported strategies: NearestToTarget: Try to get as close to the
- * target as possible
- *
- * <pre>
- *
- * Options:
- *  #_STRATEGY: [String] Optional (default: NearestToTarget)
- *                  -> Strategy used for drive
- *
- * Slots:
- *  NavigationGoalDataSlot: [NavigationGoalData] [Read]
- *      -> Navigation goal to drive to
- *
- * ExitTokens:
- *  success:    Drive finished successfully
- *  error:      Drive failed
- *
- * Sensors:
- *
- *
- * Actuators:
- *  NavigationActuator: [NavigationActuator]
- *      -> Called to execute drive
- *
- * </pre>
- *
- * @author cklarhorst
- * @author jkummert
  */
 public class NavigateTo extends AbstractSkill {
 

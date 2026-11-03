@@ -30,41 +30,7 @@ import java.util.concurrent.Future;
 /**
  * Drive to a given person.
  *
- * <pre>
  *
- * Options:
- *  #_PERSON_LOST_TIMEOUT:  [long] Optional (default: 100)
- *                              -> Time passed in ms without seeing the person before exiting
- *  #_STOP_DISTANCE:        [double] Optional (default: 800)
- *                              -> Distance considered close enough to the person in mm. Consider personal space
- *  #_STRATEGY:             [String] Optional (default: "NearestToTarget")
- *                              -> Drive strategy to drive to person
- *  #_REFIND_DISTANCE:      [double] Optional (default: 500)
- *                              -> In case the robot looses track of the person it tries to refind them this close to where they were seen last in mm
- *
- *
- * Slots:
- *  PersonDataSlot:       [PersonData] [Read and Write]
- *      -> Read in person to drive to. If successfull save the person to memory
- *
- * ExitTokens:
- *  success:                No goal was set in #_NO_GOAL_TIMEOUT ms
- *  error.personLost:       Cannot find person or person is more than #_PERSON_LOST_DISTANCE away
- *  error.couldNotReach:    Robot could not get within #_STOP_DISTANCE of person
- *
- * Sensors:
- *  PersonSensor:       [PersonDataList]
- *      -> Read in currently seen persons
- *  PositionSensor:     [PositionData]
- *      -> Read current robot position
- *
- * Actuators:
- *  NavigationActuator: [NavigationActuator]
- *      -> Called to execute drive
- *
- * </pre>
- *
- * @author jkummert
  */
 public class FollowPersonNeedsFix extends AbstractSkill {
 
