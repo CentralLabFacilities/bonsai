@@ -8,11 +8,9 @@ import de.unibi.citec.clf.bonsai.engine.model.AbstractSkill
 import de.unibi.citec.clf.bonsai.engine.model.ExitStatus
 import de.unibi.citec.clf.bonsai.engine.model.ExitToken
 import de.unibi.citec.clf.bonsai.engine.model.config.ISkillConfigurator
-import de.unibi.citec.clf.btl.data.ecwm.robocup.EntityWithAttributes
+import de.unibi.citec.clf.btl.data.knowledge.Attributes
 import de.unibi.citec.clf.btl.data.world.Entity
 import de.unibi.citec.clf.btl.data.world.Model
-import de.unibi.citec.clf.btl.data.ecwm.robocup.ModelWithAttributes
-import de.unibi.citec.clf.btl.data.knowledge.Attributes
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Future
 
@@ -47,8 +45,8 @@ class GetAttributes : AbstractSkill() {
 
 
     private val KEY_TYPE = "type"
-    private val KEY_FROM_STRING = "type_from_string"
-    private val KEY_MODEL_SLOT = "use_model_slot"
+
+    private val KEY_SLOT_TYPE = "slot_type"
 
     private var fur: Future<Attributes?>? = null
 
@@ -72,21 +70,24 @@ class GetAttributes : AbstractSkill() {
         ecwm = configurator.getActuator("ECWMRobocup", ECWMRobocup::class.java)
         attributes = configurator.getWriteSlot("Attributes", Attributes::class.java)
 
-        if (configurator.hasConfigurationKey(KEY_TYPE)) {
-            if(configurator.hasConfigurationKey(KEY_FROM_STRING))
-                throw ConfigurationException("cant mix $KEY_TYPE and $KEY_FROM_STRING")
-            if(configurator.hasConfigurationKey(KEY_MODEL_SLOT))
-                throw ConfigurationException("cant mix $KEY_TYPE and $KEY_MODEL_SLOT")
-            typename = configurator.requestValue(KEY_TYPE)
-        } else {
-            if(configurator.hasConfigurationKey(KEY_FROM_STRING)) {
-                type = configurator.getReadSlot("Type", String::class.java)
-            } else if (configurator.hasConfigurationKey(KEY_MODEL_SLOT)) {
-                model = configurator.getReadSlot("Model", Model::class.java)
-            } else {
-                entity = configurator.getReadSlot("Entity", Entity::class.java)
+        typename = configurator.requestOptionalValue(KEY_TYPE, "", "Model type name, use slot if empty")
+        if (!configurator.hasConfigurationKey(KEY_TYPE)) {
+            val slottype = configurator.requestOptionalValue(KEY_SLOT_TYPE, "","Type of slot to read can be [model,entity], default to string")
+            when (slottype) {
+                "model" -> {
+                    model = configurator.getReadSlot("Model", Model::class.java)
+                }
+                "entity" -> {
+                    entity = configurator.getReadSlot("Entity", Entity::class.java)
+                }
+                else -> {
+                    type = configurator.getReadSlot("Type", String::class.java)
+                }
             }
+        } else if (configurator.hasConfigurationKey(KEY_SLOT_TYPE)) {
+            throw ConfigurationException("cant use $KEY_TYPE and $KEY_SLOT_TYPE parameters at the same time")
         }
+
     }
 
     override fun init(): Boolean {
