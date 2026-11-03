@@ -1,5 +1,6 @@
 package de.unibi.citec.clf.bonsai.engine
 
+import de.unibi.citec.clf.bonsai.core.exception.ConfigurationException
 import de.unibi.citec.clf.bonsai.engine.communication.SCXMLServer
 import de.unibi.citec.clf.bonsai.engine.communication.web.RuntimeEventWebSocket
 import de.unibi.citec.clf.bonsai.engine.communication.web.WebServer
@@ -133,11 +134,17 @@ class SCXMLStarterWeb : SCXMLStarter() {
                     logger.debug("POST /skill")
                     val id: String by call.parameters
                     val params = call.receive<ParameterMap>()
-                    val skill = getSkill(id, params.params)
-                    if (skill != null) {
-                        call.respond(skill)
-                    } else {
-                        call.respond(HttpStatusCode.NotFound)
+                    try {
+                        val skill = getSkill(id, params.params)
+                        if (skill != null) {
+                            call.respond(skill)
+                        } else {
+                            logger.error("ERROR: skill not found")
+                            call.respond(HttpStatusCode.NotFound)
+                        }
+                    } catch (e: ConfigurationException) {
+                        logger.error("ConfigurationException: ${id}[$params]: '${e.message}'")
+                        call.respond(HttpStatusCode.BadRequest, ConfigurationError(e.message))
                     }
                 }
                 get("/debug") {
@@ -249,6 +256,7 @@ class SCXMLStarterWeb : SCXMLStarter() {
         try {
             runner.tryConfigure()
         } catch (e: NotImplementedError) {
+            logger.error(e)
             throw Exception(e)
         }
 

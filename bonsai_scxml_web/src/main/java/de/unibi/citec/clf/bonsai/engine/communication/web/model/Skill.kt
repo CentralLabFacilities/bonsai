@@ -27,3 +27,9 @@ data class SkillInfo(
     val events: List<SkillTransition>
 )
 
+@Serializable
+data class ConfigurationError(
+    val error: String?,
+)
+
+
