@@ -72,7 +72,7 @@ class GetAttributes : AbstractSkill() {
 
         typename = configurator.requestOptionalValue(KEY_TYPE, "", "Model type name, use slot if empty")
         if (!configurator.hasConfigurationKey(KEY_TYPE)) {
-            val slottype = configurator.requestOptionalValue(KEY_SLOT_TYPE, "","Type of slot to read can be [model,entity], default to string")
+            val slottype = configurator.requestOptionalValue(KEY_SLOT_TYPE, "string","Type of slot to read can be [model,entity,string], default to string")
             when (slottype) {
                 "model" -> {
                     model = configurator.getReadSlot("Model", Model::class.java)
@@ -80,9 +80,12 @@ class GetAttributes : AbstractSkill() {
                 "entity" -> {
                     entity = configurator.getReadSlot("Entity", Entity::class.java)
                 }
-                else -> {
+                "string" -> {
                     type = configurator.getReadSlot("Type", String::class.java)
+                } else -> {
+                    throw ConfigurationException("Unknown slot type $slottype")
                 }
+
             }
         } else if (configurator.hasConfigurationKey(KEY_SLOT_TYPE)) {
             throw ConfigurationException("cant use $KEY_TYPE and $KEY_SLOT_TYPE parameters at the same time")

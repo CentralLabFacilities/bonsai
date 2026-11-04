@@ -71,15 +71,18 @@ public class PopList<T, L extends java.util.List<T>> extends AbstractSkill {
         String typeString = configurator.requestValue(KEY_DATA_TYPE);
         String listTypeString = configurator.requestValue(KEY_LIST_TYPE);
 
-        try {
-            type = (Class<T>) Class.forName(typeString);
-            listType = (Class<L>) Class.forName(listTypeString);
-        } catch (ClassNotFoundException e) {
-            logger.error(e);
-            throw new ConfigurationException(e);
+        if(configurator.hasConfigurationKey(KEY_DATA_TYPE) && configurator.hasConfigurationKey(KEY_LIST_TYPE)) {
+            try {
+                type = (Class<T>) Class.forName(typeString);
+                listType = (Class<L>) Class.forName(listTypeString);
+            } catch (ClassNotFoundException e) {
+                logger.error(e);
+                throw new ConfigurationException(e);
+            }
+            itemSlot = configurator.getWriteSlot("ItemSlot", type);
+            listSlot = configurator.getSlot("ListSlot", listType);
         }
-        itemSlot = configurator.getWriteSlot("ItemSlot", type);
-        listSlot = configurator.getSlot("ListSlot", listType);
+
     }
 
 
