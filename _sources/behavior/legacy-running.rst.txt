@@ -1,0 +1,21 @@
+======================================
+Legacy Command-Line Runtime Example
+======================================
+
+Some Bonsai distributions support launching a state-machine file directly
+from the command line. This is an optional integration and diagnostics
+reference; it is not necessary for designing a behavior.
+
+For a distribution assembled with the Maven ``appassembler`` plugin, an
+example invocation is::
+
+    target/appassembler/bin/bonsai -c src/main/config/bonsai_configs/minimalConfig.xml -t src/main/config/state_machines/minimal.xml
+
+Here ``-c`` selects a Bonsai configuration and ``-t`` selects the behavior
+file to run. The files and executable must exist in the particular
+distribution. A launcher such as ``LaunchLocal.java`` may also be provided
+by an application project.
+
+See :doc:`SCXML Behavior Engine <../behavior>` for low-level representation
+details, or :doc:`Behaviors and state machines <concepts>` for
+an explanation of behavior structure without XML.

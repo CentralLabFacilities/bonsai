@@ -7,9 +7,10 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Memory Slots &mdash; Bonsai Docs 0.8-SNAPSHOT documentation</title>
-      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
-      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=f06a32cd" />
+      <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=6a604523" />
       <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=f06a32cd" />
 
   
@@ -17,8 +18,9 @@
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../_static/documentation_options.js?v=3242a324"></script>
-      <script src="../_static/doctools.js?v=9bcbadda"></script>
-      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script data-sd-tabs-storage-prefix="sphinx-design-tab-id-" src="../_static/design-tabs.js?v=fcb327ea"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -177,16 +179,16 @@ The skill can define the key used to reference the slot. The slot location for t
 <div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kd">public</span><span class="w"> </span><span class="kd">class</span> <span class="nc">ExampleSkill</span><span class="w"> </span><span class="kd">implements</span><span class="w"> </span><span class="n">AbstractSkill</span><span class="w"> </span><span class="p">{</span>
 
 <span class="w">     </span><span class="c1">// define here the keys of everything we want to get from the configurator</span>
-<span class="w">     </span><span class="kd">private</span><span class="w"> </span><span class="kd">static</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">KEY_CLASS_SLOT</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;ClassSlot&quot;</span><span class="p">;</span>
-<span class="w">     </span><span class="kd">private</span><span class="w"> </span><span class="kd">static</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">KEY_INT_SLOT</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;IntSlot&quot;</span><span class="p">;</span>
-<span class="w">     </span><span class="kd">private</span><span class="w"> </span><span class="kd">static</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">KEY_STRING_SLOT</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;StringSlot&quot;</span><span class="p">;</span>
+<span class="w">     </span><span class="kd">private</span><span class="w"> </span><span class="kd">static</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">KEY_CLASS_SLOT</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"ClassSlot"</span><span class="p">;</span>
+<span class="w">     </span><span class="kd">private</span><span class="w"> </span><span class="kd">static</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">KEY_INT_SLOT</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"IntSlot"</span><span class="p">;</span>
+<span class="w">     </span><span class="kd">private</span><span class="w"> </span><span class="kd">static</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">KEY_STRING_SLOT</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"StringSlot"</span><span class="p">;</span>
 
 <span class="w">     </span><span class="c1">// Declare the Actuators, Sensors, Slots and parameters</span>
 <span class="w">     </span><span class="kd">private</span><span class="w"> </span><span class="n">Slot</span><span class="o">&lt;</span><span class="n">String</span><span class="o">&gt;</span><span class="w"> </span><span class="n">stringSlot</span><span class="p">;</span>
 <span class="w">     </span><span class="kd">private</span><span class="w"> </span><span class="n">Slot</span><span class="o">&lt;</span><span class="n">Integer</span><span class="o">&gt;</span><span class="w"> </span><span class="n">intSlot</span><span class="p">;</span>
 <span class="w">     </span><span class="kd">private</span><span class="w"> </span><span class="n">Slot</span><span class="o">&lt;</span><span class="n">Type</span><span class="o">&gt;</span><span class="w"> </span><span class="n">classSlot</span><span class="p">;</span>
 
-<span class="w">     </span><span class="kd">private</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">stringData</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;example&quot;</span><span class="p">;</span>
+<span class="w">     </span><span class="kd">private</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">stringData</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"example"</span><span class="p">;</span>
 <span class="w">     </span><span class="kd">private</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">intData</span><span class="p">;</span>
 <span class="w">     </span><span class="kd">private</span><span class="w"> </span><span class="n">Type</span><span class="w"> </span><span class="n">classData</span><span class="p">;</span>
 
@@ -251,7 +253,7 @@ Other parameters need to define slots are provided using the <a class="reference
 
   <div role="contentinfo">
     <p>&#169; Copyright 2025, Team of Bielefeld.
-      <span class="lastupdated">Last updated on Dec 04, 2025.
+      <span class="lastupdated">Last updated on Nov 12, 2026.
       </span></p>
   </div>
 

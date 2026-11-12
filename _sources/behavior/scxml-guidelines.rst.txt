@@ -1,0 +1,69 @@
+===========================
+SCXML Authoring Conventions
+===========================
+
+These guidelines concern Bonsai SCXML state-machine definitions. For the
+Bonsai Framework's skill implementation conventions, see
+:doc:`Skill development conventions <../general/coding-guideline>`.
+
+State machines
+--------------
+
+
+- Skills should *NOT* be given scxml data parameter ``@DATA`` if this changes the configure requests.
+
+*ExampleSkill* ``Configure()``:
+
+.. code-block:: java
+
+    useAct = configurator.requestOptionalBool("#_USE", false);
+    if(useAct) act = configurator.getActuator("Foo", Bar.class);
+
+If ``#_USE`` is set to ``@DATA`` with expression ``false`` during LOAD but gets changed to ``true`` with ``<assign>`` the State will not function properly
+
+
+Location
+~~~~~~~~
+
+- Keep reusable behavior definitions in a shared source location rather than
+  duplicating them in each deployment.
+
+- Keep environment-specific behavior files and settings in the relevant application or deployment project.
+
+Reference Behaviours::
+
+    nav.navigateToAnnotation
+    knowledge.storeCurrentPosition
+
+Usage Documentation
+~~~~~~~~~~~~~~~~~~~
+
+Above the statemachine there should always be a short paragraph to describe the behaviour. It shall be of the form:
+
+.. code-block:: xml
+
+    <!-->
+    A summary what this behaviour exactly does.
+
+    Used Slots:
+    A short summary of the Slots this Behaviour gets/writes its data from/to
+        What this specific slot is used for:
+        -> xpath="/nameOfTheBehaviour/slotName"
+
+    A state declaration, ready to be copy-pasted and slightly adjusted. Example:
+    <state id="navigateToPerson" src="${MAPPING}/nav/navigateToPerson.xml">
+            <onentry>
+                    <assign location="personLostTimeout"    expr="100"/>
+                    <assign location="stopDistance"         expr="800"/>
+                    <assign location="strategy"             expr="NearestToTarget"/>
+                    <assign location="refindDistance"       expr="800"/>
+            </onentry>
+            <transition event="navigateToPerson.success"    target="TOFILL"/>
+            <transition event="navigateToPerson.personLost" target="TOFILL"/>
+            <transition event="navigateToPerson.fatal"      target="TOFILL"/>
+    </state>
+
+    Look up the skill documentation to see what the options do.
+    Only assign values where you differ from the default. otherwise if someone finds
+    better working default values you will not profit from that!
+    <!-->

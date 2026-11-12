@@ -7,9 +7,10 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Integrate Bonsai Skills into the State Machine &mdash; Bonsai Docs 0.8-SNAPSHOT documentation</title>
-      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
-      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=f06a32cd" />
+      <link rel="stylesheet" type="text/css" href="../../_static/sphinx-design.min.css?v=6a604523" />
       <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=f06a32cd" />
 
   
@@ -17,8 +18,9 @@
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../../_static/documentation_options.js?v=3242a324"></script>
-      <script src="../../_static/doctools.js?v=9bcbadda"></script>
-      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script data-sd-tabs-storage-prefix="sphinx-design-tab-id-" src="../../_static/design-tabs.js?v=fcb327ea"></script>
     <script src="../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
@@ -137,38 +139,38 @@
 <p>This skill is in the <code class="docutils literal notranslate"><span class="pre">de.unibi.citec.clf.bonsai.skills.example</span></code> package.
 The file is named <code class="docutils literal notranslate"><span class="pre">Nothing.kt</span></code>. Each Bonsai Skill needs to inherit from the <code class="docutils literal notranslate"><span class="pre">AbstractSkill</span></code> class.</p>
 <p>Now, how to we integrate this skill into our state machine? The following example shows how:</p>
-<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="cp">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;</span>
-<span class="nt">&lt;scxml</span><span class="w"> </span><span class="na">xmlns=</span><span class="s">&quot;http://www.w3.org/2005/07/scxml&quot;</span><span class="w"> </span><span class="na">version=</span><span class="s">&quot;1.0&quot;</span><span class="w"> </span><span class="na">initial=</span><span class="s">&quot;Nothing&quot;</span><span class="nt">&gt;</span>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="cp">&lt;?xml version="1.0" encoding="UTF-8"?&gt;</span>
+<span class="nt">&lt;scxml</span><span class="w"> </span><span class="na">xmlns=</span><span class="s">"http://www.w3.org/2005/07/scxml"</span><span class="w"> </span><span class="na">version=</span><span class="s">"1.0"</span><span class="w"> </span><span class="na">initial=</span><span class="s">"Nothing"</span><span class="nt">&gt;</span>
 <span class="w">    </span><span class="nt">&lt;datamodel&gt;</span>
-<span class="w">        </span><span class="nt">&lt;data</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;#_STATE_PREFIX&quot;</span><span class="w"> </span><span class="na">expr=</span><span class="s">&quot;&#39;de.unibi.citec.clf.bonsai.skills.example.&#39;&quot;</span><span class="nt">/&gt;</span>
+<span class="w">        </span><span class="nt">&lt;data</span><span class="w"> </span><span class="na">id=</span><span class="s">"#_STATE_PREFIX"</span><span class="w"> </span><span class="na">expr=</span><span class="s">"'de.unibi.citec.clf.bonsai.skills.example.'"</span><span class="nt">/&gt;</span>
 <span class="w">    </span><span class="nt">&lt;/datamodel&gt;</span>
 
-<span class="w">    </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;Nothing&quot;</span><span class="nt">&gt;</span>
-<span class="w">        </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;Nothing.fatal&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;End&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">"Nothing"</span><span class="nt">&gt;</span>
+<span class="w">        </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">"Nothing.fatal"</span><span class="w"> </span><span class="na">target=</span><span class="s">"End"</span><span class="nt">/&gt;</span>
 <span class="w">    </span><span class="nt">&lt;/state&gt;</span>
 
-<span class="w">    </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;End&quot;</span><span class="w"> </span><span class="na">final=</span><span class="s">&quot;true&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">"End"</span><span class="w"> </span><span class="na">final=</span><span class="s">"true"</span><span class="nt">/&gt;</span>
 
 <span class="nt">&lt;/scxml&gt;</span>
 </pre></div>
 </div>
 <p>The state machine begins with the state with the id “Nothing” by setting <code class="docutils literal notranslate"><span class="pre">initial=&quot;Nothing</span></code>:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>``&lt;scxml xmlns=&quot;http://www.w3.org/2005/07/scxml&quot; version=&quot;1.0&quot; initial=&quot;Nothing&quot;&gt;``
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>``&lt;scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="Nothing"&gt;``
 </pre></div>
 </div>
 <p>In order for the state machine to find the Nothing skill in the <code class="docutils literal notranslate"><span class="pre">de.unibi.citec.clf.bonsai.skills.example</span></code> package we have to setup the <code class="docutils literal notranslate"><span class="pre">#_STATE_PREFIX</span></code> (Mind the full stop/period at the end of the prefix):</p>
 <div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;datamodel&gt;</span>
-<span class="w">    </span><span class="nt">&lt;data</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;#_STATE_PREFIX&quot;</span><span class="w"> </span><span class="na">expr=</span><span class="s">&quot;&#39;de.unibi.citec.clf.bonsai.skills.example.&#39;&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;data</span><span class="w"> </span><span class="na">id=</span><span class="s">"#_STATE_PREFIX"</span><span class="w"> </span><span class="na">expr=</span><span class="s">"'de.unibi.citec.clf.bonsai.skills.example.'"</span><span class="nt">/&gt;</span>
 <span class="nt">&lt;/datamodel&gt;</span>
 </pre></div>
 </div>
 <p>The state machine then tries to find the skill “#_STATE_PREFIX.id”.
 The id here is set to ‘Nothing’. Thus, this state uses the de.unibi.citec.clf.bonsai.skills.example.Nothing class.</p>
-<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;Nothing&quot;</span><span class="nt">&gt;</span>
-<span class="w">    </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;Nothing.fatal&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;End&quot;</span><span class="nt">/&gt;</span>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">"Nothing"</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">"Nothing.fatal"</span><span class="w"> </span><span class="na">target=</span><span class="s">"End"</span><span class="nt">/&gt;</span>
 <span class="nt">&lt;/state&gt;</span>
 
-<span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;End&quot;</span><span class="w"> </span><span class="na">final=</span><span class="s">&quot;true&quot;</span><span class="nt">/&gt;</span>
+<span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">"End"</span><span class="w"> </span><span class="na">final=</span><span class="s">"true"</span><span class="nt">/&gt;</span>
 </pre></div>
 </div>
 <p>After the skill finishes its exit status gets send as event <cite>id.event</cite>.
@@ -181,14 +183,14 @@ Since the Nothing skill only returns the Fatal exit token, we transition on the 
 <p>The state id are unique to each state. So what do we do when we want to use a skill multiple times?
 For this case, we can add a hashtag some text following it, which will be ignored in the search for the class.</p>
 <p>Following the example above, we can thus add a second state as follows:</p>
-<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;Nothing&quot;</span><span class="nt">&gt;</span>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">"Nothing"</span><span class="nt">&gt;</span>
 <span class="w">    </span><span class="cm">&lt;!-- The transition only uses the skill name --&gt;</span>
-<span class="w">    </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;Nothing.fatal&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;Nothing#2&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">"Nothing.fatal"</span><span class="w"> </span><span class="na">target=</span><span class="s">"Nothing#2"</span><span class="nt">/&gt;</span>
 <span class="nt">&lt;/state&gt;</span>
 
 <span class="cm">&lt;!-- This results in unique state ids we can refer to --&gt;</span>
-<span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;Nothing#2&quot;</span><span class="nt">&gt;</span>
-<span class="w">    </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;Nothing.fatal&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;End&quot;</span><span class="nt">/&gt;</span>
+<span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">"Nothing#2"</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">"Nothing.fatal"</span><span class="w"> </span><span class="na">target=</span><span class="s">"End"</span><span class="nt">/&gt;</span>
 <span class="nt">&lt;/state&gt;</span>
 </pre></div>
 </div>
@@ -209,7 +211,7 @@ To refer to the skill, use the whole unique id with the hashtag as done in the t
 
   <div role="contentinfo">
     <p>&#169; Copyright 2025, Team of Bielefeld.
-      <span class="lastupdated">Last updated on Dec 04, 2025.
+      <span class="lastupdated">Last updated on Nov 12, 2026.
       </span></p>
   </div>
 

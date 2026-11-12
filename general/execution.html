@@ -1,0 +1,155 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Execution and Terminal Logging &mdash; Bonsai Docs 0.8-SNAPSHOT documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=f06a32cd" />
+      <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=6a604523" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=f06a32cd" />
+
+  
+    <link rel="shortcut icon" href="../_static/favicon.ico"/>
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=3242a324"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script data-sd-tabs-storage-prefix="sphinx-design-tab-id-" src="../_static/design-tabs.js?v=fcb327ea"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Bonsai Docs
+              <img src="../_static/bonsai-l1s.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Table of Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">QuickStart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../general.html">Bonsai</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../behavior.html">SCXML Behavior Engine</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changes.html">Change Log</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Bonsai Docs</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Execution and Terminal Logging</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="execution-and-terminal-logging">
+<span id="section-execution"></span><h1>Execution and Terminal Logging<a class="headerlink" href="#execution-and-terminal-logging" title="Link to this heading"></a></h1>
+<p>The Bonsai Framework provides the lifecycle and configuration mechanisms used
+by skills. A skill is configured, initialized, executed, and ended by the
+application or execution framework that runs it. See <a class="reference internal" href="skills.html"><span class="doc">Skills</span></a> for the methods involved.</p>
+<p>When using <strong>Bonsai SCXML</strong>, a running application additionally loads a
+behavior definition. That definition determines which skills run, their
+inputs, and what should happen after each outcome. See <a class="reference internal" href="../behavior.html"><span class="doc">Bonsai SCXML</span></a> for behavior semantics.</p>
+<section id="starting-execution">
+<h2>Starting execution<a class="headerlink" href="#starting-execution" title="Link to this heading"></a></h2>
+<ol class="arabic simple">
+<li><p>Make sure the required middleware, services, hardware interfaces, or
+simulation are running for the selected skills.</p></li>
+<li><p>Start the application using the launcher provided by its distribution.
+Supply the Bonsai configuration and any resources the application or
+execution framework requires, such as an SCXML behavior definition.</p></li>
+<li><p>Check the <strong>terminal output</strong> for loading or configuration errors.</p></li>
+<li><p>When execution starts, observe the available skill results, diagnostic
+messages, and completion status.</p></li>
+</ol>
+<p>The exact startup command depends on the distribution. An example
+command-line launcher is described in <a class="reference internal" href="../quickstart/install.html"><span class="doc">the installation guide</span></a>.</p>
+</section>
+<section id="understanding-terminal-logs">
+<h2>Understanding terminal logs<a class="headerlink" href="#understanding-terminal-logs" title="Link to this heading"></a></h2>
+<p>Terminal logs are the primary place to diagnose execution problems. The
+available details depend on the application’s logging configuration and
+whether individual skills emit diagnostic messages.</p>
+<p>When execution fails, check the logs for:</p>
+<ul class="simple">
+<li><p><strong>Loading and configuration:</strong> Could the required sensors, actuators,
+parameters, and memory slots be configured?</p></li>
+<li><p><strong>Skill initialization:</strong> Did each skill initialize successfully before
+execution began?</p></li>
+<li><p><strong>Skill outcomes:</strong> Did a skill report its expected Exit Token, or fail?</p></li>
+<li><p><strong>Termination:</strong> Did execution finish normally, fail, or stop unexpectedly?</p></li>
+</ul>
+<p>With Bonsai SCXML, additionally check whether a reported outcome has a
+matching transition and whether a transition exits a compound or parallel
+state. Leaving a parallel state also stops its other active children;
+finishing one child alone does not necessarily end the entire parallel.</p>
+<p>For skill-specific failures, meaningful logger messages in <code class="docutils literal notranslate"><span class="pre">configure()</span></code>,
+<code class="docutils literal notranslate"><span class="pre">init()</span></code>, <code class="docutils literal notranslate"><span class="pre">execute()</span></code>, and <code class="docutils literal notranslate"><span class="pre">end()</span></code> are often more useful than inspecting
+low-level execution files. Logging configuration and output paths may differ
+between distributions.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Team of Bielefeld.
+      <span class="lastupdated">Last updated on Nov 12, 2026.
+      </span></p>
+  </div>
+
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

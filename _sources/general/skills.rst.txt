@@ -32,7 +32,8 @@ Each skill *must* contain the following functions:
      - Explanation
      - Note
    * - configure()
-     - | Configures the Sensor and Actuator  
+     - | Loads and applies the skill configuration, 
+       | including the Sensor and Actuator  
        | from the Bonsai config  and slots and 
        | parameters from the behavior model.
      - | For more infos on skill configurations 
@@ -61,9 +62,14 @@ Each skill *must* contain the following functions:
 
 The Skill methods gets invoked in the following order
 
-::
+.. list-table::
+   :widths: 7 15
+   :header-rows: 1
 
-    configure -> init -> execute -> end
+   * - Load behavior
+     - Start behavior
+   * - ``configure()`` →
+     - ``init()`` → ``execute()`` → ``end()``
 
 .. _section_skill_configurator:
 
@@ -80,57 +86,130 @@ They all can be requested by the configurator using a **specified key**.
 The parameter functions and memory slot keys are defined within the skill and configured in the :ref:`robotic behavior code <section_parameters_scxml>`.
 The actuator and sensor, however, get their configurations from the **Bonsai config**.
 
+
+The ``configure`` function in the example skill below gets the ``SkillConfigurator`` as parameter.
+With this it can request the sensors, actuators, parameters, slots and ExitTokens.
+
+.. code-block:: kotlin
+
+    import ...
+    import ExampleActuatorInterface // import the Actuator interfaces you want to use
+    import SensorType               // import the DataType returned by the Sensor
+
+    class ExampleSkill : AbstractSkill {
+
+        
+        // Define here the keys of everything we want to get from the configurator
+        private val KEY_ACTUATOR = "Example1"
+        private val KEY_SENSOR = "Example2"
+        private val KEY_STRING_PARAMETER = "StringParam"
+        private val KEY_INT_PARAMETER = "IntParam"
+        private val KEY_SLOT = "StringSlot"
+      
+
+        // Declare the Actuators, Sensors, Slots and parameters
+        private var actuator: ExampleActuatorInterface? = null
+        private var sensor: ExampleSensorInterface? = null
+        private var paramName: String = ""
+        private var optValue: Int = 0
+        private var slot: Slot<String>? = null
+
+        /*
+        * This function uses the SkillConfigurator to get the configured objects and initialize everything
+        * that has been declared above
+        */
+        override fun configure(conf: ISkillConfigurator) {
+            this.actuator = conf.getActuator(KEY_ACTUATOR, ExampleActuatorInterface::class.java) // returns ExampleActuator class
+            this.sensor = conf.getSensor(KEY_SENSOR, DataType::class.java) // returns ExampleSensor class
+            this.paramName = conf.getValue(KEY_STRING_PARAMETER)
+            this.optValue = conf.getOptionalInt(KEY_INT_PARAMETER, parameter2)
+            this.slot = conf.getReadWriteSlot(KEY_SLOT, SlotType::class.java)
+        }
+
+        ...
+    }
+
 .. note:: 
 
     For more information on how and where the SkillConfigurator gets the configuration, look up the section :ref:`SkillConfigurator <section_skill_configurator>`.
 
 Configure is already called before during load, therefore errors can be handled before execution.
 
-.. list-table:: SkillConfigurator Functions
-   :widths: 15 15
-   :header-rows: 1
+Here are SkillConfigurator Functions: 
 
-   * - Function
-     - Explanation
-   * - requestValue(String key)
-     - | From the behavior model, request the parameter 
-       | with key and cast it to a String
-   * - requestOptionalValue(String key, String default)
-     - | From the behavior model, request the parameter 
-       | with key and cast it to a String. If the parameter 
-       | has not been declared in the configuration file,
-       | then use the default value. The getOptional
-       | functions are also available for the other types below.
-   * - | requestInt(String key)
-       | requestOptionalInt(String key, int default)
-     - | From the behavior model, request the parameter 
-       | with key and cast it to an int
-   * - | requestDouble(String key)
-       | requestOptionalDouble(String key, double default)
-     - | From the behavior model, request the parameter 
-       | with key and cast it to a double
-   * - | requestBoolean(String key)
-       | requestOptionalBoolean(String key, boolean default)
-     - | From the behavior model, request the parameter 
-       | with key and cast it to Boolean
-   * - | getReadSlot(String key)
-       | getWriteSlot(String key)
-       | getReadWriteSlot(String key)
-     - | Request :ref:`memory slot <section_memory>` with specified key.
-       | The :ref:`robotic behavior code <section_memory_scxml>` has to provide the other configurations needed.
-   * - getSensor(String key, DataType T)
-     - | Provides the :ref:`Sensor <section_sensor>` with the specified key 
-       | from the **Bonsai config**. The sensor will return
-       | data of the specified type T.
-   * - getActuator(String key, InterfaceClass T)
-     - | Provides :ref:`Actuator <section_actuator>` with specified key from the
-       | **Bonsai config** and cast it to the 
-       | interface class. 
-   * - requestExitToken(ExitStatus exitStatus)
-     - | Request an :ref:`ExitToken <section_exit_token>`
-       | No configurations needed to get the ExitTokens.
+.. dropdown:: Parameters
 
+    .. list-table:: 
+      :widths: 15 15
+      :header-rows: 1
 
+      * - Function
+        - Explanation
+      * - requestValue(String key)
+        - | From the behavior model, request the parameter 
+          | with key and cast it to a String
+      * - requestOptionalValue(String key, String default)
+        - | From the behavior model, request the parameter 
+          | with key and cast it to a String. If the parameter 
+          | has not been declared in the configuration file,
+          | then use the default value. The getOptional
+          | functions are also available for the other types below.
+      * - | requestInt(String key)
+          | requestOptionalInt(String key, int default)
+        - | From the behavior model, request the parameter 
+          | with key and cast it to an int
+      * - | requestDouble(String key)
+          | requestOptionalDouble(String key, double default)
+        - | From the behavior model, request the parameter 
+          | with key and cast it to a double
+      * - | requestBoolean(String key)
+          | requestOptionalBoolean(String key, boolean default)
+        - | From the behavior model, request the parameter 
+          | with key and cast it to Boolean
+
+.. dropdown:: Slot
+
+    .. list-table::  
+      :widths: 15 15
+      :header-rows: 1
+
+      * - Function
+        - Explanation
+      * - | getReadSlot(String key)
+          | getWriteSlot(String key)
+          | getReadWriteSlot(String key)
+        - | Request :ref:`memory slot <section_memory>` with specified key.
+          | The :ref:`robotic behavior code <section_memory_scxml>` has to provide the other configurations needed.
+
+.. dropdown:: Sensor and Actuator
+
+    .. list-table:: 
+      :widths: 15 15
+      :header-rows: 1
+
+      * - Function
+        - Explanation
+      * - getSensor(String key, DataType T)
+        - | Provides the :ref:`Sensor <section_sensor>` with the specified key 
+          | from the **Bonsai config**. The sensor will return
+          | data of the specified type T.
+      * - getActuator(String key, InterfaceClass T)
+        - | Provides :ref:`Actuator <section_actuator>` with specified key from the
+          | **Bonsai config** and cast it to the 
+          | interface class. 
+
+.. dropdown:: ExitToken
+
+    .. list-table:: 
+      :widths: 15 15
+      :header-rows: 1
+
+      * - Function
+        - Explanation
+      * - requestExitToken(ExitStatus exitStatus)
+        - | Request an :ref:`ExitToken <section_exit_token>`
+          | No configurations needed to get the ExitTokens.
+      
 .. note::
     Even though some function names for the :ref:`ObjectConfigurator <section_object_configurator>` and the ``SkillConfigurator`` are the same, 
     when requesting values, int, doubles, or booleans, the ``SkillConfigurator`` searches for the key inside the robotic behavior code (SCXML)
@@ -138,63 +217,6 @@ Configure is already called before during load, therefore errors can be handled 
 
     **They are the parameters that can be provided to a skill through the SCXML and not the Bonsai configuration.** 
 
-Let's assume we have the following configuration of actuators and sensors in the **Bonsai configuration file**:
-
-.. code-block:: xml
-
-    <!-- ACTUATORS -->
-    <Actuator key="Example1" ... >
-        <Options>
-            <Option key="topic">/example</Option>
-            <Option key="optional_int">1</Option>
-        </Options>
-    </Actuator>
-
-    <!-- SENSORS -->
-    <Sensor key="Example2" ... >
-        ...
-    </Sensor>
-
-The ``configure`` function in the example skill below gets the ``SkillConfigurator`` as parameter.
-With this it can request the sensors, actuators, parameters, slots and ExitTokens.
-
-.. code-block:: java
-
-    import ...
-    import ExampleActuatorInterface;    // import the Actuator interfaces you want to use
-    import SensorType;                  // import the DataType returned by the Sensor
-
-    public class ExampleSkill implements AbstractSkill {
-
-        // define here the keys of everything we want to get from the configurator
-        private static final String KEY_ACTUATOR = "Example1";
-        private static final String KEY_SENSOR = "Example2";
-        private static final String KEY_STRING_PARAMETER = "StringParam";
-        private static final String KEY_INT_PARAMETER = "IntParam";
-        private static final String KEY_SLOT = "StringSlot";
-
-        // Declare the Actuators, Sensors, Slots and parameters
-        private ExampleActuatorInterface actuator;
-        private ExampleSensorInterface sensor;
-        private String paramName;
-        private int optValue = 0;
-        private Slot<String> slot;
-
-        /*
-        * This function uses the Skillconfigurator to get the configured objects and initialize everything
-        * that has been declared above
-        */
-        public void configure(ISkillConfigurator conf) {
-            this.actuator = conf.getActuator(KEY_ACTUATOR, ExampleActuatorInterface.class);    // returns ExampleActuator class
-            this.sensor = conf.getSensor(KEY_SENSOR, DataType.class);          // returns ExampleSensor class
-            this.paramName = conf.getValue(KEY_STRING_PARAMETER);
-            this.optValue = conf.getOptionalInt(KEY_INT_PARAMETER, parameter2);
-            this.slot = conf.getReadWriteSlot(KEY_SLOT);
-        }
-
-        ...
-
-    }
 
 The options and memory slots that a skill can request from the configurator are not defined in the Bonsai configs, but should be set within the code of the :ref:`robotic behavior <section_scxml>`.
 
@@ -241,11 +263,10 @@ There exist three ExitTokens:
 ExitTokens can be requested from the configurator:
 ::
 
-    @Override
-    public void configure(SkillConfigurator configurator) {
+    override fun configure(configurator: ISkillConfigurator) {
         // request all tokens that you plan to return from other methods
-        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS());
-        tokenError = configurator.requestExitToken(ExitStatus.ERROR());
+        tokenSuccess = configurator.requestExitToken(ExitStatus.SUCCESS())
+        tokenError = configurator.requestExitToken(ExitStatus.ERROR())
     }
 
 Sometimes, we need more refined ExitTokens. 
@@ -255,11 +276,10 @@ The skill can run successfully. However, which can mean it detected no objects o
 To distinguish this case, we can do the following:
 ::
 
-    @Override
-    public void configure(SkillConfigurator configurator) {
+    override fun configure(configurator: ISkillConfigurator)  {
         // request all tokens that you plan to return from other methods
-        tokenSuccessNoObj = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus("no_obj"));
-        tokenSuccessDetected = configurator.requestExitToken(ExitStatus.SUCCESS().withProcessingStatus("detected"));
+        tokenSuccessNoObj = configurator.requestExitToken(ExitStatus.SUCCESS().ps("no_obj"))
+        tokenSuccessDetected = configurator.requestExitToken(ExitStatus.SUCCESS().ps("detected"))
     }
 
 
@@ -267,3 +287,27 @@ To distinguish this case, we can do the following:
 
   For each ExitToken, you should make sure that either **ALL** or **NONE** of that exit tokens have a ps.
   Don't define e.g. ``ExitToken.SUCCESS()`` without a ps when you already have defined ``ExitToken.SUCCESS().ps("example")``
+
+.. _section_sensor_and_actuator:
+
+Sensor and Actuator
+-----------------
+The behavior model defines the sensors and actuators used by the skill, including their 
+unique keys and optional configuration parameters specified through key-value pairs in the Options element.
+
+Let's assume we have the following configuration of actuators and sensors in the **Bonsai configuration file**:
+
+.. code-block:: xml
+
+    <!-- ACTUATORS -->
+    <Actuator key="Example1" ... >
+        <Options>
+            <Option key="topic">/example</Option>
+            <Option key="optional_int">1</Option>
+        </Options>
+    </Actuator>
+
+    <!-- SENSORS -->
+    <Sensor key="Example2" ... >
+        ...
+    </Sensor>

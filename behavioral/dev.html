@@ -7,9 +7,10 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Behavior Abstraction Layer &mdash; Bonsai Docs 0.8-SNAPSHOT documentation</title>
-      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
-      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=f06a32cd" />
+      <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=6a604523" />
       <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=f06a32cd" />
 
   
@@ -17,8 +18,9 @@
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../_static/documentation_options.js?v=3242a324"></script>
-      <script src="../_static/doctools.js?v=9bcbadda"></script>
-      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script data-sd-tabs-storage-prefix="sphinx-design-tab-id-" src="../_static/design-tabs.js?v=fcb327ea"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" /> 
@@ -80,10 +82,10 @@
 <p>BehaviorAL is used to expose robot behaviors to extern users (e.x Apartment)
 It can be used to trigger statemachines remotely.</p>
 <p>Params:</p>
-<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="nd">@Option</span><span class="p">(</span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;-l&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">aliases</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="s">&quot;--logging&quot;</span><span class="p">},</span><span class="w"> </span><span class="n">metaVar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;PATH&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">usage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;path to a log4j properties file&quot;</span><span class="p">)</span>
-<span class="nd">@Option</span><span class="p">(</span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;-c&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">aliases</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="s">&quot;--config&quot;</span><span class="p">},</span><span class="w"> </span><span class="n">metaVar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;PATH&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">usage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;path to the bahaviorAL config file&quot;</span><span class="p">)</span>
-<span class="nd">@Option</span><span class="p">(</span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;-s&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">aliases</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="s">&quot;--server_scope&quot;</span><span class="p">},</span><span class="w"> </span><span class="n">metaVar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;VALUE&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">usage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;scope for server, default is: &#39;/bonsai&#39;&quot;</span><span class="p">)</span>
-<span class="nd">@Option</span><span class="p">(</span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;-b&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">aliases</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="s">&quot;--bonsai_server&quot;</span><span class="p">},</span><span class="w"> </span><span class="n">metaVar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;VALUE&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">usage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;scope for bonsai (the server that gets the xml files), default is: &#39;/behavioral/server&#39;&quot;</span><span class="p">)</span>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="nd">@Option</span><span class="p">(</span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"-l"</span><span class="p">,</span><span class="w"> </span><span class="n">aliases</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="s">"--logging"</span><span class="p">},</span><span class="w"> </span><span class="n">metaVar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"PATH"</span><span class="p">,</span><span class="w"> </span><span class="n">usage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"path to a log4j properties file"</span><span class="p">)</span>
+<span class="nd">@Option</span><span class="p">(</span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"-c"</span><span class="p">,</span><span class="w"> </span><span class="n">aliases</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="s">"--config"</span><span class="p">},</span><span class="w"> </span><span class="n">metaVar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"PATH"</span><span class="p">,</span><span class="w"> </span><span class="n">usage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"path to the bahaviorAL config file"</span><span class="p">)</span>
+<span class="nd">@Option</span><span class="p">(</span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"-s"</span><span class="p">,</span><span class="w"> </span><span class="n">aliases</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="s">"--server_scope"</span><span class="p">},</span><span class="w"> </span><span class="n">metaVar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"VALUE"</span><span class="p">,</span><span class="w"> </span><span class="n">usage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"scope for server, default is: '/bonsai'"</span><span class="p">)</span>
+<span class="nd">@Option</span><span class="p">(</span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"-b"</span><span class="p">,</span><span class="w"> </span><span class="n">aliases</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="s">"--bonsai_server"</span><span class="p">},</span><span class="w"> </span><span class="n">metaVar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"VALUE"</span><span class="p">,</span><span class="w"> </span><span class="n">usage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"scope for bonsai (the server that gets the xml files), default is: '/behavioral/server'"</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>Example config file:</p>
@@ -96,11 +98,11 @@ It can be used to trigger statemachines remotely.</p>
 <span class="w">                        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">talk</span>
 <span class="w">                                </span><span class="l l-Scalar l-Scalar-Plain">target</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ExecuteSpeak</span>
 <span class="w">                                </span><span class="l l-Scalar l-Scalar-Plain">params</span><span class="p p-Indicator">:</span>
-<span class="w">                                        </span><span class="nt">text</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;hello&quot;</span>
+<span class="w">                                        </span><span class="nt">text</span><span class="p">:</span><span class="w"> </span><span class="s">"hello"</span>
 <span class="w">                        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gotoannotation</span>
 <span class="w">                                </span><span class="l l-Scalar l-Scalar-Plain">target</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ExecuteNavToAnnotation</span>
 <span class="w">                                </span><span class="l l-Scalar l-Scalar-Plain">params</span><span class="p p-Indicator">:</span>
-<span class="w">                                        </span><span class="nt">location</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;start&quot;</span>
+<span class="w">                                        </span><span class="nt">location</span><span class="p">:</span><span class="w"> </span><span class="s">"start"</span>
 <span class="w">                        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stop</span>
 <span class="w">                                </span><span class="l l-Scalar l-Scalar-Plain">target</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ExecuteStop</span>
 <span class="w">                        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test</span>
@@ -122,7 +124,7 @@ It can be used to trigger statemachines remotely.</p>
 <li><p><code class="docutils literal notranslate"><span class="pre">params</span></code>  can be used to overwrite statemachine variables:</p></li>
 </ul>
 <p>Example dialog.Talk skill (from ExecuteSpeak):</p>
-<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;data</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;#_MESSAGE&quot;</span><span class="w"> </span><span class="na">expr=</span><span class="s">&quot;&#39;@text&#39;&quot;</span><span class="w"> </span><span class="nt">/&gt;</span>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;data</span><span class="w"> </span><span class="na">id=</span><span class="s">"#_MESSAGE"</span><span class="w"> </span><span class="na">expr=</span><span class="s">"'@text'"</span><span class="w"> </span><span class="nt">/&gt;</span>
 </pre></div>
 </div>
 <section id="rsb-interface">
@@ -199,7 +201,7 @@ It can be used to trigger statemachines remotely.</p>
 
   <div role="contentinfo">
     <p>&#169; Copyright 2025, Team of Bielefeld.
-      <span class="lastupdated">Last updated on Dec 04, 2025.
+      <span class="lastupdated">Last updated on Nov 12, 2026.
       </span></p>
   </div>
 

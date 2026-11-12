@@ -7,9 +7,10 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Transitions &mdash; Bonsai Docs 0.8-SNAPSHOT documentation</title>
-      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
-      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=f06a32cd" />
+      <link rel="stylesheet" type="text/css" href="../../_static/sphinx-design.min.css?v=6a604523" />
       <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=f06a32cd" />
 
   
@@ -17,8 +18,9 @@
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../../_static/documentation_options.js?v=3242a324"></script>
-      <script src="../../_static/doctools.js?v=9bcbadda"></script>
-      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script data-sd-tabs-storage-prefix="sphinx-design-tab-id-" src="../../_static/design-tabs.js?v=fcb327ea"></script>
     <script src="../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
@@ -109,13 +111,13 @@
 <span class="cm">* This skill only succeeds</span>
 <span class="cm">*/</span>
 <span class="kd">class</span><span class="w"> </span><span class="nc">Succeeder</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">AbstractSkill</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">var</span><span class="w"> </span><span class="nv">tokenSuccess</span><span class="p">:</span><span class="w"> </span><span class="n">ExitToken? </span><span class="o">=</span><span class="w"> </span><span class="kc">null</span>
+<span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">var</span><span class="w"> </span><span class="nv">tokenSuccess</span><span class="p">:</span><span class="w"> </span><span class="n">ExitToken?</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">null</span>
 
 <span class="w">    </span><span class="nd">@Throws</span><span class="p">(</span><span class="n">SkillConfigurationException</span><span class="o">::</span><span class="n">class</span><span class="p">)</span>
 <span class="w">    </span><span class="kd">override</span><span class="w"> </span><span class="kd">fun</span><span class="w"> </span><span class="nf">configure</span><span class="p">(</span><span class="n">configurator</span><span class="p">:</span><span class="w"> </span><span class="n">ISkillConfigurator</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
 <span class="w">        </span><span class="n">tokenSuccess</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">configurator</span><span class="p">.</span><span class="na">requestExitToken</span><span class="p">(</span><span class="n">ExitStatus</span><span class="p">.</span><span class="na">SUCCESS</span><span class="p">())</span>
-<span class="w">        </span><span class="n">configurator</span><span class="p">.</span><span class="na">requestExitToken</span><span class="p">(</span><span class="n">ExitStatus</span><span class="p">.</span><span class="na">ERROR</span><span class="p">().</span><span class="na">ps</span><span class="p">(</span><span class="s">&quot;never&quot;</span><span class="p">))</span>
-<span class="w">        </span><span class="n">configurator</span><span class="p">.</span><span class="na">requestExitToken</span><span class="p">(</span><span class="n">ExitStatus</span><span class="p">.</span><span class="na">ERROR</span><span class="p">().</span><span class="na">ps</span><span class="p">(</span><span class="s">&quot;neverEver&quot;</span><span class="p">))</span>
+<span class="w">        </span><span class="n">configurator</span><span class="p">.</span><span class="na">requestExitToken</span><span class="p">(</span><span class="n">ExitStatus</span><span class="p">.</span><span class="na">ERROR</span><span class="p">().</span><span class="na">ps</span><span class="p">(</span><span class="s">"never"</span><span class="p">))</span>
+<span class="w">        </span><span class="n">configurator</span><span class="p">.</span><span class="na">requestExitToken</span><span class="p">(</span><span class="n">ExitStatus</span><span class="p">.</span><span class="na">ERROR</span><span class="p">().</span><span class="na">ps</span><span class="p">(</span><span class="s">"neverEver"</span><span class="p">))</span>
 <span class="w">    </span><span class="p">}</span>
 
 <span class="w">    </span><span class="kd">override</span><span class="w"> </span><span class="kd">fun</span><span class="w"> </span><span class="nf">init</span><span class="p">():</span><span class="w"> </span><span class="kt">Boolean</span><span class="w"> </span><span class="p">{</span>
@@ -140,8 +142,8 @@ In order to use Success and Error tokens, they have to be requested first:</p>
 </pre></div>
 </div>
 <p>If you want several tokens or return more information, you can register Exit tokens with a processing status:</p>
-<div class="highlight-kotlin notranslate"><div class="highlight"><pre><span></span><span class="n">configurator</span><span class="p">.</span><span class="na">requestExitToken</span><span class="p">(</span><span class="n">ExitStatus</span><span class="p">.</span><span class="na">ERROR</span><span class="p">().</span><span class="na">ps</span><span class="p">(</span><span class="s">&quot;never&quot;</span><span class="p">))</span>
-<span class="n">configurator</span><span class="p">.</span><span class="na">requestExitToken</span><span class="p">(</span><span class="n">ExitStatus</span><span class="p">.</span><span class="na">ERROR</span><span class="p">().</span><span class="na">ps</span><span class="p">(</span><span class="s">&quot;neverEver&quot;</span><span class="p">))</span>
+<div class="highlight-kotlin notranslate"><div class="highlight"><pre><span></span><span class="n">configurator</span><span class="p">.</span><span class="na">requestExitToken</span><span class="p">(</span><span class="n">ExitStatus</span><span class="p">.</span><span class="na">ERROR</span><span class="p">().</span><span class="na">ps</span><span class="p">(</span><span class="s">"never"</span><span class="p">))</span>
+<span class="n">configurator</span><span class="p">.</span><span class="na">requestExitToken</span><span class="p">(</span><span class="n">ExitStatus</span><span class="p">.</span><span class="na">ERROR</span><span class="p">().</span><span class="na">ps</span><span class="p">(</span><span class="s">"neverEver"</span><span class="p">))</span>
 </pre></div>
 </div>
 <div class="admonition warning">
@@ -151,11 +153,11 @@ In this example, you should not use the ExitStatus.ERROR() token without a proce
 </div>
 <p>Depending on the skill, other process statuses can be returned which then need to be considered in the state machine.</p>
 <p>This can be easily done by adding the processing status in the event:</p>
-<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;example.Succeeder&quot;</span><span class="nt">&gt;</span>
-<span class="w">    </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;Succeeder.success&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;End&quot;</span><span class="nt">/&gt;</span>
-<span class="w">    </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;Succeeder.fatal&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;Fatal&quot;</span><span class="nt">/&gt;</span>
-<span class="w">    </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;Succeeder.error.never&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;Fatal&quot;</span><span class="nt">/&gt;</span>
-<span class="w">    </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">&quot;Succeeder.error.*&quot;</span><span class="w"> </span><span class="na">target=</span><span class="s">&quot;Fatal&quot;</span><span class="nt">/&gt;</span>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">"example.Succeeder"</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">"Succeeder.success"</span><span class="w"> </span><span class="na">target=</span><span class="s">"End"</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">"Succeeder.fatal"</span><span class="w"> </span><span class="na">target=</span><span class="s">"Fatal"</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">"Succeeder.error.never"</span><span class="w"> </span><span class="na">target=</span><span class="s">"Fatal"</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;transition</span><span class="w"> </span><span class="na">event=</span><span class="s">"Succeeder.error.*"</span><span class="w"> </span><span class="na">target=</span><span class="s">"Fatal"</span><span class="nt">/&gt;</span>
 <span class="nt">&lt;/state&gt;</span>
 </pre></div>
 </div>
@@ -170,8 +172,8 @@ The other error transitions are catched with the <code class="docutils literal n
 <h2>Verification<a class="headerlink" href="#verification" title="Link to this heading"></a></h2>
 <p>If we forget some events bonsai will remind us after loading.
 For example, if we would not include the error transitions above, you would then see errors looking something like this:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">State</span> <span class="k">with</span> <span class="nb">id</span> <span class="s2">&quot;de.unibi.citec.clf.bonsai.skills.example.Succeeder&quot;</span> <span class="n">misses</span> <span class="n">transition</span> <span class="k">for</span> <span class="n">event</span> <span class="s2">&quot;Succeeder.error.neverEver&quot;</span>
-<span class="n">State</span> <span class="k">with</span> <span class="nb">id</span> <span class="s2">&quot;de.unibi.citec.clf.bonsai.skills.example.Succeeder&quot;</span> <span class="n">misses</span> <span class="n">transition</span> <span class="k">for</span> <span class="n">event</span> <span class="s2">&quot;Succeeder.error.never&quot;</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">State</span> <span class="k">with</span> <span class="nb">id</span> <span class="s2">"de.unibi.citec.clf.bonsai.skills.example.Succeeder"</span> <span class="n">misses</span> <span class="n">transition</span> <span class="k">for</span> <span class="n">event</span> <span class="s2">"Succeeder.error.neverEver"</span>
+<span class="n">State</span> <span class="k">with</span> <span class="nb">id</span> <span class="s2">"de.unibi.citec.clf.bonsai.skills.example.Succeeder"</span> <span class="n">misses</span> <span class="n">transition</span> <span class="k">for</span> <span class="n">event</span> <span class="s2">"Succeeder.error.never"</span>
 </pre></div>
 </div>
 </section>
@@ -189,7 +191,7 @@ For example, if we would not include the error transitions above, you would then
 
   <div role="contentinfo">
     <p>&#169; Copyright 2025, Team of Bielefeld.
-      <span class="lastupdated">Last updated on Dec 04, 2025.
+      <span class="lastupdated">Last updated on Nov 12, 2026.
       </span></p>
   </div>
 

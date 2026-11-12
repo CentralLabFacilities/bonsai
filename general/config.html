@@ -7,9 +7,10 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Bonsai Configuration &mdash; Bonsai Docs 0.8-SNAPSHOT documentation</title>
-      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
-      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=f06a32cd" />
+      <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=6a604523" />
       <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=f06a32cd" />
 
   
@@ -17,8 +18,9 @@
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../_static/documentation_options.js?v=3242a324"></script>
-      <script src="../_static/doctools.js?v=9bcbadda"></script>
-      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script data-sd-tabs-storage-prefix="sphinx-design-tab-id-" src="../_static/design-tabs.js?v=fcb327ea"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -98,54 +100,54 @@
 <span id="section-config"></span><h1>Bonsai Configuration<a class="headerlink" href="#bonsai-configuration" title="Link to this heading"></a></h1>
 <p>In order for Bonsai to know which sensor and actuator to use, we need to define them in a configuration file.
 The configuration file can look like the following:</p>
-<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="cp">&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt;</span>
-<span class="nt">&lt;BonsaiConfiguration</span><span class="w"> </span><span class="na">xmlns:xsi=</span><span class="s">&quot;http://www.w3.org/2001/XMLSchema-instance&quot;</span>
-<span class="w">                    </span><span class="na">xsi:noNamespaceSchemaLocation=</span><span class="s">&quot;BonsaiConfiguration.xsd&quot;</span><span class="nt">&gt;</span>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="cp">&lt;?xml version="1.0" encoding="utf-8"?&gt;</span>
+<span class="nt">&lt;BonsaiConfiguration</span><span class="w"> </span><span class="na">xmlns:xsi=</span><span class="s">"http://www.w3.org/2001/XMLSchema-instance"</span>
+<span class="w">                    </span><span class="na">xsi:noNamespaceSchemaLocation=</span><span class="s">"BonsaiConfiguration.xsd"</span><span class="nt">&gt;</span>
 
 <span class="w">    </span><span class="cm">&lt;!-- FACTORY CLASSES --&gt;</span>
-<span class="w">    </span><span class="nt">&lt;FactoryOptions</span><span class="w"> </span><span class="na">factoryClass=</span><span class="s">&quot;de.unibi.citec.clf.bonsai.ros.RosFactory&quot;</span><span class="w"> </span><span class="nt">&gt;</span>
-<span class="w">        </span><span class="nt">&lt;Option</span><span class="w"> </span><span class="na">key=</span><span class="s">&quot;NODE_INIT_TIMEOUT&quot;</span><span class="nt">&gt;</span>5000<span class="nt">&lt;/Option&gt;</span>
-<span class="w">        </span><span class="nt">&lt;Option</span><span class="w"> </span><span class="na">key=</span><span class="s">&quot;INIT_SLEEP_TIME&quot;</span><span class="nt">&gt;</span>500<span class="nt">&lt;/Option&gt;</span>
+<span class="w">    </span><span class="nt">&lt;FactoryOptions</span><span class="w"> </span><span class="na">factoryClass=</span><span class="s">"de.unibi.citec.clf.bonsai.ros.RosFactory"</span><span class="w"> </span><span class="nt">&gt;</span>
+<span class="w">        </span><span class="nt">&lt;Option</span><span class="w"> </span><span class="na">key=</span><span class="s">"NODE_INIT_TIMEOUT"</span><span class="nt">&gt;</span>5000<span class="nt">&lt;/Option&gt;</span>
+<span class="w">        </span><span class="nt">&lt;Option</span><span class="w"> </span><span class="na">key=</span><span class="s">"INIT_SLEEP_TIME"</span><span class="nt">&gt;</span>500<span class="nt">&lt;/Option&gt;</span>
 <span class="w">    </span><span class="nt">&lt;/FactoryOptions&gt;</span>
 
-<span class="w">    </span><span class="nt">&lt;FactoryOptions</span><span class="w"> </span><span class="na">factoryClass=</span><span class="s">&quot;de.unibi.citec.clf.bonsai.memory.MemoryFactory&quot;</span><span class="w"> </span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;FactoryOptions</span><span class="w"> </span><span class="na">factoryClass=</span><span class="s">"de.unibi.citec.clf.bonsai.memory.MemoryFactory"</span><span class="w"> </span><span class="nt">/&gt;</span>
 
 <span class="w">    </span><span class="cm">&lt;!-- COORDINATE TRANSFORMATION CLASS --&gt;</span>
-<span class="w">    </span><span class="nt">&lt;CoordinateTransformer</span><span class="w"> </span><span class="na">factoryClass=</span><span class="s">&quot;de.unibi.citec.clf.bonsai.ros.RosFactory&quot;</span>
-<span class="w">                        </span><span class="na">coordinateTransformerClass=</span><span class="s">&quot;de.unibi.citec.clf.bonsai.ros.TFTransformer&quot;</span>
+<span class="w">    </span><span class="nt">&lt;CoordinateTransformer</span><span class="w"> </span><span class="na">factoryClass=</span><span class="s">"de.unibi.citec.clf.bonsai.ros.RosFactory"</span>
+<span class="w">                        </span><span class="na">coordinateTransformerClass=</span><span class="s">"de.unibi.citec.clf.bonsai.ros.TFTransformer"</span>
 <span class="w">    </span><span class="nt">/&gt;</span>
 
 <span class="w">    </span><span class="cm">&lt;!-- MEMORY --&gt;</span>
-<span class="w">    </span><span class="nt">&lt;WorkingMemory</span><span class="w"> </span><span class="na">key=</span><span class="s">&quot;WorkingMemory&quot;</span>
-<span class="w">                </span><span class="na">factoryClass=</span><span class="s">&quot;de.unibi.citec.clf.bonsai.memory.MemoryFactory&quot;</span>
-<span class="w">                </span><span class="na">workingMemoryClass=</span><span class="s">&quot;de.unibi.citec.clf.bonsai.memory.DefaultMemory&quot;</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;WorkingMemory</span><span class="w"> </span><span class="na">key=</span><span class="s">"WorkingMemory"</span>
+<span class="w">                </span><span class="na">factoryClass=</span><span class="s">"de.unibi.citec.clf.bonsai.memory.MemoryFactory"</span>
+<span class="w">                </span><span class="na">workingMemoryClass=</span><span class="s">"de.unibi.citec.clf.bonsai.memory.DefaultMemory"</span><span class="nt">&gt;</span>
 <span class="w">    </span><span class="nt">&lt;/WorkingMemory&gt;</span>
 
 <span class="w">    </span><span class="cm">&lt;!-- SENSORS --&gt;</span>
-<span class="w">    </span><span class="nt">&lt;Sensors</span><span class="w"> </span><span class="na">src=</span><span class="s">&quot;default/DefaultSensors.xml&quot;</span><span class="w"> </span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;Sensors</span><span class="w"> </span><span class="na">src=</span><span class="s">"default/DefaultSensors.xml"</span><span class="w"> </span><span class="nt">/&gt;</span>
 
-<span class="w">    </span><span class="nt">&lt;Sensor</span><span class="w"> </span><span class="na">key=</span><span class="s">&quot;PersonSensor&quot;</span>
-<span class="w">        </span><span class="na">factoryClass=</span><span class="s">&quot;de.unibi.citec.clf.bonsai.ros.RosFactory&quot;</span>
-<span class="w">        </span><span class="na">sensorClass=</span><span class="s">&quot;de.unibi.citec.clf.bonsai.ros.sensors.RosBtlMsgSensor&quot;</span>
-<span class="w">        </span><span class="na">wireTypeClass=</span><span class="s">&quot;people_msgs.People&quot;</span>
-<span class="w">        </span><span class="na">dataTypeClass=</span><span class="s">&quot;de.unibi.citec.clf.btl.data.person.PersonDataList&quot;</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;Sensor</span><span class="w"> </span><span class="na">key=</span><span class="s">"PersonSensor"</span>
+<span class="w">        </span><span class="na">factoryClass=</span><span class="s">"de.unibi.citec.clf.bonsai.ros.RosFactory"</span>
+<span class="w">        </span><span class="na">sensorClass=</span><span class="s">"de.unibi.citec.clf.bonsai.ros.sensors.RosBtlMsgSensor"</span>
+<span class="w">        </span><span class="na">wireTypeClass=</span><span class="s">"people_msgs.People"</span>
+<span class="w">        </span><span class="na">dataTypeClass=</span><span class="s">"de.unibi.citec.clf.btl.data.person.PersonDataList"</span><span class="nt">&gt;</span>
 <span class="w">        </span><span class="nt">&lt;Options&gt;</span>
-<span class="w">            </span><span class="nt">&lt;Option</span><span class="w"> </span><span class="na">key=</span><span class="s">&quot;topic&quot;</span><span class="nt">&gt;</span>/people_tracker/people<span class="nt">&lt;/Option&gt;</span>
+<span class="w">            </span><span class="nt">&lt;Option</span><span class="w"> </span><span class="na">key=</span><span class="s">"topic"</span><span class="nt">&gt;</span>/people_tracker/people<span class="nt">&lt;/Option&gt;</span>
 <span class="w">        </span><span class="nt">&lt;/Options&gt;</span>
 <span class="w">    </span><span class="nt">&lt;/Sensor&gt;</span>
 
 <span class="w">    </span><span class="cm">&lt;!-- ACTUATORS --&gt;</span>
-<span class="w">    </span><span class="nt">&lt;Actuators</span><span class="w"> </span><span class="na">src=</span><span class="s">&quot;default/DefaultActuators.xml&quot;</span><span class="w"> </span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;Actuators</span><span class="w"> </span><span class="na">src=</span><span class="s">"default/DefaultActuators.xml"</span><span class="w"> </span><span class="nt">/&gt;</span>
 
-<span class="w">    </span><span class="nt">&lt;Actuator</span><span class="w"> </span><span class="na">key=</span><span class="s">&quot;NavigationActuator&quot;</span>
-<span class="w">          </span><span class="na">factoryClass=</span><span class="s">&quot;de.unibi.citec.clf.bonsai.ros.RosFactory&quot;</span>
-<span class="w">          </span><span class="na">actuatorClass=</span><span class="s">&quot;de.unibi.citec.clf.bonsai.ros.actuators.ClfMoveBaseNavigationActuator&quot;</span>
-<span class="w">          </span><span class="na">actuatorInterface=</span><span class="s">&quot;de.unibi.citec.clf.bonsai.actuators.NavigationActuator&quot;</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;Actuator</span><span class="w"> </span><span class="na">key=</span><span class="s">"NavigationActuator"</span>
+<span class="w">          </span><span class="na">factoryClass=</span><span class="s">"de.unibi.citec.clf.bonsai.ros.RosFactory"</span>
+<span class="w">          </span><span class="na">actuatorClass=</span><span class="s">"de.unibi.citec.clf.bonsai.ros.actuators.ClfMoveBaseNavigationActuator"</span>
+<span class="w">          </span><span class="na">actuatorInterface=</span><span class="s">"de.unibi.citec.clf.bonsai.actuators.NavigationActuator"</span><span class="nt">&gt;</span>
 <span class="w">        </span><span class="nt">&lt;Options&gt;</span>
-<span class="w">            </span><span class="nt">&lt;Option</span><span class="w"> </span><span class="na">key=</span><span class="s">&quot;topic&quot;</span><span class="nt">&gt;</span>/move_base<span class="nt">&lt;/Option&gt;</span>
-<span class="w">            </span><span class="nt">&lt;Option</span><span class="w"> </span><span class="na">key=</span><span class="s">&quot;moveRelativeTopic&quot;</span><span class="nt">&gt;</span>/key_vel<span class="nt">&lt;/Option&gt;</span>
-<span class="w">            </span><span class="nt">&lt;Option</span><span class="w"> </span><span class="na">key=</span><span class="s">&quot;costmapTopic&quot;</span><span class="nt">&gt;</span>/move_base/clear_costmaps<span class="nt">&lt;/Option&gt;</span>
-<span class="w">            </span><span class="nt">&lt;Option</span><span class="w"> </span><span class="na">key=</span><span class="s">&quot;makePlanTopic&quot;</span><span class="nt">&gt;</span>/move_base/GlobalPlanner/make_plan<span class="nt">&lt;/Option&gt;</span>
+<span class="w">            </span><span class="nt">&lt;Option</span><span class="w"> </span><span class="na">key=</span><span class="s">"topic"</span><span class="nt">&gt;</span>/move_base<span class="nt">&lt;/Option&gt;</span>
+<span class="w">            </span><span class="nt">&lt;Option</span><span class="w"> </span><span class="na">key=</span><span class="s">"moveRelativeTopic"</span><span class="nt">&gt;</span>/key_vel<span class="nt">&lt;/Option&gt;</span>
+<span class="w">            </span><span class="nt">&lt;Option</span><span class="w"> </span><span class="na">key=</span><span class="s">"costmapTopic"</span><span class="nt">&gt;</span>/move_base/clear_costmaps<span class="nt">&lt;/Option&gt;</span>
+<span class="w">            </span><span class="nt">&lt;Option</span><span class="w"> </span><span class="na">key=</span><span class="s">"makePlanTopic"</span><span class="nt">&gt;</span>/move_base/GlobalPlanner/make_plan<span class="nt">&lt;/Option&gt;</span>
 <span class="w">        </span><span class="nt">&lt;/Options&gt;</span>
 <span class="w">    </span><span class="nt">&lt;/Actuator&gt;</span>
 <span class="nt">&lt;/BonsaiConfiguration&gt;</span>
@@ -157,9 +159,9 @@ The <strong>BonsaiConfiguration</strong> element contains all configurations Bon
 <p class="admonition-title">Note</p>
 <p>When you start Bonsai and want to load your robotic behavior, you also need to provide your Bonsai config file</p>
 </div>
-<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="cp">&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt;</span>
-<span class="nt">&lt;BonsaiConfiguration</span><span class="w"> </span><span class="na">xmlns:xsi=</span><span class="s">&quot;http://www.w3.org/2001/XMLSchema-instance&quot;</span>
-<span class="w">                    </span><span class="na">xsi:noNamespaceSchemaLocation=</span><span class="s">&quot;BonsaiConfiguration.xsd&quot;</span><span class="nt">&gt;</span>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="cp">&lt;?xml version="1.0" encoding="utf-8"?&gt;</span>
+<span class="nt">&lt;BonsaiConfiguration</span><span class="w"> </span><span class="na">xmlns:xsi=</span><span class="s">"http://www.w3.org/2001/XMLSchema-instance"</span>
+<span class="w">                    </span><span class="na">xsi:noNamespaceSchemaLocation=</span><span class="s">"BonsaiConfiguration.xsd"</span><span class="nt">&gt;</span>
 <span class="w">    </span>...
 <span class="nt">&lt;/BonsaiConfiguration&gt;</span>
 </pre></div>
@@ -175,11 +177,11 @@ The RosFactory will check if a ros master node has been started.
 It starts ROS nodes for each sensor, actuator, and coordinate transform and creates the respective Bonsai interface for skills to use.
 it needs additional options such as timeout or initial sleep time, which can be provided with the <cite>Option</cite> tag.</p>
 <div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="cm">&lt;!-- FACTORY CLASSES --&gt;</span>
-<span class="nt">&lt;FactoryOptions</span><span class="w"> </span><span class="na">factoryClass=</span><span class="s">&quot;de.unibi.citec.clf.bonsai.memory.MemoryFactory&quot;</span><span class="w"> </span><span class="nt">/&gt;</span>
+<span class="nt">&lt;FactoryOptions</span><span class="w"> </span><span class="na">factoryClass=</span><span class="s">"de.unibi.citec.clf.bonsai.memory.MemoryFactory"</span><span class="w"> </span><span class="nt">/&gt;</span>
 
-<span class="nt">&lt;FactoryOptions</span><span class="w"> </span><span class="na">factoryClass=</span><span class="s">&quot;de.unibi.citec.clf.bonsai.ros.RosFactory&quot;</span><span class="w"> </span><span class="nt">&gt;</span>
-<span class="w">    </span><span class="nt">&lt;Option</span><span class="w"> </span><span class="na">key=</span><span class="s">&quot;NODE_INIT_TIMEOUT&quot;</span><span class="nt">&gt;</span>5000<span class="nt">&lt;/Option&gt;</span>
-<span class="w">    </span><span class="nt">&lt;Option</span><span class="w"> </span><span class="na">key=</span><span class="s">&quot;INIT_SLEEP_TIME&quot;</span><span class="nt">&gt;</span>500<span class="nt">&lt;/Option&gt;</span>
+<span class="nt">&lt;FactoryOptions</span><span class="w"> </span><span class="na">factoryClass=</span><span class="s">"de.unibi.citec.clf.bonsai.ros.RosFactory"</span><span class="w"> </span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;Option</span><span class="w"> </span><span class="na">key=</span><span class="s">"NODE_INIT_TIMEOUT"</span><span class="nt">&gt;</span>5000<span class="nt">&lt;/Option&gt;</span>
+<span class="w">    </span><span class="nt">&lt;Option</span><span class="w"> </span><span class="na">key=</span><span class="s">"INIT_SLEEP_TIME"</span><span class="nt">&gt;</span>500<span class="nt">&lt;/Option&gt;</span>
 <span class="nt">&lt;/FactoryOptions&gt;</span>
 </pre></div>
 </div>
@@ -189,23 +191,23 @@ it needs additional options such as timeout or initial sleep time, which can be 
 <p>Actuators and sensors are configured in the <em>Actuator</em> and <em>Sensor</em> tag respectively.
 Additionally, more configurations can be sourced with the <em>Actuators</em> and <em>Sensors</em> tag</p>
 <div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="cm">&lt;!-- SOURCE ACTUATORS FROM ANOTHER FILE --&gt;</span>
-<span class="nt">&lt;Actuators</span><span class="w"> </span><span class="na">src=</span><span class="s">&quot;default/DefaultActuators.xml&quot;</span><span class="w"> </span><span class="nt">/&gt;</span>
+<span class="nt">&lt;Actuators</span><span class="w"> </span><span class="na">src=</span><span class="s">"default/DefaultActuators.xml"</span><span class="w"> </span><span class="nt">/&gt;</span>
 
 <span class="w"> </span><span class="cm">&lt;!-- SOURCE SENSORS FROM ANOTHER FILE --&gt;</span>
-<span class="nt">&lt;Sensors</span><span class="w"> </span><span class="na">src=</span><span class="s">&quot;default/DefaultSensors.xml&quot;</span><span class="w"> </span><span class="nt">/&gt;</span>
+<span class="nt">&lt;Sensors</span><span class="w"> </span><span class="na">src=</span><span class="s">"default/DefaultSensors.xml"</span><span class="w"> </span><span class="nt">/&gt;</span>
 </pre></div>
 </div>
 <p>Single Actuator and Sensor tags can require multiple options. These options can be described here and then gathered in the Actuator/Sensor implementation.</p>
 <section id="sensor-configuration">
 <h3>Sensor Configuration<a class="headerlink" href="#sensor-configuration" title="Link to this heading"></a></h3>
 <p>The example above configures the PersonSensor which is a RosNode that publishes people messages to the topic <em>/people_tracker/people</em>.</p>
-<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;Sensor</span><span class="w"> </span><span class="na">key=</span><span class="s">&quot;PersonSensor&quot;</span>
-<span class="w">    </span><span class="na">factoryClass=</span><span class="s">&quot;de.unibi.citec.clf.bonsai.ros.RosFactory&quot;</span>
-<span class="w">    </span><span class="na">sensorClass=</span><span class="s">&quot;de.unibi.citec.clf.bonsai.ros.sensors.RosBtlMsgSensor&quot;</span>
-<span class="w">    </span><span class="na">wireTypeClass=</span><span class="s">&quot;people_msgs.People&quot;</span>
-<span class="w">    </span><span class="na">dataTypeClass=</span><span class="s">&quot;de.unibi.citec.clf.btl.data.person.PersonDataList&quot;</span><span class="nt">&gt;</span>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;Sensor</span><span class="w"> </span><span class="na">key=</span><span class="s">"PersonSensor"</span>
+<span class="w">    </span><span class="na">factoryClass=</span><span class="s">"de.unibi.citec.clf.bonsai.ros.RosFactory"</span>
+<span class="w">    </span><span class="na">sensorClass=</span><span class="s">"de.unibi.citec.clf.bonsai.ros.sensors.RosBtlMsgSensor"</span>
+<span class="w">    </span><span class="na">wireTypeClass=</span><span class="s">"people_msgs.People"</span>
+<span class="w">    </span><span class="na">dataTypeClass=</span><span class="s">"de.unibi.citec.clf.btl.data.person.PersonDataList"</span><span class="nt">&gt;</span>
 <span class="w">    </span><span class="nt">&lt;Options&gt;</span>
-<span class="w">        </span><span class="nt">&lt;Option</span><span class="w"> </span><span class="na">key=</span><span class="s">&quot;topic&quot;</span><span class="nt">&gt;</span>/people_tracker/people<span class="nt">&lt;/Option&gt;</span>
+<span class="w">        </span><span class="nt">&lt;Option</span><span class="w"> </span><span class="na">key=</span><span class="s">"topic"</span><span class="nt">&gt;</span>/people_tracker/people<span class="nt">&lt;/Option&gt;</span>
 <span class="w">    </span><span class="nt">&lt;/Options&gt;</span>
 <span class="nt">&lt;/Sensor&gt;</span>
 </pre></div>
@@ -262,15 +264,15 @@ Additionally, more configurations can be sourced with the <em>Actuators</em> and
 <section id="actuator-configuration">
 <h3>Actuator Configuration<a class="headerlink" href="#actuator-configuration" title="Link to this heading"></a></h3>
 <p>Let’s take a look at the NavigationActuator example here:</p>
-<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;Actuator</span><span class="w"> </span><span class="na">key=</span><span class="s">&quot;NavigationActuator&quot;</span>
-<span class="w">          </span><span class="na">factoryClass=</span><span class="s">&quot;de.unibi.citec.clf.bonsai.ros.RosFactory&quot;</span>
-<span class="w">          </span><span class="na">actuatorInterface=</span><span class="s">&quot;de.unibi.citec.clf.bonsai.actuators.NavigationActuator&quot;</span>
-<span class="w">          </span><span class="na">actuatorClass=</span><span class="s">&quot;de.unibi.citec.clf.bonsai.ros.actuators.ClfMoveBaseNavigationActuator&quot;</span><span class="nt">&gt;</span>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;Actuator</span><span class="w"> </span><span class="na">key=</span><span class="s">"NavigationActuator"</span>
+<span class="w">          </span><span class="na">factoryClass=</span><span class="s">"de.unibi.citec.clf.bonsai.ros.RosFactory"</span>
+<span class="w">          </span><span class="na">actuatorInterface=</span><span class="s">"de.unibi.citec.clf.bonsai.actuators.NavigationActuator"</span>
+<span class="w">          </span><span class="na">actuatorClass=</span><span class="s">"de.unibi.citec.clf.bonsai.ros.actuators.ClfMoveBaseNavigationActuator"</span><span class="nt">&gt;</span>
 <span class="w">    </span><span class="nt">&lt;Options&gt;</span>
-<span class="w">        </span><span class="nt">&lt;Option</span><span class="w"> </span><span class="na">key=</span><span class="s">&quot;topic&quot;</span><span class="nt">&gt;</span>/move_base<span class="nt">&lt;/Option&gt;</span>
-<span class="w">        </span><span class="nt">&lt;Option</span><span class="w"> </span><span class="na">key=</span><span class="s">&quot;moveRelativeTopic&quot;</span><span class="nt">&gt;</span>/key_vel<span class="nt">&lt;/Option&gt;</span>
-<span class="w">        </span><span class="nt">&lt;Option</span><span class="w"> </span><span class="na">key=</span><span class="s">&quot;costmapTopic&quot;</span><span class="nt">&gt;</span>/move_base/clear_costmaps<span class="nt">&lt;/Option&gt;</span>
-<span class="w">        </span><span class="nt">&lt;Option</span><span class="w"> </span><span class="na">key=</span><span class="s">&quot;makePlanTopic&quot;</span><span class="nt">&gt;</span>/move_base/GlobalPlanner/make_plan<span class="nt">&lt;/Option&gt;</span>
+<span class="w">        </span><span class="nt">&lt;Option</span><span class="w"> </span><span class="na">key=</span><span class="s">"topic"</span><span class="nt">&gt;</span>/move_base<span class="nt">&lt;/Option&gt;</span>
+<span class="w">        </span><span class="nt">&lt;Option</span><span class="w"> </span><span class="na">key=</span><span class="s">"moveRelativeTopic"</span><span class="nt">&gt;</span>/key_vel<span class="nt">&lt;/Option&gt;</span>
+<span class="w">        </span><span class="nt">&lt;Option</span><span class="w"> </span><span class="na">key=</span><span class="s">"costmapTopic"</span><span class="nt">&gt;</span>/move_base/clear_costmaps<span class="nt">&lt;/Option&gt;</span>
+<span class="w">        </span><span class="nt">&lt;Option</span><span class="w"> </span><span class="na">key=</span><span class="s">"makePlanTopic"</span><span class="nt">&gt;</span>/move_base/GlobalPlanner/make_plan<span class="nt">&lt;/Option&gt;</span>
 <span class="w">    </span><span class="nt">&lt;/Options&gt;</span>
 <span class="nt">&lt;/Actuator&gt;</span>
 </pre></div>
@@ -317,7 +319,7 @@ The topics can be configured under the <code class="docutils literal notranslate
 <p>In the actual implementation of the Actuator (here it is <cite>ClfMoveBaseNavigationActuator</cite>) the options can be gathered from the configurations using the keys,
 e.g. key “topic” to get the <em>/move_base</em> topic.</p>
 <p>A skill in Bonsai can access the Actuator and Sensors defined in the configuration by referring to the key defined in the <em>Actuator</em> or <em>Sensor</em> tag</p>
-<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;Actuator</span><span class="w"> </span><span class="na">key=</span><span class="s">&quot;NavigationActuator&quot;</span><span class="w"> </span><span class="err">...</span><span class="w"> </span><span class="nt">&gt;</span>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;Actuator</span><span class="w"> </span><span class="na">key=</span><span class="s">"NavigationActuator"</span><span class="w"> </span><span class="err">...</span><span class="w"> </span><span class="nt">&gt;</span>
 <span class="w">    </span>...
 <span class="nt">&lt;/Actuator&gt;</span>
 </pre></div>
@@ -379,7 +381,7 @@ e.g. key “topic” to get the <em>/move_base</em> topic.</p>
 
   <div role="contentinfo">
     <p>&#169; Copyright 2025, Team of Bielefeld.
-      <span class="lastupdated">Last updated on Dec 04, 2025.
+      <span class="lastupdated">Last updated on Nov 12, 2026.
       </span></p>
   </div>
 

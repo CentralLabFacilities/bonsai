@@ -1,0 +1,413 @@
+.. _section_behaviors:
+
+============================
+Behaviors and State Machines
+============================
+
+A **behavior** describes how a robot carries out a task: what happens first,
+which actions may run at the same time, how the robot reacts to different
+outcomes, and when the task is finished. **Bonsai SCXML** provides a
+state-machine model for expressing and executing those decisions.
+
+You can understand this model without knowing the underlying file format.
+The essential concepts are **states**, **transitions**, **events**, and the
+**data** used by the behavior.
+
+A first example
+---------------
+
+Imagine a robot that should find an object, navigate to it, and pick it up.
+The intended sequence is:
+
+#. **FindObject** searches for an object.
+#. When the search succeeds, **ApproachObject** moves toward it.
+#. When navigation succeeds, **PickObject** attempts to grasp it.
+#. When the grasp succeeds, the behavior reaches **End**.
+
+Real tasks need alternatives. A failed search might trigger another attempt;
+a navigation error might trigger recovery; a failure that cannot be handled
+might lead to **Fatal**. A behavior specifies all of these possible paths,
+not just the successful one.
+
+One possible control flow is::
+
+    FindObject
+      |-- object found ------> ApproachObject
+      |                           |-- success --> PickObject --> End
+      |                           \-- error ----> Recover
+      |-- nothing found ----> SearchAgain
+      \-- fatal ------------> Fatal
+
+The names in this example stand for states in a behavior. Some states execute
+Bonsai skills, while others organize several states or mark completion.
+
+The execution model
+-------------------
+
+A **state machine** is a collection of states connected by transitions. At
+runtime it keeps track of which states are **active**.
+
+* Every behavior has an **initial state**: the starting point of execution.
+* Entering a state makes it active. If that state executes a skill, the skill
+  starts its work.
+* An **event** may cause a **transition** to be taken. A transition may leave
+  the current state and enter another state.
+* A state stops being active when it is exited. Its enclosing states may
+  remain active, depending on where the transition leads.
+* Execution continues until the behavior reaches a terminal outcome or is
+  stopped by the surrounding application.
+
+States are not always executed strictly one after another. Compound states
+allow nesting; parallel states allow multiple active children. The set of
+active states therefore describes *where the behavior currently is*, even
+when several pieces of work are happening.
+
+States, skills, and outcomes
+----------------------------
+
+A **state** is part of the behavior's control flow. A **skill** is a reusable
+Bonsai Framework component that performs work, such as detecting an object,
+navigating to a destination, or speaking a sentence. A state can execute a
+skill, but a state and a skill are not the same thing.
+
+This separation lets the same skill be used at different points in a
+behavior. For example, a navigation skill may be used once to approach a
+person and again to return to a starting position. Each use is a distinct
+state and may have different parameters or memory-slot connections.
+
+A skill reports how it finished using an **Exit Token**. Common outcomes
+include:
+
+.. list-table:: Common skill outcomes
+   :header-rows: 1
+   :widths: 20 80
+
+   * - Outcome
+     - Meaning
+   * - **Success**
+     - The skill completed its work as intended.
+   * - **Error**
+     - The skill could not complete normally. The behavior may attempt
+       recovery or choose another path.
+   * - **Fatal**
+     - A serious failure occurred, for example during initialization.
+       The behavior must decide how to handle the reported outcome.
+   * - **Loop**
+     - The skill is still working and should continue executing. This is
+       **not** a completed outcome that normally advances the behavior.
+
+Some skills distinguish multiple variants of success or error. An object
+search could report **Success: object found** and **Success: nothing found**,
+allowing the behavior to react differently. For the skill lifecycle and
+available Exit Tokens, see :doc:`Skills and Exit Tokens <../general/skills>`.
+
+**Important:** A skill's successful completion does not mean the entire
+behavior has finished. The behavior still decides what comes next.
+
+Events and transitions
+----------------------
+
+An **event** announces that something relevant happened. The completion of a
+skill generates an event representing its outcome. Events can also be
+produced by the behavior itself, and the state-machine runtime can report
+state entries, exits, and changes to behavior variables.
+
+A **transition** is a rule for reacting to an event. It answers the question:
+*When this happens, what should the behavior do?*
+
+For the object search, the rules might be:
+
+.. list-table:: Example: reacting to a search result
+   :header-rows: 1
+   :widths: 35 35 30
+
+   * - Event / outcome
+     - Next state
+     - Reason
+   * - Object found
+     - **ApproachObject**
+     - Continue with the task.
+   * - Nothing found
+     - **SearchAgain**
+     - Try another search.
+   * - Search error
+     - **RecoverSearch**
+     - Handle a problem.
+   * - Fatal failure
+     - **Fatal**
+     - End unsuccessfully.
+
+The outcome and the transition serve different purposes. The skill reports
+*what happened*; the transition defines *what to do about it*. Thus, the same
+skill can be reused in behaviors that respond differently to its results.
+
+Transitions may also **perform actions**, such as updating a behavior variable
+or sending another event. Not every transition has to change the active
+state: a transition can react to an event while the current state stays
+active.
+
+Conditions and transition selection
+-----------------------------------
+
+An event alone is not always enough to choose the next step. A transition
+can also have a **condition** (sometimes called a *guard*). It may be taken
+only when both its event matches and its condition is true.
+
+For example, after a failed search:
+
+* If fewer than three attempts have been made, go to **SearchAgain**.
+* If three attempts have already been made, go to **EndSearch** and report
+  that no object was found.
+
+A behavior variable such as **attemptCount** can record the number of
+attempts. The transitions then use its current value to decide which path
+is valid.
+
+Transitions are evaluated in the context of the **currently active states**.
+When states are nested, matching transitions in the deepest active child
+are considered before more general transitions defined by its enclosing
+state. A parent can therefore provide fallback handling when a child has
+no applicable transition.
+
+Some transition rules may match a group of related events. This can be
+convenient for shared error handling, but broad matches must be used
+carefully: the runtime also generates internal events. When multiple rules
+could apply, their order and scope matter.
+
+**Design rule:** Consider all expected outcomes of each skill. An outcome
+without an applicable transition can leave the behavior unable to proceed
+as intended. Bonsai SCXML can report missing skill-outcome transitions during
+loading; the terminal logs are useful for diagnosing them.
+
+Compound states: organizing a sequence
+--------------------------------------
+
+A **compound state** contains other states. It represents a larger step
+that consists of smaller steps, without requiring the rest of the behavior
+to know every detail.
+
+Consider a compound state named **PrepareObject**. Its child states are:
+
+#. **FindObject**
+#. **ApproachObject**
+#. **PickObject**
+
+When **PrepareObject** is entered, its **initial child state** is entered
+first. A successful search can move execution to **ApproachObject**; a
+successful approach can lead to **PickObject**. Throughout this sequence,
+**PrepareObject** stays active along with its current child state.
+
+A useful way to think about this is:
+
+* **PrepareObject** answers *which larger step are we performing?*
+* Its active child answers *which part of that step are we performing now?*
+
+The compound state can define rules that apply to its children. For
+example, it can handle an error not already handled by a child's own
+transitions and direct execution to a recovery state. If a transition
+**leaves PrepareObject**, its active child is also exited.
+
+A compound state is not a parallel state: within one ordinary compound
+state, its children are alternatives in a sequence or branching flow, not
+all active at once.
+
+Parallel states: doing several things concurrently
+--------------------------------------------------
+
+A **parallel state** has multiple **direct child states** that are active
+at the same time. Each direct child can run a skill or be a compound state
+containing its own sequence of work.
+
+For example, a parallel state named **DeliverSafely** could contain:
+
+* **PerformDelivery**: a compound state that approaches a destination and
+  delivers an object.
+* **MonitorSafety**: a state that monitors whether continuing is safe.
+
+Entering **DeliverSafely** activates **both** children. While
+**PerformDelivery** moves through its sequence, **MonitorSafety** remains
+active. This is concurrent execution, not an instruction to run the
+children one after another. Their nesting can be described as::
+
+    DeliverSafely (parallel)
+      |-- PerformDelivery (compound)
+      |     |-- ApproachDestination (initial child)
+      |     \-- HandOverObject
+      \-- MonitorSafety
+
+**ApproachDestination** and **MonitorSafety** can therefore be active at
+the same time, along with their enclosing states.
+
+There are two important kinds of progress:
+
+**Progress within a child**
+    A transition from **ApproachDestination** to **HandOverObject** changes
+    the active child of **PerformDelivery**, while **MonitorSafety** remains
+    active.
+
+**Exiting the enclosing parallel state**
+    If **MonitorSafety** reports a critical problem and a transition leaves
+    **DeliverSafely** for **Fatal**, *all active children of DeliverSafely are
+    exited*. Work still active in **PerformDelivery** must stop too.
+
+Finishing a single child does **not** by itself exit the enclosing parallel
+state or cancel its siblings. The behavior must specify how the parallel
+work as a whole should finish or be interrupted. In Bonsai SCXML, rules
+that leave the parallel state are defined on that enclosing parallel state;
+its children can still have their own internal transitions.
+
+This distinction is especially important for monitoring, timeouts, and
+other concurrent activities: **a local change affects one child; leaving
+the parallel affects them all**.
+
+.. note::
+
+   A parallel child can itself be a compound state. This is how an entire
+   sequence of actions can run alongside an independent monitoring task.
+
+Reusing behaviors inside behaviors
+----------------------------------
+
+A larger behavior can be assembled from smaller, reusable **sub-behaviors**.
+For instance, **DeliverObject** might use a self-contained **FindAndPickUp**
+behavior followed by **BringToDestination**.
+
+A sub-behavior has its own starting point and internal states. The enclosing
+behavior does not need to handle every internal transition; it is primarily
+interested in how the sub-behavior finishes.
+
+In Bonsai SCXML, a sourced sub-behavior is incorporated into the enclosing
+state machine. Its completion outcomes, such as **Success**, **Error**, and
+**Fatal**, can then be handled by the enclosing behavior through
+transitions. This is behavior reuse, not a second independent runtime
+running beside the first.
+
+Think of it as a reusable procedure with internal steps and an outcome
+that the larger task responds to.
+
+Data flow: sharing information between skills
+---------------------------------------------
+
+Transitions explain **control flow**: what happens next. Behaviors also
+need **data flow**: what information each step reads or produces.
+
+For example:
+
+#. **FindObject** determines a location and writes it to a memory slot.
+#. **ApproachObject** reads that location from a memory slot.
+#. **PickObject** reads information about the selected object.
+
+A **memory slot** connects a skill's requested input or output to a shared
+memory location. A skill may request read access, write access, or both.
+Two skills do not automatically share data just because they use the same
+slot-key name: their requests must be connected to the intended shared
+location in the behavior configuration.
+
+**Parameters** are different. They provide configured values to a skill
+instance, such as a search timeout or a distance threshold. Two uses of the
+same skill may have different parameter values and slot connections.
+
+**Behavior variables** are different again. They hold values used by the
+state machine itself, such as a retry counter or a flag indicating that a
+condition has been met. Transitions may check these values as conditions
+and update them through actions.
+
+.. list-table:: Three kinds of information
+   :header-rows: 1
+   :widths: 22 41 37
+
+   * - Mechanism
+     - What it is for
+     - Example
+   * - **Parameter**
+     - Configure one use of a skill.
+     - Maximum navigation time.
+   * - **Memory slot**
+     - Exchange data between skills.
+     - Detected object's position.
+   * - **Behavior variable**
+     - Track or evaluate behavior-level decisions.
+     - Number of retries performed.
+
+These mechanisms can work together. A search skill can receive a timeout as
+a parameter, write a detected position to a memory slot, and produce an
+outcome that causes a transition to update a retry counter.
+
+For further details about shared data, see :doc:`Memory Slots
+<../general/memory>`.
+
+Finishing a behavior: End, Fatal, and other outcomes
+----------------------------------------------------
+
+A behavior must define when it is complete, rather than merely allowing
+individual skills to stop running.
+
+**End** is the conventional successful terminal state in Bonsai SCXML.
+**Fatal** is the conventional terminal state for an unrecoverable failure.
+They are treated as final states in the usual Bonsai SCXML configuration.
+An **Error** reported by a skill does not necessarily mean the behavior
+must reach **Fatal**: an error can lead to a retry, a recovery procedure,
+or an alternative successful result.
+
+Likewise, **Fatal** as a skill outcome and **Fatal** as a terminal state
+are related but distinct. The skill reports its outcome; a transition
+determines whether the entire behavior should terminate.
+
+When a behavior is reused inside another one, completion may instead be
+reported to its enclosing behavior, which then decides how to continue.
+
+Putting it together: a delivery behavior
+----------------------------------------
+
+Consider the following design, combining most of the concepts introduced
+above.
+
+**1. Find an object**
+    The initial state runs **FindObject**, with a parameter specifying the
+    maximum search duration. A successful result stores the selected
+    object's position in a memory slot. If nothing is found, a transition
+    checks a retry counter and either searches again or stops the attempt.
+
+**2. Prepare the object**
+    A compound state **PrepareObject** contains **ApproachObject** followed
+    by **PickObject**. Both read the data they need from memory slots.
+    The compound state handles failures that its children cannot recover
+    from themselves.
+
+**3. Deliver while monitoring safety**
+    A parallel state **DeliverSafely** activates a delivery sequence and a
+    safety-monitoring state at the same time. The delivery sequence may
+    progress through several states without stopping the monitor. If the
+    monitor reports a critical problem, a transition exits the entire
+    parallel and therefore stops the delivery sequence as well.
+
+**4. Report the outcome**
+    Successful delivery leads to **End**. Unrecoverable failures lead to
+    **Fatal**. Each transition explicitly defines which outcome is handled
+    and which state comes next.
+
+This design contains sequential work, branching, reusable skills, nesting,
+concurrent work, shared data, and terminal outcomes. Those are the central
+ideas behind Bonsai SCXML; understanding them is enough to reason about how
+such a behavior should execute.
+
+A short checklist
+-----------------
+
+When reading or designing a Bonsai SCXML behavior, ask:
+
+#. Which state is entered first?
+#. Which skills are performed, and which outcomes can they return?
+#. For each outcome or event, what transition is applicable? Does it have a
+   condition?
+#. Which states are compound, and which child begins when each is entered?
+#. Which states run concurrently, and what happens to their other active
+   children when the parallel state is exited?
+#. Which parameters, memory slots, and behavior variables are needed?
+#. What counts as normal completion, recoverable failure, or terminal
+   failure?
+
+For execution problems, see :doc:`Execution and Terminal Logging
+<../general/execution>`. If you need the exact representation or the
+runtime-specific configuration options, continue with :doc:`SCXML Concepts
+and Syntax <scxml-intro>` and :doc:`Runtime Configuration <config>`.

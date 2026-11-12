@@ -7,9 +7,10 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Sensors and Actuators &mdash; Bonsai Docs 0.8-SNAPSHOT documentation</title>
-      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
-      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=f06a32cd" />
+      <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=6a604523" />
       <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=f06a32cd" />
 
   
@@ -17,8 +18,9 @@
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../_static/documentation_options.js?v=3242a324"></script>
-      <script src="../_static/doctools.js?v=9bcbadda"></script>
-      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script data-sd-tabs-storage-prefix="sphinx-design-tab-id-" src="../_static/design-tabs.js?v=fcb327ea"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -185,8 +187,8 @@ Using the configurator, the Actuator or Sensor can request parameters from the <
 <p>Within the <code class="docutils literal notranslate"><span class="pre">configure()</span></code> function, options defined in the configuration file can be requested using the <code class="docutils literal notranslate"><span class="pre">key</span></code> specified in <code class="docutils literal notranslate"><span class="pre">Option</span></code> tag in the configuration file.</p>
 <div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kd">public</span><span class="w"> </span><span class="kd">class</span> <span class="nc">ExampleActuator</span><span class="w"> </span><span class="kd">implements</span><span class="w"> </span><span class="n">AbstractExampleActuator</span><span class="w"> </span><span class="p">{</span>
 
-<span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">static</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">KEY_TOPIC</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;topic&quot;</span><span class="p">;</span>
-<span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">static</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">KEY_INT</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;optional_int&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">static</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">KEY_TOPIC</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"topic"</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">static</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">KEY_INT</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"optional_int"</span><span class="p">;</span>
 
 <span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">topic</span><span class="p">;</span>
 <span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">optionalInt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
@@ -205,13 +207,13 @@ Using the configurator, the Actuator or Sensor can request parameters from the <
 The Actuator wants to request two options from the configuration, <em>topic</em> and <em>optional_int</em>.</p>
 <p>The Actuator configuration could look like this:</p>
 <div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="cm">&lt;!-- ACTUATORS --&gt;</span>
-<span class="nt">&lt;Actuator</span><span class="w"> </span><span class="na">key=</span><span class="s">&quot;Example1&quot;</span>
-<span class="w">          </span><span class="na">factoryClass=</span><span class="s">&quot;ExampleFactoryClass&quot;</span>
-<span class="w">          </span><span class="na">actuatorInterface=</span><span class="s">&quot;AbstractExampleActuator&quot;</span>
-<span class="w">          </span><span class="na">actuatorClass=</span><span class="s">&quot;ExampleActuator&quot;</span><span class="nt">&gt;</span>
+<span class="nt">&lt;Actuator</span><span class="w"> </span><span class="na">key=</span><span class="s">"Example1"</span>
+<span class="w">          </span><span class="na">factoryClass=</span><span class="s">"ExampleFactoryClass"</span>
+<span class="w">          </span><span class="na">actuatorInterface=</span><span class="s">"AbstractExampleActuator"</span>
+<span class="w">          </span><span class="na">actuatorClass=</span><span class="s">"ExampleActuator"</span><span class="nt">&gt;</span>
 <span class="w">    </span><span class="nt">&lt;Options&gt;</span>
-<span class="w">        </span><span class="nt">&lt;Option</span><span class="w"> </span><span class="na">key=</span><span class="s">&quot;topic&quot;</span><span class="nt">&gt;</span>/example<span class="nt">&lt;/Option&gt;</span>
-<span class="w">        </span><span class="nt">&lt;Option</span><span class="w"> </span><span class="na">key=</span><span class="s">&quot;optional_int&quot;</span><span class="nt">&gt;</span>1<span class="nt">&lt;/Option&gt;</span>
+<span class="w">        </span><span class="nt">&lt;Option</span><span class="w"> </span><span class="na">key=</span><span class="s">"topic"</span><span class="nt">&gt;</span>/example<span class="nt">&lt;/Option&gt;</span>
+<span class="w">        </span><span class="nt">&lt;Option</span><span class="w"> </span><span class="na">key=</span><span class="s">"optional_int"</span><span class="nt">&gt;</span>1<span class="nt">&lt;/Option&gt;</span>
 <span class="w">    </span><span class="nt">&lt;/Options&gt;</span>
 <span class="nt">&lt;/Actuator&gt;</span>
 </pre></div>
@@ -300,7 +302,7 @@ Thus, the requested parameter that our Actuator gets is <em>“/example”</em>.
 
   <div role="contentinfo">
     <p>&#169; Copyright 2025, Team of Bielefeld.
-      <span class="lastupdated">Last updated on Dec 04, 2025.
+      <span class="lastupdated">Last updated on Nov 12, 2026.
       </span></p>
   </div>
 

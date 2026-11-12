@@ -1,0 +1,57 @@
+.. _section_execution:
+
+==============================
+Execution and Terminal Logging
+==============================
+
+The Bonsai Framework provides the lifecycle and configuration mechanisms used
+by skills. A skill is configured, initialized, executed, and ended by the
+application or execution framework that runs it. See :doc:`Skills
+<skills>` for the methods involved.
+
+When using **Bonsai SCXML**, a running application additionally loads a
+behavior definition. That definition determines which skills run, their
+inputs, and what should happen after each outcome. See :doc:`Bonsai SCXML
+<../behavior>` for behavior semantics.
+
+Starting execution
+------------------
+
+1. Make sure the required middleware, services, hardware interfaces, or
+   simulation are running for the selected skills.
+2. Start the application using the launcher provided by its distribution.
+   Supply the Bonsai configuration and any resources the application or
+   execution framework requires, such as an SCXML behavior definition.
+3. Check the **terminal output** for loading or configuration errors.
+4. When execution starts, observe the available skill results, diagnostic
+   messages, and completion status.
+
+The exact startup command depends on the distribution. An example
+command-line launcher is described in :doc:`the installation guide
+<../quickstart/install>`.
+
+Understanding terminal logs
+---------------------------
+
+Terminal logs are the primary place to diagnose execution problems. The
+available details depend on the application's logging configuration and
+whether individual skills emit diagnostic messages.
+
+When execution fails, check the logs for:
+
+* **Loading and configuration:** Could the required sensors, actuators,
+  parameters, and memory slots be configured?
+* **Skill initialization:** Did each skill initialize successfully before
+  execution began?
+* **Skill outcomes:** Did a skill report its expected Exit Token, or fail?
+* **Termination:** Did execution finish normally, fail, or stop unexpectedly?
+
+With Bonsai SCXML, additionally check whether a reported outcome has a
+matching transition and whether a transition exits a compound or parallel
+state. Leaving a parallel state also stops its other active children;
+finishing one child alone does not necessarily end the entire parallel.
+
+For skill-specific failures, meaningful logger messages in ``configure()``,
+``init()``, ``execute()``, and ``end()`` are often more useful than inspecting
+low-level execution files. Logging configuration and output paths may differ
+between distributions.

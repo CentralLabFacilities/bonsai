@@ -7,9 +7,10 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Changes &mdash; Bonsai Docs 0.8-SNAPSHOT documentation</title>
-      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
-      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=f06a32cd" />
+      <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=6a604523" />
       <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=f06a32cd" />
 
   
@@ -17,8 +18,9 @@
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../_static/documentation_options.js?v=3242a324"></script>
-      <script src="../_static/doctools.js?v=9bcbadda"></script>
-      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script data-sd-tabs-storage-prefix="sphinx-design-tab-id-" src="../_static/design-tabs.js?v=fcb327ea"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -151,7 +153,7 @@
 <section id="sourcing">
 <h3>Sourcing<a class="headerlink" href="#sourcing" title="Link to this heading"></a></h3>
 <p>sourcing can now utilize defined mappings instead of relative paths</p>
-<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;consume&quot;</span><span class="w"> </span><span class="na">src=</span><span class="s">&quot;${TEST}/memorySlots.xml&quot;</span><span class="nt">/&gt;</span>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;state</span><span class="w"> </span><span class="na">id=</span><span class="s">"consume"</span><span class="w"> </span><span class="na">src=</span><span class="s">"${TEST}/memorySlots.xml"</span><span class="nt">/&gt;</span>
 </pre></div>
 </div>
 <p>the mappings can be set with the -m option example:</p>
@@ -180,11 +182,11 @@
 <ul class="simple">
 <li><p>Wire type is now a required attribute for Sensors</p></li>
 </ul>
-<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;Sensor</span><span class="w"> </span><span class="na">key=</span><span class="s">&quot;SpeechSensor&quot;</span>
-<span class="w">    </span><span class="na">dataTypeClass=</span><span class="s">&quot;de.unibi.citec.clf.btl.data.speechrec.Utterance&quot;</span>
-<span class="w">    </span><span class="na">factoryClass=</span><span class="s">&quot;de.unibi.citec.clf.bonsai.ros.RosFactory&quot;</span>
-<span class="w">    </span><span class="na">sensorClass=</span><span class="s">&quot;de.unibi.citec.clf.bonsai.ros.sensors.RosBtlMsgSensor&quot;</span>
-<span class="w">    </span><span class="na">wireTypeClass=</span><span class="s">&quot;std_msgs.String&quot;</span><span class="nt">&gt;</span>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;Sensor</span><span class="w"> </span><span class="na">key=</span><span class="s">"SpeechSensor"</span>
+<span class="w">    </span><span class="na">dataTypeClass=</span><span class="s">"de.unibi.citec.clf.btl.data.speechrec.Utterance"</span>
+<span class="w">    </span><span class="na">factoryClass=</span><span class="s">"de.unibi.citec.clf.bonsai.ros.RosFactory"</span>
+<span class="w">    </span><span class="na">sensorClass=</span><span class="s">"de.unibi.citec.clf.bonsai.ros.sensors.RosBtlMsgSensor"</span>
+<span class="w">    </span><span class="na">wireTypeClass=</span><span class="s">"std_msgs.String"</span><span class="nt">&gt;</span>
 </pre></div>
 </div>
 </section>
@@ -202,7 +204,7 @@
 
   <div role="contentinfo">
     <p>&#169; Copyright 2025, Team of Bielefeld.
-      <span class="lastupdated">Last updated on Dec 04, 2025.
+      <span class="lastupdated">Last updated on Nov 12, 2026.
       </span></p>
   </div>
 

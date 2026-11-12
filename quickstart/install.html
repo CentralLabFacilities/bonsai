@@ -7,9 +7,10 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Install &mdash; Bonsai Docs 0.8-SNAPSHOT documentation</title>
-      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
-      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=f06a32cd" />
+      <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=6a604523" />
       <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=f06a32cd" />
 
   
@@ -17,8 +18,9 @@
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../_static/documentation_options.js?v=3242a324"></script>
-      <script src="../_static/doctools.js?v=9bcbadda"></script>
-      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script data-sd-tabs-storage-prefix="sphinx-design-tab-id-" src="../_static/design-tabs.js?v=fcb327ea"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -132,7 +134,7 @@
 <li><p>Copy tutorials and patch the path:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">cp</span> <span class="o">-</span><span class="n">r</span> <span class="n">bonsai</span><span class="o">/</span><span class="n">bonsai_tutorials</span> <span class="n">my_dist</span>
 <span class="n">cp</span> <span class="n">my_dist</span><span class="o">/</span><span class="n">src</span><span class="o">/</span><span class="n">main</span><span class="o">/</span><span class="n">resources</span><span class="o">/</span><span class="n">localMapping</span><span class="o">.</span><span class="n">default</span><span class="o">.</span><span class="n">properties</span> <span class="n">my_dist</span><span class="o">/</span><span class="n">src</span><span class="o">/</span><span class="n">main</span><span class="o">/</span><span class="n">resources</span><span class="o">/</span><span class="n">localMapping</span><span class="o">.</span><span class="n">properties</span>
-<span class="n">sed</span> <span class="o">-</span><span class="n">i</span> <span class="s1">&#39;s@&lt;PATH_TO&gt;@&#39;</span><span class="s2">&quot;$PWD&quot;</span><span class="s1">&#39;@g&#39;</span> <span class="n">my_dist</span><span class="o">/</span><span class="n">src</span><span class="o">/</span><span class="n">main</span><span class="o">/</span><span class="n">resources</span><span class="o">/</span><span class="n">localMapping</span><span class="o">.</span><span class="n">properties</span>
+<span class="n">sed</span> <span class="o">-</span><span class="n">i</span> <span class="s1">'s@&lt;PATH_TO&gt;@'</span><span class="s2">"$PWD"</span><span class="s1">'@g'</span> <span class="n">my_dist</span><span class="o">/</span><span class="n">src</span><span class="o">/</span><span class="n">main</span><span class="o">/</span><span class="n">resources</span><span class="o">/</span><span class="n">localMapping</span><span class="o">.</span><span class="n">properties</span>
 </pre></div>
 </div>
 </li>
@@ -241,7 +243,7 @@
 <span class="n">git</span> <span class="n">clone</span> <span class="n">http</span><span class="p">:</span><span class="o">//</span><span class="n">projects</span><span class="o">.</span><span class="n">cit</span><span class="o">-</span><span class="n">ec</span><span class="o">.</span><span class="n">uni</span><span class="o">-</span><span class="n">bielefeld</span><span class="o">.</span><span class="n">de</span><span class="o">/</span><span class="n">git</span><span class="o">/</span><span class="n">pepper</span><span class="o">.</span><span class="n">bonsai</span><span class="o">.</span><span class="n">git</span>
 <span class="n">git</span> <span class="n">clone</span> <span class="n">http</span><span class="p">:</span><span class="o">//</span><span class="n">projects</span><span class="o">.</span><span class="n">cit</span><span class="o">-</span><span class="n">ec</span><span class="o">.</span><span class="n">uni</span><span class="o">-</span><span class="n">bielefeld</span><span class="o">.</span><span class="n">de</span><span class="o">/</span><span class="n">git</span><span class="o">/</span><span class="n">robocupathome</span><span class="o">.</span><span class="n">robocup</span><span class="o">-</span><span class="n">dist</span><span class="o">.</span><span class="n">git</span>
 <span class="n">cp</span> <span class="n">pepper</span><span class="o">.</span><span class="n">bonsai</span><span class="o">/</span><span class="n">pepper</span><span class="o">-</span><span class="nb">bin</span><span class="o">/</span><span class="n">src</span><span class="o">/</span><span class="n">main</span><span class="o">/</span><span class="n">resources</span><span class="o">/</span><span class="n">localMapping</span><span class="o">.</span><span class="n">default</span><span class="o">.</span><span class="n">properties</span> <span class="n">pepper</span><span class="o">.</span><span class="n">bonsai</span><span class="o">/</span><span class="n">pepper</span><span class="o">-</span><span class="nb">bin</span><span class="o">/</span><span class="n">src</span><span class="o">/</span><span class="n">main</span><span class="o">/</span><span class="n">resources</span><span class="o">/</span><span class="n">localMapping</span><span class="o">.</span><span class="n">properties</span>
-<span class="n">sed</span> <span class="o">-</span><span class="n">i</span> <span class="s1">&#39;s@&lt;PATH_TO&gt;@&#39;</span><span class="s2">&quot;$PWD&quot;</span><span class="s1">&#39;@g&#39;</span> <span class="n">pepper</span><span class="o">.</span><span class="n">bonsai</span><span class="o">/</span><span class="n">pepper</span><span class="o">-</span><span class="nb">bin</span><span class="o">/</span><span class="n">src</span><span class="o">/</span><span class="n">main</span><span class="o">/</span><span class="n">resources</span><span class="o">/</span><span class="n">localMapping</span><span class="o">.</span><span class="n">properties</span>
+<span class="n">sed</span> <span class="o">-</span><span class="n">i</span> <span class="s1">'s@&lt;PATH_TO&gt;@'</span><span class="s2">"$PWD"</span><span class="s1">'@g'</span> <span class="n">pepper</span><span class="o">.</span><span class="n">bonsai</span><span class="o">/</span><span class="n">pepper</span><span class="o">-</span><span class="nb">bin</span><span class="o">/</span><span class="n">src</span><span class="o">/</span><span class="n">main</span><span class="o">/</span><span class="n">resources</span><span class="o">/</span><span class="n">localMapping</span><span class="o">.</span><span class="n">properties</span>
 <span class="n">cd</span> <span class="n">pepper</span><span class="o">.</span><span class="n">bonsai</span>
 <span class="n">cp</span> <span class="o">-</span><span class="n">R</span> <span class="n">idea</span><span class="o">-</span><span class="n">default</span> <span class="n">idea</span>
 <span class="n">idea</span> <span class="n">idea</span>
@@ -312,7 +314,7 @@
 
   <div role="contentinfo">
     <p>&#169; Copyright 2025, Team of Bielefeld.
-      <span class="lastupdated">Last updated on Dec 04, 2025.
+      <span class="lastupdated">Last updated on Nov 12, 2026.
       </span></p>
   </div>
 

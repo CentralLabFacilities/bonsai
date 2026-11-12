@@ -7,9 +7,10 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Coding Guidelines &mdash; Bonsai Docs 0.8-SNAPSHOT documentation</title>
-      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
-      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=f06a32cd" />
+      <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=6a604523" />
       <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=f06a32cd" />
 
   
@@ -17,8 +18,9 @@
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../_static/documentation_options.js?v=3242a324"></script>
-      <script src="../_static/doctools.js?v=9bcbadda"></script>
-      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script data-sd-tabs-storage-prefix="sphinx-design-tab-id-" src="../_static/design-tabs.js?v=fcb327ea"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" /> 
@@ -97,11 +99,11 @@
 &lt;pre&gt;
 Options:
 A summary of the optional data this skill can be given. Each shall be of the form:
-#_KEY_NAME: [type of the key] *additional information such as &quot;Optional (default: defaultvalue)&quot;*
+#_KEY_NAME: [type of the key] *additional information such as "Optional (default: defaultvalue)"*
 
 Slots:
 A summary of what slots this skill reads/writes. Each shall be of the form:
-NameOfTheSlot: [type of the slot] [Read or Write] *additional information such as &quot;optional&quot;*
+NameOfTheSlot: [type of the slot] [Read or Write] *additional information such as "optional"*
         -&gt; Description of what this slot exactly contains
 
 ExitTokens:
@@ -182,8 +184,8 @@ Analogous to  Actuators.
 <li><p>Skills should <em>NOT</em> be given scxml data parameter <code class="docutils literal notranslate"><span class="pre">&#64;DATA</span></code> if this changes the configure requests.</p></li>
 </ul>
 <p><em>ExampleSkill</em> <code class="docutils literal notranslate"><span class="pre">Configure()</span></code>:</p>
-<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">useAct</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">configurator</span><span class="p">.</span><span class="na">requestOptionalBool</span><span class="p">(</span><span class="s">&quot;#_USE&quot;</span><span class="p">,</span><span class="w"> </span><span class="kc">false</span><span class="p">);</span>
-<span class="k">if</span><span class="p">(</span><span class="n">useAct</span><span class="p">)</span><span class="w"> </span><span class="n">act</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">configurator</span><span class="p">.</span><span class="na">getActuator</span><span class="p">(</span><span class="s">&quot;Foo&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">Bar</span><span class="p">.</span><span class="na">class</span><span class="p">);</span>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">useAct</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">configurator</span><span class="p">.</span><span class="na">requestOptionalBool</span><span class="p">(</span><span class="s">"#_USE"</span><span class="p">,</span><span class="w"> </span><span class="kc">false</span><span class="p">);</span>
+<span class="k">if</span><span class="p">(</span><span class="n">useAct</span><span class="p">)</span><span class="w"> </span><span class="n">act</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">configurator</span><span class="p">.</span><span class="na">getActuator</span><span class="p">(</span><span class="s">"Foo"</span><span class="p">,</span><span class="w"> </span><span class="n">Bar</span><span class="p">.</span><span class="na">class</span><span class="p">);</span>
 </pre></div>
 </div>
 <p>If <code class="docutils literal notranslate"><span class="pre">#_USE</span></code> is set to <code class="docutils literal notranslate"><span class="pre">&#64;DATA</span></code> with expression <code class="docutils literal notranslate"><span class="pre">false</span></code> during LOAD but gets changed to <code class="docutils literal notranslate"><span class="pre">true</span></code> with <code class="docutils literal notranslate"><span class="pre">&lt;assign&gt;</span></code> the State will not function properly</p>
@@ -208,19 +210,19 @@ Analogous to  Actuators.
 <span class="cm">Used Slots:</span>
 <span class="cm">A short summary of the Slots this Behaviour gets/writes its data from/to</span>
 <span class="cm">    What this specific slot is used for:</span>
-<span class="cm">    -&gt; xpath=&quot;/nameOfTheBehaviour/slotName&quot;</span>
+<span class="cm">    -&gt; xpath="/nameOfTheBehaviour/slotName"</span>
 
 <span class="cm">A state declaration, ready to be copy-pasted and slightly adjusted. Example:</span>
-<span class="cm">&lt;state id=&quot;navigateToPerson&quot; src=&quot;${ROBOCUP}/behavior/nav/navigateToPerson.xml&quot;&gt;</span>
+<span class="cm">&lt;state id="navigateToPerson" src="${ROBOCUP}/behavior/nav/navigateToPerson.xml"&gt;</span>
 <span class="cm">        &lt;onentry&gt;</span>
-<span class="cm">                &lt;assign location=&quot;personLostTimeout&quot;    expr=&quot;100&quot;/&gt;</span>
-<span class="cm">                &lt;assign location=&quot;stopDistance&quot;         expr=&quot;800&quot;/&gt;</span>
-<span class="cm">                &lt;assign location=&quot;strategy&quot;             expr=&quot;NearestToTarget&quot;/&gt;</span>
-<span class="cm">                &lt;assign location=&quot;refindDistance&quot;       expr=&quot;800&quot;/&gt;</span>
+<span class="cm">                &lt;assign location="personLostTimeout"    expr="100"/&gt;</span>
+<span class="cm">                &lt;assign location="stopDistance"         expr="800"/&gt;</span>
+<span class="cm">                &lt;assign location="strategy"             expr="NearestToTarget"/&gt;</span>
+<span class="cm">                &lt;assign location="refindDistance"       expr="800"/&gt;</span>
 <span class="cm">        &lt;/onentry&gt;</span>
-<span class="cm">        &lt;transition event=&quot;navigateToPerson.success&quot;    target=&quot;TOFILL&quot;/&gt;</span>
-<span class="cm">        &lt;transition event=&quot;navigateToPerson.personLost&quot; target=&quot;TOFILL&quot;/&gt;</span>
-<span class="cm">        &lt;transition event=&quot;navigateToPerson.fatal&quot;      target=&quot;TOFILL&quot;/&gt;</span>
+<span class="cm">        &lt;transition event="navigateToPerson.success"    target="TOFILL"/&gt;</span>
+<span class="cm">        &lt;transition event="navigateToPerson.personLost" target="TOFILL"/&gt;</span>
+<span class="cm">        &lt;transition event="navigateToPerson.fatal"      target="TOFILL"/&gt;</span>
 <span class="cm">&lt;/state&gt;</span>
 
 <span class="cm">Look up the skill documentation to see what the options do.</span>
@@ -242,7 +244,7 @@ Analogous to  Actuators.
 
   <div role="contentinfo">
     <p>&#169; Copyright 2025, Team of Bielefeld.
-      <span class="lastupdated">Last updated on Dec 04, 2025.
+      <span class="lastupdated">Last updated on Nov 12, 2026.
       </span></p>
   </div>
 

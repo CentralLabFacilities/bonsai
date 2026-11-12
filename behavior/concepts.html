@@ -1,0 +1,503 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Behaviors and State Machines &mdash; Bonsai Docs 0.8-SNAPSHOT documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=f06a32cd" />
+      <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=6a604523" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=f06a32cd" />
+
+  
+    <link rel="shortcut icon" href="../_static/favicon.ico"/>
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=3242a324"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script data-sd-tabs-storage-prefix="sphinx-design-tab-id-" src="../_static/design-tabs.js?v=fcb327ea"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Bonsai Docs
+              <img src="../_static/bonsai-l1s.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Table of Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">QuickStart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../general.html">Bonsai</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../behavior.html">SCXML Behavior Engine</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../general/changes.html">Change Log</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Bonsai Docs</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Behaviors and State Machines</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="behaviors-and-state-machines">
+<span id="section-behaviors"></span><h1>Behaviors and State Machines<a class="headerlink" href="#behaviors-and-state-machines" title="Link to this heading"></a></h1>
+<p>A <strong>behavior</strong> describes how a robot carries out a task: what happens first,
+which actions may run at the same time, how the robot reacts to different
+outcomes, and when the task is finished. <strong>Bonsai SCXML</strong> provides a
+state-machine model for expressing and executing those decisions.</p>
+<p>You can understand this model without knowing the underlying file format.
+The essential concepts are <strong>states</strong>, <strong>transitions</strong>, <strong>events</strong>, and the
+<strong>data</strong> used by the behavior.</p>
+<section id="a-first-example">
+<h2>A first example<a class="headerlink" href="#a-first-example" title="Link to this heading"></a></h2>
+<p>Imagine a robot that should find an object, navigate to it, and pick it up.
+The intended sequence is:</p>
+<ol class="arabic simple">
+<li><p><strong>FindObject</strong> searches for an object.</p></li>
+<li><p>When the search succeeds, <strong>ApproachObject</strong> moves toward it.</p></li>
+<li><p>When navigation succeeds, <strong>PickObject</strong> attempts to grasp it.</p></li>
+<li><p>When the grasp succeeds, the behavior reaches <strong>End</strong>.</p></li>
+</ol>
+<p>Real tasks need alternatives. A failed search might trigger another attempt;
+a navigation error might trigger recovery; a failure that cannot be handled
+might lead to <strong>Fatal</strong>. A behavior specifies all of these possible paths,
+not just the successful one.</p>
+<p>One possible control flow is:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">FindObject</span>
+  <span class="o">|--</span> <span class="nb">object</span> <span class="n">found</span> <span class="o">------&gt;</span> <span class="n">ApproachObject</span>
+  <span class="o">|</span>                           <span class="o">|--</span> <span class="n">success</span> <span class="o">--&gt;</span> <span class="n">PickObject</span> <span class="o">--&gt;</span> <span class="n">End</span>
+  <span class="o">|</span>                           \<span class="o">--</span> <span class="n">error</span> <span class="o">----&gt;</span> <span class="n">Recover</span>
+  <span class="o">|--</span> <span class="n">nothing</span> <span class="n">found</span> <span class="o">----&gt;</span> <span class="n">SearchAgain</span>
+  \<span class="o">--</span> <span class="n">fatal</span> <span class="o">------------&gt;</span> <span class="n">Fatal</span>
+</pre></div>
+</div>
+<p>The names in this example stand for states in a behavior. Some states execute
+Bonsai skills, while others organize several states or mark completion.</p>
+</section>
+<section id="the-execution-model">
+<h2>The execution model<a class="headerlink" href="#the-execution-model" title="Link to this heading"></a></h2>
+<p>A <strong>state machine</strong> is a collection of states connected by transitions. At
+runtime it keeps track of which states are <strong>active</strong>.</p>
+<ul class="simple">
+<li><p>Every behavior has an <strong>initial state</strong>: the starting point of execution.</p></li>
+<li><p>Entering a state makes it active. If that state executes a skill, the skill
+starts its work.</p></li>
+<li><p>An <strong>event</strong> may cause a <strong>transition</strong> to be taken. A transition may leave
+the current state and enter another state.</p></li>
+<li><p>A state stops being active when it is exited. Its enclosing states may
+remain active, depending on where the transition leads.</p></li>
+<li><p>Execution continues until the behavior reaches a terminal outcome or is
+stopped by the surrounding application.</p></li>
+</ul>
+<p>States are not always executed strictly one after another. Compound states
+allow nesting; parallel states allow multiple active children. The set of
+active states therefore describes <em>where the behavior currently is</em>, even
+when several pieces of work are happening.</p>
+</section>
+<section id="states-skills-and-outcomes">
+<h2>States, skills, and outcomes<a class="headerlink" href="#states-skills-and-outcomes" title="Link to this heading"></a></h2>
+<p>A <strong>state</strong> is part of the behavior’s control flow. A <strong>skill</strong> is a reusable
+Bonsai Framework component that performs work, such as detecting an object,
+navigating to a destination, or speaking a sentence. A state can execute a
+skill, but a state and a skill are not the same thing.</p>
+<p>This separation lets the same skill be used at different points in a
+behavior. For example, a navigation skill may be used once to approach a
+person and again to return to a starting position. Each use is a distinct
+state and may have different parameters or memory-slot connections.</p>
+<p>A skill reports how it finished using an <strong>Exit Token</strong>. Common outcomes
+include:</p>
+<table class="docutils align-default" id="id1">
+<caption><span class="caption-text">Common skill outcomes</span><a class="headerlink" href="#id1" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 80.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Outcome</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><strong>Success</strong></p></td>
+<td><p>The skill completed its work as intended.</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>Error</strong></p></td>
+<td><p>The skill could not complete normally. The behavior may attempt
+recovery or choose another path.</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>Fatal</strong></p></td>
+<td><p>A serious failure occurred, for example during initialization.
+The behavior must decide how to handle the reported outcome.</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>Loop</strong></p></td>
+<td><p>The skill is still working and should continue executing. This is
+<strong>not</strong> a completed outcome that normally advances the behavior.</p></td>
+</tr>
+</tbody>
+</table>
+<p>Some skills distinguish multiple variants of success or error. An object
+search could report <strong>Success: object found</strong> and <strong>Success: nothing found</strong>,
+allowing the behavior to react differently. For the skill lifecycle and
+available Exit Tokens, see <a class="reference internal" href="../general/skills.html"><span class="doc">Skills and Exit Tokens</span></a>.</p>
+<p><strong>Important:</strong> A skill’s successful completion does not mean the entire
+behavior has finished. The behavior still decides what comes next.</p>
+</section>
+<section id="events-and-transitions">
+<h2>Events and transitions<a class="headerlink" href="#events-and-transitions" title="Link to this heading"></a></h2>
+<p>An <strong>event</strong> announces that something relevant happened. The completion of a
+skill generates an event representing its outcome. Events can also be
+produced by the behavior itself, and the state-machine runtime can report
+state entries, exits, and changes to behavior variables.</p>
+<p>A <strong>transition</strong> is a rule for reacting to an event. It answers the question:
+<em>When this happens, what should the behavior do?</em></p>
+<p>For the object search, the rules might be:</p>
+<table class="docutils align-default" id="id2">
+<caption><span class="caption-text">Example: reacting to a search result</span><a class="headerlink" href="#id2" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 35.0%" />
+<col style="width: 35.0%" />
+<col style="width: 30.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Event / outcome</p></th>
+<th class="head"><p>Next state</p></th>
+<th class="head"><p>Reason</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Object found</p></td>
+<td><p><strong>ApproachObject</strong></p></td>
+<td><p>Continue with the task.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Nothing found</p></td>
+<td><p><strong>SearchAgain</strong></p></td>
+<td><p>Try another search.</p></td>
+</tr>
+<tr class="row-even"><td><p>Search error</p></td>
+<td><p><strong>RecoverSearch</strong></p></td>
+<td><p>Handle a problem.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Fatal failure</p></td>
+<td><p><strong>Fatal</strong></p></td>
+<td><p>End unsuccessfully.</p></td>
+</tr>
+</tbody>
+</table>
+<p>The outcome and the transition serve different purposes. The skill reports
+<em>what happened</em>; the transition defines <em>what to do about it</em>. Thus, the same
+skill can be reused in behaviors that respond differently to its results.</p>
+<p>Transitions may also <strong>perform actions</strong>, such as updating a behavior variable
+or sending another event. Not every transition has to change the active
+state: a transition can react to an event while the current state stays
+active.</p>
+</section>
+<section id="conditions-and-transition-selection">
+<h2>Conditions and transition selection<a class="headerlink" href="#conditions-and-transition-selection" title="Link to this heading"></a></h2>
+<p>An event alone is not always enough to choose the next step. A transition
+can also have a <strong>condition</strong> (sometimes called a <em>guard</em>). It may be taken
+only when both its event matches and its condition is true.</p>
+<p>For example, after a failed search:</p>
+<ul class="simple">
+<li><p>If fewer than three attempts have been made, go to <strong>SearchAgain</strong>.</p></li>
+<li><p>If three attempts have already been made, go to <strong>EndSearch</strong> and report
+that no object was found.</p></li>
+</ul>
+<p>A behavior variable such as <strong>attemptCount</strong> can record the number of
+attempts. The transitions then use its current value to decide which path
+is valid.</p>
+<p>Transitions are evaluated in the context of the <strong>currently active states</strong>.
+When states are nested, matching transitions in the deepest active child
+are considered before more general transitions defined by its enclosing
+state. A parent can therefore provide fallback handling when a child has
+no applicable transition.</p>
+<p>Some transition rules may match a group of related events. This can be
+convenient for shared error handling, but broad matches must be used
+carefully: the runtime also generates internal events. When multiple rules
+could apply, their order and scope matter.</p>
+<p><strong>Design rule:</strong> Consider all expected outcomes of each skill. An outcome
+without an applicable transition can leave the behavior unable to proceed
+as intended. Bonsai SCXML can report missing skill-outcome transitions during
+loading; the terminal logs are useful for diagnosing them.</p>
+</section>
+<section id="compound-states-organizing-a-sequence">
+<h2>Compound states: organizing a sequence<a class="headerlink" href="#compound-states-organizing-a-sequence" title="Link to this heading"></a></h2>
+<p>A <strong>compound state</strong> contains other states. It represents a larger step
+that consists of smaller steps, without requiring the rest of the behavior
+to know every detail.</p>
+<p>Consider a compound state named <strong>PrepareObject</strong>. Its child states are:</p>
+<ol class="arabic simple">
+<li><p><strong>FindObject</strong></p></li>
+<li><p><strong>ApproachObject</strong></p></li>
+<li><p><strong>PickObject</strong></p></li>
+</ol>
+<p>When <strong>PrepareObject</strong> is entered, its <strong>initial child state</strong> is entered
+first. A successful search can move execution to <strong>ApproachObject</strong>; a
+successful approach can lead to <strong>PickObject</strong>. Throughout this sequence,
+<strong>PrepareObject</strong> stays active along with its current child state.</p>
+<p>A useful way to think about this is:</p>
+<ul class="simple">
+<li><p><strong>PrepareObject</strong> answers <em>which larger step are we performing?</em></p></li>
+<li><p>Its active child answers <em>which part of that step are we performing now?</em></p></li>
+</ul>
+<p>The compound state can define rules that apply to its children. For
+example, it can handle an error not already handled by a child’s own
+transitions and direct execution to a recovery state. If a transition
+<strong>leaves PrepareObject</strong>, its active child is also exited.</p>
+<p>A compound state is not a parallel state: within one ordinary compound
+state, its children are alternatives in a sequence or branching flow, not
+all active at once.</p>
+</section>
+<section id="parallel-states-doing-several-things-concurrently">
+<h2>Parallel states: doing several things concurrently<a class="headerlink" href="#parallel-states-doing-several-things-concurrently" title="Link to this heading"></a></h2>
+<p>A <strong>parallel state</strong> has multiple <strong>direct child states</strong> that are active
+at the same time. Each direct child can run a skill or be a compound state
+containing its own sequence of work.</p>
+<p>For example, a parallel state named <strong>DeliverSafely</strong> could contain:</p>
+<ul class="simple">
+<li><p><strong>PerformDelivery</strong>: a compound state that approaches a destination and
+delivers an object.</p></li>
+<li><p><strong>MonitorSafety</strong>: a state that monitors whether continuing is safe.</p></li>
+</ul>
+<p>Entering <strong>DeliverSafely</strong> activates <strong>both</strong> children. While
+<strong>PerformDelivery</strong> moves through its sequence, <strong>MonitorSafety</strong> remains
+active. This is concurrent execution, not an instruction to run the
+children one after another. Their nesting can be described as:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">DeliverSafely</span> <span class="p">(</span><span class="n">parallel</span><span class="p">)</span>
+  <span class="o">|--</span> <span class="n">PerformDelivery</span> <span class="p">(</span><span class="n">compound</span><span class="p">)</span>
+  <span class="o">|</span>     <span class="o">|--</span> <span class="n">ApproachDestination</span> <span class="p">(</span><span class="n">initial</span> <span class="n">child</span><span class="p">)</span>
+  <span class="o">|</span>     \<span class="o">--</span> <span class="n">HandOverObject</span>
+  \<span class="o">--</span> <span class="n">MonitorSafety</span>
+</pre></div>
+</div>
+<p><strong>ApproachDestination</strong> and <strong>MonitorSafety</strong> can therefore be active at
+the same time, along with their enclosing states.</p>
+<p>There are two important kinds of progress:</p>
+<dl class="simple">
+<dt><strong>Progress within a child</strong></dt><dd><p>A transition from <strong>ApproachDestination</strong> to <strong>HandOverObject</strong> changes
+the active child of <strong>PerformDelivery</strong>, while <strong>MonitorSafety</strong> remains
+active.</p>
+</dd>
+<dt><strong>Exiting the enclosing parallel state</strong></dt><dd><p>If <strong>MonitorSafety</strong> reports a critical problem and a transition leaves
+<strong>DeliverSafely</strong> for <strong>Fatal</strong>, <em>all active children of DeliverSafely are
+exited</em>. Work still active in <strong>PerformDelivery</strong> must stop too.</p>
+</dd>
+</dl>
+<p>Finishing a single child does <strong>not</strong> by itself exit the enclosing parallel
+state or cancel its siblings. The behavior must specify how the parallel
+work as a whole should finish or be interrupted. In Bonsai SCXML, rules
+that leave the parallel state are defined on that enclosing parallel state;
+its children can still have their own internal transitions.</p>
+<p>This distinction is especially important for monitoring, timeouts, and
+other concurrent activities: <strong>a local change affects one child; leaving
+the parallel affects them all</strong>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>A parallel child can itself be a compound state. This is how an entire
+sequence of actions can run alongside an independent monitoring task.</p>
+</div>
+</section>
+<section id="reusing-behaviors-inside-behaviors">
+<h2>Reusing behaviors inside behaviors<a class="headerlink" href="#reusing-behaviors-inside-behaviors" title="Link to this heading"></a></h2>
+<p>A larger behavior can be assembled from smaller, reusable <strong>sub-behaviors</strong>.
+For instance, <strong>DeliverObject</strong> might use a self-contained <strong>FindAndPickUp</strong>
+behavior followed by <strong>BringToDestination</strong>.</p>
+<p>A sub-behavior has its own starting point and internal states. The enclosing
+behavior does not need to handle every internal transition; it is primarily
+interested in how the sub-behavior finishes.</p>
+<p>In Bonsai SCXML, a sourced sub-behavior is incorporated into the enclosing
+state machine. Its completion outcomes, such as <strong>Success</strong>, <strong>Error</strong>, and
+<strong>Fatal</strong>, can then be handled by the enclosing behavior through
+transitions. This is behavior reuse, not a second independent runtime
+running beside the first.</p>
+<p>Think of it as a reusable procedure with internal steps and an outcome
+that the larger task responds to.</p>
+</section>
+<section id="data-flow-sharing-information-between-skills">
+<h2>Data flow: sharing information between skills<a class="headerlink" href="#data-flow-sharing-information-between-skills" title="Link to this heading"></a></h2>
+<p>Transitions explain <strong>control flow</strong>: what happens next. Behaviors also
+need <strong>data flow</strong>: what information each step reads or produces.</p>
+<p>For example:</p>
+<ol class="arabic simple">
+<li><p><strong>FindObject</strong> determines a location and writes it to a memory slot.</p></li>
+<li><p><strong>ApproachObject</strong> reads that location from a memory slot.</p></li>
+<li><p><strong>PickObject</strong> reads information about the selected object.</p></li>
+</ol>
+<p>A <strong>memory slot</strong> connects a skill’s requested input or output to a shared
+memory location. A skill may request read access, write access, or both.
+Two skills do not automatically share data just because they use the same
+slot-key name: their requests must be connected to the intended shared
+location in the behavior configuration.</p>
+<p><strong>Parameters</strong> are different. They provide configured values to a skill
+instance, such as a search timeout or a distance threshold. Two uses of the
+same skill may have different parameter values and slot connections.</p>
+<p><strong>Behavior variables</strong> are different again. They hold values used by the
+state machine itself, such as a retry counter or a flag indicating that a
+condition has been met. Transitions may check these values as conditions
+and update them through actions.</p>
+<table class="docutils align-default" id="id3">
+<caption><span class="caption-text">Three kinds of information</span><a class="headerlink" href="#id3" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 22.0%" />
+<col style="width: 41.0%" />
+<col style="width: 37.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Mechanism</p></th>
+<th class="head"><p>What it is for</p></th>
+<th class="head"><p>Example</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><strong>Parameter</strong></p></td>
+<td><p>Configure one use of a skill.</p></td>
+<td><p>Maximum navigation time.</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>Memory slot</strong></p></td>
+<td><p>Exchange data between skills.</p></td>
+<td><p>Detected object’s position.</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>Behavior variable</strong></p></td>
+<td><p>Track or evaluate behavior-level decisions.</p></td>
+<td><p>Number of retries performed.</p></td>
+</tr>
+</tbody>
+</table>
+<p>These mechanisms can work together. A search skill can receive a timeout as
+a parameter, write a detected position to a memory slot, and produce an
+outcome that causes a transition to update a retry counter.</p>
+<p>For further details about shared data, see <a class="reference internal" href="../general/memory.html"><span class="doc">Memory Slots</span></a>.</p>
+</section>
+<section id="finishing-a-behavior-end-fatal-and-other-outcomes">
+<h2>Finishing a behavior: End, Fatal, and other outcomes<a class="headerlink" href="#finishing-a-behavior-end-fatal-and-other-outcomes" title="Link to this heading"></a></h2>
+<p>A behavior must define when it is complete, rather than merely allowing
+individual skills to stop running.</p>
+<p><strong>End</strong> is the conventional successful terminal state in Bonsai SCXML.
+<strong>Fatal</strong> is the conventional terminal state for an unrecoverable failure.
+They are treated as final states in the usual Bonsai SCXML configuration.
+An <strong>Error</strong> reported by a skill does not necessarily mean the behavior
+must reach <strong>Fatal</strong>: an error can lead to a retry, a recovery procedure,
+or an alternative successful result.</p>
+<p>Likewise, <strong>Fatal</strong> as a skill outcome and <strong>Fatal</strong> as a terminal state
+are related but distinct. The skill reports its outcome; a transition
+determines whether the entire behavior should terminate.</p>
+<p>When a behavior is reused inside another one, completion may instead be
+reported to its enclosing behavior, which then decides how to continue.</p>
+</section>
+<section id="putting-it-together-a-delivery-behavior">
+<h2>Putting it together: a delivery behavior<a class="headerlink" href="#putting-it-together-a-delivery-behavior" title="Link to this heading"></a></h2>
+<p>Consider the following design, combining most of the concepts introduced
+above.</p>
+<dl class="simple">
+<dt><strong>1. Find an object</strong></dt><dd><p>The initial state runs <strong>FindObject</strong>, with a parameter specifying the
+maximum search duration. A successful result stores the selected
+object’s position in a memory slot. If nothing is found, a transition
+checks a retry counter and either searches again or stops the attempt.</p>
+</dd>
+<dt><strong>2. Prepare the object</strong></dt><dd><p>A compound state <strong>PrepareObject</strong> contains <strong>ApproachObject</strong> followed
+by <strong>PickObject</strong>. Both read the data they need from memory slots.
+The compound state handles failures that its children cannot recover
+from themselves.</p>
+</dd>
+<dt><strong>3. Deliver while monitoring safety</strong></dt><dd><p>A parallel state <strong>DeliverSafely</strong> activates a delivery sequence and a
+safety-monitoring state at the same time. The delivery sequence may
+progress through several states without stopping the monitor. If the
+monitor reports a critical problem, a transition exits the entire
+parallel and therefore stops the delivery sequence as well.</p>
+</dd>
+<dt><strong>4. Report the outcome</strong></dt><dd><p>Successful delivery leads to <strong>End</strong>. Unrecoverable failures lead to
+<strong>Fatal</strong>. Each transition explicitly defines which outcome is handled
+and which state comes next.</p>
+</dd>
+</dl>
+<p>This design contains sequential work, branching, reusable skills, nesting,
+concurrent work, shared data, and terminal outcomes. Those are the central
+ideas behind Bonsai SCXML; understanding them is enough to reason about how
+such a behavior should execute.</p>
+</section>
+<section id="a-short-checklist">
+<h2>A short checklist<a class="headerlink" href="#a-short-checklist" title="Link to this heading"></a></h2>
+<p>When reading or designing a Bonsai SCXML behavior, ask:</p>
+<ol class="arabic simple">
+<li><p>Which state is entered first?</p></li>
+<li><p>Which skills are performed, and which outcomes can they return?</p></li>
+<li><p>For each outcome or event, what transition is applicable? Does it have a
+condition?</p></li>
+<li><p>Which states are compound, and which child begins when each is entered?</p></li>
+<li><p>Which states run concurrently, and what happens to their other active
+children when the parallel state is exited?</p></li>
+<li><p>Which parameters, memory slots, and behavior variables are needed?</p></li>
+<li><p>What counts as normal completion, recoverable failure, or terminal
+failure?</p></li>
+</ol>
+<p>For execution problems, see <a class="reference internal" href="../general/execution.html"><span class="doc">Execution and Terminal Logging</span></a>. If you need the exact representation or the
+runtime-specific configuration options, continue with <a class="reference internal" href="scxml-intro.html"><span class="doc">SCXML Concepts
+and Syntax</span></a> and <a class="reference internal" href="config.html"><span class="doc">Runtime Configuration</span></a>.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Team of Bielefeld.
+      <span class="lastupdated">Last updated on Nov 12, 2026.
+      </span></p>
+  </div>
+
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
