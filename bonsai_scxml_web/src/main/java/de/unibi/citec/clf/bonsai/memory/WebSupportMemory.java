@@ -128,6 +128,8 @@ public final class WebSupportMemory implements WorkingMemory, AutoCloseable {
 
     // Capture the written value on the skill's thread, then enqueue without network I/O.
     private void notifyWrite(String path, Object value) {
+        // Unix epoch milliseconds captured on the writing thread, before serialization or SSE delivery.
+        long timestamp = System.currentTimeMillis();
         // Capture the value now, not by recalling the slot later (it may already have changed).
         // Like /getSlot, this exposes the object's textual representation, not an object graph.
         String text;
@@ -138,7 +140,8 @@ public final class WebSupportMemory implements WorkingMemory, AutoCloseable {
             text = "<unavailable>";
         }
         String event = "event: slot_written\ndata: {\"path\":" + jsonString(path)
-                + ",\"value\":" + jsonString(text) + "}\n\n";
+                + ",\"value\":" + jsonString(text)
+                + ",\"timestamp\":" + timestamp + "}\n\n";
         for (Client client : clients) {
             if (!client.messages.offer(event)) {
                 // A slow subscriber cannot silently miss writes: tell it to resync and reconnect.
@@ -295,3 +298,4 @@ public final class WebSupportMemory implements WorkingMemory, AutoCloseable {
         catch (IOException ignored) { }
     }
 }
+
