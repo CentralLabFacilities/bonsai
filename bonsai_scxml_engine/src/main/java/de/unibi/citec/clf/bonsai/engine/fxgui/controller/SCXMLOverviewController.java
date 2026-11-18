@@ -150,19 +150,34 @@ public class SCXMLOverviewController implements IStateListener {
         });
 
         final SortedList<String> sortedData = new SortedList<>(filteredData);
-        sortedData.comparatorProperty().setValue((string1, string2) -> {
-            int id1val = distanceMap.getOrDefault(string1,-1);
-            int id2val = distanceMap.getOrDefault(string2,-1);
 
-            if(id1val == id2val) {
-                String id1 = string1.toUpperCase();
-                String id2 = string2.toUpperCase();
-                //ascending order
-                return id1.compareTo(id2);
-            } else {
-                //descending order
-                return Integer.compare(id2val,id1val);
+        sortedData.setComparator((string1, string2) -> {
+            String query = filterField.getText();
+
+            if (query != null && !query.isEmpty()) {
+                String lowerQuery = query.toLowerCase(Locale.ENGLISH);
+
+                boolean starts1 = string1.toLowerCase(Locale.ENGLISH).startsWith(lowerQuery);
+                boolean starts2 = string2.toLowerCase(Locale.ENGLISH).startsWith(lowerQuery);
+
+                // Prefix matches always come first
+                if (starts1 != starts2) {
+                    return starts1 ? -1 : 1;
+                }
             }
+
+            // Otherwise, sort by fuzzy score (descending)
+            int score1 = distanceMap.getOrDefault(string1, -1);
+            int score2 = distanceMap.getOrDefault(string2, -1);
+
+            int comparison = Integer.compare(score2, score1);
+
+            if (comparison != 0) {
+                return comparison;
+            }
+
+            // Alphabetical fallback
+            return String.CASE_INSENSITIVE_ORDER.compare(string1, string2);
         });
 
 
