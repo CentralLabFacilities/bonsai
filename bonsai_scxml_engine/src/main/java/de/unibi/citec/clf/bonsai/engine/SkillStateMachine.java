@@ -491,6 +491,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
      * @return Whether the state machine has reached a &quot;final&quot; configuration.
      */
     public synchronized boolean fireEventFromSkill(final String event) {
+        SCXMLEventBus.publish(SCXMLEventFactory.sendRequested("", "", "", event, null, 0));
         if (!triggerEvents) {
             logger.warn("automatic transitions are disabled:" + event);
             return false;
@@ -521,6 +522,7 @@ public class SkillStateMachine implements SCXMLListener, SkillExceptionHandler {
     }
 
     public synchronized boolean fireEvent(final String event) {
+        SCXMLEventBus.publish(SCXMLEventFactory.sendRequested("", "", "", event, null, 0));
         TriggerEvent evts = new TriggerEvent(event, TriggerEvent.SIGNAL_EVENT);
         try {
             logger.debug("FIRE Event: " + event);
