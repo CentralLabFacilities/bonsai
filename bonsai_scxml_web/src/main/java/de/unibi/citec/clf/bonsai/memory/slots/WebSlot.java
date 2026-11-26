@@ -17,6 +17,11 @@ public final class WebSlot<T> extends ObjectSlot<T> {
     }
 
     @Override
+    public String toString() {
+        return "WebSlot: [" + this.getDataType() + "] path='" +  this.path + "'";
+    }
+
+    @Override
     public synchronized <S extends T> void memorize(S value) throws CommunicationException {
         System.out.println("WebSlot.memorize: " + path + " = " + value);
         super.memorize(value);

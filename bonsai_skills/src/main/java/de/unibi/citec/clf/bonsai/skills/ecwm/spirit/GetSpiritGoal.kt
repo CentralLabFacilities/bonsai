@@ -122,13 +122,13 @@ class GetSpiritGoal : AbstractSkill() {
     override fun init(): Boolean {
         if (useSpirit) {
             spirit = spiritSlot?.recall<Spirit>() ?: run {
-                logger.error("spirit from slot is null")
+                logger.error("spirit from slot is null: $spiritSlot")
                 return false
             }
         } else {
             if(entity != null) {
                 val e = entity!!.recall<Entity>() ?: run {
-                    logger.error("entity from slot is null")
+                    logger.error("entity from slot is null: $entity")
                     return false
                 }
                 entityname = e.id
@@ -136,7 +136,7 @@ class GetSpiritGoal : AbstractSkill() {
 
             if(storage != null) {
                 storageName = storage!!.recall<String>() ?: run {
-                    logger.error("storage from slot is null")
+                    logger.error("storage from slot is null: $storage")
                     return false
                 }
             }

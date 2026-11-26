@@ -100,6 +100,12 @@ public class ObjectSlot<T extends Object> implements MemorySlot<T> {
     }
 
     @Override
+    public String toString() {
+        return "ObjectSlot: [" + this.getDataType() + "]";
+    }
+
+
+    @Override
     public <S extends T> Class<S> getDataType() {
         return (Class<S>) dataType;
     }
